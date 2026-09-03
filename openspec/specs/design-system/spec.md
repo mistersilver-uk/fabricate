@@ -118,6 +118,38 @@ Such a primitive declares that chrome on its own rule instead.
 - **THEN** the family is re-rooted first, in its own change
 - **AND** the adoption is not landed on top of a family that only paints on one screen
 
+### Requirement: A component's own declaration outranks the module sheet, whatever the specificity
+
+`module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports an unlayered module stylesheet at `layer(modules)`.
+A Svelte component's scoped block is injected as an ordinary UNLAYERED `<style>` at runtime.
+An unlayered declaration beats a layered one whatever the specificity, so for any property a component declares in its own scoped block, no rule in `styles/fabricate.css` can override it — not at (0,4,0) against the component's (0,2,0), and not at any specificity that can be written.
+
+The failure is SILENT and no gate reports it.
+The selector is emitted, it matches the element, and the declaration is simply never used; Stylelint does not read `.svelte`, Svelte's unused-selector analysis never sees the other file, and a browser measurement that loads both sheets flat reports the global rule winning because in that page it does.
+So a change verified only in a harness can pass and do nothing in the product.
+
+The consequence for the primitive set is a rule about WHERE, not about specificity.
+A property a shared primitive declares for itself is overridden by EXTENDING that primitive — a prop with a default that preserves the shipped rendering, so its existing callers are byte-identical — and never by a route-scoped or app-scoped rule in the module sheet.
+That is the same `reuse, then extend, then add` order this capability already states, reached from the cascade instead of from the vocabulary.
+A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
+Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
+
+Two corollaries a reader will otherwise get wrong.
+Svelte emits some scope hashes as `:where(.svelte-<hash>)`, which contributes ZERO specificity, so a compound that looks like it gained a class may not have; and changing whether a selector's compounds sit inside `:global()` changes which form Svelte emits, which moves specificity silently while looking like a repair.
+Neither is answerable by reading the source, so the method that settles both is to compile the component with `css: 'external'` and read the emitted selector.
+
+#### Scenario: A screen wants one property of a shared primitive to differ
+
+- **WHEN** a surface needs a primitive to drop a border, a margin or a glyph the primitive declares for itself
+- **THEN** the primitive takes a prop whose default is the shipped rendering
+- **AND** no rule targeting that primitive's own classes is added to `styles/fabricate.css`
+
+#### Scenario: A cascade question is settled
+
+- **WHEN** two rules for one property are believed to be in a specificity relationship
+- **THEN** the component is compiled with `css: 'external'` and the emitted selector is read
+- **AND** the layer each rule sits in is established before its specificity is compared
+
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
 Every colour, spacing value and shadow MUST come from a `--fab-*` token.
@@ -215,6 +247,17 @@ A spinner alone is insufficient because Foundry's bundled Font Awesome disables 
 
 Motion is limited to a 140ms ease on a control state change, and nothing else animates.
 Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
+
+A SELECTED face is a FILL and an EDGE.
+A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
+So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
+Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
+
+#### Scenario: A multi-select list marks the rows a GM has chosen
+
+- **WHEN** a list lets more than one row be selected at once
+- **THEN** each selected row takes a tinted fill and an accent border
+- **AND** it draws no leading inset bar, whatever a single-select list beside it draws
 
 #### Scenario: A control enters a pending state
 
@@ -317,6 +360,7 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
+An empty state INSIDE AN OVERLAY the product has already drawn a boundary around — a picker popover, a suggestion list — is a note rather than a panel: one quiet line at that overlay's own scale, with no border, no fill and no icon tile, because a second bordered box inside a bordered panel reads as a card the GM could act on.
 
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
@@ -755,7 +799,9 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
-The selection bar replaces the filter bar in place when anything is selected.
+The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a set of controls mixed into it.
+The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
+Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
 A browse surface MAY suppress the bar entirely while the whole filtered list fits ONE page, and MUST restore it the moment a second page exists; suppression is per surface and opt-in, so a surface that says nothing keeps the bar.
 The permission is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.

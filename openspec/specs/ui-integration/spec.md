@@ -318,7 +318,10 @@ A surface that paints its permanent hint in `warning` alongside a conditional `w
 Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
 A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
 A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
-Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
+Its test and screenshot hook names, its host row class, its labels and its standing hint are parameters of that primitive, not a reason to fork it.
+Where a surface gates that toolbar on an active selection, the toolbar carries the WHOLE register — the tri-state control included — so no part of it is left standing in the filter row it was lifted out of.
+The hint is the sentence that keeps the band and the bulk edit panel from competing: the band states the count and names where the bulk actions are, and the panel holds them.
+A surface whose bulk body does not render in an inspector states nothing there rather than pointing at a rail it has not got.
 
 #### Bulk edit panels
 
@@ -1361,29 +1364,69 @@ There is no Tool Kind field, filter, selector, pill, icon taxonomy, or persisted
 
 The library uses the Manager three-column shell at `210px | 1fr | 340px`.
 It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
-The center library accepts an Item drop to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
+The center library accepts no Item drop.
+Creating a Tool from an Item is a WORLD-scope act and its drop zone lives on the World Tools Catalogue, because a Tool's identity is one world record that every crafting system adopts rather than a per-system copy.
+That zone rejects non-Items and snapshots the source Item's name, image and description.
+A drop whose source Item is already named by a world Tool - through any of that record's source references - resolves to that record and opens it rather than creating a second one, and states which record it landed on and whether that record is disabled at world scope.
+A drop no world Tool names creates one with a durable id of its own that references the source Item by uuid, so one game-world Item is one world record.
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
 The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
+The Tool editor's own rail states five regions in a fixed order: how the Tool behaves, its effective rules, how players see one copy of it, a per-actor preview, and what requires it in this system.
+The player region shows the Tool's art, its remaining-uses pill and a preview-only `Show as broken` switch whose sentence states what the authored on-break action does to a character's copy; nothing about that switch is stored.
+The per-actor preview evaluates the Tool's selected character prerequisites against a chosen actor's prepared roll data through the same AND-semantics helper the crafting engine gates on, and states the gate mode's consequence — unusable, or usable with the check bonus withheld.
+The required-for region lists this system's recipes and gathering tasks that reference the Tool, each with its kind, and states its empty case rather than rendering an empty region.
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
-When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
-The result list scrolls independently above a persistent, full-width pagination footer that remains outside the scrolling region for both one-page and multi-page result sets.
+When Tools exist and the current selection is absent or stale, the library selects the first MEMBER row of the rendered page exactly once, reading the membership filter, search term, sort key, sort direction and page slice the GM is actually looking at rather than the unsorted authored array.
+It skips unadopted world rows, so a deliberate selection of one is never snapped away from the `Add {tool} to {system}` action that is its only purpose.
+A valid current selection is preserved and an empty library emits no selection.
+The result list scrolls independently above a full-width pagination footer that remains outside the scrolling region, and that footer's bar renders only for a multi-page result set, so a single page draws no pagination band.
+
+**The membership segment selects the list's COHORT, and the zero state is a fact about that cohort rather than about the system's own Tool array.**
+`In this system` lists the Tools this crafting system has adopted.
+`All world tools` widens the same list with every world Tool this system holds no rules record for, each drawn as a non-member row whose only action is `Add to system`.
+`Overriding` narrows it to the members whose world join reports an overridden section.
+The `No Tools yet` panel and its two routes render only when the SELECTED cohort is empty, never when the system's own array is.
+A system that has adopted nothing while the world holds Tools is exactly the state that panel's own primary route — `Show the {count} world Tools you can add` — exists to leave, so gating the panel on the system's array makes both that button and the segment beside it change a filter whose result the panel then hides.
+That widened cohort is the only route on this screen to a Tool the GM has not adopted, and therefore the only thing the inspector's `Add {tool} to {system}` action can act on: with it unreachable, a GM cannot adopt a world Tool into a system from this screen at all.
+A cohort that is non-empty before the search term and empty after it is the FILTERED state, not the zero state.
+The foot pager's presence follows the selected cohort, on the same cohort the list draws.
 
 Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
 Selection, Edit, and enabled toggle are distinct localized named hit targets.
 Activating Edit or the toggle does not select or open through the row handler.
 The enabled toggle persists live through the same immediate path as Recipe enabling, updating both the focused draft and its baseline without marking an otherwise-clean editor dirty; a newly-created, not-yet-persisted Tool cannot be enabled through this path.
 
-The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, Breakage, Requirements, and Validation.
-The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
-The body includes a live behavior preview, while the inspector summarizes identity, linkage, usage, and validation context.
+The editor uses `210px | 1fr | 320px` and exposes exactly three tabs: Breakage, Requirements, and Validation.
+It authors a crafting system's RULES for a Tool and never that Tool's identity, so it has no Overview tab: the linked Item, the shared display name, the art and the description are the world Tool's, and its header states that in one sentence — `Rules in {system} · identity comes from the world Tool`.
+The header owns Back to Tool Rules, a World Tool route to the world record, Save rules, and the dirty-state affordance; there is no footer save bar and no bare `Delete`.
+Both navigations render as the same secondary treatment, because they are the same kind of verb — leaving this screen for another — and `Save rules` is the only primary in the cluster.
+The World Tool route renders only when the world catalogue actually holds a record for the Tool, because a pre-migration in-system Tool has no world half to open.
+The body includes a live behavior preview, while the inspector summarizes identity, effective rules, the player-facing copy, a per-actor preview, and what requires the Tool in this system.
 
-Overview uses the Recipe Studio tab, field, and enabled-card primitives.
-Source name and description are read-only snapshots, while the display label alone is editable.
-A linked source exposes Copy source UUID immediately before Unlink, never renders the raw UUID or a replacement picker, and accepts replacement only through a persistent drag-only drop-zone card with visible instructions and no button role, tabindex, or keyboard-operability claim.
-The persistent behavior inspector explains source Items, recipe requirements, salvage use, character prerequisites, check bonuses, and breakage on every editor tab, followed by a localized link to the published Tools documentation.
+Breakage opens with the two per-system facts that are not rules — `Enabled in {system}` and the per-system display-label OVERRIDE — and closes with `Stop using this Tool here`.
+The label field states that it overrides the world Tool name in this crafting system only and that blank falls back to it.
+The removal callout names the consequence in full — the rules in this system go, the world Tool and every other system are untouched — and its control is the shared armed destructive button rather than a second confirmation dialog.
+Removal is TWO writes and both are required: the in-system record is deleted, because while `## CraftingSystem` requirement 36 holds it is the row the read union answers with, and the world membership record and its overrides go with it.
+
+**The editor DISPLAYS from the read union and SAVES only the sections the membership record marks OVERRIDING.**
+Its draft is seeded from `## Scoped Entity Definitions` requirement 15's read union rather than from the raw in-system array, so every card and every effective-rules row states the value a craft will actually take.
+Reading the raw array gave this one screen a second answer to a question the union already answers: `breakage` only appeared to inherit because adoption copied the world value onto the record, and `prerequisites` and `bonus` — which have no such copy — stated the in-system empty over an authored world value, so the rail read `No check bonus` while every craft added the world bonus.
+The save is therefore SECTION-AWARE: a section the membership record marks INHERITING is restored from the live in-system record and never persisted from the draft, and every other key — identity, the display-label override, `enabled`, `checkBreakable`, `requirement`, `repairRequirements` — is written from the draft unchanged.
+Persisting the draft whole would write the world's answer for an inheriting section onto the in-system record, silently converting that section into an override that stops tracking its world default; the pill, the record's validity and every automated check would all still read correct, so this rule is a correctness rule rather than a presentational one.
+
+Each of the four world-default sections — `breakage`, `onBreak`, `prerequisites` and `bonus` — is drawn as a bordered card whose head states the section, whether this system INHERITS the world Tool's answer or OVERRIDES it, what the world's answer is, and the shared scoped inherit switch that moves between the two.
+While a section inherits, the card renders the resolved world value read-only rather than disabled controls, and the switch writes NOTHING to the in-system record in that direction: the union already answers an inheriting section from the world default, so the pill is true without a second write, and making one would mint an override-shaped value under a switch that says there is none.
+Flipping a section to OVERRIDING seeds the in-system record from the value that was on screen — the resolved one — so the GM's first keystroke edits the inherited value rather than an older local one the record happened to retain.
+A section whose resolved value is absent seeds nothing.
+That head's pill states `Inheriting` in the informational colour family and `Overridden` in the warning family, and the Tool Rules list inspector states the same two words the same way, so one model is not read through two vocabularies one click apart.
+A Tool the world catalogue has no record of renders no switch, no pill and no removal callout: there is no parent to inherit from and no membership to remove, and its save writes every section from the draft.
 Disabled preview rules are titled `No prerequisites to use` and `No check bonus`.
 Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
+The tool-specific mode set the editor PRESENTS is four choices, not three: `Unlimited uses` leads them as a first-class option rather than as an unset state.
+`limitedUses` with a null `maxUses` IS the unlimited answer — the rail, the player preview and the library row all already print `Unlimited uses` for it — so a set that omitted it left the state authorable only by absence, and a stepper that defaulted the null to `1` silently converted it.
+Picking `Limited uses` therefore seeds `maxUses` at 1 rather than at null, or the choice would return the GM to the option they just left; picking `Unlimited uses` writes the null back; and the stepper renders the stored value with no fallback, because the only case a fallback could fire for is the one the fourth choice now owns.
+Each of the four retains its own configuration while another is selected, and `Unlimited uses` configures nothing, so the editor draws neither a configuration block nor the rule that would separate one.
 Percentage authoring uses the shared synchronized number-and-range slider primitive also used by Gathering drop chances; Tool breakage supplies its own accessible labels and continuously interpolates across a green, yellow, amber, then red risk scale as the chance increases.
 Changing authority or check-driven immunity does not clear the inactive tool-specific configuration or on-break values.
 When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.
@@ -1391,10 +1434,18 @@ When `checkBreakable` is false under check-driven authority, on-break controls a
 `flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
 `replaceWith` authors exactly one managed Component target through a full-width shared searchable popover card.
 The Tool Studio does not create or edit direct Item targets; legacy direct Item discriminators remain readable and executable at runtime until the GM deliberately replaces them with a managed Component target.
-Requirements selects ids from the WORLD character-prerequisite library (issue 1308), the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Requirements selects ids from the WORLD character-prerequisite library (issue 1308), the `bonus | usability` gate mode, and the enabled check bonus without embedding prerequisite definitions in the Tool.
 Its empty state SHALL say the library is empty for the WORLD rather than for this system, and a Tool save SHALL preserve the selected ids: `upsertTool` derives the same Valid Id Basis `_normalizeSystem` does, so a save on a world whose library cannot be vouched for prunes nothing rather than silently clearing the gate.
-The bonus expression input visually supplies a leading `@` for roll-data paths, stores that sigil exactly once, provides explanatory hint text, and does not offer game-system-specific preset values.
-Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+The check bonus is PICKED from the world modifier library and never typed: the section offers a single-select list of `characterLibraries.modifiers[]` and writes the chosen entry's expression to `bonus.expression`, which stays a string.
+Selection is resolved BY EXPRESSION rather than by entry id, because a stored expression does not record which entry produced it, so where two entries carry the same expression the first is the selected one.
+An expression the library does not contain keeps its own row at the head of the list, selected and labelled as set by hand, so a value authored under the retired free-text field is neither highlighted as nothing nor dropped on the next save.
+An empty library states the same absence sentence the prerequisite list states, naming where modifiers are authored, and renders no list frame around nothing.
+Both scopes — the world Tool entry and the system Tool rules editor — render that one section from one component.
+At SYSTEM scope the Requirements card opens with an informational strip naming the crafting system whose rules these are and saying that each section follows the world Tool until this screen overrides it, which is the one element distinguishing the two scopes' otherwise identical card.
+The world Tool entry has no such scope to name and draws no strip; the sentence is resolved by the caller rather than composed inside the shared section.
+Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Breakage and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+It carries NO identity check: a missing game-world Item is the world Tool's defect and no control on this screen can clear it, so it is stated as a routed notice naming the world Tool and it never counts toward the blocking total or the tab badge.
+The domain still refuses the save, and the notice says so rather than implying the record can be saved as it stands.
 
 Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
 Save proceeds only after successful validation and persistence.
@@ -1403,7 +1454,13 @@ The Validation tab projects domain failures onto stable localized categories and
 Save, delete, and enabled-toggle failures likewise emit only their localized operation-specific message; raw caught errors may remain internal state for control flow but never become notification copy.
 Discard restores the baseline before navigation, while Keep editing preserves the draft and focus.
 Re-entering the same Tool does not prompt.
-Delete uses a separate destructive DialogV2 confirmation; cancellation preserves the draft, and successful deletion returns to the library without a second dirty prompt.
+Stopping use of the Tool in this system is armed at its own control rather than confirmed by a separate DialogV2; successful removal returns to the library without a second dirty prompt.
+`Delete`, which destroys the Tool itself, belongs to the world Tool entry.
+
+Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, and no component on them restates that type in its own scoped block.
+The same holds for a card's surface fill, which comes from the route's surface ladder in the global sheet.
+Both are correctness rules rather than tidiness: the global sheet is imported at `layer(modules)` while a component's scoped block is injected unlayered, so a local declaration silently discards the shared rule for that property at any specificity, and the shared value can then be corrected without the screen moving.
+The two breakage configuration labels — `Uses per copy` and `Break chance per use` — are NOT eyebrows and carry no kicker: each names the control on its own row and is drawn as a sentence-case title in the body ink.
 
 Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
 Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.
@@ -1411,7 +1468,7 @@ The Tool editor's sole identity/action header spans the complete Tool shell abov
 Tool routes suppress the generic system status ribbon, generic edit heading, rail scope card, and rail-collapse control so they do not precede the Tool content.
 At product-root widths of `832px` and wider, the library preserves `210px | minmax(0, 1fr) | 340px` and the editor preserves `210px | minmax(0, 1fr) | 320px`; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
 Only below `832px` do rail, main, and inspector stack in reading order with max-content rows, the body becoming the single vertical scroller while the bounded rail remains independently scrollable and main/inspector overflow becomes visible.
-At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, Delete, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
+At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, World Tool, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
 
 ### Recipes Tab
 
@@ -2053,6 +2110,12 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    A control that offers "inherit" beside the concrete choices needs to know which of them is current, and a resolved token cannot answer that.
    So the projection that publishes the resolved authority ALSO publishes which scope authored it, one value per branch of the resolver, and the shell carries that value to the control on its own prop.
    Both halves are the gateway's, and neither is deferrable to the change that draws the control: the producer is open to that change, but the carrier line is inside a closed file, so publishing the value without carrying it would leave it unreachable.
+   **THREE VALUES, NOT TWO, AND THE THIRD ARRIVES ON THE BUNDLE RATHER THAN ON A PROP OF ITS OWN.**
+   A control offering "inherit" needs the RESOLVED token, the SCOPE that authored it, and the value it would fall back to — and the third is the WORLD's own token, which no resolved value can recover: `checkDriven` looks identical whether this system authored it or inherited it.
+   It reaches a system-scope authoring surface through the `scope` leg of that type's per-entity bundle, which is the published world corpus and already carries it, rather than through a fourth static attribute the closed shell would have to add.
+   That is what keeps such a control buildable without reopening a gateway file, and it holds only because the shell spreads the bundle BEFORE it restates the static attributes, so a screen that DECLARES exactly what its call site passes never falls through to the bundle for a name the site restates.
+   The rule the shell states is the binding one: a screen declares what its call site passes, or the site passes what the screen declares.
+   A screen reading the bundle-supplied leg in a reactive scope projects it to a scalar immediately, because the corpus is a new object on every world-scope publish.
    **The CAPTURE REGISTRY is NOT one of the closed files, and the reason is structural rather than a concession.**
    A capture case asserts that a route is REACHABLE and drives it by clicking a rendered control, so a route whose only entrance is a screen that has not shipped cannot be reached: the capture driver throws by name on a selector that matches nothing, and — because capture coverage is keyed on the route a case asserts — an unreachable case becomes its own surface and is selected by every later change to a capture input.
    A case registered ahead of its screen therefore fails the capture run whole, thereafter, for every change that touches a capture input.
@@ -2163,6 +2226,74 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     Toolbar row one already matches the reference, so the deviation is confined to the presentation control at its end — which `### Essences Tab` already exempts from the filter-clearing rule for the same reason: it is not a filter, and it is the only route to the grid.
     What is NOT licensed by this ruling is a grid that says less than the list: `### Essences Tab` binds the two presentations to one state vocabulary, and a divergence there is a defect however this deviation is ruled.
 
+### GM World Tool Screens
+
+The two world tool screens and the system-scope Tool Rules list share one break-mode contract, and it is stated here rather than per screen because the three surfaces disagree about the same value only if it is.
+
+1. **The world Tools Catalogue carries the World breakage default control, and it is the ONLY surface at world scope that authors it.**
+   Its two options are `toolSpecific` and `checkDriven`; there is no third, because the world is where this value is authored and there is nothing above it to inherit from.
+   It states how many crafting systems override it before an edit lands, on the same rule every world-default editor states its inherit count — counting only systems whose OWN authored token DIFFERS from the world's, since a system that agrees is unaffected by a world change either way.
+   **A count it cannot answer is WITHHELD rather than answered `0`.**
+   The crafting-system roster a world screen receives is a projected allowlist, so a roster that does not carry each system's own `toolBreakage` block cannot answer the question at all; reading an absent field would report "nothing overrides it", which is a wrong number rather than a missing one.
+2. **The world Tool entry displays the world break mode READ-ONLY.**
+   Authoring it from two world screens would be one field authored at two places, which `## Scoped Entity Definitions` prohibits, and the failure is concrete: two controls over one setting disagree the moment either is edited with the other on screen.
+   The entry states it because a GM authoring a tool's breakage section has to know which authority decides whether that section is read at all.
+3. **The system Tool Rules list's break-mode control is a TRI-STATE whose selection is the AUTHORED layer, never the resolved token.**
+   Its third option CLEARS the per-system override rather than writing one of the two tokens.
+   A control selected on the resolved token is indistinguishable between "this system chose it" and "this system inherited it", and re-selecting the segment it already draws as current MINTS an override — which is the defect this requirement removes.
+   Selection is read from the published authoring scope, one value per branch of the resolver, and never from a comparison of the resolved token against the world's: that comparison is wrong for a REDUNDANT override, which is exactly the state the two-state control produced.
+   The inherit option is LABELLED with the world's own token, and where the world authored nothing the label says so rather than crediting the world with the shipped fallback.
+   The pill beside it names the layer the current answer came from, and it has THREE states for the resolver's three branches rather than the prototype's two.
+4. **The world Tool ENTRY authors `repairRequirements` by SHOWING it; the world Tool CATALOGUE still states nothing about it.**
+   The entry's Breakage tab renders the repair editor — the SAME component the system Tool Rules editor mounts — in the `flagBroken` on-break mode and in no other, over the WORLD component, essence and tag rosters, and routes its change to the tool-family seed action rather than to the section writer, which would refuse the name.
+   Currency IS offered there, over the WORLD ladder.
+   The ladder is world scope (`### World Currency`): one configuration for the whole world, because a world runs exactly one ruleset and so has exactly one way actors store coins.
+   The per-system `requirements.currency.enabled` flag exists so the RECIPE editor can gate a cost on the system it is authoring for; at world scope there is no system to gate on, so the flag has no referent and reading `false` for "no referent" refused a write over units the screen can address perfectly well.
+   That is the same mistake the component and essence rosters above were corrected for.
+   The tab states the seed's reach beside it: an edit reaches the next system to ADOPT the Tool and none that already has it.
+
+   **AND IT STATES WHAT MENDING COSTS, in one plain-language sentence** beneath the editor, at both scopes.
+   Alternatives within a requirement join with ` or `, requirements join with ` + `, and an empty set says a broken copy cannot be mended.
+   It is the only place the whole set is stated as a COST rather than drawn as an editor, which is what a GM checking their own work reads.
+   **A reference the roster cannot resolve is NAMED, never printed**: `unset component`, `unset essence`, `unset currency`, or `unset tag`, each a localized string rather than the stored id.
+   This covers both misses — a reference that was never set and one whose catalogue entry has gone — because the two are indistinguishable to the reader of a sentence and the design collapses them the same way.
+   A currency unit is resolved against the LADDER before it is printed rather than merely tested for presence, since a unit id is as opaque to a GM as a component id is.
+   An unresolved reference carries neither the multiplier nor the kind suffix a resolved one gets, because a count of a thing that cannot be named states nothing.
+   **This REPLACES an earlier reading of this requirement** (issue 1373, maintainer round 6), which said an unresolvable id is named by that id so a GM can tell "never named" from "gone".
+   The design draws no such distinction, and the state the rule was written to serve is the one every world starts in — a world whose components have not been lifted yet, where every row prints an id and the sentence reads as a database dump.
+
+   **THIS IS A CORRECTION OF AN EARLIER READING OF THIS REQUIREMENT, NOT A REVERSAL OF ITS RULE** (issue 1373, maintainer round 2).
+   The earlier text said neither world Tool screen CAN state anything about the seed, because a repair group names quantities over the owning system's components "which world scope cannot address".
+   That premise was retired by `## Scoped Entity Definitions` itself: components are a WORLD entity, a world component id is the id a membership record carries, and `### Tool scope` requirement 2 now records the same correction.
+   What world scope genuinely cannot promise is MEMBERSHIP — that every system inheriting the Tool has adopted each named Component — which is a reason the seed is copied on adoption rather than resolved live, not a reason it cannot be authored.
+
+   **A SCREEN MAY NOT OFFER A WRITE OVER DATA IT HAS DECLARED ITSELF UNABLE TO SHOW.** That general rule STANDS and is what the removed card broke: it stated a bare group COUNT — a number a GM has nothing to check against — and offered `Clear the seed` beside it, so a destructive control sat over an unreadable list, where refusing it costs a GM one navigation and taking it costs them a repair recipe they never saw.
+   The requirement is satisfied by SHOWING the groups, never by restoring the count.
+   The catalogue inspector's fifth world-default card stays removed for the same reason it was removed: an inspector states facts about a selected record and has no room for an ingredient editor, so a count is all it could offer.
+5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 14 and through that requirement's shared module and shared action pair rather than a second implementation of either.
+   What it buffers is the display label and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all, and the DESCRIPTION is not among them because the screen no longer authors that either — the description a Tool has is the linked game-world Item's, which the Overview tab states read-only on the card that names the Item, and a second editable copy of it was the same paragraph rendered twice on one tab.
+
+   **THE DISPLAY LABEL IS OPTIONAL, AND THE FIELD SAYS SO.** It is drawn empty with the linked Item's name as its placeholder, under a helper naming that fallback, and a blank resolves to the linked Item's name everywhere this record is displayed — the header band, the breadcrumb, the entry's own rail and the catalogue row, which reads the same fallback through the list frame's own per-lane name rung.
+   Where no Item is linked there is nothing to fall back to, and the helper says that instead of promising a resolution the record cannot make.
+   This is a different field from the per-system `label` override, which stays on the system Tool rules editor and names itself as an override of this value.
+
+   **Its `Delete` is in the header band, between Back and Save**, which is where the design draws it and which is the placement the SYSTEM Tool rules editor's danger CARD (`Stop using this Tool here`) is deliberately not: the two scopes had one destructive treatment each and had swapped them, so a GM met the same verb in two different places one route apart.
+   The reach a GM cannot recover afterwards — the world record, its world defaults and every membership record naming it, in every system — is the armed control's accessible name and hover title rather than a body sentence, which is where a consequence belongs on a control that has one.
+   `.manager-header` is a sibling of `.manager-main`, so the page cannot render into that band: it reports an ACTION DESCRIPTOR — the token, the two labels, the two consequence strings and the write — and the shell draws the shipped two-step control from it.
+   The verb, the copy and the ordering the write needs stay with the page that owns the record.
+   The two facts the header band states about the record, its NAME and whether it names a game-world Item, are reported UP by the page: the page already resolves both, and deriving them again in the shell would let the band and the page disagree about one record.
+6. **The world Tool entry offers FOUR breakage choices, because `limitedUses` carries two answers.**
+   `breakage.mode: 'limitedUses'` with `maxUses: null` IS the unlimited state — `## Tool Definition Model` defines the null that way, `Tool#evaluateBreakage` short-circuits on it, and the retired `mode: 'immune'` reads forward onto it — so a control offering the three MODES cannot express one of the four answers a GM authors.
+   The choices are `unlimited`, `limitedUses`, `breakageChance` and `diceExpression`, resolved by the one shared helper both scopes read rather than by either screen keying off `breakage.mode`, and `unlimited` leads them because it is the model's default and the state a Tool made by dropping an Item opens in.
+   **Selecting `Limited uses` SEEDS `maxUses` at 1 and selecting `Unlimited uses` writes the null explicitly**, so the choice a GM makes is the one that persists rather than a merge onto the value they just left.
+   The uses stepper renders under `limitedUses` alone and takes NO fallback: gated on the choice, it is only ever handed a non-null value, and the fallback it used to carry could fire only for the unlimited state — which it drew as `1` against a `min` of 1, so the screen stated `Limited uses`, `1`, `Unlimited uses` and a validation warning about one field at once, and no reachable stepper value put the null back.
+   That made a stepper nudge convert an unlimited world default into a one-use one for every system inheriting it.
+   **An authored `Unlimited uses` is a COMPLETE answer to the breakage-value check**, never a warning: the check reports a mode with nothing behind it, and this mode's answer is the absence of a mechanic.
+   The value editor is ABSENT rather than empty for it, since it configures nothing.
+7. **The world Tool entry's Validation tab draws no heading and no intro.**
+   The design opens that tab on its summary head and counts; a title above it restates the tab label a GM has just clicked, one line under it.
+   The system Tool Rules editor's Validation tab already takes that opt-out, and a shared surface whose title default is `Validation` is opted out of by omitting the prop, not by passing it empty.
+
 ### Scoped entity editor patterns
 
 The six scoped-entity editors — a catalogue and an entry editor for each of components, essences and tools — share one set of patterns, built once.
@@ -2183,10 +2314,16 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 7. **A WORLD-DEFAULTS EDITOR MAY OFFER ONLY WORLD-ADDRESSABLE REFERENTS.**
    `data-models/spec.md` `### Essence scope` requirement 5 binds a world essence default's `effectSource` to a world-addressable referent and never a system-local component id.
    The store writes section values OPAQUELY and the normalizer coerces shape rather than addressability, so neither can enforce it: the PICKER is the enforcement point.
+   The world Tool entry's two on-break arguments are bound the same way: the REPLACEMENT COMPONENT names a world component, and a repair group names world components, world essences and world tags.
+   Each is offered from the corresponding WORLD corpus and from no system's roster, which is what makes a world default that a second system inherits resolve to the same referent it resolved to in the first.
+   A drop onto the replacement zone is resolved against that same offered set — a dragged document matched on the world record's own source-link uuids — so an Item this scope does not manage names nothing and writes nothing, rather than storing an id no reader resolves.
 8. **The validation tab and the player preview are shared shells**, and the six editors are callers rather than authors of them.
    The validation shell renders the shipped editor-validation surface and owns the count and pass/warn status labels both existing sites already agreed on; only the BLOCK label differs, because an essence always saves while a Tool refuses to.
 9. **Requirement rows introduce NO new component:** the shipped tool repair-requirement editor is the recipe-free ingredient editor, already rendered chromeless.
-10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
+10. **The check bonus picks from the world modifier library and never a free-text expression**, and it is drawn as ROWS through the shared modifier-library row, not as a stack of option cards.
+    The row is the one the Checks Studio's modifier catalogue draws — glyph tile, name, expression in mono, and the caller's own control at the trailing edge — with a single-select radio where that screen puts its eligibility toggle, so the two screens that present this library present it identically.
+    A library entry gets a ROW and a closed set of modes gets option cards; the bonus is library entries, and the `bonus | usability` gate mode one section above is a closed mode set, so the two sit on one screen in the two treatments.
+    It is NOT the shared SUBJECT modifier picker, and that is a contract mismatch rather than a preference: that picker authors a MULTI pick of entry ids with a tri-state inheritance and an activity cap, while the Tool bonus writes ONE entry's expression to a string field with no inheritance of picks and no cap.
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
     A site whose button stem and panel stem differ — `checks-section-<id>` beside `checks-panel-<id>` — overrides either half rather than being kept out of the primitive.
@@ -2205,6 +2342,11 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     **MEMBERSHIP AND DELETE ARE NOT BUFFERED.**
     Adding an entity to a crafting system, removing it, switching it on or off, and deleting the world record are actions on records this draft does not describe, each with its own armed confirmation; an armed `Remove` that removed nothing until a later button states the opposite of what arming an action says.
     A delete drops the draft before it navigates, because the record the draft is an edit of no longer exists and the exit guard would otherwise offer to save into it.
+    **THE BUFFERED FIELD SET IS PER SCREEN, and it is exactly what that editor AUTHORS.**
+    It is the shared module's one per-screen argument, so an editor states its own list rather than taking the entity type's lifted identity wholesale: the world tool entry authors a display label and a description, and buffering the item art and the three source-link uuids beside them would put fields in a draft that no control on the screen can move and send them back unchanged on every Save.
+    A world-scope value the screen authors OUTSIDE the draft is immediate on the same rule membership is — the tool entry's world master switch reaches every crafting system at once and states that reach beside itself, and the repair seed is cleared by its own control — because staging either behind Save would show a GM a consequence that had not happened.
+    **THE PAGE HEADING FOLLOWS THE BUFFERED NAME**, not the persisted one, because a heading names the thing being edited and the enabled `Save` beside it is what says the edit is unsaved.
+    The name is REPORTED by the page from an effect rather than read off the draft handle, which is deliberately a live accessor that never re-renders; the same wire carries whatever else the band states about the record that the page already renders elsewhere, so one sentence is resolved once.
 15. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
@@ -2267,9 +2409,26 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
 20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
     These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
-    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a single page of eleven rows.
+    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a fifteen-row list a GM has put on a twenty-five-row page.
     Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, per-page selector offered.
     The ROWS REGION takes the column's slack whether or not a pager is under it, and the pager never does — the two are separate declarations and a gate that measured only "the pager ends at the foot of the column" is satisfied by a pager that fills it.
+    **THE DEFAULT PAGE WINDOW MUST BE NARROW ENOUGH THAT THE SUPPRESSION STAYS AN EXCEPTION**, and it is TEN rows: the smallest size the pager itself offers, and about what the column holds at the window sizes these screens are used at.
+    A suppression rule and a wide window compose into a screen with no page control at all — at twenty-five an eleven-record catalogue was one unbounded scroll — so the two are one decision and the ruling is stated as a pair: eleven rows MUST draw a bar and three MUST NOT.
+    The window is declared in the frame and RESTATED on the lifted browse view-state, because the frame's own constant is reached only when nothing binds one; a stale restatement pins the old window on every surface that does bind one, while the frame's default looks as though it simply had not worked.
+
+21. **A SCOPE-WIDE CONTROL SITS INSIDE THE LIST COLUMN, ABOVE THE FILTER BAR — never across the route.**
+    A value that governs every record in the corpus is neither a row nor an entity, so it has nowhere to live in the list; drawn as a sibling of the list frame it spans the CONTENT AREA, which is the list column plus the inspector's track, and the inspector then starts a card's height below the app header bar instead of running the whole route.
+    The inspector rail runs the FULL HEIGHT of the content area on every scoped list, which is the property the shared aside has by construction and the one a self-drawn column has to be given.
+    The control renders on the unavailable branch too, because it was chrome for the route before it was part of the list and a corpus that failed to read must not take a scope-level control off screen.
+
+22. **THE RESTING INSPECTOR STATES ITS OWN SURFACE'S VERB, not the page subtitle a second time.**
+    A generic "nothing selected" over the screen's own lede repeats the sentence the header prints a few pixels above it, and on an EMPTY corpus that panel is the whole of the right-hand track — the one place that could have said what the column is for.
+    The copy is the lane's, defaulting to the generic pair, and the panel fills its column rather than floating as a short card in a tall empty one.
+
+23. **A LIST THAT OFFERS SELECTION MUST OFFER SOMETHING TO DO WITH IT.**
+    These shells render a per-row selection box and a counting selection register unconditionally, and the inspector's bulk face is a LANE snippet — so a lane that supplies none ships a screen that counts ticks and then says "nothing selected" beside them, with nothing failing anywhere, because a conditional on an absent snippet is silent.
+    The bulk face replaces the identity panel from the first ticked row, states the same count the register does, and reaches the selection's owner: the ticked ids arrive as an array, so clearing the set is a capability the shells must pass down rather than something a lane can do for itself.
+    A bulk axis is offered only where its value is CLOSED and means the same thing for every record in the selection; an axis carrying a per-record value is named as staying per-record rather than left to be inferred from a short panel.
 
 ### GM Travel Route
 
@@ -2659,9 +2818,67 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 ### Ingredients tab
 
-A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per requirement, replacing the loose per-row and footer add-buttons.
-It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Currency, and Essence — each appended to that requirement as a new OR alternative for the row's own picker to fill in.
+#### The requirement row
+
+ONE row shape authors every requirement, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set, and the world Tool entry's copy of that same set.
+Its anatomy is the kind FIRST and the value second:
+
+```text
+[plate] [kind select] [name field] [quantity] [or…] [remove]
+```
+
+- **Each kind carries its own tint, on every glyph the row draws for its subject.**
+The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
+The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
+- **No row carries a `REQUIRED` badge.**
+A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
+- **The kind is a real `<select>`,** carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
+Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
+- **The name field has two faces.**
+Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
+Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+- **A suggestion starts where the query starts.**
+The panel sits directly under the field it completes, so each suggestion's glyph and label are left-aligned against the typed text above them; a suggestion centred in its panel is not continuing what the GM typed.
+This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
+- **Losing focus commits NOTHING; Enter commits.**
+The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
+Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
+- **What Enter commits is the top suggestion, not the typed string.**
+A requirement names a catalogue ENTRY by id rather than carrying a free name, so a query matching nothing commits nothing rather than authoring an unresolvable id.
+- **An empty catalogue DEGRADES the field rather than blocking it.**
+The input still renders and is still typeable, and its own placeholder says there is nothing to name yet.
+A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
+
+A TAG row is one line.
+It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
+There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
+The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
+It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
+An unfilled tag row is therefore level with the component row beside it, and asks for less room than one.
+The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
+What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
+
+#### Adding a requirement, and adding an alternative
+
+Every adder creates a row carrying its KIND and no value; the row's own field names it.
+No adder chooses a subject, so none can dedupe against a requirement the set already holds — a GM who names one component twice is told so by the Validation tab, which is where a check the adder cannot make belongs.
+
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per bare requirement, replacing the loose per-row and footer add-buttons.
+It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
+A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
+
+The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
+The header is what lets each entry be one word.
+The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
+The width is stated by the caller and not left to the shared picker's own floor, which is sized for lists of world components and actors and is wide enough that the panel overflowed the application window.
+
+Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
+One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
+
+Both of the requirement row's in-row affordances — the `or…` trigger and a tag arm's `+ Tag` — are DASHED OUTLINES with no fill, because each is an affordance for adding standing among controls and chips that are values.
+They are drawn at their own two scales: `or…` is a control among controls, level with the quantity stepper beside it, while `+ Tag` is a chip among chips.
+Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
 Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
@@ -2670,7 +2887,9 @@ Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
 The per-option `tagMatch` (any / all) control is retained on every tag alternative, and renders through the shared segmented-control primitive rather than a hand-rolled toggle-button pair.
-The set-level **"Add essence requirement"** control is retained and now appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
+The set-level **"Add essence"** control is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
+The add-new essence OFFER — withholding a DISABLED essence, while keeping an already-authored one reachable — is applied where an essence is actually CHOSEN, which is the row's own field.
+An adder that names nothing cannot leak a disabled essence, so the adders gate on the system HAVING essences and the field narrows the list.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 

@@ -258,6 +258,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // average this import-free leaf computes, which is also what tells it that a modifier
   // rolls at all.
   'src/utils/rollExpressionAverage.js',
+  'src/utils/rollFormulaRollability.js',
   // Issue 1095 gave it a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair. That module
   // imports only `craftingCheckExpression.js`, already listed, so this entry closes the

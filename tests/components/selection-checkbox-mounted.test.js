@@ -140,7 +140,7 @@ describe('SelectionCheckbox', () => {
   });
 
   it('forwards disabled and the rest spread onto the real control', async () => {
-    // `value` is how `ChecklistCardRow` identifies a prerequisite, and the Tool Studio suite
+    // `value` is how the Tool Studio identifies a prerequisite, and that suite
     // drives the tab through `input[value=…]`; the `data-*` hooks are how the component
     // browser's toolbar controls are reached. Both ride the rest spread onto the INPUT,
     // because the input is what a test clicks and what a form reads.
@@ -175,14 +175,24 @@ describe('SelectionCheckbox — the two invariants a mounted test cannot see', (
       false,
       'an area-agnostic primitive cannot reach an area-scoped manager property'
     );
-    // `--fab-on-accent` differs from `--fab-bg-1` in every theme, so substituting it for
-    // the checked glyph would re-colour the shipped Tool Studio box.
-    assert.equal(
-      /--fab-on-accent/.test(styles),
-      false,
-      'the checked glyph is --fab-bg-1, matching the box this replaced'
+    // ── THE CHECKED INK IS PER SIZE, AND `--fab-on-accent` IS THE SMALL BOX'S ALONE ────────
+    // This used to ban `--fab-on-accent` outright: it differs from `--fab-bg-1` in every theme,
+    // and the extraction's contract (issue 772) was that every size render byte-identically to
+    // the box it replaced. Issue 1373's round 5 gave the SMALL size the reference's own figures
+    // — `proto:4740` states `color: var(--on-accent)` over the accent fill — so an outright ban
+    // is no longer the invariant. The invariant is the SCOPE of that exception, which is what is
+    // asserted instead: the shared state keeps `--fab-bg-1`, so `md` and `lg` are untouched, and
+    // the only rule naming `--fab-on-accent` is the small size's own.
+    assert.match(styles, /\.fab-selection-check\.is-checked \{[^}]*color: var\(--fab-bg-1\);/);
+    const onAccentRules = [...styles.matchAll(/([^\n{}]+)\{[^}]*--fab-on-accent[^}]*\}/g)].map(
+      (match) => match[1].trim()
     );
-    assert.match(styles, /color: var\(--fab-bg-1\);/);
+    assert.deepEqual(
+      onAccentRules,
+      ['.fab-selection-check.is-sm.is-checked'],
+      'only the small size may re-ink its tick; widening it re-colours two screens this ' +
+        'change did not measure'
+    );
   });
 
   it('keeps the Foundry pseudo-element reset with the input it protects', () => {

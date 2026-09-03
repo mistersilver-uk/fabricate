@@ -175,6 +175,74 @@ const RECIPE_BULK_EDIT_MATCHES = [
 ];
 
 /**
+ * The trigger set the ten system Tool Rules LIST frames share (issue 1373).
+ *
+ * It replaces the pair those ten cases each declared —
+ * `^src/ui/svelte/apps/manager/Tool` and `^src/ui/svelte/apps/manager/tools/` — and the
+ * replacement is a NARROWING, which is the whole point. Both of those patterns are directory or
+ * prefix anchors over a directory that holds two different screens: the LIST, which is
+ * `ToolsBrowserView` plus the rail `CraftingSystemManagerRoot` mounts beside it, and the
+ * EDITOR, which is `ToolEditView` and the six tab bodies under `tools/`. Ten list frames
+ * therefore answered for every editor file in the directory, and the failure that produced is
+ * not theoretical: `tools/ToolEditorTabs.svelte` published exactly ten frames and NONE of them
+ * renders it, because all ten are the list.
+ *
+ * The membership is derived from the import graph rather than chosen. `ToolsBrowserView.svelte`
+ * imports exactly one module from `tools/` — `toolStudio.js`, for `projectToolRow` and
+ * `toolSearchText` — and `tools/ToolBrowserInspector.svelte` is the list's right-hand rail,
+ * imported by `CraftingSystemManagerRoot`. Nothing else under `tools/` is reachable from the
+ * list at all; every other file in it is imported only by `ToolEditView` or by
+ * `scoped/WorldToolEntryPage`, and both of those screens have frames of their own that claim
+ * their files by name.
+ *
+ * It sits outside every case region for the same reason `RECIPE_BULK_EDIT_MATCHES` does: a
+ * change here has to widen the capture selection rather than be attributed to whichever case
+ * literal happens to surround it.
+ */
+const TOOL_LIST_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+];
+
+/**
+ * The trigger set every SYSTEM Tool rules EDITOR frame shares (issue 1373).
+ *
+ * The editor's own shell and its tab strip, which is the half of the narrowing above that has to
+ * land somewhere. `ToolEditView.svelte` was already claimed by name on most editor cases;
+ * `tools/ToolEditorTabs.svelte` was claimed by nothing that renders it, so a change to the strip
+ * — its tab list, its two badges, the neutral tick — published ten frames of the list it is not
+ * in. Hoisted rather than repeated so the two files cannot drift apart per case.
+ */
+const TOOL_EDITOR_SHELL_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/ToolEditorTabs\.svelte$/,
+];
+
+/**
+ * The literal typed into the World Tools Catalogue's search field by
+ * `world-tool-catalogue-search`, and the literal typed into it by
+ * `world-tool-catalogue-filtered-empty`.
+ *
+ * EXPORTED for the reason {@link WORLD_PARTIES_SEARCH_TERM} is: which rows survive a term is a
+ * fact about the lab fixture rather than about the case, and an over-match is invisible in a
+ * screenshot — a frame showing four rows where two were meant looks like a frame. The catalogue
+ * searches an entity's name, its description and BOTH of its Item uuids
+ * (`worldToolSearchText`), so a term chosen off the names alone can be answered by a uuid.
+ * `tests/view-lab-cases.test.js` derives the survivors from `labContent.js` and fails by name
+ * when a rename makes either term match a different set.
+ *
+ * `rune` survives on `rw-tool-stylus` and `rw-tool-punch` and nothing else; the miss term
+ * survives on nothing, which is the filtered-empty hero's whole premise.
+ *
+ * @type {string}
+ */
+export const WORLD_TOOL_SEARCH_TERM = 'rune';
+
+/** @type {string} */
+export const WORLD_TOOL_SEARCH_MISS_TERM = 'quenching trough';
+
+/**
  * The literal typed into the World > Parties search field by `manager-world-parties-search-filtered`.
  *
  * EXPORTED, and that is the point. The World > Parties filter matches a party's name, any
@@ -242,6 +310,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
   // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // The manager's ONE selection box, whose `sm` SIZE has exactly one caller and is absent from
+  // both representative frames: `manager-components-normal` and `fabricate-app-shell` draw the
+  // browse row's `lg` box and nothing else. `sm` is the Tool Studio's prerequisite row (issue
+  // 1373, round 5), and until that round's case existed no frame in the registry drew it at all
+  // — which is how it went on inheriting the row's 14px into a 16px box, unphotographed.
+  //
+  // ADDITIVE, not a replacement: `selectRenderFileCases` adds the representative pair for any
+  // broad-signal file as well, so a change to the box still publishes the browse surfaces that
+  // draw the other two sizes.
+  'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
+    'manager-tool-prerequisites-selected-1280x720',
+  ]),
   // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
   // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
   // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a
@@ -460,13 +540,62 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // contain it. `manager-systems-empty` is the frame that does, and it is the frame
   // `docs/help/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
   // reader sees going stale.
-  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze(['manager-systems-empty']),
+  // A SECOND ENTRY as of issue 1373, and it is a second TREATMENT rather than a second
+  // instance. `manager-systems-empty` is the hero panel filling a pane; the `note` variant
+  // released the panel entirely for an empty inside an overlay the product has already drawn a
+  // boundary around, and that treatment appears in no frame that draws a pane.
+  // `world-tool-entry-on-break-repair-tag-picker-empty` is the one frame that draws it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
+    'manager-systems-empty',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
+  ]),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
   // its trigger with the search field and suppresses the in-popover search row; the
   // realm-override picker keeps its value-bearing trigger and renders that row. A change
   // to the search row, the header ordering or the compact field is invisible in the first
   // frame and a change to the inline trigger is invisible in the second.
+  // The drop target (issue 1373). Its representative pair are browse surfaces that render no drop
+  // zone at all, so every PR that restyled it published two frames in which the changed control is
+  // absent. `world-tool-catalogue-list-head` exists precisely because the resting catalogue case
+  // auto-scrolls to a selected row and carries the list head off the top: this is the one frame
+  // that photographs the zone as the list's FIRST element, which is where the design puts it.
+  //
+  // THREE MORE, AND THEY ARE THREE FACES RATHER THAN THREE INSTANCES (issue 1373). The entry
+  // above names the CREATE zone only — `kind="tool-create"`, which is a full-width dashed
+  // panel — so the world Tool entry's `tool-source` tile published nothing at all, and the
+  // round-2 repair that gave its LINKED face a solid fill and handed the dashed edge back to
+  // the unlinked prompt was evidenced by no frame in the corpus. The component's `state` prop
+  // is a closed set of three and each is painted differently:
+  //
+  //   - `world-tool-entry-overview` is the LINKED face: a solid, filled tile with the Item's
+  //     art, its name and the Unlink control, which is what the repair actually moved;
+  //   - `world-tool-entry-unlinked` is the UNLINKED face: the dashed prompt in the danger ink,
+  //     which is the face the linked one was wrongly wearing;
+  //   - `world-tool-entry-source-missing` is the MISSING face, the one a GM meets when the
+  //     linked Item has been deleted out from under the record. It is reachable only from a
+  //     world entity whose `registeredItemUuid` resolves to nothing, which the lab corpus had
+  //     none of until `lab-tool-warped-crucible` — see `labContent.js`.
+  'src/ui/svelte/apps/manager/ItemDropZone.svelte': Object.freeze([
+    'world-tool-catalogue-list-head',
+    'world-tool-entry-overview',
+    'world-tool-entry-unlinked',
+    'world-tool-entry-source-missing',
+  ]),
+  // The radio-card group (issue 1373). TWO frames because the primitive has two faces and the
+  // representative pair renders neither: `manager-tool-parity-03-breakage-1280x720` is the
+  // `is-config-cards` face at system scope, and `world-tool-entry-requirements` is the same face
+  // at world scope, inside a card whose heading idiom is the kicker rather than the title.
+  //
+  // The world entry was named for `legendVisible` — the un-hidden gate-mode legend — until issue
+  // 1373's round 5 removed that caller: `proto:2334` introduces the gate pair with the sentence
+  // above it and heads it with nothing, so the legend is screen-reader-only again at both scopes
+  // and no frame in the corpus draws a visible one. The pair is kept because the two SCOPES still
+  // differ around the group, which is what a change to it would show up differently in.
+  'src/ui/svelte/apps/manager/RadioCardGroup.svelte': Object.freeze([
+    'world-tool-entry-requirements',
+    'manager-tool-parity-03-breakage-1280x720',
+  ]),
   //
   // A THIRD entry as of issue 1458, and it is a third MODE rather than a third instance. Both
   // parties pickers above render the search row; the three converted add menus render none, which
@@ -481,11 +610,33 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // a portal host; `player-actor-picker` is the frame that shows it doing so. A change to this
   // primitive that broke only outside the manager would otherwise publish three frames in which it
   // still works.
+  //
+  // A FIFTH AND A SIXTH as of issue 1373, and they are the primitive's EMPTY branch and the one
+  // caller whose panel had no frame at all. Every one of the four above opens a picker over a
+  // populated list, so the branch that renders when the list is empty — reached by all 22 call
+  // sites, and by five of them with no `emptyHint` to render — was published by nothing, which
+  // is how a dashed hero panel with a magnifier and no words shipped inside a 240px popover.
+  // `manager-recipe-edit-tag-picker` is the populated tag picker, over the herbalism system's
+  // own eight-tag vocabulary; `world-tool-entry-on-break-repair-tag-picker-empty` is the same
+  // control at WORLD scope, where the vocabulary is the union of every world component's own
+  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
+  // and in a freshly installed one alike, which is the state a GM meets on day one.
+  //
+  // A FIFTH entry as of issue 1373 round 8, and it is a fifth CONFIGURATION: the recipe row's
+  // `or…` menu is the only frame that renders this primitive's `popoverTitle` header on a panel
+  // that has NO search field, at a caller-fixed 150px. The parties pickers draw the header over a
+  // search row and the availability menu draws the search-less list with no header, so between
+  // them the two halves are covered and their COMBINATION is not — which is exactly where the
+  // width floor bit: the shared box declares `min-width: 240px`, so a caller asking for 150 got
+  // 240 with its own inline width sitting there looking honoured.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
     'manager-gathering-task-availability-menu',
     'player-actor-picker',
+    'manager-recipe-edit-tag-picker',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
+    'manager-recipe-edit-ingredients-or-menu',
   ]),
   // THE overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
   // the environment editor and one `SearchablePopover` in the component editor that was announcing
@@ -1083,6 +1234,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
+      // The expression field this screen is now the ONLY caller of (issue 1373). It was a
+      // BROAD SIGNAL until the Tool check bonus stopped authoring a raw expression and took
+      // its modifiers from the world library instead; a broad-signal file cannot be claimed
+      // by `sourceMatches` at all, so this pattern would have been unreachable configuration
+      // before that change and is load-bearing after it.
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
       // itself is a BROAD SIGNAL and reaches this case through
       // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
@@ -1498,6 +1655,49 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-catalogue-list-head',
+    label: 'Manager — World Tools Catalogue, list head',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ONE STATE THE RESTING CATALOGUE FRAME CANNOT SHOW (issue 1373).
+    //
+    // The design opens the list with a full-width dashed creation zone directly under the
+    // toolbar (`tmp/proto/tool-catalogue.png`); what shipped had it hoisted OUT of the list into
+    // the band above, sharing a row with the world breakage card and taking a third of its
+    // width. Moving it back is `EntityListInspectorFrame`'s new `listLead` snippet.
+    //
+    // IT NEEDS ITS OWN FRAME because the sibling case INSPECTS a row two thirds of the way down
+    // an eleven-row list, and inspecting a row auto-scrolls it into view - which carries the head
+    // of the list, and therefore the zone, off the top. The two frames answer different
+    // questions: that one shows what the catalogue DECIDES, this one shows what it OPENS with.
+    //
+    // NO ROW STEP AT ALL, which is the whole point: the list rests at its own top.
+    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    expectView: 'world-tools',
+    expectSelector: '[data-item-drop-zone="tool-create"]',
+    expectContained: [
+      // THE ZONE, INSIDE THE LIST. Rendered anywhere on the screen it would satisfy
+      // `expectSelector`; this is what proves it is in the list rather than beside the card.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-item-drop-zone="tool-create"]',
+      },
+      // AND THE BREAKAGE CARD STILL SPANNING THE COLUMN ABOVE IT, which is the other half of the
+      // same move: the card only reaches the pane's edge because the zone left its row.
+      {
+        container: '[data-world-tool-break-mode]',
+        target: '[data-world-tool-break-segment="checkDriven"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      // The frame that owns the `listLead` slot and the list scroller the zone sits in.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-catalogue',
     label: 'Manager — World Tools Catalogue',
     reaches: 'beyond',
@@ -1505,14 +1705,1645 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `Tools Catalogue` is PLURAL where its siblings are singular, and `Tools` is a live
     // substring of it — which is why the shipped `Tools` rail entry could no longer be reached
     // by text either.
-    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    // THE ROW IS INSPECTED, not merely listed. The shell's inspector column is where the
+    // per-section inherit counts and the per-system membership cluster live, and neither is
+    // rendered at rest - so a frame taken without this click shows a list and nothing this
+    // screen decides.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
+    ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
+    // THE REAL CATALOGUE, not the placeholder (issue 1373). Three things have to be IN the
+    // frame rather than merely rendered somewhere: the World breakage default card with a
+    // segment selected, a populated row, and that row's source badge. `expectContained` is
+    // what proves each is inside its container rather than clipped out of it.
+    expectContained: [
+      {
+        container: '[data-world-tool-break-mode]',
+        target: '[data-world-tool-break-segment="toolSpecific"]',
+      },
+      // THE FACT RUN, which is where a Tool row's badges live since issue 1373: the design puts
+      // the chips under the NAME and the frame renders them inside the identity column, so a
+      // trailing-column assertion would be measuring a container the row no longer uses.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-row-facts]',
+      },
+      // AND THE FOOT PAGER, WHICH ELEVEN ROWS NOW HAVE (issue 1373, maintainer feedback round 2).
+      // The window was twenty-five, so an eleven-tool world was one page and the `multiPageOnly`
+      // bar never rendered — twelve tools as one unbounded scroll, with no page control at all.
+      // Asserted INSIDE the list column rather than merely present, because the inspector's own
+      // system roster carries a pager too and a bare presence check is satisfied by that one.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-pagination-page]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inherit-count="breakage"]',
+      },
+      // THE FIFTH INSPECTOR CARD IS GONE, and nothing replaces it here.
+      // `[data-scoped-list-extra-card="repair"]` stated `{n} groups` over a seed whose contents
+      // name components world scope cannot address (issue 1373), and the design draws four
+      // world-default cards at either scope.
+      //
+      // THE CREATION ZONE'S NEW PLACE IS THE SIBLING CASE'S FRAME. It is the list's first
+      // element now rather than a third of the band above the toolbar, and inspecting a row two
+      // thirds down an eleven-row list auto-scrolls the head of the list off the top — so this
+      // frame structurally cannot contain it. `world-tool-catalogue-list-head` is the one that
+      // does, and it claims the same two files.
+      //
+      // AND THE UNLINKED ROW'S SOURCE BADGE MOVED TO `world-tool-catalogue-page-two` for the
+      // same kind of reason: `Unclaimed Bellows` sorts last of eleven, so at a ten-row window it
+      // is the whole of page two and no page-one frame can contain it. That case walks to it.
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE PLACEHOLDER CLAIM IS GONE, and dropping it is not optional bookkeeping.
+    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
+    // body" against "that route's page still imports it" as a BICONDITIONAL, so a claim left
+    // behind here publishes this route's real screen as evidence of a placeholder-body change.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // `MembershipActions` IS NO LONGER CLAIMED HERE, AND NO CASE REPLACES IT (issue 1373).
+      //
+      // The claim was added on the reasoning that the inspector renders the cluster per crafting
+      // system row. It does not, on THIS surface: `WorldToolCataloguePage` passes
+      // `systemRowAction="navigate"` with a non-null `onOpenSystemRules`, and the cluster's own
+      // branch is the OTHER arm of that test — so the component is structurally unreachable in
+      // every state this frame can be driven to. That is unreachable configuration, which issue
+      // 1116 names precisely because it is indistinguishable from working configuration: the
+      // pattern matched, the frame published, and the changed component was not in it.
+      //
+      // The right answer is to remove the pattern rather than to add a case, because the state is
+      // not one this screen has. `world-essence-entry` and the three essence editor frames claim
+      // the component on the surfaces that DO render it.
+      //
+      // `toolStudio.js` TAKES ITS PLACE, and for the opposite reason: it is genuinely rendered
+      // here and was claimed by nothing that shows it. `worldToolStudio.js` was the only studio
+      // module named, while the row's badges, its break summary and the inspector's own facts all
+      // come through `tools/toolStudio.js` — which published one world frame
+      // (`world-tool-entry-destroyed-preview`) and the ten SYSTEM list frames, none of them this
+      // catalogue.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-page-two',
+    label: 'Manager — World Tools Catalogue, page two',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE PAGER, DRIVEN (issue 1373, maintainer feedback round 2).
+    //
+    // The catalogue had no pagination at all: `Pagination` is `multiPageOnly` on this frame, the
+    // window was twenty-five rows, and the lab world holds eleven tools - so the bar never
+    // rendered and a real world's twelve tools were one unbounded scroll. The window is ten now,
+    // which is the smallest size the pager itself offers and the maintainer's stated pair
+    // (eleven rows must show a bar, three must not).
+    //
+    // A SECOND PAGE IS THE ONLY THING THAT PROVES IT WORKS. A frame of page one shows a bar; this
+    // one shows the bar MOVING the list, which is the difference between a rendered control and a
+    // working one. It is also where the unlinked record lives now - `Unclaimed Bellows` sorts
+    // last of eleven - so the source badge this registry has always photographed comes with it
+    // rather than being dropped.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-page="world-tools"]',
+    expectContained: [
+      // THE ROW THAT ONLY PAGE TWO HAS. Present anywhere it would satisfy a bare selector; this
+      // says the walk actually landed on the page that holds it.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-source]',
+      },
+      // AND THE BAR ITSELF, inside the LIST column rather than the inspector's - the roster panel
+      // beside it carries a pager of its own, so an unscoped assertion is answered by that one.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-pagination-prev]',
+      },
+    ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The page window itself. It is restated on the lifted view-state, and a change there with
+      // no claim would publish a frame of some other screen as evidence that the pager moved.
+      /^src\/utils\/managerBrowserViewState\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-bulk',
+    label: 'Manager — World Tools Catalogue, bulk edit',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THAT SHIPPED BROKEN AND THAT NO CASE COULD SEE (issue 1373, maintainer feedback
+    // round 2). Every row on this screen has carried a selection box since it shipped and the
+    // toolbar has counted the ticks; the inspector beside it went on saying `Nothing selected`,
+    // because `bulk` is a lane snippet and the page passed none. A conditional on an undefined
+    // snippet is silent, so nothing failed and no frame showed it - this registry photographed
+    // the resting panel and the inspected panel and never a selected one.
+    //
+    // FOUR ROWS, which is the maintainer's own reproduction and is not arbitrary: it is enough
+    // for the count in the toolbar and the count in the panel hero to be checked against each
+    // other in one photograph, and enough for the plural wording of both.
+    //
+    // Ticked through the LABEL rather than the input, which is the idiom every other
+    // multi-select case here uses: `SelectionCheckbox` renders the real control visually hidden
+    // behind its own box, and the label is the click target a GM actually has.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-anvil"])' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-tongs"])' },
+      { selector: 'label:has(input[data-scoped-list-select="hb-tool-mortar"])' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-hammer"])' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-world-tool-bulk-panel]',
+    expectContained: [
+      // IN THE INSPECTOR'S OWN COLUMN. Rendered anywhere on the screen the panel would satisfy
+      // `expectSelector`; this is what says it REPLACED the identity panel rather than appearing
+      // somewhere else, which is the whole of the finding.
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-world-tool-bulk-panel]',
+      },
+      // The staged axis and the Apply that names the blast radius, both inside the panel: an
+      // Apply outside its own dock would be a panel that had lost its primary action.
+      {
+        container: '[data-world-tool-bulk-panel]',
+        target: '[data-world-tool-bulk-status]',
+      },
+      {
+        container: '[data-world-tool-bulk-panel]',
+        target: '[data-world-tool-bulk-apply]',
+      },
+      // AND THE TOOLBAR'S OWN COUNT, in the same frame. The two numbers are derived from one
+      // `selection` object, so a frame holding both is what makes "the toolbar says four and the
+      // inspector says nothing" impossible to ship again unnoticed.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-scoped-list-selection-count]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ToolCatalogueBulkPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The shared bulk chrome the panel composes. These sit directly under `apps/manager/` and
+      // fall through every directory glob in the registry, so the case that RENDERS them claims
+      // them by name - the same rule the studio bulk cases follow.
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BulkSelectionToolbar\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-empty',
+    label: 'Manager — World Tools Catalogue, empty world',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE EMPTY CATALOGUE, WHICH THE FIXTURE COULD NOT PRODUCE (issue 1373, maintainer feedback
+    // round 2). `noTools` is a lab flag rather than a fixture edit for the reason `stripTools`
+    // records: the lab runs every migration on every build and the world-scope pass lifts each
+    // crafting system's own tools into world records, so an empty `toolScope` alone still boots
+    // an eleven-row catalogue. Nothing here could reach the state, so nothing photographed it -
+    // which is exactly why its drop zone touched the hero and its inspector said nothing.
+    //
+    // The scope band is deliberately still authored: it is a world SETTING rather than a Tool,
+    // and a frame that had blanked it too would photograph two absences as one.
+    query: { noTools: '1' },
+    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-state="empty"]',
+    expectContained: [
+      // THE HERO, UNDER THE ZONE AND INSIDE THE LIST. The zone renders in the empty states too -
+      // an empty catalogue is when a GM most needs the surface that makes the first record - and
+      // the two touched, because the gap belonged to neither of them.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-item-drop-zone="tool-create"]',
+      },
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-state="empty"]',
+      },
+      // AND THE INSPECTOR'S OWN NO-STATE, inside the column that owns it. On an empty catalogue
+      // the whole right-hand track is this one box, and this frame is what says which SHAPE it
+      // takes: a content-height panel at the top of a full-height aside, the same treatment
+      // `.manager-tool-browser-inspector-empty` records for the system Tool Rules rail, rather
+      // than a ~700px dashed box stretched down the whole column.
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inspector-state="resting"]',
+      },
+      // The scope band survives an empty corpus and is still confined to the LIST column - the
+      // half of the finding that says the band must not span the inspector's track.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-world-tool-break-mode]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // `EmptyState.svelte` AND `ItemDropZone.svelte` WERE CLAIMED HERE AND ARE NOT ANYMORE.
+      // Both are BROAD SIGNALS (`BROAD_SIGNAL_PATTERN`, via the named manager-primitive leg), and
+      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it reads any case's
+      // `sourceMatches` — so the two patterns declared an interest the router could never act on,
+      // and `tests/design-system-primitives.test.js` property (b) failed on them from the commit
+      // that added them. Removing them changes no routing whatsoever: a change to either file
+      // publishes the representative pair exactly as it did with the claim present. The seam for
+      // "this frame is the one that draws the primitive's deliberate state" is
+      // `BROAD_SIGNAL_CASE_OVERRIDES`, and giving either file one is a routing decision about
+      // every screen that renders it rather than about this case.
+    ],
+  }),
+  // ── THE WORLD TOOLS CATALOGUE'S TOOLBAR, DRIVEN (issue 1373) ─────────────────────────────────
+  //
+  // Until these four cases existed the registry contained ZERO steps naming
+  // `data-scoped-list-search`, `data-scoped-list-sort`, `data-scoped-list-clear-filters` or
+  // `data-scoped-list-state="filtered"` — across all of its cases, not just this screen's. Every
+  // frame of every scoped catalogue photographed the toolbar at rest, so the row's five controls
+  // were evidenced as five shapes and none of them as a control that does anything.
+  //
+  // Four rather than six, because two pairs of states share a frame without either being hidden
+  // by the other: the desc direction is only reachable by choosing a sort to reverse, and the
+  // inert direction toggle is only reachable by choosing the lane sort that disables it.
+  managerCase({
+    id: 'world-tool-catalogue-search',
+    label: 'Manager — World Tools Catalogue, filtered by search',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A TYPED SEARCH, which no case in the registry had ever driven on this frame. The field is
+    // the toolbar's widest member and the one whose sizing three separate rounds argued about
+    // (see `EntityListInspectorFrame`'s own note on the filter row having been three things), and
+    // every argument was settled against a frame in which nothing had been typed.
+    //
+    // WHAT IT PROVES BEYOND THE FIELD is the pair the count states: `2 of 12 tools`, which is the
+    // reading that tells a GM "this world holds twelve" apart from "ten are hidden by a filter I
+    // forgot". A frame of the resting list shows those two numbers equal, which is the one state
+    // in which the pair says nothing.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: WORLD_TOOL_SEARCH_TERM },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-row="rw-tool-stylus"]',
+    // BOTH SURVIVORS, inside the list. The term matches on an entity's name, its description AND
+    // both of its Item uuids, so a frame asserting one row would pass over a filter that had
+    // silently widened to a third — which is exactly the failure `WORLD_TOOL_SEARCH_TERM`'s own
+    // derivation test above exists to catch from the other end.
+    expectContained: [
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="rw-tool-punch"]',
+      },
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-scoped-list-count]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      // The model that answers the query. It cannot SELECT this frame today — `src/utils/` is
+      // not a render path — and it is declared because it is what the frame is evidence ABOUT.
+      /^src\/utils\/scopedEntityListModel\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-filtered-empty',
+    label: 'Manager — World Tools Catalogue, filtered to nothing',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // FILTERED TO NOTHING IS NOT AN ABSENCE, and the frame draws a different panel to say so:
+    // `EmptyState` at `filtered`, with a `Clear filters` action rather than the corpus-empty
+    // hero's creation prompt. `world-tool-catalogue-empty` photographs the OTHER panel — a world
+    // with no Tools at all — and the two are one selector apart and completely different
+    // statements, which is why one cannot stand in for the other.
+    //
+    // The term is a MISS by construction and the miss is derived rather than assumed: the
+    // catalogue searches names, descriptions and both Item uuids, so a term that reads like a
+    // miss can still be answered by a uuid. See `WORLD_TOOL_SEARCH_MISS_TERM`.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: WORLD_TOOL_SEARCH_MISS_TERM },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-state="filtered"]',
+    // THE ACTION, INSIDE THE PANEL. `Clear filters` is the whole difference between this panel
+    // and a dead end, and it is drawn by nothing else in the corpus — a frame proving only the
+    // hero would pass over a panel that had lost its one way out.
+    expectContained: [
+      {
+        container: '[data-scoped-list-state="filtered"]',
+        target: '[data-scoped-list-clear-filters]',
+      },
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-state="filtered"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-sorted-desc',
+    label: 'Manager — World Tools Catalogue, sorted by systems descending',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE TWO HALVES OF THE SORT CONTROL, IN ONE FRAME, and neither was in any frame before.
+    // `systems` is one of the two non-default sort keys the frame offers, and `desc` is the only
+    // state the direction toggle has other than the one it boots in — so a change to either the
+    // select or the toggle's pressed treatment published frames showing both at their defaults.
+    //
+    // THE TOGGLE STATES ITS OWN POSITION rather than offering the other one, which is a decision
+    // a frame can check and a source read cannot: `aria-pressed` follows `asc` and the visible
+    // word follows the CURRENT direction. Reversed, it must read `Desc`.
+    //
+    // AND IT IS HALF OF A PAIR. The glyph follows the direction too — `arrow-down-a-z` ascending,
+    // `arrow-up-a-z` descending — which it did not until issue 1373: the control drew the
+    // descending arrow in both positions, so in `desc` the mark asserted the opposite of the
+    // order on screen. The ASC half is not a case of its own: every resting catalogue frame draws
+    // it, and `world-tool-catalogue-list-head` in particular photographs the toolbar untouched at
+    // the top of the list. This is the frame that has to be read against those.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-sort]', select: 'systems' },
+      { selector: '[data-scoped-list-direction]' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-direction="desc"]',
+    // THE TOGGLE IS LIVE HERE, which is the half that separates this frame from its sibling
+    // below: `systems` is one of the frame's OWN sort keys, so the direction composes with it and
+    // the control is enabled. Asserted by attribute rather than by containment, because what is
+    // under test is which value the button carries, not where it sits.
+    expectAttributes: [
+      { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'false' },
+    ],
+    expectContained: [
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-scoped-list-direction]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-sort-lane-inert',
+    label: 'Manager — World Tools Catalogue, the lane sort with the direction inert',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE SHARPEST OF THE FOUR, and the one written FOR a frame that did not exist. A lane sort
+    // is its own whole order — the descriptor supplies one `compare`, not a pair — so composing a
+    // direction onto it would produce an id `project` does not know and fall back silently to
+    // name order. The frame's answer is to DISABLE the direction toggle rather than hide it, on
+    // the stated reasoning that a GM who cannot reverse an order can still see that reversing is
+    // what the control does.
+    //
+    // That reasoning is entirely about what the control LOOKS like when it is inert, and no frame
+    // in the registry drew one. `break-asc` is the world Tool catalogue's one lane descriptor,
+    // and this is the case that chooses it.
+    //
+    // THE ROWS ARE THE SECOND HALF. A disabled toggle over a list that had NOT reordered would be
+    // the silent fallback the frame exists to prevent — a lane id composed with a direction falls
+    // through to name order and looks exactly like a working sort — so the containment names a row
+    // the BREAK order puts on the first page and the name order does not.
+    //
+    // `lab-tool-warped-crucible` is that row, and the coupling is deliberate rather than
+    // incidental: it carries a 0% break chance, so `worldToolSorts` puts `0% break` first of
+    // twelve, while its name sorts it last of twelve and onto page two. The pairing is stated at
+    // the fixture too, so a later edit to either end has a note at the other.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-sort]', select: 'break-asc' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-direction][disabled]',
+    // `aria-pressed` STILL FOLLOWS `asc`, which is the second half of "inert, not hidden": the
+    // control keeps saying which way the order runs even though pressing it would do nothing.
+    // Asserted rather than assumed, because the obvious wrong repair — clearing the attribute
+    // with the disable — is invisible in a screenshot.
+    expectAttributes: [
+      { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'true' },
+    ],
+    expectContained: [
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-scoped-list-direction]',
+      },
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="lab-tool-warped-crucible"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      // The lane descriptor itself: `worldToolSorts` is the only `sorts` array on this screen and
+      // it is what makes the toggle inert at all.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  // ── STATES OF THESE SCREENS THAT CANNOT EXIST, RECORDED SO NOBODY ADDS A CASE (issue 1373) ───
+  //
+  // An enumeration of ~200 reachable states over the four Tool surfaces turned up four that look
+  // like coverage gaps and are not. Each is written here rather than left to be rediscovered,
+  // because "no frame draws it" and "no frame CAN draw it" are indistinguishable from a registry
+  // listing, and the second one has already cost this file one unreachable `sourceMatches`
+  // pattern (see `world-tool-catalogue`'s note on `MembershipActions`).
+  //
+  //   - THE MEMBERSHIP SEGMENTED CONTROL, on the world Tools Catalogue.
+  //     `WorldToolCataloguePage` passes `membershipFilter={false}`, so the whole `{#if}` arm is
+  //     dead on this surface. The system Tool Rules list asks the same question with its own
+  //     segmented track and `manager-tool-rules-overriding-filter-1280x720` photographs that one.
+  //
+  //   - THE `MembershipActions` CLUSTER, on the same screen and for the same kind of reason:
+  //     `systemRowAction="navigate"` with a non-null handler takes the other arm of the test the
+  //     cluster is behind. Removing the claim was the fix; adding a case would have been a case
+  //     for a state the screen has no route to.
+  //
+  //   - THE UNAVAILABLE-CORPUS BRANCH (`data-scoped-list-state="unavailable"`). It renders when
+  //     the world settings corpus cannot be READ, which the lab has no mechanism to produce — the
+  //     fixture writes the settings map directly and every read succeeds by construction. A mount
+  //     flag that faked it would be photographing the flag.
+  //
+  //   - `saveError` ON THE WORLD ENTRY (`data-tool-save-error`). It renders when a write is
+  //     REJECTED, and nothing in the lab rejects one; the draft flush goes through the real store
+  //     against a real settings map.
+  //
+  //   - EVERY DRAG-OVER STATE — `data-tool-replacement-drop="over"`, `ItemDropZone`'s own
+  //     `is-over`, and the scoped list's row drop targets. These are honest non-gaps rather than
+  //     impossible states: the capture runner has five verbs and none of them is a drag, so the
+  //     states are real and simply not photographable by this harness. A verb would be the fix,
+  //     not a case.
+  //
+  //   - `BLOCKS ENABLE` ON THE WORLD ENTRY'S VALIDATION TAB, which IS a gap and is recorded here
+  //     because it looks like one that a case could close and cannot. All four of that tab's
+  //     checks bottom out at `warn` in the lab: `name` falls back through the linked Item's name
+  //     to the record id, so it can never be blank; `source` and `membership` are warn-only by
+  //     construction; and `breakage-value` blocks only on a `diceExpression` whose formula parses
+  //     and cannot be ROLLED, which `formulaRolls` decides — and that predicate FAILS OPEN when
+  //     the dice class has no `evaluateSync`, which the lab's `Roll` double does not. So the
+  //     block face needs `tests/view-lab/foundry/labRoll.js` to grow a maximizing synchronous
+  //     evaluate, which would re-answer every authored formula in the corpus and is a fixture
+  //     change with its own capture to justify it. `world-tool-entry-validation` photographs the
+  //     warn face; `manager-tool-stress-invalid-validation` is the corpus's one `BLOCKS ENABLE`.
+  managerCase({
+    id: 'world-tool-entry',
+    label: 'Manager — World Tool entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // REACHED BY CLICKING A CATALOGUE ROW, which is the only way in: the entry route takes an
+    // entity id the rail cannot supply. That is why the lab fixture seeds a world tool corpus
+    // (`tests/view-lab/world/labContent.js`) - the capture driver throws by name on a selector
+    // that matches nothing, so the fixture and this case ship together.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-scoped-page="world-tool-entry"]',
+    // A SECTION TAB OPEN WITH ITS INHERIT COUNT, the read-only world break mode, and at least
+    // one per-system row. Each is a distinct decision this screen makes, and a frame missing
+    // any of them is evidence of a different screen.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-world-tool-entry-inherit-count="breakage"]',
+      },
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-world-tool-entry-break-label]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+      // The buffered-save seam (issue 1373), claimed by the SECOND screen that renders it.
+      // The essence entry's own claim set says this is what a shared seam's claims are
+      // supposed to look like: a change to the pair or to the draft leaf publishes every
+      // window that draws them, rather than one of them standing in for the other.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-dirty',
+    label: 'Manager — World Tool entry, unsaved',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE EXPLICIT SAVE EXISTS FOR (issue 1373), and the twin of
+    // `world-essence-entry-dirty` beside it.
+    //
+    // The entry editor buffers its edit now, so `Save tool` is DISABLED until there is
+    // something to flush — which means every other frame of this screen photographs the button
+    // in its disabled treatment, and the whole change is a control nobody can see working.
+    // This case types into the display label and captures the same band with the edit
+    // standing: an enabled, primary Save, and the heading following the buffered name.
+    //
+    // `fill` rather than a click, because a dirty form is unreachable by clicking: the draft is
+    // seeded from the persisted record and only an `input` event moves it.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-name]', fill: 'Smith\u{2019}s Great Hammer' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-scoped-page="world-tool-entry"]',
+    // THE HEADER PAIR, proved present and inside the band that owns it. A frame in which the
+    // Save had not rendered at all would satisfy `expectSelector` on its own, and that is the
+    // one thing this case exists to show.
+    expectContained: [
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-tool-save]',
+      },
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-tool-back]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE SAME FILES THE RESTING CASE CLAIMS, deliberately: one screen photographed in two
+    // states, where the resting frame shows the screen and this one shows that its Save is a
+    // live control. A change to the header pair or the draft leaf that only ever published the
+    // resting frame would publish a DISABLED button as its evidence.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-overview',
+    label: 'Manager — World Tool entry, Overview',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A SECOND FRAME ON ONE SCREEN, because the entry's two tabs make DIFFERENT decisions and
+    // its sibling case opens Breakage. Overview is where the world record's identity and its
+    // MASTER SWITCH live (issue 1373), and the switch is the one control on this screen that
+    // reaches every crafting system at once - a state no case covered, which is exactly the
+    // gap that publishes an unrelated frame.
+    //
+    // NO TAB STEP: Overview is the tab the route opens on, and clicking the tab it is already
+    // on would assert nothing the default does not.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-card="enabled"]',
+    // THE SWITCH AND THE CONSEQUENCE COUNT BESIDE IT. A world-scope write persists on change
+    // and has no confirmation step, so a frame proving the control without the count would be
+    // evidence of the half that is safe to ship on its own and is not.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="enabled"]',
+        target: '[data-world-tool-entry-enabled]',
+      },
+      // AND THE OPTIONAL DISPLAY LABEL'S HELPER (issue 1373). The reach sentence that used to be
+      // asserted here is now the switch's accessible name rather than a third visible line — the
+      // design's card is a title, one line and a bare pill — so what this frame proves instead is
+      // the affordance the Overview tab had lost: that the label may be left blank and what
+      // answers for it when it is.
+      {
+        container: '[data-world-tool-entry-card="display-label"]',
+        target: '[data-world-tool-entry-name-hint]',
+      },
+      // THE HEADER `Delete`, which the design draws between Back and Save and which this screen
+      // did not have. It is claimed on THIS case because the body card it replaces was on this
+      // tab, so the frame that showed the card is the frame that has to show its successor.
+      {
+        container: '.manager-header-actions',
+        target: '[data-arm-token^="world-tool-delete:"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-unlinked',
+    label: 'Manager — World Tool entry, no linked Item',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OTHER FACE OF THE SOURCE TILE, which no case reached (issue 1373, maintainer round 2).
+    //
+    // `ItemDropZone` paints two faces and every world Tool frame photographed the LINKED one, so
+    // the design's own idiom could be inverted — the healthy state drawn dashed and unfilled,
+    // which is the design's BROKEN state — and no frame could show it. The repair makes the
+    // linked tile solid and filled and gives the dashed edge back to the unlinked prompt in the
+    // danger ink, and half of that repair is unphotographable without this case.
+    //
+    // THE STATE IS ONE THE MIGRATION PRODUCES, not a synthetic. `worldScopeEntityGrouping`
+    // records that a definition with no source references of its own becomes a world entity
+    // flagged unlinked, and `lab-tool-unlinked` is that record in the lab corpus — already
+    // seeded, already listed by the catalogue case, and until now never opened.
+    // THE PAGER STEP IS LOAD-BEARING, and it was added after a cross-lane break (issue 1373).
+    // This case reached the row directly until the catalogue's window became ten rows in the same
+    // epic: `Unclaimed Bellows` sorts last of eleven, so the record moved to page two and the row
+    // selector matched nothing — `the case cannot reach its view state`, which fails the whole
+    // capture and publishes NO frames rather than one bad one. Neither change was wrong alone and
+    // neither lane's own capture could see it, because the case and the page size were authored in
+    // different worktrees. `world-tool-catalogue-page-two` states the same fact from the other end.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
+      {
+        selector:
+          '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-action="open-entry"]',
+      },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-card="linked-item"]',
+    // BOTH HALVES OF THE UNLINKED FACE, inside the card that owns them: the drop prompt itself
+    // and the sentence that says what the record has without an Item. A frame proving only the
+    // card would pass on a screen that had fallen back to the linked tile with an empty name.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="linked-item"]',
+        target: '[data-item-drop-zone="tool-source"]',
+      },
+      {
+        container: '[data-world-tool-entry-card="linked-item"]',
+        target: '[data-world-tool-entry-unlinked]',
+      },
+      // AND THE WORLD MASTER SWITCH, OFF (issue 1373). No Tool in the lab corpus was ever
+      // disabled at world scope, so the one control on this screen that reaches every crafting
+      // system at once was photographed exclusively in its ON position — on all three of the
+      // surfaces that draw it. `lab-tool-unlinked` now carries `enabled: false` in its world
+      // default, which is the cheapest place in the corpus to put it: the record has no
+      // membership and no system, so the veto reaches nothing but the three world-scope surfaces
+      // it is evidence for. The catalogue's row toggle and its inspector pill are the other two,
+      // and `world-tool-catalogue-page-two` is the frame that draws the row.
+      {
+        container: '[data-world-tool-entry-card="enabled"]',
+        target: '[data-world-tool-entry-enabled="off"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-source-missing',
+    label: 'Manager — World Tool entry, linked Item deleted',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THIRD FACE OF THE SOURCE TILE, and the one no corpus state could reach (issue 1373).
+    //
+    // `ItemDropZone` paints three: LINKED, UNLINKED and MISSING. The first two have frames;
+    // `missing` renders only when the record NAMES a game-world Item and that Item no longer
+    // resolves, which is the state a GM is in the moment they delete the Item behind a Tool — and
+    // the lab minted an Item for every tool it seeded, so no fixture record could be in it.
+    // `sourceMissing` is the derivation and it deliberately requires a NON-EMPTY roster, because
+    // an empty one is a roster that has not loaded rather than evidence of a broken link.
+    //
+    // `lab-tool-warped-crucible` is that record: a world Tool naming
+    // `Item.lab-tool-warped-crucible`, which `buildDocumentIndex` does not mint because the
+    // entity is world-only and the index is built from the crafting systems' own tool
+    // definitions. See `labContent.js` for the rest of what it carries and why.
+    //
+    // IT IS ON PAGE TWO, and the pager step is load-bearing for the same reason
+    // `world-tool-entry-unlinked`'s is: `Warped Crucible` sorts last of twelve under the default
+    // name order, so a case reaching for its row on page one would match nothing and fail the
+    // whole capture rather than publish one bad frame.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
+      {
+        selector:
+          '[data-scoped-list-row="lab-tool-warped-crucible"] [data-scoped-list-action="open-entry"]',
+      },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-item-drop-zone="tool-source"]',
+    // THE MISSING FACE ITSELF, by its own state value. The tile is the same element in all three
+    // faces, so a bare selector on the zone is satisfied by the LINKED one — which is exactly
+    // what this record would fall back to if the resolution ever stopped distinguishing a dead
+    // uuid from a live one, and the fallback renders a plausible tile under the snapshot name.
+    expectAttributes: [
+      {
+        selector: '[data-item-drop-zone="tool-source"]',
+        name: 'data-item-drop-state',
+        value: 'missing',
+      },
+    ],
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="linked-item"]',
+        target: '[data-item-drop-zone="tool-source"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-name-blank',
+    label: 'Manager — World Tool entry, display label left blank',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OPTIONAL FIELD, ACTUALLY LEFT BLANK (issue 1373). The design draws the display label
+    // EMPTY with the linked Item's name as its placeholder, under `Leave blank to use the linked
+    // Item name.`, and the whole point of that pair is that a GM can see both that the field may
+    // be left alone and what answers for it when they do. Every world Tool in the corpus carries
+    // an authored name, so every frame of this card drew a FILLED field and the placeholder — the
+    // half of the affordance that is only visible when the field is empty — appeared nowhere.
+    //
+    // AUTHORED RATHER THAN SEEDED, and that is not a convenience. `scopedEntryName` falls back to
+    // the record ID when an entity's own name is blank, and the catalogue sorts on exactly that
+    // string — so a persisted blank-named Tool would sort under `lab-tool-…` while displaying the
+    // Item's name, moving it into the middle of page one and carrying `Smith's Hammer` off it.
+    // Six cases open the hammer from page one. Clearing the field in the DRAFT reaches the same
+    // rendering with the persisted record untouched.
+    //
+    // IT IS ALSO A DIRTY FORM, and that overlap is deliberate rather than accidental:
+    // `world-tool-entry-dirty` photographs a dirty header with a LONGER name typed in, so between
+    // them the buffered edit is shown adding and removing.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-name]', fill: '' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-card="display-label"]',
+    // THE FIELD AND ITS HELPER, inside the card. The helper has TWO branches — one for a record
+    // with an Item to fall back on and one for a record without — and this frame is the first
+    // that draws the first branch over an empty field, which is the only state in which the
+    // sentence and the placeholder are saying the same thing at the same time.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="display-label"]',
+        target: '[data-world-tool-entry-name]',
+      },
+      {
+        container: '[data-world-tool-entry-card="display-label"]',
+        target: '[data-world-tool-entry-name-hint]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-requirements',
+    label: 'Manager — World Tool entry, Requirements',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE FOURTH TAB, which the screen did not have (issue 1373). `prerequisites` and `bonus`
+    // became world-default sections a crafting system inherits and may override, so the world
+    // entry is where the default is authored - and until this tab existed there was nowhere to
+    // author it, which is what left the design's four tabs at three.
+    //
+    // IT RENDERS THE SHIPPED `ToolRequirementsTab`, the same component the SYSTEM editor mounts,
+    // so this frame is also the evidence that one meaning has one shape across the two scopes.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="requirements"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-requirements-tab]',
+    // THE TWO CONTROLS AND THE REACH LINE. A frame proving the tab exists but not that each
+    // section states how many systems inherit it would be evidence for the strip alone.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-prerequisites-enabled]',
+      },
+      // THE REACH LINE MOVED INSIDE THE SECTION IT COUNTS (issue 1373, maintainer round 2).
+      // It was `data-world-tool-entry-inherit-count="prerequisites"`, a paragraph stacked at the
+      // foot of a WRAPPER card beside an identical one for the bonus; the wrapper is gone with
+      // the card-inside-a-card it made, and each sentence is now the last line of its own
+      // section's card as `data-tool-section-note`.
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-section-note="prerequisites"]',
+      },
+      // AND THE BONUS IS A PICK FROM THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round
+      // 3). The tab shipped a free-text `Bonus expression` field the design has no counterpart
+      // for; `proto:2353`-`2369` draws a single-select list of `characterLibraries.modifiers[]`
+      // instead. This frame could not have caught that: `sm-tool-hammer` carried neither
+      // section, so both cards drew their off-state sentence and the control under test was on
+      // no frame at all. `TOOL_WORLD_REQUIREMENT_DEFAULTS` gives the hammer a bonus, and the
+      // containment below is what stops the list falling back to the empty-library sentence.
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-modifier]',
+      },
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // BOTH of this tab's lists' row (issue 1373, rounds 4 and 5) — the bonus list, shared
+      // with the Checks Studio catalogue, and the prerequisite list above it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+      // The card the tab draws each of its two sections as (issue 1373). This frame is the only
+      // one that photographs the WORLD face of it: `headingStyle="kicker"`, and the section
+      // subtitle, which at system scope the inherit row spends the head on instead.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-bonus-empty-library',
+    label: 'Manager — World Tool entry, bonus with no world modifiers',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 3): the bonus
+    // section selects over the WORLD modifier library, and most worlds have authored none. The
+    // section then draws one muted sentence naming where modifiers come from — the shape and
+    // voice the prerequisite list one section up already uses for the same absence, which this
+    // frame shows directly BELOW it for exactly that comparison.
+    //
+    // `clearSystem` is the whole mechanism and it is not a side effect: both world libraries are
+    // built by the `1.28.0`/`1.30.0` passes LIFTING each crafting system's own copy, so a world
+    // with no crafting systems is the honest way to reach an empty one. It leaves the world Tool
+    // corpus, the entry route and the record's own authored bonus untouched, so what changes
+    // between this frame and `world-tool-entry-requirements` is the library and nothing else.
+    //
+    // THE `1` ON THE VALIDATION TAB IS THAT WORLD, NOT THIS SECTION: with no crafting systems
+    // the entry's `membership` check warns that nothing has the Tool. It is stated here because
+    // a reader comparing this frame with its sibling would otherwise read the badge as a fault
+    // the bonus list introduced.
+    //
+    // AND THE RECORD'S OWN `@prof` IS STILL SET, so this frame carries the second state as well:
+    // an authored expression the library cannot account for keeps its own row rather than being
+    // silently dropped. Those two are the same picture in a world with no library at all, which
+    // is exactly the world a GM installing Fabricate starts in.
+    query: { clearSystem: '1' },
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="requirements"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-bonus-empty]',
+    // BOTH SENTENCES, because the claim is that the two absences read the same way. Asserting
+    // the bonus one alone would pass just as well against a second voice invented for it.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-empty]',
+      },
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-unlimited-uses',
+    label: 'Manager — World Tool entry, an unlimited-uses world default',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE FIRST-RUN BREAKAGE STATE, WHICH NO FRAME REACHED (issue 1373). Every other
+    // `world-tool-entry-*` case opens a `breakageChance` Tool, so the arm of this panel that a
+    // brand-new Tool lands in was drawn by nothing at world scope — and that is not an exotic
+    // corner: a Tool created by dropping an Item defaults to `limitedUses` with no `maxUses`,
+    // which IS `Unlimited uses`.
+    //
+    // AND IT IS THE STATE THE SCREEN GOT WRONG, which is what makes the frame evidence rather
+    // than an illustration. `sm-tool-anvil`'s world default is `{mode: 'limitedUses', maxUses:
+    // null}`, and the panel rendered `Limited uses` selected, a stepper reading `1` against
+    // `min={1}`, and a summary line reading `Unlimited uses` — three answers to one field, with
+    // no control that could restore the state the record was actually in. So a GM who touched the
+    // stepper silently converted an unlimited Tool into a one-use Tool for every inheriting
+    // system. The mode list is four cards now, `unlimited` leading, and the state has a card of
+    // its own with no argument under it.
+    //
+    // THE GROUP IS TWO COLUMNS OF FOUR, so the card block is two rows deep rather than one. That
+    // is stated here because it moves everything below it on this tab, and because a frame is the
+    // only place it can be seen.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-anvil"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+    ],
+    expectView: 'world-tool-entry',
+    // THE CHOSEN CARD AND THE ABSENT INSET, IN ONE SELECTOR, and the absence is the load-bearing
+    // half. `Unlimited uses` is a mode with no argument — that is the whole of what it means — so
+    // the correct rendering has NO value editor under the cards at all. The defect drew one: a
+    // stepper against `maxUses ?? 1` with `min={1}`, which is a control that cannot express the
+    // state it is displaying and whose first nudge converts an unlimited Tool into a one-use Tool
+    // for every inheriting system.
+    //
+    // A frame asserting only the chosen card would pass with that stepper still standing beside
+    // it, which is exactly how the state shipped. `:not(:has(...))` is what refuses it, and the
+    // registry already uses that shape on `manager-world-parties-last-page` for the same reason:
+    // some claims are about what is NOT on the screen.
+    expectSelector:
+      '[data-world-tool-entry-card="breakage"]' +
+      ':has([data-world-tool-entry-breakage-mode="unlimited"] input:checked)' +
+      ':not(:has([data-world-tool-entry-breakage-value]))',
+    // THE SUMMARY LINE, which is the reading the stepper used to contradict. With the fourth mode
+    // in the list the card and the line agree, and this is the frame in which they can be read
+    // against each other.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="breakage"]',
+        target: '[data-world-tool-entry-breakage-summary]',
+      },
+      {
+        container: '[data-world-tool-entry-card="breakage"]',
+        target: '[data-world-tool-entry-breakage-mode="unlimited"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-validation',
+    label: 'Manager — World Tool entry, Validation',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE FOURTH TAB, WHICH HAD NO FRAME AT ALL (issue 1373). Four tabs, three photographed —
+    // and the unphotographed one is where four separate defects accumulated, which is not a
+    // coincidence: a surface with no case, no frame and no assertion is a surface nothing can
+    // report on.
+    //
+    // IT MOUNTS A WORLD-SPECIFIC GROUP. `ScopedValidationTab` is shared with the system editor
+    // and with the essence entry, but the four checks in it are this screen's own — a name, a
+    // source link, the breakage mode's value, and whether any crafting system has the Tool at all
+    // — and `EditorValidationSurface` is where the whole `is-pass` / `is-clear` colour defect of
+    // this issue lives. A blocked record and a clean one rendered identically, which is precisely
+    // the kind of fault a frame settles and a source read cannot.
+    //
+    // NO HEADING AND NO INTRO AT THIS SCOPE, and that is what the frame is partly for. The
+    // surface's in-pane title is optional, and world scope was passing both — drawing a heading
+    // the reference does not have and duplicating the tab label a few pixels above it. The
+    // panel's first element is the summary head now, which is a statement about vertical rhythm
+    // that only a photograph settles.
+    //
+    // THE WARPED CRUCIBLE, because a Validation tab whose every row passes is evidence for a
+    // layout and not for a judgement. That record is the corpus's NEGLECTED one — a 0% break
+    // chance, so `The breakage mode has no usable value`, and no crafting system at all, so `No
+    // crafting system has this Tool` — which puts two warnings, two passes and the `Needs
+    // attention` summary in one frame. The anvil next door is the all-clear reading and is
+    // photographed by its own Breakage frame instead.
+    //
+    // `BLOCKS ENABLE` IS NOT IN THIS FRAME, and cannot be in any world one — see the recorded
+    // impossible states above the `world-tool-entry` case for the whole reason. The system
+    // editor's `manager-tool-stress-invalid-validation` is the corpus's one frame of it.
+    //
+    // THE PAGER STEP IS LOAD-BEARING for the reason `world-tool-entry-source-missing` records:
+    // `Warped Crucible` sorts last of twelve, so it is the whole of page two with the unlinked
+    // record, and a case reaching for its row on page one would fail the capture WHOLE.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
+      {
+        selector:
+          '[data-scoped-list-row="lab-tool-warped-crucible"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="validation"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-validation]',
+    // THE SUMMARY, THE COUNTS RAIL AND A NAMED CHECK. The named check is what stops this passing
+    // over a surface that rendered its head and no rows — and `breakage-value` specifically,
+    // because it is one of the two rows carrying this record's warnings and therefore a row whose
+    // STATUS the frame is evidence about.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-validation]',
+        target: '[data-editor-validation-summary]',
+      },
+      {
+        container: '[data-world-tool-entry-validation]',
+        target: '[data-editor-validation-count="warnings"]',
+      },
+      {
+        container: '[data-world-tool-entry-validation]',
+        target: '[data-world-tool-entry-check="breakage-value"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      // The shared shell BOTH validation tabs are callers of, claimed on the frame that draws its
+      // world face. Its only other claim is `manager-essence-edit-validation`.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedValidationTab\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-empty',
+    label: 'Manager — World Tool entry, an empty repair set',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE A GM IS IN THE INSTANT THEY PICK `Mark as broken`, and it was drawn by nothing
+    // (issue 1373). Three strings exist solely for it — the count chip's `none yet`, the summary
+    // line's `Nothing listed — a broken copy cannot be mended.`, and the set card's own empty
+    // paragraph — and every fixture Tool that selects `flagBroken` ships a populated seed, so all
+    // three were unreachable from the corpus.
+    //
+    // AUTHORED BY THE CLICK RATHER THAN SEEDED, which is the only honest route: a second
+    // `flagBroken` Tool with an empty seed would sit in the catalogue permanently, changing the
+    // row count and the inspector's own arithmetic on every other frame of this screen, to depict
+    // a state that lasts one interaction. `sm-tool-hammer` is destroy-mode with no repair
+    // requirements at all, so choosing `Mark as broken` on it is exactly the transition.
+    //
+    // NO SCROLL STEP, unlike its populated sibling: an empty set is a heading, a chip, a hint,
+    // one adder row and a summary, so the whole section fits under the breakage card without one.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-world-tool-entry-onbreak-mode="flagBroken"]' },
+    ],
+    expectView: 'world-tool-entry',
+    // THE COUNT AT ZERO, which is the one selector that separates this frame from its populated
+    // twin. `[data-tool-repair-requirements]` alone is satisfied by either.
+    expectSelector: '[data-tool-repair-count="0"]',
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="on-break"]',
+        target: '[data-tool-repair-requirements]',
+      },
+      {
+        container: '[data-tool-repair-requirements]',
+        target: '[data-tool-repair-summary]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      // The sentence generator, which is the whole of what this frame's last line shows and
+      // which had no claim of its own once the list cases stopped swallowing `tools/`.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-replace-empty',
+    label: 'Manager — World Tool entry, a replacement with no target chosen',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `ToolReplacementTarget`'s EMPTY FACE, which has sixty lines of CSS written for it and no
+    // frame at either scope (issue 1373). Both fixture Tools carrying `replaceWith` ship a chosen
+    // target, so the corpus could only ever draw the FILLED tile — and the empty one is not a
+    // smaller version of it: it is a dashed drop target holding a search trigger, and its rules
+    // exist specifically to defeat the full-width treatment a `manager-button` takes inside a
+    // card.
+    //
+    // IT IS ALSO THE STATE A GM PASSES THROUGH EVERY TIME. Choosing `Replace with component` and
+    // then naming the component is two acts, and the screen between them is this one — which
+    // used to be the state the screen could not author at all, before world scope got the picker.
+    //
+    // ON THE HAMMER, which is destroy-mode, so the click is the whole of the setup and the
+    // record's own persisted `onBreak` is untouched.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-world-tool-entry-onbreak-mode="replaceWith"]' },
+    ],
+    expectView: 'world-tool-entry',
+    // THE DROP FACE, by its own idle value. `[data-tool-replacement-target]` is the card in both
+    // faces, so asserting the card would pass over the filled tile — which is the exact frame
+    // `world-tool-entry-on-break-replace` already publishes.
+    expectSelector: '[data-tool-replacement-drop="idle"]',
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="on-break"]',
+        target: '[data-tool-replacement-target]',
+      },
+      {
+        container: '[data-tool-replacement-drop="idle"]',
+        target: '.manager-tool-replacement-component-trigger',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair',
+    label: 'Manager — World Tool entry, repair route',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A STATE NO CASE COULD REACH, WHICH IS WHY THE SCREEN SHIPPED WITHOUT THE CONTROL (issue
+    // 1373, maintainer round 2). `Mark as broken` is the on-break action that takes an ARGUMENT
+    // — the ingredient groups that mend a broken copy — and no lab tool selected it, so every
+    // frame of this tab photographed `Destroy the item`, which configures nothing. Two automated
+    // parity passes then read the tab as complete while it rendered nothing at all for the two
+    // modes that DO configure something.
+    //
+    // `sm-tool-tongs` carries `onBreak: {mode: 'flagBroken'}` and a two-group repair seed for
+    // this case, and a 22% break chance so this frame also shows the chance track and its band
+    // one step along from the hammer's.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      // SCROLLED, because the repair editor is the LAST thing in the second card of a panel
+      // that also holds the read-only mode band and the whole breakage card. Anchored on the
+      // repair section itself rather than on a row inside it: `scrollIntoView` aligns what it is
+      // given to the TOP of the scroller, so anchoring deeper would leave the section's own
+      // heading above the fold and the frame would prove rows with nothing naming them.
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE ROWS AND THE ADDERS. A frame proving the section exists but not that it holds real
+    // ingredient rows would be evidence for a heading, and the repair editor's whole claim is
+    // that world scope can now NAME the Components a broken copy is mended with. The adder
+    // proves it is a CONTROL: the `REPAIR MATERIALS` card this replaces could state a group
+    // COUNT and offered only to destroy the list behind it.
+    //
+    // THE BREAK-CHANCE BAND IS DELIBERATELY NOT ASSERTED HERE even though this Tool has one:
+    // the frame is scrolled to the repair section, which puts the band above the fold, so a
+    // containment assertion on it could never pass. `world-tool-entry` photographs the band.
+    //
+    // AND THE TAG ROW, which no repair frame held until round 6. `sm-tool-tongs` carries a
+    // third group whose one row is a TAG requirement, because the tag arm is the only row
+    // anatomy that carries several values at once and a Tool inspector is the NARROW copy of
+    // it - narrower than the recipe tab `manager-recipe-edit-ingredients-cost` measures. The
+    // arm not being drawn at all, and the arm being drawn shredded one chip to a line, are the
+    // two failures this containment separates from a frame of the section alone.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-group]',
+      },
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-add="component"]',
+      },
+      {
+        container: '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag',
+        target: '[data-tool-repair-requirements] [data-recipe-option-tags]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      // THE ROW ITSELF, because this is the only frame in the registry that photographs a TAG
+      // requirement inside a Tool inspector. Without the claim a change to the row published
+      // the recipe tab's frames and left this one stale - which is how a four-line tag arm
+      // shipped past two capture runs.
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-empty-catalogue',
+    label: 'Manager — World Tool entry, repair route with no catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 5). The repair
+    // row's name field completes from the world component and essence catalogues, and a world
+    // that has authored neither — which is every world a GM installs Fabricate into — gets a
+    // field that can complete nothing. The design's answer, and premium's, is a DEGRADED field
+    // rather than a blocked one: the input still renders and is still typeable, and one muted
+    // line under it says there is nothing to name yet.
+    //
+    // `clearSystem` is the whole mechanism, and it is the same one
+    // `world-tool-entry-bonus-empty-library` uses: both world catalogues are built by LIFTING
+    // each crafting system's own copy, so a world with no crafting systems is the honest way to
+    // reach an empty one. It leaves the world Tool corpus, the entry route and this Tool's own
+    // authored repair seed untouched, so what changes between this frame and
+    // `world-tool-entry-on-break-repair` is the catalogue and nothing else.
+    //
+    // WHICH IS ALSO WHY BOTH FRAMES ARE NEEDED. The populated one photographs a named row
+    // reading back on its chip; this one photographs the field a GM meets on day one. A single
+    // frame of either would be evidence that the OTHER state renders correctly by assumption.
+    query: { clearSystem: '1' },
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE DEGRADED FIELD ITSELF, not merely the section. A frame asserting only that the editor
+    // rendered would pass just as well over a row that had silently dropped its field, which is
+    // the failure this state is most likely to arrive as — and the marker is what separates a
+    // field that CANNOT complete from one that simply has not been typed into yet.
+    expectContained: [
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-option]',
+        target: '[data-recipe-option-search]',
+      },
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-option]',
+        target: '[data-recipe-option-empty-catalogue] input',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-empty-tag',
+    label: 'Manager — World Tool entry, repair route with an empty tag row',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ROW THE MAINTAINER AUTHORED, WHICH NO FIXTURE COULD SEED (issue 1373, maintainer
+    // round 7). `sm-tool-tongs` carries a POPULATED tag row because an option with no tags
+    // fails `Ingredient.validate`, so an empty-tag seed would flip this Tool's Validation badge
+    // and change what every other frame of it is evidence for. But an empty tag arm — the
+    // policy word and `+ Tag`, with no chips between them — is the state a GM meets the instant
+    // they press `Add tag`, and it is the ONE the maintainer photographed at 96px against the
+    // other rows' 46px.
+    //
+    // Pressing the adder is how this case reaches it: the state is authored rather than seeded,
+    // so the Tool's stored requirements are untouched and no other frame of it moves.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE ARM, IN A ROW THAT HOLDS NO CHIPS. The populated frame beside this one cannot stand
+    // in for it: with two chips the arm is wide enough to look inline whatever its own wrap
+    // behaviour is, and it was green through the defect for exactly that reason.
+    expectContained: [
+      {
+        container:
+          '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag:last-of-type',
+        target: '[data-tool-repair-requirements] [data-recipe-option-tags]:last-of-type',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-tag-picker-empty',
+    label: 'Manager — World Tool entry, the tag picker over a world with no tags',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN, and the one the redesign is actually about. A
+    // world that has authored no component tags gives this picker nothing to list, and until
+    // this case existed no frame in the registry drew ANY picker with an empty list — so the
+    // dashed hero panel `EmptyState` used to put inside a 240px popover was unphotographed at
+    // all 22 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
+    // hero panel in a full pane and cannot show the note.
+    //
+    // NO `clearSystem`, AND THAT IS THE FINDING. The world tag vocabulary is not lifted from
+    // the crafting systems the way the world component and essence catalogues are: it is the
+    // union of every world component's own `defaults.tags`, which only the explicit
+    // `setWorldTags` action ever writes. Nothing in the lab world calls it and nothing in a
+    // freshly installed world has either, so the world Tool repair route's `+ Tag` picker is
+    // empty on the ORDINARY fixture — which is precisely why this is the panel the maintainer
+    // met and photographed. Its populated twin therefore runs in the recipe editor, where
+    // `itemTags` is the selected system's own vocabulary.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add-tag]' },
+    ],
+    expectView: 'world-tool-entry',
+    // THE NOTE, BY ITS VARIANT CLASS. `.manager-empty` alone would pass over the dashed hero this
+    // frame exists to prove is gone, and the popover alone would pass over a list of rows.
+    expectSelector:
+      '.fabricate-manager .fabricate-picker-popover .manager-travel-popover-empty ' +
+      '.manager-empty.is-note',
+    expectContained: [
+      {
+        container: '.fabricate-manager',
+        target: '.fabricate-picker-popover .manager-travel-popover-empty',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-suggestions',
+    label: 'Manager — World Tool entry, repair route with a suggestion list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY OPENED A SUGGESTION LIST (issue 1373, maintainer round 7), which
+    // is why the row that completes a typed name shipped centred and unphotographed. The
+    // suggestion panel is the whole point of the inline field: it is what makes the field
+    // COMPLETE a name rather than open a second surface over the row, so a registry that never
+    // draws it is evidence for the field and not for the thing the field is for.
+    //
+    // Clearing the first row and typing into it is the shortest route: `or…`-free, one
+    // requirement, and `ingot` matches several world components so the panel holds real rows
+    // rather than the `No matches` line the empty-catalogue frame would give.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-option-clear]' },
+      { selector: '[data-tool-repair-requirements] [data-recipe-option-search]', fill: 'ingot' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
+    // THE PANEL UNDER THE FIELD IT COMPLETES. Containment against the field's own wrapper is
+    // what says the two are one control; against the page it would pass just as well over a
+    // panel drawn anywhere on the screen.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-replace',
+    label: 'Manager — World Tool entry, replacement component',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OTHER UNREACHABLE STATE: replace-mode WITH a component attached. `hb-tool-alembic`
+    // has carried `onBreak: {mode: 'replaceWith', replacementTarget: {componentId:
+    // 'hb-empty-vial'}}` in the fixture all along, and no case ever opened it — so the world
+    // entry could offer `Replace with component` and name nothing, and nothing photographed the
+    // gap.
+    //
+    // IT ALSO CARRIES THE PLAYER PREVIEW'S SECOND FACE. `Show as broken` on a replace-mode Tool
+    // draws the REPLACEMENT Component's art rather than a `Replaced` chip over the Tool's own,
+    // and this is the only Tool in the lab that can show it.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="hb-tool-alembic"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-player-broken]' },
+      // SCROLLED for the reason the repair frame is: the card is the last thing in the second
+      // card of the panel, and its unlink control sits at the foot of it.
+      { selector: '[data-tool-replacement-target]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-replacement-target]',
+    // THE FILLED FACE OF THE DROP ZONE AND THE TILE IT EXPLAINS. `data-tool-replacement-tile`
+    // proves a Component is actually attached rather than that the card rendered empty, and
+    // `data-tool-player-image="replacement"` is the assertion that the preview swapped the art
+    // — an empty box and a Tool's own art are the same selector without it.
+    expectContained: [
+      {
+        container: '[data-tool-replacement-target]',
+        target: '[data-tool-replacement-tile]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-image="replacement"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
+      // The rail's player tile is what this frame's second assertion is about, so a change to
+      // the shared preview publishes it rather than a frame of the working copy alone.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-destroyed-preview',
+    label: 'Manager — World Tool entry, destroyed copy',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THIRD FACE OF `Show as broken`, and the one no case could reach (issue 1373,
+    // maintainer round 2). Destroy-on-break leaves NOTHING in the inventory, and the rail drew
+    // the Tool's own art dimmed under a chip reading `Destroyed` — a word for the outcome
+    // beside a picture of the opposite of it. It draws an EMPTY SLOT now, and an empty slot is
+    // exactly what a selector on the tile cannot distinguish from a missing region, which is
+    // why the frame is asserted on `data-tool-player-image="none"`.
+    //
+    // `sm-tool-hammer` is the lab's destroy-mode Tool, so this case is its Overview route with
+    // the preview toggle flipped; its sibling `world-tool-entry-on-break-replace` photographs
+    // the replacement face on `hb-tool-alembic`, and `world-tool-entry-player-preview` the
+    // working copy.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-tool-player-broken]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-preview]',
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-image="none"]',
+      },
+      // AND THE SENTENCE THAT EXPLAINS THE EMPTY BOX. With the chip gone, this note is the only
+      // thing that says WHY the slot is empty, so a frame without it would show an absence with
+      // no account of itself.
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-player-preview',
+    label: 'Manager — World Tool entry, player preview',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THIRD FRAME ON THIS SCREEN, and it is the only one that can show its preview COLUMN
+    // (issue 1373). The column has four regions and the pane is 900px: its two siblings both
+    // photograph the tab BODY, so `Preview as` and `Required for` are below the fold in both and
+    // a change to either would publish a frame that cannot contain it.
+    //
+    // WHAT THE THREE LOWER REGIONS ANSWER is the half of this screen a rules list cannot: what a
+    // COPY of the Tool looks like in a player's inventory, whether one named character may wield
+    // it, and what stops working if the Tool is deleted. None is derivable from the world
+    // defaults above them.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      // SCROLLED, because the column is what this frame is about and it does not fit. Anchored
+      // on the last region's LAST ELEMENT rather than on the region itself: `scrollIntoView`
+      // aligns what it is given to the TOP of the scroller, so anchoring on the region left its
+      // own pager below the rail's bottom edge and the capture gate reported the region as
+      // clipped. Anchoring on the pager pulls the whole region up with it.
+      { selector: '[data-tool-required-for] .manager-pagination', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-preview]',
+    // ONE ASSERTION PER REGION, against the preview column itself. A frame proving only the
+    // inventory tile would be evidence for a third of the change.
+    //
+    // THE HOOKS ARE THE SHARED RAIL'S NOW (issue 1373). This column was a FORK of
+    // `tools/ToolBehaviorPreview` that re-implemented all five regions and lost the treatment of
+    // four of them; it composes the shared component instead, so the per-region hooks are the
+    // ones that component writes. `data-world-tool-entry-preview` survives as the aside's own
+    // name, which is a `hookAttribute` prop for exactly the reason `EditorTabs` carries one.
+    expectContained: [
+      // THE PLAYER TILE, ITS NAME CAPTION, THE USABILITY CARD AND THE PAGED `Required for` LIST —
+      // one per region. The fork drew a bare 64px thumbnail with no caption element at all, and a
+      // dead `and 5 more` sentence where the pager is.
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-preview]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-name]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-preview-usability]',
+      },
+      // THE `Required for` REGION IS ASSERTED THROUGH ITS TWO PARTS rather than its wrapper, and
+      // that is a real constraint rather than a weaker claim. The region is the LAST of four in a
+      // rail that scrolls inside a 900px window, so its wrapper is taller than the space any
+      // scroll position can leave for it and a rect-containment check on the wrapper can never
+      // pass. A ROW and the PAGER are what findings 20 and 21 are about — the icon-tiled row
+      // treatment the fork had lost, and the pager that replaced its dead `and 5 more` sentence —
+      // and each of them fits.
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-required-row]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-required-for] .manager-pagination',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE SHARED RAIL AND THE SHELL UNDER IT ARE BOTH CLAIMED, unlike this screen's other two
+    // cases: every region in this frame is drawn by `ToolBehaviorPreview` through
+    // `ScopedEntityPreview`'s trailing slot, so a change to either that only published a system
+    // scope frame would leave the world rail unphotographed.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
     ],
   }),
   managerCase({
@@ -2434,6 +4265,30 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-ingredients' },
     ],
     expectView: 'recipe-edit',
+    // THE CONVERGED ROW, NAMED (issue 1373). This case had nothing but its route, and the frame
+    // it published depicted the RETIRED row: a `REQUIRED` pill, a chevroned picker trigger and
+    // three adders whose strings are no longer in `lang/en.json`. A stale frame is not a
+    // registry fault on its own — the capture refreshes it — but an unasserted case is what let
+    // the frame go on standing as this tab's evidence through the whole conversion, because
+    // `expectView: 'recipe-edit'` is satisfied by any tab of the editor.
+    //
+    // `data-recipe-option-kind` is the row's leading KIND SELECT, which is the single element the
+    // old anatomy did not have and the new one cannot be without: the retired row opened a popover
+    // to pick a kind BEFORE it existed, so a row with a kind control on it is a row from after the
+    // convergence. Its shipped counterpart is `fabricate-premium`'s `RewardRow`.
+    expectSelector: '[data-recipe-option] [data-recipe-option-kind]',
+    expectContained: [
+      {
+        container: '[data-recipe-option]',
+        target: '[data-recipe-option-kind]',
+      },
+      // AND THE ADDERS, which are three controls in one row rather than three buttons stacked
+      // under a heading. The set card is what draws them.
+      {
+        container: '[data-recipe-set]',
+        target: '[data-recipe-add="tag-requirement"]',
+      },
+    ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -2459,6 +4314,104 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-option-currency]', scroll: true },
     ],
     expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-tag-picker',
+    label: 'Manager — Recipe edit, the tag picker open over a system vocabulary',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY OPENED THIS POPOVER (issue 1373, maintainer round 8), which is the
+    // third such gap in as many rounds and is why it went on drawing a panel that is not the
+    // design's. `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover` change to four frames
+    // and each is a picker in a different surface over a populated list, so the panel, the field
+    // and the option rows this primitive draws for the recipe editor's `+ Tag` — the control the
+    // maintainer put beside `proto:2258` — were published by nothing.
+    //
+    // `hb-r-tincture` is the one lab recipe carrying a TAG requirement: `hb-set-tincture-g3`
+    // matches `solvent`, and herbalism authors eight tags, so opening the picker over that row
+    // lists the seven it does not already hold. `reaches: 'beyond'` because the state is
+    // authored by clicking rather than seeded, exactly as the sibling cost frame's scroll is.
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-option-tags]', scroll: true },
+      { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
+    ],
+    expectView: 'recipe-edit',
+    // THE PANEL AND A ROW IN IT. The panel alone would pass over an empty list, which is the
+    // OTHER new case and a different picture; the row is what makes this frame evidence for the
+    // populated presentation — the 30px option rows, their 8px gap and their 7px corner.
+    expectSelector:
+      '.fabricate-manager .fabricate-picker-popover.manager-travel-popover ' +
+      '.manager-travel-popover-options .manager-travel-option',
+    // Portaled, so containment is asserted against the APPLICATION ROOT rather than against the
+    // row that owns the trigger: the panel escapes the editor's clipping on purpose, so a
+    // container assertion on that row could only ever fail.
+    //
+    // `SearchablePopover.svelte` is deliberately NOT in `sourceMatches`. It is a broad-signal
+    // file, so a pattern naming it is shadowed by that signal and the mapping gate reds on it;
+    // the routing that reaches this frame from a change to the primitive is its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry, which names both of these cases.
+    expectContained: [
+      {
+        container: '.fabricate-manager',
+        target: '.fabricate-picker-popover .manager-travel-popover-search input',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-or-menu',
+    label: 'Manager — Recipe edit ingredients, the "or…" menu open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY HAD EVER OPENED THIS MENU (issue 1373, maintainer round 8), and that
+    // is the whole reason it shipped as a wide list of four full sentences with no header and no
+    // colour while three surfaces around it were being brought onto the design. The registry held
+    // frames of the requirement row, of its suggestion list and of its empty tag arm; the one
+    // overlay the row can open was evidence-free, so the only thing anyone could check it against
+    // was its own source, and its source read as though it were fine.
+    //
+    // `lab-herbalism` rather than the default system because the menu's LENGTH is configuration-
+    // dependent: Currency appears only when the system enables currency and has authored units,
+    // and Essence only when it has essences. Herbalism is the one system with both, so this is the
+    // frame that shows all four kinds — and therefore the only one that can show four tints.
+    //
+    // The FIRST requirement is the one opened. It is a bare single-alternative component row
+    // (`hb-moonleaf`), which is the shape that carries the inline `or…` control at all — a
+    // two-alternative requirement drops it for the dashed adders at its foot — and it sits at the
+    // top of the list, so the panel is fully on screen without a scroll step to keep in sync.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '.manager-recipe-or-trigger' },
+    ],
+    expectView: 'recipe-edit',
+    // NAMED ON THE LAST KIND, not on the panel. The panel exists the moment the trigger is
+    // pressed; `alternative-currency` is the choice that is only offered when the system really
+    // does configure currency, so a fixture drift that quietly turned it off would publish a
+    // three-entry menu under a case whose whole subject is four.
+    expectSelector: '.manager-recipe-or-popover [data-recipe-add="alternative-currency"]',
+    // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
+    // root and not the recipe view: it is deliberately outside the scrolling editor pane, and
+    // containment against the pane would be a claim about a box it does not sit in.
+    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-popover' }],
+    // …and it is actually on top. A menu drawn under the row it hangs from is contained, visible
+    // and useless, which is a failure no bounding box can see.
+    expectCenterHit: '.manager-recipe-or-popover [data-recipe-add="alternative-component"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -3588,6 +5541,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
@@ -3628,6 +5585,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   managerCase({
@@ -3658,6 +5619,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   // ── the SHARED subject picker, one case per host (issue 1095) ───────────────────────────────
@@ -5666,10 +7631,41 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/Tool/,
-      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    id: 'manager-tool-adopted-world-tool-1280x720',
+    label: 'Manager — Tool rules, world Tool adopted 1280x720',
+    // BEYOND, and the empty smoke labels go with it: the live smoke walks no world-Tool
+    // adoption, so there is no counterpart frame to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    // THE ONLY STATE THAT PROVES THE LOOP CLOSES (issue 1373). Adopting a world Tool used to
+    // write a membership record the Tool Rules list could not read, so the row stayed a ghost
+    // and the button looked inert. `hb-tool-mortar` is a world entity whose only membership is
+    // Herbalism, so in Smithing it starts unadopted - which is why the filter has to be widened
+    // to `All world tools` before there is anything to press.
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
     ],
+    expectView: 'tools',
+    // A MEMBER ROW, named by the control only a member renders. `data-tool-add-to-system` and
+    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so asserting the
+    // second is asserting the first is gone.
+    expectSelector:
+      '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"] [data-tool-edit-rules]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
     id: 'manager-tool-zero-state-empty-library-1280x720',
@@ -5679,28 +7675,480 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
+    // THE TWO-BUTTON BRANCH, NAMED (issue 1373). This case has always landed on it and never
+    // said so, which is what let its one-CTA twin go unnoticed: `lab-jewelry` holds no tools of
+    // its own while the world holds twelve, so the panel offers the near route — switch the
+    // membership filter in place — as its primary and the world catalogue as the fallback. The
+    // primary renders only when `ghostRows.length > 0`, and its count is in its own hook, so
+    // asserting the hook is asserting the branch.
+    expectSelector: '[data-tool-empty-browse-world]',
+    expectContained: [
+      {
+        container: '[data-tool-library-empty]',
+        target: '[data-tool-empty-browse-world]',
+      },
+      {
+        container: '[data-tool-library-empty]',
+        target: '[data-tool-empty-open-catalogue]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    id: 'manager-tool-zero-state-no-world-tools-1280x720',
+    label: 'Manager — Tool zero state on a world with no Tools at all 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ONE-CTA BRANCH, WHICH IS THE STATE A NEW WORLD IS ACTUALLY IN (issue 1373).
+    //
+    // The panel has two honest answers and they are different sizes: switch the membership filter
+    // in place, which needs something adoptable to switch TO, and leave for the world catalogue,
+    // which is the only route when the world holds none either. `manager-tool-zero-state-empty-
+    // library-1280x720` always reaches the FIRST — `lab-jewelry` has no tools and the world has
+    // twelve — so the second branch, which is what a GM sees the first time they open Tool Rules
+    // in a world they just installed Fabricate into, was drawn by nothing.
+    //
+    // `noTools` IS THE WHOLE MECHANISM AND IT ALREADY EXISTED, so this needs no fixture change:
+    // the flag empties the world corpus, every system's own library and the flat roster together,
+    // which is what makes `ghostRows` empty and takes the primary off the panel. `world-tool-
+    // catalogue-empty` is the same flag one screen away, photographing the catalogue that has
+    // nothing to offer.
+    //
+    // NO `system` QUERY: with every library emptied the default system reaches the same state, so
+    // pinning one would state a dependency the case does not have.
+    query: { noTools: '1' },
+    steps: [{ selector: '#manager-nav-tool-rules' }],
+    expectView: 'tools',
+    expectSelector: '[data-tool-library-empty]',
+    // THE REMAINING ROUTE, INSIDE THE PANEL. There is no `expect` verb for an absence, so what
+    // this can assert is that the panel rendered and that its ONE action is the catalogue link;
+    // the sibling case above asserts the other branch's pair, and the two together are what make
+    // "which branch is this" a question the registry answers rather than one a reader guesses.
+    expectContained: [
+      {
+        container: '[data-tool-library-empty]',
+        target: '[data-tool-empty-open-catalogue]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    id: 'manager-tool-zero-state-browse-world-1280x720',
+    label: 'Manager — Tool zero state, world Tools browsed 1280x720',
+    // BEYOND: the live smoke walks no widened Tool rules list on a system holding none.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // WHAT PRESSING THE ZERO STATE'S PRIMARY ROUTE ACTUALLY DRAWS (issue 1373), and until this
+    // case it was unproducible. `manager-tool-zero-state-empty-library-1280x720` above ends at
+    // the panel and asserts the button EXISTS; nothing anywhere pressed it. The list body gated
+    // its zero state on this system's own adopted Tools rather than on the cohort the segment
+    // selects, so the button set a filter whose result the panel then hid — the ghost rows were
+    // derived, counted, sorted and paged, and thrown away by one boolean. The maintainer found
+    // that by hand on a real world, through a surface that had passed every gate.
+    //
+    // `lab-jewelry` is the same system its sibling above uses and for the same reason: it holds
+    // `tools: []` while the lab world holds twelve world Tools, so it lands in the panel with
+    // something to widen TO.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-empty-browse-world]' },
+    ],
+    expectView: 'tools',
+    // A NON-MEMBER ROW CARRYING ITS ONE ACTION. `data-tool-add-to-system` and
+    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so naming the first
+    // inside a row marked `absent` states both that the row rendered and that it rendered as a
+    // Tool this system has not adopted — which is the whole point of the widened cohort.
+    expectSelector: '.manager-tools-row[data-tool-row-member="absent"] [data-tool-add-to-system]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-tool-row-member="absent"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    id: 'manager-tool-zero-state-membership-all-1280x720',
+    label: 'Manager — Tool zero state, membership widened to all 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE SECOND ROUTE TO THE SAME STATE, AND IT IS NOT INFERABLE FROM THE FIRST (issue 1373).
+    // The maintainer reported two symptoms — the button did nothing AND the middle segment did
+    // nothing — and they are separate call sites: the segment sets the membership filter
+    // directly, while the button sets it from INSIDE the panel the filter was supposed to leave.
+    // A GM who reads `All world tools (12)` in the toolbar and clicks it never touches the
+    // button at all, so a case covering only the button would leave that route photographed by
+    // nothing.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '.manager-tools-row[data-tool-row-member="absent"] [data-tool-add-to-system]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-tool-row-member="absent"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // THE INHERITING STATE OF THE RULES EDITOR (issue 1373), and the only frame that shows it.
+    //
+    // `beyond` with no smoke label, for the same reason its sibling adoption case is: the live
+    // smoke walks no world-Tool adoption, and a MIGRATED Tool is `Overridden` on all four
+    // sections by construction — `migrateToolRequirementSections` records every existing
+    // system's own value as its own override, so every other Tool frame in this registry shows
+    // the override face. Adopting `hb-tool-mortar` into Smithing is what produces a membership
+    // record that inherits every section, and opening its rules is what photographs the
+    // `Inheriting` pill, the `World default: …` line and the read-only world value beneath it.
+    //
+    // IT LANDS ON `Requirements`, NOT ON THE DEFAULT `Breakage` TAB, and that is the point of the
+    // frame rather than a detail of it. `prerequisites` and `bonus` are the two sections that
+    // joined `TOOL_SECTIONS` at `1.31.0`, and they are the two the editor got wrong: `breakage`
+    // only ever LOOKED inherited because adoption used to copy the world value onto the in-system
+    // record, so a frame of the Breakage tab could not tell a union read from a raw one. The
+    // Requirements tab's two cards can — the lab world authors a world `prerequisites` and
+    // `bonus` for `hb-tool-mortar` precisely so they resolve to something a screenshot can read —
+    // and the effective-rules rail beside them states all FOUR sections in the same frame, so the
+    // inheriting breakage face is not lost by moving tab.
+    id: 'manager-tool-rules-inheriting-1280x720',
+    label: 'Manager — Tool rules inheriting the world defaults 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
+      { selector: '[data-tool-edit-rules="hb-tool-mortar"]' },
+      { selector: '#tool-tab-requirements' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-rule-card="bonus"][data-tool-rule-state="inheriting"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/],
+  }),
+  managerCase({
+    // A NON-MEMBER TOOL, SELECTED (issue 1373).
+    //
+    // The reference's own tool-rules frame is in exactly this state - its inspector shows
+    // `Mining Pick`, a `No rules here` pill and a pinned `Add Mining Pick to Mythwright Forge`
+    // - and no frame in this registry reached it. Both halves were implemented and neither was
+    // photographable: `data-tool-inspector-no-rules` and `data-tool-inspector-add` render only
+    // for a world Tool the selected system has no rules record for, which needs the membership
+    // filter widened AND the ghost row clicked rather than its own `Add to system` button.
+    //
+    // WHAT IT CATCHES. The panel is fed a DIFFERENT prop from a member's (`unadopted`, a world
+    // entry, against `tool`, a system record), so every regression in that branch is invisible
+    // to the member frames: an empty panel where a Tool was clicked, a `Enabled here` pill over
+    // rules that do not exist, a missing CTA, a rules list captioned `Effective rules here`
+    // rather than `What it would inherit here`, and - since this round - the `Inheritance`
+    // region wrongly rendering for a Tool with nothing to inherit through.
+    //
+    // It clicks the ROW rather than the row's `Add to system`: pressing that button adopts the
+    // Tool and destroys the state this case exists to photograph.
+    id: 'manager-tool-non-member-selected-1280x720',
+    label: 'Manager — Tool rules, non-member Tool selected 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"] .manager-tools-select-target',
+      },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-inspector-add="hb-tool-mortar"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // FILTERED TO NOTHING (issue 1373), and the state that let a whole hero panel ship green.
+    //
+    // No case in this registry has ever typed a query into this list, so the `filteredTools
+    // .length === 0` branch was drawn by nothing. What shipped there passed an `icon` and a
+    // `title` and no `filtered`, which took `EmptyState`'s CENTRAL hero treatment - a 44px
+    // inset, a 46px glyph tile and a 13px serif heading - where the reference draws one dashed
+    // box around a single 11.5px sentence. Every parity pass on this screen had reported the
+    // list complete.
+    //
+    // WHAT IT CATCHES. The panel's whole composition (no icon, no title, one sentence), the
+    // dashed-box geometry the `filtered` variant now states from `proto:2545`, and the copy -
+    // which names the FILTER rather than the search, because three controls narrow this list
+    // and only one of them is the query.
+    //
+    // The query is deliberately a string no fixture Tool can contain, rather than a plausible
+    // one: a case that reaches its state only while the fixture happens not to hold a matching
+    // name is a case that silently stops testing the moment a Tool is added.
+    id: 'manager-tool-rules-filtered-empty-1280x720',
+    label: 'Manager — Tool rules filtered to nothing 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-manager-tools-search] input', fill: 'qqzzxx' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-library-filtered-empty]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // THE `Overriding` MEMBERSHIP FILTER (issue 1373).
+    //
+    // Three segments narrow this list and only two of them were ever drawn: every case that
+    // touches the filter clicks `all`, so the third branch of `filteredRows` - the one that
+    // keeps a row only when its world join reports an overridden section - was unphotographed
+    // end to end, including the toolbar state that says which segment is live.
+    //
+    // WHAT IT CATCHES. The selected segment's own paint on the third position; the row set the
+    // branch produces; and the per-row `Overrides ...` sentence, which is the only thing on the
+    // screen that can disagree with the filter that selected the row.
+    id: 'manager-tool-rules-overriding-filter-1280x720',
+    label: 'Manager — Tool rules filtered to overriding 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="over"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-membership-filter="over"] [data-tool-membership-option="over"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // THE SORT ROW, DRIVEN (issue 1373).
+    //
+    // `SORT BY [Name] [Asc]` has only ever been photographed at its defaults, so neither the
+    // flipped glyph and label of the direction toggle nor the membership-first ordering of the
+    // `In this system` key was drawn by any frame. Both are a control's ONLY changed state:
+    // the toggle swaps its icon and its word together, and a swap that changed one and not the
+    // other would look correct in every existing frame.
+    //
+    // TWO VERBS, because the two halves of the row are two different controls: `select` on the
+    // native key picker and a click on the direction button. The order matters only in that
+    // both are applied before the frame, and the resulting list is sorted by membership,
+    // descending - the exact ordering no other case produces.
+    id: 'manager-tool-rules-sorted-desc-1280x720',
+    label: 'Manager — Tool rules sorted by membership descending 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '.manager-tools-sort-select', select: 'state' },
+      { selector: '.manager-tools-sort-direction' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-sort-direction="desc"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // A SELECTED ROW UNDER THE POINTER (issue 1373), which is how a live cascade defect stayed
+    // invisible through three parity passes.
+    //
+    // `[data-manager-view='tools'] .manager-tools-row:hover` was (0,4,0) and the selected-row
+    // rule is (0,3,1), so hover won: crossing the row a GM had just chosen repainted it from
+    // the accent fill to the pane's next rung and took the selection marking away. Nothing in
+    // the registry could report it, because no frame had a pointer resting on a row.
+    //
+    // THE LAST STEP IS THE HOVER, and it is a click rather than a verb of its own. Playwright's
+    // click moves the virtual mouse to the element's centre and LEAVES IT THERE - nothing in
+    // the runner moves it again, and `frame.screenshot()` does not - so the element a case
+    // clicks last is the element the frame photographs hovered. Every existing frame in this
+    // registry already carries that state on whatever it clicked last; this is the first case
+    // that depends on it, so it is stated rather than assumed. Adding a `hover` verb to the
+    // runner would say it more plainly, at the cost of making `view-lab-screenshots.mjs` a
+    // changed file and therefore selecting a full surface-coverage capture on every future
+    // touch of it.
+    //
+    // It clicks the LAST row, not the first: the first is already selected by the view's own
+    // auto-select on mount, so clicking it would prove nothing about a selection made under a
+    // pointer that stayed put.
+    //
+    // AND THE ASSERTION CARRIES `:hover`, which is what stops this case being vacuous. The frame
+    // it publishes is, by design, indistinguishable from the resting one — that IS the repair —
+    // so a case that only asserted `.is-selected` would go on passing if the pointer stopped
+    // arriving, and would then publish a resting frame as evidence of a hovered state.
+    // `document.querySelector` evaluates `:hover` against the real pointer, so the runner's own
+    // presence check is the proof.
+    id: 'manager-tool-rules-row-hovered-1280x720',
+    label: 'Manager — Tool rules selected row under the pointer 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="sm-tool-hammer"] .manager-tools-select-target',
+      },
+    ],
+    expectView: 'tools',
+    expectSelector: '.manager-tools-row[data-manager-tool-id="sm-tool-hammer"].is-selected:hover',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // THE BREAKAGE-MODE CARD'S OVERRIDDEN FACE (issue 1373).
+    //
+    // The card renders one of three source states at a time and every frame in this registry
+    // shows the same one: the lab world authors a world break mode, no lab system authors its
+    // own, so `breakageSource` is `world` and the pill reads `World default` everywhere. The
+    // `system` state - the amber `Overridden here` pill beside a THIRD selected segment - was
+    // reachable by one click and drawn by nothing.
+    //
+    // WHAT IT CATCHES. The tri-state's selected-segment paint on a position no other frame
+    // uses; the warning-toned pill; and the knock-on the whole list takes, since a check-driven
+    // authority re-labels every row's breakage chip.
+    //
+    // THE THIRD STATE, `Fabricate default`, IS NOT REACHABLE HERE and is deliberately not
+    // faked. It requires the WORLD to have authored no break mode at all, and the lab world
+    // authors one on purpose so that the World breakage card has a selected segment to draw.
+    // One world corpus serves every frame, so the two states are mutually exclusive by
+    // construction rather than by omission; `world-scope-tool-breakage-authority.test.js`
+    // covers that branch of `breakModeSourcePill` instead.
+    id: 'manager-tool-rules-breakage-overridden-1280x720',
+    label: 'Manager — Tool rules breakage mode overridden here 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-authority-pill="system"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    // THE EDITOR'S RAIL, SCROLLED (issue 1373).
+    //
+    // The rail has five regions and every editor frame in this registry photographs the first
+    // two. `HOW PLAYERS SEE IT`, `PREVIEW AS` and `REQUIRED FOR` sit below the fold at every
+    // height the registry captures, so three regions - the player tile with its broken-copy
+    // switch, the actor selector with its resolved-prerequisite readout, and the list of what
+    // in this system requires the Tool - shipped unphotographed.
+    //
+    // WHAT IT CATCHES. Each of those three resolves values the rules cards do not: the uses
+    // pill and the broken-copy note come from `projectToolPlayerPreview`, the usability row from
+    // a live prerequisite evaluation, and `REQUIRED FOR` from a store projection over recipes
+    // and gathering tasks. A defect in any of them - a mis-toned pill, an empty `Required for`
+    // over a Tool four recipes require, a usability sentence that stopped resolving - is
+    // currently reported by nothing at all.
+    //
+    // `scroll` on `[data-tool-required-for]`, the LAST region: bringing it into view brings the
+    // two above it with it, and it is a stable container rather than leaf content.
+    id: 'manager-tool-editor-rail-scrolled-1280x720',
+    label: 'Manager — Tool rules editor rail scrolled 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-required-for]', scroll: true },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-preview-usability]',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/Tool/,
-      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-tool-parity-02-overview-1280x720',
-    label: 'Manager — Tool parity 02 overview 1280x720',
-    smokeLabels: ['manager-tool-parity-02-overview-1280x720'],
+    // THE EDITOR WITH UNSAVED CHANGES (issue 1373).
+    //
+    // Every other editor frame photographs a CLEAN draft, where `Save rules` is disabled - so
+    // the screen's primary action has only ever been captured switched off, and a review that
+    // reads it as "a dim ghost, lower in emphasis than the two secondary buttons" is reading
+    // the only state a frame could show. The `Unsaved` chip has the same problem.
+    //
+    // WHAT IT CATCHES. The enabled primary's own paint and its rank against the two secondaries;
+    // the dirty chip; and - because the step that dirties the draft is the breakage choice - the
+    // `Limited uses` face of the radio group with its uses stepper, which is the state the
+    // registry could not otherwise reach on the default fixture. That last one is load-bearing
+    // this round: `Unlimited uses` and `Limited uses` are one `breakage.mode` split into two
+    // authored answers, and a frame that shows only one of the two cannot see them diverge.
+    //
+    // The step clicks the LABEL, never the `input` inside it: a radio card's input is overlaid
+    // by its own label, so a click aimed at the input is intercepted.
+    id: 'manager-tool-editor-dirty-1280x720',
+    label: 'Manager — Tool rules editor with unsaved changes 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-breakage-choice="limitedUses"]' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-limited-uses-stepper]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE OVERVIEW FRAME IS GONE BECAUSE THE OVERVIEW TAB IS (issue 1373). The system Tool rules
+    // editor's tabs are `Breakage · Requirements · Validation`; identity is world scope's, and
+    // `#tool-tab-overview` no longer exists to click, so a case pointed at it would fail its
+    // `expectView` rather than photograph anything.
+    //
+    // The slot photographs the tab's CLOSING state instead — the `Stop using this Tool here`
+    // callout, which is system scope's counterpart to the world entry's `Delete` and which no
+    // other frame reaches: 03 and 06 capture the same tab from the top, above the fold.
+    id: 'manager-tool-parity-02-remove-1280x720',
+    label: 'Manager — Tool parity 02 remove from system 1280x720',
+    smokeLabels: ['manager-tool-parity-02-remove-1280x720'],
     reaches: 'exact',
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
-      { selector: '#tool-tab-overview' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-remove-from-system]', scroll: true },
     ],
     expectView: 'tool-edit',
+    expectSelector: '[data-tool-remove-from-system]',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-long-name',
@@ -5712,17 +8160,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     // A long DISPLAY LABEL, authored on the fixture rather than typed: the field is the one
     // the smoke fills, and an authored value reaches the same overflow without a keystroke.
+    //
+    // NO TAB STEP. The field used to be on an `Overview` tab this case clicked; the system rules
+    // editor has no such tab (issue 1373), and the per-system label OVERRIDE the field became
+    // opens the `Breakage` tab, which is where the editor already lands.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] [data-tool-edit-rules]',
       },
-      { selector: '#tool-tab-overview' },
     ],
     expectView: 'tool-edit',
+    expectSelector: '[data-tool-label]',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolSystemScopeCards\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-03-breakage-1280x720',
@@ -5732,13 +8187,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    // THE STRIP IS CLAIMED HERE (issue 1373). `tools/ToolEditorTabs.svelte` used to be swallowed
+    // by the ten LIST cases' `tools/` directory glob, so a change to the tab list or either badge
+    // published ten frames of the screen the strip is not on. This is the frame that shows it at
+    // rest, on the tab the editor opens.
+    //
+    // AND THE RAIL. `tools/ToolBehaviorPreview.svelte` was in the same position: the world entry's
+    // two preview frames claim it and the SYSTEM editor's copy of it was reached only through that
+    // same glob, so a change confined to the preview left every system frame of it stale.
+    sourceMatches: [
+      ...TOOL_EDITOR_SHELL_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-repair',
@@ -5753,7 +8220,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
       // The repair editor sits below the breakage tab's own fold; without this the frame shows
@@ -5762,7 +8229,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      // The repair set IS a list of `RecipeIngredientOption` rows at system scope too, and this
+      // frame is the only one that photographs them there (issue 1373, round 6).
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      // The summary sentence's own module, claimed by name since the list cases stopped
+      // swallowing the whole `tools/` directory (issue 1373). It is the POPULATED sentence here
+      // and the empty one on `world-tool-entry-on-break-repair-empty`, which are its two arms.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-replacement',
@@ -5776,15 +8254,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
-        selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
       { selector: '[data-tool-replacement-target]', scroll: true },
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    // THE CARD ITSELF IS CLAIMED HERE (issue 1373, maintainer round 2). This is the only frame
+    // in the registry that photographs the replacement tile at SYSTEM scope, and it claimed the
+    // tab that mounts the card rather than the card — so a change confined to
+    // `ToolReplacementTarget` published the world entry's frame and left the system one stale.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-immune',
@@ -5802,13 +8287,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-authority-segment="checkDriven"]' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-anvilstone"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-anvilstone"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-04-requirements-1280x720',
@@ -5818,13 +8306,144 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-requirements' },
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    // NO `ToolInheritCard` CLAIM HERE, and that is a choice rather than an omission: this case
+    // opens the Anvil, whose two sections are the canonical empty, so both cards draw their
+    // off-state sentence and neither shows the inherit row the card's head is spent on.
+    // `manager-tool-prerequisites-selected-1280x720` is the system-scope frame that does, and it
+    // claims the card.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-tool-prerequisites-selected-1280x720',
+    label: 'Manager — Tool requirements, prerequisites with a selection 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE STATE NO FRAME PHOTOGRAPHED (issue 1373, maintainer round 5). The prerequisite list is
+    // the tab's other library list, and until this case existed the registry contained no frame
+    // that drew it at all — let alone one with a row selected.
+    // `manager-tool-parity-04-requirements-1280x720` opens the Anvil, whose two sections are the
+    // canonical empty, so it photographs two off-switches and no decision;
+    // `manager-tool-bonus-hand-typed-1280x720` opens the stylus, whose prerequisites are off by
+    // design so its bonus card fits one 720px frame; and `world-tool-entry-requirements` opens
+    // the hammer, which carries a world-default bonus and no prerequisites. So the list's rows,
+    // its checkbox and its selected fill were unphotographable, which is how a bespoke row with
+    // its own metrics, its own fill and its own selected treatment survived beside the shared
+    // one the section below it draws.
+    //
+    // WHAT IT CATCHES that nothing else can: the row losing its geometry (the sheet's joined
+    // cell blocks are anchored on the LIST class, so a rename silently draws a row with no box
+    // at all), the checked box painting the wrong ink or overflowing its square, the selected
+    // ROW painting the option-card treatment's leading accent bar, and either of the two retired
+    // headings coming back. `rw-tool-caliper` carries one of the world's five prerequisites, so
+    // the frame shows a checked row against four unchecked ones in the same picture — which is
+    // the only way a selected-state regression is visible rather than merely absent.
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
+      },
+      { selector: '#tool-tab-requirements' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-prerequisite-list]',
+    // THE CHECKED ROW AND AN UNCHECKED ONE. A frame proving the list renders but not that a
+    // selection reads differently from a non-selection would be evidence for half the control.
+    expectContained: [
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target: '[data-tool-prerequisite-row="rw-prereq-arcana"].is-active input:checked',
+      },
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target:
+          '[data-tool-prerequisite-row="rw-prereq-int"] .manager-modifier-readonly-expression',
+      },
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target: '[data-tool-prerequisites-summary]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The row both of this tab's lists draw (issue 1373, round 5), and the checkbox the
+      // prerequisite list trails on it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+      // Deliberately NO pattern for `components/SelectionCheckbox.svelte`, for the reason
+      // `manager-setup-first-run` records: it is a broad signal, `selectRenderFileCases`
+      // `continue`s on one BEFORE consulting any case's `sourceMatches`, and such an entry would
+      // be unreachable. This case is reached through `BROAD_SIGNAL_CASE_OVERRIDES` instead.
+      //
+      // The card whose eyebrow, title and description line this frame heads both sections with.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+      // AND THE TAB STRIP, on the one system frame that draws its REQUIREMENTS badge (issue
+      // 1373). The badge is suppressed at zero by the primitive's own rule, and every other
+      // editor frame opens a Tool whose requirement count is zero, so this is the frame that
+      // shows a strip with a count on it.
+      ...TOOL_EDITOR_SHELL_MATCHES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-tool-bonus-hand-typed-1280x720',
+    label: 'Manager — Tool requirements, hand-typed bonus 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE VALUE THE LIBRARY DOES NOT CONTAIN (issue 1373, maintainer round 3). Replacing a free
+    // text field with a pick list makes every expression a GM already typed unrepresentable, and
+    // the honest failure mode — highlighting nothing, then dropping the value on the next save —
+    // is invisible in a screenshot because a list with nothing selected looks like a list.
+    //
+    // `rw-tool-stylus` carries `+2`, a flat bonus no world modifier expresses, so this frame is
+    // that record's own row at the head of the list: selected, showing the value, and saying
+    // where it came from. It needs no fixture of its own — the stylus has carried that bonus
+    // since the Tool corpus was seeded, and nothing could render it until now.
+    //
+    // IT IS ALSO THE SYSTEM-SCOPE TWIN OF THE WHOLE SECTION (`proto:2886`-`2905`). The stylus is
+    // a MEMBER of a world Tool record — the world-scope pass lifts every in-system tool into one
+    // — so this is the overriding face, with the inherit switch on the card head and the
+    // section's own enable switch as the first row of the body, and it is the only frame that
+    // shows the modifier list at that scope. `manager-tool-parity-04-requirements-1280x720`
+    // opens the Anvil, whose two sections are the canonical empty, so it photographs two
+    // off-switches and no decision at all — which is how a free-text bonus field survived two
+    // parity rounds here. The stylus's prerequisites are off, which is what keeps the bonus
+    // card's head, its eyebrow and its rows in one 720px frame with no scroll step.
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] [data-tool-edit-rules]',
+      },
+      { selector: '#tool-tab-requirements' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-bonus-modifier="fabricate:tool-bonus-custom"]',
+    expectContained: [
+      {
+        container: '[data-tool-rule-card="bonus"]',
+        target: '[data-tool-bonus-modifier="fabricate:tool-bonus-custom"] input:checked',
+      },
+      { container: '[data-tool-rule-card="bonus"]', target: '[data-tool-bonus-note]' },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-05-validation-1280x720',
@@ -5834,13 +8453,42 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
+    // THE TAB HAD A CASE AND NO ASSERTION (issue 1373). `expectView: 'tool-edit'` is satisfied by
+    // the editor on ANY tab, so this case would have photographed the Breakage tab under the
+    // Validation tab's name had the click failed — and that is not a hypothetical failure mode
+    // here: the strip's ids moved in this same issue when `Overview` was retired. Four separate
+    // defects accumulated inside this surface unseen, which is what an unasserted frame buys.
+    expectSelector: '[data-tool-validation-tab]',
+    // THE SURFACE'S THREE PARTS, each inside the region that owns it: the summary medallion, the
+    // counts rail beside it, and a real check row in the group below. A frame proving only the
+    // wrapper would pass over a surface that had rendered its head and no rows, which is the
+    // shape a projection fault arrives in.
+    expectContained: [
+      {
+        container: '[data-tool-validation-tab]',
+        target: '[data-editor-validation-summary]',
+      },
+      {
+        container: '[data-tool-validation-tab]',
+        target: '[data-editor-validation-counts]',
+      },
+      {
+        container: '[data-tool-validation-tab]',
+        target: '[data-tool-validation-check]',
+      },
+    ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    // THE STRIP'S PASSING BADGE. This is the frame that draws the NEUTRAL tick — the treatment
+    // issue 1373 took the filled success disc down to — and its danger twin is the frame below.
+    sourceMatches: [
+      ...TOOL_EDITOR_SHELL_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-invalid-validation',
@@ -5857,15 +8505,41 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-requirements' },
-      { selector: '.manager-checklist-card-row:has(input[value="rw-prereq-arcana"])' },
+      // ADDRESSED BY THE ROW'S OWN HOOK since issue 1373's round 5: the prerequisite list is
+      // `ModifierLibraryRow` now, and `data-tool-prerequisite-row` carries the entry id, so this
+      // step no longer reaches through a class the list does not write.
+      { selector: '[data-tool-prerequisite-row="rw-prereq-arcana"]' },
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
+    // THE BLOCKED ROW ITSELF, not the tab (issue 1373). This case walks four steps to reach a
+    // draft state persistence cannot hold, and `expectView` is satisfied by the editor on any
+    // tab with the prerequisite still ticked — so every one of those four steps could have
+    // failed quietly and the frame would have published the all-clear surface under the name of
+    // the blocking one. `.is-block` is the class the blocking status writes and `BLOCKS ENABLE`
+    // is the only pill that renders on it, so this is the corpus's one frame of that word.
+    expectSelector: '[data-tool-validation-tab] .manager-recipe-val-row.is-block',
+    expectContained: [
+      {
+        container: '[data-tool-validation-tab]',
+        target: '[data-editor-validation-count="blocking"]',
+      },
+      {
+        container: '[data-tool-validation-tab]',
+        target: '.manager-recipe-val-row.is-block .manager-recipe-val-pill',
+      },
+    ],
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    // THE STRIP'S DANGER BADGE, which is the count `manager-tool-parity-05-validation-1280x720`'s
+    // neutral tick replaces. One frame each, because a change to either treatment is invisible in
+    // the other.
+    sourceMatches: [
+      ...TOOL_EDITOR_SHELL_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-06-breakage-900x700',
@@ -5875,13 +8549,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
     position: { width: 900, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-wrapping-680',
@@ -5893,16 +8570,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 680, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
-    sourceMatches: [
-      // The shared scoped-entity preview shell (issue 1362). `ToolBehaviorPreview` renders
-      // through it on every tab of the Tool editor, so this frame shows it.
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
-      // The shared scoped-entity validation shell (issue 1362). Both validation tabs are
-      // callers of it, so it is claimed on the two frames that photograph one.
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedValidationTab\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/Tool/,
-      /^src\/ui\/svelte\/apps\/manager\/tools\//,
-    ],
+    // TWO CLAIMS REMOVED HERE, AND NEITHER WAS ROUTING (issue 1373). This case is the LIST at
+    // 680px — its steps are one rail click and its `expectView` is `tools` — so it renders
+    // `ToolsBrowserView` and the `ToolBrowserInspector` rail beside it, and nothing else. It
+    // claimed `scoped/ScopedEntityPreview.svelte` on the reasoning that the Tool editor's rail
+    // renders through it, and `scoped/ScopedValidationTab.svelte` on the reasoning that both
+    // validation tabs are callers of it. Both are true of the EDITOR and neither is true of this
+    // frame, so a change to either published a 680px photograph of a list that cannot contain it.
+    //
+    // `manager-tool-editor-rail-scrolled-1280x720` and `world-tool-entry-player-preview` claim
+    // the preview shell; `manager-essence-edit-validation` and `world-tool-entry-validation`
+    // claim the validation shell. Every one of those four frames draws the file it names.
+    sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
     id: 'manager-knowledge-owned-copies',

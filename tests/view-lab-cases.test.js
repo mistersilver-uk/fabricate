@@ -37,6 +37,8 @@ import {
   parsePlayerMountRegions,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
+  WORLD_TOOL_SEARCH_MISS_TERM,
+  WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
@@ -1222,6 +1224,83 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   assert.match(worldSource, /noParties\s*\n?\s*\? \[\]/);
 });
 
+test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
+  // WHY THIS EXISTS AT ALL is the reason its parties counterpart above does: an over-match is
+  // INVISIBLE in a screenshot. A frame showing four rows where two were meant looks like a frame,
+  // and the catalogue's filter does not search only names — `worldToolSearchText` concatenates the
+  // entity's name, its description AND both of its Item uuids, so a term chosen by reading the
+  // fixture's names can be answered by a uuid nobody looked at.
+  const [{ buildLabContent }, { worldToolSearchText }] = await Promise.all([
+    import('./view-lab/world/labContent.js'),
+    import('../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'),
+  ]);
+  const content = buildLabContent();
+
+  // THE DOMAIN IS THE UNION, and that is what makes the derivation honest rather than
+  // convenient. The catalogue's twelve rows come from two places: the seven records the fixture
+  // seeds into `toolScope.entities`, and the five the `1.30.0` world-scope pass LIFTS out of the
+  // crafting systems' own `tools[]` — the lab seeds no `migrationVersion`, so every migration
+  // runs on every build. Deriving over the seeded set alone would leave the five migrated rows
+  // out of the check, and both of the rows this term is chosen for are migrated ones.
+  const seeded = new Map(content.toolScope.entities.map((entity) => [entity.id, entity]));
+  const domain = [
+    ...content.toolScope.entities,
+    ...content.tools
+      .filter((tool) => !seeded.has(tool.id))
+      // The shape the lift produces, in the fields the search reads. `label` is the authored
+      // display override and it is what the row draws when a tool carries one.
+      .map((tool) => ({
+        id: tool.id,
+        name: tool.label ?? tool.name,
+        description: tool.description ?? '',
+        originItemUuid: tool.originItemUuid,
+        registeredItemUuid: tool.registeredItemUuid,
+      })),
+  ];
+  assert.equal(domain.length, 12, 'the lab catalogue holds twelve rows');
+
+  const survivors = (term) =>
+    domain
+      .filter((entity) => worldToolSearchText({ entity }).includes(term.toLowerCase()))
+      .map((entity) => entity.id)
+      .sort();
+
+  assert.deepEqual(
+    survivors(WORLD_TOOL_SEARCH_TERM),
+    ['rw-tool-punch', 'rw-tool-stylus'],
+    'the search frame claims exactly these two rows'
+  );
+  assert.deepEqual(
+    survivors(WORLD_TOOL_SEARCH_MISS_TERM),
+    [],
+    'and the filtered-empty frame claims a term nothing answers'
+  );
+
+  // NON-VACUITY: a `searchOf` that answered the empty string for everything would satisfy both
+  // assertions above, and so would a domain the filter reads nothing from.
+  assert.ok(
+    survivors('tool').length > 0,
+    'the search text is non-empty; the two assertions above are answering something'
+  );
+
+  // AND THE CASES ACTUALLY TYPE THEM. The constants are exported so the two ends cannot drift,
+  // which only holds while the cases still read them.
+  assert.deepEqual(getCaseById('world-tool-catalogue-search').steps.at(-1), {
+    selector: '[data-scoped-list-search]',
+    fill: WORLD_TOOL_SEARCH_TERM,
+  });
+  assert.deepEqual(getCaseById('world-tool-catalogue-filtered-empty').steps.at(-1), {
+    selector: '[data-scoped-list-search]',
+    fill: WORLD_TOOL_SEARCH_MISS_TERM,
+  });
+  assert.ok(
+    getCaseById('world-tool-catalogue-search').expectContained.some(
+      (rule) => rule.target === '[data-scoped-list-row="rw-tool-punch"]'
+    ),
+    'the second survivor is asserted, so a filter that widened to one row fails the capture'
+  );
+});
+
 test('World Downtime publishes four tabs plus narrow/collapsed frames with generic browser assertions', () => {
   const allCases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('manager-world-downtime-'));
   assert.deepEqual(
@@ -1815,21 +1894,42 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // gathering-task frame draws the menu CLOSED — where the whole conversion is a wrapper
   // class and a scoping hash.
   //
+  // The FIFTH is a fifth CONFIGURATION rather than a fifth mode (issue 1373, round 8): the
+  // recipe row's `or…` menu is the only frame that renders the `popoverTitle` header on a panel
+  // with NO search field, at a caller-fixed 150px. The parties frames draw the header over a
+  // search row, the availability menu draws the search-less list with no header, and neither can
+  // show what happens where the two meet — which is where the shared box's `min-width: 240px`
+  // floor silently overrode a caller asking for 150.
+  //
   // The FOURTH is not a mode but an APPLICATION (issue 1475). Those three are all manager
   // frames, and until `ActorSelectTopBar` converted, the manager was the only place this
   // primitive could paint at all. `player-actor-picker` opens it in the player window, so
   // a regression that broke the primitive only outside the manager — a re-rooted family
   // reverted, a portal host narrowed back to `.fabricate-manager` — no longer publishes
   // three frames in every one of which it still works.
+  //
+  // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
+  // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
+  // above open a picker over a POPULATED list, so the branch that renders when the list is empty
+  // — reached by every one of the 22 call sites, and by five of them with no `emptyHint` to draw
+  // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
+  // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
+  // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
+  // WORLD scope, where the vocabulary is the union of every world component's own
+  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
+  // and in a freshly installed one alike, which is the state the maintainer met.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
       'fabricate-app-shell',
       'manager-components-normal',
       'manager-gathering-task-availability-menu',
+      'manager-recipe-edit-ingredients-or-menu',
+      'manager-recipe-edit-tag-picker',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );
 });
@@ -4337,5 +4437,128 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
     ),
     [FALLBACK_CASE_ID],
     'an unmatched UI path falls through to the fallback, which is what the probe rules out'
+  );
+});
+
+// ── The world-tool capture cases and the lab fixture that feeds them (issue 1373) ──────────
+//
+// A CASE THAT NAMES A FIXTURE RECORD IS A HAND-MAINTAINED MIRROR, and this is the guard that
+// stops it rotting silently. The `world-tool-entry` case is reached by CLICKING a catalogue
+// row, so its steps name a world tool by id; the capture driver throws by name on a selector
+// that matches nothing, and a case registered ahead of its data fails the capture run WHOLE,
+// thereafter, for every change that touches a capture input.
+//
+// So the ids the cases click are resolved against the lab world's own corpus, through the REAL
+// store and the REAL projection rather than by reading the fixture literal: what has to hold is
+// that the record survives normalization and projects a row, not that a key is present.
+/**
+ * The one `(case, row)` pair whose row deliberately has NO membership record.
+ *
+ * The clause this exempts is a real one and stays for every other case: a world Tool ENTRY frame
+ * taken on a record no crafting system has adopted shows an empty per-system cluster, and that is
+ * a frame of an empty state rather than of the screen.
+ *
+ * `world-tool-entry-unlinked` is photographing something else, and its own `expectContained`
+ * says so: the SOURCE tile's unlinked face, on the Overview tab, which is where a world record
+ * with no game-world Item behind it states what it has and what it lacks. `worldScopeEntityGrouping`
+ * records that state as one the `1.30.0` migration produces, and `lab-tool-unlinked` is the lab
+ * corpus's instance of it. Giving it a membership to satisfy the clause would put a row it does
+ * not have into the catalogue, the system Tool Rules library and three other frames, to green a
+ * clause about a cluster this case's frame does not contain.
+ *
+ * The key is `<caseId>|<rowId>`, so the exemption is a pair rather than a blanket pass on the id:
+ * a second case clicking the same row still has to answer the clause.
+ *
+ * @type {Set<string>}
+ */
+const MEMBERLESS_ROW_CASES = new Set([
+  'world-tool-entry-unlinked|lab-tool-unlinked',
+  // The DANGLING SOURCE LINK record (issue 1373). Like `lab-tool-unlinked` above it, it is a
+  // world-ONLY entity: the state it exists to draw — `ItemDropZone`'s `missing` face, which
+  // renders only when a record NAMES an Item and that Item does not resolve — is a fact about a
+  // world record and about nothing a crafting system holds, and giving it a membership would put
+  // an unresolvable Tool into a system's rules list on every other frame of that list.
+  'world-tool-entry-source-missing|lab-tool-warped-crucible',
+  // The same record on its Validation tab. Its memberlessness is not incidental there — it is one
+  // of the two warnings the frame exists to photograph, and the check that reports it says so in
+  // as many words: `No crafting system has this Tool, so its world defaults reach nothing.`
+  'world-tool-entry-validation|lab-tool-warped-crucible',
+]);
+
+test('every world tool id the capture cases click exists in the lab world, projected', async () => {
+  const [{ buildLabContent }, { createToolScopeStore }, { projectWorldScopeEntity }] =
+    await Promise.all([
+      import('./view-lab/world/labContent.js'),
+      import('../src/systems/worldScopeStores.js'),
+      import('../src/ui/svelte/stores/worldScopeProjection.js'),
+    ]);
+
+  const content = buildLabContent();
+  const settings = new Map([['toolScope', content.toolScope]]);
+  const store = createToolScopeStore({
+    getSetting: (key) => settings.get(key),
+    setSetting: async () => {},
+  });
+  store.load();
+  const scope = projectWorldScopeEntity({
+    entityType: 'tool',
+    corpus: store.corpus(),
+    systems: content.systems.map((system) => ({ id: system.id, name: system.name })),
+  });
+
+  // PAIRED WITH THE CASE THAT CLICKS IT, not flattened to a set of ids (issue 1373, round 2).
+  // The membership clause below has exactly one honest exception and it is a PER-CASE fact, so
+  // a bare set of ids could not express it without exempting the id everywhere.
+  const clicked = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(
+        /\[data-scoped-list-(?:row|inspect)="([^"]+)"\]/g
+      )) {
+        clicked.push({ caseId: viewCase.id, id });
+      }
+    }
+  }
+  assert.ok(clicked.length > 0, 'the scan found no clicked row ids; it is broken');
+
+  for (const { caseId, id } of clicked) {
+    const entry = scope.entries.find((candidate) => candidate.id === id);
+    assert.ok(
+      Boolean(entry),
+      `a capture case clicks the world row "${id}", which the lab world does not hold`
+    );
+    if (MEMBERLESS_ROW_CASES.has(`${caseId}|${id}`)) continue;
+    assert.ok(
+      entry.membershipCount > 0,
+      `"${id}" has no membership record, so its entry editor shows no per-system row and the ` +
+        'frame is evidence of an empty state rather than of the screen'
+    );
+  }
+
+  // AND THE EXEMPTIONS ARE LIVE. An entry naming a pair no case makes, or one whose record has
+  // since gained a membership, is a permission that has stopped describing anything - and it
+  // would sit here silently granting the next author a pass they did not ask for.
+  for (const key of MEMBERLESS_ROW_CASES) {
+    const [caseId, id] = key.split('|');
+    assert.ok(
+      clicked.some((pair) => pair.caseId === caseId && pair.id === id),
+      `${key} exempts a click no case makes; the exemption is stale`
+    );
+    assert.equal(
+      scope.entries.find((candidate) => candidate.id === id)?.membershipCount,
+      0,
+      `${key} exempts a record that HAS a membership now, so the exemption is stale`
+    );
+  }
+
+  // NON-VACUITY ON THE FIXTURE, not only on the scan. Both states the catalogue draws have to
+  // exist, or the frame shows one badge and proves nothing about the other.
+  assert.ok(
+    scope.entries.some((entry) => entry.hasSourceLink),
+    'the lab world holds a LINKED world tool'
+  );
+  assert.ok(
+    scope.entries.some((entry) => !entry.hasSourceLink),
+    'and an UNLINKED one, which is the state a source-item badge alone cannot show'
   );
 });

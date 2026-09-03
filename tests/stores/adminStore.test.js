@@ -9082,9 +9082,16 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
    * one performs exactly one); this pins that the STORE actually supplies it.
    *
    * An exact budget rather than a bound, because the quantity is a per-refresh fetch count
-   * and every one of them copies the whole library. The three are the system list's per-system
-   * `recipeCount`, this cohort fetch, and the validation report — dropping the threading adds
-   * a fourth, and any newly added cohort read has to move this number deliberately.
+   * and every one of them copies the whole library. The first three are the system list's
+   * per-system `recipeCount`, this cohort fetch, and the validation report — dropping the
+   * threading adds another, and any newly added cohort read has to move this number
+   * deliberately.
+   *
+   * THE FOURTH IS `_worldToolUsage` (issue 1373), and it is moved here deliberately rather
+   * than absorbed: the world Tools Catalogue states how many recipes require each world Tool
+   * PER CRAFTING SYSTEM, and that count cannot come from the threaded cohort because the
+   * threaded cohort is the SELECTED system's alone. So the budget is three plus ONE PER
+   * CRAFTING SYSTEM, and this fixture holds exactly one.
    */
   it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
     const services = createMockServices();
@@ -9105,14 +9112,15 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
     await store.refresh();
     assert.equal(
       cohortFetches,
-      3,
-      'one GM refresh reads the system recipe cohort three times, and the row projection is ' +
-        'not one of them: it projects from the array the refresh already holds'
+      4,
+      'one GM refresh reads the system recipe cohort three times plus once per crafting ' +
+        'system for the world Tool usage count, and the row projection is not one of them: ' +
+        'it projects from the array the refresh already holds'
     );
 
     // POSITIVE CONTROL, same fixture, same counter: the counter is live and the budget is
     // per-refresh rather than a one-off.
     await store.refresh();
-    assert.equal(cohortFetches, 6, 'the counter CAN go up — by exactly one refresh worth');
+    assert.equal(cohortFetches, 8, 'the counter CAN go up — by exactly one refresh worth');
   });
 });

@@ -8,8 +8,9 @@
  *
  * ## A component has ONE section, and the row set is derived rather than listed
  *
- * `COMPONENT_SECTIONS` is `['category']`; essences have two; tools have two, plus the seeded
- * `repairRequirements` that is NOT a section and gets no switch. Every row set here comes
+ * `COMPONENT_SECTIONS` is `['category']`; essences have two; tools have FOUR since `1.31.0`
+ * (`breakage`, `onBreak`, `prerequisites`, `bonus`), plus the seeded `repairRequirements` that is
+ * NOT a section and gets no switch. Every row set here comes
  * from `WORLD_SCOPE_DESCRIPTORS[entityType].sections`, so a screen cannot draw a switch for a
  * field the resolver does not read through - the failure that produces is an inherit toggle
  * whose write `normalizeMembership` discards on the next `load()`.
@@ -87,15 +88,23 @@ const SECTION_COPY = Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Sections.OnBreak',
     label: 'On break',
   }),
+  prerequisites: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Sections.Prerequisites',
+    label: 'Prerequisites',
+  }),
+  bonus: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Sections.Bonus',
+    label: 'Check bonus',
+  }),
 });
 
 /**
  * The label one section renders under, localized through the caller's `text` resolver.
  *
  * EXPORTED so a catalogue's per-section `inheritCounts` are labelled from the ONE list rather
- * than a restated five (issue 1380). `SECTION_COPY` stays module-private: what a caller needs
+ * than a restated set (issue 1380). `SECTION_COPY` stays module-private: what a caller needs
  * is the resolved label for a section it already holds, not the table — and handing out the
- * table is how a second copy of these five strings gets written, which is the mirror rot the
+ * table is how a second copy of these strings gets written, which is the mirror rot the
  * seeded-section note above guards against for its own list.
  *
  * An unknown section falls back to its own key rather than an empty string, so a section added

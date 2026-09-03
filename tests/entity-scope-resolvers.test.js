@@ -275,10 +275,11 @@ test('the two essence inherit switches are independent', () => {
 // --- Tool: the hard block, the repairRequirements seed, the breakage authority (criteria 2, 6) -
 
 test('the SEEDED sections are disjoint from the inherited ones, and stay that way', () => {
-  // Three world-default sections, TWO of them inherited. `repairRequirements` is the third and is
-  // a SEED (`seedToolRepairRequirements`), so promoting it into TOOL_SECTIONS would silently give
-  // it an inherit switch, a live world parent, and a UI row for a value the world scope cannot
-  // even address — a repair recipe names ingredient groups over the OWNING SYSTEM's components.
+  // FIVE world-default sections, FOUR of them inherited since `1.31.0` (issue 1373).
+  // `repairRequirements` is the fifth and is a SEED (`seedToolRepairRequirements`), so promoting
+  // it into TOOL_SECTIONS would silently give it an inherit switch, a live world parent, and a UI
+  // row for a value the world scope cannot even address — a repair recipe names ingredient
+  // groups over the OWNING SYSTEM's components.
   assert.deepStrictEqual([...TOOL_SEEDED_SECTIONS], ['repairRequirements']);
   for (const seeded of TOOL_SEEDED_SECTIONS) {
     assert.ok(
@@ -290,8 +291,8 @@ test('the SEEDED sections are disjoint from the inherited ones, and stay that wa
   assert.deepStrictEqual(overlap, [], 'the two lists are disjoint in both directions');
   assert.equal(
     TOOL_SCOPE.sections.length + TOOL_SEEDED_SECTIONS.length,
-    3,
-    'three world-default sections in total'
+    5,
+    'five world-default sections in total'
   );
 });
 

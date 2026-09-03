@@ -408,7 +408,10 @@ const REVIEWED = [
     id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled)'),
     disposition: 'INTENDED',
     convertedReach: [
-      { file: 'src/ui/svelte/apps/manager/ToolEditView.svelte', role: 'ghost', buttons: 1 },
+      // TWO since issue 1373: `World Tool` joined `Back to Tool Rules` on the ghost role,
+      // because `proto:2601` and `proto:2602` are one style string and the two buttons sit
+      // side by side.
+      { file: 'src/ui/svelte/apps/manager/ToolEditView.svelte', role: 'ghost', buttons: 2 },
       {
         file: 'src/ui/svelte/apps/manager/component/ComponentEditorHeader.svelte',
         role: 'ghost',
@@ -464,6 +467,17 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
         container: 'manager-header-actions',
+        // 3 -> 4 with issue 1373's `World Tool` header action: the rules LIST already
+        // advertised `Edit the world Tool`, and the editor behind `Edit rules` had no route to
+        // that record, so the list promised a destination the next screen could not reach.
+        //
+        // 4 -> 3 in the same issue, once the rules editor was rebuilt against its design. The
+        // header lost `Delete`: at SYSTEM scope the destructive verb is `Remove from system`,
+        // an explained callout at the foot of the Breakage tab, because removing a Tool from
+        // one system and deleting the world record are different acts and a bare header button
+        // could say which it was. `Delete` survives only on the world Tool entry, which is the
+        // scope that owns the record. So this container renders `World Tool`, `Back to Tool
+        // Rules` and `Save rules`.
         buttons: 3,
       },
     ],
@@ -509,7 +523,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
     disposition: 'EXCLUDE',
-    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:147'],
+    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:153'],
     why:
       MOVED_POPULATION +
       'The move is unusually clean here, because this entry always rested on the site that ' +
@@ -686,6 +700,36 @@ const REVIEWED = [
       'from the layout context — 26px rather than the page-level 34px — because five of those ' +
       'rows plus three cards, a search field and a pager have to fit one 300px inspector ' +
       'column, which is the arrangement the prototype draws (`essences.png`).',
+  },
+
+  {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-tile:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE - issue 1373`s round-2 parity pass wrote it. The ' +
+      'replacement Component control is a `SearchablePopover` trigger rendered from this ' +
+      'card`s own `triggerClass` string, so it never gains `fab-manager-button` and this rule ' +
+      'cannot be re-chained onto the primitive. What it states is that the FILLED face is the ' +
+      'design`s tile (`proto:2205`) rather than a select: the box moves to the row that holds ' +
+      'the trigger and the unlink, and the trigger itself is neutralised to a chromeless ' +
+      'region inside it.',
+  },
+  {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-drop:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'The EMPTY face`s half of the entry above, and the same population: one ' +
+      '`SearchablePopover` trigger, from the same `triggerClass` string. It states the 28px ' +
+      'inline search pill the design draws inside the drop zone (`proto:2216`) against the ' +
+      'sheet`s `width: 100%`, which had made the affordance a second full-width select.',
   },
 
   {
@@ -1332,10 +1376,30 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // could not have named because the file did not exist yet when it was written. It is left
   // unconverted, exactly like the other 16, for the same reason: converting a `triggerClass`
   // site changes `SearchablePopover`'s own trigger contract rather than this call site's.
+  //
+  // AN 18TH LANDED WITH `tools/ToolReplacementTarget.svelte` (issue 1373, maintainer round 2).
+  // That component is where the system Tool editor's one-line replacement picker went when the
+  // design's full card — a drop zone with `Click to search`, or a filled tile with an unlink —
+  // shipped at both scopes, and the two faces are two `triggerClass` sites where the block it
+  // replaced had one. The count moves by one rather than by two for that reason. Both stay
+  // unconverted on the standing argument above.
+  //
+  // AND SIX LEFT AT ISSUE 1373's MAINTAINER ROUND 5, taking the count to 12. The repair and
+  // ingredient row converged on the design's own anatomy (`proto:2248`), which is a kind
+  // `<select>` plus a field the GM types into — so the row's three `SearchablePopover` triggers
+  // (component, essence, currency unit) are not triggers any more, they are an inline search
+  // with its suggestions beneath it, and the two set-level adders that were PICKERS became
+  // plain dashed `<ManagerButton>`s that create an empty row. The sixth is `+ Tag`, which the
+  // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
+  // writing no `manager-button` class at all.
+  //
+  // Licensed by the same rule as the entries above: each of the six SITES left the product,
+  // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
+  // field in the same place on the same screen; none was silently unconverted.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    17,
-    'plus the 17 SearchablePopover triggerClass sites named as debt'
+    12,
+    'plus the 12 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

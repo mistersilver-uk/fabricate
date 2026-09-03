@@ -49,7 +49,10 @@
      restores focus to it on close — has no other way to reach it.
    - density: 'default' (the manager's one chip scale), 'row' — the Checks Studio
      modifier row's own scale for an in-line annotation chip (the bounds chip, the
-     "Rolls dice" chip), taken from the prototype (issue 1096) — or 'action', the page
+     "Rolls dice" chip), taken from the prototype (issue 1096) — 'list', a browser ROW's
+     own in-line pill, which the reference draws smaller and quieter than either
+     (`proto:4872`: a ~15px stadium at 9px/600 in the secondary ink on the soft surface) —
+     or 'action', the page
      header's action cluster, where a chip stands in the same row as the Back / Delete /
      Save buttons and has to be one of them. `styles/fabricate.css`
      cannot state it: that sheet imports at `layer(modules)` while this component's
@@ -141,6 +144,7 @@
       mono ? 'is-mono' : '',
       truncate ? 'is-truncated' : '',
       density === 'row' ? 'is-row' : '',
+      density === 'list' ? 'is-list' : '',
       density === 'action' ? 'is-action' : '',
       extraClass,
     ]
@@ -389,6 +393,43 @@
     font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  /* LIST density (issue 1373): a browser ROW's in-line pill — the Tool Rules list's breakage
+     and state pills, and the same construction on every list the reference draws.
+     `proto:4872` states it exactly: `padding: 1px 8px; border-radius: 999px; background:
+     var(--surface-soft); border: 1px solid var(--border); font: 600 9px var(--sans); color:
+     var(--text2)`, a stadium about 15px tall.
+
+     THE DEFAULT SCALE IS FIVE PIXELS TALLER AND A WEIGHT HEAVIER than that, which is a lot on
+     a chip that sits under a 13.5px row name and is meant to read as an annotation of it. The
+     row was carrying two chips at nearly the height of the name above them.
+
+     A VARIANT ON THE PRIMITIVE, not a caller override, for the reason `density` documents
+     above — and here that reason is enforced rather than advisory: `manager-layout.test.js`
+     asserts in terms that `.manager-tools-library-chips .manager-chip` must not exist in the
+     global sheet, and its hand-rolled-chip ratchet fails on the token appearing anywhere in a
+     manager `.svelte` other than this one. Both directions are closed on purpose; this prop is
+     the door that is open.
+
+     `min-height: 0` is required and is not slack. The base rule's 20px floor is a MINIMUM, so
+     restating padding and font-size alone would leave the pill exactly as tall as it was.
+     The base rule already draws the 1px `--fab-border` edge, so only the corner is restated.
+
+     SIZE ONLY, and no colour, which is the mirror image of the rule this block's neighbours
+     state for a tone. `proto:4872` also names `--surface-soft` and `--text2`, and those two
+     are withheld deliberately: the same list draws a `danger`-toned pill for a Tool that needs
+     attention, and a density that painted a fill and a foreground would flatten that tone into
+     the neutral one. The difference between the base chip's fill and the design's is a single
+     percentage point of the same overlay; the difference between an amber warning and a
+     neutral pill is the whole message. */
+  .manager-chip.is-list {
+    min-height: 0;
+    /* `1px` is the spacing scale's documented hairline exemption; `8px` is its own step. */
+    padding: 1px var(--fab-space-2);
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 600;
   }
 
   /* ACTION density: a chip standing in the page header's action cluster.

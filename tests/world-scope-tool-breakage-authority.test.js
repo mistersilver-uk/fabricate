@@ -239,14 +239,17 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
     [...tally.entries()].sort(([left], [right]) => left.localeCompare(right)),
     [
       ['selectedSystem?.toolBreakage?.authority', 4],
-      ['selectedSystem?.toolBreakage?.source', 1],
+      ['selectedSystem?.toolBreakage?.source', 2],
     ],
     'every `toolBreakage` access in the shell reads the PUBLISHED projection off ' +
       '`selectedSystem`. FOUR read the resolved authority — `ChecksView` gates on it (and fans ' +
       'out internally to crafting, salvage and gathering rather than being three editors), ' +
       '`ToolsBrowserView` authors it, `ToolEditView` reads it, and `tools/ToolBrowserInspector` ' +
       'draws the per-tool behaviour copy from it — and ONE carries the authoring scope to the ' +
-      'control. If your change adds a LEGITIMATE fifth read off `selectedSystem`, this pin is ' +
+      'control TWICE — the rules list authors the mode and the rules EDITOR states, in the ' +
+      'words the reference uses, whether the mode it is showing is the world default or a ' +
+      'departure this system authored (issue 1373). If your change adds a LEGITIMATE further ' +
+      'read off `selectedSystem`, this pin is ' +
       'not a verdict on it: bump the expected count and say so. What it is a verdict on is a ' +
       'read rooted anywhere ELSE, including an alias bound to the block — that is a screen ' +
       're-defaulting on a raw crafting system'
@@ -269,4 +272,45 @@ test('the normalizer flip is absence-preserving and keeps a recognised token', a
       'a RECOGNISED authored token is never stripped — every existing value is AUTHORED'
     );
   }
+});
+
+test('the source pill names all three layers, including the one no frame can reach', async () => {
+  // THE UNPHOTOGRAPHABLE BRANCH (issue 1373). The system Tool Rules card draws one of three
+  // source states at a time and the View Lab can reach only two of them: the lab world authors
+  // a world break mode - deliberately, so the World breakage card has a selected segment to
+  // draw - so `default` requires a world that has authored nothing, which one shared corpus
+  // cannot be and not be at once. `manager-tool-rules-breakage-overridden-1280x720` photographs
+  // the `system` state and points here for this one.
+  //
+  // The three answers differ in TONE as well as in wording, and the tone is the part a reader
+  // acts on: an amber pill says this system has departed from the world, and an informational
+  // one says it has not. A branch that returned the right words in the wrong tone would read as
+  // a defect in a system that has none.
+  const { breakModeSourcePill } = await import(
+    '../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'
+  );
+  const text = (key, fallback) => fallback;
+
+  assert.deepEqual(breakModeSourcePill('system', text), {
+    state: 'system',
+    tone: 'warning',
+    label: 'Overridden here',
+  });
+  assert.deepEqual(breakModeSourcePill('world', text), {
+    state: 'world',
+    tone: 'info',
+    label: 'World default',
+  });
+  // `Fabricate default`, never `World default`: naming the world here would credit it with a
+  // choice it did not make, which is the distinction this three-state pill exists for.
+  assert.deepEqual(breakModeSourcePill('default', text), {
+    state: 'default',
+    tone: 'info',
+    label: 'Fabricate default',
+  });
+  assert.deepEqual(
+    breakModeSourcePill(undefined, text),
+    breakModeSourcePill('default', text),
+    'an absent source is the unauthored one, not an unrecognised fourth state'
+  );
 });

@@ -136,7 +136,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|RollDataExpressionInput|SearchablePopover|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SearchablePopover|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -149,6 +149,8 @@ const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/comp
 const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
@@ -170,6 +172,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   // Its override names the one frame that draws the capped reading.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
+  // — and neither representative frame draws it. Its override names the one frame that does.
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
@@ -240,9 +245,11 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * Each later primitive extraction in this programme removes its own entry, and the only accepted
  * edit is a REMOVAL. `ModifierPillSelect` left it that way at issue 1458, when its add menu became
  * a `SearchablePopover` and the at-cap trigger treatment it was left holding acquired an override
- * naming the one frame that draws it. `ActorSelectTopBar` left it the same way at issue 1475, and
- * it is the first to leave WITHOUT becoming or extracting a primitive: it stays a
- * `NOT_A_PRIMITIVE` row, and what earned it a frame is ADOPTING one.
+ * naming the one frame that draws it. `ActorSelectTopBar` left it the same way at issue 1475,
+ * and it is the first to leave WITHOUT becoming or extracting a primitive: it stays a
+ * `NOT_A_PRIMITIVE` row, and what earned it a frame is ADOPTING one. `SelectionCheckbox` left
+ * it at issue 1373's round 5, when the Tool Studio's prerequisite list gained a frame and with
+ * it the `sm` size's only rendering.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -250,10 +257,7 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
@@ -268,7 +272,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
 ];
 
@@ -286,7 +289,7 @@ test('the inputs every property below quantifies over are alive', () => {
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 10, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -302,7 +305,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 308);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 284);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -389,11 +392,20 @@ test('(a) the two older overrides still name the frame that renders their state'
       'the frame that draws the dashed empty panel, and the one `docs/help/quickstart.md` Step 1 ' +
         'embeds — both representative frames are POPULATED states',
     ],
+    // The `note` variant (issue 1373) released the panel entirely for an empty inside an overlay
+    // the product has already bounded — a picker popover. `manager-systems-empty` is a hero panel
+    // filling a pane and cannot show it, so the primitive gained a SECOND treatment with no frame
+    // rather than a second instance of one it had.
+    [
+      'src/ui/svelte/apps/manager/EmptyState.svelte',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
+      'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
+        'bordered panel filling a region',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
-    assert.deepEqual(
-      BROAD_SIGNAL_CASE_OVERRIDES[file],
-      [caseId],
+    assert.ok(
+      BROAD_SIGNAL_CASE_OVERRIDES[file].includes(caseId),
       `${file} no longer overrides to '${caseId}', ${because}`
     );
     const selected = mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);

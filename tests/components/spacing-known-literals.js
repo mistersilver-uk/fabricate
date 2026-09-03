@@ -159,8 +159,14 @@ export function isExemptSpacingPixels(pixels) {
 /**
  * The headline. Pinned exactly rather than derived, so a hand edit to one row's count that
  * forgets this number fails rather than quietly re-baselining.
+ *
+ * It was 932, over 620 rows. Issue 1373's Tool Rules parity pass took the toolbar column, the
+ * header band, the inspector inset and one authority-segment inset onto the published scale,
+ * which paid five occurrences down and emptied one row entirely (`padding: 6px`). The debt was
+ * paid by TOKENIZING rather than by deleting, so it is banked here rather than left as a slot
+ * the next author could fill for free.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 923;
+export const KNOWN_RAW_SPACING_TOTAL = 917;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

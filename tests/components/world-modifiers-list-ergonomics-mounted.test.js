@@ -55,6 +55,7 @@ const harness = createMountedComponentHarness({
     'src/utils/checkModifierPicks.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // `RollDataExpressionInput` reads the shared `@`-sigil helpers from the copy module.
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',

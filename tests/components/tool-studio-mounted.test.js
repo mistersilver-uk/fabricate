@@ -7,7 +7,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
@@ -39,9 +39,21 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
+    // module so the two scopes that render the block share one copy of the sentence.
+    'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
+    // The ONE ingredient-kind table (issue 1373, round 8): the requirement row's plate glyph and
+    // tint, its kind select's four words, and the `or…` menu's four entries all read it.
+    'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
+    // THE WORLD SCOPE CLOSURE, and it is new to this tree (issue 1373). The rules editor draws
+    // its inherit/override cards through the shared `scoped/InheritRow`, whose row set comes
+    // from the SCOPE DESCRIPTOR — `scopedStudio.js` -> `toolScope.js` + `worldScopeProjection.js`
+    // and everything they reach. Imported from the shared manifest rather than re-typed: a copy
+    // would go on naming a module the real one had moved past.
+    ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
@@ -65,7 +77,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
+    // The shared selection control (issue 772). `ModifierLibraryRow` below trails it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -74,12 +86,24 @@ const harness = createMountedComponentHarness({
     // renders it for the tag-match Any/All control, so it is in this tree's static
     // import graph and the closure validator throws without it.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
+    // The world modifier library's row, which the prerequisite list and the bonus list both
+    // draw since issue 1373's round 5. Static in this tree, so omitting it HANGS the suite.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373): the armed remove-from-system
+    // control, the routed identity notice on Validation, the inherit/override card every
+    // behaviour section is drawn as, the system-scope band that opens Breakage, and the shared
+    // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/StatusPill.svelte',
+    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
@@ -87,11 +111,26 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
+    // `ToolBehaviorPreview` renders the shipped pager for its `Required for` region since
+    // issue 1373's parity round. This editor passes no `requiredForPageSize`, so it draws no
+    // pager - but the import is STATIC, so it is in this tree's graph either way and the
+    // harness's closure validator throws for a shared-harness suite that omits it.
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
+    // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in
+    // this tree's static graph. `ToolOverviewTab` is NOT: issue 1373 retired the Overview tab
+    // from the SYSTEM rules editor, because a crafting system authors no identity.
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
-    'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    // The shared `REPLACEMENT COMPONENT` card (issue 1373, maintainer round 2). The system
+    // editor's own bespoke block became a caller of it, so it is in this tree's static graph
+    // and an omission HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
+    // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
+    // list and the Checks Studio catalogue render it, so it is static in this tree's graph
+    // and an omission HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -122,12 +161,72 @@ const worldItems = [
     description: 'Still useful.',
   },
 ];
+// THE WORLD CHARACTER-PREREQUISITE LIBRARY (issue 1308), in the shape
+// `normalizeCharacterPrerequisite` publishes: `{id, name, icon, path, op, value}`. It used to
+// carry an `expression` key, which `prerequisitePreview` does not read — so every row's second
+// line rendered the placeholder `@… ≥` and the cell the row list is judged on carried nothing
+// real. The paths are ROLL-DATA paths, which is the convention the resolver reads.
 const prerequisites = [
-  { id: 'expert', name: 'Expert Crafter', expression: '@prof >= 4' },
-  { id: 'smith', name: "Proficient with Smith's Tools", expression: '@prof' },
-  { id: 'attuned', name: 'Attuned to the Weave', expression: '@abilities.int.mod >= 2' },
-  { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
-  { id: 'arena', name: 'Trained in Arcana', expression: '@skills.arcana >= 1' },
+  { id: 'expert', name: 'Expert Crafter', icon: 'fas fa-star', path: 'prof', op: 'gte', value: 4 },
+  {
+    id: 'smith',
+    name: "Proficient with Smith's Tools",
+    icon: 'fas fa-hammer',
+    path: 'tools.smith.value',
+    op: 'gte',
+    value: 1,
+  },
+  {
+    id: 'attuned',
+    name: 'Attuned to the Weave',
+    icon: 'fas fa-wand-sparkles',
+    path: 'attributes.attuned',
+    op: 'isTrue',
+  },
+  {
+    id: 'strong',
+    name: 'Strength 13 or higher',
+    icon: 'fas fa-hand-fist',
+    path: 'abilities.str.value',
+    op: 'gte',
+    value: 13,
+  },
+  {
+    id: 'arena',
+    name: 'Trained in Arcana',
+    icon: 'fas fa-hat-wizard',
+    path: 'skills.arc.value',
+    op: 'gte',
+    value: 1,
+  },
+];
+// The WORLD modifier library (`characterLibraries.modifiers[]`), in the shape
+// `normalizeModifierLibrary` publishes. It is the design's `MODS` (`proto:3797`) and the roster
+// the bonus section selects over since issue 1373's maintainer round 3. Three entries, and the
+// third is a dice expression, because `isRollExpression` is the one field the row does NOT draw
+// and a library of interchangeable scalars could not show that.
+const modifiers = [
+  {
+    id: 'mod-prof',
+    label: 'Proficiency',
+    icon: 'fa-solid fa-medal',
+    expression: '@prof',
+    isRollExpression: false,
+  },
+  {
+    id: 'mod-int',
+    label: 'Intelligence modifier',
+    icon: 'fa-solid fa-brain',
+    expression: '@abilities.int.mod',
+    isRollExpression: false,
+  },
+  {
+    id: 'mod-guidance',
+    label: 'Guidance',
+    icon: 'fa-solid fa-dice-d4',
+    expression: '1d4',
+    isRollExpression: true,
+  },
 ];
 const itemTags = ['metal', 'salvage'];
 const essenceOptions = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
@@ -153,12 +252,55 @@ function tool(overrides = {}) {
   };
 }
 
+/**
+ * The world projection this `(tool, system)` pair is a member of, in the shape
+ * `worldScopeProjection` publishes and `ToolEditView` reads: an entry per world entity, a row
+ * per crafting system, and the `inherit` map on the row.
+ *
+ * Hand-built rather than projected for real, because what these cases vary is the ONE fact the
+ * editor reads out of it - which sections this system overrides - and a real projection would
+ * bury that under a corpus the assertions do not care about.
+ *
+ * @param {object} [options]
+ * @param {object} [options.inherited] The per-section inherit map. Absent reads as inheriting.
+ * @param {object|null} [options.defaults] The world defaults record for the Tool.
+ * @param {boolean} [options.member] Whether this system holds a rules record at all.
+ * @returns {object}
+ */
+function toolScope({ inherited = OVERRIDES_EVERYTHING, defaults = null, member = true } = {}) {
+  return {
+    entries: [
+      {
+        id: 'hammer',
+        defaults,
+        systems: [{ systemId: 'sys-forge', member, inherited, enabled: true }],
+      },
+    ],
+  };
+}
+
+/**
+ * What every MIGRATED tool membership record carries: all four sections overridden.
+ * `migrateToolRequirementSections` writes exactly this, so it is the state every existing world
+ * is in and the right default for a case that is not about inheritance.
+ */
+const OVERRIDES_EVERYTHING = Object.freeze({
+  breakage: false,
+  onBreak: false,
+  prerequisites: false,
+  bonus: false,
+});
+
 function props(overrides = {}) {
   return {
     tool: tool(),
     validation: { valid: true, errors: [] },
     dirty: false,
-    activeTab: 'overview',
+    // `breakage`, not `overview`: the system rules editor has no Overview tab (issue 1373).
+    activeTab: 'breakage',
+    systemId: 'sys-forge',
+    systemName: 'The Herbalist',
+    scope: toolScope(),
     worldItems,
     managedItems,
     itemTags,
@@ -166,6 +308,7 @@ function props(overrides = {}) {
     currencyUnits,
     currencyEnabled: true,
     prerequisiteOptions: prerequisites,
+    modifierOptions: modifiers,
     ...overrides,
   };
 }
@@ -175,7 +318,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
-  it('renders header-only actions, four accessible tabs, linked Item evidence, and no Kind', async () => {
+  it('renders header-only actions, three accessible tabs, and no Kind', async () => {
     const navigation = [];
     const root = await harness.mount(
       props({
@@ -202,162 +345,459 @@ describe('Tool Studio editor (mounted)', () => {
     root.querySelector('[data-tool-editor-open-tools]').click();
     assert.deepEqual(navigation, ['systems', 'system', 'tools']);
     assert.match(root.querySelector('[data-tool-editor-image]').getAttribute('src'), /hammer/);
+    // THE SUBTITLE STATES SCOPE, NOT THE LINK (issue 1373). `Linked game-world Item` is the
+    // WORLD editor's subtitle and describes the one thing this screen cannot change.
     assert.equal(
       root.querySelector('[data-tool-editor-source-context]').textContent,
-      'Linked game-world Item'
+      'Rules in The Herbalist · identity comes from the world Tool'
     );
     assert.equal(root.querySelector('[data-tool-editor-status]'), null);
     assert.equal(
-      root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]').textContent.trim(),
-      'Back to tools'
+      root
+        .querySelector('[data-tool-editor-back][aria-label="Back to the Tool Rules list"]')
+        .textContent.trim(),
+      'Back to Tool Rules'
     );
-    assert.ok(root.querySelector('[data-tool-editor-delete]'));
+    // NO `Delete` IN THE HEADER. On a screen whose subject is one world Tool adopted by many
+    // crafting systems, `Delete` names no scope; the design puts it on the world entry and gives
+    // system scope the explained `Stop using this Tool here` callout instead.
+    assert.ok(!root.querySelector('[data-tool-editor-delete]'), 'no bare Delete at system scope');
     assert.ok(root.querySelector('[data-tool-editor-save]'));
-    assert.equal(root.querySelector('[data-tool-editor-delete]').textContent.trim(), 'Delete');
-    assert.equal(root.querySelector('[data-tool-editor-save]').textContent.trim(), 'Save tool');
-    assert.equal(root.querySelectorAll('[role="tab"]').length, 4);
-    const tabPanel = root.querySelector('[role="tabpanel"]');
-    assert.equal(tabPanel.id, 'tool-panel-overview');
-    assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-overview');
-    assert.equal(tabPanel.getAttribute('tabindex'), '0');
-    assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith's Hammer/);
-    assert.equal(root.querySelector('[data-tool-source-card] code'), null);
-    assert.match(
-      root.querySelector('[data-tool-description]').textContent,
-      /well-balanced forge hammer/
+    assert.equal(root.querySelector('[data-tool-editor-save]').textContent.trim(), 'Save rules');
+    assert.equal(root.querySelectorAll('[role="tab"]').length, 3);
+    assert.deepEqual(
+      [...root.querySelectorAll('[role="tab"] span:first-of-type')].map((node) => node.textContent),
+      ['Breakage', 'Requirements', 'Validation']
     );
+    const tabPanel = root.querySelector('[role="tabpanel"]');
+    assert.equal(tabPanel.id, 'tool-panel-breakage');
+    assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-breakage');
+    assert.equal(tabPanel.getAttribute('tabindex'), '0');
+    // THE LINKED-ITEM CARD IS NOT HERE, and its absence is the assertion (issue 1373). It used
+    // to open this tab with a drop zone, a copy-uuid action and an unlink action, which let a
+    // CRAFTING SYSTEM re-point which game-world Item a Tool IS. Identity is world-scoped, so the
+    // whole card moved to the world Tool entry; `world-tool-entry-mounted` exercises it there.
+    assert.ok(!root.querySelector('[data-tool-source-card]'), 'no source card at system scope');
+    assert.ok(!root.querySelector('[data-tool-description]'), 'and no linked-Item description');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
     assert.match(
       root.querySelector('[data-tool-preview-identity]').textContent,
-      /Linked game-world Item/
+      /Rules in The Herbalist · identity comes from the world Tool/
     );
     assert.doesNotMatch(root.textContent, /\bKind\b/);
     assert.equal(root.querySelector('footer'), null);
   });
 
-  it('renders the Overview hierarchy and persistent inspector guidance', async () => {
+  it('opens Breakage with the two system-scope controls and no standing explainer', async () => {
     const root = await harness.mount(props());
-    const sections = [...root.querySelector('[data-tool-overview-tab]').children];
 
+    // THERE IS NO OVERVIEW TAB, so there is no overview panel (issue 1373). The two controls a
+    // crafting system genuinely authors that are not rules — its enable switch and its
+    // display-label OVERRIDE — open the Breakage tab as a band, which is where the design puts
+    // the one it draws (`Enabled in <System>`).
+    assert.ok(!root.querySelector('[data-tool-overview-tab]'), 'no overview panel');
+    const band = root.querySelector('[data-tool-system-scope]');
+    assert.ok(Boolean(band), 'the system-scope band opens the Breakage tab');
     assert.deepEqual(
-      sections.map((section) => section.dataset.toolOverviewRegion),
-      ['source', 'identity', 'enabled']
-    );
-    assert.ok(root.querySelector('[data-tool-source-card][data-tool-source-layout="compact"]'));
-    const sourceCard = root.querySelector('[data-tool-source-card]');
-    assert.equal(sourceCard.getAttribute('role'), null);
-    assert.equal(sourceCard.getAttribute('tabindex'), null);
-    assert.ok(sourceCard.querySelector('[data-tool-source-drop-hint]'));
-    const sourceActions = [
-      ...sourceCard.querySelectorAll('.manager-item-drop-zone-actions > button'),
-    ];
-    assert.deepEqual(
-      sourceActions.map((button) =>
-        button.hasAttribute('data-tool-source-copy-uuid') ? 'copy' : 'unlink'
-      ),
-      ['copy', 'unlink']
-    );
-    assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
-    assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
-    assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
-    // The bold lead-in and its prose are one sentence and need a separator between them.
-    // A literal space in the template is the last token inside the `{#if}`, and Svelte
-    // trims block-trailing whitespace, so they rendered welded: "…game-world Item.Drag any
-    // Item…". Every existing assertion here matches MID-sentence and so cannot see the
-    // join; this one straddles it. Found in a screenshot, not by a test (issue 881).
-    for (const row of root.querySelectorAll('[data-tool-how-it-works] li')) {
-      const prose = row.querySelector('span');
-      // The row's ONE leading space is the other half of that fix and is just as fragile.
-      // The `{' '}` separator carries an `eslint-disable-next-line
-      // svelte/no-useless-mustaches` directive that MUST stay welded to the preceding
-      // markup comment's `-->`: moved onto its own line it splits the surrounding markup
-      // whitespace into two runs, Svelte collapses each to one space, and the row renders
-      // with a DOUBLE space between the glyph and the prose. The `<span>` text is byte-identical
-      // either way, so only an assertion over the whole ROW text can see it — and reflowing
-      // that one line is the likeliest way a human silently undoes the fix.
-      assert.equal(
-        row.textContent,
-        ` ${prose.textContent}`,
-        `explainer row must render exactly one space before its prose, got ${JSON.stringify(row.textContent.slice(0, 60))}`
-      );
-
-      const lead = row.querySelector('strong')?.textContent;
-      if (!lead) continue;
-      // Asserted on the span rather than the row, so the leading whitespace above does not
-      // have to be restated here; `startsWith` pins the lead-in join at exactly one space.
-      assert.ok(
-        prose.textContent.startsWith(`${lead} `) && !prose.textContent.startsWith(`${lead}  `),
-        `explainer lead-in "${lead}" must be followed by exactly one space, got ${JSON.stringify(prose.textContent.slice(0, 60))}`
-      );
-    }
-    assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
-      /supplies the name, art, and description/
+      [...band.children].map((section) => section.dataset.toolOverviewRegion),
+      ['enabled', 'identity']
     );
     assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(2)').textContent,
-      /recipe.*Tool’s library identity/i
+      root.querySelector('[data-tool-enabled]').textContent,
+      /Enabled in The Herbalist.*Recipes and salvage in this system can require it\./s
     );
-    assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(3)').textContent,
-      /salvaging components/i
-    );
-    assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(4)').textContent,
-      /character prerequisites/i
-    );
-    assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(5)').textContent,
-      /check bonus/i
-    );
-    assert.match(
-      root.querySelector('[data-tool-how-it-works] li:nth-child(6)').textContent,
-      /breakage/i
-    );
-    assert.equal(root.querySelector('[data-tool-how-it-works] button'), null);
-    assert.equal(
-      root
-        .querySelector('[data-tool-how-it-works] a.manager-explainer-card-docs')
-        ?.textContent.trim(),
-      'Read the docs'
-    );
-    assert.equal(root.querySelector('[data-tool-name]'), null);
-    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
-    assert.ok(root.querySelector('[data-tool-label]').closest('.manager-recipe-field'));
-    assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
+    // THE EXPLAINER IS GONE. Six paragraphs of standing documentation occupied the space the
+    // design gives to the player preview; the design's rail does not have it at all.
+    assert.ok(!root.querySelector('[data-tool-how-it-works]'), 'no standing explainer card');
+    assert.ok(!root.querySelector('[data-tool-preview-live-update]'), 'and no live-update strip');
   });
 
-  it('routes Copy UUID, unlink, and drag-only source replacement through named callbacks', async () => {
-    const calls = [];
+  it('draws the rail regions the design has, and not the two decorations it does not', async () => {
     const root = await harness.mount(
       props({
-        onCopySourceUuid: (uuid) => calls.push(['copy', uuid]),
-        onUnlinkSource: () => calls.push(['unlink']),
-        onSourceDrop: (data) => calls.push(['drop', data.uuid]),
+        requiredFor: [
+          { id: 'recipe-anvil', kind: 'recipe', name: 'Anvil Reforging' },
+          { id: 'task-seam', kind: 'gathering', name: 'Quarry Open Seam' },
+        ],
       })
     );
 
-    root.querySelector('[data-tool-source-copy-uuid]').click();
-    root.querySelector('[data-tool-source-unlink]').click();
-    const sourceCard = root.querySelector('[data-tool-source-card]');
-    dispatchDrop(sourceCard, { type: 'Item', uuid: 'Item.replacement' });
+    // THE IDENTITY CARD IS A THUMBNAIL, A NAME AND A SCOPE SENTENCE. Its On/Off pill and its two
+    // chips restated the FIRST and FOURTH effective-rules rows one line below them.
+    const identity = root.querySelector('[data-tool-preview-identity]');
+    assert.ok(!identity.querySelector('.manager-chip'), 'no status pill and no duplicate chips');
+    assert.ok(!root.querySelector('.manager-tool-preview-chips'), 'and no chip strip at all');
 
-    assert.deepEqual(calls, [['copy', 'Item.hammer'], ['unlink'], ['drop', 'Item.replacement']]);
+    // HOW PLAYERS SEE IT — the art, the uses pill, the name and the broken preview.
+    const player = root.querySelector('[data-tool-player-preview]');
+    assert.ok(Boolean(player), 'the player preview renders');
+    assert.match(player.textContent, /5 uses left/);
+    assert.match(player.textContent, /A working copy\. Recipes and gathering tasks accept it\./);
+    assert.equal(root.querySelector('[data-tool-player-name]').textContent, "Smith's Hammer");
 
-    // Issue 1036/7, at THIS call site: the widened `resolveDropUuid` guard resolves a uuid
-    // out of more drag shapes than the old `data.uuid` read did, so the document-type check
-    // is now the only thing keeping an Actor or a Macro out of a Tool's source link.
-    dispatchRejectedDrops(sourceCard);
-    assert.equal(
-      calls.filter(([kind]) => kind === 'drop').length,
-      1,
-      'the tool source zone still refuses every non-Item and document-less payload'
+    // PREVIEW AS — the actor selector, the gate sentence and the usability row.
+    const actorSelect = root.querySelector('[data-tool-preview-actor]');
+    assert.ok(Boolean(actorSelect), 'the actor selector renders');
+    assert.equal(actorSelect.querySelector('option').textContent, 'No actor');
+    assert.match(root.querySelector('[data-tool-preview-gate]').textContent, /One prerequisite/);
+    assert.match(
+      root.querySelector('[data-tool-preview-usability]').textContent,
+      /Usable, adding @prof/
     );
 
-    // And the legacy compendium pair IS now accepted here, exactly as its `onDrop` — which
-    // calls `resolveDropUuid` itself — always expected.
-    dispatchDrop(sourceCard, { type: 'Item', pack: 'fabricate.items', id: 'legacy' });
-    assert.equal(calls.filter(([kind]) => kind === 'drop').length, 2);
+    // REQUIRED FOR — one row per referencing recipe and gathering task, each with its kind chip.
+    const rows = [...root.querySelectorAll('[data-tool-required-row]')];
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('strong').textContent),
+      ['Anvil Reforging', 'Quarry Open Seam']
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.manager-chip').textContent),
+      ['Recipe', 'Gathering']
+    );
+  });
+
+  it('shows what breakage does to a copy, and never writes it', async () => {
+    // `Show as broken` is a PREVIEW state: it is the one thing the effective-rules rows state in
+    // the abstract and never show. Nothing about it reaches the draft.
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        tool: tool({ onBreak: { mode: 'flagBroken' } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    const broken = root.querySelector('[data-tool-player-broken]');
+    broken.checked = true;
+    broken.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    assert.match(
+      root.querySelector('[data-tool-player-note]').textContent,
+      /Marked broken and renamed/
+    );
+    assert.equal(root.querySelector('[data-tool-player-name]').textContent, "Smith's Hammer (Broken)");
+    assert.equal(
+      root.querySelector('[data-tool-player-image]').dataset.toolPlayerImage,
+      'tool',
+      'a marked-broken copy is still the Tool, dimmed and renamed'
+    );
+    assert.deepEqual(patches, [], 'the broken preview writes nothing');
+  });
+
+  // THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT (issue 1373, maintainer round 2).
+  //
+  // All three on-break actions used to draw the SAME picture — the Tool's own art, dimmed, under
+  // a differently-worded chip — so a GM checking what `Destroy the item` does to a copy saw the
+  // copy, and what `Replace with component` produces was a chip reading `Replaced`.
+  //
+  // ASSERTED THROUGH `data-tool-player-image`, which exists for this: an empty box, the Tool's
+  // own art and a replacement's art are three different renderings that a selector on the tile
+  // cannot tell apart, and `assert.ok(!el)` rather than `assert.equal(el, null)` because
+  // node:assert serialises a mounted happy-dom element's circular tree to build a diff.
+  it('empties the inventory tile when the Tool is DESTROYED on break', async () => {
+    const root = await harness.mount(props({ tool: tool({ onBreak: { mode: 'destroy' } }) }));
+    const broken = root.querySelector('[data-tool-player-broken]');
+    broken.checked = true;
+    broken.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const tile = root.querySelector('[data-tool-player-image]');
+    assert.equal(tile.dataset.toolPlayerImage, 'none', 'the slot is empty');
+    assert.ok(!tile.querySelector('img'), 'no art is drawn for a copy that is gone');
+    assert.ok(
+      !root.querySelector('[data-tool-player-preview] .fab-status-pill'),
+      'and no chip names the outcome the empty box already states'
+    );
+  });
+
+  it('draws the REPLACEMENT Component when the Tool is swapped on break', async () => {
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          onBreak: {
+            mode: 'replaceWith',
+            replacementTarget: { type: 'component', componentId: 'scrap' },
+          },
+        }),
+      })
+    );
+    const broken = root.querySelector('[data-tool-player-broken]');
+    broken.checked = true;
+    broken.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const tile = root.querySelector('[data-tool-player-image]');
+    assert.equal(tile.dataset.toolPlayerImage, 'replacement');
+    assert.equal(
+      tile.querySelector('img').getAttribute('src'),
+      managedItems[1].img,
+      'the tile draws what the Tool BECOMES'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-player-name]').textContent.trim(),
+      managedItems[1].name,
+      'and the caption names it, not the Tool it replaced'
+    );
+  });
+
+  it('evaluates the Tool against a chosen actor, and says what that character gets', async () => {
+    // `PREVIEW AS` is the design's third rail region and it is a REAL evaluation, not a label:
+    // the roll data comes back through an injected resolver — the only thing on this screen's
+    // path that touches a Foundry document — and `evaluatePrerequisites` is the same AND-semantics
+    // helper the crafting engine gates on, so the rail cannot answer differently from the runtime.
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          prerequisites: { enabled: true, ids: ['strong'], gateMode: 'usability' },
+          bonus: { enabled: false, expression: '' },
+        }),
+        // A REAL prerequisite shape. `evaluatePrerequisite` reads `path`/`op`/`value` — the
+        // canonical stored shape `normalizeCharacterPrerequisite` produces and the one the
+        // Requirements tab's own `prerequisitePreview` already reads. The loose `expression`
+        // string the rest of this suite's fixtures carry resolves NO path, which every operator
+        // reads as `0` and every comparison then passes: an assertion written over it would be
+        // green whatever the actor's data said.
+        prerequisiteOptions: [
+          {
+            id: 'strong',
+            name: 'Strength 13 or higher',
+            path: 'abilities.str.mod',
+            op: 'gte',
+            value: 2,
+          },
+        ],
+        actorOptions: [
+          { uuid: 'Actor.brawn', name: 'Brawn' },
+          { uuid: 'Actor.wisp', name: 'Wisp' },
+        ],
+        getActorRollData: async (uuid) =>
+          uuid === 'Actor.brawn'
+            ? { abilities: { str: { mod: 3 } } }
+            : { abilities: { str: { mod: 0 } } },
+      })
+    );
+
+    const select = root.querySelector('[data-tool-preview-actor]');
+    assert.deepEqual(
+      [...select.querySelectorAll('option')].map((option) => option.textContent),
+      ['No actor', 'Brawn', 'Wisp']
+    );
+
+    select.value = 'Actor.brawn';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    await tick();
+    assert.match(
+      root.querySelector('[data-tool-preview-gate]').textContent,
+      /Brawn meets every prerequisite\./
+    );
+    assert.match(
+      root.querySelector('[data-tool-preview-usability]').textContent,
+      /Usable, with no check bonus/
+    );
+
+    select.value = 'Actor.wisp';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    await tick();
+    assert.match(
+      root.querySelector('[data-tool-preview-gate]').textContent,
+      /Wisp does not meet: Strength 13 or higher/
+    );
+    // The GATE MODE decides the consequence, and the row states the one that applies: a
+    // `usability` gate makes the Tool unusable, where a `bonus` gate would only withhold it.
+    assert.match(
+      root.querySelector('[data-tool-preview-usability]').textContent,
+      /Unusable here/
+    );
+  });
+
+  it('states the required-for empty case rather than an empty region', async () => {
+    const root = await harness.mount(props({ requiredFor: [] }));
+    assert.match(
+      root.querySelector('[data-tool-required-for-empty]').textContent,
+      /Nothing in The Herbalist requires it yet\./
+    );
+  });
+
+  it('draws every behaviour section as an inherit-aware card', async () => {
+    const toggles = [];
+    const root = await harness.mount(
+      props({
+        scope: toolScope({
+          inherited: { breakage: true, onBreak: false },
+          defaults: { id: 'hammer', breakage: { mode: 'limitedUses', maxUses: 2 } },
+        }),
+        onToggleInherited: (section, next) => toggles.push([section, next]),
+      })
+    );
+
+    // THE INHERITING SECTION states the world value and offers no controls: while
+    // `## CraftingSystem` requirement 36 keeps the in-system record authoritative, a control a
+    // GM could still reach would let this system diverge from a default the pill says it follows.
+    const breakage = root.querySelector('[data-tool-rule-card="breakage"]');
+    assert.equal(breakage.dataset.toolRuleState, 'inheriting');
+    assert.equal(breakage.querySelector('[data-tool-rule-chip]').textContent, 'Inheriting');
+    assert.match(
+      breakage.querySelector('[data-scoped-inherit-note="breakage"], .manager-scoped-inherit-label')
+        .textContent,
+      /World default: 2 uses/
+    );
+    assert.match(
+      root.querySelector('[data-tool-rule-inherited="breakage"]').textContent,
+      /2 uses.*Following the world Tool\. Flip the switch/s
+    );
+    assert.ok(!breakage.querySelector('input[name="tool-breakage-mode"]'), 'no mode controls');
+
+    // THE OVERRIDDEN SECTION states the override and draws its own controls.
+    const onBreak = root.querySelector('[data-tool-rule-card="onBreak"]');
+    assert.equal(onBreak.dataset.toolRuleState, 'overridden');
+    assert.equal(onBreak.querySelector('[data-tool-rule-chip]').textContent, 'Overridden');
+    assert.ok(onBreak.querySelector('[data-tool-on-break-controls]'), 'its controls are offered');
+
+    // The switch writes a BOOLEAN for a NAMED section, never a toggle of unknown current state.
+    breakage.querySelector('[data-scoped-inherit-toggle="breakage"]').click();
+    onBreak.querySelector('[data-scoped-inherit-toggle="onBreak"]').click();
+    assert.deepEqual(toggles, [
+      ['breakage', false],
+      ['onBreak', true],
+    ]);
+  });
+
+  it('draws no inherit affordance for a Tool the world catalogue has no record of', async () => {
+    // A pre-migration in-system Tool has no world half, so there is nothing to inherit FROM and
+    // nothing to be removed from. Every card renders its controls with no switch and no pill —
+    // exactly what this screen did before the epic.
+    const root = await harness.mount(props({ scope: { entries: [] } }));
+
+    assert.equal(
+      root.querySelector('[data-tool-rule-card="breakage"]').dataset.toolRuleState,
+      'local'
+    );
+    assert.ok(!root.querySelector('[data-scoped-inherit-toggle]'), 'no inherit switch');
+    assert.ok(!root.querySelector('[data-tool-rule-chip]'), 'and no inheritance pill');
+    assert.ok(!root.querySelector('[data-tool-remove-from-system]'), 'and no remove callout');
+    assert.ok(root.querySelector('input[name="tool-breakage-mode"]'), 'the controls still draw');
+  });
+
+  it('closes the Breakage tab with an explained, armed remove-from-system callout', async () => {
+    let removed = 0;
+    const root = await harness.mount(props({ onRemoveFromSystem: () => (removed += 1) }));
+
+    const callout = root.querySelector('[data-tool-remove-from-system]');
+    assert.ok(Boolean(callout), 'the callout closes the tab');
+    assert.match(callout.textContent, /Stop using this Tool here/);
+    assert.match(
+      callout.textContent,
+      /Removes the rules in The Herbalist only\. The world Tool and every other system are untouched\./
+    );
+    assert.match(callout.textContent, /Remove from system/);
+
+    // ARMED, not immediate: one press arms, the second confirms. The first press must not remove.
+    const button = callout.querySelector('button');
+    button.click();
+    await tick();
+    assert.equal(removed, 0, 'arming does not remove');
+    assert.match(callout.textContent, /Confirm\?/);
+    button.click();
+    await tick();
+    assert.equal(removed, 1);
+  });
+
+  it('states the display label as an override inside the screen own inherit idiom', async () => {
+    // THE DEFECT THIS PINS (issue 1373). The card was the only overridable fact on the screen
+    // with no state pill, no world-default line and no globe row, wearing the NAME-AUTHORING
+    // field treatment with the world Tool own name as its placeholder - on a screen whose
+    // subtitle and whose tab strip both say a crafting system authors no identity. A blank
+    // field showing a greyed name is indistinguishable from a field that lost one.
+    const patches = [];
+    const root = await harness.mount(props({ onPatch: (patch) => patches.push(patch) }));
+
+    assert.equal(root.querySelector('[data-tool-name]'), null);
+    assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
+
+    // BLANK IS INHERITING, and inheriting renders the world value read-only - not a disabled
+    // field, and not an empty one.
+    const card = root.querySelector('[data-tool-rule-card="label"]');
+    assert.ok(Boolean(card), 'the display label is a rule card');
+    assert.equal(card.dataset.toolRuleState, 'inheriting');
+    assert.match(card.textContent, /World default: Smith/);
+    assert.ok(!root.querySelector('[data-tool-label]'), 'no field while it inherits');
+    assert.ok(
+      Boolean(card.querySelector('[data-tool-rule-inherited="label"] .fa-globe')),
+      'and the globe row states where the name came from'
+    );
+
+    // The switch is the same control, in the same place, with the same polarity as every other
+    // card head on the tab: ON is OVERRIDDEN.
+    const toggle = card.querySelector('[data-scoped-inherit-toggle="label"]');
+    assert.ok(Boolean(toggle), 'the card carries the shared inherit switch');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+    toggle.click();
+    // Overriding SEEDS this system own copy of the world name rather than emptying the field,
+    // which is the same claim `ToolInheritCard` makes for every other section.
+    assert.deepEqual(patches, [{ label: "Smith's Hammer" }]);
+  });
+
+  it('renders an ORDINARY field for the label override, never the name treatment', async () => {
+    const root = await harness.mount(props({ tool: tool({ label: 'Forge Mallet' }) }));
+
+    const card = root.querySelector('[data-tool-rule-card="label"]');
+    assert.equal(card.dataset.toolRuleState, 'overridden');
+    const field = root.querySelector('[data-tool-label]');
+    assert.ok(Boolean(field), 'the override renders its field');
+    assert.equal(field.value, 'Forge Mallet');
+    // `manager-recipe-name-input` is this manager NAME-AUTHORING treatment. Wearing it here is
+    // half of why the card read as though a crafting system names Tools.
+    assert.equal(field.classList.contains('manager-recipe-name-input'), false);
+    // NO PLACEHOLDER. The world value is on the card head; repeating it as ghost text inside
+    // the override is what made a blank field look like a lost name.
+    assert.equal(field.getAttribute('placeholder'), null);
+    assert.ok(Boolean(field.closest('.manager-tool-label-field')));
+  });
+
+
+  it('offers NO route to re-point the linked Item, at any of its three former controls', async () => {
+    // The negative half of issue 1373's relocation, asserted as three named absences rather
+    // than one: the drop target, the copy-uuid action and the unlink action were three separate
+    // controls, and a partial removal would leave one of them writing world identity from a
+    // crafting system. The positive half lives in `world-tool-entry-mounted`.
+    const root = await harness.mount(props());
+
+    assert.ok(!root.querySelector('[data-tool-source-card]'), 'no drop target');
+    assert.ok(!root.querySelector('[data-tool-source-copy-uuid]'), 'no copy-uuid action');
+    assert.ok(!root.querySelector('[data-tool-source-unlink]'), 'no unlink action');
+    assert.ok(!root.querySelector('[data-manager-item-drop-zone]'), 'and no drop zone at all');
+  });
+
+  it('routes the header World Tool button out to the world record, when one exists', async () => {
+    // Task 4's whole scope: the rules LIST advertises `Inherits world defaults`, `What it would
+    // inherit here` and an `Edit the world Tool` button, and the editor behind `Edit rules` had
+    // no route to that record at all. This is the same navigation the list's inspector takes.
+    const routed = [];
+    const root = await harness.mount(
+      props({
+        scope: { entries: [{ id: 'hammer' }] },
+        onEditWorldTool: (id) => routed.push(id),
+      })
+    );
+
+    const button = root.querySelector('[data-tool-editor-world-tool="hammer"]');
+    assert.ok(button, 'the header offers the route');
+    assert.match(button.textContent, /World Tool/);
+    button.click();
+    assert.deepEqual(routed, ['hammer']);
+  });
+
+  it('withholds that button for a Tool the world catalogue has no record of', async () => {
+    // `false` is a real answer rather than a fallback: a pre-migration in-system Tool that no
+    // `1.30.0` pass lifted has no world half, and routing there would land the GM on the entry
+    // editor's `no longer in the corpus` state.
+    const root = await harness.mount(props({ scope: { entries: [{ id: 'someone-else' }] } }));
+
+    assert.ok(!root.querySelector('[data-tool-editor-world-tool]'));
   });
 
   it('stages only Display label and routes Enabled through immediate persistence', async () => {
@@ -365,13 +805,15 @@ describe('Tool Studio editor (mounted)', () => {
     const enabled = [];
     const root = await harness.mount(
       props({
+        tool: tool({ label: 'Forge Mallet' }),
         onPatch: (patch) => patches.push(patch),
         onToggleEnabled: (value) => enabled.push(value),
       })
     );
 
     assert.equal(root.querySelector('[data-tool-name]'), null);
-    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
+    // The field exists only on the OVERRIDING face of the label card (issue 1373), so the tool
+    // this mounts already carries an override rather than the inheriting blank.
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
@@ -381,11 +823,11 @@ describe('Tool Studio editor (mounted)', () => {
     assert.deepEqual(enabled, [false]);
   });
 
-  it('routes all four tab controls without moving actions into a footer', async () => {
+  it('routes all three tab controls without moving actions into a footer', async () => {
     const tabs = [];
     const root = await harness.mount(props({ onTabChange: (id) => tabs.push(id) }));
     for (const button of root.querySelectorAll('[role="tab"]')) button.click();
-    assert.deepEqual(tabs, ['overview', 'breakage', 'requirements', 'validation']);
+    assert.deepEqual(tabs, ['breakage', 'requirements', 'validation']);
     assert.equal(root.querySelector('footer'), null);
   });
 
@@ -401,16 +843,11 @@ describe('Tool Studio editor (mounted)', () => {
 
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('aria-controls')),
-      [
-        'tool-panel-overview',
-        'tool-panel-breakage',
-        'tool-panel-requirements',
-        'tool-panel-validation',
-      ]
+      ['tool-panel-breakage', 'tool-panel-requirements', 'tool-panel-validation']
     );
-    assert.equal(root.querySelector('#tool-panel-overview')?.getAttribute('role'), 'tabpanel');
+    assert.equal(root.querySelector('#tool-panel-breakage')?.getAttribute('role'), 'tabpanel');
     assert.equal(
-      buttons[3].querySelector('.manager-editor-tab-badge').getAttribute('aria-label'),
+      buttons[2].querySelector('.manager-editor-tab-badge').getAttribute('aria-label'),
       '1 issue'
     );
 
@@ -418,12 +855,12 @@ describe('Tool Studio editor (mounted)', () => {
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     assert.equal(document.activeElement, buttons[1]);
     buttons[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
-    assert.equal(document.activeElement, buttons[3]);
-    buttons[3].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    assert.equal(document.activeElement, buttons[2]);
+    buttons[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     assert.equal(document.activeElement, buttons[0]);
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-    assert.equal(document.activeElement, buttons[3]);
-    assert.deepEqual(tabs, ['breakage', 'validation', 'overview', 'validation']);
+    assert.equal(document.activeElement, buttons[2]);
+    assert.deepEqual(tabs, ['requirements', 'validation', 'breakage', 'validation']);
   });
 
   it('offers exactly the authority-owned breakage choices and preserves mode patches', async () => {
@@ -431,14 +868,19 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(
       props({ activeTab: 'breakage', onPatch: (patch) => patches.push(patch) })
     );
+    // FOUR, and `unlimited` leads them (issue 1373). It is not a fourth `breakage.mode`: it is
+    // the `limitedUses` mode with a NULL `maxUses`, which the model has always documented as
+    // "never used up", which `Tool#validate` has always accepted, and which every reading
+    // surface has always printed as `Unlimited uses` - while this group offered no option for
+    // it at all and the stepper beside it drew the null as `1`.
     assert.deepEqual(
       Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).map(
         (input) => input.value
       ),
-      ['limitedUses', 'breakageChance', 'diceExpression']
+      ['unlimited', 'limitedUses', 'breakageChance', 'diceExpression']
     );
     const mechanicChoices = root.querySelectorAll('[data-tool-breakage-choice]');
-    assert.equal(mechanicChoices.length, 3);
+    assert.equal(mechanicChoices.length, 4);
     for (const choice of mechanicChoices) {
       assert.ok(choice.querySelector('input[type="radio"]'));
       assert.ok(choice.querySelector('[data-tool-choice-icon]'));
@@ -446,18 +888,37 @@ describe('Tool Studio editor (mounted)', () => {
       assert.ok(choice.querySelector('[data-tool-choice-description]'));
     }
     assert.ok(root.querySelector('[data-tool-breakage-authority-explanation]'));
+    // THE ROW NAMES THE SCREEN THAT STILL EXISTS. It read `from the Tools library`, which is
+    // what the system's Tool list was called two renames ago; it is the Tool Rules screen now,
+    // and the design's own copy names it.
+    // THE PROVENANCE, NOT A PADLOCK (issue 1373). The row closed with a `System-wide` lock chip
+    // and dropped the world half of the sentence entirely, while the rules LIST one route away
+    // chipped the same setting `World default`. It states where the mode came from now, and the
+    // padlock - which claimed a permanence a per-system setting does not have - is gone.
     assert.match(
       root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
-      /Set for every Tool from the Tools library\..*System-wide/
+      /World default \u00b7 Tool-specific \u00b7\s+Set for every Tool on the Tool Rules screen\./
+    );
+    assert.doesNotMatch(
+      root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
+      /System-wide/
     );
     assert.doesNotMatch(
       root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
       /settings for both models/
     );
-    assert.ok(root.querySelector('[data-tool-breakage-method-heading]'));
+    // The bare `manager-tool-section-heading` block is gone: every behaviour section is a
+    // `ToolInheritCard` now, and the card's own head carries the title (issue 1373).
+    assert.ok(!root.querySelector('[data-tool-breakage-method-heading]'));
+    assert.match(
+      root.querySelector('[data-tool-rule-card="breakage"] h3').textContent,
+      /How this Tool breaks/
+    );
     assert.ok(root.querySelector('[data-tool-breakage-config-divider]'));
     assert.ok(root.querySelector('[data-tool-limited-uses-stepper]'));
-    assert.ok(root.querySelector('[data-tool-limited-uses-info]'));
+    // NO PER-COPY EXPLAINER CARD (issue 1373). `Each copy tracks its own remaining uses` restated
+    // a fact the rail states one column over, in a card the reference does not draw.
+    assert.ok(!root.querySelector('[data-tool-limited-uses-info]'));
     root.querySelector('input[value="breakageChance"]').click();
     root.querySelector('input[value="diceExpression"]').click();
     assert.equal(patches[0].breakage.mode, 'breakageChance');
@@ -537,6 +998,107 @@ describe('Tool Studio editor (mounted)', () => {
       3,
       'the immune fieldset removes every on-break radio from interaction'
     );
+  });
+
+  it('draws a null maxUses as Unlimited uses on every surface of the editor', async () => {
+    // THE DEFECT THIS PINS (issue 1373). `breakage: { mode: "limitedUses", maxUses: null }` is a
+    // valid saved state - `src/models/Tool.js:23` documents the null as UNLIMITED, the runtime
+    // short-circuits on it, `normalizeBreakage` reads the retired `mode: "immune"` forward onto
+    // it, and `Tool#validate` accepts it. Every READING surface said `Unlimited uses`. The
+    // editor did not: the radio group had no option for the state, so it fell to `Limited uses`,
+    // and the stepper beside it printed `tool.breakage.maxUses ?? 1` as `1`. The pane and the
+    // rail therefore stated DIFFERENT RULES for one saved Tool, with Save disabled, and the
+    // Validation tab called it `All clear`.
+    //
+    // A GM could land in that state, could not see it, and had no control to leave it.
+    const root = await harness.mount(
+      props({ tool: tool({ breakage: { mode: 'limitedUses', maxUses: null } }) })
+    );
+
+    const checked = Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).find(
+      (input) => input.checked
+    );
+    assert.equal(checked?.value, 'unlimited', 'the radio group selects the state it is in');
+    assert.ok(
+      !root.querySelector('[data-tool-limited-uses-stepper]'),
+      'and offers no uses stepper, which is what drew the null as 1'
+    );
+    // THE RAIL, THE PLAYER PREVIEW AND THE PANE NOW AGREE. The first two are the surfaces that
+    // were already right; the assertion is that the pane has joined them, not that they moved.
+    assert.match(
+      root.querySelector('[data-tool-preview-breakage]').textContent,
+      /Unlimited uses/
+    );
+    assert.match(root.querySelector('[data-tool-player-preview]').textContent, /Unlimited uses/);
+    assert.match(
+      root.querySelector('[data-tool-breakage-choice="unlimited"]').textContent,
+      /Unlimited uses/
+    );
+  });
+
+  it('seeds a real count when the GM leaves Unlimited uses, and clears it on return', async () => {
+    // THE OTHER DOOR INTO THE SAME DEFECT. `createBreakageConfigs` seeded its `limitedUses`
+    // config with `maxUses: null` - the UNLIMITED answer - so choosing `Limited uses` from any
+    // other mode wrote the state the GM had just left, silently, while the stepper drew `1`.
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        tool: tool({ breakage: { mode: 'limitedUses', maxUses: null } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    root.querySelector('[data-tool-breakage-choice="limitedUses"] input').click();
+    assert.deepEqual(patches, [{ breakage: { mode: 'limitedUses', maxUses: 1 } }]);
+
+    await harness.setProps(
+      props({
+        tool: tool({ breakage: { mode: 'limitedUses', maxUses: 4 } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+    assert.equal(root.querySelector('[data-tool-max-uses]').value, '4');
+    root.querySelector('[data-tool-breakage-choice="unlimited"] input').click();
+    // Back to the state the model calls unlimited, written EXPLICITLY rather than left to a
+    // fallback that reads it as one use.
+    assert.deepEqual(patches[1], { breakage: { mode: 'limitedUses', maxUses: null } });
+  });
+
+  it('hides a switched-off requirements section rather than greying its controls', async () => {
+    // THE DEFECT THIS PINS (issue 1373). The card head said `Character prerequisites` +
+    // `Overridden` with the inherit switch at the right margin; the body opened with a SECOND
+    // full card heading, restating the head own hint verbatim, with a second switch at the same
+    // margin - and below it five greyed rows, a greyed summary line and a greyed radio pair. A
+    // GM reading a card that says `Overridden` over a greyed-out body cannot tell which of the
+    // two switches greyed it.
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({
+          prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+          bonus: { enabled: false, expression: '' },
+        }),
+      })
+    );
+
+    assert.ok(
+      Boolean(root.querySelector('[data-tool-prerequisites-enabled]')),
+      'the section switch stays, and keeps the hook the smoke hit-tests'
+    );
+    assert.ok(!root.querySelector('[data-tool-prerequisite-list]'), 'no greyed checklist');
+    assert.ok(!root.querySelector('[data-radio-card-group="tool-gate-mode"]'), 'no greyed radios');
+    assert.ok(!root.querySelector('[data-field="tool-bonus"]'), 'no greyed bonus field');
+    // It states the ANSWER instead, in the words the rail states it in one column over.
+    assert.match(
+      root.querySelector('[data-tool-prerequisites-off]').textContent,
+      /Any character may use it/
+    );
+    assert.match(
+      root.querySelector('[data-tool-bonus-off]').textContent,
+      /Adds nothing to the crafting check/
+    );
+    // And no second card head: the body head is a subordinate ROW.
+    assert.ok(!root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading'));
   });
 
   it('resets inactive breakage mode values when the mounted editor switches Tools', async () => {
@@ -724,9 +1286,12 @@ describe('Tool Studio editor (mounted)', () => {
     await tick();
     document.querySelector('[data-recipe-add="alternative-essence"]').click();
     await tick();
+    // BORN UNNAMED since issue 1373's maintainer round 5: the alternative used to arrive
+    // holding the first selectable essence. Its row's own field names it, which is also what
+    // lets a GM retype the row afterwards rather than deleting it.
     assert.deepEqual(patches.at(-1).repairRequirements[0].options[1].match, {
       type: 'essence',
-      essenceId: 'fire',
+      essenceId: '',
       amount: 1,
     });
   });
@@ -785,30 +1350,115 @@ describe('Tool Studio editor (mounted)', () => {
     );
   };
 
+  // ── THE DESIGN'S OWN TREATMENTS, WHERE THIS SCREEN HAD ITS OWN (issue 1373) ─────────────
+  //
+  // Each case below pins a value the design states once that this repository was stating
+  // twice, or in a vocabulary the design does not use at all.
+  it('draws both header verbs as one treatment, and keeps the primary primary', async () => {
+    // `proto:2601` and `proto:2602` are ONE style string - transparent over a border - so the
+    // two verbs that leave this screen render alike. `World Tool` took the neutral role, which
+    // is a FILLED control, standing beside a ghost `Back to Tool Rules`.
+    const root = await harness.mount(props());
+    for (const hook of ['[data-tool-editor-world-tool]', '[data-tool-editor-back]']) {
+      assert.ok(
+        root.querySelector(hook).classList.contains('is-ghost'),
+        `${hook} takes the design's transparent-over-a-border treatment`
+      );
+    }
+    // The green Save is a standing maintainer ruling and is not what this converges.
+    assert.ok(root.querySelector('[data-tool-editor-save]').classList.contains('is-primary'));
+  });
+
+  it('draws the two breakage configuration labels as titles rather than eyebrows', async () => {
+    // `proto:2645` and `proto:2656` state both as `font: 600 11.5px var(--sans);
+    // color: var(--text)` - sentence case in the body ink. Both were `.manager-kicker`, which
+    // is the uppercase micro-label the reference keeps for a SECTION head; neither heads one.
+    const root = await harness.mount(props());
+    const usesTitle = root.querySelector('[data-tool-limited-uses-copy] > p');
+    assert.equal(usesTitle.textContent.trim(), 'Uses per copy');
+    assert.ok(
+      !usesTitle.classList.contains('manager-kicker'),
+      '`proto:2645` draws a title, not an eyebrow'
+    );
+    assert.ok(usesTitle.classList.contains('manager-tool-breakage-config-title'));
+  });
+
+  it('sizes the repair count pill as the design’s in-line count chip', async () => {
+    // `proto:4696`: `padding: 1px 8px; border-radius: 999px; font: 600 9px var(--sans)`, which
+    // is `Chip`'s `list` density value for value. It rendered the base 20px chip scale and
+    // outweighed the eyebrow it counts.
+    const root = await harness.mount(
+      props({ tool: tool({ onBreak: { mode: 'flagBroken' }, repairRequirements: [] }) })
+    );
+    assert.ok(
+      root.querySelector('[data-tool-repair-count]').classList.contains('is-list'),
+      'the count pill takes the list density'
+    );
+  });
+
+  it('states the inheritance pill in the design’s two colour families', async () => {
+    // `proto:4912` builds this pill from the INFO family while a section inherits and from the
+    // WARNING family once it is overridden, and the Tool Rules list inspector already reads that
+    // string. This card read `neutral` / `accent` - one model, two vocabularies, one click apart.
+    const inheriting = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        scope: toolScope({ inherited: { ...OVERRIDES_EVERYTHING, prerequisites: true } }),
+      })
+    );
+    const inheritingPill = inheriting.querySelector('[data-tool-rule-chip="inheriting"]');
+    assert.ok(Boolean(inheritingPill), 'an inheriting section carries its pill');
+    assert.ok(inheritingPill.classList.contains('is-info'), '`Inheriting` is the info family');
+    assert.ok(!inheritingPill.classList.contains('is-neutral'));
+  });
+
+  it('states an overridden section’s pill in the warning family', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+    const pill = root.querySelector('[data-tool-rule-chip="overridden"]');
+    assert.ok(Boolean(pill), 'an overridden section carries its pill');
+    assert.ok(pill.classList.contains('is-warning'), '`Overridden` is the warning family');
+    assert.ok(!pill.classList.contains('is-accent'));
+  });
+
+  it('opens the Requirements card with the scope strip the design gives system scope', async () => {
+    // `proto:2855`. It is the ONE element distinguishing this card from the world entry's
+    // otherwise identical one, and `world-tool-entry-mounted` asserts its absence there.
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', systemName: 'The Herbalist' })
+    );
+    const strip = root.querySelector('[data-tool-requirements-intro]');
+    assert.ok(Boolean(strip), 'the system Requirements card opens with the info strip');
+    assert.equal(strip.dataset.calloutTone, 'info');
+    // The design's own sentence describes a model with no inheritance; ours inherits for real,
+    // so the strip names the system it belongs to and says what following the world Tool means.
+    assert.match(strip.textContent, /The Herbalist/);
+    assert.match(strip.textContent, /follows the world Tool until you override it here/);
+    // AND IT OPENS THE CARD, which is the half a presence check cannot see.
+    const card = root.querySelector('.manager-tool-requirements-card');
+    assert.ok(
+      card.firstElementChild.matches('[data-tool-requirements-intro]'),
+      'the strip is the first thing in the card'
+    );
+  });
+
   it('separates the breakage tab sibling blocks with exactly one whitespace run', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
-    for (const hook of [
-      '[data-tool-authority-copy]',
-      '[data-tool-limited-uses-copy]',
-      '[data-tool-limited-uses-info]',
-    ]) {
+    // `[data-tool-limited-uses-info]` is GONE with the explainer card it wrapped (issue 1373),
+    // and `[data-tool-authority-copy]` is a single block now that the mode row states its
+    // provenance in its own element rather than as a third paragraph inside the copy column.
+    for (const hook of ['[data-tool-limited-uses-copy]']) {
       const element = root.querySelector(hook);
       assert.ok(element, `${hook} must render`);
       joinedByOneSpace(element, hook);
     }
 
-    // The on-break legend is the one join in these files with an inline element on BOTH sides
-    // — `<span>` then `<small>`, with no block box to collapse a run against. Prettier leaves
-    // it welded today; if a later reflow split it, the newline would become a text node this
-    // assertion sees. Kept deliberately opposite to the rule above: NO separator here.
-    const legend = root.querySelector('[data-tool-on-break-legend]');
-    assert.ok(legend, 'the on-break legend must render');
-    assert.equal(
-      legend.textContent,
-      [...legend.children].map((child) => child.textContent).join(''),
-      `the on-break legend must keep its label and badge welded, got ${JSON.stringify(legend.textContent)}`
-    );
+    // THE ON-BREAK LEGEND IS GONE (issue 1373). It was a `<span>` label welded to a `<small>`
+    // reading `Always fires` — a badge that was never news, in the slot the design uses for the
+    // inheritance pill. The card above the fieldset carries the title and the pill now, so the
+    // fieldset has no legend at all and the join it used to pin does not exist.
+    assert.ok(!root.querySelector('[data-tool-on-break-legend]'), 'no on-break legend');
+    assert.doesNotMatch(root.textContent, /Always fires/);
   });
 
   it('separates the requirements tab sibling blocks with exactly one whitespace run', async () => {
@@ -821,7 +1471,66 @@ describe('Tool Studio editor (mounted)', () => {
     }
   });
 
-  it('authors prerequisite AND gates, gate mode, and a hint-led bonus expression', async () => {
+  // ── E3 AT SYSTEM SCOPE (issue 1373, maintainer round 2) ─────────────────────────────────
+  //
+  // The tab is shared with the world entry and gains the design's heading anatomy at BOTH
+  // scopes: one card, an eyebrow over a sentence-case title, and a rule between the sections.
+  //
+  // WHAT DOES NOT MOVE HERE is the enable switch. The world entry puts it on the header row,
+  // where the design draws it; a system card's header row is already spent on the INHERIT
+  // switch, which is a different question wearing the same track, so the enable switch stays as
+  // the first row of the body. This case is the record of that divergence — without it, a later
+  // author reading the world frame would "fix" the system one into two identical switches a
+  // line apart.
+  it('heads both sections with an eyebrow inside ONE card, and keeps the system enable row', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+    const card = root.querySelector('.manager-tool-requirements-card');
+    assert.ok(Boolean(card), 'the tab is one card at system scope too');
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-card]')].map(
+        (section) => section.dataset.toolRuleCard
+      ),
+      ['prerequisites', 'bonus']
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-eyebrow]')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Prerequisites', 'Bonus'],
+      'the eyebrow is the short word at this scope as well'
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('.manager-tool-rule-card-title h3')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Character prerequisites', 'Bonus to the check'],
+      'and the title is the sentence'
+    );
+
+    // THE HEADER ROW'S CONTROL IS THE INHERIT SWITCH, and the enable switch is in the body.
+    for (const [section, hook] of [
+      ['prerequisites', 'data-tool-prerequisites-enabled'],
+      ['bonus', 'data-tool-bonus-enabled'],
+    ]) {
+      const rule = card.querySelector(`[data-tool-rule-card="${section}"]`);
+      assert.ok(
+        Boolean(rule.querySelector(`[data-scoped-inherit-toggle="${section}"]`)),
+        'the inheritance switch keeps the head'
+      );
+      const enable = rule.querySelector(`[${hook}]`);
+      assert.ok(Boolean(enable), 'and the section still has its own enable switch');
+      assert.ok(
+        !enable.closest('.manager-tool-rule-card-head'),
+        'which stays in the body rather than joining a second track on the head'
+      );
+      assert.ok(
+        Boolean(enable.closest('.manager-tool-setting-row')),
+        'as the first row of it'
+      );
+    }
+  });
+
+  it('authors prerequisite AND gates, gate mode, and a world-modifier bonus', async () => {
     const patches = [];
     const root = await harness.mount(
       props({ activeTab: 'requirements', onPatch: (patch) => patches.push(patch) })
@@ -832,7 +1541,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelectorAll('[data-tool-prerequisite-row]').length, 5);
     assert.deepEqual(
-      [...root.querySelectorAll('[data-tool-prerequisite-row] strong')].map(
+      [...root.querySelectorAll('[data-tool-prerequisite-row] .manager-modifier-readonly-label')].map(
         (node) => node.textContent
       ),
       [
@@ -861,32 +1570,232 @@ describe('Tool Studio editor (mounted)', () => {
         .textContent.trim(),
       ''
     );
-    assert.ok(root.querySelector('[data-tool-requirements-divider]'));
-    assert.match(
-      root.querySelector('.manager-tool-bonus-field small').textContent,
-      /without @.*stored with @ automatically/i
+    // The `<hr>` between the two sections went with the card idiom: each section is a
+    // `ToolInheritCard` with its own border, so a rule between them drew a second separator.
+    assert.ok(!root.querySelector('[data-tool-requirements-divider]'));
+    assert.equal(root.querySelectorAll('[data-tool-rule-card]').length, 2);
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-tool-rule-card]')].map((card) => card.dataset.toolRuleCard),
+      ['prerequisites', 'bonus']
+    );
+    // THE BONUS IS A PICK FROM THE WORLD LIBRARY, NOT A TYPED EXPRESSION (issue 1373, maintainer
+    // round 3). `proto:2353`-`2369` draws a `World modifiers` list and `proto:4753` sets `bonus`
+    // to the chosen entry's `expr`; the free-text field this tab shipped with had no counterpart
+    // anywhere in the design. The persisted shape is unchanged - `bonus.expression` is still a
+    // string - so what this asserts is that the only way to author one is the list.
+    assert.ok(
+      !root.querySelector('[data-roll-data-expression="tool-bonus"]'),
+      'no free-text bonus expression field'
     );
     assert.equal(root.querySelector('[data-tool-bonus-preset]'), null);
     root.querySelector('.manager-tool-prerequisite-list input[value="strong"]').click();
     root.querySelector('input[name="tool-gate-mode"][value="bonus"]').click();
-    const bonusInput = root.querySelector('[data-roll-data-expression="tool-bonus"]');
-    bonusInput.value = '1d4';
-    bonusInput.dispatchEvent(new Event('input', { bubbles: true }));
+    root.querySelector('[data-tool-bonus-modifier="mod-guidance"] input[type="radio"]').click();
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('strong')));
     assert.ok(patches.some((patch) => patch.prerequisites?.gateMode === 'bonus'));
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
   });
 
-  // Issue 772, acceptance 11 — the ONLY proof that extracting the check box out of
-  // `ChecklistCardRow` left this tab rendering what it rendered before. There is no Tool
-  // Studio screenshot recipe that `ChecklistCardRow.svelte` matches (it routes to the
-  // broad theme-or-global-ui recipe only), so no published frame can show it either.
+  // ── THE BONUS SECTION IS THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round 3) ──────
   //
-  // The three things a conversion of this shape can silently break: the box stops being a
-  // real `<input type="checkbox">` (killing the keyboard, the label association and every
-  // `input[value=…]` selector this suite already uses); the checked state stops rendering;
-  // or the change callback stops firing. Each is asserted below.
-  it('renders the prerequisite row through the shared selection control after the conversion', async () => {
+  // `proto:3797` is the library the design's list reads (`MODS`, `{id, label, expr, note, icon}`)
+  // and ours is `characterLibraries.modifiers[]` — the same roster, normalized to
+  // `{id, label, expression, isRollExpression, icon?}`. `proto:4750` marks a row selected by
+  // `r.bonus === m.expr`, so the selection is resolved by EXPRESSION even though the radio's own
+  // value is the entry id: two entries may share an expression and a duplicate `{#each}` key
+  // throws, while `normalizeModifierLibrary` guarantees the ids are unique.
+  //
+  // ── AND IT IS A ROW LIST, NOT A CARD STACK (issue 1373, maintainer round 4) ───────────────
+  //
+  // The first pass drew the roster as a `RadioCardGroup`. This app already draws the
+  // distinction the other way, one screen from here: `checks/CraftingModifierCatalogueCard`
+  // presents THIS SAME roster as compact rows, and `How they combine` — a closed four-option
+  // set of behaviours, each needing a sentence — is the `RadioCardGroup` beneath it. So the
+  // classes below are the assertion, not decoration: they are the CHECKS row's own cells, and
+  // a card stack cannot emit them.
+  it('draws the world modifier library as a single-select ROW list, one row per entry', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+
+    const rows = [...root.querySelectorAll('[data-tool-bonus-modifier]')];
+    assert.deepEqual(
+      rows.map((row) => row.dataset.toolBonusModifier),
+      ['mod-prof', 'mod-int', 'mod-guidance'],
+      'one row per library entry, in library order'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.classList.contains('manager-modifier-readonly-row')),
+      [true, true, true],
+      'each entry is the Checks Studio modifier ROW'
+    );
+    const bonusCard = root.querySelector('[data-tool-rule-card="bonus"]');
+    assert.ok(
+      !bonusCard.querySelector('.manager-resolution-option'),
+      'and no option-card markup survives in the bonus section'
+    );
+    assert.ok(
+      !bonusCard.querySelector('[data-radio-card-group]'),
+      'nor the option-card group that wrapped them'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.manager-modifier-readonly-label').textContent.trim()),
+      ['Proficiency', 'Intelligence modifier', 'Guidance'],
+      'the row carries the entry’s name'
+    );
+    assert.deepEqual(
+      rows.map((row) =>
+        row.querySelector('.manager-modifier-readonly-expression').textContent.trim()
+      ),
+      ['@prof', '@abilities.int.mod', '1d4'],
+      'and its expression, in the row’s own mono cell (`proto:2363`)'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('input[type="radio"]').checked),
+      [true, false, false],
+      '`@prof` selects the entry whose expression it is'
+    );
+    assert.deepEqual(
+      [...new Set(rows.map((row) => row.querySelector('input[type="radio"]').name))],
+      ['tool-bonus-modifier'],
+      'one radio group name across the rows, so arrow keys traverse it as one control'
+    );
+    // NO THIRD LINE. The design's rows carry an authored `note`; ours have no such field and
+    // one is NOT invented on the persisted shape. See the tab's own docblock. A row is icon +
+    // label + expression + the pick control, which is exactly the Checks row's anatomy.
+    assert.equal(
+      rows[0].querySelector('.manager-modifier-readonly-label').nextElementSibling.tagName,
+      'CODE',
+      'the expression follows the name directly, with no description between them'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Applied to the crafting check as @prof.',
+      '`proto:4755`'
+    );
+  });
+
+  it('states that nothing is added until a modifier is picked', async () => {
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', tool: tool({ bonus: { enabled: true, expression: '' } }) })
+    );
+
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-tool-bonus-modifier] input[type="radio"]')].map(
+        (radio) => radio.checked
+      ),
+      [false, false, false]
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Nothing is added to the check until you pick a modifier.',
+      '`proto:4755`'
+    );
+  });
+
+  // ── AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS NOT DISCARDED ──────────────────────────
+  //
+  // A GM could type one under the control this list replaces, and the design's own model simply
+  // highlights nothing in that case. Dropping it would be silent data loss on save, so it keeps
+  // its own row at the head of the list, selected, saying where it came from — and picking a
+  // library entry replaces it.
+  it('keeps a hand-typed expression as its own row and lets a library entry replace it', async () => {
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({ bonus: { enabled: true, expression: '@abilities.str.mod + 2' } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    const rows = [...root.querySelectorAll('[data-tool-bonus-modifier]')];
+    assert.equal(rows.length, 4, 'the authored value joins the three library entries');
+    const custom = rows[0];
+    assert.equal(
+      custom.dataset.toolBonusModifier,
+      'fabricate:tool-bonus-custom',
+      'and it is FIRST, because it is the answer the record currently holds'
+    );
+    assert.equal(
+      custom.querySelector('.manager-modifier-readonly-label').textContent.trim(),
+      'Set by hand'
+    );
+    assert.equal(
+      custom.querySelector('.manager-modifier-readonly-expression').textContent.trim(),
+      '@abilities.str.mod + 2'
+    );
+    assert.equal(custom.querySelector('input[type="radio"]').checked, true);
+    // THE SENTENCE IS A SIBLING OF THE ROW, NOT A THIRD LINE INSIDE IT. The Checks row is one
+    // line and stays one line; its own bounds fault is stated the same way, as a paragraph
+    // after the row it qualifies. The radio names it through `aria-describedby`, so the
+    // explanation is announced with the option rather than orphaned beside it.
+    const hint = root.querySelector('[data-tool-bonus-custom-hint]');
+    assert.match(
+      hint.textContent,
+      /not one of the world modifiers/i,
+      'the row says why it is not in the library'
+    );
+    assert.equal(
+      custom.querySelector('input[type="radio"]').getAttribute('aria-describedby'),
+      hint.id,
+      'and the sentence is announced with the option it explains'
+    );
+    assert.deepEqual(
+      rows.slice(1).map((row) => row.querySelector('input[type="radio"]').checked),
+      [false, false, false]
+    );
+
+    rows[2].querySelector('input[type="radio"]').click();
+    assert.deepEqual(
+      patches.map((patch) => patch.bonus?.expression),
+      ['@abilities.int.mod'],
+      'picking a library entry replaces the typed value'
+    );
+  });
+
+  // ── AND THE LIBRARY CAN BE EMPTY ─────────────────────────────────────────────────────────
+  //
+  // The same state the prerequisite list one section up already draws, in the same words and
+  // the same shape: one muted sentence, no control. It carries the route as well, because
+  // `ToolInheritCard` renders the card's `subtitle` at WORLD scope only — at system scope the
+  // head is spent on the inherit row — so this sentence is the one line both scopes show.
+  it('states the empty world modifier library the way the prerequisite list does', async () => {
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        modifierOptions: [],
+        tool: tool({ bonus: { enabled: true, expression: '' } }),
+      })
+    );
+
+    assert.equal(
+      root.querySelector('[data-tool-bonus-empty]').textContent.trim(),
+      'No modifiers are defined in this world yet. They are defined under World, Rules and resources.'
+    );
+    assert.ok(
+      !root.querySelector('[data-tool-bonus-list]'),
+      'and no empty list frame around nothing'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Nothing is added to the check until you pick a modifier.',
+      'and the standing note still says what the section resolves to'
+    );
+  });
+
+  // ── THE PREREQUISITE LIST IS THE SAME ROW AS THE BONUS LIST (issue 1373, round 5) ────────
+  //
+  // `proto:4741` gives the reference's prerequisite row
+  // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
+  // background: bg1|surface-active; border: 1px solid (border|accent-border)`, which is
+  // `proto:4752`'s bonus row byte for byte. The two lists are one row in the reference and were
+  // two in ours: a bespoke `ChecklistCardRow` above, `ModifierLibraryRow` below.
+  //
+  // This test replaces issue 772's conversion guard, which proved the same three things about
+  // the retired row: that the control is a real `<input type="checkbox">` (the keyboard, the
+  // label association and every `input[value=…]` selector this suite uses depend on it), that
+  // the checked state reaches the visible box, and that the change callback still fires. All
+  // three are asserted below against the row that replaced it, so nothing is dropped.
+  it('draws the prerequisite list as the shared modifier row, with a checkbox', async () => {
     const patches = [];
     const root = await harness.mount(
       props({
@@ -899,28 +1808,237 @@ describe('Tool Studio editor (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-tool-prerequisite-row]')];
     assert.equal(rows.length, 5);
 
-    // The real control survives the extraction, and the row still owns the `<label>` — the
-    // primitive is rendered in `contents` mode precisely so no second label is nested here.
     for (const row of rows) {
+      // THE SHARED ROW, not a copy of its class list: the three cells below are written by
+      // `ModifierLibraryRow` and by nothing else on this tab.
+      assert.ok(
+        row.classList.contains('manager-modifier-readonly-row'),
+        'every prerequisite row is the shared library row'
+      );
+      assert.ok(row.querySelector('.manager-modifier-readonly-glyph'));
+      assert.ok(row.querySelector('.manager-modifier-readonly-label'));
+      assert.ok(row.querySelector('.manager-modifier-readonly-expression'));
+      // A `<label>` host, so the whole row is the box's hit target and its accessible name,
+      // with the input NESTED rather than the row converted into a `role="checkbox"` wrapper.
       assert.equal(row.tagName, 'LABEL');
       assert.equal(row.querySelectorAll('label').length, 0);
       const box = row.querySelector('input[type="checkbox"]');
       assert.ok(box, 'every prerequisite row renders a real checkbox');
-      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has
-      // to be there beside the hidden input.
+      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has to be
+      // there beside the hidden input.
       assert.ok(row.querySelector('.fab-selection-check.is-sm'));
     }
 
-    // Checked state reaches the visible box, not just the input.
+    // AND THE ROW IS A ROW, not the retired checklist card.
+    assert.equal(
+      root.querySelectorAll('.manager-checklist-card-row').length,
+      0,
+      'the bespoke checklist row is gone from this tab'
+    );
+
+    // The expression cell carries the entry's real preview, which is the reference's own second
+    // line for this row (`proto:2333`).
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.manager-modifier-readonly-expression').textContent),
+      [
+        '@prof ≥ 4',
+        '@tools.smith.value ≥ 1',
+        '@attributes.attuned is true',
+        '@abilities.str.value ≥ 13',
+        '@skills.arc.value ≥ 1',
+      ]
+    );
+
+    // Checked state reaches the visible box, not just the input, and the ROW carries the
+    // selected class the sheet paints `--fab-surface-active` on.
     const expertRow = rows[0];
     assert.equal(expertRow.querySelector('input[value="expert"]').checked, true);
-    assert.equal(expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'), true);
+    assert.equal(
+      expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'),
+      true
+    );
+    assert.ok(expertRow.classList.contains('is-active'), 'and the row reads as selected');
     assert.equal(rows[1].querySelector('input[value="smith"]').checked, false);
-    assert.equal(rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'), false);
+    assert.equal(
+      rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'),
+      false
+    );
+    assert.equal(rows[1].classList.contains('is-active'), false);
+
+    // ── AND NEITHER HEADING THE REFERENCE DOES NOT DRAW IS EMITTED ─────────────────────────
+    // `proto:2326` runs from the section header row straight into the list at `proto:2328`, and
+    // `proto:2334` is one muted sentence that states the AND rule AND introduces the gate pair.
+    const cardText = root.querySelector('[data-tool-rule-card="prerequisites"]').textContent;
+    assert.equal(cardText.includes('Which prerequisites'), false, 'no list eyebrow');
+    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet, and `legendVisible`
+    // un-hides it by adding `is-legend-visible` to the fieldset. So the class is what says
+    // whether a heading is PAINTED; the `<legend>` element is there either way, carrying the
+    // group's accessible name, which is the part that must survive.
+    assert.ok(
+      !root.querySelector('[data-tool-rule-card="prerequisites"] .is-legend-visible'),
+      'and no visible gate-pair legend — the sentence above it is the introduction'
+    );
+    assert.equal(
+      root
+        .querySelector('[data-tool-rule-card="prerequisites"] .manager-resolution-mode-legend')
+        .textContent.trim(),
+      'When prerequisites fail',
+      'the group keeps its accessible name'
+    );
+    assert.ok(
+      cardText.includes('All selected prerequisites are required (AND). When a character fails them:'),
+      'the AND rule and the gate introduction are one sentence'
+    );
 
     // And the change callback still reaches the tab's patch handler through the primitive.
     root.querySelector('.manager-tool-prerequisite-list input[value="smith"]').click();
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('smith')));
+  });
+
+  // -- THE TWO ROWS ARE ONE COMPONENT WITH TWO DECLARED VARIANTS (issue 1373, round 6) ------
+  //
+  // Round 5 landed both lists on `ModifierLibraryRow` and recorded two DEVIATIONS from the
+  // reference rather than reproducing them: the prerequisite row's control moved to the trailing
+  // edge and its label and expression went inline. The maintainer's round-6 ruling is that both
+  // differences are real and load-bearing, and that the answer is declared variants on ONE
+  // component rather than two components or one shape forced on both.
+  //
+  // `proto:2331`-`2333`: the checkbox is the FIRST child, then the glyph, then a text block whose
+  // label and expression are STACKED. `proto:2361`-`2364`: no leading control, the label and
+  // expression INLINE in a flex row, and the radio dot trailing at `margin-left: auto`.
+  //
+  // ASSERTED AS DOCUMENT POSITION, not as a class list. A class assertion is satisfied by a row
+  // that emits `is-control-leading` and still renders its control last, which is the exact defect
+  // this guard exists to catch.
+  it('leads the prerequisite row with its control and stacks its text, and trails the bonus row', async () => {
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({
+          prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' },
+          bonus: { enabled: true, expression: '@prof' },
+        }),
+      })
+    );
+
+    // -- THE PREREQUISITE ROW: CONTROL FIRST, TEXT STACKED ----------------------------------
+    for (const row of root.querySelectorAll('[data-tool-prerequisite-row]')) {
+      const box = row.querySelector('.fab-selection-check');
+      const glyph = row.querySelector('.manager-modifier-readonly-glyph');
+      assert.ok(Boolean(box), 'the prerequisite row draws the shared selection box');
+      // DOCUMENT_POSITION_FOLLOWING (4): the glyph comes AFTER the box, so the control leads.
+      assert.equal(
+        box.compareDocumentPosition(glyph) & 4,
+        4,
+        '`proto:2331` puts the checkbox FIRST, before the glyph — round 5 trailed it'
+      );
+      // The literal first child is `SelectionCheckbox`'s real input, which is what makes the
+      // control the row's leading slot rather than merely its first PAINTED cell.
+      assert.equal(
+        row.firstElementChild.tagName,
+        'INPUT',
+        'the caller control is rendered into the row before anything the row owns'
+      );
+
+      const label = row.querySelector('.manager-modifier-readonly-label');
+      const expression = row.querySelector('.manager-modifier-readonly-expression');
+      const stack = row.querySelector('.manager-modifier-readonly-text');
+      assert.ok(Boolean(stack), '`proto:2333` sets the name over the expression in one text block');
+      assert.equal(label.parentElement, stack, 'the name is inside that block');
+      assert.equal(expression.parentElement, stack, 'and so is the expression');
+      assert.ok(
+        row.classList.contains('is-text-stacked'),
+        'and the row declares the stacked variant, which is what the sheet paints'
+      );
+      assert.ok(row.classList.contains('is-control-leading'));
+    }
+
+    // -- THE BONUS ROW: CONTROL LAST, TEXT INLINE -------------------------------------------
+    for (const row of root.querySelectorAll('[data-tool-bonus-modifier]')) {
+      const dot = row.querySelector('input[type="radio"]');
+      assert.ok(Boolean(dot), 'the bonus row draws a real radio');
+      assert.equal(
+        row.lastElementChild,
+        dot,
+        '`proto:2364` trails the dot — the bonus row keeps the shipped trailing slot'
+      );
+      const label = row.querySelector('.manager-modifier-readonly-label');
+      const expression = row.querySelector('.manager-modifier-readonly-expression');
+      assert.equal(label.parentElement, row, 'the name is a direct cell of the row');
+      assert.equal(expression.parentElement, row, 'and the expression sits inline beside it');
+      assert.ok(
+        !row.querySelector('.manager-modifier-readonly-text'),
+        'the inline face renders no text block at all, so the Checks Studio DOM is untouched'
+      );
+      assert.equal(row.classList.contains('is-control-leading'), false);
+      assert.equal(row.classList.contains('is-text-stacked'), false);
+    }
+  });
+
+  // -- ONE PREREQUISITE IS "One prerequisite", NOT "1 prerequisites" (issue 1373, round 6) --
+  //
+  // `manager-tool-prerequisites-selected-1280x720` photographed the preview rail with exactly one
+  // prerequisite chosen and it read `1 prerequisites must be met.`. The singular string is not
+  // missing - `FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCountOne` has been in `lang/en.json`
+  // all along - the call BRANCHED ITS FALLBACK and passed the plural KEY either way, so the
+  // singular was selected only in a world with no translation loaded at all.
+  //
+  // WHICH IS WHY THIS TEST INSTALLS THE REAL LOCALE. The shared harness's `game.i18n.localize`
+  // returns the key, so every `text()`/`formattedText()` call in this suite takes its FALLBACK
+  // branch - the one branch that was already correct. Mounted against that double the defect is
+  // invisible and the guard would pass on the broken tree, which is the vacuity this suite has
+  // been bitten by before.
+  it('says "One prerequisite" for one, reading the real locale', async () => {
+    const locale = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const flat = new Map();
+    (function walk(node, prefix) {
+      for (const [key, value] of Object.entries(node)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object') walk(value, path);
+        else flat.set(path, value);
+      }
+    })(locale, '');
+    const previous = globalThis.game.i18n;
+    globalThis.game.i18n = {
+      localize: (key) => flat.get(key) ?? key,
+      format: (key, data) =>
+        Object.entries(data || {}).reduce(
+          (copy, [name, value]) => copy.replaceAll(`{${name}}`, String(value)),
+          flat.get(key) ?? key
+        ),
+    };
+    try {
+      // The locale double is only honest if it can be SEEN: a sentence this suite already pins
+      // through its fallback must now arrive from `lang/en.json` instead.
+      const one = await harness.mount(
+        props({
+          activeTab: 'requirements',
+          tool: tool({ prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' } }),
+        })
+      );
+      assert.equal(
+        one.querySelector('[data-tool-preview-gate]').textContent.trim(),
+        'One prerequisite must be met.',
+        'one selected prerequisite reads as one'
+      );
+
+      harness.remount();
+      const several = await harness.mount(
+        props({
+          activeTab: 'requirements',
+          tool: tool({
+            prerequisites: { enabled: true, ids: ['expert', 'smith'], gateMode: 'block' },
+          }),
+        })
+      );
+      assert.equal(
+        several.querySelector('[data-tool-preview-gate]').textContent.trim(),
+        '2 prerequisites must be met.',
+        'and the plural is untouched'
+      );
+    } finally {
+      globalThis.game.i18n = previous;
+    }
   });
 
   it('renders the recipe-style grouped validation surface and Validation-only live preview note', async () => {
@@ -939,13 +2057,15 @@ describe('Tool Studio editor (mounted)', () => {
         focusValidationNonce: 1,
       })
     );
-    assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 6);
+    // FIVE CHECKS, NOT SIX. `A game-world Item is linked` was a check on IDENTITY under a
+    // `LINKED ITEM` heading, on a screen that cannot link one (issue 1373). It is stated as a
+    // routed notice now, and only when the link is genuinely missing.
+    assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
     assert.deepEqual(
       [...root.querySelectorAll('[data-tool-validation-check] .manager-recipe-val-title')].map(
         (node) => node.textContent
       ),
       [
-        'A game-world Item is linked',
         'Breakage settings are complete',
         'On-break action is complete',
         'Repair requirements are complete',
@@ -953,6 +2073,7 @@ describe('Tool Studio editor (mounted)', () => {
         'Check bonus is complete',
       ]
     );
+    assert.ok(!root.querySelector('[data-tool-identity-notice]'), 'a linked Tool states nothing');
     assert.equal(
       root
         .querySelector('[data-tool-validation-check="breakage"]')
@@ -964,7 +2085,7 @@ describe('Tool Studio editor (mounted)', () => {
       true
     );
     assert.equal(root.querySelector('[data-editor-validation-count="blocking"]').textContent, '2');
-    assert.equal(root.querySelector('[data-editor-validation-count="passing"]').textContent, '4');
+    assert.equal(root.querySelector('[data-editor-validation-count="passing"]').textContent, '3');
     assert.match(
       root.querySelector('[data-editor-validation-summary="block"]').textContent,
       /Needs attention/
@@ -976,20 +2097,28 @@ describe('Tool Studio editor (mounted)', () => {
       /Break chance must be between 0% and 100%/
     );
     assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
-    assert.equal(root.querySelector('.manager-recipe-tab-title').textContent.trim(), 'Validation');
-    assert.match(root.querySelector('.manager-recipe-tab-intro').textContent, /blocking issue/);
+    // NO IN-PANE PAGE HEADING (issue 1373). It was the only one of the three tabs to carry an
+    // `<h2>` and an intro, and the reference draws neither on any of them - the strip above
+    // names the tab, the header above that names the Tool, and the summary card below already
+    // states the outcome. `blocking issue` moved to that card, which is asserted next.
+    assert.ok(!root.querySelector('.manager-recipe-tab-title'), 'no in-pane page heading');
+    assert.ok(!root.querySelector('.manager-recipe-tab-intro'), 'and no intro block');
+    assert.match(
+      root.querySelector('[data-editor-validation-summary]').textContent,
+      /blocking issue/
+    );
     assert.equal(
       root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'),
       null
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
+    assert.ok(!root.querySelector('[data-tool-preview-live-update]'), 'no live-update strip');
     // Issue 881: every effective-rule row is the shared icon fact row, so the preview and
     // the library inspector cannot drift back into two geometries for one projection.
     assert.equal(
       root.querySelectorAll('[data-tool-preview-rule] > .manager-icon-fact-row').length,
       4
     );
-    assert.ok(root.querySelector('[data-tool-preview-live-update]'));
   });
 
   it('reports a missing bonus independently without duplicating its domain blocker and preserves all-pass state', async () => {
@@ -1051,7 +2180,7 @@ describe('Tool Studio editor (mounted)', () => {
 
     harness.remount();
     const validRoot = await harness.mount(props({ activeTab: 'validation' }));
-    assert.equal(validRoot.querySelectorAll('[data-tool-validation-check]').length, 6);
+    assert.equal(validRoot.querySelectorAll('[data-tool-validation-check]').length, 5);
     assert.equal(validRoot.querySelectorAll('[data-tool-validation-check].is-invalid').length, 0);
     assert.match(
       validRoot.querySelector('[data-editor-validation-summary="pass"]').textContent,
@@ -1069,7 +2198,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
-  it('uses prototype preview copy and shows the live-update note on every tab', async () => {
+  it('uses prototype preview copy on every tab', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
     assert.equal(
@@ -1086,11 +2215,13 @@ describe('Tool Studio editor (mounted)', () => {
       '1 prerequisite'
     );
     assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
-    assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /5 uses.*@prof/);
-    // The note stands on EVERY tab (issue 883). The preview updates live whichever tab you
-    // are editing, so gating the statement on Validation understated it — the maintainer
-    // moved it above Effective rules and dropped the condition, which retires the
-    // prototype's tab-scoped placement deliberately.
+    // THE IDENTITY CARD CARRIES NEITHER OF THOSE ANSWERS ANY MORE (issue 1373). Its two chips
+    // restated the first and fourth effective-rules rows one line below them, and the design
+    // draws a thumbnail, a name and a scope sentence.
+    assert.doesNotMatch(
+      root.querySelector('[data-tool-preview-identity]').textContent,
+      /5 uses|@prof/
+    );
     //
     // Asserted as a boolean rather than by comparing the node to `null`/an element: on
     // failure node:assert serialises the actual value for its diff, and walking a mounted
@@ -1098,8 +2229,8 @@ describe('Tool Studio editor (mounted)', () => {
     // `# cancelled` with no message, which reads like a hang rather than a failed
     // expectation — this exact assertion cost an OOM to diagnose.
     assert.ok(
-      !!root.querySelector('[data-tool-preview-live-update]'),
-      'the live-update note renders on every tab, not only Validation'
+      !root.querySelector('[data-tool-preview-live-update]'),
+      'the live-update strip is gone with the standing explainer'
     );
   });
 
@@ -1144,7 +2275,13 @@ describe('Tool Studio editor (mounted)', () => {
     );
 
     const blockers = root.querySelector('[data-tool-validation-tab]').textContent;
-    assert.match(blockers, /Link an Item or managed Component/);
+    // THE IDENTITY FAILURE IS A ROUTED NOTICE, NOT A CHECK ROW (issue 1373). It names the world
+    // Tool, because that is the only scope that can repair it — and it does NOT count toward the
+    // blocking total, so it cannot redden this editor's tab badge over a defect no control here
+    // can clear. Escalated and stated in the handoff: the DOMAIN still refuses the save.
+    assert.ok(Boolean(root.querySelector('[data-tool-identity-notice]')));
+    assert.match(blockers, /Its identity is set on the world Tool, not here/);
+    assert.doesNotMatch(blockers, /Link an Item or managed Component/);
     assert.match(blockers, /Repair group 3 is incomplete/);
     assert.match(blockers, /Some Tool settings are incomplete/);
     assert.doesNotMatch(blockers, /componentId|repairRequirements|unexpected internal/);

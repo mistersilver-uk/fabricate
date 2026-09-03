@@ -108,6 +108,13 @@ const VOCABULARY_PROPS = Object.freeze(['actions', 'systems', 'vocabulary']);
  */
 const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../config/currencyProviders.js',
+  // ADDED BY ISSUE 1373, and deliberately: the world Tool entry's `Preview as` region resolves
+  // its Tool's world-default prerequisites against ONE actor, and the roster it offers is the
+  // shared, GM-configurable player-character predicate rather than a second `type === 'character'`
+  // test. The projection to `{id, name, img}` happens in the shell because the page is a leaf
+  // with no Foundry in its closure; the predicate is what makes that roster the same one the
+  // Checks Studio's picker already offers.
+  '../../../../config/playerCharacterTypes.js',
   '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
   '../../../../systems/checkModifierResolver.js',
@@ -129,6 +136,13 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../utils/recipeBulkEditModel.js',
   '../../../../utils/recipeCategories.js',
   '../../../../utils/routedOutcomeKeywords.js',
+  // ADDED BY ISSUE 1373, and legitimately under the message below. One game-world Item is one
+  // world Tool, so the catalogue's drop zone RESOLVES before it creates - and the walk over a
+  // record's `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is the shared one the
+  // definition index and the read union already answer that question with. A fourth comparison
+  // written in the shell would drift from the index the migration grouped by, which is exactly
+  // the failure `sourceReferenceUnion` was extracted to prevent.
+  '../../../../utils/sourceReferenceUnion.js',
   '../../../../utils/vocabularyUsage.js',
   '../../../managerExtensions.js',
   '../../../navTabBadgeStore.js',
@@ -141,6 +155,12 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../util/dropUtils.js',
   '../../util/foundryBridge.js',
   './AccessTabView.svelte',
+  // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete`
+  // (issue 1373's parity round). The design draws `Back to tools · Delete · Save tool` on
+  // the title line, and `.manager-header` is a sibling of `.manager-main`, so the page
+  // structurally cannot render into that band - it reports an action descriptor and the shell
+  // draws the control. The verb, the reach and the write are all still the page's.
+  './ArmedDangerButton.svelte',
   './BooksScrollsView.svelte',
   './Chip.svelte',
   './ComponentEditView.svelte',

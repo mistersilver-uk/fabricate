@@ -50,6 +50,7 @@ import { ESSENCE_SCOPE, ESSENCE_SECTIONS } from '../../../systems/essenceScope.j
 import { membershipKey, setSectionInheritance } from '../../../systems/scopedDefinitions.js';
 import {
   seedToolRepairRequirements,
+  TOOL_BREAKAGE_AUTHORITIES,
   TOOL_SCOPE,
   TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
@@ -79,6 +80,20 @@ const WRITE_DESCRIPTORS = Object.freeze({
     taggable: false,
   }),
 });
+
+/**
+ * Whether this entity type's WORLD DEFAULTS carry a master switch.
+ *
+ * DERIVED from the scope descriptor rather than restated in the table above, on the same rule
+ * `worldScopeProjection` follows: `defineScope` decides which types have one, so a second copy
+ * here could only ever go stale in the direction that ships a write nothing resolves.
+ *
+ * @param {object} descriptor
+ * @returns {boolean}
+ */
+function hasWorldEnabled(descriptor) {
+  return descriptor?.scope?.worldEnableable === true;
+}
 
 /**
  * A trimmed id, or `''` for anything that cannot be one.
@@ -139,7 +154,8 @@ function persistedShape(raw) {
  * Build the world-scope write path for ONE entity type.
  *
  * The returned object's KEY SET is part of its contract: `setEnabled` is present only on an
- * enableable entity, and `setWorldTags` / `setMutedTags` only on a taggable one.
+ * enableable entity, `setWorldEnabled` only on one whose WORLD DEFAULTS carry a master switch,
+ * and `setWorldTags` / `setMutedTags` only on a taggable one.
  *
  * @param {object} options
  * @param {string} options.entityType `component`, `essence` or `tool`.
@@ -454,6 +470,114 @@ export function createWorldScopeEntityActions({ entityType, getStore }) {
         const record = membershipOf(payload, target, system);
         if (!record) return false;
         putMembership(payload, { ...record, enabled });
+        return true;
+      });
+    };
+  }
+
+  if (hasWorldEnabled(descriptor)) {
+    /**
+     * Flip the WORLD MASTER SWITCH: enable or disable the entity across every crafting system
+     * at once.
+     *
+     * WORLD OFF WINS. `resolveScopedDefinition` ANDs this flag with each system's own, so a
+     * world-disabled entity is off everywhere whatever a system says, and no per-system write
+     * can bring it back. Re-enabling here restores whatever each system had already chosen,
+     * because this write never touches a membership record.
+     *
+     * IT IS SEPARATE FROM `setEnabled` RATHER THAN AN OVERLOAD OF IT. `setEnabled` takes a
+     * system id and writes one membership record; this takes none and writes the world
+     * defaults. Collapsing them onto one name behind an optional argument would make the
+     * SCOPE of a destructive-feeling write depend on an argument a caller can forget.
+     *
+     * `true` IS WRITTEN EXPLICITLY rather than deleting the key. Absence and `true` resolve
+     * identically (`isWorldEnabled`), so unlike the world tool-breakage authority this is not a
+     * one-way door, and an explicit `true` is what lets a GM see that the switch was
+     * deliberately left on.
+     *
+     * @param {string} entityId
+     * @param {boolean} enabled
+     * @returns {Promise<boolean>}
+     */
+    actions.setWorldEnabled = async (entityId, enabled) => {
+      const target = id(entityId);
+      if (!target || typeof enabled !== 'boolean') return false;
+      return mutate((payload) => {
+        if (payload.entities.every((entry) => id(entry?.id) !== target)) return false;
+        const current = plain(payload.defaults[target]);
+        payload.defaults[target] = { ...current, id: target, enabled };
+        return true;
+      });
+    };
+  }
+
+  if (entityType === 'tool') {
+    /**
+     * Author the WORLD tool-breakage authority, or CLEAR it.
+     *
+     * NOT A SECTION, and not routed through `updateWorldDefaultSection`: the break mode is one
+     * value for the whole world rather than a per-entity default, so it has no entity id to
+     * address and `knownSection` would refuse the name anyway.
+     *
+     * THE CLEAR IS A DELETE, NOT AN EMPTY BLOCK, AND THAT IS THE HALF THAT MATTERS. "No world
+     * authority" has to stay expressible on disk, because `resolveToolBreakageAuthority` reads
+     * the world layer only when the system authored nothing - so a world value that could be
+     * set and never unset would be a one-way door. `normalizeWorldToolBreakage` is
+     * absence-preserving and a world SETTING preserves key absence (unlike `setFlag`, whose
+     * merge resurrects a removed key), so the delete survives the round trip.
+     *
+     * ANYTHING THAT IS NOT ONE OF THE TWO SHIPPED TOKENS CLEARS. `null` is the caller the
+     * tri-state control passes for its Inherit segment, and an unrecognized string is treated
+     * the same way rather than stored: the normalizer would drop it on the next `load()`, so
+     * storing it would report a write that vanishes.
+     *
+     * @param {unknown} authority One of {@link TOOL_BREAKAGE_AUTHORITIES}, or anything else
+     *   to clear.
+     * @returns {Promise<boolean>}
+     */
+    actions.setWorldToolBreakage = async (authority) =>
+      mutate((payload) => {
+        if (typeof authority === 'string' && TOOL_BREAKAGE_AUTHORITIES.includes(authority)) {
+          payload.toolBreakage = { authority };
+        } else {
+          delete payload.toolBreakage;
+        }
+        return true;
+      });
+
+    /**
+     * Replace one tool's WORLD `repairRequirements` default.
+     *
+     * ITS OWN ACTION, because `repairRequirements` is deliberately NOT a tool section:
+     * `TOOL_SECTIONS` is `['breakage', 'onBreak', 'prerequisites', 'bonus']` and does not name
+     * it, so `updateWorldDefaultSection` refuses the name and writes nothing. Without this
+     * action the world Tool entry would display a seed source nobody can author.
+     *
+     * THE WRITE PATH AND THE READ PATH ARE DELIBERATELY ASYMMETRIC. The world holds this list;
+     * the MEMBERSHIP RECORD answers it. `seedToolRepairRequirements` copies it once, when a
+     * tool is added to a system, and `resolveTool` never reads it back out of the world
+     * defaults - so an edit here changes what the NEXT system to adopt this tool starts from,
+     * and reaches no system that already has it.
+     *
+     * The groups are OPAQUE and stored verbatim, exactly as `updateWorldDefaultSection` stores
+     * a section value; a non-array is written as an empty list, on the `setWorldTags`
+     * precedent.
+     *
+     * @param {string} entityId
+     * @param {unknown} groups The ingredient-group list.
+     * @returns {Promise<boolean>}
+     */
+    actions.setWorldRepairRequirements = async (entityId, groups) => {
+      const target = id(entityId);
+      if (!target) return false;
+      return mutate((payload) => {
+        if (payload.entities.every((entry) => id(entry?.id) !== target)) return false;
+        const current = plain(payload.defaults[target]);
+        payload.defaults[target] = {
+          ...current,
+          id: target,
+          repairRequirements: Array.isArray(groups) ? groups : [],
+        };
         return true;
       });
     };

@@ -179,7 +179,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-world-travel-ungated',
   'manager-tool-parity-01-library-1280x720',
   'manager-tool-zero-state-empty-library-1280x720',
-  'manager-tool-parity-02-overview-1280x720',
+  'manager-tool-parity-02-remove-1280x720',
   'manager-tool-stress-long-name',
   'manager-tool-parity-03-breakage-1280x720',
   'manager-tool-stress-repair',

@@ -92,6 +92,7 @@ describe('1286 EmptyState — variant contract', () => {
       ['compact', 'is-compact'],
       ['filtered', 'is-filtered'],
       ['inline', 'is-inline'],
+      ['note', 'is-note'],
     ]) {
       const target = await harness.mount({ [prop]: true });
       assert.deepEqual(
@@ -128,6 +129,25 @@ describe('1286 EmptyState — variant contract', () => {
     assert.match(glyph, /width:\s*auto/, 'the 46px tile width is released');
     assert.match(glyph, /height:\s*auto/, 'and its height with it');
     assert.match(glyph, /background:\s*none/, 'the tile FILL is gone, not merely resized');
+  });
+
+  it('the NOTE variant releases the panel itself — no edge, no corner, no tile', () => {
+    // The popover empty (issue 1373). `proto:2262` is one line and nothing else —
+    // `padding:7px; font:500 10px var(--sans); color:var(--subtle)` — where every other
+    // variant here keeps the dashed panel. That is the distinction: `is-inline` puts the
+    // sentence on one LINE and keeps the box, `is-note` removes the BOX. A note that merely
+    // shrank the panel would still draw a bordered card inside a 240px popover, which is the
+    // shape the maintainer photographed beside the design.
+    const panel = ruleBody('.manager-empty.is-note');
+    assert.match(panel, /border:\s*0/, 'the dashed edge is released, not merely thinned');
+    assert.match(panel, /padding:\s*var\(--fab-space-chip\)/, 'proto:2262`s 7px, nearest step 6');
+    assert.match(panel, /text-align:\s*left/, 'a note reads from the left, not centred');
+
+    // The tile is released the way `is-inline` releases it rather than resized, so a caller
+    // that does pass an icon gets a bare glyph and never a third tile size.
+    const glyph = ruleBody('.manager-empty.is-note > div > i');
+    assert.match(glyph, /width:\s*auto/, 'the tile width is released');
+    assert.match(glyph, /background:\s*none/, 'and its fill with it');
   });
 
   it('leaves the shipped compact tile at 32px, so inline is not a second compact', () => {

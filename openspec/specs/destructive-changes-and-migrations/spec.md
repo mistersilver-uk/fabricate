@@ -850,6 +850,28 @@ It mutates no input, throws no `FatalMigrationError`, and skips a malformed envi
     The `enabled*Ids` entries themselves survive the downgrade; what is lost is their COMPOSITION, silently, because the old engine drops a picked record that no longer matches rather than reporting it.
 11. **The `label` string is the one string a GM ever reads about this migration**, so it states the new rule in both modes, says the fold is what stops a manual environment composing nothing after the upgrade, says the clear is what keeps the manual-to-automatic guarantee, and names the downgrade cost.
 
+### Tool Requirement Sections (`1.31.0`, `downgradeTo: '1.30.0'`, pure, idempotent)
+
+Records every existing tool membership record's OWN `prerequisites` and `bonus` as an override, now that both are world-default sections (`## Scoped Entity Definitions` `### Tool scope` requirement 1a, issue 1373).
+
+1. **WHY IT IS A SECOND PASS RATHER THAN A WIDER `1.30.0`.**
+   `1.30.0` has already run in every world that has upgraded, and it wrote each tool membership record with an `inherit` map naming only the two sections that existed then.
+   Adding two more makes `normalizeInherit` read an ABSENT key as INHERITING, so every one of those records would claim to inherit a world default for a value its own crafting system authored.
+   `1.30.0` cannot be widened retroactively: its per-pair guard deliberately never rewrites a membership record a previous pass already wrote, precisely so a re-run cannot overwrite a GM's later edit.
+2. **THE VALUE COMES FROM THE IN-SYSTEM `Tool` RECORD OF THAT PAIR'S SYSTEM**, which is the value that system resolves today while `## CraftingSystem` requirement 36 makes the in-system record decide every key it carries.
+   Copying it onto the membership record with the switch OFF is therefore behaviour-preserving BY CONSTRUCTION rather than by fixture choice.
+   An absent in-system value is filled with the canonical empty gate or empty bonus, on the same rule requirement 6 above states for the same reason.
+   A membership record whose system or tool is gone still gets the canonical empty and both switches off: leaving it inheriting is the one state this pass exists to prevent, and there is no system left whose value could be preferred.
+3. **IDEMPOTENT PER SECTION.**
+   A record already carrying an authored `inherit` entry for a section is left alone, switch and stored value both.
+   That is what makes a re-run, and a run after `1.30.0` already wrote the pair, a no-op — and what stops the pass undoing a GM who has since flipped a section back to inheriting.
+4. **NO WORLD DEFAULT IS WRITTEN**, on the unknowable-provenance rule requirement 7 above records for the pair.
+5. **DOWNGRADE IS DATA-LOSSLESS IN BOTH DIRECTIONS.**
+   The pass only ADDS membership-record keys, and `1.30.0`'s `TOOL_SECTIONS` does not name them, so `normalizeMembership` drops them on read there and the crafting system's own values keep deciding.
+   Nothing a GM authored is removed or rewritten by either direction.
+
+Mutated setting keys: `fabricate.toolScope` (membership records only).
+
 ### World-Scope Entity Migration (`1.30.0`, `downgradeTo: '1.29.0'`, pure, non-mutating, idempotent)
 
 Issue 1363 (epic 1357, PR 3) gives the world ONE record per component, essence and tool instead of one per crafting system.
@@ -891,12 +913,14 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
    Refusing a pair removes its definitions from every group they belonged to, which can change another group's identity donor, so the derivation is iterated to a FIXED POINT; the refusal set only grows and is bounded by the number of `(system, entityType)` pairs.
 6. **Every membership record is created with EVERY SECTION OVERRIDDEN**, each value copied verbatim from that system's own definition, so nothing inherits at migration time and every system's resolved behaviour is unchanged.
    A component record carries `category` verbatim — `general` is a legitimate stored token on an override — and its own `tags` with no `mutedTags`.
-   An essence record carries `effectSource` and `macro` and its `enabled` flag; a tool record carries `breakage`, `onBreak`, the seeded `repairRequirements` and its `enabled` flag.
+   An essence record carries `effectSource` and `macro` and its `enabled` flag; a tool record carries `breakage`, `onBreak`, `prerequisites`, `bonus`, the seeded `repairRequirements` and its `enabled` flag.
+   `prerequisites` and `bonus` joined at `1.31.0` (issue 1373) and are written UNCONDITIONALLY, defaulting an unauthored one to the canonical empty gate and empty bonus rather than leaving the section absent — `Tool` mints both on construction, so a raw record without them ALREADY resolves to exactly those values, and an absent section under an `inherit: false` switch would fall back to the world value instead.
 7. **WORLD DEFAULTS ARE ELECTED FROM THE DONOR** - the OLDEST contributing system, the same donor that wins identity, extending the oldest-wins rule from identity to behaviour.
    SIX sections take one: component `category`, essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
    **TWO are excluded, for two DIFFERENT reasons.**
    Component `tags` is excluded because the tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once - a hazard independent of who the donor is.
    The world tool-breakage authority is excluded because its problem is unknowable PROVENANCE rather than an ambiguous donor: the pre-flip normalizer minted a concrete `toolSpecific` on every save, so `### Tool scope` requirement 5's every-existing-value-is-AUTHORED rule applies and there is nothing to lift.
+   Tool `prerequisites` and `bonus` are excluded at `1.31.0` on that same provenance rule and for the same structural cause: `Tool#toJSON` emits both keys on EVERY save, so a persisted `{enabled: false}` is the normalizer's mint and a GM's deliberate "nothing required" written identically (`### Tool scope` requirement 1a).
 
    **FIVE CONSTRAINTS can decline an individual SECTION**, and a declined section simply gets no world default and is reported.
    Nothing is lost by a refusal, which is why refusing is always the safe answer: every membership record still OVERRIDES every section with its own system's value verbatim, so resolution at migration time is unchanged either way and a world default only ever matters for a system added LATER or an override cleared later.

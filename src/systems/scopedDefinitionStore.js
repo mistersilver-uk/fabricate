@@ -360,7 +360,7 @@ export function unionScopedDefinitions({
   const bySystem = membershipsForSystem(memberships, system);
   const byId = worldEntitiesById(entities);
   const identityFields = liftedIdentityFields(entityType);
-  const sectionWriters = inheritedSectionWriters(entityType);
+  const sectionWriters = inheritedSectionWriters(entityType, declaredSections(resolve));
 
   const union = [];
   for (const entry of legacy) {
@@ -479,21 +479,74 @@ const INHERITED_SECTION_WRITERS = Object.freeze({
     onBreak(row, value) {
       row.onBreak = value;
     },
+    // `prerequisites` and `bonus` joined `TOOL_SECTIONS` at `1.31.0` (issue 1373), and BOTH ARE
+    // ASSIGNMENTS because the section name and the shipped field name coincide: a normalized
+    // `Tool` carries `prerequisites: {enabled, ids, gateMode}` and `bonus: {enabled, expression}`
+    // under exactly those keys (`Tool.js`, and `toolCheckBonus.js` reads `tool.prerequisites`
+    // and `tool.bonus`), unlike the essence's two, whose section names name nothing on the
+    // record. Verified against the field, not against the section name: a writer guessed from
+    // the section name is right here and wrong two lines above, which is why the check is per
+    // entry rather than per table.
+    prerequisites(row, value) {
+      row.prerequisites = value;
+    },
+    bonus(row, value) {
+      row.bonus = value;
+    },
   }),
 });
 
 /**
- * The inherited-section writers for one entity type, REFUSING an unrecognised one.
+ * The sections a scope DECLARES, asked of the resolver this union was handed.
+ *
+ * NOT AN IMPORT OF THE THREE SECTION LISTS, because `componentScope.js`, `essenceScope.js` and
+ * `toolScope.js` all import THIS module for {@link unionScopedDefinitions}, so reading
+ * `TOOL_SECTIONS` from here would close an import cycle around the very function the cycle's other
+ * half calls.
+ *
+ * The probe is the resolver's own documented non-member branch: `resolveScopedDefinition` fills
+ * `inherited` for every section the scope declares BEFORE it consults either record, and answers
+ * a null world default and a null membership without raising - which is the state the world-scope
+ * preview already resolves in. So the key set of `resolve(null, null).inherited` is exactly the
+ * scope's section list, obtained once per union rather than per row.
+ *
+ * @param {(worldDefault: object|null, membership: object|null) => object} resolve
+ * @returns {string[]}
+ */
+function declaredSections(resolve) {
+  if (typeof resolve !== 'function') return [];
+  return Object.keys(resolve(null, null)?.inherited ?? {});
+}
+
+/**
+ * The inherited-section writers for one entity type, REFUSING an unrecognised entity type AND a
+ * DECLARED SECTION THIS TABLE DOES NOT WRITE.
  *
  * It throws for the same reason {@link liftedIdentityFields} does, and the failure it catches is
  * the same shape: a typo would leave every section of that entity type reading the in-system
  * record whatever its switch said, with every suite green, because the union's other two passes
  * still produce a complete-looking row.
  *
+ * THE SECOND REFUSAL IS THE SAME FAILURE ONE LEVEL DOWN, and it is here because it has already
+ * happened. Issue 1373 added `prerequisites` and `bonus` to `TOOL_SECTIONS` while this table
+ * still wrote `breakage` and `onBreak` alone, and the result was not a red line anywhere near
+ * the table: the two new sections simply kept answering from the in-system record whatever their
+ * switch said, exactly as an entity-type typo would have. Only a suite that happens to drive
+ * every DECLARED section caught it, and a lane that adds a section without touching that suite
+ * would not have been caught at all. A section list and a writer table that must stay equal, and
+ * that live in two modules, is a mirror; the mirror is now checked where it is READ.
+ *
+ * The check is on the KEY SET only - it cannot see a writer that projects onto the wrong field
+ * name, which is what `tests/world-scope-inherited-section-resolution.test.js` drives
+ * behaviourally, per section, for exactly that reason.
+ *
  * @param {'components'|'essences'|'tools'} entityType
+ * @param {readonly string[]} [declared] The sections the scope declares, from
+ *   {@link declaredSections}. An empty list checks nothing, which is the honest answer for a
+ *   caller that supplied no resolver.
  * @returns {Readonly<Record<string, (row: object, value: unknown) => void>>}
  */
-function inheritedSectionWriters(entityType) {
+function inheritedSectionWriters(entityType, declared = []) {
   const writers = INHERITED_SECTION_WRITERS[entityType];
   if (!writers) {
     const known = Object.keys(INHERITED_SECTION_WRITERS).join(', ');
@@ -502,6 +555,17 @@ function inheritedSectionWriters(entityType) {
         JSON.stringify(entityType) +
         '; expected one of ' +
         known
+    );
+  }
+  const unwritten = declared.filter((section) => !Object.hasOwn(writers, section));
+  if (unwritten.length > 0) {
+    throw new TypeError(
+      'unionScopedDefinitions: entityType ' +
+        JSON.stringify(entityType) +
+        ' declares section(s) ' +
+        unwritten.map((section) => JSON.stringify(section)).join(', ') +
+        ' that INHERITED_SECTION_WRITERS does not write; an inheriting system would silently ' +
+        'answer them from the in-system record'
     );
   }
   return writers;

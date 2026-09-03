@@ -109,7 +109,7 @@ function withScreenshotFixtures(fixtures, runAssert) {
 const TOOL_STUDIO_VIEWS = [
   ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 682],
   ['zero-state-empty-library-1280x720', 'manager-tool-zero-state-empty-library-1280x720', 1212, 682],
-  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 682],
+  ['02-remove-1280x720', 'manager-tool-parity-02-remove-1280x720', 1212, 682],
   ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 682],
   ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 682],
   ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 682],

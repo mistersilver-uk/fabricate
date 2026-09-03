@@ -106,6 +106,7 @@ const harness = createMountedComponentHarness({
     'src/utils/progressiveStageThresholds.js',
     'src/utils/recipeCategories.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     'src/utils/sourceReferenceUnion.js',
     'src/utils/sourceUuid.js',
   ],

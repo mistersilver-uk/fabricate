@@ -78,6 +78,9 @@ const SHELL_MODULES = [
   // for that reason, exactly as `IconButton` is listed before `Pagination`.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, so the essence
+  // trees that render the frame carry it in their static graph too. An omission HANGS the suite.
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
   // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.

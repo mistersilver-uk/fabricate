@@ -12,11 +12,43 @@
   UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue stands, which is why its
   block row reads `BLOCKS ENABLE` where the essence's reads `INCOMPLETE`. That word is the one
   thing the two sites genuinely disagree about, and it is the only status label either passes.
+
+  == THERE IS NO `LINKED ITEM` GROUP, AND ITS ABSENCE IS THE CONTRACT (issue 1373) ============
+  This surface opened with a `LINKED ITEM` heading over a single row reading `A game-world Item
+  is linked` — a check on IDENTITY, which is world scope's and which no control on this screen
+  can satisfy. It counted toward the blocking total and reddened the tab badge over a defect a
+  GM could only fix somewhere else.
+
+  It is not silently dropped. `toolEditorValidation` carries the failure out as `identityErrors`
+  and the surface states it as a ROUTED NOTICE naming the world Tool — the place it is fixed —
+  rather than as a check row. The notice renders only when the link is genuinely missing, so a
+  healthy Tool's surface is exactly the four rules checks and nothing else.
+
+  == AND NO IN-PANE PAGE HEADING (issue 1373) =================================================
+  It opened with an `<h2>` reading `Validation` over a `A Tool saves only when every blocking
+  issue is cleared.` intro — the only tab of the three to carry one, and the reference draws it
+  on none of them. The tab strip immediately above already names the tab, the editor header
+  above that names the Tool, and the summary card immediately below already says `Every Tool
+  check passes. Ready to save.` in the state where it matters. Both props are simply not
+  passed; `EditorValidationSurface` renders no head block at all when neither is given, so no
+  other caller of that surface changes.
+
+  ESCALATED, NOT SOLVED: the domain still refuses the SAVE. `Tool#validate` and
+  `CraftingSystemManager#upsertTool` both reject a Tool with neither a `componentId` nor a source
+  reference, because an unmatched Tool cannot be found in any inventory. So a rules record whose
+  world half has lost its Item still cannot be saved from here; what changed is that the screen
+  now says where to go instead of asking the GM to clear a check with no control behind it.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Callout from '../Callout.svelte';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
-  import { toolEditorValidation, toolValidationPresentation } from './toolStudio.js';
+  import {
+    toolEditorValidation,
+    toolHasLinkedSource,
+    toolValidationPresentation,
+  } from './toolStudio.js';
 
   let {
     tool = null,
@@ -24,6 +56,12 @@
     validation = { valid: false, errors: [] },
     saveError = '',
     focusValidationNonce = 0,
+    // Whether the world catalogue actually holds a record for this Tool, and the route to it.
+    // Both come from the editor, which already answers the same question for its header button:
+    // an unlifted pre-migration Tool has no world half, so the notice states the defect and
+    // offers no route to a record that would open on nothing.
+    worldRecordExists = false,
+    onEditWorldTool = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -59,7 +97,6 @@
   }
 
   const labels = {
-    source: 'A game-world Item is linked',
     breakage: 'Breakage settings are complete',
     onBreak: 'On-break action is complete',
     prerequisites: 'Character prerequisites are complete',
@@ -67,7 +104,6 @@
     repair: 'Repair requirements are complete',
   };
   const icons = {
-    source: 'fas fa-link',
     breakage: 'fas fa-heart-crack',
     requirements: 'fas fa-user-shield',
   };
@@ -111,14 +147,12 @@
       }));
   }
 
+  const identityBroken = $derived(
+    !toolHasLinkedSource(tool) || editorValidation.identityErrors.length > 0
+  );
+
   const groups = $derived.by(() => {
     const result = [
-      {
-        id: 'source',
-        label: text('FABRICATE.Admin.Manager.Tools.Editor.Source', 'Source'),
-        icon: icons.source,
-        rows: rows(['source']),
-      },
       {
         id: 'breakage',
         label: text('FABRICATE.Admin.Manager.Tools.Breakage', 'Breakage'),
@@ -155,17 +189,34 @@
   stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
   hookAttribute="data-tool-validation-tab"
   focusNonce={focusValidationNonce}
-  title={text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}
-  intro={text(
-    'FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro',
-    'A Tool saves only when every blocking issue is cleared.'
-  )}
   {summary}
   counts={{ passing, warnings: 0, blocking }}
   {groups}
   rowDataAttr="data-tool-validation-check"
   blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE')}
 >
+  {#if identityBroken}
+    <div class="manager-tool-identity-notice" data-tool-identity-notice>
+      <Callout
+        tone="warning"
+        icon="fas fa-link-slash"
+        text={text(
+          'FABRICATE.Admin.Manager.Tools.Editor.IdentityMissing',
+          'This Tool names no game-world Item. Its identity is set on the world Tool, not here, and it cannot be saved until that link is restored.'
+        )}
+      />
+      {#if worldRecordExists}
+        <ManagerButton
+          data-tool-identity-route={String(tool?.id ?? '')}
+          aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
+          onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
+          ><i class="fas fa-globe" aria-hidden="true"></i><span
+            >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
+          ></ManagerButton
+        >
+      {/if}
+    </div>
+  {/if}
   {#if saveError && saveError !== 'invalid'}
     <p class="manager-validation-error" role="alert" data-tool-save-error>
       {text(

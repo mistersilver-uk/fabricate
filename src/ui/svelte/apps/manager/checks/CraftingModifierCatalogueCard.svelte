@@ -96,6 +96,7 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import {
     normalizeModifierPolicy,
     policyDefersSelection,
@@ -577,18 +578,21 @@
            second editor for the same rows is how two screens come to disagree about which
            one wrote last. The eligibility pill at the end is NOT part of that — which
            entries an activity applies is exactly what this screen owns. -->
-      <div class="manager-modifier-readonly-row" data-crafting-modifier-row={modifier.id}>
-        <span class="manager-modifier-readonly-glyph" aria-hidden="true">
-          <i class={modifier.icon || DEFAULT_MODIFIER_ICON} data-crafting-modifier-readonly-icon
-          ></i>
-        </span>
-        <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
-          >{modifier.label || modifier.id}</span
-        >
-        <code
-          class="manager-modifier-readonly-expression"
-          data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
-        >
+      <!-- THE ROW IS `ModifierLibraryRow` SINCE ISSUE 1373's ROUND 4, and the markup that was
+           written out here is unchanged — it MOVED. The Tool Studio's check-bonus picker draws
+           the same world modifier library and now calls the same row, which is what stops the
+           two screens presenting one concept from two copies. Everything below the three cells
+           is still this card's: which entries an activity applies is exactly what it owns. -->
+      <ModifierLibraryRow
+        as="div"
+        icon={modifier.icon || DEFAULT_MODIFIER_ICON}
+        label={modifier.label || modifier.id}
+        expression={modifier.expression}
+        rowAttributes={{ 'data-crafting-modifier-row': modifier.id }}
+        iconAttributes={{ 'data-crafting-modifier-readonly-icon': true }}
+        labelAttributes={{ 'data-crafting-modifier-readonly': 'label' }}
+        expressionAttributes={{ 'data-crafting-modifier-readonly': 'expression' }}
+      >
         {#if boundsChipLabel(modifier)}
           <Chip density="row" class="manager-modifier-bounds-chip">{boundsChipLabel(modifier)}</Chip
           >
@@ -623,7 +627,7 @@
           <span class="manager-modifier-eligibility-dot" aria-hidden="true"></span>
           {eligibilityLabelOf(modifier.id)}
         </button>
-      </div>
+      </ModifierLibraryRow>
 
       {#if boundsFault(modifier)}
         <p
@@ -807,9 +811,18 @@
 
      What stays here is layout CONTEXT rather than the chip's own geometry: `flex: 0 0 auto`
      keeps both chips from shrinking below their content when the row is narrow, which is a
-     property of this row's flex layout, not of a chip. */
-  .manager-modifier-readonly-row :global(.manager-modifier-bounds-chip),
-  .manager-modifier-readonly-row :global(.manager-modifier-roll-chip) {
+     property of this row's flex layout, not of a chip.
+
+     RE-ANCHORED ON THE CARD (issue 1373, round 4), for the reason the two rules above already
+     record about `.manager-inspector-card`. The row moved into `ModifierLibraryRow`, so
+     `.manager-modifier-readonly-row` is written by THAT component and carries its hash; the
+     scoped ancestor half stopped matching the moment it moved. Wrapped WHOLE rather than
+     leaving the chip half scoped, and anchored on this card's own hook so the reach is
+     unchanged: `.manager-inspector-card[data-crafting-modifier-catalogue]` is a class plus an
+     attribute, so each half stays at the (0,3,0) the scoped
+     `.manager-modifier-readonly-row.svelte-hash .manager-modifier-bounds-chip` form had. */
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
   }
 

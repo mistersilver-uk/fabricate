@@ -70,7 +70,7 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
-  // The manager's ONE selection control (issue 772). `ChecklistCardRow` renders it after
+  // The manager's ONE selection control (issue 772). `ModifierLibraryRow` trails it after
   // the conversion, which puts it in this root's static graph through the Tool Studio; the
   // component browser's multi-select puts it there a second way.
   'SelectionCheckbox',
@@ -214,6 +214,9 @@ function compileManagerRoot() {
   // Per-recipe check-modifier catalogue card (issue 770), rendered inside the crafting
   // checks stack; omitting it HANGS the mounted suite (# cancelled).
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte');
+  // Its entry row, shared with the Tool Studio's check-bonus picker (issue 1373, maintainer
+  // round 4). Static in BOTH graphs, so omitting it HANGS the mounted suite (# cancelled).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ModifierLibraryRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
@@ -254,7 +257,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ChecklistCardRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
   // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
@@ -308,6 +310,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte');
+  // The world Tool catalogue's BULK EDIT panel (issue 1373, maintainer feedback round 2). The
+  // page imports it statically, so it is in this root's graph whether or not anything ticks a
+  // row — and an omission HANGS this file rather than failing one test in it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.
@@ -319,8 +325,15 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte');
+  // The rules editor's inherit/override card and the system-scope band that opens its Breakage
+  // tab (issue 1373). `ToolOverviewTab` went with the Overview tab they replaced: identity is
+  // world scope's, so the SYSTEM editor has no tab for it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte');
+  // The shared `REPLACEMENT COMPONENT` card both Tool editors render (issue 1373, maintainer
+  // round 2). Static in both graphs, so an omission HANGS every test in this file.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
@@ -529,7 +542,7 @@ function compileManagerRoot() {
       )
     );
   }
-  for (const recipeModule of ['recipeReadiness.js']) {
+  for (const recipeModule of ['recipeReadiness.js', 'ingredientKindMeta.js']) {
     const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
@@ -804,6 +817,11 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The repair block's plain-language readback (issue 1373, maintainer round 5). A pure
+    // module, so the two scopes that render the block share one copy of the sentence — which
+    // is what puts it in every mounted tree that reaches `ToolRepairRequirements`. This suite
+    // has NO dependency validator, so an omission HANGS it (# cancelled) rather than naming it.
+    'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -885,6 +903,7 @@ function compileManagerRoot() {
     // …and issue 1118 gave it another: the deterministic average a rolling modifier is
     // ranked by, which is also what tells the resolver that a modifier rolls at all.
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // …and issue 1095 gave it a THIRD import: `resolveActiveSalvageCheckFormula` delegates
     // to the one salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
     'src/systems/salvageCheckUsability.js',
@@ -940,14 +959,17 @@ function compileManagerRoot() {
     'src/migration/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
-    // Issue 1372 (epic 1357, PR 6b): the two world ESSENCE screens are real bodies now, so the
-    // shared scoped list shells, the inherit row and the membership cluster are all in this
-    // root's static graph — and so are the three plain modules underneath them. Same mechanical
-    // rule as every entry above: drop one and the whole file HANGS behind one
-    // ERR_MODULE_NOT_FOUND, reported as `# cancelled`, rather than failing a test.
+    // Issue 1372 (epic 1357, PR 6b) and issue 1373 (PR 6c): the two world ESSENCE screens and
+    // the world TOOL screens are real bodies now, so the shared scoped list shells, the inherit
+    // row and the membership cluster are all in this root's static graph — and so are the plain
+    // modules underneath them. This list has NO dependency validator —
+    // `assertCompiledSvelteClosure` walks `.svelte` only — so an omission here does not fail
+    // one test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, and every blocked test
+    // is reported as `# cancelled` rather than failing.
     'src/ui/svelte/stores/worldScopeProjection.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
     'src/utils/scopedEntityListModel.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -2367,6 +2389,34 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
+    // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373). The rules
+    // editor reads its `(tool, system)` row for the ONE fact the system's own record cannot
+    // state - whether each world-default section is inherited or overridden - and reads
+    // `member` to decide whether to offer the inherit switches and the removal callout at all.
+    // Every seeded row is a MIGRATED one: `migrateToolRequirementSections` writes all four
+    // sections overridden, so that is the state every existing world is actually in.
+    worldScope: {
+      tool: {
+        entities: (options.gatheringLibraryTools || []).map((tool) => ({ id: tool.id })),
+        entries: (options.gatheringLibraryTools || []).map((tool) => ({
+          id: tool.id,
+          defaults: options.worldToolDefaults?.[tool.id] ?? null,
+          systems: [
+            {
+              systemId: 'alchemy',
+              member: options.worldToolMember !== false,
+              enabled: true,
+              inherited: options.worldToolInherit?.[tool.id] ?? {
+                breakage: false,
+                onBreak: false,
+                prerequisites: false,
+                bonus: false,
+              },
+            },
+          ],
+        })),
+      },
+    },
     // Participation is the SELECTED SYSTEM's answer; the reveal/visibility pair beside it is
     // the world's (issue 1282).
     gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
@@ -3264,6 +3314,24 @@ function createStore(calls = [], options = {}) {
       }));
       return options.deleteToolDraftResult ?? true;
     },
+    // THE TWO IMMEDIATE-PERSISTENCE WRITES THE RULES EDITOR PERFORMS (issue 1373): stop using a
+    // Tool in this system, and move one world-default section between inheriting and overriding.
+    // Both are the store's because both are TWO writes — a world membership record and the
+    // in-system record — and the editor must not perform half of either.
+    removeToolFromSystem: (...args) => {
+      calls.push(['removeToolFromSystem', ...args]);
+      viewState.update((state) => ({
+        ...state,
+        toolDraft: null,
+        toolDraftBaseline: null,
+        toolDraftDirty: false,
+      }));
+      return options.removeToolFromSystemResult ?? true;
+    },
+    setToolSectionInherited: (...args) => {
+      calls.push(['setToolSectionInherited', ...args]);
+      return true;
+    },
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
     addToolFromUuidToDraft: (...args) => {
       calls.push(['addToolFromUuidToDraft', ...args]);
@@ -3645,8 +3713,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       0,
       'the standalone Overview nav item should be removed'
     );
+    // NO ZERO BADGE (issue 1373). The rail states counts where there is something to count, and
+    // the reference draws none beside a row whose section is empty: a `0` there is a badge whose
+    // whole content is the absence the row already reads as. This system adopts no Tools, so the
+    // assertion is that the badge is ABSENT rather than that it reads zero.
     const toolsNav = navButton('Tool Rules');
-    assert.equal(toolsNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
+    assert.ok(!toolsNav.querySelector('.manager-nav-count'), 'no zero count badge on Tool Rules');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
@@ -12075,7 +12147,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       open: async () => {
         navButton('Tool Rules').click();
       },
-      searchLabel: 'Search Tools',
+      // Sentence case since issue 1373's parity pass: the design sets this placeholder
+      // 'Search tools', and the screen's own page copy is sentence case throughout.
+      searchLabel: 'Search tools',
       term: 'Hammer',
       leave: () => navButton('Essence Rules').click(),
       leftView: 'essences',
@@ -19516,14 +19590,8 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('keeps the compact Tool library hierarchy callback-complete and selects a row once', async () => {
     const selections = [];
     const authorityChanges = [];
-    const dropped = [];
     const edits = [];
     const enabledChanges = [];
-    const worldItem = {
-      uuid: 'Item.hammer',
-      name: 'Smith Hammer',
-      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
-    };
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
@@ -19532,9 +19600,6 @@ describe('CraftingSystemManager mounted behavior', () => {
         tools: [toolRouteFixture],
         managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
         onSelectTool: (id) => selections.push(id),
-        onCreateToolDrop: (data) => {
-          dropped.push(data);
-        },
         onSetBreakageAuthority: (authority) => {
           authorityChanges.push(authority);
         },
@@ -19548,67 +19613,76 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
+    // THREE BANDS AND A LIST (issue 1373). The `create` band is GONE, and its absence is the
+    // change: the design puts the `Drag an Item here to make it a Tool` zone on the WORLD
+    // Tools Catalogue and puts NONE here, and the two screens carried it exactly inverted. A
+    // Tool is one world record every system adopts, so this screen can only ever author RULES
+    // for a record the world already holds.
     assert.deepEqual(
       [...target.querySelector('.manager-tools-main-content').children].map((element) =>
         element.hasAttribute('data-manager-tools-authority')
           ? 'authority'
           : element.hasAttribute('data-manager-tools-search')
             ? 'search'
-            : element.hasAttribute('data-tool-create-card')
-              ? 'create'
+            : element.hasAttribute('data-manager-tools-sort')
+              ? 'sort'
               : 'list'
       ),
-      ['authority', 'search', 'create', 'list']
+      ['authority', 'search', 'sort', 'list']
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
-    assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 2);
+    // THREE, not two (issue 1373): `Inherit`, `Tool-specific`, `Check-driven`. This count is
+    // a guard in BOTH directions - shipping the tri-state without moving it reds, and
+    // claiming a tri-state while leaving it at 2 reds.
+    assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 3);
     assert.deepEqual(
       [...authority.children].map((element) =>
         element.classList.contains('manager-tools-authority-heading')
           ? 'heading'
           : element.classList.contains('manager-tools-authority-segments')
             ? 'segments'
-            : 'caption'
+            : 'other'
       ),
-      ['heading', 'segments', 'caption']
+      ['heading', 'segments']
     );
-    assert.match(
-      authority.querySelector('.manager-tools-authority-caption').textContent,
-      /Each Tool tracks its own breakage.*applies to all 1 tool/
+    assert.ok(
+      !authority.querySelector('.manager-tools-authority-caption'),
+      'the breakage card is a head and a track, with no caption restating the selected segment'
     );
+    // NO GLYPHS on the system card's segments, where the WORLD card's carry one. Asserted
+    // because the two cards look alike and the difference is the design's own composition.
+    assert.equal(authority.querySelectorAll('[data-tool-authority-segment] i').length, 0);
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
 
-    const createCard = target.querySelector('[data-tool-create-card]');
-    assert.ok(createCard.hasAttribute('data-tool-create-drop-prompt'));
-    assert.equal(
-      createCard.parentElement?.hasAttribute('data-tool-create-card'),
-      false,
-      'the shared drop zone is the sole creation surface rather than a nested dashed card'
+    assert.ok(
+      !target.querySelector('[data-item-drop-zone="tool-create"]'),
+      'the system Tool Rules list offers no creation surface at all'
     );
     assert.equal(
       target.querySelector('[data-manager-tools-search] .manager-chip'),
       null,
       'the bare search control does not disguise the result count as a chip'
     );
-    assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
-    assert.equal(createCard.querySelector('summary, select, button'), null);
-    dispatchDrop(createCard, { type: 'Item', uuid: worldItem.uuid });
-    await tick();
-    flushSync();
-    assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
-
-    // Issue 1036/7, at THIS call site: `ItemDropZone`'s guard now reads
-    // `resolveDropUuid(data)` rather than `data.uuid`, so the document-type check is what
-    // keeps a non-Item out of the Tool creation surface. Asserted per call site, because
-    // the criterion is about the SITES rather than about the primitive in isolation.
-    dispatchRejectedDrops(createCard);
-    await tick();
-    flushSync();
-    assert.equal(dropped.length, 1, 'the tool create zone still refuses every non-Item payload');
+    assert.match(
+      target.querySelector('[data-tool-result-count]').textContent,
+      /1 shown .* 1 of 1 in this system/
+    );
+    // THE THREE MEMBERSHIP SEGMENTS, which are the only route on this screen to a world Tool
+    // this system has no rules for.
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map(
+        (element) => element.dataset.toolMembershipOption
+      ),
+      ['in', 'all', 'over']
+    );
+    // The drop behaviour itself moved WITH the control, to
+    // `tests/components/world-tool-catalogue-mounted.test.js`, which drives the zone on the
+    // screen that now owns it - including the compendium `{pack, id}` payload that carries no
+    // `uuid` and the non-Item payloads the zone must refuse.
 
     target.querySelector('.manager-tools-enabled-toggle').click();
-    target.querySelector('.manager-tools-library-actions .manager-icon-button').click();
+    target.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
     assert.deepEqual(enabledChanges, [['tool-catalyst', false]]);
     assert.deepEqual(edits, ['tool-catalyst']);
     assert.deepEqual(
@@ -19622,7 +19696,62 @@ describe('CraftingSystemManager mounted behavior', () => {
     select.click();
     assert.deepEqual(selections, ['tool-catalyst', 'tool-catalyst']);
     assert.ok(target.querySelector('[data-tool-library-scroll]'));
-    assert.ok(target.querySelector('[data-tool-browser-pagination] .manager-pagination'));
+    // NO FOOT PAGER ON ONE PAGE (issue 1373). `PROTO-tool-rules.png` draws three rows and no bar
+    // under them, and this list shipped a `persistent` one that could only ever read
+    // `Showing 1-1 of 1 · Page 1 of 1` beside a result count already saying `1 shown`.
+    //
+    // THE SLOT IS ASSERTED PRESENT BESIDE IT, because it is not what came out: it is the
+    // bottom-pinned layout div, and it is what keeps the list card above from becoming
+    // `:last-child` and stretching to the foot of the pane. Without this line the absence below
+    // would also be satisfied by the whole browser failing to render.
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-browser-pagination]')),
+      'the bottom-pinned pager slot must survive the bar it no longer holds'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      'a one-page list must draw no foot pager at all'
+    );
+    // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default, stated on the
+    // world catalogue's row; repeating it here says nothing this screen decides.
+    assert.equal(
+      [...target.querySelectorAll('.manager-tools-library-chips .manager-chip')].filter((chip) =>
+        /Destroys|Marks broken|Replaces/.test(chip.textContent)
+      ).length,
+      0
+    );
+  });
+
+  it('draws the foot pager once the rules list runs to a SECOND page', () => {
+    // The negative above and this positive are the two halves of one rule, and neither is
+    // sufficient alone: a pager deleted outright satisfies the absence, and a `persistent` one
+    // satisfies the presence. The page size is eight, so nine rows is the first dataset that
+    // asks for a second page.
+    const nineTools = Array.from({ length: 9 }, (unused, index) => ({
+      ...toolRouteFixture,
+      id: `tool-${index}`,
+      label: `Tool ${index}`,
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: { tools: nineTools, managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }] },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelectorAll('.manager-tools-row').length,
+      8,
+      'the page size the pager is judged against is not the one this list actually pages by'
+    );
+    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    assert.ok(Boolean(bar), 'a two-page list must still draw its foot pager');
+    assert.match(bar.querySelector('[data-pagination-summary]').textContent, /of 9/);
+    assert.ok(
+      Boolean(bar.querySelector('.manager-pagination-nav')),
+      'a bar with a second page to reach and no nav would be a summary, not a pager'
+    );
   });
 
   it('does not override a valid Tool selection and emits nothing for an empty library', async () => {
@@ -19657,6 +19786,63 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.deepEqual(selections, []);
+  });
+
+  it('ends each rules row with the count of THIS system\u2019s recipes that require it', () => {
+    // C5 (issue 1373). The design's row ends `[N RECIPES] [Edit rules]`, and ours ended at the
+    // action. The number is READ OFF THE PROJECTION'S PER-SYSTEM ROW rather than counted here:
+    // this screen holds no recipe corpus, and a world-wide total under a heading that already
+    // names one system would be a wrong number rather than a missing one.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [toolRouteFixture],
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        systemId: 'sys-forge',
+        scope: {
+          entityType: 'tool',
+          available: true,
+          entries: [
+            {
+              id: 'tool-catalyst',
+              entity: { id: 'tool-catalyst', name: 'Artisan Catalyst' },
+              systems: [
+                { systemId: 'sys-forge', member: true, inherited: {}, recipeCount: 2 },
+                { systemId: 'sys-alchemy', member: true, inherited: {}, recipeCount: 9 },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    flushSync();
+
+    const cell = target.querySelector('[data-tool-row-recipes="tool-catalyst"]');
+    assert.ok(Boolean(cell), 'the row states how much of this system leans on the Tool');
+    assert.equal(
+      cell.querySelector('strong').textContent,
+      '2',
+      'the ADDRESSED system\u2019s count, never the other system\u2019s and never their sum'
+    );
+    assert.match(cell.textContent, /Recipes/);
+  });
+
+  it('reads a MISSING per-system count as zero rather than as blank', () => {
+    // A world Tool this system has no rules record for cannot be referenced by a recipe here,
+    // so `0` is a real answer. Rendering nothing would leave the column ragged and say nothing.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: { tools: [toolRouteFixture], managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }] },
+    });
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-tool-row-recipes="tool-catalyst"] strong').textContent,
+      '0'
+    );
   });
 
   it('shows canonical validation status on every Tool row and preserves a long label', () => {
@@ -19722,7 +19908,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   async function openFixtureToolEditor(calls) {
     const row = target.querySelector('[data-manager-tool-id="tool-catalyst"]');
     assert.ok(row, 'the persisted Tool is rendered in the library');
-    row.querySelector('.manager-tools-library-actions .manager-icon-button').click();
+    row.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
     flushSync();
     const openIndex = calls.findIndex((call) => call[0] === 'openToolDraft');
     assert.ok(openIndex >= 0);
@@ -19737,7 +19923,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('wires Tool library selection to the shell inspector without restoring an inline editor', async () => {
     const calls = await mountToolRoute();
 
-    assert.equal(target.querySelector('.fabricate-manager > .manager-titlebar'), null);
+    // THE TITLE BAND RENDERS HERE NOW (issue 1373). It was suppressed on both Tool routes, so
+    // the two screens the reference draws it on most explicitly were the two that showed ~18px
+    // of empty ground where the selected system resolution is stated. `assert.ok(Boolean(...))`
+    // rather than an identity comparison: `node:assert` serialises a mounted happy-dom element
+    // to build its diff and walks the circular tree until the heap dies, so a one-line failure
+    // surfaces as an OOM with no message.
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-manager > .manager-titlebar')),
+      'the Tool library draws the shared title band'
+    );
     const contextHeader = target.querySelector(
       '.fabricate-manager > .manager-header[data-tool-library-context]'
     );
@@ -19754,7 +19949,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       // 'Tool Rules' is the Tool Studio's screen title since issue 1362 (see the rail
       // relabel). The crumb takes it too: a trail whose leaf disagrees with the heading
       // below it is the WCAG 2.5.3 "Label in Name" hazard the relabel had to avoid.
-      ['Crafting Systems', 'Alchemy', 'Crafting', 'Tool Rules']
+      //
+      // NO `Crafting` CRUMB (issue 1373). It claimed Tool Rules sits inside the Crafting group,
+      // and the rail rendered in the same frame shows that group holding Recipes and Settings
+      // with Tool Rules a sibling OUTSIDE it. Two navigations one pane apart disagreed about the
+      // shape of the app; the rail is the one a GM clicks, and the EDITOR's own trail never had
+      // the crumb, so dropping it also makes the two Tool screens agree with each other.
+      ['Crafting Systems', 'Alchemy', 'Tool Rules']
     );
     assert.equal(contextHeader.querySelector('.manager-title').textContent, 'Tool Studio');
     assert.match(
@@ -19800,9 +20001,596 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspector = target.querySelector('[data-tool-browser-inspector]');
     assert.ok(inspector);
     assert.match(inspector.textContent, /Artisan Catalyst/);
-    assert.equal(inspector.querySelector('[data-tool-inspector-edit]'), null);
+    // AN INLINE EDITOR is what this route must not restore, and it still does not. The
+    // inspector's own route into the tool-edit ROUTE is a different thing and is asserted in
+    // its own test below; `[data-manager-tool-editor]` is the inline one.
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  // ── THE AUTO-SELECTED ROW IS THE ONE THE GM IS LOOKING AT (issue 1373) ───────────────────
+  // The library's auto-selection read `tools[0]` - the raw authored prop - while the list
+  // renders `pagedTools`: the membership filter, the search term, the sort key and direction
+  // and the page slice, applied in that order. Those two agreed until the design's
+  // `SORT BY [Name] [Asc]` control shipped, and the Foundry smoke caught them disagreeing.
+  //
+  // The first two cases mount the ROOT, not the view, because the view does not own the
+  // selection: `onSelectTool` goes to the shell, which opens the draft and feeds
+  // `selectedToolId` back. Asserting the callback alone would stay green on a screen that
+  // never paints the selection, so these read `is-selected` and the inspector heading out of
+  // the DOM instead.
+  const libraryRowNames = () =>
+    [...target.querySelectorAll('.manager-tools-row .manager-tools-select-target strong')].map(
+      (node) => node.textContent.trim()
+    );
+  const selectedLibraryRowNames = () =>
+    [
+      ...target.querySelectorAll(
+        '.manager-tools-row.is-selected .manager-tools-select-target strong'
+      ),
+    ].map((node) => node.textContent.trim());
+  const inspectorSubjectName = () =>
+    target.querySelector('[data-tool-browser-inspector] h2')?.textContent.trim() || '';
+  const openedToolDraftIds = (calls) => [
+    ...new Set(calls.filter((call) => call[0] === 'openToolDraft').map((call) => call[1])),
+  ];
+  const namedTools = (labels) =>
+    labels.map((label, index) => ({ ...toolRouteFixture, id: `tool-order-${index}`, label }));
+
+  /**
+   * The world Tool projection this screen widens its list with, built from `[id, name]` pairs.
+   *
+   * ONE FACTORY FOR EVERY WIDENING CASE (issue 1373). `scope.entries[]` is the world corpus's
+   * per-entity join, its shape is fixed, and a second hand-written copy of it is a second place
+   * for that shape to drift — and one Sonar counts as duplicated however the names inside it
+   * differ, because CPD matches by shape and normalizes literals.
+   *
+   * `systems: []` is the state every widening case needs: no per-system row at all, which is
+   * exactly what makes an entry a GHOST in whichever system is mounted.
+   *
+   * @param {Array<[string, string]>} entries Ordered `[id, name]` pairs.
+   * @returns {object} A world tool scope projection.
+   */
+  const worldToolScope = (entries) => ({
+    entityType: 'tool',
+    available: true,
+    entries: entries.map(([id, name]) => ({ id, entity: { id, name }, systems: [] })),
+  });
+
+  /**
+   * Mount the Tool rules list on its own, onto the shared `target`/`mounted` the suite tears
+   * down in `afterEach`. Mounting the VIEW rather than the root is what keeps a selection open
+   * while the membership filter moves; the root answers `onSelectTool` by feeding a valid
+   * `selectedToolId` back, and the auto-select effect's still-valid-selection early return would
+   * then stop before the widened list was ever consulted.
+   *
+   * @param {object} props Props overriding the shared defaults.
+   * @returns {void}
+   */
+  function mountToolsBrowser(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        systemId: 'sys-forge',
+        ...props,
+      },
+    });
+    flushSync();
+  }
+
+  const libraryRowStates = () =>
+    [...target.querySelectorAll('.manager-tools-row')].map(
+      (row) => `${row.dataset.managerToolId}:${row.dataset.toolRowMember}`
+    );
+
+  /**
+   * THE PANE-LEVEL INVARIANT this defect broke, written once (issue 1373).
+   *
+   * `{shown}` in `3 shown · 0 of 3 in this system` IS `pagedTools.length`, and the list body
+   * draws `pagedTools`. So a toolbar claiming rows the body does not draw is the WHOLE class of
+   * defect in one comparison, rather than the single instance the cases below pin. The shipped
+   * bug made this summary read `3 shown` above a rendered zero state and nothing anywhere
+   * compared the two numbers.
+   *
+   * It holds in every state, including both zero states: with nothing to page, `{shown}` is `0`
+   * and the body draws no rows.
+   *
+   * @param {string} why What the pane was doing when the invariant was checked.
+   * @returns {void}
+   */
+  const assertResultCountMatchesRows = (why) => {
+    const summary = target.querySelector('[data-tool-result-count]')?.textContent ?? '';
+    const drawn = target.querySelectorAll('.manager-tools-row').length;
+    assert.equal(
+      Number(/^(\d+) shown/.exec(summary)?.[1]),
+      drawn,
+      `${why}: the result summary reads "${summary}" over ${drawn} drawn row(s)`
+    );
+  };
+
+  it('auto-selects the row at the top of the SORTED PAGE, not the first authored Tool', async () => {
+    // Nine Tools, authored with the alphabetically LAST one first. Name-ascending pages the
+    // first eight of them, so the authored-first Tool is not merely further down the list - it
+    // is on page two, and selecting it left the inspector describing a Tool the GM could not
+    // see at all.
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: namedTools([
+          'Zephyr Kiln',
+          "Alchemist's Supplies",
+          'Arcane Forge',
+          'Ley-Line Nexus',
+          "Master's Anvil",
+          'Moonwell',
+          "Smith's Hammer",
+          'Volcanic Vent',
+          'Woodcarving Tools',
+        ]),
+      },
+    });
+
+    assert.deepEqual(libraryRowNames(), [
+      "Alchemist's Supplies",
+      'Arcane Forge',
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      "Smith's Hammer",
+      'Volcanic Vent',
+      'Woodcarving Tools',
+    ]);
+    assert.equal(
+      libraryRowNames().includes('Zephyr Kiln'),
+      false,
+      'the authored-first Tool sorts onto page two, so nothing on this page can be it'
+    );
+    assert.deepEqual(
+      selectedLibraryRowNames(),
+      ["Alchemist's Supplies"],
+      'exactly one row is marked, and it is the one drawn at the top of the list'
+    );
+    assert.equal(
+      inspectorSubjectName(),
+      "Alchemist's Supplies",
+      'the inspector describes the row the GM sees first, not an off-page Tool'
+    );
+    assert.deepEqual(openedToolDraftIds(calls), ['tool-order-1']);
+  });
+
+  it('keeps the auto-selected row marked and on screen when the sort direction flips', async () => {
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: namedTools([
+          "Smith's Hammer",
+          "Alchemist's Supplies",
+          'Arcane Forge',
+        ]),
+      },
+    });
+    assert.deepEqual(selectedLibraryRowNames(), ["Alchemist's Supplies"]);
+
+    target.querySelector('[data-tool-sort-direction]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-tool-sort-direction]').dataset.toolSortDirection,
+      'desc'
+    );
+    assert.deepEqual(libraryRowNames(), ["Smith's Hammer", 'Arcane Forge', "Alchemist's Supplies"]);
+    // THE SELECTION NEITHER CHASES THE NEW TOP ROW NOR VANISHES. A GM who re-sorts is looking
+    // for a Tool, not replacing the one they are inspecting, and the still-valid-selection
+    // early return is what keeps the panel still while the list moves under it.
+    assert.deepEqual(selectedLibraryRowNames(), ["Alchemist's Supplies"]);
+    assert.equal(inspectorSubjectName(), "Alchemist's Supplies");
+    assert.deepEqual(
+      openedToolDraftIds(calls),
+      ['tool-order-1'],
+      'a re-sort must not open a second draft'
+    );
+  });
+
+  it('never auto-selects an UNADOPTED world row through the adopted-Tool callback', async () => {
+    // `All world tools` widens the list with `ghostRows` - world Tools this system holds no
+    // rules record for. They are inspected through `selectedUnadoptedToolId`, so pushing one
+    // through `onSelectTool` would misroute the panel AND latch: an unadopted selection
+    // suppresses every later auto-select. The pick therefore skips every non-member row.
+    //
+    // Mounted on the VIEW here, because the selection must still be open when the `all` filter
+    // is applied: the shell answers `onSelectTool` by feeding a valid `selectedToolId` back,
+    // and the effect's still-valid-selection early return would then stop before the widened
+    // list was ever consulted.
+    const selections = [];
+    mountToolsBrowser({
+      tools: [
+        { ...toolRouteFixture, id: 'tool-zephyr', label: 'Zephyr Kiln' },
+        { ...toolRouteFixture, id: 'tool-basalt', label: 'Basalt Mortar' },
+      ],
+      scope: worldToolScope([
+        ['tool-zephyr', 'Zephyr Kiln'],
+        ['tool-basalt', 'Basalt Mortar'],
+        ['world-aegis', 'Aegis Crucible'],
+      ]),
+      onSelectTool: (id) => selections.push(id),
+    });
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      libraryRowStates(),
+      ['world-aegis:absent', 'tool-basalt:member', 'tool-zephyr:member'],
+      'the widened list really does draw an unadopted world row above every member'
+    );
+    assert.deepEqual(
+      selections,
+      ['tool-basalt'],
+      'the first MEMBER row is selected once, and the unadopted row above it is never pushed through onSelectTool'
+    );
+  });
+
+  // ── THE COHORT'S ZERO POINT (issue 1373) ────────────────────────────────────────────────
+  // The case above mounts TWO adopted Tools, and that is precisely why it could not see the
+  // defect these three pin. The list body's three-way branch gated its zero state on the raw
+  // `tools` prop — THIS system's adopted Tools — while the counts, the rows, the pager and the
+  // result summary were all computed over the widened cohort. With members present the two
+  // never disagree; with none adopted, `tools.length === 0` is true and STAYS true whatever the
+  // membership segment says, so the zero state won unconditionally and the ghost rows were
+  // derived, counted, sorted, paged and then thrown away.
+  //
+  // Zero members is the only place the widened branch and the empty branch can disagree, and it
+  // is also the state a GM is in the first time they open this screen in a world-scoped world —
+  // where widening is the ONLY route in the product to adopting a world Tool into a system.
+  //
+  // TWO CONTROLS REACH IT AND BOTH ARE PINNED, because they are separate call sites: the
+  // segment sets the filter directly, and the zero state's own primary button sets it from
+  // INSIDE the branch the filter was supposed to leave. The maintainer reported both symptoms.
+  const THREE_WORLD_TOOLS = [
+    ['world-aegis', 'Aegis Crucible'],
+    ['world-loom', 'Star Loom'],
+    ['world-anvil', 'Deep Anvil'],
+  ];
+  const WIDENED_GHOST_ROWS = ['world-aegis:absent', 'world-anvil:absent', 'world-loom:absent'];
+
+  it('reaches the world Tools from the zero state BUTTON when the system has adopted none', async () => {
+    const selections = [];
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+      onSelectTool: (id) => selections.push(id),
+    });
+    await tick();
+    flushSync();
+
+    // THE BUTTON'S OWN PRESENCE IS THE PRECONDITION, so it is asserted rather than assumed: it
+    // renders only inside the empty branch and only when `ghostRows.length > 0`, so finding it
+    // here proves the mount really is in the state the defect was reported from.
+    const browseWorld = target.querySelector('[data-tool-empty-browse-world]');
+    assert.ok(Boolean(browseWorld), 'the zero state offers its near route into the world Tools');
+    assert.equal(browseWorld.dataset.toolEmptyBrowseWorld, '3');
+    assert.match(browseWorld.textContent, /Show the 3 world Tools you can add/);
+    assertResultCountMatchesRows('before the zero state button is pressed');
+
+    browseWorld.click();
+    await tick();
+    flushSync();
+
+    // PRESSING IT MUST DO SOMETHING, and this is the assertion that did not exist: the hook was
+    // named by two View Lab terminals and clicked by nothing, so it was proven to EXIST and
+    // never proven to ACT.
+    assert.deepEqual(
+      libraryRowStates(),
+      WIDENED_GHOST_ROWS,
+      'the button the panel offers must draw the world Tools it promises'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-library-empty]'),
+      'a list drawing three rows must not also claim there is nothing here'
+    );
+    // READ FROM THE REGISTRY, NOT RESTATED (issue 1373). This is the exact selector
+    // `manager-tool-zero-state-browse-world-1280x720` publishes its frame on, and a restated
+    // copy is the drift `labCaseSelector` exists to stop: the copy goes on passing after the
+    // case it mirrors changes, and the frame is then published on a state nothing asserts.
+    assert.equal(
+      target.querySelectorAll(labCaseSelector('manager-tool-zero-state-browse-world-1280x720'))
+        .length,
+      3,
+      'every unadopted row carries the one action it exists for, under the selector the ' +
+        'capture case itself waits on'
+    );
+    assertResultCountMatchesRows('after the zero state button is pressed');
+    assert.deepEqual(
+      selections,
+      [],
+      'a page holding no member row selects nothing rather than pushing a ghost id through the adopted-Tool callback'
+    );
+  });
+
+  it('reaches the world Tools from the membership SEGMENT when the system has adopted none', async () => {
+    // THE SECOND SYMPTOM, and it is not inferable from the first: the button sets the same
+    // state, but a GM who never sees the button — or who reads the segment's `All world tools
+    // (3)` and clicks that instead — took a different route to the same broken body.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map((option) =>
+        option.textContent.trim()
+      ),
+      ['In this system (0)', 'All world tools (3)', 'Overriding'],
+      'the segment states a cohort of three against a membership of none'
+    );
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-tool-membership-filter]').dataset.toolMembershipFilter,
+      'all'
+    );
+    assert.deepEqual(libraryRowStates(), WIDENED_GHOST_ROWS);
+    assert.ok(!target.querySelector('[data-tool-library-empty]'));
+    assertResultCountMatchesRows('after the membership segment is widened');
+    // THE FOOT PAGER SLOT FOLLOWS THE COHORT TOO. It was gated on the same raw prop one layer
+    // down, so the slot stayed absent for a zero-member system even once the rows above it drew.
+    // The slot is the bottom-pinned layout element that decides whether the browser card is
+    // `:last-child`; the BAR inside it stays `multiPageOnly` and three rows is one page.
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-browser-pagination]')),
+      'the widened list gets its layout slot back'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      'a single page still draws no bar inside that slot'
+    );
+  });
+
+  // TWELVE world Tools, named so name-ascending order is the authored order and a page
+  // boundary is readable at a glance. Twelve rather than nine because eight is the page size:
+  // nine proves two pages exist and twelve proves the SECOND page is a real slice rather than
+  // one stray row, which is the difference between a bar that renders and a bar that works.
+  const TWELVE_WORLD_TOOLS = Array.from({ length: 12 }, (_, index) => [
+    `world-page-${String(index + 1).padStart(2, '0')}`,
+    `World Tool ${String(index + 1).padStart(2, '0')}`,
+  ]);
+
+  it('PAGES a widened ghost-only cohort, which is the state the slot repair exists for', async () => {
+    // THE STATE THE PAGER FIX ACTUALLY UNBLOCKS, and until this case nothing asserted it.
+    // The two cases above widen to THREE ghosts — one page — so the only thing they can say
+    // about the bar is that it is ABSENT, and a predicate that never renders the slot at all
+    // satisfies that perfectly. Twelve world Tools at a page size of eight is where the old
+    // and new predicates give different answers: gated on `tools.length`, a zero-member system
+    // got no slot, the `multiPageOnly` bar had nowhere to draw, and pages 2+ of the widened
+    // cohort were unreachable by every control on the screen.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(TWELVE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    assert.ok(
+      Boolean(bar),
+      'twelve world Tools over eight rows a page is two pages, so the bar must RENDER — ' +
+        'asserting only its absence at three rows is satisfied by never rendering the slot'
+    );
+    assert.equal(
+      bar.querySelector('[data-pagination-summary]').textContent.trim(),
+      'Showing 1–8 of 12'
+    );
+    assert.equal(bar.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
+    assertResultCountMatchesRows('on page one of a widened ghost-only cohort');
+
+    // AND PAGE TWO IS REACHABLE, which is the half a rendered-but-inert bar would fail. The
+    // four remaining ghosts are the tail of the sort, so a slice that silently re-read page one
+    // cannot pass here.
+    bar.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      libraryRowStates(),
+      [
+        'world-page-09:absent',
+        'world-page-10:absent',
+        'world-page-11:absent',
+        'world-page-12:absent',
+      ],
+      'the second page of a cohort this system has adopted none of must be reachable'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-library-empty]'),
+      'page two of a widened cohort is rows, not the zero state'
+    );
+    assertResultCountMatchesRows('on page two of a widened ghost-only cohort');
+  });
+
+  it('LEAVES for the world catalogue when the zero state’s farther route is pressed', async () => {
+    // THE TWIN OF THE DEFECT ABOVE, and it sat immediately beside it:
+    // `data-tool-empty-open-catalogue` was named by two View Lab cases as an `expectContained`
+    // target and clicked by nothing anywhere, which is the same "proven to EXIST, never proven
+    // to ACT" shape the maintainer found by hand on `data-tool-empty-browse-world`.
+    //
+    // BOTH BRANCHES, because the panel renders two different shapes and each has its own View
+    // Lab case: the ONE-CTA branch a freshly installed world is in, and the two-button branch
+    // where this control is the fallback beside the widening primary.
+    const opened = [];
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope([]),
+      onOpenWorldCatalogue: () => opened.push('one-cta'),
+    });
+    await tick();
+    flushSync();
+
+    const soleRoute = target.querySelector('[data-tool-empty-open-catalogue]');
+    assert.ok(
+      Boolean(soleRoute),
+      'a world holding no Tools at all offers the catalogue as its only route out'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-empty-browse-world]'),
+      'there is nothing to widen to, so this really is the one-CTA branch'
+    );
+    soleRoute.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      opened,
+      ['one-cta'],
+      'the only route out of an empty world must actually navigate'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+      onOpenWorldCatalogue: () => opened.push('two-button'),
+    });
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-empty-browse-world]')),
+      'the widening primary renders, so this is the OTHER branch'
+    );
+    target.querySelector('[data-tool-empty-open-catalogue]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      opened,
+      ['one-cta', 'two-button'],
+      'the fallback route works in the branch where it is a fallback too'
+    );
+  });
+
+  it('keeps the zero state for the cohorts that really are empty, and names the filtered one', async () => {
+    // THE NEGATIVE HALF, without which the repair above is satisfiable by deleting the zero
+    // state outright. Three states must NOT become a row list, and one must become the FILTERED
+    // panel rather than the zero state.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-library-empty]')),
+      '`In this system` on a system holding none is a real zero state'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination]'),
+      'an empty cohort keeps the list card content-sized, exactly as before'
+    );
+
+    // `Overriding` WITH NOTHING ADOPTED KEEPS THE ZERO STATE. With nothing adopted the panel's
+    // two routes out are the useful answer, and `Nothing matches that filter` is not.
+    target.querySelector('[data-tool-membership-option="over"] input').click();
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+    assert.ok(Boolean(target.querySelector('[data-tool-empty-browse-world]')));
+
+    // A WORLD HOLDING NO TOOLS EITHER keeps the one-route zero state under every segment.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope([]) });
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+    assert.ok(
+      !target.querySelector('[data-tool-empty-browse-world]'),
+      'there is nothing to widen to, so the near route is not offered'
+    );
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+
+    // A COHORT NARROWED TO NOTHING BY THE SEARCH IS THE FILTERED STATE, not the zero state —
+    // and that is what makes the zero state's primary route honest in every state it renders in.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    const search = target.querySelector('[data-manager-tools-search] input[type="search"]');
+    search.value = 'quenching trough';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-library-filtered-empty]')),
+      'a cohort that was non-empty before the search term states that, rather than claiming the system holds nothing'
+    );
+    assert.ok(!target.querySelector('[data-tool-library-empty]'));
+    assertResultCountMatchesRows('with the widened cohort searched down to nothing');
+  });
+
+  it('never claims more rows in the result summary than the list body draws', async () => {
+    // THE PANE-LEVEL INVARIANT, swept across the states that can break it. This is the guard
+    // that would have caught the whole CLASS rather than this one instance: a toolbar counting
+    // `pagedTools` above a body that draws something else is a contradiction visible without
+    // knowing which branch is at fault.
+    mountToolsBrowser({
+      tools: namedTools([
+        'Zephyr Kiln',
+        "Alchemist's Supplies",
+        'Arcane Forge',
+        'Ley-Line Nexus',
+        "Master's Anvil",
+        'Moonwell',
+        "Smith's Hammer",
+        'Volcanic Vent',
+        'Woodcarving Tools',
+      ]),
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+    });
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a paged single-system list');
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a paged widened list');
+
+    const search = target.querySelector('[data-manager-tools-search] input[type="search"]');
+    search.value = 'aegis';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a widened list searched down to one world Tool');
+    assert.deepEqual(libraryRowStates(), ['world-aegis:absent']);
+
+    // AND AT THE COHORT'S ZERO POINT, which is the state that made the invariant worth writing:
+    // the shipped summary read `3 shown` above a body drawing nothing at all. Every state above
+    // holds a member, and with members present the two numbers cannot disagree — so without
+    // this remount the invariant would be green on the very defect it exists to catch.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a system holding no Tools of its own');
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a widened list belonging to a system holding none');
   });
 
   it('projects configured Tool values into the compact library inspector', async () => {
@@ -19836,28 +20624,70 @@ describe('CraftingSystemManager mounted behavior', () => {
       inspector.querySelector('[data-tool-inspector-description]').textContent,
       'A well-balanced forge hammer.'
     );
+    // ONE GROUP HEADING, NOT FOUR (issue 1373). Each row used to carry its own kicker —
+    // `BREAKAGE` over a row already reading `5 uses` in bold — so the assertions matched the
+    // heading and the value together. The heading the panel needs is the one naming the whole
+    // group, and it is asserted separately below.
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="breakage"]').textContent,
-      /Breakage.*5 uses/
+      /5 uses/
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="on-break"]').textContent,
-      /On break.*destroy the item/i
+      /destroy the item/i
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="prerequisites"]').textContent,
-      /Prerequisites.*1 prerequisite/
+      /1 prerequisite/
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
-      /Check bonus.*Adds @prof/
+      /Adds @prof/
     );
-    assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
+    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE, against the four
+    // per-row headings it replaced. The second is `Inheritance`, and it is not a fifth rule: the
+    // rules above state what the Tool RESOLVES to here and cannot state where each answer came
+    // from, because a section overridden to the world's own value resolves identically to one
+    // inherited. The row one column left already claims `Overrides breakage, prerequisites,
+    // check bonus`, and the panel it opened listed four rules with no marking at all — so the
+    // claim was unverifiable on the screen that made it, and two of the four read `No...`, which
+    // made an overriding Tool indistinguishable from one authoring nothing.
+    assert.deepEqual(
+      Array.from(inspector.querySelectorAll('.manager-tool-inspector-section-kicker')).map((node) =>
+        node.textContent.trim()
+      ),
+      ['Effective rules here', 'Inheritance'],
+      'one heading names the resolved rules, a second names where each of them came from'
+    );
+    const inheritance = inspector.querySelector('[data-tool-inspector-inheritance]');
+    assert.ok(Boolean(inheritance), 'the panel states the per-section inherit truth');
+    assert.deepEqual(
+      Array.from(inheritance.querySelectorAll('[data-tool-inspector-inherit]')).map(
+        (row) => `${row.dataset.toolInspectorInherit}:${row.dataset.toolInspectorInheritState}`
+      ),
+      [
+        'breakage:overridden',
+        'onBreak:overridden',
+        'prerequisites:overridden',
+        'bonus:overridden',
+      ],
+      'all four world-default sections, each with its own state'
+    );
+    // `overridden` FOUR TIMES IS THE LOAD-BEARING HALF. An absent inherit key reads as
+    // INHERITING everywhere in this model, so a region that failed to reach the world join at
+    // all would render four `Inherited` pills and look perfectly healthy. This fixture's
+    // membership record overrides every section — which is the state every migrated world is in
+    // — so the four `overridden` values can only have come from the join.
+    assert.equal(
+      inheritance.querySelectorAll('[data-tool-inspector-inherit-state="inherited"]').length,
+      0
+    );
+    assert.ok(!inspector.querySelector('[data-tool-inspector-validation]'));
     // Issue 881: the library inspector renders the SAME icon fact row the editor's
     // behavior preview does, from the same behavior-fact projection — one implementation,
     // so the two side panels cannot hold two geometries for one meaning.
     assert.equal(
-      inspector.querySelectorAll('[data-tool-inspector-rule] > .manager-icon-fact-row').length,
+      inspector.querySelectorAll('.manager-icon-fact-row[data-tool-inspector-rule]').length,
       4
     );
   });
@@ -19887,17 +20717,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('keeps Edit on the Tool row instead of duplicating it in the inspector', async () => {
+  // ── THE INSPECTOR CARRIES A ROUTE INTO THE EDITOR, AND THAT IS A REVERSAL ────────────────
+  // This test used to assert the opposite — `Edit` on the row and NOTHING in the inspector —
+  // on the reasoning that a second pen beside the row's pen is a duplicate affordance. The
+  // design says otherwise, and its picture is what settles it: the panel ends in a
+  // full-width primary button pinned to the foot of the column, which is where a GM who has
+  // just read four resolved rules is looking when they decide to change one.
+  //
+  // The two are not duplicates once they are not the same control. The row's is a labelled
+  // `Edit rules` button ON the row it edits, reachable without selecting anything; the
+  // panel's is the terminal action of the panel that describes the selection. Both are kept
+  // asserted here, and both must reach the same route.
+  it('routes into the Tool editor from the row AND from the foot of the inspector', async () => {
     const calls = await mountToolRoute();
     target
       .querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target')
       .click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-tool-inspector-edit]'), null);
+
+    const inspectorEdit = target.querySelector(
+      '[data-tool-browser-inspector] [data-tool-inspector-edit]'
+    );
+    assert.ok(inspectorEdit, 'the inspector pins its route into the rules editor');
+    assert.equal(inspectorEdit.dataset.toolInspectorEdit, 'tool-catalyst');
+
     target
       .querySelector(
-        '[data-manager-tool-id="tool-catalyst"] .manager-tools-library-actions .manager-icon-button'
+        '[data-manager-tool-id="tool-catalyst"] .manager-tools-library-actions [data-tool-edit-rules]'
       )
       .click();
     await tick();
@@ -19907,7 +20754,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
 
-  it('opens the focused Tool editor with header-only actions, four tabs, and preview', async () => {
+  it('opens the focused Tool editor with header-only actions, three tabs, and preview', async () => {
     const calls = await mountToolRoute();
     await openFixtureToolEditor(calls);
 
@@ -19925,10 +20772,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the editor does not pay for a separate root breadcrumb header'
     );
-    assert.equal(
-      target.querySelector('.fabricate-manager > .manager-titlebar'),
-      null,
-      'Tool parity routes suppress the generic system status ribbon'
+    // THE TITLE BAND RENDERS HERE TOO (issue 1373). Suppressing it left the Tool editor showing
+    // ~18px of empty ground where the reference states the selected system's resolution — and
+    // the shared `.manager-header` above IS still suppressed, because this route draws a header
+    // of its own; the two gates were never the same decision. `assert.ok(Boolean(...))` rather
+    // than an identity comparison: serialising a mounted element for a diff walks its circular
+    // tree until the heap dies, so a one-line failure surfaces as an OOM with no message.
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-manager > .manager-titlebar')),
+      'the Tool editor draws the shared title band'
     );
     const editorRail = target.querySelector('.manager-rail');
     assert.equal(
@@ -19961,15 +20813,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the manager shell must not restore its generic Tool subtitle above the editor'
     );
-    assert.equal(editor.querySelectorAll('[role="tab"]').length, 4);
+    // THREE TABS AND NO `Delete` (issue 1373). Identity is world scope's, so the system editor
+    // has no Overview tab to put it on; and a bare `Delete` on a screen whose subject is one
+    // world Tool adopted by many crafting systems names no scope, so system scope gets the
+    // explained `Stop using this Tool here` callout at the foot of Breakage instead.
+    assert.equal(editor.querySelectorAll('[role="tab"]').length, 3);
     assert.ok(editor.querySelector('[data-tool-editor-back]'));
-    assert.ok(editor.querySelector('[data-tool-editor-delete]'));
+    assert.ok(!editor.querySelector('[data-tool-editor-delete]'));
     assert.ok(editor.querySelector('[data-tool-editor-save]'));
     assert.ok(editor.querySelector('[data-tool-behavior-preview]'));
     assert.equal(editor.querySelector('footer'), null);
   });
 
-  it('keeps Tool creation drag-only and replacement authoring Component-only', async () => {
+  it('keeps replacement authoring Component-only, with no creation surface on this route', async () => {
     const calls = await mountToolRoute({
       storeOptions: {
         gatheringLibraryTools: [
@@ -19981,8 +20837,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    assert.ok(target.querySelector('[data-item-drop-zone="tool-create"]'));
-    assert.equal(target.querySelector('[data-tool-create-card] select'), null);
+    // NO CREATION SURFACE ON THIS ROUTE (issue 1373): it moved to the world Tools Catalogue,
+    // where the design puts it. What this test still governs is the half in its own name -
+    // replacement authoring stays Component-only.
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-create"]'));
 
     await openFixtureToolEditor(calls);
     target.querySelector('#tool-tab-breakage').click();
@@ -20026,7 +20884,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(document.querySelector('[data-recipe-add="alternative-currency"]'));
   });
 
-  it('a dropped Item opens one linked focused Tool draft instead of an inline row editor', async () => {
+  it('offers NO Tool creation on the system Tool Rules route, on any drop target', async () => {
+    // RETARGETED, NOT DELETED (issue 1373). This test used to drop an Item on this route's own
+    // creation zone and assert a system-scope draft opened. Creation moved to the world Tools
+    // Catalogue, so what remains to govern here is the half a regression would quietly undo:
+    // that this route grew the zone back. The drop BEHAVIOUR moved with the control, to
+    // `tests/components/world-tool-catalogue-mounted.test.js`.
     const calls = await mountToolRoute({
       services: {
         resolveToolSource: async (uuid) => ({
@@ -20037,56 +20900,27 @@ describe('CraftingSystemManager mounted behavior', () => {
         }),
       },
     });
-    const drop = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(drop, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.hammer' }) },
-    });
-    target.querySelector('[data-item-drop-zone="tool-create"]').dispatchEvent(drop);
-    await Promise.resolve();
-    await tick();
-    flushSync();
 
-    assert.ok(calls.some((call) => call[0] === 'createToolDraft'));
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tool-edit');
-    assert.ok(target.querySelector('[data-tool-editor-dirty]'));
-    assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-create"]'));
+    assert.ok(!target.querySelector('[data-tool-create-drop-prompt]'));
+    assert.ok(
+      !calls.some((call) => call[0] === 'createToolDraft'),
+      'nothing on this route opens a system-scope Tool draft from a drop'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tools');
   });
 
-  it('always resolves a Tool source replacement and stages the complete snapshot only on success', async () => {
-    const resolved = {
-      uuid: 'Compendium.mythwright.items.Item.smith-hammer',
-      name: "Smith's Hammer",
-      img: 'icons/tools/hand/hammer-and-nail.webp',
-      type: 'weapon',
-      description: 'A complete resolved Tool source snapshot.',
-    };
-    const requested = [];
-    const calls = await mountToolRoute({
-      services: {
-        resolveToolSource: async (uuid) => {
-          requested.push(uuid);
-          return uuid === resolved.uuid ? resolved : null;
-        },
-      },
-    });
+  it('offers NO source drop zone on the system Tool editor, at any tab', async () => {
+    // THE RELOCATION, MEASURED AT THE ROUTE (issue 1373). The system editor used to carry the
+    // linked-item card, so a crafting system could re-point which world Item a Tool IS.
+    // Identity is world-scoped; the card and its resolve-then-write behaviour moved to the
+    // world Tool entry, where the block at the end of this file exercises them.
+    const calls = await mountToolRoute({});
     await openFixtureToolEditor(calls);
 
-    for (const uuid of [resolved.uuid, 'Compendium.mythwright.items.Item.missing']) {
-      const drop = new Event('drop', { bubbles: true, cancelable: true });
-      Object.defineProperty(drop, 'dataTransfer', {
-        value: { getData: () => JSON.stringify({ type: 'Item', uuid }) },
-      });
-      target.querySelector('[data-item-drop-zone="tool-source"]').dispatchEvent(drop);
-      await Promise.resolve();
-      await tick();
-      flushSync();
-    }
-
-    assert.deepEqual(requested, [resolved.uuid, 'Compendium.mythwright.items.Item.missing']);
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'stageToolDraftSource'),
-      [['stageToolDraftSource', resolved.uuid, resolved]]
-    );
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-source"]'));
+    assert.ok(!target.querySelector('[data-tool-source-copy-uuid]'));
+    assert.ok(!target.querySelector('[data-tool-source-unlink]'));
   });
 
   it('keeps a dirty Tool mounted when navigation chooses Keep editing', async () => {
@@ -20159,19 +20993,31 @@ describe('CraftingSystemManager mounted behavior', () => {
         .startsWith('Validation'),
       true
     );
-    const firstFailure = target.querySelector('[data-tool-validation-check="source"]');
-    assert.match(firstFailure.textContent, /Link an Item or managed Component/);
+    // THE IDENTITY FAILURE IS A ROUTED NOTICE, NOT A CHECK ROW (issue 1373). `Item source is
+    // required` is the world Tool's defect: this screen cannot link an Item, so asking it to
+    // clear a `LINKED ITEM` check was asking it to repair someone else's record. It states the
+    // fact and names where it is fixed, and it does not count toward the blocking total.
+    assert.ok(!target.querySelector('[data-tool-validation-check="source"]'), 'no identity check');
+    assert.match(
+      target.querySelector('[data-tool-identity-notice]').textContent,
+      /Its identity is set on the world Tool, not here/
+    );
     assert.equal(
       target.querySelector('[data-editor-validation-count="blocking"]').textContent,
-      '1'
+      '0'
     );
   });
 
-  it('uses a separate destructive confirmation and returns to the library without a dirty prompt', async () => {
+  it('arms its own removal, takes no second dialog, and returns to the library unprompted', async () => {
+    // THE CONFIRMATION IS THE CONTROL, NOT A DIALOG (issue 1373). This route's destructive action
+    // used to be a header `Delete` behind `confirmDeleteTool`, whose dialog asks `Delete <name>?`
+    // over a `Delete` button — the WORLD action's wording, on the screen that cannot perform it.
+    // What system scope does is stop using the Tool here, and the callout that does it is an
+    // `ArmedDangerButton`: two deliberate presses, with the whole consequence stated beside them.
     const calls = await mountToolRoute({
       services: {
         confirmDeleteTool: () => {
-          calls.push(['confirmDeleteTool']);
+          calls.push(['unexpectedDeleteDialog']);
           return true;
         },
         confirmDirtyToolsNavigation: () => {
@@ -20181,14 +21027,36 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     await openFixtureToolEditor(calls);
-    target.querySelector('[data-tool-editor-delete]').click();
+
+    const remove = target.querySelector('[data-tool-remove-from-system] button');
+    assert.ok(Boolean(remove), 'the Breakage tab closes with the removal callout');
+    remove.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'removeToolFromSystem'),
+      false,
+      'arming must not remove'
+    );
+
+    target.querySelector('[data-tool-remove-from-system] button').click();
     await Promise.resolve();
     await Promise.resolve();
     await tick();
     flushSync();
 
-    assert.ok(calls.some((call) => call[0] === 'confirmDeleteTool'));
-    assert.ok(calls.some((call) => call[0] === 'deleteToolDraft'));
+    assert.ok(
+      calls.some(
+        (call) =>
+          call[0] === 'removeToolFromSystem' && call[1] === 'tool-catalyst' && call[2] === 'alchemy'
+      ),
+      'and confirming removes THIS Tool from THIS system'
+    );
+    assert.equal(
+      calls.some((call) => call[0] === 'unexpectedDeleteDialog'),
+      false,
+      'without a second confirmation the armed control already gave'
+    );
     assert.equal(
       calls.some((call) => call[0] === 'unexpectedDirtyPrompt'),
       false
@@ -26079,15 +26947,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   describe('world scoped-entity routes (issue 1362)', () => {
     /**
      * Rail leaf id -> the route token it commits, the screen title it renders, and the BODY
-     * SELECTOR that route's page draws.
-     *
-     * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and
-     * issue 1372 makes that false for `world-essences`: the essence catalogue is a real screen
-     * now and draws the shared list shell instead. Naming the selector per route keeps the
-     * assertion LIVE in both directions rather than deleting it for the replaced route — the
-     * replaced page must still render a body of its own, and the three that still delegate must
-     * still render the shared one. The titles are the prototype's, verbatim, including the
+     * SELECTOR that route's page draws. The titles are the prototype's, verbatim, including the
      * lowercase `c` and the plural `Tools`.
+     *
+     * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and the
+     * screen lanes of this epic make that false one route at a time and in no fixed order: issue
+     * 1372 replaced `world-essences` and issue 1373 replaced `world-tools`, and both draw the
+     * shared list shell instead. Naming the selector per route keeps the assertion LIVE in both
+     * directions rather than deleting it for a replaced route — a replaced page must still render
+     * a body of its own, and the routes that still delegate must still render the shared one.
      */
     const RAIL_REACHABLE_ROUTES = [
       [
@@ -26103,12 +26971,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         '[data-scoped-placeholder="world-vocabulary"]',
       ],
       ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
-      [
-        'tool-catalogue',
-        'world-tools',
-        'Tools Catalogue',
-        '[data-scoped-placeholder="world-tools"]',
-      ],
+      // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook, and the
+      // route token pins it to the screen this row is about rather than to any scoped list.
+      ['tool-catalogue', 'world-tools', 'Tools Catalogue', '[data-scoped-list="world-tools"]'],
     ];
 
     async function settleRoute() {
@@ -26170,6 +27035,25 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
     });
 
+    // THE WORLD BREAKAGE DEFAULT IS ON THE CATALOGUE AND NOWHERE ELSE (issue 1373).
+    //
+    // Asserted in the DOM rather than from source because "the only surface at world scope
+    // that authors it" is a claim about what RENDERS: a second writer added to the entry
+    // route would leave every source assertion in this repository green.
+    it('the world Tools Catalogue carries the world breakage default control', async () => {
+      await mountRail();
+      worldNavItem('tool-catalogue').click();
+      await settleRoute();
+      const card = target.querySelector('[data-world-tool-break-mode]');
+      assert.ok(Boolean(card), 'the catalogue renders the World breakage default card');
+      assert.equal(
+        card.querySelectorAll('[data-world-tool-break-segment]').length,
+        2,
+        'TWO options at world scope, never three: the world is where this value is authored, ' +
+          'so there is nothing above it to inherit from'
+      );
+    });
+
     it('draws a TWO-crumb trail rooted at World, with World itself clickable', async () => {
       await mountRail();
       worldNavItem('component-catalogue').click();
@@ -26216,6 +27100,31 @@ describe('CraftingSystemManager mounted behavior', () => {
       return {
         corpus: () => corpus,
         isSeeded: () => true,
+        // ── THE TWO SEAMS A WORLD-SCOPE WRITE NEEDS (issue 1373) ───────────────────────────
+        // `worldScopeActions` reads the PERSISTED payload, edits it and saves it back, so a
+        // double carrying `corpus()` alone cannot serve a write at all: it throws on the
+        // missing `save`. The persisted shape is a map per sub-key and the published corpus is
+        // an array per sub-key, and these two are where that conversion lives in production, so
+        // the double does it rather than pretending the two shapes are one.
+        //
+        // `save` REPLACES the corpus object rather than mutating it, which is the property the
+        // resolved-union memo keys on.
+        get: () => ({
+          ...extraCorpus,
+          entities: corpus.entities.map((entry) => ({ ...entry })),
+          defaults: Object.fromEntries(corpus.defaults.map((entry) => [entry.id, entry])),
+          membership: Object.fromEntries(
+            corpus.membership.map((entry) => [`${entry.entityId}|${entry.systemId}`, entry])
+          ),
+        }),
+        save(payload) {
+          corpus = {
+            ...extraCorpus,
+            entities: [...(payload?.entities ?? [])],
+            defaults: Object.values(payload?.defaults ?? {}),
+            membership: Object.values(payload?.membership ?? {}),
+          };
+        },
         replace(next) {
           corpus = { entities: next, defaults: [], membership: [], ...extraCorpus };
         },
@@ -26240,24 +27149,40 @@ describe('CraftingSystemManager mounted behavior', () => {
      * near-identical block SonarCloud's new-code duplication gate counts, and both defaults
      * leave every existing caller reading exactly what it read before.
      *
+     * `craftingCheck` joins them for the same reason (issue 1373): AC-4 needs a trigger to
+     * exist before the authority-gated break-tools card has anywhere to render, and the
+     * default fixture authors none.
+     *
      * @param {object} [options]
      * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
+     * @param {Array<object>|null} [options.worldTools] The world tool corpus. Named entities,
+     *   for the same reason `worldEssences` is: the default roster is id-only, and a breadcrumb
+     *   is about a name.
      * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
      *   entities are what the entry heading below is about; the id-only default keeps the rail
      *   counts every caller above it reads exactly where they were.
+     * @param {object|null} [options.craftingCheck] The selected system's crafting check.
+     * @param {string} [options.resolutionMode] The selected system's resolution mode.
      * @returns {Promise<object>} the store
      */
     async function mountWithRealStore({
       worldToolBreakage,
       systemToolBreakage,
       worldEssences,
+      worldTools,
+      craftingCheck,
+      resolutionMode,
+      // The COMPONENT's services bag, which is a different one from the admin store's: the
+      // shell reaches `services.resolveToolSource` to turn a drag payload into a snapshot, and
+      // that seam has no other route into the mounted tree (issue 1373).
+      componentServices = {},
     } = {}) {
       scopeStores = {
         component: scopeStore(worldEntities(3, 'comp')),
         essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
         tool: scopeStore(
-          worldEntities(1, 'tool'),
+          worldTools ?? worldEntities(1, 'tool'),
           worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
         ),
         // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
@@ -26268,6 +27193,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         id: 'sys1',
         name: 'Forge',
         ...(systemToolBreakage ? { toolBreakage: systemToolBreakage } : {}),
+        ...(craftingCheck ? { craftingCheck } : {}),
+        ...(resolutionMode ? { resolutionMode } : {}),
       });
       const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
       const systems = [forge, alchemy];
@@ -26286,7 +27213,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       await store.refresh();
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(Component, { target, props: { store, services: {} } });
+      mounted = mount(Component, { target, props: { store, services: componentServices } });
       flushSync();
       await tick();
       flushSync();
@@ -26414,7 +27341,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         await tick();
         flushSync();
         const segments = target.querySelectorAll('[data-tool-authority-segment]');
-        assert.equal(segments.length, 2, 'the Tool Studio authority radiogroup is rendered');
+        assert.equal(segments.length, 3, 'the Tool Studio authority radiogroup is rendered');
         return [...segments].map((segment) => ({
           authority: segment.dataset.toolAuthoritySegment,
           selected: segment.classList.contains('is-selected'),
@@ -26437,15 +27364,33 @@ describe('CraftingSystemManager mounted behavior', () => {
         return get(store.viewState).selectedSystem.toolBreakage;
       }
 
+      function segmentLabel(value) {
+        return target
+          .querySelector(`[data-tool-authority-segment="${value}"]`)
+          ?.textContent?.trim();
+      }
+
       it('a WORLD authority reaches the card when the system authored none', async () => {
         const store = await mountWithRealStore({
           worldToolBreakage: { authority: 'checkDriven' },
         });
+        // AC-1. POSITIVELY, through the helper that reads the class AND the radio together:
+        // `inherit` is the single selected segment and `checkDriven` is NOT. Selecting the
+        // resolved token here is the defect - it draws an inherited value as this system's own
+        // choice, and re-clicking it MINTS an override nothing can then clear.
         assert.equal(
           selectedAuthority(await openToolStudio()),
-          'checkDriven',
-          'a system that authored nothing INHERITS the world break mode; re-defaulting locally ' +
-            'is what made the world half unreachable before'
+          'inherit',
+          'a system that authored nothing INHERITS the world break mode, and the control says ' +
+            'so on the AUTHORED layer rather than drawing the resolved token as current'
+        );
+        // AC-2. The inherit segment names the WORLD's token. This fixture is the right one
+        // precisely because deriving the label off `breakageAuthority` would read the same
+        // value here - so the disagreeing fixture below is what actually catches it.
+        assert.match(
+          segmentLabel('inherit'),
+          /Check-driven/,
+          'the inherit segment names what the world actually says'
         );
         assert.deepEqual(publishedToolBreakage(store), {
           authority: 'checkDriven',
@@ -26463,6 +27408,14 @@ describe('CraftingSystemManager mounted behavior', () => {
           'toolSpecific',
           'the per-system override is the winning scope'
         );
+        // AC-2, on the fixture where the two values DISAGREE. A label derived from
+        // `breakageAuthority` renders `Tool-specific` here and is wrong; only the world's own
+        // token, carried on the `scope` leg of the bundle, answers `Check-driven`.
+        assert.match(
+          segmentLabel('inherit'),
+          /Check-driven/,
+          'the inherit segment names the WORLD token, not the resolved one'
+        );
         assert.deepEqual(publishedToolBreakage(store), {
           authority: 'toolSpecific',
           source: 'system',
@@ -26471,13 +27424,681 @@ describe('CraftingSystemManager mounted behavior', () => {
 
       it('neither scope authoring a token falls to the default, and says so', async () => {
         const store = await mountWithRealStore();
-        assert.equal(selectedAuthority(await openToolStudio()), 'toolSpecific');
+        assert.equal(
+          selectedAuthority(await openToolStudio()),
+          'inherit',
+          'nothing authored anywhere is still not this system authoring toolSpecific'
+        );
+        // AND THE LABEL DOES NOT CALL IT A WORLD DEFAULT. `DEFAULT_TOOL_BREAKAGE_AUTHORITY` is
+        // a shipped fallback, not a GM's choice, so copy crediting the world with it would be
+        // a lie the `default` branch exists to prevent.
+        assert.match(segmentLabel('inherit'), /\(default\)/);
+        assert.doesNotMatch(segmentLabel('inherit'), /World default/);
         assert.deepEqual(
           publishedToolBreakage(store),
           { authority: 'toolSpecific', source: 'default' },
           'the third branch of the resolver: the same TOKEN as an authored toolSpecific, and a ' +
             'different source — which is the whole reason source exists'
         );
+      });
+
+      // AC-3. CHOOSING `Inherit` CLEARS RATHER THAN MINTS.
+      //
+      // ASSERTED ON THE FORWARDED ARGUMENT, never on a post-state, and that is not a
+      // convenience: `adminStore.js`'s `setToolBreakageAuthority` writes `{toolBreakage: {}}`
+      // for anything outside the two tokens, and `updateSystem` is what turns that into a key
+      // REMOVAL. A double whose `updateSystem` ends in `Object.assign` cannot delete a key, so
+      // a post-state check cannot tell a clear from a re-write of the same token.
+      //
+      // The seam is a property read at CALL TIME - `store.setToolBreakageAuthority?.(...)` in
+      // the shell - so replacing the property after mount intercepts the real call path rather
+      // than a copy of it.
+      // AC-4. A WORLD `checkDriven` WITH NOTHING ON THE SYSTEM REACHES `ChecksView`.
+      //
+      // `tests/world-scope-tool-breakage-authority.test.js` records that of the FOUR manager
+      // surfaces reading this field, only the Tool Studio radiogroup has behavioural coverage -
+      // the other three are held by a text scan alone. This is the second, and it is the one
+      // that matters most: a re-default anywhere along the chain leaves a GM who authored a
+      // world `checkDriven` looking at a triggers list that says, in as many words, "switch the
+      // tool-breakage authority to check-driven".
+      //
+      // A TRIGGER HAS TO EXIST FIRST. The gate is `showBreakTools`, which is only asked once
+      // there is a trigger card to ask it on, so the fixture authors one.
+      it('a WORLD checkDriven reaches the Checks triggers with NOTHING on the system', async () => {
+        await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+          // `routedByCheck` because the crafting check is OPTIONAL in `simple` mode, and an
+          // optional check that is off collapses the section strip to `roll` alone - so the
+          // triggers section, and with it the authority gate, would have nowhere to render.
+          resolutionMode: 'routedByCheck',
+          craftingCheck: {
+            enabled: true,
+            mode: 'passFail',
+            macroUuid: null,
+            outcomes: [],
+            routed: {
+              enabled: true,
+              type: 'relative',
+              rollFormula: '1d20',
+              checkBreakage: {
+                triggers: [
+                  {
+                    id: 'trg-1',
+                    condition: { type: 'rollTotal', operator: '<=', value: 1 },
+                    outcome: 'failure',
+                    breakTools: false,
+                  },
+                ],
+              },
+            },
+          },
+        });
+        navButton('Checks').click();
+        await tick();
+        flushSync();
+        await openChecksActivity('crafting');
+        await openChecksSection('triggers');
+        const trigger = target.querySelector('[data-trigger="trg-1"]');
+        assert.ok(Boolean(trigger), 'the authored trigger renders, so the gate has a subject');
+        target.querySelector('[data-trigger-disclosure="trg-1"]').click();
+        await tick();
+        flushSync();
+        assert.ok(
+          Boolean(target.querySelector('[data-trigger="trg-1"] [data-trigger-break]')),
+          'the break-tools card renders ENABLED under an inherited world checkDriven'
+        );
+        assert.ok(
+          !target.querySelector('[data-trigger-break-unavailable]'),
+          'and the "switch the authority to check-driven" hint stands down: it is already ' +
+            'check-driven, at world scope'
+        );
+      });
+
+      it('choosing Inherit CLEARS the per-system override rather than minting one', async () => {
+        const store = await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+          systemToolBreakage: { authority: 'toolSpecific' },
+        });
+        await openToolStudio();
+        const forwarded = [];
+        store.setToolBreakageAuthority = (authority) => {
+          forwarded.push(authority);
+          return Promise.resolve();
+        };
+        target.querySelector('[data-tool-authority-segment="inherit"] input[type="radio"]').click();
+        flushSync();
+        assert.deepEqual(
+          forwarded,
+          [null],
+          'Inherit forwards null, which is what `setToolBreakageAuthority` turns into a key ' +
+            'removal. Forwarding a token instead writes an override the GM cannot clear'
+        );
+      });
+    });
+
+    // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
+    //
+    // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
+    // this describe, and it is the only harness in the repository that drives the manager shell
+    // over a real world-scope corpus — which is what it takes to render this heading at all.
+    //
+    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS, and that is the point rather than a
+    // preference. The heading lives in `.manager-header`, a SIBLING of `.manager-main`, so
+    // `WorldEssenceEntryPage`'s own mounted suite cannot see it: every assertion there is green
+    // whether the shell renders the draft name, the persisted name or nothing. And the seam
+    // between them is a reported value, so a test that read the reporting callback would be
+    // satisfied by a shell that received the name and printed the other one.
+    //
+    // The DOM, not the callback, for the reason Svelte 5 makes sharp: the shell holds this name
+    // in a rune it can only publish by REASSIGNING, and every wrong version of that — a mutated
+    // object, a value read off the deliberately non-reactive draft handle — reports correctly
+    // and renders staleness.
+    describe('world essence entry heading (issue 1372)', () => {
+      /** Two NAMED world essences: the heading is about a name, so an id-only corpus is mute. */
+      const WORLD_ESSENCES = Object.freeze([
+        Object.freeze({ id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember' }),
+        Object.freeze({ id: 'brine', name: 'Brine' }),
+      ]);
+
+      async function settleEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const headingText = () =>
+        target
+          .querySelector('[data-world-essence-entry-heading] .manager-title')
+          ?.textContent?.trim();
+
+      const subtitleText = () =>
+        target.querySelector('[data-world-essence-entry-subline]')?.textContent?.trim();
+
+      /** Open `ash`'s world entry editor the way a GM does: rail, then the row's pen. */
+      async function openAshEntry() {
+        await mountWithRealStore({ worldEssences: [...WORLD_ESSENCES] });
+        worldNavItem('essence-catalogue').click();
+        await settleEntryRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="ash"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(
+          Boolean(open),
+          'the essence catalogue rendered no open-entry action for `ash`, so nothing below ' +
+            'reaches the editor this block is about'
+        );
+        open.click();
+        await settleEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-essence-entry',
+          'the row pen did not commit the entry route'
+        );
+      }
+
+      /** Type into the buffered name field — an `input` event, which is the only thing that
+       * moves the draft: it is seeded from the persisted record, so a click cannot dirty it. */
+      async function typeName(value) {
+        const field = target.querySelector('[data-scoped-entry-name]');
+        assert.ok(Boolean(field), 'the entry editor rendered no name field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleEntryRoute();
+      }
+
+      it('opens on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          headingText(),
+          'Ash',
+          'an untouched editor must head the screen with the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered name as the GM types, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          target.querySelector('[data-scoped-entry-name]').value,
+          'Aetherlight',
+          'the keystroke never reached the draft, so the heading assertion below is vacuous'
+        );
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading still names the PERSISTED essence while the name field and the player ' +
+            'preview both show the buffered one — one screen naming one essence two ways'
+        );
+      });
+
+      it('leaves the USAGE SUBTITLE on the persisted record, which is a count of systems', async () => {
+        await openAshEntry();
+        const before = subtitleText();
+        assert.ok(
+          Boolean(before),
+          'the heading block rendered no subtitle at all, so its stability below proves nothing'
+        );
+        await typeName('Aetherlight');
+        assert.equal(
+          subtitleText(),
+          before,
+          'a rename changed the count of systems using this essence, which no keystroke can do ' +
+            'until the write lands'
+        );
+      });
+
+      it('falls back to the ROUTE TITLE when the buffered name is emptied', async () => {
+        // The same guard the missing-record path takes. A GM who clears the field is authoring
+        // an empty name, and an empty `<h1>` is not a heading — this is what the route already
+        // renders for a record whose persisted name is empty.
+        await openAshEntry();
+        await typeName('');
+        assert.equal(headingText(), 'Essence entry');
+      });
+
+      // ── AND SO DOES THE REST OF THE CHROME (issue 1372, parity round 6) ──────────────
+      //
+      // The heading was fixed on its own in round 5, and the two things beside it were left on
+      // the published corpus: the breadcrumb's last crumb and the 44px medallion. The result was
+      // the same self-contradiction one rung quieter — `Aether` in the trail under an
+      // `Aetherlight` heading, and a tile still wearing the colour on disk.
+      //
+      // THE DOM, NOT THE REPORT, for the reason this whole block is mounted: the shell holds
+      // the reported identity in a rune it can only publish by REASSIGNING, and the wrong
+      // versions of that — a mutated object, a value read off the deliberately non-reactive
+      // draft handle — report correctly and render staleness.
+
+      const crumbText = () =>
+        target
+          .querySelector('[data-breadcrumb-world-scoped="world-essence-entry"]')
+          ?.textContent?.trim();
+
+      const headingMedallion = () =>
+        target.querySelector('[data-world-essence-entry-heading] .fab-medallion');
+
+      /** Pick a preset swatch in the entry editor's inline colour palette. */
+      async function pickColour(token) {
+        const swatch = target.querySelector(
+          `[data-scoped-entry-colour] [data-manager-color-token="${token}"]`
+        );
+        assert.ok(Boolean(swatch), `the entry editor rendered no \`${token}\` colour swatch`);
+        swatch.click();
+        await settleEntryRoute();
+      }
+
+      it('opens with the crumb on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          crumbText(),
+          'Ash',
+          'an untouched editor must trail the record on disk, exactly as the heading does'
+        );
+      });
+
+      it('FOLLOWS the buffered name in the last crumb, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading did not move, so the crumb assertion below would be measuring the ' +
+            'wrong failure'
+        );
+        assert.equal(
+          crumbText(),
+          'Aetherlight',
+          'the trail still names the PERSISTED essence under a heading that names the draft — ' +
+            'one screen naming one essence two ways, one line apart'
+        );
+      });
+
+      it('resolves the crumb GENERICALLY, so every scoped entry route inherits it', async () => {
+        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`, and
+        // the buffered name is read from a route-agnostic channel in front of it. This asserts
+        // the SHAPE of that: the leaf carries the route it is on, and the same element answers
+        // for the component and tool entries with no code of their own. A per-essence crumb
+        // would satisfy the test above and leave the tool entry to repeat the fix.
+        await openAshEntry();
+        await typeName('Aetherlight');
+        const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
+        assert.equal(
+          leaf?.getAttribute('data-breadcrumb-world-scoped'),
+          'world-essence-entry',
+          'the buffered name is being rendered somewhere other than the shared entry leaf'
+        );
+        assert.equal(leaf.textContent.trim(), 'Aetherlight');
+      });
+
+      it('falls back to the ROUTE TITLE in the crumb when the buffered name is emptied', async () => {
+        await openAshEntry();
+        await typeName('');
+        assert.equal(
+          crumbText(),
+          'Essence entry',
+          'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
+            '"nothing typed"'
+        );
+      });
+
+      it('opens the heading MEDALLION on the persisted icon and colour', async () => {
+        await openAshEntry();
+        const medallion = headingMedallion();
+        assert.ok(Boolean(medallion), 'the entry heading rendered no medallion');
+        assert.equal(medallion.getAttribute('data-medallion-tint'), 'ember');
+        assert.ok(
+          medallion.querySelector('i')?.className.includes('fa-fire'),
+          'the medallion opened on some icon other than the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered colour in the heading medallion, before any Save', async () => {
+        await openAshEntry();
+        await pickColour('lavender');
+        assert.ok(
+          target
+            .querySelector('[data-scoped-entry-colour] [data-manager-color-token="lavender"]')
+            ?.className.includes('is-selected'),
+          'the swatch click never reached the draft, so the medallion assertion below is vacuous'
+        );
+        assert.equal(
+          headingMedallion()?.getAttribute('data-medallion-tint'),
+          'lavender',
+          'the tile at the top of the screen still wears the colour on disk while the picker, ' +
+            'the preview rail and the form tile have all moved'
+        );
+      });
+
+      it('FOLLOWS the buffered icon in the heading medallion, before any Save', async () => {
+        // The COLOUR case above and this one are not one test twice: the colour is a bare palette
+        // key the medallion turns into a tint, the icon is a class it renders directly, and a
+        // shell that read one buffered field and not the other would pass whichever of the two
+        // was written first.
+        await openAshEntry();
+        const trigger = target.querySelector('.essence-icon-picker-trigger');
+        assert.ok(Boolean(trigger), 'the entry editor rendered no icon picker');
+        trigger.click();
+        await settleEntryRoute();
+        // The picker's option list is PORTALLED out of the page, so it is found on the document.
+        const option = [...document.querySelectorAll('.essence-icon-picker-option')].find(
+          (candidate) => !(candidate.querySelector('i')?.className ?? '').includes('fa-fire')
+        );
+        assert.ok(Boolean(option), 'the icon picker offered no glyph other than the persisted one');
+        // The picker's own `<i>` carries ITS component's Svelte scope hash and the medallion's
+        // carries none, so the two are compared on the glyph classes rather than verbatim.
+        const glyphClasses = (element) =>
+          (element?.className ?? '')
+            .split(/\s+/)
+            .filter((token) => token && !token.startsWith('svelte-'))
+            .join(' ');
+        const chosen = glyphClasses(option.querySelector('i'));
+        assert.ok(chosen.length > 0, 'the picker offered an option with no glyph class at all');
+        option.click();
+        await settleEntryRoute();
+        assert.equal(
+          glyphClasses(headingMedallion()?.querySelector('i')),
+          chosen,
+          'the tile at the top of the screen kept the glyph on disk while the picker trigger ' +
+            'and the player preview both moved to the buffered one'
+        );
+      });
+    });
+
+    // ── AND THE WORLD TOOL ENTRY INHERITS IT (issue 1373) ────────────────────────────
+    //
+    // The crumb above is derived once for all three entry routes, so this screen was supposed to
+    // need ONE LINE: reporting its buffered identity through the same `onDraftIdentityChange`
+    // prop the essence entry reports through. This block is what makes that claim falsifiable
+    // rather than an argument — the shell's derivation being generic does nothing at all for a
+    // page that never reports, and the failure would be silent: the crumb keeps rendering, on
+    // the record on disk, under a heading that has moved.
+    //
+    // THE DOM, NOT THE CALLBACK, for the same reason the essence block states: the shell holds
+    // the reported identity in a rune it can only publish by reassigning, and the wrong versions
+    // of that report correctly and render staleness.
+    describe('world tool entry crumb (issue 1373)', () => {
+      /** One NAMED world tool: a breadcrumb is about a name, so the id-only default is mute. */
+      const WORLD_TOOLS = Object.freeze([Object.freeze({ id: 'pick', name: 'Mining Pick' })]);
+
+      async function settleToolEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const toolCrumbText = () =>
+        target
+          .querySelector('[data-breadcrumb-world-scoped="world-tool-entry"]')
+          ?.textContent?.trim();
+
+      const toolHeadingText = () =>
+        target.querySelector('[data-world-tool-entry-heading] .manager-title')?.textContent?.trim();
+
+      /** Open `pick`'s world entry editor the way a GM does: rail, then the row's pen. */
+      async function openPickEntry() {
+        await mountWithRealStore({ worldTools: [...WORLD_TOOLS] });
+        worldNavItem('tool-catalogue').click();
+        await settleToolEntryRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="pick"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(
+          Boolean(open),
+          'the tool catalogue rendered no open-entry action for `pick`, so nothing below ' +
+            'reaches the editor this block is about'
+        );
+        open.click();
+        await settleToolEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-tool-entry',
+          'the row pen did not commit the tool entry route'
+        );
+      }
+
+      /** Type into the buffered display-label field, which is the only thing that moves the
+       * draft: it is seeded from the persisted record, so a click cannot dirty it. */
+      async function typeToolName(value) {
+        const field = target.querySelector('[data-world-tool-entry-name]');
+        assert.ok(Boolean(field), 'the tool entry editor rendered no display-label field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleToolEntryRoute();
+      }
+
+      it('opens with the crumb on the persisted name', async () => {
+        await openPickEntry();
+        assert.equal(toolCrumbText(), 'Mining Pick');
+      });
+
+      it('FOLLOWS the buffered name in the last crumb, before any Save', async () => {
+        await openPickEntry();
+        await typeToolName('Miners Pick');
+        assert.equal(
+          toolHeadingText(),
+          'Miners Pick',
+          'the heading did not move, so the crumb assertion below would be measuring the ' +
+            'wrong failure'
+        );
+        assert.equal(
+          toolCrumbText(),
+          'Miners Pick',
+          'the trail still names the PERSISTED Tool under a heading that names the draft — ' +
+            'the inherited crumb never reached this route'
+        );
+      });
+
+      it('falls back to the ROUTE TITLE in the crumb when the buffered name is emptied', async () => {
+        await openPickEntry();
+        await typeToolName('');
+        assert.equal(
+          toolCrumbText(),
+          'Tool entry',
+          'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
+            '"nothing typed"'
+        );
+      });
+    });
+
+    // ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────
+    //
+    // The catalogue's creation zone minted `store.randomID()` unconditionally and wrote the
+    // dropped uuid into BOTH source fields, so dragging the same Item on twice produced two
+    // world Tools with identical identity. `worldScopeActions.createEntity` cannot catch that:
+    // it dedupes on the entity ID and the id is fresh every time. Both records then appear in
+    // every system's catalogue and nothing on any screen says which one a recipe means.
+    //
+    // It is also the rule the rest of the epic already follows. `worldScopeEntityGrouping`
+    // groups the migration BY RESOLVED SOURCE ITEM precisely so one real Item becomes one world
+    // record, and the system-scope path this zone replaced upserted — `_findToolForUpsert`
+    // resolves a drop by requested id, then by a durable flag, then by the source references.
+    //
+    // NESTED HERE because `mountWithRealStore` is declared in this describe and is the only
+    // harness in the repository that drives the shell over a REAL world-scope corpus. A fake
+    // `worldScope.tool` would answer whatever the test told it to and could not see a second
+    // entity land in the corpus at all.
+    describe('world Tool creation from an Item drop (issue 1373)', () => {
+      const HAMMER = Object.freeze({
+        uuid: 'Item.smith-hammer',
+        name: 'Smith Hammer',
+        img: 'icons/tools/smithing/hammer-worn-steel-grey.webp',
+        description: 'A well-balanced forge hammer.',
+      });
+      const AWL = Object.freeze({
+        uuid: 'Compendium.fabricate.tools.Item.bone-awl',
+        name: 'Bone Awl',
+        img: '',
+        description: '',
+      });
+      const SOURCES = Object.freeze({ [HAMMER.uuid]: HAMMER, [AWL.uuid]: AWL });
+
+      async function settleDrop() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      async function goToToolCatalogue() {
+        worldNavItem('tool-catalogue').click();
+        await settleDrop();
+        assert.ok(
+          Boolean(target.querySelector('[data-item-drop-zone="tool-create"]')),
+          'the catalogue rendered no creation drop zone, so nothing below drops anywhere'
+        );
+      }
+
+      /**
+       * Open the world Tools Catalogue over a real corpus, with the resolver seam wired.
+       *
+       * @param {Array<object>} worldTools the world tool corpus to start from.
+       * @returns {Promise<object>} the mounted admin store.
+       */
+      async function openToolCatalogue(worldTools) {
+        const store = await mountWithRealStore({
+          worldTools,
+          componentServices: { resolveToolSource: async (uuid) => SOURCES[uuid] ?? null },
+        });
+        await goToToolCatalogue();
+        return store;
+      }
+
+      const worldToolIds = () =>
+        scopeStores.tool.corpus().entities.map((entity) => String(entity?.id ?? ''));
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+      const entryName = () => target.querySelector('[data-world-tool-entry-name]')?.value ?? '';
+
+      /**
+       * Drop one Item on the creation zone, capturing what the GM is told while it happens.
+       *
+       * `ui.notifications` is installed per drop and removed again: nothing else in this
+       * describe needs the Foundry `ui` global, and a standing one is something a neighbouring
+       * test comes to depend on.
+       *
+       * @param {string} uuid
+       * @returns {Promise<string[]>} the info toasts raised by the drop.
+       */
+      async function dropItem(uuid) {
+        const messages = [];
+        const previousUi = globalThis.ui;
+        globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+        try {
+          dispatchDrop(target.querySelector('[data-item-drop-zone="tool-create"]'), {
+            type: 'Item',
+            uuid,
+          });
+          await settleDrop();
+          return messages;
+        } finally {
+          if (previousUi === undefined) delete globalThis.ui;
+          else globalThis.ui = previousUi;
+        }
+      }
+
+      it('mints ONE world Tool when the same Item is dropped twice', async () => {
+        await openToolCatalogue([]);
+
+        const firstDrop = await dropItem(HAMMER.uuid);
+        assert.deepEqual(firstDrop, [], 'the first drop is a plain creation and says nothing');
+        assert.equal(worldToolIds().length, 1, 'the first drop creates the record');
+        assert.equal(managerView(), 'world-tool-entry', 'and lands the GM on it');
+        const created = worldToolIds()[0];
+
+        // BACK TO THE CATALOGUE AND DROP THE SAME ITEM AGAIN, which is exactly what a GM does
+        // when they cannot remember whether they already made a Tool for this Item.
+        await goToToolCatalogue();
+        const secondDrop = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(
+          worldToolIds(),
+          [created],
+          'a second drop of the SAME Item must not mint a second world Tool: the id is fresh ' +
+            'every time, so `createEntity`’s id dedupe cannot see the collision'
+        );
+        assert.equal(
+          managerView(),
+          'world-tool-entry',
+          'the drop still goes somewhere — a drop that appears to do nothing is the defect ' +
+            'this screen just spent a round removing'
+        );
+        assert.equal(entryName(), HAMMER.name, 'and it is the record the Item already had');
+        assert.equal(secondDrop.length, 1, 'the GM is TOLD they landed on an existing record');
+        assert.match(secondDrop[0], /Smith Hammer/, 'and the toast names it');
+      });
+
+      it('resolves the drop through the whole source-reference union, not one field', async () => {
+        // THE UNION IS THE SHARED WALK, not a fourth comparison written at the call site.
+        // `getItemMatchUuids` reads `registeredItemUuid`, `originItemUuid` AND `aliasItemUuids`,
+        // and a record whose link was re-pointed keeps the old uuid as an alias — so a match on
+        // the alias alone is a real world in which a naive `registeredItemUuid ===` test mints
+        // the duplicate this block exists to refuse.
+        await openToolCatalogue([
+          {
+            id: 'legacy-hammer',
+            name: 'Legacy Hammer',
+            registeredItemUuid: 'Item.some-other-item',
+            aliasItemUuids: [HAMMER.uuid],
+          },
+        ]);
+
+        const messages = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(
+          worldToolIds(),
+          ['legacy-hammer'],
+          'an ALIAS reference is still this Item’s world Tool'
+        );
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.equal(entryName(), 'Legacy Hammer');
+        assert.match(messages[0] ?? '', /Legacy Hammer/);
+      });
+
+      it('reuses a world-DISABLED record, and says that is what happened', async () => {
+        // THE DECISION, PINNED. `enabled` is the world master switch, so opening a disabled
+        // record silently leaves a GM on a screen whose Tool does nothing with no reason given —
+        // and minting a second record instead would put two rows behind one Item and strand the
+        // GM's own switch decision on the one they can no longer find. So it is the SAME reuse
+        // with a DIFFERENT sentence: the record opens, and the toast names the switch, on the
+        // one screen where that switch can be moved.
+        const store = await openToolCatalogue([
+          { id: 'shelved', name: 'Shelved Hammer', originItemUuid: HAMMER.uuid },
+        ]);
+        // Disabled through the REAL write family, so the state under test is the one the
+        // projection publishes rather than a hand-stamped field the projection never reads.
+        assert.equal(await store.worldScope.tool.setWorldEnabled('shelved', false), true);
+        await settleDrop();
+
+        const messages = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(worldToolIds(), ['shelved'], 'a disabled record is still the record');
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.match(messages[0] ?? '', /Shelved Hammer/, 'the toast names the record');
+        assert.match(
+          messages[0] ?? '',
+          /disabled/i,
+          'and it names the master switch, which is the whole difference from the enabled case'
+        );
+      });
+
+      it('still creates a SECOND world Tool for a DIFFERENT Item', async () => {
+        // THE NON-VACUITY HALF, and without it the repair is satisfiable by a zone that refuses
+        // every drop. Two different Items are two world Tools, which is the whole premise of a
+        // catalogue whose records each ARE a game-world Item.
+        await openToolCatalogue([]);
+        await dropItem(HAMMER.uuid);
+        await goToToolCatalogue();
+        await dropItem(AWL.uuid);
+
+        assert.equal(
+          worldToolIds().length,
+          2,
+          'a different source Item is a different world Tool'
+        );
+        assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
       });
     });
 

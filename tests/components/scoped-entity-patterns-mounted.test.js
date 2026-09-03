@@ -213,7 +213,7 @@ describe('InheritRow (mounted)', () => {
     assert.equal(root.querySelectorAll(EMPTY_STATE_SELECTOR).length, 0, 'no empty state');
   });
 
-  it('draws exactly TWO rows for a tool, and none for the SEEDED section', async () => {
+  it('draws exactly FOUR rows for a tool, and none for the SEEDED section', async () => {
     // NON-VACUITY FIRST. "A seeded section renders none" is satisfied by an EMPTY seeded list,
     // which removes nothing — and the tool list is inert today for a second reason:
     // `TOOL_SECTIONS` never carried `repairRequirements`, so the resolver does not read
@@ -234,7 +234,9 @@ describe('InheritRow (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')].map((row) =>
       row.getAttribute('data-scoped-inherit-row')
     );
-    assert.deepEqual(rows, ['breakage', 'onBreak']);
+    // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
+    // sections with inherit switches of their own.
+    assert.deepEqual(rows, ['breakage', 'onBreak', 'prerequisites', 'bonus']);
     for (const seeded of SCOPED_SEEDED_SECTIONS.tool) {
       assert.equal(
         rows.includes(seeded),
@@ -262,7 +264,11 @@ describe('InheritRow (mounted)', () => {
     const states = [...root.querySelectorAll('[data-scoped-inherit-state]')].map((chip) =>
       chip.getAttribute('data-scoped-inherit-state')
     );
-    assert.deepEqual(states, ['overridden', 'inherited'], 'an absent key reads as inheriting');
+    assert.deepEqual(
+      states,
+      ['overridden', 'inherited', 'inherited', 'inherited'],
+      'an absent key reads as inheriting'
+    );
     const toggles = [...root.querySelectorAll('[data-scoped-inherit-toggle]')];
     // ON IS OVERRIDDEN. The switch means "this system sets its own", so the OVERRIDDEN row's
     // switch is pressed and the INHERITING row's is not. This assertion is the inverse of what
@@ -272,12 +278,15 @@ describe('InheritRow (mounted)', () => {
     // `compare-images/PROTO-essence-rules-editor.png` and `tmp/proto/tool-rules-editor.png`.
     assert.deepEqual(
       toggles.map((toggle) => toggle.getAttribute('aria-pressed')),
-      ['true', 'false']
+      // FOUR rows, because issue 1373 gave a tool `prerequisites` and `bonus` alongside the two
+      // breakage sections, and the `states` assertion above counts the same four. The DIRECTION
+      // is issue 1372's: only the overridden row is pressed.
+      ['true', 'false', 'false', 'false']
     );
     // And the CLASS the sheet paints from, which is what a frame actually shows.
     assert.deepEqual(
       toggles.map((toggle) => (toggle.classList.contains('is-on') ? 'is-on' : 'is-off')),
-      ['is-on', 'is-off'],
+      ['is-on', 'is-off', 'is-off', 'is-off'],
       'the painted state agrees with the pressed state'
     );
     // The pair must never agree with each other by accident: the chip and the switch are read
@@ -322,6 +331,8 @@ describe('InheritRow (mounted)', () => {
     assert.deepEqual(calls, [
       ['breakage', false],
       ['onBreak', true],
+      ['prerequisites', false],
+      ['bonus', false],
     ]);
   });
 

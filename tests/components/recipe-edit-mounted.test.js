@@ -59,6 +59,10 @@ const RAW_MODULES = [
   'src/config/flags.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
+  // The ONE ingredient-kind table (issue 1373, round 8): the requirement row's plate glyph and
+  // tint, its kind select's four words, and the `or...` menu's four entries all read it, so both
+  // ingredient components import it and the closure validator throws without it.
+  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // The validation tab localizes a signature-collision blocker row via this pure
@@ -85,6 +89,7 @@ const RAW_MODULES = [
   // …and issue 1118 a FOURTH: the resolver ranks a rolling modifier by the deterministic
   // average this import-free leaf computes.
   'src/utils/rollExpressionAverage.js',
+  'src/utils/rollFormulaRollability.js',
   // …and issue 1095 a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
   'src/systems/salvageCheckUsability.js',
@@ -3184,8 +3189,9 @@ describe('RecipeEditView (mounted)', () => {
       /Mountain Herb/,
       'first alternative resolves the component name on the trigger'
     );
-    // The component image renders in the row (the popover trigger portrait).
-    const herbImg = options[0].querySelector('.manager-travel-portrait img');
+    // The component image renders on the CHOSEN CHIP (issue 1373, maintainer round 5), which
+    // is what a named row reads back as now — it was the portrait inside a popover trigger.
+    const herbImg = options[0].querySelector('.manager-recipe-option-chosen-img');
     assert.ok(herbImg, 'the component alternative shows an image');
     assert.equal(
       herbImg.getAttribute('src'),
@@ -3228,6 +3234,26 @@ describe('RecipeEditView (mounted)', () => {
       'no AND divider is rendered between AND’d requirements'
     );
 
+    // NO `REQUIRED` PILL, ON ANY ROW (issue 1373, maintainer round 6). The word appears ZERO
+    // times in the design's 6,236 lines — `proto:2466` and `proto:3008` head a "Required for"
+    // BACK-REFERENCE panel, which is a different question entirely (what needs this essence),
+    // and nothing draws a per-row badge. It is redundant as well as absent: a choice group
+    // says OR in its own `ANY ONE OF` pill, so every row OUTSIDE one is required by position,
+    // and the tab's own intro sentence already states the AND.
+    //
+    // Asserted over the WHOLE SET rather than over the bare requirement that carried it, so a
+    // reintroduction anywhere in the ingredient list fails here.
+    assert.equal(
+      set.querySelectorAll('[data-recipe-req-tag="required"]').length,
+      0,
+      'no requirement row emits a REQUIRED pill'
+    );
+    assert.doesNotMatch(
+      set.textContent,
+      /REQUIRED/i,
+      'and the word is not rendered by some other element either'
+    );
+
     // The essence requirement renders as a first-class essence OPTION row (issue 649),
     // its amount edited by the SAME end-of-row Stepper every other row type uses (676).
     const essenceReq = set.querySelector('[data-recipe-group-id="grp-3"]');
@@ -3267,25 +3293,24 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a component requirement (born populated, id-less) via the Add component popover', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, from `appends a component requirement (born
+  // populated, id-less) via the Add component popover`. `Add component` was a picker: it chose a
+  // component and the requirement arrived holding it. The design and premium's rewards picker
+  // both create the row from its KIND and let the row name the value, so what this now pins is
+  // the eager id and the quantity default — the two things about the append that did NOT change.
+  // The kind-and-no-value half is pinned by `creates a row with a kind and NO value from the
+  // set-level adder` below.
+  it('appends a requirement carrying an eager id and a quantity of 1', async () => {
     const { target, patches } = await mountIngredientGroups([], {
       set: { name: 'Primary' },
       props: { componentOptions: COMPONENT_OPTIONS },
     });
-    await pickPopoverOption(
-      target,
-      '[data-recipe-set-id="set-1"] [data-recipe-add="component"]',
-      /Mountain Herb/
-    );
-    assert.equal(patches.length, 1, 'choosing a component patches the recipe');
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'the adder patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
     assert.ok(groups[0].id, 'the appended requirement carries an eager id');
-    assert.deepEqual(
-      groups[0].options[0].match,
-      { type: 'component', componentId: 'cmp-herb' },
-      'the requirement is born populated with the chosen component'
-    );
     assert.equal(groups[0].options[0].quantity, 1, 'the alternative defaults to quantity 1');
     editHarness.remount();
   });
@@ -3328,24 +3353,28 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments an existing single-component requirement instead of duplicating it', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, from `increments an existing
+  // single-component requirement instead of duplicating it`. That behaviour was only available
+  // to a picker that KNEW which component the GM had chosen: `Add component` names no component
+  // now, so there is nothing to compare an existing requirement against at add time. A GM who
+  // then names the same component twice gets the Validation tab's duplicate issue, which is
+  // where a check the adder cannot make belongs — `RecipeIngredientSetCard` records the same
+  // reasoning at the removal, and the sibling `leaves an existing alternative untouched` test
+  // already made this argument for the alternative adders.
+  it('appends a second requirement rather than touching the one the set already holds', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
       { set: { name: 'Primary' }, props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    await pickPopoverOption(
-      target,
-      '[data-recipe-set-id="set-1"] [data-recipe-add="component"]',
-      /Mountain Herb/
-    );
-    assert.equal(patches.length, 1, 'choosing the already-required component patches the recipe');
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'the adder patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
-    assert.equal(groups.length, 1, 'no duplicate requirement is appended');
-    assert.equal(groups[0].options.length, 1, 'the requirement keeps a single option');
-    assert.equal(
-      groups[0].options[0].quantity,
-      3,
-      'the existing requirement quantity is incremented by one'
+    assert.equal(groups.length, 2, 'a second, empty requirement is appended');
+    assert.deepEqual(
+      groups[0].options[0],
+      { quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+      'and the requirement the set already held is untouched'
     );
     editHarness.remount();
   });
@@ -3426,8 +3455,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     const optionRows = req.querySelectorAll('[data-recipe-option]');
     assert.ok(
-      optionRows[0].querySelector('.manager-recipe-component-trigger'),
-      'the first alternative is a component editor'
+      optionRows[0].querySelector('[data-recipe-option-chosen]'),
+      'the first alternative is a named component row'
     );
     assert.ok(
       optionRows[1].querySelector('[data-recipe-tag-match="any"]'),
@@ -3492,38 +3521,36 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders the component option image trigger with the name as separate static text (not inside the button)', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, from `renders the component option image
+  // trigger with the name as separate static text (not inside the button)`. Issue 676's finding
+  // stands and is what this still pins — the image and the name are ONE thing, never a live
+  // button beside inert text — but the thing they are is a chip that reads back the row's value,
+  // not a trigger that opens a picker. The picker is gone: the row searches inline.
+  it('reads a named row back as one chip carrying the image, the name and a tooltip', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
     const row = target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-option]');
-    const trigger = row.querySelector('.manager-recipe-component-trigger');
-    assert.ok(trigger, 'the component picker trigger renders');
     assert.ok(
-      trigger.querySelector('.manager-travel-portrait img'),
-      'the trigger shows the component image'
+      !row.querySelector('.manager-recipe-component-trigger'),
+      'the row opens no picker: it is the field'
     );
-    // §676: the name is INSIDE the clickable trigger — the whole image+name is one hit
-    // target that both says what the component is and opens the picker. It used to be
-    // loose text beside an image-only button, which made the obvious target inert.
-    const name = trigger.querySelector('.manager-recipe-component-name');
-    assert.ok(name, 'the component name renders inside the trigger button');
+    const chosen = row.querySelector('[data-recipe-option-chosen]');
+    assert.ok(chosen, 'the named row reads back as a chip');
+    const image = chosen.querySelector('.manager-recipe-option-chosen-img');
+    assert.ok(image, 'the chip carries the component image');
+    assert.equal(image.getAttribute('src'), 'icons/herb.webp', 'resolved from the component');
     assert.equal(
-      name.textContent.trim(),
+      chosen.querySelector('.manager-recipe-option-chosen-name').textContent.trim(),
       'Mountain Herb',
-      'the trigger name resolves the component name'
+      'and its name'
     );
-    assert.equal(
-      row.querySelector('.manager-recipe-option-component > .manager-recipe-component-name'),
-      null,
-      'no loose name is rendered beside the trigger'
-    );
-    // The image trigger carries the component name as a tooltip.
-    assert.equal(
-      trigger.getAttribute('title'),
-      'Mountain Herb',
-      'the image trigger has a name tooltip'
+    assert.equal(chosen.getAttribute('title'), 'Mountain Herb', 'with the name as a tooltip');
+    // And the field is not a search while it is named — the two faces are exclusive.
+    assert.ok(
+      !row.querySelector('[data-recipe-option-search]'),
+      'a named row shows no search field'
     );
     editHarness.remount();
   });
@@ -3580,10 +3607,21 @@ describe('RecipeEditView (mounted)', () => {
       'the box has no compact "or..." popover'
     );
     const buttons = [...adds.querySelectorAll('button[data-recipe-add]')];
+    // COMPONENT, TAG, ESSENCE, CURRENCY — the order `proto:4624`'s kind table uses and the
+    // order the row's own kind select offers, so the two controls that name the same four
+    // things cannot list them differently. The marker family is unchanged.
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('data-recipe-add')),
-      ['alternative-component', 'alternative-tag', 'alternative-cost', 'alternative-essence'],
+      ['alternative-component', 'alternative-tag', 'alternative-essence', 'alternative-cost'],
       'four dashed add-buttons in order, each keeping its marker'
+    );
+    // `alt component` rather than `Add component` (`proto:4692`): inside an `ANY ONE OF` group
+    // every one of these appends an ALTERNATIVE, and `Add component` beside `Add cost` reads as
+    // two different verbs for one act.
+    assert.deepEqual(
+      buttons.map((button) => button.textContent.trim()),
+      ['alt component', 'alt tag', 'alt essence', 'alt currency'],
+      'and each is worded as the alternative it appends'
     );
     for (const button of buttons) {
       assert.ok(button.classList.contains('is-dashed'), 'each add-button is dashed');
@@ -3678,8 +3716,8 @@ describe('RecipeEditView (mounted)', () => {
       [...listbox.querySelectorAll('[data-recipe-add]')].map((option) =>
         option.getAttribute('data-recipe-add')
       ),
-      ['alternative-component', 'alternative-tag', 'alternative-currency', 'alternative-essence'],
-      'all four kinds are flat OR alternatives, in order'
+      ['alternative-component', 'alternative-tag', 'alternative-essence', 'alternative-currency'],
+      'all four kinds are flat OR alternatives, in the kind order the row select uses'
     );
     editHarness.remount();
   });
@@ -3717,6 +3755,75 @@ describe('RecipeEditView (mounted)', () => {
       dialog.querySelector('input[type="text"]'),
       null,
       'the search-less row popover renders no search input'
+    );
+    editHarness.remount();
+  });
+
+  it('draws the "or..." menu the way the design does: a header, four one-word entries, four tints', async () => {
+    // WHAT SHIPPED, AND WHY IT WAS NEVER SEEN (issue 1373, maintainer round 8). No case in the
+    // View Lab registry opened this menu, so the only evidence for it was its own source. It
+    // rendered as a wide list of four full sentences - `Add alternative component`, `Add
+    // alternative tag requirement`, `Add essence`, `Add alternative cost` - with no header and
+    // no colour. Three of those four say `alternative`, one says `cost` where the row it
+    // authors says `currency`, and a fourth says neither.
+    //
+    // `proto:4682` takes the four labels STRAIGHT FROM `KINDMETA` (`proto:4624`), which is the
+    // same table the row's own kind select reads: `Component`, `Tag`, `Essence`, `Currency`.
+    // The verb lives once, in the header `proto:2293` draws above them (`Accept instead`), so
+    // no entry has to carry it - and the entries then read as the four KINDS they append,
+    // which is what the GM is choosing between.
+    //
+    // ASSERTED AGAINST THE ROW'S OWN SELECT rather than against a copied literal list. The
+    // menu and the select answer the same question about the same four kinds, and a guard that
+    // pinned four strings here would go green while the two surfaces drifted apart in wording.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const kindWords = [...target.querySelectorAll('[data-recipe-option-kind] option')].map(
+      (option) => option.textContent.trim()
+    );
+
+    await openOrMenu(target, 'grp-1');
+    const popover = document.querySelector('.manager-recipe-or-popover');
+    assert.ok(Boolean(popover), 'the "or..." menu is open');
+
+    // THE HEADER (`proto:2293`). It is what makes a one-word entry legible: without it the
+    // panel is four nouns with no verb anywhere on it.
+    const heading = popover.querySelector('[data-popover-header] .manager-travel-popover-title');
+    assert.ok(Boolean(heading), 'the panel carries the eyebrow that names what choosing does');
+    assert.equal(heading.textContent.trim(), 'Accept instead');
+
+    const entries = [...popover.querySelectorAll('[role="listbox"] [data-recipe-add]')];
+    assert.deepEqual(
+      entries.map((entry) => entry.querySelector('.manager-travel-option-name').textContent.trim()),
+      kindWords,
+      'every entry is the bare kind name the row select uses, in the same order'
+    );
+
+    // THE TINT, TAKEN FROM THE ROW'S OWN MARK rather than from a second table. The class the
+    // glyph carries IS `styles/fabricate.css`'s per-kind ink rule, so the menu cannot drift
+    // from the plate and the chosen chip beside it; `manager-layout.test.js` measures the four
+    // colours it resolves to in a real cascade.
+    const marks = entries.map((entry) => entry.querySelector('i').className);
+    for (const mark of marks) {
+      assert.ok(
+        mark.includes('manager-recipe-option-mark'),
+        `an entry glyph carries the row's own tinted-mark class (got \`${mark}\`)`
+      );
+    }
+    const tones = marks.map((mark) => mark.match(/\bis-[a-z]+\b/)?.[0] || '');
+    assert.deepEqual(
+      tones,
+      ['is-component', 'is-tag', 'is-essence', 'is-currency'],
+      'each entry is inked as its own kind, and the four are four different kinds'
     );
     editHarness.remount();
   });
@@ -3759,9 +3866,13 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends an ESSENCE OR alternative to the requirement (issue 649)', async () => {
-    // Essence is now a first-class ingredient match type, so choosing Essence from the
-    // flat "Accept instead" menu appends a real OR alternative to THIS requirement (seeded
-    // from the first system essence at amount 1) — it does NOT bubble to a per-set map.
+    // Essence is a first-class ingredient match type, so choosing Essence from the flat
+    // "Accept instead" menu appends a real OR alternative to THIS requirement — it does NOT
+    // bubble to a per-set map.
+    //
+    // UNSEEDED since issue 1373's maintainer round 5: the alternative used to arrive holding
+    // the first selectable essence so its amount field was usable at once, which authors a
+    // choice the GM did not make and the same one every time. The row's own field names it.
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       {
@@ -3783,8 +3894,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.deepEqual(
       set.ingredientGroups[0].options[1].match,
-      { type: 'essence', essenceId: 'ess-life', amount: 1 },
-      'the essence alternative is seeded from the first system essence at amount 1'
+      { type: 'essence', essenceId: '', amount: 1 },
+      'the essence alternative is born unnamed, at amount 1, for the row to name'
     );
     editHarness.remount();
   });
@@ -3837,20 +3948,37 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('changes a component alternative via its picker trigger', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, from `changes a component alternative via
+  // its picker trigger`. Re-naming a row is now clear-then-search rather than open-a-popover,
+  // which is two writes where there was one — so this drives BOTH, and the second half is the
+  // half the popover never had to prove.
+  it('re-names a component alternative by clearing it and searching again', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    target.querySelector('[data-recipe-option] .manager-recipe-component-trigger').click();
+    const row = target.querySelector('[data-recipe-option]');
+    row.querySelector('[data-recipe-option-clear]').click();
     await flushRender();
-    const options = [...document.querySelectorAll('.manager-travel-option')];
-    assert.equal(options.length, 2, 'the popover lists both components');
-    options.find((option) => /Pure Water/.test(option.textContent)).click();
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.componentId,
+      null,
+      'clearing empties the row'
+    );
+
+    // The parent owns recipe state in production, so mount the cleared row to search it.
+    const { target: cleared, patches: next } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: null } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    const field = cleared.querySelector('[data-recipe-option] [data-recipe-option-search]');
+    field.value = 'Water';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await flushRender();
-    assert.equal(patches.length, 1, 'choosing a component patches the recipe');
+    cleared.querySelector('[data-recipe-option-suggestion]').click();
+    await flushRender();
     assert.deepEqual(
-      patches[0].ingredientSets[0].ingredientGroups[0].options[0].match,
+      next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
       { type: 'component', componentId: 'cmp-water' },
       'the alternative records the newly chosen component id'
     );
@@ -3922,53 +4050,70 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('lays out the tag match with Any/All first and the tags in a bordered area (No tags set when empty)', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, from `lays out the tag match with Any/All
+  // first and the tags in a bordered area (No tags set when empty)`. The shape it pinned IS the
+  // defect the design names: a second full-width line carrying the toggle, an `Add tag`
+  // dropdown and a bordered box that said `No tags set` in a dashed frame the size of the row.
+  // `proto:2252`-`2268` reads `Any of [chips] [+ Tag] … [Any of|All of]`, on the row.
+  it('reads the tag row as a sentence: the policy word, the tags, then + Tag', async () => {
     const { target: tagTarget } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'all' } }],
       { props: { itemTags: ITEM_TAGS } }
     );
     const option = tagTarget.querySelector('[data-recipe-option]');
-    // The controls row leads with the Any/All toggle, then the Add tag control.
-    // Ordering asserted over the rendered NODES rather than an innerHTML substring
-    // scan: the toggle is now the shared SegmentedControl, whose track class is not
-    // recipe-specific, so a substring search would be ambiguous.
-    const controls = option.querySelector('.manager-recipe-option-tags-controls');
-    const kids = [...controls.children];
+    const tagArm = option.querySelector('[data-recipe-option-tags]');
+    assert.ok(tagArm, 'the tag arm renders on the row');
+    // Ordering asserted over the rendered NODES rather than an innerHTML substring scan: the
+    // chips are the shared Chip primitive and `+ Tag` a SearchablePopover trigger, so neither
+    // carries a class a substring search could anchor on unambiguously.
+    const kids = [...tagArm.children];
     const has = (node, selector) => node.matches(selector) || Boolean(node.querySelector(selector));
-    const toggleAt = kids.findIndex((node) => has(node, '[data-recipe-tag-match]'));
-    const triggerAt = kids.findIndex((node) => has(node, '.manager-recipe-tag-trigger'));
+    const policyAt = kids.findIndex((node) => has(node, '[data-recipe-tag-policy]'));
+    const chipAt = kids.findIndex((node) => has(node, '[data-recipe-tag="herbal"]'));
+    const addAt = kids.findIndex((node) => has(node, '[data-recipe-add-tag]'));
     assert.ok(
-      toggleAt !== -1 && triggerAt !== -1 && toggleAt < triggerAt,
-      'the Any/All toggle precedes the Add tag control'
+      policyAt === 0 && policyAt < chipAt && chipAt < addAt,
+      `policy word, then chips, then + Tag (${policyAt}/${chipAt}/${addAt})`
     );
-    // The tags live in their own bordered area below; empty shows "No tags set".
-    const list = option.querySelector('[data-recipe-tags-list]');
-    assert.ok(list, 'the tags render in their own bordered area');
     assert.equal(
-      list.querySelector('.manager-recipe-tag-chips'),
-      null,
-      'no chip list renders when empty'
+      tagArm.querySelector('[data-recipe-tag-policy]').textContent.trim(),
+      'All of',
+      'the policy word is the sentence the Any of / All of control writes'
     );
-    const empty = list.querySelector('[data-recipe-tags-empty]');
-    assert.ok(empty, 'an empty tag requirement shows the empty-state marker');
-    assert.equal(empty.textContent.trim(), 'No tags set', 'the empty state reads "No tags set"');
+    // And the control that writes it is the row's next sibling, not a second line's.
+    assert.ok(
+      option.querySelector('[data-recipe-tag-match="all"]').classList.contains('is-active'),
+      'the Any of / All of control reads back the same answer'
+    );
     editHarness.remount();
   });
 
-  it('renders chosen tags as chips inside the bordered area with no empty state', async () => {
+  // REWRITTEN alongside the test above, from `renders chosen tags as chips inside the bordered
+  // area with no empty state`. There is no bordered area and no empty state: an unfilled tag row
+  // already says `Any of` with nothing after it, which is the emptiness stated once.
+  it('renders chosen tags as chips on the row, and no empty state when there are none', async () => {
     const { target: tagTarget } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } }],
       { props: { itemTags: ITEM_TAGS } }
     );
-    const list = tagTarget.querySelector('[data-recipe-option] [data-recipe-tags-list]');
+    const arm = tagTarget.querySelector('[data-recipe-option] [data-recipe-option-tags]');
     assert.ok(
-      list.querySelector('[data-recipe-tag="herbal"]'),
-      'the chosen tag renders as a chip inside the bordered area'
+      arm.querySelector('[data-recipe-tag="herbal"]'),
+      'the chosen tag renders as a chip on the row'
     );
-    assert.equal(
-      list.querySelector('[data-recipe-tags-empty]'),
-      null,
-      'no empty state when tags are set'
+
+    const { target: emptyTarget } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      { props: { itemTags: ITEM_TAGS } }
+    );
+    const emptyRow = emptyTarget.querySelector('[data-recipe-option]');
+    assert.ok(
+      !emptyRow.querySelector('[data-recipe-tags-empty]'),
+      'an empty tag row states no empty state of its own'
+    );
+    assert.ok(
+      !emptyRow.querySelector('[data-recipe-tags-list]'),
+      'and there is no bordered area for it to sit in'
     );
     editHarness.remount();
   });
@@ -3985,8 +4130,8 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(groups[0].id, 'the appended requirement carries an eager id');
     assert.deepEqual(
       groups[0].options[0].match,
-      { type: 'currency', unit: 'gp', amount: 1 },
-      'the currency requirement starts with the first unit and amount 1'
+      { type: 'currency', unit: '', amount: 1 },
+      'the currency requirement is born unnamed, at amount 1, for the row to name its unit'
     );
     editHarness.remount();
   });
@@ -4002,8 +4147,8 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(options.length, 2, 'the alternative list grew by one');
     assert.deepEqual(
       options[1].match,
-      { type: 'currency', unit: 'gp', amount: 1 },
-      'the new alternative is a currency match'
+      { type: 'currency', unit: '', amount: 1 },
+      'the new alternative is an unnamed currency match'
     );
     editHarness.remount();
   });
@@ -4013,14 +4158,18 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }],
       { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
     );
-    // The currency option's editor is now just its unit picker; the amount moved out to
-    // the shared end-of-row Stepper (issue 676).
+    // The currency option names its unit through the SAME field every other kind uses
+    // (issue 1373, maintainer round 5); the amount is the shared end-of-row Stepper (676).
     const currency = target.querySelector('[data-recipe-option-currency]');
-    assert.ok(currency, 'the currency option renders its editor');
-    assert.equal(
-      currency.querySelector('[data-recipe-currency-amount]'),
-      null,
+    assert.ok(currency, 'the currency option renders its name field');
+    assert.ok(
+      !currency.querySelector('[data-recipe-currency-amount]'),
       'the bare amount input no longer opens the currency row'
+    );
+    assert.match(
+      currency.querySelector('[data-recipe-option-chosen]').textContent,
+      /Gold/,
+      'and reads its unit back on the chosen chip'
     );
     // Still no `data-recipe-option-quantity`: a currency row's count lives on the MATCH
     // (`match.amount`), not on `option.quantity`.
@@ -4047,14 +4196,20 @@ describe('RecipeEditView (mounted)', () => {
       'editing the amount records it on the currency match (keeping the unit)'
     );
 
-    // Open the unit picker and choose Silver.
-    await pickPopoverOption(
-      target,
-      '[data-recipe-currency-unit] .manager-recipe-currency-trigger',
-      /Silver/
+    // Clear the unit and search for Silver. Mounted unnamed, because the parent owns recipe
+    // state in production and the clear above emits a patch rather than re-rendering this tree.
+    const { target: unnamed, patches: next } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'currency', unit: '', amount: 100 } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
     );
+    const field = unnamed.querySelector('[data-recipe-option] [data-recipe-option-search]');
+    field.value = 'Silver';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    unnamed.querySelector('[data-recipe-option-suggestion]').click();
+    await flushRender();
     assert.deepEqual(
-      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
+      next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
       { type: 'currency', unit: 'sp', amount: 100 },
       'choosing a unit records it (keeping the prop amount)'
     );
@@ -4191,6 +4346,162 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // KIND FIRST, THEN VALUE (issue 1373, maintainer round 5).
+  //
+  // The row used to be created BY a value: the set-level `Add component` opened a popover, the
+  // GM picked a component, and the row arrived with its kind already fixed and unchangeable.
+  // The design (`proto:2248`) and the premium downtime rewards picker both create the row from
+  // its KIND alone and let the value be set — and re-set, and re-typed — inside the row. These
+  // guards pin that order, because it is the half a markup read cannot see.
+  it('creates a row with a kind and NO value from the set-level adder', async () => {
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'the adder patches the recipe directly, with no popover');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'a requirement is appended to the set');
+    assert.deepEqual(
+      groups[0].options[0].match,
+      { type: 'component', componentId: null },
+      'the row is born with its KIND and no value for the row itself to name'
+    );
+    editHarness.remount();
+  });
+
+  it('retypes an existing row through its kind select, clearing the old value', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    const kind = target.querySelector('[data-recipe-option] select[data-recipe-option-kind]');
+    assert.ok(kind, 'every row carries a real <select> for its kind');
+    assert.equal(kind.value, 'component', 'it reads back the row current kind');
+    kind.value = 'tags';
+    kind.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.length, 1, 'changing the kind patches the recipe');
+    assert.deepEqual(
+      patches[0].ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'tags', tags: [], tagMatch: 'any' },
+      'the row becomes an empty row of the new kind rather than keeping a stale component id'
+    );
+    editHarness.remount();
+  });
+
+  // BLUR COMMITS NOTHING; ENTER COMMITS. Premium's `commitTyped` docblock records the defect
+  // this is the guard for: an `onchange` fires on a text input when it LOSES FOCUS, so clicking
+  // a suggestion committed the raw query and unmounted the suggestion before its own click ran.
+  it('commits a typed search on Enter and never on blur', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: null } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    const field = target.querySelector('[data-recipe-option] input[data-recipe-option-search]');
+    assert.ok(field, 'an unnamed row searches inline rather than behind a popover');
+    field.value = 'Pure';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    // BOTH EVENTS, and `change` is the load-bearing one. The DOM fires `change` on a text
+    // input when it LOSES FOCUS, which is how premium's `onchange` came to commit on blur at
+    // all — so dispatching `blur` alone proves nothing here: happy-dom does not synthesise the
+    // follow-on `change`, and a re-added `onchange` handler passes a blur-only guard.
+    field.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
+    await flushRender();
+    field.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.length, 0, 'losing focus commits NOTHING');
+    field.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
+    await flushRender();
+    assert.equal(patches.length, 1, 'Enter commits');
+    assert.deepEqual(
+      patches[0].ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'component', componentId: 'cmp-water' },
+      'and commits the catalogue entry the query names'
+    );
+    editHarness.remount();
+  });
+
+  it('renders the suggestions BENEATH the field, and picking one names the row', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: null } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    const row = target.querySelector('[data-recipe-option]');
+    const field = row.querySelector('input[data-recipe-option-search]');
+    field.value = 'Pure';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    const suggestions = [...row.querySelectorAll('[data-recipe-option-suggestion]')];
+    assert.equal(suggestions.length, 1, 'the list narrows to the query, in the row itself');
+    suggestions[0].click();
+    await flushRender();
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.componentId,
+      'cmp-water',
+      'clicking a suggestion names the row'
+    );
+    editHarness.remount();
+  });
+
+  it('names a chosen row with a chip carrying a real clear button', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    const row = target.querySelector('[data-recipe-option]');
+    const chosen = row.querySelector('[data-recipe-option-chosen]');
+    assert.ok(chosen, 'a named row reads back as a chip');
+    assert.match(chosen.textContent, /Mountain Herb/);
+    const clear = chosen.querySelector('button[data-recipe-option-clear]');
+    assert.ok(clear, 'the clear affordance is a real button, not a clickable span');
+    clear.click();
+    await flushRender();
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.componentId,
+      null,
+      'clearing returns the row to its search face'
+    );
+    editHarness.remount();
+  });
+
+  // ONE LINE (`proto:2251`-`2258`). The tag row broke onto a second full-width line carrying an
+  // `Any|All` segmented control, an `Add tag` dropdown and a large dashed `No tags set` box. The
+  // design draws the policy word, the chips, `+ Tag` and the Any of / All of control on the row.
+  it('draws the tag row on ONE line, with no empty-state box below it', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      { props: { itemTags: ITEM_TAGS } }
+    );
+    const row = target.querySelector('[data-recipe-option]');
+    // `assert.ok(!node)` rather than `assert.equal(node, null)`: on failure `node:assert`
+    // serialises the actual value to build its diff and walks a mounted happy-dom element's
+    // circular tree until the heap dies, so the assertion surfaces as an unattributed OOM.
+    assert.ok(
+      !row.querySelector('[data-recipe-tags-empty]'),
+      'the dashed No tags set box is gone'
+    );
+    assert.ok(
+      !row.querySelector('.manager-recipe-option-tags-detail'),
+      'and so is the full-width second line it sat on'
+    );
+    assert.ok(
+      row.querySelector('[data-recipe-tag-policy]'),
+      'the policy word leads the tag list, as the sentence the row reads'
+    );
+    assert.ok(row.querySelector('[data-recipe-add-tag]'), 'the + Tag control is on the row');
+    assert.ok(
+      row.querySelector('[data-recipe-tag-match="all"]'),
+      'and so is the Any of / All of control'
+    );
+    editHarness.remount();
+  });
+
   it('removing the last alternative drops the whole requirement from the set', async () => {
     const { target, patches } = await mountIngredientGroups(
       [
@@ -4246,14 +4557,33 @@ describe('RecipeEditView (mounted)', () => {
   // nothing passes the positive half of all three.
   // ---------------------------------------------------------------------------
 
-  // `ess-life` disabled, `ess-water` enabled. Declaration order matters: the disabled one
-  // is FIRST, which is what makes the `firstEssence` default selection provable.
+  // `ess-life` disabled, `ess-water` enabled. Declaration order matters: the disabled one is
+  // FIRST, so a filter that simply took the head of the list would be visibly wrong.
   const MIXED_ESSENCE_OPTIONS = Object.freeze([
     Object.freeze({ id: 'ess-life', name: 'Life', icon: 'fas fa-heart', enabled: false }),
     Object.freeze({ id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true }),
   ]);
 
-  it('1036/18: the alternative-essence default selection SKIPS a disabled essence', async () => {
+  // WHAT A ROW'S OWN NAME FIELD IS OFFERING. Since issue 1373's maintainer round 5 the essence
+  // OFFER is the row's inline suggestion list rather than an adder's popover, so every 1036
+  // assertion below reads it here. `e` is the query because it is in both `Life` and `Water`:
+  // a query that matched only one of them would prove the search rather than the filter.
+  async function offeredIn(row, query = 'e') {
+    const field = row.querySelector('[data-recipe-option-search]');
+    field.value = query;
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    return [...row.querySelectorAll('[data-recipe-option-suggestion]')].map((suggestion) =>
+      suggestion.textContent.trim()
+    );
+  }
+
+  // REWRITTEN at issue 1373's maintainer round 5, from `the alternative-essence default
+  // selection SKIPS a disabled essence`. The alternative adder no longer SELECTS anything, so
+  // there is no default to skip; what has to withhold a disabled essence is the row's own
+  // field, which is where an essence is chosen now. The end-to-end path is the assertion: add
+  // an alternative from the box footer, then read what the row it created offers.
+  it('1036/18: the row an essence alternative creates withholds a disabled essence', async () => {
     const { target, patches } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4266,52 +4596,62 @@ describe('RecipeEditView (mounted)', () => {
       .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
       .click();
     await flushRender();
-
     const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
-    // Without the filter this would author a requirement on a DISABLED essence, which the
-    // activation validator then refuses — the recipe would be born unenableable.
-    assert.equal(options.at(-1).match.essenceId, 'ess-water');
+    assert.equal(options.at(-1).match.essenceId, '', 'the alternative names no essence at all');
+
+    // The parent owns recipe state in production, so mount the row the adder described.
+    const { target: added } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+    const offered = await offeredIn(added.querySelector('[data-recipe-option]'));
+    // Without the filter a GM could name a DISABLED essence here, which the activation
+    // validator then refuses — the recipe would be authored unenableable.
+    assert.deepEqual(offered, ['Water'], 'only the enabled essence is offered');
     editHarness.remount();
   });
 
-  it('1036/18 negative control: with both enabled, the default is the FIRST essence', async () => {
-    const { target, patches } = await mountSingleGroup(
-      [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
-      ],
-      { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: ESSENCE_OPTIONS } }
+  it('1036/18 negative control: with both enabled, BOTH are offered', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } }],
+      { props: { essenceOptions: ESSENCE_OPTIONS } }
     );
-
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
-      .click();
-    await flushRender();
-
-    // `ess-life` is first in `ESSENCE_OPTIONS` too, so this proves the test above measured
-    // the FILTER rather than an unrelated change of ordering.
-    assert.equal(
-      patches.at(-1).ingredientSets[0].ingredientGroups[0].options.at(-1).match.essenceId,
-      'ess-life'
+    // `ess-life` leads both rosters, so this proves the test above measured the FILTER rather
+    // than an unrelated change of ordering or a query that simply matched one name.
+    assert.deepEqual(
+      await offeredIn(target.querySelector('[data-recipe-option]')),
+      ['Life', 'Water'],
+      'the filter is not simply emptying the list'
     );
     editHarness.remount();
   });
 
-  it('1036/18: the set-level essence picker withholds a disabled essence, and offers an enabled one', async () => {
-    const { target } = await mountIngredientGroups([], {
+  // REWRITTEN from `the set-level essence picker withholds a disabled essence, and offers an
+  // enabled one`. The set-level adder is not a picker any more, so the same claim is made about
+  // the row it creates — end to end, from the button the GM presses.
+  it('1036/18: the set-level essence adder creates a row that withholds a disabled essence', async () => {
+    const { target, patches } = await mountIngredientGroups([], {
       props: { essenceOptions: MIXED_ESSENCE_OPTIONS },
     });
-    target.querySelector('[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger').click();
+    target
+      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
+      .click();
     await flushRender();
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.essenceId,
+      '',
+      'the requirement names no essence'
+    );
 
-    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
-      option.textContent.trim()
+    const { target: added } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
-    assert.ok(
-      offered.some((label) => /Water/.test(label)),
-      'negative control: the ENABLED essence IS offered, so the picker is not simply empty'
+    assert.deepEqual(
+      await offeredIn(added.querySelector('[data-recipe-option]')),
+      ['Water'],
+      'and the row it created withholds the disabled one'
     );
-    assert.ok(!offered.some((label) => /Life/.test(label)), 'the disabled essence is withheld');
     editHarness.remount();
   });
 
@@ -4323,11 +4663,17 @@ describe('RecipeEditView (mounted)', () => {
 
     // The PROP boundary: `RecipeIngredientOption` resolves its display through the
     // unfiltered `essenceOptions`, so an authored requirement on a disabled essence reads
-    // back by NAME. Filtering the prop would render it as an unresolved "Pick essence".
-    const trigger = target.querySelector(
-      '[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger'
+    // back by NAME on its chip. Filtering the prop would leave the row on its empty search
+    // face, showing a GM a blank field where their own authored requirement used to be.
+    const chosen = target.querySelector(
+      '[data-recipe-group-id="grp-1"] [data-recipe-option-chosen]'
     );
-    assert.match(trigger.textContent, /Life/, 'the authored disabled essence still names itself');
+    assert.match(chosen.textContent, /Life/, 'the authored disabled essence still names itself');
+    // And the kind select still says what the row IS, though `Essence` would be offered anyway.
+    assert.equal(
+      target.querySelector('[data-recipe-option] [data-recipe-option-kind]').value,
+      'essence'
+    );
 
     // And it is still CLEARABLE: the option can be removed outright.
     target
@@ -4338,23 +4684,18 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('1036/18: the per-option picker withholds a disabled essence unless it is the CURRENT choice', async () => {
+  // REWRITTEN from `the per-option picker withholds a disabled essence unless it is the CURRENT
+  // choice`. Same claim, read off the inline field instead of a popover — and the retained arm
+  // is now visible in one place rather than two, because clearing a row is what puts its own
+  // current choice back into the list it is searching.
+  it('1036/18: the row field withholds a disabled essence unless it is the CURRENT choice', async () => {
     const { target } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-water', amount: 1 } }],
+      [{ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } }],
       { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
-    target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger').click();
-    await flushRender();
-
-    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
-      option.textContent.trim()
-    );
-    assert.ok(
-      offered.some((label) => /Water/.test(label)),
-      'negative control: the enabled essence IS offered'
-    );
-    assert.ok(
-      !offered.some((label) => /Life/.test(label)),
+    assert.deepEqual(
+      await offeredIn(target.querySelector('[data-recipe-option]')),
+      ['Water'],
       'a disabled essence that is NOT the current choice is withheld'
     );
     editHarness.remount();
@@ -4380,18 +4721,17 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('adds a set-level essence requirement as a single-option essence GROUP (issue 649)', async () => {
-    // The retained set-level "Add essence requirement" control now appends a
-    // single-option essence GROUP (an AND-required requirement preserving the old
-    // per-set semantics), NOT a per-set essences map entry.
+    // The set-level `Add essence` control appends a single-option essence GROUP — an
+    // AND-required requirement preserving the old per-set semantics — NOT a per-set essences
+    // map entry. Since issue 1373's maintainer round 5 it names no essence: the row does.
     const { target, patches } = await mountIngredientGroups([], {
       props: { essenceOptions: ESSENCE_OPTIONS },
     });
-    await pickPopoverOption(
-      target,
-      '[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger',
-      /Life/
-    );
-    assert.equal(patches.length, 1, 'choosing an essence patches the recipe');
+    target
+      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
+      .click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'the adder patches the recipe');
     const set = patches[0].ingredientSets[0];
     assert.equal(set.essences, undefined, 'no per-set essences map is written');
     assert.equal(set.ingredientGroups.length, 1, 'a single essence group is appended');
@@ -4399,8 +4739,8 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(set.ingredientGroups[0].options.length, 1, 'the group has one essence option');
     assert.deepEqual(
       set.ingredientGroups[0].options[0].match,
-      { type: 'essence', essenceId: 'ess-life', amount: 1 },
-      'the chosen essence is seeded at amount 1'
+      { type: 'essence', essenceId: '', amount: 1 },
+      'born unnamed, at amount 1'
     );
     editHarness.remount();
   });

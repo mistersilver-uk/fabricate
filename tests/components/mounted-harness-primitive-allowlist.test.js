@@ -43,7 +43,7 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/Callout.svelte',
   // The manager's ONE selection control and ONE essence quantity card (issue 772), and the
   // shared editable-input stepper the card is built on. All three sit in two or more mounted
-  // trees already: `ChecklistCardRow` renders the checkbox for the Tool Studio while the
+  // trees already: the Tool Studio's prerequisite row trails the checkbox while the
   // component browser's multi-select renders it a second way, and the card is rendered by
   // both the component editor and the browser's bulk-edit rail. They could not be listed here
   // before the `named` detection below was narrowed — a bare substring match produced false
@@ -148,6 +148,19 @@ const SHARED_PRIMITIVES = [
   // in the static graph of nearly every manager editor tree, so the next screen that grows a
   // field cancels its suite on an omission here rather than failing it.
   'src/ui/svelte/components/Field.svelte',
+  // The scoped-entity list composition and the world-catalogue shell over it (issue 1380).
+  // `EntityListInspectorFrame` is the sharpest entry since `Chip`: SIX screens across four
+  // lanes of epic 1357 compose it, so every lane that lands drops it into another mounted
+  // tree, and each omission costs a HUNG suite rather than a failing one.
+  //
+  // `EntityRulesListShell` is deliberately NOT here yet, and that is the guard below working
+  // rather than an oversight: nothing renders it, so it is reachable from no declared
+  // application root and adding it would red the reachability assertion. `RowDisclosure`
+  // came off this list for exactly that reason at issue 1096's parity round, and the note
+  // there records that it goes back on the moment something renders it. Same rule: the lane
+  // whose screen composes the rules-list shell adds it in that change.
+  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   // THE manager's filter bar and its search field (issue 1039). The pair reaches every browse
   // screen in the manager — systems, recipes, components, essences, environments, gathering
   // tasks and events, realms, books-and-scrolls, access and both world scoped-entity lists —

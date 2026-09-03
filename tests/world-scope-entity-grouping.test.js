@@ -500,15 +500,37 @@ test('every membership record is created with EVERY SECTION OVERRIDDEN and its v
       enabled: true,
       breakage: { mode: 'limitedUses', maxUses: 2 },
       onBreak: { mode: 'destroy' },
+      prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '@prof' },
       repairRequirements: [{ id: 'rr', options: [] }],
     },
     'tools',
     't1',
     'sys-a'
   );
-  assert.deepEqual(toolRecord.inherit, { breakage: false, onBreak: false });
+  // FOUR SECTIONS SINCE `1.31.0` (issue 1373): `prerequisites` and `bonus` are world defaults a
+  // system inherits and may override, so a record created by this pass overrides them too.
+  assert.deepEqual(toolRecord.inherit, {
+    breakage: false,
+    onBreak: false,
+    prerequisites: false,
+    bonus: false,
+  });
   assert.deepEqual(toolRecord.breakage, { mode: 'limitedUses', maxUses: 2 });
+  assert.deepEqual(toolRecord.prerequisites, {
+    enabled: true,
+    ids: ['trained'],
+    gateMode: 'usability',
+  });
+  assert.deepEqual(toolRecord.bonus, { enabled: true, expression: '@prof' });
   assert.deepEqual(toolRecord.repairRequirements, [{ id: 'rr', options: [] }]);
+
+  // AND AN UNAUTHORED PAIR IS WRITTEN AS THE CANONICAL EMPTY, never left absent: an absent
+  // SECTION under an `inherit: false` switch falls back to the WORLD value by design, so
+  // skipping it is the one answer that would change a member's behaviour.
+  const bareTool = buildMembershipRecord({ id: 't2' }, 'tools', 't2', 'sys-a');
+  assert.deepEqual(bareTool.prerequisites, { enabled: false, ids: [], gateMode: 'usability' });
+  assert.deepEqual(bareTool.bonus, { enabled: false, expression: '' });
 });
 
 test('macro and effectSource are written UNCONDITIONALLY, so neither can fall back', async () => {

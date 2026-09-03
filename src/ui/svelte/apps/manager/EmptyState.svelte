@@ -40,6 +40,13 @@
      the PLAYER app's own empties (`salvage-empty`, `alchemy-*-empty`,
      `inventory-detail-empty-note`) are still a different area shell and are NOT this
      variant's remit, as the note at the foot of this block says of the primitive at large.
+   - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
+     corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
+     the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
+     the box, and a bordered card inside a 240px picker panel is the shape the design does not
+     draw (`proto:2262` is `padding:7px; font:500 10px var(--sans); color:var(--subtle)` and
+     nothing else). `SearchablePopover` is its consumer, which is every picker in the manager
+     and the player window's actor bar.
    - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
      "your filters match nothing", which is not an absence of content and deliberately
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
@@ -64,6 +71,7 @@
     hint = '',
     compact = false,
     inline = false,
+    note = false,
     filtered = false,
     contextClass = '',
     dataAttr = '',
@@ -80,6 +88,7 @@
   class="manager-empty {contextClass}"
   class:is-compact={compact}
   class:is-inline={inline}
+  class:is-note={note}
   class:is-filtered={filtered}
   {...hookAttributes}
 >
@@ -246,16 +255,94 @@
     font-size: 11.5px;
   }
 
+  /* ── THE POPOVER NOTE (issue 1373) ────────────────────────────────────────────────────
+     The one variant that releases the PANEL. Every other member of this family — base,
+     `is-compact`, `is-inline`, `is-filtered` — keeps the dashed box, because each of them
+     answers for a region of a screen and a box is what marks the region out. A picker's
+     popover is not a region: it is already a bordered, shadowed panel 228-340px wide, and a
+     second bordered box drawn inside it reads as a card the GM might be able to act on.
+     `proto:2262` states it as one line and nothing else, and `proto:2281` states the sibling
+     popover's the same way.
+
+     Written AFTER `.is-inline` so a caller that set both still gets the released panel, and
+     the tile is released the way `is-inline` releases it rather than resized — a third tile
+     size is exactly what that variant's own comment refuses.
+
+     26px had no step on the spacing scale and took 24; 7px has none either and takes
+     `--fab-space-chip`. */
+  .manager-empty.is-note {
+    place-items: start;
+    padding: var(--fab-space-chip);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    text-align: left;
+  }
+
+  .manager-empty.is-note > div {
+    align-items: flex-start;
+    gap: var(--fab-space-2xs);
+  }
+
+  .manager-empty.is-note > div > i {
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    background: none;
+    font-size: 10px;
+  }
+
+  /* The line itself, at the popover's scale rather than the panel family's. `proto:2262` is
+     `500 10px var(--sans)` in the subtle tone: a sentence in the list's own voice, quieter
+     than the rows it stands in for. The serif face the hero title carries is deliberately
+     dropped — a serif heading is the loudest thing in a 228px panel. */
+  .manager-empty.is-note h3 {
+    color: var(--fab-text-subtle);
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* The optional second line — the travel-actor picker names a module setting here — kept at
+     the same quiet scale so a two-line note is one voice rather than a heading over a body. */
+  .manager-empty.is-note p {
+    max-width: none;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
   /*
     Filtered to nothing is not an error and does not want the full empty-panel apparatus
     (a 46px icon, an <h3>, a paragraph). One dashed panel says it in a sentence, and the
     Clear-filters button — which the prototype has no equivalent of, and which is kept —
     is the way out of it.
+
+    ── THE FIGURES ARE THE REFERENCE'S NOW (issue 1373) ────────────────────────────────
+    `proto:2545` states this state exactly, and it is the only design source there is for
+    it: `padding: 26px; text-align: center; border: 1px dashed var(--border);
+    border-radius: 10px; font: 400 11.5px var(--sans); color: var(--disabled)`.
+
+    What this variant shipped agreed with none of it — a 40px inset, the STRONGER border
+    colour, the base panel's 12px corner and 1.5px edge, and a 12.8px sentence — so the
+    "quieter" panel was in fact both larger and higher-contrast than the reference's, and
+    on the one screen whose reference frame we hold it was drawn at nearly twice the
+    height. The values are corrected on the VARIANT rather than route-scoped for the
+    reason `contextClass` gives two blocks up: appearance belongs to this file, and a
+    layered global rule could not reach an unlayered scoped block in any case. Every
+    caller of `filtered` gets the reference's own treatment, which is the point of a
+    shared variant.
+
+    26px has no step on the 4px spacing scale and takes the nearest, 24.
   */
   .manager-empty.is-filtered {
     align-content: center;
-    padding: 40px;
-    border-color: var(--fab-border-strong);
+    padding: var(--fab-space-6);
+    border-width: 1px;
+    border-color: var(--fab-border);
+    border-radius: 10px;
+    color: var(--fab-text-disabled);
   }
 
   .manager-empty.is-filtered > div {
@@ -263,6 +350,8 @@
   }
 
   .manager-empty.is-filtered p {
-    font-size: 0.8rem;
+    color: var(--fab-text-disabled);
+    font-size: 11.5px;
+    font-weight: 400;
   }
 </style>

@@ -37,7 +37,8 @@ The Tool Studio has no browse button or blank Tool shortcut.
 
 Fabricate records the linked Item's name, image, and description when you create or relink the Tool.
 Later changes to the source Item do not refresh that stored display automatically.
-Open **Overview** and drop another Item onto the linked source card when you want a new source and a fresh display snapshot.
+Open the Tool's entry in the world **Tools Catalogue** and drop another Item onto its linked source card when you want a new source and a fresh display snapshot.
+A crafting system's Tool rules editor cannot change which Item a Tool is.
 
 A **Display label** overrides the stored source name in Fabricate without changing the Item.
 The source name and description are read-only in the Tool Studio.
@@ -45,24 +46,26 @@ Unlinking the Item preserves the draft, but the Tool cannot be saved until it ha
 
 ## Edit a Tool
 
-The editor has four tabs:
+The editor has three tabs:
 
-- **Overview** controls the linked Item, display label, and enabled state.
-- **Breakage** controls wear, check-driven immunity, on-break behavior, replacement, and repair materials.
+- **Breakage** controls whether this system is enabled for the Tool, its display label here, wear, check-driven immunity, on-break behavior, replacement, and repair materials.
 - **Requirements** controls shared character prerequisites and the Tool check bonus.
 - **Validation** lists every issue that blocks saving.
 
-{% include screenshot.html case="manager-tool-parity-02-overview-1280x720" caption="The overview tab of the Tool editor." %}
+A Tool's identity — the linked Item, its art and its description — is not editable here.
+It belongs to the world Tool, which the header's **World Tool** button opens.
+
+Each behavior section states whether this system **inherits** the world Tool's answer or **overrides** it, and the switch at the card's right edge moves between the two.
+While a section inherits, the card shows the world value and the controls are not offered; turning the switch off opens them on that value.
 
 The behavior preview summarizes the draft while you work.
-Its **How Tools work in Fabricate** card remains available on every tab.
 The **Unsaved** state appears after a change.
 Leaving the editor with unsaved changes offers **Save**, **Discard**, and **Keep editing**.
 
-Choose **Save Tool** when the Tool is ready.
+Choose **Save rules** when the Tool's rules are ready.
 An invalid or failed save keeps the editor open and moves attention to **Validation**.
 Validation and operation failures use safe descriptions instead of technical error details.
-Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
+Changing **Enabled in <system>** takes effect immediately and does not stage the other editor changes.
 
 Because the library is a draft-and-save surface, your edits are held until you save, leaving with unsaved edits prompts before discarding, and a notice appears if someone else changed the Tool list while you were editing it.
 

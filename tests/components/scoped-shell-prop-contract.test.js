@@ -66,7 +66,26 @@ const CATALOGUE_PROPS = [
   // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
   // shells, so the difference clause below is unchanged: one composition, configured per scope.
   'browserState',
+  // ── THE THREE ISSUE 1373 FEEDBACK-ROUND SEAMS ───────────────────────────────────────────────
+  // `columnLead` puts a scope-wide card ABOVE the toolbar and INSIDE the list column, which is
+  // the only placement that leaves the inspector running the whole route's height: the world Tool
+  // catalogue drew its breakage card as a sibling of this shell, so the band spanned the
+  // inspector's track too and the panel started a card's height below the app header bar.
+  // `restingTitle` and `restingHint` replace a generic `Nothing selected` over the page SUBTITLE
+  // — the sentence the header already prints — with the lane's own verb.
+  //
+  // All three default to what shipped, so the component and essence catalogues are untouched.
+  'columnLead',
   'countUnit',
+  // ── THE FIVE ROW-AND-INSPECTOR PARITY SWITCHES ISSUE 1373 ADDED ─────────────────────────────
+  // Every one is OPT-IN and defaults to what the component and essence catalogues already
+  // rendered, which is the property that let the tool catalogue reach the design without moving
+  // either of them: `describeEntry` (the linked source's description, as the second rung of a
+  // row's), `openEntryLabel` (the design's bordered `Edit tool` in place of a bare pen),
+  // `rowSecondLine` (chips under the name instead of a description), `rowTrailing` (the row's
+  // interactive trailing content, which `rowSecondLine: 'meta'` cannot hold because it renders
+  // inside a `<button>`) and `systemRowAction` (navigate-only inspector system rows).
+  'describeEntry',
   'emptyHint',
   'emptyTitle',
   'extraCards',
@@ -77,11 +96,24 @@ const CATALOGUE_PROPS = [
   'inspectorCaption',
   'inspectorFoot',
   'inspectorKicker',
+  // THE LIST'S OWN TWO SEAMS (issue 1373's parity round), both opt-in and both defaulting to
+  // exactly what the component and essence catalogues render: `listLead` puts a lane's
+  // create-from-drop zone at the HEAD OF THE LIST, where the design draws it, instead of in a
+  // band above the toolbar; `nameEntry` gives a lane a rung under the entity's own `name`, which
+  // the Tool catalogue needs because a Tool's display label is optional and a blank falls back to
+  // the linked Item.
+  'listLead',
   'membershipFilter',
+  'nameEntry',
   'onOpenEntry',
   'onOpenSystemRules',
   'onSelect',
+  'openEntryLabel',
+  'restingHint',
+  'restingTitle',
   'rowMeta',
+  'rowSecondLine',
+  'rowTrailing',
   'scope',
   'searchOf',
   'searchPlaceholder',
@@ -92,6 +124,7 @@ const CATALOGUE_PROPS = [
   'selectedId',
   'sorts',
   'subtitle',
+  'systemRowAction',
   'systems',
   'title',
 ];
@@ -157,19 +190,38 @@ describe('the shells declare the pinned prop sets', () => {
       // They are catalogue-only because the rules-list shell supplies NO `inspectorBody` and so
       // renders no inspector at all: there is nothing on that screen for a kicker, a card title or
       // a pinned foot action to appear in.
+      // The three feedback-round seams are catalogue-only for the same reason as the rest: two of
+      // them are the INSPECTOR's copy and the rules-list shell renders no inspector, and
+      // `columnLead` places a card in a column that shell's own page owns.
+      'columnLead',
       'countUnit',
+      // The five parity switches (issue 1373) are catalogue-only for the same reason: four of
+      // them describe a ROW the rules-list shell draws differently, and `systemRowAction` names
+      // an inspector system row that shell has no inspector to draw.
+      'describeEntry',
       'extraCards',
       'inspectorBody',
       'inspectorCaption',
       'inspectorFoot',
       'inspectorKicker',
+      // AND THE TWO LIST SEAMS issue 1373's parity round added, catalogue-only for the same
+      // reason: `listLead` opens a LIST the rules-list shell draws differently, and `nameEntry`
+      // answers a display label the world catalogue alone has to resolve a blank for.
+      'listLead',
       'membershipFilter',
+      'nameEntry',
       'onOpenEntry',
       'onOpenSystemRules',
+      'openEntryLabel',
+      'restingHint',
+      'restingTitle',
+      'rowSecondLine',
+      'rowTrailing',
       'searchPlaceholder',
       'sectionIcons',
       'sectionTitles',
       'selectAllLabel',
+      'systemRowAction',
     ]);
   });
 });

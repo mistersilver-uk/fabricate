@@ -41,6 +41,7 @@ import { migrateSeedFailureResultPolicy } from './migrateSeedFailureResultPolicy
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
+import { migrateToolRequirementSections } from './migrateToolRequirementSections.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateTravelToWorldScope } from './migrateTravelToWorldScope.js';
@@ -634,7 +635,8 @@ const MIGRATIONS = [
       'the two systems it spans, and every other reference to a re-keyed id is rewritten across ' +
       'your recipes, systems and gathering config in the same pass. NO SYSTEM CHANGES BEHAVIOUR: ' +
       'every membership record is created fully OVERRIDING, so each system keeps exactly the ' +
-      'category, tags, effect source, macro, breakage, on-break and repair recipe it had, and ' +
+      'category, tags, effect source, macro, breakage, on-break, prerequisites, check bonus ' +
+      'and repair recipe it had, and ' +
       'no world defaults are written at all — a system created later inherits nothing until you ' +
       'author them. Essences are matched by id and are never re-keyed. Where a system could ' +
       'not be re-keyed safely the pass REFUSES that system outright and reports it, rather than ' +
@@ -666,6 +668,26 @@ const MIGRATIONS = [
     // `_worldScopeEntityReport` field (captured and deleted by the runner below for the GM
     // notice).
     migrate: (data) => migrateWorldScopeEntities(data),
+  },
+  {
+    version: '1.31.0',
+    label:
+      "Record each crafting system's own Tool prerequisites and check bonus as its own, now that " +
+      'both are world defaults a system can inherit. Every Tool in every system keeps exactly ' +
+      'the prerequisites and the check bonus it had, written down as that system’s override so ' +
+      'nothing changes; no world default is created, because a Tool that requires nothing and ' +
+      'one nobody ever configured are stored identically and guessing between them would put ' +
+      'words in your mouth. Author the world defaults yourself on the Tools Catalogue when you ' +
+      'want systems to share them. DOWNGRADING IS LOSSLESS: 1.30.0 reads a Tool’s ' +
+      'prerequisites and bonus from the crafting system exactly as before and ignores the ' +
+      'overrides this pass wrote, which survive untouched for a re-upgrade',
+    downgradeTo: '1.30.0',
+    // DATA-lossless in both directions: the pass only ADDS membership-record keys, and 1.30.0's
+    // `TOOL_SECTIONS` does not name them, so `normalizeMembership` drops them on read there and
+    // the crafting system's own values keep deciding. Nothing a GM authored is removed or
+    // rewritten by either direction.
+    downgradeLosesData: false,
+    migrate: (data) => migrateToolRequirementSections(data),
   },
   // Future migrations added here in version order
 ];

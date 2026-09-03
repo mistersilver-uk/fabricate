@@ -344,6 +344,11 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
+  // The world modifier library's entry row (issue 1373, maintainer round 4). Genuinely
+  // undocumented rather than an adjudicated non-member: it is a MEMBER at two callers, and
+  // `library.html` specifies no row for a library entry at all — `:626`'s `<OptionCards>` is the
+  // card group this row replaced at one of the two call sites, which is the opposite treatment.
+  'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',

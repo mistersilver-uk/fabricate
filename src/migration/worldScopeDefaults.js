@@ -16,6 +16,14 @@
  *   cannot distinguish an authored value from a defaulted one, and `### Tool scope` requirement 5
  *   mandates treating every existing value as AUTHORED. The other six sections carry values a GM
  *   really authored, and the only open question was whose.
+ * - **Tool `prerequisites` and `bonus`** (issue 1373), which became world-default sections at
+ *   `1.31.0`. Same reason as the break mode, for the same structural cause: `Tool#toJSON` emits
+ *   both keys on EVERY save, so a persisted `{enabled: false, ids: [], gateMode: 'usability'}` is
+ *   the normalizer's mint and a GM's deliberate "nothing required" written identically. Electing
+ *   one as a world default would state a choice nobody made, on every tool in the corpus.
+ *   Nothing is lost by declining: `buildMembershipRecord` writes each member's own value as an
+ *   OVERRIDE unconditionally, so resolution is unchanged, and the remedy is the one this module
+ *   already names — author the world default directly on the world Tool entry's Requirements tab.
  *
  * ## CONSTRAINT 0: EVERY LIVE MEMBER MUST HAVE AUTHORED THE SECTION
  *
@@ -108,8 +116,9 @@ export const RESERVED_CATEGORY = 'general';
  * The sections a membership record CANNOT express an empty override for, and which therefore fall
  * back to the world value when a member authored none. See CONSTRAINT 0 in the module note.
  *
- * `effectSource` and `macro` are absent because the builder writes them unconditionally;
- * `repairRequirements` is absent because it is not a resolver section.
+ * `effectSource` and `macro` are absent because the builder writes them unconditionally, and so
+ * are tool `prerequisites` and `bonus` for the same reason; `repairRequirements` is absent because
+ * it is not a resolver section.
  *
  * @type {ReadonlySet<string>}
  */

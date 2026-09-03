@@ -67,6 +67,14 @@
      did not declare it, and a snippet a shell does not forward is dropped in SILENCE — the frame
      rendered its own name-only fallback and the caption looked merely unfinished rather than
      unwired.
+   - rowTrailing / rowSecondLine / describeEntry / nameEntry / listLead / openEntryLabel /
+     systemRowAction: the row, list and inspector parity switches, each opt-in and each
+     defaulting to what shipped. See the frame's prop notes, and `SystemRulesRoster`'s own note
+     for `systemRowAction`. `listLead` is what puts a lane's create-from-drop zone at the head of
+     the list where the design draws it, instead of in a band above the toolbar.
+   - columnLead / restingTitle / restingHint: threaded straight to the frame; see its prop notes.
+     `columnLead` renders a scope-wide card above the toolbar INSIDE the list column, which is the
+     only placement that leaves the inspector running the whole route's height.
    - onOpenSystemRules(entityId, systemId): the inspector system row's `Rules ↗` deep link, into
      that system's own rules for this entity. `null` — the default — falls the row back to the
      membership cluster, so a lane whose shell has nowhere to route to still gets a usable row.
@@ -117,6 +125,35 @@
     onSelect = () => {},
     onOpenEntry = () => {},
     rowMeta = undefined,
+    // Threaded straight to the frame; see its own prop notes. All three are OPT-IN and default to
+    // exactly what the component and essence catalogues render today.
+    rowTrailing = undefined,
+    rowSecondLine = 'description',
+    describeEntry = undefined,
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
+    // exactly what the component and essence catalogues render today.
+    nameEntry = undefined,
+    listLead = undefined,
+    // Threaded straight to the frame; see its own prop notes. `columnLead` is what puts a
+    // scope-wide card ABOVE the toolbar and INSIDE the list column, which is where the design
+    // draws the world Tool catalogue's breakage card — a page that renders such a card as a
+    // sibling of this shell spans it across the inspector's track too, and starts the inspector
+    // a card's height below the app header (issue 1373, maintainer feedback round 2).
+    columnLead = undefined,
+    // The resting inspector's copy. Both default to what shipped, so only a lane that names its
+    // noun changes.
+    restingTitle = '',
+    restingHint = '',
+    // The ROW ACTION the list offers per entity. The shipped icon button stays the default; a
+    // lane that NAMES the verb gets the design's bordered `Edit <noun>` button instead, which is
+    // also what our own system rules list already draws.
+    openEntryLabel = '',
+    // WHAT AN INSPECTOR SYSTEM ROW OFFERS. `manage` is the shipped pair - a `Rules` link for a
+    // member and the membership cluster for a non-member. `navigate` is the design's tool
+    // catalogue: EVERY row is a link, and the verb that creates a system's record lives on the
+    // system's own screen rather than on the world catalogue. Passed through to
+    // `SystemRulesRoster`, which owns the row since that panel was extracted.
+    systemRowAction = 'manage',
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -148,7 +185,11 @@
     {
       id: 'open-entry',
       icon: 'fas fa-pen',
-      label: text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
+      // A LANE THAT NAMES THE VERB GETS THE LABELLED BUTTON. The design's row action reads
+      // `Edit tool`, and a bare pen states neither the verb nor the noun; the shipped `Open`
+      // icon button stays the default so no other catalogue's row moves.
+      labelled: Boolean(openEntryLabel),
+      label: openEntryLabel || text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
       run: (entry) => onOpenEntry(entry.id),
     },
   ]);
@@ -193,6 +234,14 @@
     {searchPlaceholder}
     {rowActions}
     {rowMeta}
+    {rowTrailing}
+    {rowSecondLine}
+    {describeEntry}
+    {nameEntry}
+    {listLead}
+    {columnLead}
+    {restingTitle}
+    {restingHint}
     {bulk}
     {inspectorKicker}
     {inspectorCaption}
@@ -279,6 +328,7 @@
     enableable={scope?.enableable === true}
     {actions}
     {onOpenSystemRules}
+    {systemRowAction}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}
@@ -324,10 +374,19 @@
     padding: 6px var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
-    /* NO FILL. The prototype draws every card in the content area on the pane's own surface and
-       separates them with a 1px border alone (issue 1372); a fill here put a fifth grey on a
-       screen that has one. */
-    background: transparent;
+    /* THE RECESS HAS SOMEWHERE TO GO, BECAUSE THIS IS NOT IN THE PANE (issue 1373).
+
+       The note here read "no fill: the design draws every card in the CONTENT AREA on the pane's
+       own surface", and that argument is sound for a card in the content area and simply does not
+       apply to this one - these three sit in the INSPECTOR ASIDE, which `proto:2003` paints
+       `--bg2` (`--fab-bg-1` here, and what the aside actually declares). `proto:2014` then
+       recesses each world-default row to `--bg1`, which is this theme's `--fab-bg-0`: the ramps
+       are shifted one rung against each other, so the design's inset colour is our pane colour
+       and there is a rung below the aside to reach for.
+
+       Transparent left the card the same value as the aside behind it, so a screen the design
+       builds out of two surfaces was drawn with one and a hairline. */
+    background: var(--fab-bg-0);
     min-width: 0;
   }
 

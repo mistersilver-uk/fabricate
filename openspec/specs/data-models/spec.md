@@ -653,7 +653,7 @@ CraftingSystem = {
     An earlier form of this requirement attributed the shed of all eight keys to the migration; that was aspirational on both counts, and it is corrected here and in the `## Scoped Entity Definitions` banner together, because both carried the identical attribution.
     `components` PERMANENTLY retains `essences`, `difficulty`, `complications`, `salvage` and `id`; `tools` permanently retains `componentId`, `label`, `requirement`, `prerequisites`, `bonus`, `checkBreakable` and `id`.
     `id` is in both lists because it is the JOIN KEY the read union merges on, and a retained-field list omitting it describes an unjoinable record.
-    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` alone") and `### Tool scope` requirement 1, whose OPENING sentence ("There are THREE tool world-default sections, TWO of them inherited") is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
+    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` alone") and `### Tool scope` requirement 1, whose OPENING sentence ("There are FIVE tool world-default sections, FOUR of them inherited", amended at `1.31.0` by its own requirement 1a) is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
     That is the genuine distinction from `COMPONENT_SECTIONS`, which is a mutable constant a later PR can edit; it is not the membership allowlist either, since the entity roster preserves every authored field verbatim.
 
     **`essenceDefinitions` IS retirable in full, and the SECTION COUNT is not why.**
@@ -2032,7 +2032,14 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > READ ENTRY has run.
 > AUTHORITY has moved ONE STEP and no further (issue 1372): requirement 15's clause 1a makes the union answer an INHERITED SECTION from the world default, while `## CraftingSystem` requirement 36 keeps the in-system arrays the source of truth for every other key, every ROW and the row ORDER, re-derived at read time, with the world layer supplying only the keys they do not carry.
 > The SHED has NOT: nothing is removed from any of the eight shadowed keys, and `destructive-changes-and-migrations` still measures zero references disappearing.
-> `src/ui/**` is deliberately still outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> `src/ui/**` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> TWO UI READERS HAVE SINCE JOINED IT (issue 1373), and both are the Tool Rules surface: the manager's selected-system `tools` projection, which the rules LIST reads, and the rules EDITOR's own draft seed.
+> The list joined because it is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
+> The editor joined for the same reason one route deeper: it stated the in-system value for a section the list beside it labelled `Inherits world defaults`, and `prerequisites` and `bonus` — which no adoption seed ever copied — disagreed with the world outright.
+> Each is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
+> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-integration/spec.md` -> Tools Tab).
+> Without that, a display repoint would convert every inheriting section into an override on the next save — an AUTHORITY move made by accident, which is exactly the conflation of clocks this banner warns about.
+> The rest of `src/ui/**` is unchanged and stays outside.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
 > The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
@@ -2087,6 +2094,7 @@ WorldEssence = {
 WorldDefaults = {
   id: string,                      // the world entity id
   [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
+  enabled?: boolean,               // TOOLS ONLY - the world MASTER SWITCH; absent means enabled
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
   // `repairRequirements` on a tool. Both are ABSENT when unauthored.
 }
@@ -2097,7 +2105,9 @@ SystemMembershipRecord = {
   systemId: string,
   inherit: { [section: string]: boolean },  // an omitted section reads as INHERITED
   [section]: unknown,                       // the local override, RETAINED while dormant
-  enabled?: boolean,                        // essences and tools ONLY; default true
+  enabled?: boolean,                        // essences and tools ONLY; default true. This is the
+                                            // SYSTEM half of a tool's resolved enablement; see
+                                            // requirement 7.
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` and `mutedTags` on
   // a component, `repairRequirements` on a tool. All are ABSENT when unauthored.
 }
@@ -2123,9 +2133,39 @@ SystemMembershipRecord = {
    Nothing is lost, so no confirmation is required and the inherit row's copy stays "fall back".
 6. Resolution answers `inherited` PER SECTION: `true` when there is no membership record, and otherwise the record's switch for that section.
    A record whose `inherit` map OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
-7. **There is no world-level `enabled` flag.**
-   For an enableable entity, resolution answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
-   Disabling an entity world-wide is N membership edits, or a bulk action, and never a fourth layer.
+7. **A world-level `enabled` flag exists for a `worldEnableable` scope, and it is a MASTER SWITCH rather than a fourth layer.**
+   The TOOL is the only scope that declares one today; the component has no enabled flag at all and the essence's world defaults carry none.
+
+   **The resolved value is the AND of the two flags — `resolved = world.enabled && system.enabled` — and WORLD OFF WINS.**
+   A world-disabled tool is off in every crafting system that has it, whatever each system says.
+   The per-system flag keeps its own meaning exactly and simply cannot re-enable a world-disabled record, so re-enabling at world scope restores whatever each system had already chosen rather than turning anything on.
+
+   **The two scopes' `enabled` are DIFFERENT CONCEPTS and prose must not name them alike.**
+   A world record's flag is the WORLD MASTER SWITCH — whether the Tool exists as a usable thing in this world at all — and a rules record's flag is the SYSTEM ENABLEMENT — whether this crafting system currently uses the Tool it has adopted.
+   The resolution answers all three under three distinct names: `worldEnabled`, `systemEnabled` and the AND as `enabled`.
+   An authoring surface reads the layer it writes; a consumer reads `enabled`.
+   Nothing above the resolver re-derives the AND, because a screen that computed it locally is how one scope's answer and another's diverge.
+
+   **It is not a fourth layer, and this is the distinction.**
+   The switch carries no per-section inherit decision, is not seeded onto a membership record, and takes no override: it is one boolean at world scope that vetoes a boolean at system scope.
+   The three layers, their per-section resolution and requirement 2's per-SECTION unit are all unchanged.
+
+   **ABSENCE READS AS ENABLED, and that is a compatibility requirement rather than a convenience.**
+   The flag is ABSENCE-PRESERVING on disk — an unauthored or non-boolean value persists NO key rather than a minted `true` — so every world default written before the switch existed comes back without it, and only an explicit `false` disables.
+   A world SETTING preserves key absence (unlike `setFlag`, whose merge resurrects a removed key), so the absence survives the round trip rather than only the first read.
+   This is DELIBERATELY ASYMMETRIC with the membership record's `enabled`, which is minted `true` on every normalize: a membership record exists only because a GM added the entity to a system, so minting states a fact that write already established, whereas minting at world scope would rewrite every persisted world default in the corpus to say something nobody authored.
+
+   For an enableable entity, resolution still answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
+
+   7a.
+   **The READ UNION re-applies the world veto over its merged rows, and it is a VETO ONLY.**
+   Requirement 15's union re-spreads the in-system record last while `## CraftingSystem` requirement 36 holds, and a normalized in-system tool carries `enabled` unconditionally — so the resolver's AND is overwritten on every read-union row unless the veto is re-applied after the merge.
+   That precedence is correct for a value the system AUTHORED and wrong for a world-scope veto, because "world off wins" means the world's off cannot be outvoted by anything.
+   The re-application never turns a row ON, so a corpus with no world-disabled record answers the identical rows — and the identical ARRAY — that it answered before the switch existed.
+   7b.
+   **A world screen must state the membership count before a GM flips the switch off.**
+   A world-scope write persists on change and has no confirmation step, and switching a Tool off silently stops every recipe in every member system that requires it.
+   The count is the number of crafting systems holding a membership record for that entity, stated beside the control rather than after the write.
 8. **`enabled` is opt-in PER ENTITY and the opt-out is STRUCTURAL rather than conventional.**
    The generic resolver does not compute the key for every entity and let one path override it: an entity that carries no enabled flag gets an answer on which `"enabled" in result` is FALSE — the key is ABSENT, not `false`.
    A resolver that answered `false` would satisfy every statement about the record and still hand a screen the exact value it would read to draw a toggle the domain does not have.
@@ -2349,8 +2389,10 @@ That hazard is independent of which system authored the list, which is why no do
    A dangling repair ingredient group has no such rule and would silently change what a repair costs.
 
    **Addressability, which is where the constraint bites.**
-   `repairRequirements` cannot be a live parent because ingredient groups are named over the OWNING SYSTEM's components, which world scope cannot address.
-   `effectSource` escapes that only because THIS SECTION makes components a world entity: `sourceItemUuid` is a world document UUID and is globally addressable already, and `sourceComponentId` is world-addressable exactly when it names a WORLD component.
+   `repairRequirements` cannot be a live parent because an ingredient group names a QUANTITY OF EACH REFERENT IN A PARTICULAR SYSTEM, and a world value that resolved live would change what a repair costs in a system that never authored it.
+   The referents themselves ARE world-addressable, and this is a correction of an earlier reading that said otherwise (issue 1373, maintainer round 2): THIS SECTION makes components a world entity, so a repair group naming world component ids is exactly as addressable as `effectSource`'s `sourceComponentId`.
+   What world scope cannot promise is MEMBERSHIP — that every system inheriting the Tool has also adopted each named Component — which is the same constraint `destructive-changes-and-migrations/spec.md` already applies when it lifts a seed only where every referenced component is a world component every member system holds.
+   `effectSource` escapes the live-parent objection for a different reason: it is a SINGLE reference rather than a costed set, so a system that resolves it to nothing degrades into the already-specified dangling-source state instead of quietly repricing a repair.
 
    **The binding constraint on EVERY WRITER, not only the migration:**
    a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
@@ -2373,6 +2415,7 @@ That hazard is independent of which system authored the list, which is why no do
 
 **What the `1.30.0` migration writes here, and the precondition on the two inherited sections.**
 Each membership record carries its own system's `breakage`, `onBreak` and seeded `repairRequirements` verbatim, and all three ALSO take a WORLD default, elected from the OLDEST contributing system wherever the migration registry's constraints permit.
+Since `1.31.0` it carries its own `prerequisites` and `bonus` too, unconditionally and with no world default elected for either — see requirement 1a.
 **`breakage` and `onBreak` are DECLINED outright whenever any member system of the group left the section unauthored**, on the same rule `### Component scope` states for `category`, and the rule is stated here too rather than left to be inferred from there.
 A membership record cannot express an EMPTY `breakage` or `onBreak` override, so a member that authored neither carries an ABSENT section, and an absent section under an `inherit: false` switch resolves to the WORLD value by requirement 2 of `## Scoped Entity Definitions` — which would hand that member the donor's breakage mode or on-break action.
 
@@ -2385,19 +2428,59 @@ An OVERRIDING section is still answered by the in-system record, and that block 
 The decline is what guarantees the transition is safe: the migration writes NO world default for a section any member left unauthored, so there is nothing for a later inherit switch to fall back INTO.
 `### Essence scope`'s `effectSource` and `macro` escape all of this because they are NEW section names that collide with nothing on the in-system record, which is why requirement 5 there can mandate an UNCONDITIONAL write instead; `repairRequirements` escapes it because requirement 2 below answers it from the membership record alone.
 
-1. There are THREE tool world-default sections, TWO of them inherited.
-   `breakage` and `onBreak` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage` and `Tool.onBreak` unchanged; `repairRequirements` is the third and is SEEDED rather than inherited.
-   A tool membership record's `inherit` map therefore carries `breakage` and `onBreak` and nothing else, and a `repairRequirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
+1. There are FIVE tool world-default sections, FOUR of them inherited.
+   `breakage`, `onBreak`, `prerequisites` and `bonus` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage`, `Tool.onBreak`, `Tool.prerequisites` and `Tool.bonus` unchanged; `repairRequirements` is the fifth and is SEEDED rather than inherited.
+   A tool membership record's `inherit` map therefore carries those four and nothing else, and a `repairRequirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
+
+   1a.
+   **`prerequisites` AND `bonus` JOINED AT `1.31.0`, AND THIS IS THE EXPLICIT AMENDMENT `## CraftingSystem` REQUIREMENT 36 DEMANDS** (issue 1373).
+   The design treats a Tool's character gate and its check bonus as WORLD defaults a crafting system inherits and may override, not as per-system-only fields; the shipped model held them per system only, which is what left the world Tool entry with three tabs where the design has four and two rows missing from two separate card stacks.
+   The maintainer ruled for the design.
+
+   **AN EMPTY OVERRIDE IS EXPRESSIBLE FOR BOTH, which is what separates them from `breakage` and `onBreak`.**
+   `{enabled: false, ids: [], gateMode: "usability"}` and `{enabled: false, expression: ""}` are real values every reader treats as "no prerequisites" and "no bonus", exactly as `### Essence scope`'s `effectSource: {}` means "no source".
+   A membership record can therefore SAY that its system requires nothing, so the every-live-member precondition the two older sections need does not apply to these two and the migration writes both UNCONDITIONALLY.
+
+   **NO WORLD DEFAULT IS ELECTED FOR EITHER, on the unknowable-PROVENANCE rule requirement 5 already states for the world tool-breakage authority.**
+   `Tool#toJSON` emits both keys on EVERY save, so a persisted `{enabled: false}` is the normalizer's mint and a GM's deliberate "nothing required" written identically, and the corpus cannot distinguish them.
+   Electing one would state a choice nobody made, on every tool at once.
+   The remedy is the one the migration registry already names for a declined section: author the world default directly, on the world Tool entry's Requirements tab.
+
+   **AN ABSENT WORLD DEFAULT RESOLVES TO THE SHIPPED BEHAVIOUR, BY CONSTRUCTION.**
+   The `1.31.0` migration records every existing `(tool, system)` pair's own in-system value as its override with the switch OFF, so the resolver answers that system's own data whether or not a world default is ever authored.
+   A world that has not yet reached `1.30.0` gets the same corpus from that pass directly — `buildMembershipRecord` writes both sections and the overriding inherit map names both — and `1.31.0` then finds nothing to do, so the two upgrade orders converge.
+   Like `breakage` and `onBreak`, the world layer for these two is SUSPENDED on requirement 15's read union while `## CraftingSystem` requirement 36 holds, because `Tool#toJSON` emits both keys and the in-system record decides every key it carries.
 2. **`repairRequirements` is a SEED, not a live parent.**
    It is the shipped `Tool.repairRequirements` — the `flagBroken` repair recipe's ingredient groups — held at world scope as a starting point only.
    It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
    Resolution answers it from the MEMBERSHIP RECORD ALONE and never reads it back out of the world defaults, because a seeded value the system has since edited is the only truth about that system's repair recipe.
-   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the world scope cannot address.
+   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe prices a set of referents FOR ONE SYSTEM, and a live world value would change what a repair costs in a system that never authored it.
+   That is a statement about COST and MEMBERSHIP, not about naming: a repair group may name world component ids, world essence ids and world tags, all of which world scope addresses (see `### Essence scope` requirement 5's addressability paragraph, which records the correction).
    The seed is a DEEP copy, so neither scope can reach into the other through a shared reference — the one exception to requirement 11's aliasing rule.
    A value structured cloning refuses degrades to a shallow copy rather than being dropped, because a seed that silently lost a repair recipe would be worse than one that shares a reference nothing structurally mutates.
    Seeding is NOT the default treatment for a section whose shipped field names an in-system reference: `### Essence scope` requirement 5 settles `effectSource` as a LIVE PARENT on the opposite side of the same question, and records what distinguishes the two.
+   **The world default is AUTHORED through its own tool-family write action, never through the section writer.**
+   `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
+   The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
+   **THE WORLD TOOL ENTRY IS A CALLER OF IT, alongside import, migration and adoption** (issue 1373, maintainer round 2).
+   The Breakage tab renders the SAME repair editor the system Tool rules editor mounts, over the WORLD component, essence and tag rosters, and routes its change to this action rather than to the section writer.
+   It is offered only in the `flagBroken` on-break mode, which is the only mode a repair route means anything in, and it states its own reach: the seed is copied when a system ADOPTS the Tool, so an edit reaches the next system to adopt it and none that already has it.
+   Currency is deliberately withheld there — units are world-wide but whether a cost is honoured is each system's `requirements.currency.enabled`, which a world default cannot state — so the editor is mounted with currency disabled and renders an imported cost read-only rather than offering a new one.
+   An earlier round removed a `REPAIR MATERIALS` card from this screen and recorded the rule that a screen may not offer a write over data it has declared itself unable to show; that rule STANDS, and this surface satisfies it by SHOWING the groups rather than by stating a bare count and offering to clear them.
+
+   **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS THE SEED IS TAKEN ONTO BOTH RECORDS, AND ONLY THE IN-SYSTEM COPY IS READ** (issue 1373).
+   `Tool.repairRequirements` is a shipped in-system field, so a normalized in-system record always carries it — and requirement 15's KEYS clause answers every key the in-system record carries FROM that record.
+   Measured: a membership record seeded with one repair group resolves to `[]` for a system whose in-system record carries the normalizer's empty array, so the membership seed alone is unreadable for the duration.
+   The copy the GM then edits is the in-system one, through the Tool editor, which is where requirement 2's "diverges freely" actually happens.
+   The membership copy is unchanged and remains the resolution source this requirement names; it becomes the READ one again when requirement 36 retires and the world layer re-takes precedence over the keys the in-system record carries.
 3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
    The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
+
+   3a.
+   **The TOOL is the one scope that declares a WORLD MASTER SWITCH**, under requirement 7 of `## Scoped Entity Definitions`: its world defaults may carry `enabled`, and resolution answers `world.enabled && system.enabled`.
+   What blocks is the RESOLVED value, so a world-disabled tool blocks with `TOOL_BLOCKED` in every member system exactly as an unadopted or system-disabled one does — the block reason does not distinguish them, because a player cannot act on the difference.
+   The essence declares no such switch: its `enabled` is a soft disable of essence-carried BEHAVIOUR, and a world-wide veto over behaviour a GM cannot see in that scope's own screens would be a persisted field with no authoring surface.
+   The component declares none because it has no enabled flag at any scope at all.
 4. **The break mode is NOT a new field.**
    The world/system pair is `toolBreakage.authority` (`## CraftingSystem` requirement 21) carrying the same two tokens `toolSpecific` / `checkDriven`; the per-tool control under `checkDriven` stays `checkBreakable`.
    The prototype's `tool` / `check` / `immune` spellings are not introduced, and `immune` is a retired name.
@@ -2405,6 +2488,11 @@ The decline is what guarantees the transition is safe: the migration writes NO w
 5. **The WORLD tool-breakage authority is persisted by `fabricate.toolScope` ALONE and carries no per-system half.**
    The per-system override stays where `## CraftingSystem` requirement 21 puts it — on the crafting system — because a second per-system home would author one field at two scopes, which the Purpose above prohibits.
    It is ABSENCE-PRESERVING at world scope: an unauthored or unrecognized authority persists NO key rather than a minted `toolSpecific`, since a minted default is indistinguishable from a GM's deliberate choice.
+
+   **AND THE WRITE HALF IS ABSENCE-PRESERVING TOO, which is what keeps inheritance from being a one-way door.**
+   The world authority is authored through a tool-family-only world-scope action that writes the key for a recognized token and REMOVES it for anything else, so "no world authority" stays expressible on disk rather than only on first read.
+   An action that minted `toolSpecific` on a clear would leave a GM who authored a world value with no way back to the unauthored state, and every absence-preserving system would go on inheriting a choice nobody made.
+   It is STRUCTURALLY ABSENT on the component and essence write families rather than present and refusing, on the same rule this section's `setEnabled` states: a caller must not be able to conclude a write landed.
 
    **It became LIVE at `1.30.0`.**
    The crafting-system normalizer substituted `toolSpecific` for anything missing or unrecognised on EVERY normalize until that release, so every persisted system carried a concrete value and `system.toolBreakage.authority ?? world` could never fall through; the flip that makes it absence-preserving is what made this half reachable.
@@ -2421,6 +2509,19 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    The two halves are stated as a PAIR because forbidding the write says nothing about forbidding the erasure.
 
    The two inherited sections' every-member precondition, and the addressability rule the third rests on, likewise bind an IMPORT-TIME write of a carried world default and are RE-DECIDED against the destination's merged corpus (`import-export/spec.md` -> World-default constraint re-check on import).
+6. **ADOPTING a world Tool into a crafting system is TWO writes while `## CraftingSystem` requirement 36 holds, and the IN-SYSTEM one is what makes the Tool exist there** (issue 1373).
+   Requirement 15 clause 3 makes the read union's ROW SET the in-system array's row set — "the world layer contributes rows only after requirement 36 retires" — so a membership record written on its own names a Tool that NO reader can see: it is absent from the system's tool list, no recipe there can reference it, and the screen that offered to add it goes on offering.
+   Adoption therefore writes the membership record AND creates the in-system `Tool` record, from the world entity's identity.
+   The order is membership first, because that write owns the already-a-member rule; if the `Tool` record is then refused the membership record is REMOVED again, because a membership record with no in-system record is exactly the unreadable state above, while an in-system record with no membership record is an ordinary pre-migration Tool.
+   An in-system record that already exists is NEVER rewritten: requirement 36 keeps it authoritative, and a migrated world's in-system record and world entity share an id by construction.
+
+   **NO INHERITED SECTION IS COPIED ONTO THE RECORD IT CREATES.**
+   The record adoption writes is IDENTITY plus the SEEDED `repairRequirements` of requirement 2, and nothing else.
+   `breakage` and `onBreak` were copied while requirement 15's retired clause 1 answered every key the in-system record carried: a normalizer emits both UNCONDITIONALLY, so an identity-only record won that contest with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
+   Clause 1a answers an INHERITING section from the world default instead, so the union makes that row's claim true and the copy no longer does; retaining it would leave an override-shaped value on a record whose every switch says `Inheriting`, invisible while they hold and wrong the first time one is flipped.
+   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
+   `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
+   `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 
 ## Tool
 

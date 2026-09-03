@@ -251,6 +251,23 @@ test('setEnabled is ABSENT on the component type and present on the other two', 
   }
 });
 
+test('the two TOOL break-mode and repair actions are declared on the tool family ALONE', () => {
+  // AC-5. THE POSITIVE HALF IS MANDATORY. An absence-only check passes on a family that
+  // returns `{}`, so this asserts presence on `tool` before it asserts absence on the other
+  // two - the same shape `setEnabled` above is pinned in, and for the same reason: these are
+  // STRUCTURALLY ABSENT rather than present-and-refusing, so a caller cannot conclude a write
+  // landed. Declaring either on the base literal instead of inside the tool guard reds the
+  // component and essence halves.
+  const tool = createWorldScopeEntityActions({ entityType: 'tool', getStore: () => null });
+  for (const action of ['setWorldToolBreakage', 'setWorldRepairRequirements']) {
+    assert.equal(action in tool, true, `${action} is declared on the tool family`);
+    for (const entityType of ['component', 'essence']) {
+      const actions = createWorldScopeEntityActions({ entityType, getStore: () => null });
+      assert.equal(action in actions, false, `${action} must not exist on ${entityType}`);
+    }
+  }
+});
+
 test('every section-taking action REFUSES a name the scope does not declare', async () => {
   const { actions, store } = actionsFor('component');
   await actions.createEntity({ id: 'ash-salt', name: 'Ash Salt' });

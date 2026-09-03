@@ -62,6 +62,14 @@ When reviewing added tests, verify the directory is in the glob and that `npm te
 - Mutation-test the COMPOSITION, not only the pure helper.
 A suite can pin `f()`'s logic while the handler, `main()`, or `if (!dryRun)` branch that must CALL `f()` is never exercised — so mutate the call site (delete the call, invert its condition, swap its branches) and confirm a test flips to FAIL.
 A mutation that survives with the pure-helper tests still green is a test-gap finding: the logic is proven, the capability is not (e.g. a waiver predicate is unit-tested but the console/`pageerror` handler that must route through it is not, so making the handler ignore the predicate ships green).
+- A control is covered when something ACTS on it, not when something SEES it.
+Presence evidence — a View Lab `expectSelector`, an `expectContained` target, a screenshot — does not constitute coverage of a control.
+Coverage means one of: a View Lab case whose `steps[]` clicks it and whose `expectSelector` names a state only its effect can produce, or a mount test that clicks it and asserts the resulting DOM.
+This is mandatory for any control rendered inside an `EmptyState`, because in that state it is the screen's only affordance: if it is inert the screen is a dead end, and a photograph of a dead end is indistinguishable from a photograph of a working one.
+Worked example: `[data-tool-empty-browse-world]` shipped named by two registry terminals and clicked by nothing anywhere, so it was proven to EXIST and never proven to ACT, and the maintainer found it inert by hand on a live world (issue 1373).
+- A guard over a filter that changes which rows EXIST — not merely which of them are shown — must exercise that filter at the cohort's ZERO POINT.
+Zero members is the only place the widened branch and the empty branch can disagree, so a widening test mounted with members present cannot fail on a widening defect.
+Worked example: the one mount test that did exercise the Tool rules list's `All world tools` widening mounted two adopted Tools, so it never entered the branch that computed, counted and paged every widened row and then discarded them (issue 1373).
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
 - For UI-changing PRs, treat unrelated image markdown, artifact names, and file lists as missing normal evidence.

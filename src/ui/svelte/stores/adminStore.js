@@ -116,7 +116,17 @@ import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 // The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
 // write path treats ANY third value as a CLEAR of the per-system override, so the set that
 // decides which arguments are tokens must be the same set the resolver and the normalizer use.
-import { TOOL_BREAKAGE_AUTHORITIES } from '../../../systems/toolScope.js';
+import {
+  seedToolRepairRequirements as _seedToolRepairRequirements,
+  TOOL_BREAKAGE_AUTHORITIES,
+  TOOL_SECTIONS,
+} from '../../../systems/toolScope.js';
+// THE READ UNION AND THE SWITCH THAT DECIDES WHAT IT ANSWERS (issue 1373). The Tool Rules editor
+// DISPLAYS from `resolvedToolsFor` — what a craft will actually do — and SAVES only the sections
+// the membership record marks overriding, which is what stops a display read from converting an
+// inheriting section into an override on the next save.
+import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
+import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -1854,6 +1864,10 @@ export function createAdminStore(services) {
     selectedSystem: null,
     itemCards: [],
     essenceCards: [],
+    // WHAT REQUIRES EACH TOOL in the selected system, keyed by tool id (issue 1373). The Tool
+    // rules editor's `Required for` rail region reads it; an empty map is what a world with no
+    // selected system publishes, and the region then states its empty case.
+    toolRequiredFor: {},
     recipes: [],
     recipeCategories: [],
     // The recipe half of the Tags & Categories reference count, folded by the row
@@ -1990,7 +2004,10 @@ export function createAdminStore(services) {
     const draft = get(toolDraft);
     const baseline = get(toolDraftBaseline);
     const systemId = get(toolDraftSystemId);
-    const library = systemId ? _systemTools(systemId) : [];
+    // THE UNION, because this is a display projection and the draft it overlays is one too
+    // (issue 1373). A raw-array library beneath a union-seeded draft would be two answers to
+    // "what does this system's Tool do" in one published object.
+    const library = systemId ? _resolvedSystemTools(systemId) : [];
     const overlay = (entries, entry) => {
       if (!entry) return entries.map(_clonePlain);
       const index = entries.findIndex((tool) => String(tool.id) === String(entry.id));
@@ -2059,6 +2076,24 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Open an UNPERSISTED draft for a brand-new system Tool.
+   *
+   * NO SCREEN REACHES THIS TODAY, and that is a stated state rather than an oversight (issue
+   * 1373). Tool CREATION moved to the world Tools Catalogue, and a system Tool is now born by
+   * ADOPTION (`adoptWorldTool`), which persists through the manager and needs no draft. Its one
+   * remaining caller, `addToolFromUuidToDraft`, is unreached from `src/` for the same reason.
+   *
+   * It is RETAINED rather than deleted because it is the only entry into the draft layer's
+   * unpersisted state - `toolDraftBaseline === null` - which `saveToolDraft`'s create branch,
+   * `discardToolDraft`'s `cancelToolsDraft` fallback and `deleteToolDraft`'s `persisted` branch
+   * each fork on. Retiring it is retiring that state, which is a change to the draft layer and
+   * not the removal of one export.
+   *
+   * @param {object} [initialPatch]
+   * @param {string} [systemId]
+   * @returns {object|null} the created draft, or `null` with no system.
+   */
   function createToolDraft(initialPatch = {}, systemId = get(selectedSystemId)) {
     if (!systemId) return null;
     const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
@@ -2067,10 +2102,23 @@ export function createAdminStore(services) {
     return _clonePlain(created);
   }
 
+  /**
+   * Open the rules editor on one Tool, SEEDED FROM THE READ UNION (issue 1373).
+   *
+   * `_resolvedSystemTools` rather than `_systemTools`: for an inheriting section the draft — and
+   * therefore every card and the effective-rules rail — must state the value a craft will take,
+   * which is the world default. The baseline is the SAME resolved record, so opening an untouched
+   * Tool is not dirty and the save below has nothing to write. What keeps that display read from
+   * becoming an override is `_toolRecordForSave`, on the save, not a second read here.
+   *
+   * @param {string} toolId
+   * @param {string} [systemId]
+   * @returns {boolean}
+   */
   function openToolDraft(toolId, systemId = get(selectedSystemId)) {
     const id = String(toolId || '');
     if (!id || !systemId) return false;
-    const existing = _systemTools(systemId).find((tool) => String(tool.id) === id);
+    const existing = _resolvedSystemTools(systemId).find((tool) => String(tool.id) === id);
     if (!existing) return false;
     return _setFocusedToolDraft(existing, existing, systemId);
   }
@@ -2204,13 +2252,21 @@ export function createAdminStore(services) {
     _patchToolsDraftViewState();
     try {
       const itemUuid = get(toolDraftSourceItemUuid);
+      // SECTION-AWARE. `_toolRecordForSave` restores every INHERITING section from the live
+      // in-system record, so a draft seeded from the read union cannot write the world's answer
+      // onto this system as an override. See its docblock for the failure that guards.
       const result = await systemManager.upsertTool(
         systemId,
-        _clonePlain(draft),
+        _toolRecordForSave(systemId, draft),
         itemUuid ? { itemUuid } : {}
       );
       if (!result?.item) throw new Error('Tool save returned no item');
-      const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
+      const persisted = _normalizeGatheringLibraryTool(result.item, _randomID);
+      // AND THE EDITOR GOES BACK TO THE UNION, not to the record the manager just wrote: an
+      // inheriting section's persisted value is deliberately NOT what this screen shows.
+      const saved =
+        _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(persisted.id)) ||
+        persisted;
       toolDraft.set(_clonePlain(saved));
       toolDraftBaseline.set(_clonePlain(saved));
       toolDraftSourceItemUuid.set('');
@@ -2281,27 +2337,50 @@ export function createAdminStore(services) {
     }
   }
 
-  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
+  /**
+   * WRITE A FEW FIELDS ONTO ONE SYSTEM'S LIVE TOOL RECORD WITHOUT COMMITTING THE OPEN DRAFT.
+   *
+   * The Tool rules editor carries two IMMEDIATE-PERSISTENCE controls beside a buffered draft:
+   * the `Enabled in <System>` switch and, since issue 1373, the per-section inherit switch. Both
+   * have to land on disk the moment they are pressed while leaving a half-finished breakage edit
+   * exactly as the GM left it, which is what the dirty branch below is for: it folds only the
+   * written fields into the draft AND its baseline, so the edit stays dirty and the write does
+   * not read as an unsaved change.
+   *
+   * Extracted rather than copied: it was one function's body, and the second caller would have
+   * been a near-identical twenty lines — the new-code duplication the SonarCloud gate fails on,
+   * and a second place for the dirty-draft rule to drift.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @param {object} patch The fields to write.
+   * @param {string} failureKey The notification key for a refused write.
+   * @param {string} failureFallback
+   * @returns {Promise<boolean>}
+   */
+  async function _writeLiveTool(toolId, systemId, patch, failureKey, failureFallback) {
     const systemManager = services.getCraftingSystemManager?.();
     const live = _systemTools(systemId).find((tool) => String(tool.id) === String(toolId));
     if (!live || typeof systemManager?.upsertTool !== 'function') return false;
     try {
-      const result = await systemManager.upsertTool(systemId, {
-        ...live,
-        enabled: enabled === true,
-      });
+      const result = await systemManager.upsertTool(systemId, { ...live, ...patch });
       if (!result?.item) return false;
       const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
       if (String(get(toolDraft)?.id || '') === String(saved.id)) {
-        const draftWasDirty = get(toolDraftDirty);
-        if (draftWasDirty) {
-          toolDraft.update((draft) => ({ ...draft, enabled: saved.enabled }));
-          toolDraftBaseline.update((baseline) =>
-            baseline ? { ...baseline, enabled: saved.enabled } : baseline
-          );
+        const written = Object.fromEntries(Object.keys(patch).map((key) => [key, saved[key]]));
+        if (get(toolDraftDirty)) {
+          toolDraft.update((draft) => ({ ...draft, ...written }));
+          toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
         } else {
-          toolDraft.set(_clonePlain(saved));
-          toolDraftBaseline.set(_clonePlain(saved));
+          // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw
+          // in-system record, so re-seeding a clean draft from it would put every inheriting
+          // section back onto the value this screen exists not to show — undoing the union read
+          // on the first press of the enable switch.
+          const resolved =
+            _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(saved.id)) ||
+            saved;
+          toolDraft.set(_clonePlain(resolved));
+          toolDraftBaseline.set(_clonePlain(resolved));
         }
         _recomputeToolsDraftDirty();
       }
@@ -2309,12 +2388,126 @@ export function createAdminStore(services) {
       _patchToolsDraftViewState();
       return true;
     } catch {
+      services.notify?.error?.(services.localize?.(failureKey) || failureFallback);
+      return false;
+    }
+  }
+
+  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
+    return _writeLiveTool(
+      toolId,
+      systemId,
+      { enabled: enabled === true },
+      'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed',
+      'The Tool status could not be changed. Try again.'
+    );
+  }
+
+  /**
+   * MOVE ONE WORLD-DEFAULT SECTION between following the world Tool and this system's own
+   * (issue 1373).
+   *
+   * ── THE SEED MOVED TO THE OTHER END OF THE SWITCH, AND THAT IS THE WHOLE CHANGE ────────────
+   * This used to write the WORLD DEFAULT onto the in-system record whenever inheritance was
+   * turned ON, because the editor read that record and would otherwise have painted an
+   * `Inheriting` pill over a value this system had authored for itself. The editor reads the
+   * READ UNION now, and the union answers an inheriting section from the world default
+   * (`## Scoped Entity Definitions` requirement 15, clause 1a) — so the pill is true with no
+   * in-system write at all, and making one would be the very thing this screen must not do: mint
+   * an override-shaped value on a record whose switch says it has none.
+   *
+   * TURNING INHERITANCE ON THEREFORE WRITES THE SWITCH ALONE, and the draft's copy of the
+   * section is re-read from the union so the card flips to the world's answer immediately.
+   *
+   * TURNING IT OFF SEEDS THE OVERRIDE FROM THE VALUE THAT WAS ON SCREEN, which is the contract
+   * `scoped/InheritRow` already states and which the in-system record cannot satisfy on its own:
+   * while the section inherited, that record's own copy was whatever it happened to hold — stale,
+   * or the normalizer's default — and never the world value the GM was looking at. Seeding at the
+   * moment of override is what makes the first keystroke an edit OF the inherited value rather
+   * than a jump back to an older one.
+   *
+   * A section whose union answer is `undefined` seeds nothing: there is no value to author from,
+   * and the canonical empty the resolver would answer is already what an absent section resolves
+   * to.
+   *
+   * @param {string} toolId
+   * @param {string} section One of the world-default tool sections.
+   * @param {boolean} inherit
+   * @param {string} [systemId]
+   * @returns {Promise<boolean>}
+   */
+  async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
+    const target = String(toolId || '').trim();
+    const system = String(systemId || '').trim();
+    if (!target || !system || typeof inherit !== 'boolean') return false;
+    // READ BEFORE THE WRITE. Once the switch says overriding, the union answers this section from
+    // the in-system record, so the world value the GM was looking at is no longer reachable here.
+    const shown = inherit
+      ? undefined
+      : _resolvedSystemTools(system).find((tool) => String(tool.id) === target)?.[section];
+    const written = await worldScope.tool.setSectionInherited(target, system, section, inherit);
+    if (written !== true) return false;
+    if (inherit || shown === undefined) {
+      await refresh();
+      _syncToolDraftSection(target, system, section);
+      return true;
+    }
+    return _writeLiveTool(
+      target,
+      system,
+      { [section]: _clonePlain(shown) },
+      'FABRICATE.Admin.Manager.Tools.Editor.InheritFailed',
+      'This section could not be set for this system. Try again.'
+    );
+  }
+
+  /**
+   * STOP USING ONE WORLD TOOL IN ONE CRAFTING SYSTEM (issue 1373) — the exact inverse of
+   * {@link adoptWorldTool}, and two writes for the same reason it is.
+   *
+   * The IN-SYSTEM record goes first, because while requirement 36 holds it is the load-bearing
+   * half: deleting it is what actually removes the Tool from the system's list, its recipes'
+   * reach and its inventory matching. The membership record and its overrides go second.
+   *
+   * A refused membership delete after a successful record delete is NOT rolled back, and that is
+   * deliberate: the Tool is already gone from the system either way — a membership record with
+   * no in-system record contributes no row (`## Scoped Entity Definitions` requirement 15
+   * clause 3), which is the same "ghost" state adoption exists to avoid creating. Re-adopting
+   * and removing again clears it. Restoring the deleted record instead would have to invent the
+   * identity fields the delete just took away.
+   *
+   * @param {string} toolId
+   * @param {string} [systemId]
+   * @returns {Promise<boolean>}
+   */
+  async function removeToolFromSystem(toolId, systemId = get(selectedSystemId)) {
+    const target = String(toolId || '').trim();
+    const system = String(systemId || '').trim();
+    if (!target || !system) return false;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.deleteTool !== 'function') return false;
+    try {
+      const deleted = await systemManager.deleteTool(system, target);
+      if (deleted?.deleted !== true) return false;
+    } catch (error) {
       services.notify?.error?.(
-        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed') ||
-          'The Tool status could not be changed. Try again.'
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemFailed') ||
+          `The Tool could not be removed from this system. ${error?.message || ''}`.trim()
       );
       return false;
     }
+    await worldScope.tool.removeFromSystem(target, system);
+    if (String(get(toolDraft)?.id || '') === target) {
+      toolDraft.set(null);
+      toolDraftBaseline.set(null);
+      toolDraftSourceItemUuid.set('');
+      toolDraftDirty.set(false);
+      toolDraftSaveError.set(null);
+      toolDraftValidation.set({ valid: false, errors: ['missing'] });
+    }
+    await refresh();
+    _patchToolsDraftViewState();
+    return true;
   }
 
   async function saveAllDirtyToolDrafts() {
@@ -2490,6 +2683,27 @@ export function createAdminStore(services) {
   }
 
   /**
+   * Route-exit prompt for the WORLD TOOL ENTRY editor (issue 1373).
+   *
+   * A THIRD prompt rather than a reuse of `confirmDiscardDirtyToolsDraft` above, which is
+   * about a different record and answers a different question: that one asks whether to
+   * DISCARD the system tool editor's row draft and answers a boolean, offering no Save at
+   * all. This one is the three-way `save | discard | cancel` the world entry editors need,
+   * because their header carries a Save and the guard has to be able to run it.
+   *
+   * Like the other Svelte-layer-dirty kinds it does NOT check dirtiness itself: the root
+   * gates on the editor's live handle before calling.
+   *
+   * @returns {Promise<'save'|'discard'|'cancel'>} the chosen action, never a boolean
+   */
+  function confirmDiscardDirtyToolEntryDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Tools.DiscardDirtyEntryContent',
+      'The current Tool has unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
+  /**
    * Route-exit prompt for the System Overview → Settings identity sub-form (Name +
    * Description only — the optional-feature toggles and the modifier/prerequisite/currency
    * cards on the same tab live-apply and stage no draft, so they never reach this prompt).
@@ -2613,8 +2827,7 @@ export function createAdminStore(services) {
       return services.getGatheringLocationService?.() || null;
     }
     function getActorOptions() {
-      const options = services.getActorOptions?.() || [];
-      return Array.isArray(options) ? _clonePlain(options) : [];
+      return _actorOptions();
     }
 
     // Reads the SHARED gate helper off the system, not `enabled` through the realm store.
@@ -3286,6 +3499,117 @@ export function createAdminStore(services) {
     return (Array.isArray(system?.tools) ? system.tools : []).map((tool) =>
       _normalizeGatheringLibraryTool(tool, _randomID)
     );
+  }
+
+  /**
+   * The same library, THROUGH THE READ UNION — what a craft will actually do (issue 1373).
+   *
+   * ── WHY THE EDITOR MUST NOT READ {@link _systemTools} ──────────────────────────────────────
+   * The Tools BROWSER has read the union since the repoint, for the reason its own comment in
+   * `adminSystemInspectorProjection` gives: a row must not read `Inherits world defaults` while
+   * displaying a value it has not inherited. The rules EDITOR behind that row went on reading the
+   * raw in-system array, so for an inheriting Tool it stated the in-system value while every
+   * craft took the world one. `breakage` only LOOKED inherited because adoption used to copy the
+   * world value onto the record; `prerequisites` and `bonus` — added to `TOOL_SECTIONS` at
+   * `1.31.0` — had no such copy, so the rail read `No check bonus` over an authored world bonus.
+   *
+   * ── IT IS A DISPLAY READ AND NEVER A WRITE SOURCE ─────────────────────────────────────────
+   * Every write path in this file still reads {@link _systemTools}. Persisting a union row would
+   * take the world's answer for an INHERITING section and write it onto the in-system record,
+   * silently converting the section into an override — the exact behaviour `## Scoped Entity
+   * Definitions` requirement 15's clause 1a retired clause 1 to remove. {@link _toolRecordForSave}
+   * is what keeps the two apart.
+   *
+   * @param {string} systemId
+   * @returns {Array<object>}
+   */
+  function _resolvedSystemTools(systemId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return [];
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
+    if (!system) return [];
+    return resolvedToolsFor(system, _worldToolCorpus()).map((tool) =>
+      _normalizeGatheringLibraryTool(tool, _randomID)
+    );
+  }
+
+  /**
+   * One `(tool, system)` pair's WORLD MEMBERSHIP RECORD — the only thing that carries the
+   * per-section inherit switch.
+   *
+   * `null` for a pre-migration in-system Tool with no world half, which inherits nothing because
+   * there is no parent; the save path then writes the draft verbatim, exactly as it always did.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @returns {object|null}
+   */
+  function _toolMembership(toolId, systemId) {
+    return findMembership(_worldToolCorpus()?.membership, toolId, systemId);
+  }
+
+  /**
+   * THE RECORD A SAVE ACTUALLY PERSISTS: the draft, with every INHERITING section restored from
+   * the live in-system record (issue 1373).
+   *
+   * ── THE FAILURE THIS EXISTS TO PREVENT, WHICH ANNOUNCES ITSELF NOWHERE ────────────────────
+   * The draft is seeded from the read union, so an inheriting section's value in the draft is the
+   * WORLD'S. Persisting the draft whole would write that value onto the in-system record, which
+   * `resolveTool` reads the moment the switch says overriding — so every inheriting section would
+   * quietly become a frozen copy of one moment's world default, and the next world edit would
+   * stop reaching this system. No suite would go red: the record would still be valid, the pill
+   * would still say `Inheriting`, and the divergence would only appear after the world changed.
+   *
+   * ── SO THE SAVE READS THE SWITCH, NOT THE DRAFT ───────────────────────────────────────────
+   * An ABSENT `inherit` key reads as inheriting, matching `isSectionInherited` and the card. A
+   * section marked OVERRIDING is taken from the draft, which is where the GM's edit is. Every key
+   * that is not a section — identity, `label`, `enabled`, `requirement`, `checkBreakable`,
+   * `repairRequirements` — comes from the draft unchanged, because none of them resolve through
+   * the world layer.
+   *
+   * @param {string} systemId
+   * @param {object} draft
+   * @returns {object} a new record; neither input is mutated.
+   */
+  function _toolRecordForSave(systemId, draft) {
+    const record = _clonePlain(draft);
+    const id = String(record?.id ?? '');
+    const membership = _toolMembership(id, systemId);
+    if (!membership) return record;
+    const live = _systemTools(systemId).find((tool) => String(tool.id) === id) || null;
+    if (!live) return record;
+    for (const section of TOOL_SECTIONS) {
+      if (!isSectionInherited(membership, section)) continue;
+      if (section in live) record[section] = _clonePlain(live[section]);
+      else delete record[section];
+    }
+    return record;
+  }
+
+  /**
+   * Re-read ONE section of the open draft from the read union, after a membership write moved it.
+   *
+   * Written onto the draft AND its baseline together, on {@link _writeLiveTool}'s own rule: the
+   * GM did not type this value, so a half-finished edit elsewhere in the draft must neither be
+   * discarded nor start reading as though this section were an unsaved change.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @param {string} section
+   * @returns {void}
+   */
+  function _syncToolDraftSection(toolId, systemId, section) {
+    if (String(get(toolDraft)?.id || '') !== String(toolId)) return;
+    const resolved = _resolvedSystemTools(systemId).find(
+      (tool) => String(tool.id) === String(toolId)
+    );
+    if (!resolved) return;
+    const written = { [section]: _clonePlain(resolved[section]) };
+    toolDraft.update((draft) => (draft ? { ...draft, ...written } : draft));
+    toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
+    _recomputeToolsDraftDirty();
+    toolDraftValidation.set(validateToolDraft());
+    _patchToolsDraftViewState();
   }
 
   /**
@@ -4549,6 +4873,20 @@ export function createAdminStore(services) {
       // undefined and silently counts zero, which is how the World > Currency subtitle came to
       // report every ladder as unadopted.
       currencyEnabled: s?.requirements?.currency?.enabled === true,
+      // WHETHER THIS SYSTEM AUTHORS ITS OWN TOOL BREAK MODE, and what it authored (issue
+      // 1373). The world Tools Catalogue states `{n} systems override it` beside the world
+      // default, which is a count of systems whose OWN token differs from the world's — a
+      // question only the per-system `toolBreakage` block answers.
+      //
+      // THE KEY IS ALWAYS PRESENT, even when nothing is authored, and that is the contract
+      // `breakModeOverridesKnown` tests: this list is a deliberate allowlist, so a consumer
+      // reaching for an absent `toolBreakage` reads undefined and counts ZERO, which renders
+      // as "no system overrides it" and is a WRONG number rather than a missing one. An
+      // always-present key with an empty `authority` lets the screen tell "nothing overrides
+      // it" from "this roster cannot answer".
+      toolBreakage: {
+        authority: typeof s?.toolBreakage?.authority === 'string' ? s.toolBreakage.authority : '',
+      },
       selected: s.id === resolvedSystemId,
     }));
 
@@ -4579,6 +4917,7 @@ export function createAdminStore(services) {
 
     let selectedSystemData = null;
     let essenceCards = [];
+    let toolRequiredFor = {};
     let recipeListData = {
       recipes: [],
       rosterRecipes: [],
@@ -4650,7 +4989,8 @@ export function createAdminStore(services) {
         essenceDefinitions,
         availableScriptMacros,
         sceneOptions,
-        worldScopeState.worldScope?.tool?.toolBreakage ?? null
+        worldScopeState.worldScope?.tool?.toolBreakage ?? null,
+        _worldToolCorpus()
       );
       recipeListData = _buildRecipeList(
         systemManager,
@@ -4659,6 +4999,7 @@ export function createAdminStore(services) {
         get(recipeSearch),
         { roster: systemRecipes }
       );
+      toolRequiredFor = _buildToolRequiredFor(selectedSystem.id, systemRecipes);
     }
 
     const visibleTab = _resolveVisibleTab(get(activeTab), selectedSystem);
@@ -4688,6 +5029,12 @@ export function createAdminStore(services) {
       accessCharacters,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
+      // THE TOOL RULES EDITOR'S RAIL DATA (issue 1373). `actorOptions` is published from the
+      // MAIN refresh now as well as from `travel.patch()`: the key was top level all along but
+      // only World > Travel ever wrote it, so every other reader saw the empty default until a
+      // scene change happened to fire.
+      actorOptions: _actorOptions(),
+      toolRequiredFor,
     }));
     await Promise.resolve();
 
@@ -4898,12 +5245,156 @@ export function createAdminStore(services) {
     return usage;
   }
 
+  /**
+   * Every tool id one recipe requires, from BOTH places a recipe names them.
+   *
+   * FOUR PLACES, not one. A recipe carries a top-level `toolIds`, each of its ingredient sets
+   * carries its own, and a MULTI-STEP recipe repeats both per step (`Recipe#toJSON` emits all
+   * four). A scan of the top level alone reports 0 for every per-set and every stepped recipe,
+   * which is precisely the population a Tool requirement is most often authored on.
+   *
+   * Ids are trimmed and de-duplicated, so one recipe naming a tool in two of the four places
+   * counts once.
+   *
+   * @param {object} recipe
+   * @returns {Set<string>}
+   */
+  function _recipeToolIds(recipe) {
+    const ids = new Set();
+    const lists = [recipe?.toolIds];
+    const setLists = [
+      ...(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []),
+      ...(Array.isArray(recipe?.steps) ? recipe.steps : []).flatMap((step) => [
+        step,
+        ...(Array.isArray(step?.ingredientSets) ? step.ingredientSets : []),
+      ]),
+    ];
+    for (const set of setLists) lists.push(set?.toolIds);
+    for (const list of lists) {
+      for (const raw of Array.isArray(list) ? list : []) {
+        const trimmed = String(raw ?? '').trim();
+        if (trimmed) ids.add(trimmed);
+      }
+    }
+    return ids;
+  }
+
+  /**
+   * How many recipes require each world Tool, PER CRAFTING SYSTEM.
+   *
+   * ── WHY PER SYSTEM RATHER THAN WORLD-WIDE ────────────────────────────────────────────────
+   * The only row that states this number is on the SYSTEM Tool Rules list, under a heading
+   * that already says which system a GM is looking at. A world-wide total there would read as
+   * "recipes in this system" and be a wrong number rather than a missing one — which is the
+   * failure this epic keeps hitting. The world-wide total is carried too, on the entry, for a
+   * surface that asks the world-scope question.
+   *
+   * ── WHY IT IS COMPUTED HERE ──────────────────────────────────────────────────────────────
+   * `worldScopeProjection` is handed a corpus and a roster and no recipes at all, and the
+   * recipe manager is already on this store's injected services bag. So the counting lives
+   * where the corpus does and the projection attaches the answer, keyed by entity id.
+   *
+   * A tool id is the same string in every system that has the world Tool — the read union
+   * matches an in-system record to its world entity BY ID — so scanning each system's own
+   * recipes and keying by that id needs no membership join.
+   *
+   * ── IT ALSO CARRIES THE REFERENCES THEMSELVES, NOT ONLY THE COUNT (issue 1373) ────────────
+   * The world Tool entry's `REQUIRED FOR` region names each recipe and gathering task that
+   * requires the Tool, with a chip for which KIND it is. A count cannot answer that, and the
+   * screen that asks it is the world entry — which is the one surface with no system context at
+   * all, so it cannot re-derive the list from a selected system either.
+   *
+   * GATHERING TASKS ARE COUNTED IN `requiredBy` AND NOT IN `recipeCount`. The count is read by a
+   * row that says `N RECIPES`, and folding a task into it would make that a wrong number rather
+   * than a missing one — the failure this file keeps naming. They are two questions, so they are
+   * two fields.
+   *
+   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
+   *   requiredBy: Array<{id: string, name: string, kind: string, systemId: string,
+   *   systemName: string}>}>}
+   */
+  function _worldToolUsage() {
+    const usage = {};
+    const recipeManager = services.getRecipeManager?.();
+    const entryFor = (toolId) =>
+      (usage[toolId] ??= { recipeCount: 0, recipeCountBySystem: {}, requiredBy: [] });
+    const record = (toolId, systemId) => {
+      const entry = entryFor(toolId);
+      entry.recipeCount += 1;
+      entry.recipeCountBySystem[systemId] = (entry.recipeCountBySystem[systemId] || 0) + 1;
+    };
+    const reference = (toolId, reference_) => {
+      entryFor(toolId).requiredBy.push(reference_);
+    };
+    const gatheringSystems = _currentGatheringConfig()?.systems ?? {};
+    for (const system of _allSystems()) {
+      const systemId = String(system?.id ?? '');
+      if (!systemId) continue;
+      const systemName = String(system?.name ?? systemId);
+      let recipes = [];
+      try {
+        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+      } catch {
+        recipes = [];
+      }
+      for (const recipe of recipes) {
+        for (const toolId of _recipeToolIds(recipe)) {
+          record(toolId, systemId);
+          reference(toolId, {
+            id: String(recipe?.id ?? ''),
+            name: String(recipe?.name ?? recipe?.id ?? ''),
+            kind: 'recipe',
+            systemId,
+            systemName,
+          });
+        }
+      }
+      const tasks = gatheringSystems?.[systemId]?.tasks;
+      for (const task of Array.isArray(tasks) ? tasks : []) {
+        for (const raw of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+          const toolId = String(raw ?? '').trim();
+          if (!toolId) continue;
+          reference(toolId, {
+            id: String(task?.id ?? ''),
+            name: String(task?.name ?? task?.id ?? ''),
+            kind: 'gathering',
+            systemId,
+            systemName,
+          });
+        }
+      }
+    }
+    return usage;
+  }
+
   function buildWorldScopeState() {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
-      usage: { essence: _worldEssenceUsage() },
+      usage: { essence: _worldEssenceUsage(), tool: _worldToolUsage() },
     });
+  }
+
+  /**
+   * The published WORLD TOOL CORPUS, or `null` when there is no store to read (issue 1373).
+   *
+   * The selected-system projection unions its `tools` against this, so the Tool Rules screen
+   * and every non-UI reader answer "which tools does this system have" the same way. It is a
+   * READ of the store's published corpus rather than a projection of it: `resolvedToolsFor`
+   * memoizes on that object's identity, and the object is stable between saves, so this and
+   * `buildWorldScopeState` see the same snapshot within one publish.
+   *
+   * GUARDED, on `worldScopeProjection`'s own `readCorpus` rule: a store that throws must
+   * degrade to "no world half" and leave the GM a working Manager, never abort the publish.
+   *
+   * @returns {object|null}
+   */
+  function _worldToolCorpus() {
+    try {
+      return services.getToolScopeStore?.()?.corpus?.() ?? null;
+    } catch {
+      return null;
+    }
   }
 
   // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
@@ -4927,6 +5418,84 @@ export function createAdminStore(services) {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * EVERY world actor, name-sorted, as the `{uuid, id, name, img, isPlayerCharacter}` records
+   * the app service projects.
+   *
+   * Read at MODULE-INSTANCE scope rather than inside the travel closure, because it now has two
+   * readers: World > Travel's party pickers and the Tool rules editor's `Preview as` selector.
+   * The travel closure delegates here so there is one read and one clone, not two.
+   *
+   * @returns {Array<object>}
+   */
+  function _actorOptions() {
+    const options = services.getActorOptions?.() || [];
+    return Array.isArray(options) ? _clonePlain(options) : [];
+  }
+
+  /**
+   * ONE ACTOR'S PREPARED ROLL DATA, for the Tool rules editor's `Preview as` evaluation.
+   *
+   * The ONLY thing on the Tool editor's path that touches a live Foundry document, which is why
+   * it is a service call rather than anything derived: `evaluatePrerequisite` reads roll-data
+   * paths, and `characterPrerequisites.js` records that every call site must spell
+   * `actor?.getRollData?.() ?? actor?.system ?? {}` because `pf2e`'s `getRollData()` answers
+   * `{actor: this}` alone. The app service owns that spelling; this is the seam it arrives
+   * through.
+   *
+   * `null` for an unresolvable uuid, which the preview reads as "no actor chosen".
+   *
+   * @param {string} actorUuid
+   * @returns {Promise<object|null>}
+   */
+  async function getActorRollData(actorUuid) {
+    const uuid = String(actorUuid || '').trim();
+    if (!uuid) return null;
+    try {
+      return (await services.getActorRollData?.(uuid)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * WHAT IN ONE CRAFTING SYSTEM REQUIRES EACH TOOL, by tool id (issue 1373).
+   *
+   * The Tool rules editor's rail states this per Tool, with a kind chip per row, and nothing
+   * published it: `_worldToolUsage` counts recipe references and carries no names, and gathering
+   * tasks were not counted at all. Both corpora are walked here, ONCE per publish, for the
+   * SELECTED system only — the only system whose editor can be open.
+   *
+   * A recipe's tool references live in FOUR places and `_recipeToolIds` already owns that walk;
+   * a gathering task carries a flat `toolIds`.
+   *
+   * @param {string} systemId
+   * @param {Array<object>} recipes The selected system's recipe cohort, already fetched.
+   * @returns {Record<string, Array<{id: string, name: string, kind: string}>>}
+   */
+  function _buildToolRequiredFor(systemId, recipes) {
+    const byTool = {};
+    const record = (toolId, entry) => {
+      const key = String(toolId || '').trim();
+      if (!key) return;
+      (byTool[key] ??= []).push(entry);
+    };
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      const id = String(recipe?.id ?? '');
+      const name = String(recipe?.name ?? '').trim() || id;
+      for (const toolId of _recipeToolIds(recipe)) record(toolId, { id, kind: 'recipe', name });
+    }
+    const tasks = _currentGatheringConfig()?.systems?.[String(systemId || '')]?.tasks;
+    for (const task of Array.isArray(tasks) ? tasks : []) {
+      const id = String(task?.id ?? '');
+      const name = String(task?.name ?? '').trim() || id;
+      for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+        record(toolId, { id, kind: 'gathering', name });
+      }
+    }
+    return byTool;
   }
 
   // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
@@ -5152,6 +5721,154 @@ export function createAdminStore(services) {
       },
     }).map(([entityType, family]) => [entityType, _republishingFamily(family)])
   );
+
+  /**
+   * The in-system Tool record adoption creates: the world entity's IDENTITY, and the ONE seeded
+   * section that has no live parent.
+   *
+   * ── WHY IT NO LONGER COPIES ANY INHERITED SECTION (issue 1373) ────────────────────────────
+   * It used to copy `breakage` and `onBreak` — two of the four sections `TOOL_SECTIONS` now
+   * declares — because the read union re-spread the in-system record LAST, so an identity-only
+   * record won those key contests with the normalizer's own defaults and the row read
+   * `Unlimited uses` under a pill saying `Inherits world defaults`. That is no longer how the
+   * union answers: clause 1a resolves an INHERITING section from the world default, on the
+   * shipped field names, whatever the in-system record carries. So the copy no longer makes the
+   * row's claim true — the union does — and every reader, this store's own editor included,
+   * enters there.
+   *
+   * ── AND SEEDING ALL FOUR WOULD BE WORSE THAN SEEDING TWO ──────────────────────────────────
+   * A freshly adopted Tool inherits every section, so the only moment any of these values is read
+   * back is after the GM turns a section's switch OFF — and `setToolSectionInherited` seeds THAT
+   * from the value on screen at that moment, which is current where an adoption-time copy is a
+   * snapshot that may be months stale. Writing four sections a system has not authored would put
+   * four override-shaped values on a record whose switches all say `Inheriting`: invisible while
+   * they hold, and wrong the first time one is flipped.
+   *
+   * ── `repairRequirements` IS THE EXCEPTION, AND IT IS NOT A SECTION ────────────────────────
+   * `TOOL_SEEDED_SECTIONS` names it precisely because the resolver does NOT read it through: it
+   * is copied once by `addToSystem` for the membership record and then diverges freely, so there
+   * is no world value for a union to answer with and no switch to read. Without the copy here an
+   * adopted Tool would simply have no repair recipe.
+   *
+   * ── `enabled` IS DELIBERATELY NOT SEEDED ──────────────────────────────────────────────────
+   * The world master switch is a VETO applied over the merged rows (`applyWorldEnabledVeto`),
+   * not a value to copy. Copying it would freeze one moment's answer into the system record and
+   * let a later world enable read back as disabled.
+   *
+   * @param {object} entity The world tool roster record.
+   * @param {object|null} worldDefault That entity's world defaults record, or `null`.
+   * @returns {object}
+   */
+  function _worldToolAdoptionSeed(entity, worldDefault) {
+    const originItemUuid = entity?.originItemUuid ?? entity?.registeredItemUuid ?? null;
+    const repairRequirements = _seedToolRepairRequirements(worldDefault);
+    return {
+      id: String(entity?.id ?? ''),
+      name: entity?.name ?? null,
+      img: entity?.img ?? null,
+      description: entity?.description ?? '',
+      originItemUuid,
+      registeredItemUuid: entity?.registeredItemUuid ?? originItemUuid,
+      aliasItemUuids: Array.isArray(entity?.aliasItemUuids) ? [...entity.aliasItemUuids] : [],
+      ...(repairRequirements.length > 0 ? { repairRequirements } : {}),
+    };
+  }
+
+  /**
+   * ADOPT a world Tool into a crafting system — BOTH halves of what membership means today.
+   *
+   * ── WHY THE MEMBERSHIP RECORD IS NOT ENOUGH ───────────────────────────────────────────────
+   * `## Scoped Entity Definitions` requirement 15 clause 3 makes the read union's ROW SET the
+   * IN-SYSTEM ARRAY'S row set for as long as `## CraftingSystem` requirement 36 holds — "the
+   * world layer contributes rows only after requirement 36 retires" — precisely so a membership
+   * record that outlives its in-system record cannot resurrect a deleted Tool. A membership-only
+   * adoption therefore writes a record that NOTHING can read: the Tool Rules list keeps drawing
+   * the row as an unadopted ghost, the button looks inert, and no recipe can name the Tool.
+   * Measured on this store: `resolveToolScope` answers `[]` for a corpus with the entity, the
+   * default and the membership record and an empty in-system array.
+   *
+   * So while requirement 36 holds, adopting is TWO writes and the in-system one is the load
+   * bearing half. This is the composition root for both — `worldScopeActions` is a pure world
+   * scope writer with no crafting-system manager, and by design reads no Foundry global.
+   *
+   * ── ORDER AND ROLLBACK ────────────────────────────────────────────────────────────────────
+   * The membership write goes first because it OWNS the already-a-member rule, so this action
+   * does not restate it. If the Tool record is then refused, the membership record is REMOVED
+   * again: leaving it would be the exact ghost state above, whereas an in-system record with no
+   * membership record is an ordinary, fully usable pre-migration Tool.
+   *
+   * ── AN EXISTING RECORD IS NEVER REWRITTEN ─────────────────────────────────────────────────
+   * A migrated world's in-system record and its world entity share an id by construction, so a
+   * system that already holds the record is adopting a Tool it already has. Requirement 36 keeps
+   * that record authoritative, so adoption adds the membership record and leaves the GM's own
+   * identity edits alone.
+   *
+   * ── NO `itemUuid`, SO NO ROLE FLAG IS STAMPED ─────────────────────────────────────────────
+   * `upsertTool`'s `{itemUuid}` option resolves the source Item to re-snapshot it and stamp the
+   * durable `roles[systemId].toolId`, and it THROWS when the uuid no longer resolves. Adoption
+   * must not fail because a world Tool's source Item was deleted, and the world entity's own
+   * identity is the authority for a world Tool anyway. Item matching still works: the durable
+   * flag is tier 1 of `resolveToolForItem` and the source references this seeds are tier 2.
+   *
+   * @param {string} entityId The world tool entity id.
+   * @param {string} [systemId] Defaults to the selected system.
+   * @returns {Promise<boolean>}
+   */
+  async function adoptWorldTool(entityId, systemId = get(selectedSystemId)) {
+    const target = String(entityId ?? '').trim();
+    const system = String(systemId ?? '').trim();
+    if (!target || !system) return false;
+    // ONE READ OF THE CORPUS for both halves of the seed, so the identity and the defaults
+    // cannot come from two different snapshots.
+    const corpus = _worldToolCorpus();
+    const byId = (records) =>
+      (Array.isArray(records) ? records : []).find(
+        (record) => String(record?.id ?? '').trim() === target
+      ) ?? null;
+    const entity = byId(corpus?.entities);
+    if (!entity) return false;
+
+    const systemManager = services.getCraftingSystemManager?.();
+    const needsRecord = !_systemTools(system).some((tool) => String(tool?.id ?? '') === target);
+    if (needsRecord && typeof systemManager?.upsertTool !== 'function') return false;
+    if ((await worldScope.tool.addToSystem(target, system)) !== true) return false;
+
+    if (needsRecord) {
+      try {
+        await systemManager.upsertTool(
+          system,
+          _worldToolAdoptionSeed(entity, byId(corpus?.defaults))
+        );
+      } catch (error) {
+        await worldScope.tool.removeFromSystem(target, system);
+        services.notify?.error?.(
+          services.localize?.('FABRICATE.Admin.Manager.Tools.AddToSystemFailed') ||
+            `The Tool could not be added to this system. ${error?.message || ''}`.trim()
+        );
+        await refresh();
+        return false;
+      }
+    }
+    await refresh();
+    return true;
+  }
+
+  // THE EXPOSED FAMILY, WITH TOOL ADOPTION COMPOSED OVER IT (issue 1373).
+  //
+  // `addToSystem` is REPLACED rather than added beside, because the three shipped call sites —
+  // the Tool Rules inspector's `Add {tool} to {system}`, the same screen's per-row add, and the
+  // world catalogue's generic system row — all reach it through this one key. A parallel
+  // `adoptWorldTool` would have left every one of them writing a record nothing can read, which
+  // is the whole defect. The world-scope leg is unchanged and still owns the membership rule;
+  // only the crafting-system leg is new.
+  //
+  // TOOL ONLY. Components and essences reach `worldScopeActions` untouched: neither has a
+  // crafting-system-manager write to compose, and inventing one here would be a write path no
+  // screen asked for.
+  const worldScopeApi = {
+    ...worldScope,
+    tool: { ...worldScope.tool, addToSystem: adoptWorldTool },
+  };
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
@@ -9947,6 +10664,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtyToolEntryDraft,
     confirmDiscardDirtySystemDetailsDraft,
     confirmDiscardDirtyChecksDraft,
     confirmDiscardDirtyRecipeDraft,
@@ -10005,7 +10723,17 @@ export function createAdminStore(services) {
     deleteGatheringLibraryTool,
     validateGatheringLibraryTool,
     createToolDraft,
+    // THE ID MINTER, EXPOSED (issue 1373). A world-scope create needs an id, and
+    // `worldScopeActions` refuses to mint one: it reads no Foundry global by design, so it
+    // takes the id it is given. The root is the only place a world Tool is created from a
+    // dropped Item, and a fourth hand-rolled copy of this ladder there would reach the
+    // `Math.random()` rung SonarCloud fails as S2245. `_randomID` already prefers the injected
+    // seam, then Foundry's own, so exposing it hands every caller the same order of preference.
+    randomID: _randomID,
     openToolDraft,
+    getActorRollData,
+    setToolSectionInherited,
+    removeToolFromSystem,
     patchToolDraft,
     stageToolDraftSource,
     unlinkToolDraftSource,
@@ -10153,10 +10881,12 @@ export function createAdminStore(services) {
     resetActorAllKnowledge,
     // --- World scope: components, essences and tools (issue 1362, epic 1357) ---
     //
-    // EXPOSED BUT UNREACHABLE. Every world route this PR ships is a placeholder, so nothing
-    // in `src/` calls one of these yet. The key set is part of the contract: `setEnabled` is
-    // absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only there.
-    worldScope,
+    // The key set is part of the contract: `setEnabled` is absent on `worldScope.component`,
+    // and `setWorldTags` / `setMutedTags` exist only there. NO LONGER UNREACHABLE — the world
+    // Tools Catalogue, the world Tool entry and the system Tool Rules screen all call the tool
+    // family now (issue 1373); the component and essence families are still placeholder-bound.
+    // `tool.addToSystem` is `adoptWorldTool` rather than the raw world-scope write; see there.
+    worldScope: worldScopeApi,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

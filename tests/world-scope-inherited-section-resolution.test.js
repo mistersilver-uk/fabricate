@@ -109,14 +109,40 @@ const SCOPES = Object.freeze([
       componentId: 'anvil',
       breakage: { mode: 'system' },
       onBreak: { action: 'system' },
+      // `prerequisites` and `bonus` are the two sections issue 1373 added to `TOOL_SECTIONS`,
+      // and they are READ HERE ON THE SHIPPED FIELD NAMES: a normalized `Tool` carries them
+      // under exactly the section name, which `toolCheckBonus.js` reads as
+      // `tool.prerequisites.gateMode` and `tool.bonus.expression`. That coincidence is the
+      // reason this arm exists rather than a key-set comparison — a writer guessed from the
+      // section name is correct for these two and wrong for the essence's two, so only driving
+      // the read can tell the two cases apart.
+      prerequisites: { enabled: true, ids: ['system-prereq'], gateMode: 'bonus' },
+      bonus: { enabled: true, expression: '1d4' },
     },
-    worldValue: { breakage: { mode: 'world' }, onBreak: { action: 'world' } },
+    worldValue: {
+      breakage: { mode: 'world' },
+      onBreak: { action: 'world' },
+      prerequisites: { enabled: true, ids: ['world-prereq'], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '2d6' },
+    },
     reads: {
       breakage: (row) => row.breakage?.mode,
       onBreak: (row) => row.onBreak?.action,
+      prerequisites: (row) => row.prerequisites?.gateMode,
+      bonus: (row) => row.bonus?.expression,
     },
-    expected: { breakage: 'world', onBreak: 'world' },
-    original: { breakage: 'system', onBreak: 'system' },
+    expected: {
+      breakage: 'world',
+      onBreak: 'world',
+      prerequisites: 'usability',
+      bonus: '2d6',
+    },
+    original: {
+      breakage: 'system',
+      onBreak: 'system',
+      prerequisites: 'bonus',
+      bonus: '1d4',
+    },
   },
 ]);
 

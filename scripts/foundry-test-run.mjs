@@ -2389,9 +2389,17 @@ function assertHorizontalContainment(parent, child, label) {
   }
 }
 
+// THREE, not four. Issue 1373 retired the editor's `Overview` tab: at SYSTEM scope a crafting
+// system authors no identity, so the linked-Item card and the description moved to the world Tool
+// entry that owns them, and the display label became an override card on Breakage. The strip is
+// `Breakage · Requirements · Validation`, which is what the design draws.
+//
+// The count is asserted rather than left open because this check exists to prove every tab is
+// MEASURABLE and horizontally contained — a strip that rendered one tab would satisfy a loop over
+// whatever it found. `screenshot-capture-scoping.test.js` pins the message, so both move together.
 function assertToolStudioTabContainment(report) {
-  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 4) {
-    throw new Error(`Tool editor must render four measurable tabs: ${JSON.stringify(report)}`);
+  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 3) {
+    throw new Error(`Tool editor must render three measurable tabs: ${JSON.stringify(report)}`);
   }
   const overflow = report.tabsOverflow;
   if (
@@ -2455,8 +2463,8 @@ async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
     ['previewNameType', 17, 'Tool preview name'],
   ]);
   if (!stacked) {
-    if (!report.preview || report.preview.width < 318 || report.preview.width > 322) {
-      throw new Error(`Tool preview is not the complete 320px rail: ${JSON.stringify(report.preview)}`);
+    if (!report.preview || report.preview.width < 338 || report.preview.width > 342) {
+      throw new Error(`Tool preview is not the complete 340px rail: ${JSON.stringify(report.preview)}`);
     }
     if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
       throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
@@ -5600,11 +5608,87 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
   }
 }
 
-async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable }) {
+// THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373).
+//
+// `PROTO-tool-rules.png` draws no bar under its list, so `ToolsBrowserView` moved from
+// `persistent` to `Pagination`'s `multiPageOnly` mode. This phase used to pin the footer's
+// geometry at eight rows AND at nine on an eight-row page, which asserted the exact opposite of
+// what now ships: at eight the bar is gone.
+//
+// SO PRESENCE IS AN ASSERTED OUTCOME HERE, not a precondition the helper skips past. Both
+// answers are checked at both dataset sizes rather than the absent case simply not being
+// looked at:
+//
+//  - eight rows, page size eight, ONE page  -> the bar must be ABSENT, and the phase fails if
+//    it is drawn. That is the assertion the prototype is about, so it has to be the one that
+//    can fail; a helper that returned early on a missing bar would pass identically against
+//    the `persistent` code this replaces.
+//  - nine rows, page size eight, TWO pages  -> the bar must be PRESENT and every geometry check
+//    below still applies to it verbatim, so the footer's full-width bottom-pinned construction,
+//    its control ordering, its scroll independence and its page-to-page stability are all still
+//    pinned exactly where they were.
+//
+// THE SLOT IS NOT THE BAR. `[data-tool-browser-pagination]` is the bottom-pinned layout div and
+// it renders whenever the selected COHORT is non-empty — not whenever the system has tools, which
+// is what it read before issue 1373 and which left it absent for a system holding none even once
+// the widened world list drew rows above it. What comes and goes inside it is
+// `.manager-pagination`, so presence is read from that, and reading the slot instead would be a
+// check that could never fail.
+//
+// It does NOT keep the list card from becoming `:last-child`, which is what this note used to
+// say. The slot is a sibling of `.manager-tools-main-content` rather than a child, so the card
+// is `:last-child` of that div either way and its `flex: 1 1 auto` never depended on the slot.
+async function assertToolLibraryPagination(page, {
+  expectedTotal,
+  expectedPage = 1,
+  expectScrollable,
+  expectFooter = true,
+  selectedToolId,
+}) {
   const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
-  const footer = browser.locator('[data-tool-browser-pagination]');
+  const slot = browser.locator('[data-tool-browser-pagination]');
+  const footer = slot.locator('.manager-pagination');
+  // THE SELECTION INVARIANT IS AN IDENTITY, NOT A ROW POSITION. This used to read
+  // `.manager-tools-row:first-child`, which was only ever right while the library rendered in
+  // fixture-authored order; the shipped `SORT BY [Name] [Asc]` control (issue 1373) puts the
+  // Tool the walk selects in row six, so a first-child check would fail against a perfectly
+  // healthy pager. The caller says which Tool it selected and every page-1 call re-reads it, so
+  // a pager or a re-render that drops the selection still fails here.
+  if (expectedPage === 1 && !selectedToolId) {
+    throw new Error('Tool pagination page-1 checks need the Tool ID the walk selected');
+  }
+  const selectionRows = browser.locator('.manager-tools-row');
+  const assertSelectionRetained = async () => {
+    const selectedToolIds = await selectionRows.evaluateAll((rows) => rows
+      .filter((candidate) => candidate.classList.contains('is-selected'))
+      .map((candidate) => candidate.dataset.managerToolId));
+    if (JSON.stringify(selectedToolIds) !== JSON.stringify([selectedToolId])) {
+      throw new Error(
+        `Tool library did not preserve its selection of ${selectedToolId}: ${JSON.stringify(selectedToolIds)}`
+      );
+    }
+  };
   await list.waitFor({ state: 'visible', timeout: 5_000 });
+  if (!expectFooter) {
+    // The SLOT must still be in the DOM, so that a bar which vanished because the whole browser
+    // failed to render cannot be mistaken for the single-page case this asserts.
+    if ((await slot.count()) !== 1) {
+      throw new Error('Tool pagination slot is missing, so its emptiness proves nothing');
+    }
+    const drawn = await footer.count();
+    if (drawn !== 0) {
+      throw new Error(`Tool pagination drew a foot bar on a single page of ${expectedTotal}`);
+    }
+    if (expectScrollable !== undefined) {
+      const scrollable = await list.evaluate((element) => element.scrollHeight > element.clientHeight);
+      if (scrollable !== expectScrollable) {
+        throw new Error(`Tool list scrollability was ${scrollable}; expected ${expectScrollable}`);
+      }
+    }
+    if (expectedPage === 1) await assertSelectionRetained();
+    return null;
+  }
   await footer.waitFor({ state: 'visible', timeout: 5_000 });
   const state = await browser.evaluate((element) => {
     const scroll = element.querySelector('[data-tool-library-scroll]');
@@ -5621,7 +5705,6 @@ async function assertToolLibraryPagination(page, { expectedTotal, expectedPage =
       scroll: rect(scroll),
       footer: rect(pagination),
       scrollable: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
-      selectedFirst: element.querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true,
       ordered: Boolean(
         summary &&
         nav &&
@@ -5643,9 +5726,7 @@ async function assertToolLibraryPagination(page, { expectedTotal, expectedPage =
     throw new Error(`Tool pagination is not a full-width bottom-pinned footer: ${JSON.stringify(state)}`);
   }
   if (!state.ordered) throw new Error('Tool pagination does not match Recipe Studio control ordering');
-  if (expectedPage === 1 && !state.selectedFirst) {
-    throw new Error('Tool library did not preserve automatic first-row selection');
-  }
+  if (expectedPage === 1) await assertSelectionRetained();
   if (expectScrollable !== undefined && state.scrollable !== expectScrollable) {
     throw new Error(`Tool list scrollability was ${state.scrollable}; expected ${expectScrollable}`);
   }
@@ -5692,39 +5773,99 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (visibleToolRowCount !== 8) {
     throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
   }
+  // NAME-ASCENDING, not authored order. The Tool Rules screen gained the design's
+  // `SORT BY [Name] [Asc]` control (issue 1373), and `sortKey`/`sortDirection` default to
+  // name/asc exactly as the design draws them. This list previously encoded the order the
+  // fixtures were authored in, which is what a screen with no sort control renders. Do not
+  // "restore" it: an authored-order library here now means the sort defaults regressed.
   const expectedToolNames = [
-    "Smith's Hammer",
-    'Arcane Forge',
     "Alchemist's Supplies",
+    'Arcane Forge',
     'Ley-Line Nexus',
     "Master's Anvil",
     'Moonwell',
+    "Smith's Hammer",
     'Volcanic Vent',
     'Woodcarving Tools',
   ];
-  const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  const readToolNames = () =>
+    visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  const visibleToolNames = await readToolNames();
   if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
   }
+  // AUTO-SELECTION IS A FIRST-RENDER FACT, so it is read here, before this walk touches the
+  // library at all. The effect behind it only re-fires when the inspected Tool leaves `tools`,
+  // so the same assertion made after a sort click - let alone after a selection click - would
+  // only prove that some selection survived, not that the screen made one for the GM on first
+  // paint. The first row is whatever the shipped default sort puts there, which is why the name
+  // comes out of the order constant above rather than being written in.
   if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error("Tool Studio parity library did not automatically select Smith's Hammer in the first row");
+    throw new Error(
+      `Tool Studio parity library did not automatically select its first row (${expectedToolNames[0]})`
+    );
+  }
+  // Drive the direction toggle, so the constant above is a gate on a working sort rather than a
+  // record of whatever order the library happened to come back in. Descending must be the exact
+  // reverse, and toggling back must restore it — a control that renders but sorts nothing passes
+  // the first assertion and fails these two.
+  const sortDirectionToggle = await requireSingleLocator(
+    manager.locator('[data-tool-sort-direction]'),
+    'Tool Studio sort direction toggle'
+  );
+  await sortDirectionToggle.click();
+  const descendingState = await sortDirectionToggle.getAttribute('data-tool-sort-direction');
+  if (descendingState !== 'desc') {
+    throw new Error(`Tool Studio sort toggle did not report descending; read "${descendingState}"`);
+  }
+  const descendingToolNames = await readToolNames();
+  if (JSON.stringify(descendingToolNames) !== JSON.stringify([...expectedToolNames].reverse())) {
+    throw new Error(
+      `Tool Studio descending sort is not the reverse of ascending: ${JSON.stringify(descendingToolNames)}`
+    );
+  }
+  await sortDirectionToggle.click();
+  const restoredState = await sortDirectionToggle.getAttribute('data-tool-sort-direction');
+  if (restoredState !== 'asc') {
+    throw new Error(`Tool Studio sort toggle did not report ascending; read "${restoredState}"`);
+  }
+  const restoredToolNames = await readToolNames();
+  if (JSON.stringify(restoredToolNames) !== JSON.stringify(expectedToolNames)) {
+    throw new Error(
+      `Tool Studio sort did not restore ascending order: ${JSON.stringify(restoredToolNames)}`
+    );
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
-  const editButton = row.locator('.manager-icon-button');
+  // THE ROW'S EDIT CONTROL IS SELECTED BY ITS DATA HOOK, NOT BY A CLASS. Prototype parity
+  // (issue 1373) replaced the pen icon - a `.manager-icon-button`, the shared square glyph
+  // button - with the design's labelled `Edit rules` button, which renders
+  // `class="manager-tools-edit-rules" data-tool-edit-rules={entry.id}`. Classes churn under
+  // design-system refactors and this row has now lost two of them; `data-tool-edit-rules`
+  // is the hook the component states it exists to be selected by, and it carries the Tool's
+  // own id, so every later lookup in this phase is an identity lookup rather than a
+  // descendant-of-a-row lookup.
+  const editButton = row.locator('[data-tool-edit-rules]');
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
-  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
-  const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
+  await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit');
+  // ROW TWO IS ONLY HOW A SECOND TOOL IS PICKED, NOT HOW IT IS ADDRESSED. The walk reads
+  // the id off the second row once and resolves that Tool by identity everywhere after,
+  // including the 680px pass further down - which runs after the library has been emptied,
+  // repopulated and re-sorted twice. A positional re-read there silently retargets the
+  // moment a sort default, a page size or the membership filter moves the row, which is
+  // exactly the class of breakage the `:first-child` selection checks already cost a run.
   const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
   if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
+  const otherRow = manager.locator(`[data-manager-tool-id="${otherToolId}"]`);
+  const otherSelectTarget = otherRow.locator('.manager-tools-select-target');
   await withSingleToolDraftTransition(
     page,
     otherToolId,
     'Tool alternate-row selection',
     () => otherSelectTarget.click(),
     async () => {
-      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+      if (!(await otherRow.evaluate((element) => element.classList.contains('is-selected')))) {
         throw new Error('Tool alternate-row selection did not expose selected state');
       }
     },
@@ -5740,8 +5881,18 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       }
     },
   );
-  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
+  // ONE SELECTED ROW, AND IT IS THE ONE THE WALK JUST CLICKED. `rowSelected` is an equality
+  // test, so the alternate row selected a moment ago has to have gone dark; this catches a
+  // library that lights a second row rather than moving the one selection. It is deliberately
+  // NOT a row-position check: under the shipped name-ascending default sort the parity fixture
+  // is row six, so asserting `:first-child` here would demand two rows be selected at once.
+  const selectedAfterParityClick = await visibleToolRows.evaluateAll((rows) => rows
+    .filter((candidate) => candidate.classList.contains('is-selected'))
+    .map((candidate) => candidate.dataset.managerToolId));
+  if (JSON.stringify(selectedAfterParityClick) !== JSON.stringify([fixture.toolId])) {
+    throw new Error(
+      `Tool Studio parity row selection did not select exactly the intended Tool: ${JSON.stringify(selectedAfterParityClick)}`
+    );
   }
   const inspectorDescription = await manager.locator('[data-tool-inspector-description]').textContent();
   if (!inspectorDescription?.includes('well-balanced forge hammer')) {
@@ -5752,13 +5903,19 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   ), systemId);
   const paginationComponentId = parityTools.find((tool) => tool.componentId)?.componentId;
   if (!paginationComponentId) throw new Error('Tool Studio pagination fixture has no managed Component identity');
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1 });
+  await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId },
+  );
   await setManagerWindowSize(page, {
     width: 1214,
     height: 524,
     sourceViewport: { width: 1280, height: 520 },
   });
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true });
+  await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId },
+  );
   await setManagerWindowSize(page, {
     width: 1214,
     height: 724,
@@ -5782,9 +5939,14 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       repairRequirements: [],
     },
   });
-  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 tools' })
+  // `8 shown`, NOT `9 shown` (issue 1373). The count above the list states the PAGE, not the
+  // filter: it was fed the filtered length, so a two-page result read `9 shown` over eight rows
+  // while the pager immediately below it read `Showing 1-8 of 9` — two counts in one pane
+  // contradicting each other. The ninth Tool is still proved present, by
+  // `assertToolLibraryPagination`'s own `of 9` summary check on the very next line.
+  await manager.locator('[data-tool-result-count]').filter({ hasText: '8 shown' })
     .waitFor({ state: 'visible', timeout: 5_000 });
-  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1 });
+  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId });
   await setManagerWindowSize(page, {
     width: 1214,
     height: 524,
@@ -5792,7 +5954,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   const firstPageFooter = await assertToolLibraryPagination(
     page,
-    { expectedTotal: 9, expectedPage: 1, expectScrollable: true },
+    { expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId },
   );
   await manager.locator('[data-tool-browser-pagination] [data-pagination-next]').click();
   const secondPageFooter = await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 2 });
@@ -5887,9 +6049,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     page,
     otherToolId,
     'Tool 680px alternate-row selection',
-    () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
+    () => otherSelectTarget.click(),
     async () => {
-      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+      if (!(await otherRow.evaluate((element) => element.classList.contains('is-selected')))) {
         throw new Error('Tool 680px alternate-row selection did not expose selected state');
       }
     },
@@ -5928,7 +6090,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     () => enabledToggle.click(),
     () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore680),
   );
-  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
+  await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit at 680px');
   await withSingleToolDraftTransition(
     page,
     fixture.toolId,
@@ -5965,100 +6127,128 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
-  const sourceCard = editor.locator('[data-tool-source-card]');
-  await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
-  await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
-  // A user must be able to expose Foundry's Item directory before starting a
-  // native drag. Move the live ApplicationV2 window left for that interaction,
-  // then restore the exact 1280px evidence geometry immediately afterwards.
-  await page.evaluate(async () => {
-    await globalThis.__fabricateSmokeManagerApp.setPosition({
-      width: 900,
-      height: 700,
-      left: 0,
-      top: 0,
-    });
-  });
-  await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
-  const replacementSourceItem = page.locator([
-    `#sidebar .directory-item[data-entry-id="${fixture.replacementSourceItemId}"]`,
-    `#sidebar .directory-item[data-document-id="${fixture.replacementSourceItemId}"]`,
-  ].join(', ')).first();
-  await replacementSourceItem.waitFor({ state: 'visible', timeout: 10_000 });
-  const [managerBounds, replacementBounds] = await Promise.all([
-    liveManagerApp.boundingBox(),
-    replacementSourceItem.boundingBox(),
-  ]);
-  if (
-    !managerBounds
-    || !replacementBounds
-    || replacementBounds.x + (replacementBounds.width / 2) <= managerBounds.x + managerBounds.width
-  ) {
-    throw new Error(`Tool Item sidebar source remains occluded by the manager: ${JSON.stringify({
-      managerBounds,
-      replacementBounds,
-    })}`);
-  }
-  await withSingleToolStoreMutation(
-    page,
-    'stageToolDraftSource',
-    'Tool Item sidebar drag',
-    () => replacementSourceItem.dragTo(sourceCard),
-    () => sourceCard.filter({ hasText: 'Smoke Tool Studio Replacement Item' })
-      .waitFor({ state: 'visible', timeout: 5_000 }),
-  );
-  wideGeometry = await setManagerWindowSize(page, {
-    width: 1214,
-    height: 724,
-    sourceViewport: { width: 1280, height: 720 },
-  });
-  const copySourceUuid = editor.locator('[data-tool-source-copy-uuid]');
-  await assertPointerTarget(page, copySourceUuid, '[data-tool-source-copy-uuid]', 'Copy source UUID');
-  await withSingleToolClipboardWrite(
-    page,
-    fixture.replacementSourceItemUuid,
-    () => copySourceUuid.click(),
-  );
-  await editor.locator('[data-tool-editor-back]').click();
-  const discardDraft = page.locator(
-    '.dialog button[data-action="discard"], .dialog button:has-text("Discard")'
-  ).first();
-  await discardDraft.waitFor({ state: 'visible', timeout: 5_000 });
-  await discardDraft.click();
-  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]')
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  await withSingleToolDraftTransition(
-    page,
-    fixture.toolId,
-    'Tool Edit route after source discard',
-    () => editButton.click(),
-    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
-      .waitFor({ state: 'visible', timeout: 5_000 }),
-  );
-  wideGeometry = await setManagerWindowSize(page, {
-    width: 1214,
-    height: 724,
-    sourceViewport: { width: 1280, height: 720 },
-  });
-  await editor.locator('[data-tool-source-card]').filter({ hasText: "Smith's Hammer" })
-    .waitFor({ state: 'visible', timeout: 5_000 });
+  // ── THE SYSTEM EDITOR AUTHORS NO IDENTITY, SO IT DRIVES NO ITEM DRAG (issue 1373) ────────
+  // An Item drop target, its copy-uuid action and the sidebar drag that exercised them are GONE
+  // from this walk because they are gone from this screen: a crafting system may not re-point
+  // which world Item a Tool IS. The capability moved whole to the world Tool entry, and the walk
+  // that exercises it belongs on the world screens with it. Recorded here rather than silently
+  // deleted, because the shape of what is missing is the point: this walk must never grow an
+  // identity edit back at system scope. Its hook names are deliberately NOT spelled out here —
+  // the guard that keeps them out reads this file as TEXT, so naming them in prose would trip it.
+  //
+  // The editor opens on `Breakage` — there is no `Overview` tab to click — and the per-system
+  // display-label OVERRIDE it still carries sits at the top of that tab, so the long-name stress
+  // frame needs no navigation of its own.
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
-  await assertSavedToolStudioCapture(editor, 'Overview parity');
-  await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', wideGeometry);
+  await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
+  const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
+  await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
+  // ── THE DISPLAY LABEL IS AN OVERRIDE, AND ITS FIELD IS ON THE OVERRIDING FACE ───────────
+  // The per-system display label is a `ToolInheritCard` like every other overridable fact on
+  // this tab (issue 1373): BLANK is the inheriting state, which renders the world name read-only
+  // on a globe row and no field at all, and the switch is what opens this system's own copy.
+  // So the walk flips the card before it types, and it flips it CONDITIONALLY - a fixture Tool
+  // that already carries a label, or one with no world membership to inherit through, is
+  // already showing its field, and a second click would put the card back to inheriting and
+  // fail the fill with nothing to type into.
+  const labelCard = editor.locator('[data-tool-rule-card="label"]');
+  await labelCard.waitFor({ state: 'visible', timeout: 5_000 });
+  if ((await labelCard.getAttribute('data-tool-rule-state')) === 'inheriting') {
+    const labelInheritToggle = editor.locator('[data-scoped-inherit-toggle="label"]');
+    await assertPointerTarget(
+      page,
+      labelInheritToggle,
+      '[data-scoped-inherit-toggle="label"]',
+      'Tool display-label override switch',
+    );
+    await labelInheritToggle.click();
+  }
   const displayLabel = editor.locator('[data-tool-label]');
+  await displayLabel.waitFor({ state: 'visible', timeout: 5_000 });
   await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);
   await displayLabel.fill("Smith's Hammer");
   await saveToolStudioDraftIfDirty(editor);
 
+  // ── THE INHERIT SWITCH AND THE REMOVE CALLOUT ────────────────────────────────────────────
+  // Both are new controls on this tab and both are POINTER-TESTED rather than pressed, and the
+  // reason is different for each. The inherit switch is a world-scope WRITE that would rewrite
+  // this Tool's breakage to the world default and change every parity frame captured after it;
+  // the remove callout's button DELETES this system's rules record, which would end the walk.
+  // Their behaviour is covered by `tests/components/tool-studio-mounted.test.js`; what only a
+  // real browser can answer is whether they are hit-testable where they are drawn, which is
+  // exactly what these two assertions ask.
+  //
+  // THE SWITCH IS DRAWN ONLY WHERE THERE IS A WORLD RECORD TO INHERIT FROM. This fixture's Tools
+  // are created with `csm.upsertTool` and never enter the world catalogue, so the card resolves
+  // `local` and renders no switch at all — correctly. Waiting on it unconditionally is what this
+  // walk did first, and it timed out on a screen that was behaving exactly as designed.
+  //
+  // So the state decides which assertion runs, and BOTH branches assert: `local` must draw no
+  // switch, anything else must draw one that is hit-testable. Neither branch can pass by finding
+  // nothing, which is the failure a bare `if (count)` guard would have shipped.
+  const breakageCard = editor.locator('[data-tool-rule-card="breakage"][data-tool-rule-state]');
+  if (await breakageCard.count() !== 1) {
+    throw new Error('the Tool breakage section must state exactly one inheritance state');
+  }
+  const breakageRuleState = await breakageCard.getAttribute('data-tool-rule-state');
+  const breakageInheritToggle = editor.locator('[data-scoped-inherit-toggle="breakage"]');
+  if (breakageRuleState === 'local') {
+    if (await breakageInheritToggle.count() !== 0) {
+      throw new Error(
+        'a Tool with no world record drew an inherit switch with nothing to inherit from',
+      );
+    }
+  } else {
+    await breakageInheritToggle.waitFor({ state: 'visible', timeout: 5_000 });
+    await assertPointerTarget(
+      page,
+      breakageInheritToggle,
+      '[data-scoped-inherit-toggle="breakage"]',
+      'Tool breakage inherit switch',
+    );
+  }
+  // GATED ON THE SAME FACT AS THE SWITCH ABOVE, and for the same reason. `ToolBreakageTab.svelte`
+  // renders this callout under `{#if member}`: removing a Tool from a system means deleting its
+  // MEMBERSHIP record, and a pre-migration in-system Tool has none, so offering the action would
+  // be a button with nothing behind it. This fixture's Tools are made with `csm.upsertTool` and
+  // never enter the world catalogue, so `local` is the state it actually reaches.
+  //
+  // Both branches assert. Absent-when-local is the claim the component's own guard makes, so it
+  // is worth holding; present-and-hit-testable is what only a real browser can answer.
+  const removeCallout = editor.locator('[data-tool-remove-from-system]');
+  if (breakageRuleState === 'local') {
+    if (await removeCallout.count() !== 0) {
+      throw new Error(
+        'a Tool with no membership record offered to remove one',
+      );
+    }
+  } else {
+    await scrollToolEditorPanelToReveal(
+      page,
+      editor,
+      '[data-tool-remove-from-system]',
+      'Remove from system',
+    );
+    await assertPointerTarget(
+      page,
+      removeCallout.locator('button'),
+      '[data-tool-remove-from-system] button',
+      'Tool remove from system',
+    );
+  }
+  await assertNoScreenshotOverlays(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-remove-1280x720', wideGeometry);
+  await resetToolStudioScroll(page);
+
   const tab = (name) => editor.locator(`#tool-tab-${name}`);
-  for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
+  for (const name of ['breakage', 'requirements', 'validation']) {
     await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
   }
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 1280px');
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
   await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);
@@ -6196,7 +6386,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
   const checkDrivenEditButton = await requireSingleLocator(
-    manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
+    manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`),
     'check-driven Tool Edit button',
   );
   await withSingleToolDraftTransition(
@@ -6208,6 +6398,19 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
   await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
+  // A ROUND TRIP, because the editor now OPENS on Breakage. Issue 1373 retired the `Overview`
+  // tab, so re-entering the editor and clicking Breakage no longer changes anything, and
+  // `clickToolTabAndAssertEffect` correctly refuses to call that a working tab click — its whole
+  // job is to reject an assertion made from the tab it was already on.
+  //
+  // Going out to Requirements first restores a real transition and asserts twice instead of
+  // once: the leave and the return.
+  await clickToolTabAndAssertEffect(
+    page,
+    editor,
+    'requirements',
+    'check-driven Tool Requirements tab',
+  );
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'check-driven Tool Breakage tab');
   const immuneChoice = editor.locator('input[name="tool-check-breakable"][value="immune"]');
   await withSingleToolStoreMutation(
@@ -6243,8 +6446,16 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     page,
     fixture.toolId,
     'tool-specific Tool Edit route',
-    () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
+    () => manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`).click(),
     () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  // Same round trip as the check-driven path above: this one also re-enters the editor, which
+  // now opens on Breakage, so clicking Breakage would be a click onto the tab it is already on.
+  await clickToolTabAndAssertEffect(
+    page,
+    editor,
+    'requirements',
+    'tool-specific Tool Requirements tab',
   );
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
   const destroyChoice = editor.locator('input[name="tool-on-break"][value="destroy"]');
@@ -6271,7 +6482,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     'Strength 13 or higher',
     'Trained in Arcana',
   ];
-  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] strong').allTextContents();
+  // The row's NAME cell. It was a `<strong>` inside the retired `ChecklistCardRow`; since issue
+  // 1373's round 5 the prerequisite list draws the shared `ModifierLibraryRow`, whose name cell
+  // is `.manager-modifier-readonly-label`. A stale selector here matches nothing and the walk
+  // fails on an empty array, which reads as a data fault rather than a selector one.
+  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] .manager-modifier-readonly-label').allTextContents();
   if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
     throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
   }
@@ -6359,7 +6574,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 900px');
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
-  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`).click();
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements restore at 900px');
 

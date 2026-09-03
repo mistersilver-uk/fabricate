@@ -39,7 +39,29 @@
    - liveNote / liveNoteHook: the "updates live" strip.
    - rules: `{id, icon, title, subtitle, titleAttr}[]`, rendered through the shared
      `IconFactRow`; `ruleHookAttribute` names the per-row `data-*` carrying the rule id.
+   - ruleTile: whether those rows draw `IconFactRow`'s bordered glyph tile. Opt-in and
+     forwarded verbatim, for the reason that primitive's own docblock gives: the reference
+     draws the tile on the Tool rails and a bare glyph one pane over, so it is a fact each
+     caller asserts about its own surface rather than a default this shell picks for all of
+     them.
    - explainer: the shared `ExplainerCard`'s props, or `null`.
+   - children: a TRAILING snippet, rendered last inside the aside.
+
+  ── WHY ONE TRAILING SNIPPET AND NOT THREE MORE REGIONS ─────────────────────────────────
+  The world Tool entry and the Tool rules editor each own preview regions this shell has no
+  vocabulary for (issue 1373): a player-inventory tile with its own broken-copy toggle, a
+  `Preview as` actor selector with a resolved-prerequisite readout, and a `Required for`
+  list of the recipes and gathering tasks that name the Tool. Every one of them resolves
+  values, holds local state, or reads a corpus — precisely what the header above says this
+  shell does NOT do. Growing three typed region props for two callers would make it the
+  union of its callers, which is the failure the deferred `EssenceBehaviorPreview`
+  conversion is already recorded against.
+
+  It renders INSIDE the aside, not after it, because the rail is a grid item with its own
+  scroll box, border and background; siblings of the aside would be siblings of that grid
+  item and the rail would stop being one column. `ScopedValidationTab` already takes a
+  trailing snippet for the same reason, so this is the shell family's existing answer
+  rather than a new one. Absent by default, so every existing caller renders identically.
 -->
 <script>
   import Chip from '../Chip.svelte';
@@ -60,7 +82,9 @@
     rulesKicker = '',
     rules = [],
     ruleHookAttribute = '',
+    ruleTile = false,
     explainer = null,
+    children,
   } = $props();
 
   const asideAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
@@ -107,11 +131,25 @@
     <ul class={`${classPrefix}-rules`}>
       {#each rules as rule (rule.id)}
         <li {...ruleAttributes(rule)}>
+          <!-- `density="rule"` IS THE VARIANT THIS ROW IS, and it already shipped unasked-for
+               (issue 1373). `IconFactRow` publishes it for exactly "the reference's
+               EFFECTIVE-RULES inset on the two Tool inspector rails", and this shell has exactly
+               two callers, both of which ARE those rails: the world Tool entry's and
+               `tools/ToolBehaviorPreview`'s. Taking the default missed five of the six values
+               `proto:2559` states - gap 10, padding 10/11, radius 10, an 11.5px/600 title and a
+               9.5px `--fab-text-subtle` note - and missed the FILL by a rung, raising the inset
+               where `proto:2014` recesses it below the aside that holds it.
+
+               It is stated here rather than made a prop because it is a fact about the ROW, not
+               about a caller's surface the way `tile` is: both callers draw the same effective-
+               rules inset, so a prop would be one value passed twice. -->
           <IconFactRow
             icon={rule.icon}
             title={rule.title}
             subtitle={rule.subtitle}
             titleAttr={rule.titleAttr || ''}
+            tile={ruleTile}
+            density="rule"
           />
         </li>
       {/each}
@@ -126,4 +164,5 @@
       dataAttr={explainer.dataAttr}
     />
   {/if}
+  {@render children?.()}
 </aside>

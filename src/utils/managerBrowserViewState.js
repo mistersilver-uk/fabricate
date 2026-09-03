@@ -98,9 +98,25 @@ export function createGatheringEventsBrowserState() {
   return browseState({ statusFilter: 'all', biomeFilter: 'all', dangerFilter: 'all' });
 }
 
-/** The tool library: search and page only, at its own page size. */
+/**
+ * The tool library's toolbar, at its own page size.
+ *
+ * `membershipFilter` defaults to `in` rather than `all` because this surface is a SYSTEM's rules
+ * list: the rows it exists to show are the tools this system has adopted, and the world tools it
+ * has not are the browse-and-adopt cohort behind the segment next to it (issue 1373).
+ *
+ * The sort axes sit here for the reason the file's header gives: they narrow and order rows the
+ * store has already published, so they are view filters rather than cohort selectors. Left in
+ * component scope they would be reset by the trip to the tool editor and back while the search
+ * term beside them survived, which is the original defect wearing a partial fix.
+ */
 export function createToolsBrowserState() {
-  return browseState({ pageSize: 8 });
+  return browseState({
+    pageSize: 8,
+    membershipFilter: 'in',
+    sortKey: 'name',
+    sortDirection: 'asc',
+  });
 }
 
 /**
@@ -149,10 +165,16 @@ export function createVocabularyBrowserState() {
  * a fixed set of axes; the frame replaces it wholesale on every change, which the proxy carries.
  * The frame's BULK SELECTION is deliberately absent: a selection is an in-progress action over a
  * set rather than a filter, and its owner is the lane that supplies the `bulk` descriptor.
+ *
+ * `pageSize` RESTATES the frame's own `DEFAULT_PAGE_SIZE` and has to move with it (issue 1373,
+ * maintainer feedback round 2). The frame falls back to its constant only when nothing binds a
+ * view-state, so a stale size here would pin the old twenty-five-row window on every surface
+ * that DOES bind one — which is most of them — and the frame's default would look like it had
+ * simply not worked.
  */
 export function createScopedListBrowserState() {
   return browseState({
-    pageSize: 25,
+    pageSize: 10,
     membership: 'all',
     filterValues: {},
     sortKey: 'name',

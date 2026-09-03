@@ -98,9 +98,18 @@ function trimmedId(value) {
  * trimmed for an inheriting one. Normalizing is the chokepoint every writer passes through, so it
  * is the one place a shape rule holds for both branches at once.
  *
+ * `worldEnableable` is the WORLD MASTER SWITCH, and it is a SECOND structural switch rather than a
+ * widening of the first. `enableable` says the entity carries a per-`(entity, system)` `enabled`
+ * flag; `worldEnableable` says its WORLD DEFAULTS carry one too, and that the resolver ANDs the
+ * two. Only the tool declares it today: an entity type whose world screens have no master switch
+ * must not acquire a persisted field its GM cannot see or clear, and a single flag covering both
+ * would mint exactly that.
+ *
  * @param {object} descriptor
  * @param {string[]} descriptor.sections Section names, in the order they are answered.
  * @param {boolean} [descriptor.enableable] Whether the entity carries an `enabled` flag.
+ * @param {boolean} [descriptor.worldEnableable] Whether the WORLD DEFAULTS carry an `enabled`
+ *   flag that vetoes the per-system one. Requires `enableable`.
  * @param {(section: string, value: unknown) => unknown} [descriptor.coerceSection] Per-entity
  *   section coercion; `undefined` means the section is absent.
  * @param {(entry: object) => object} [descriptor.worldExtras] Per-entity world-default fields.
@@ -110,6 +119,7 @@ function trimmedId(value) {
 export function defineScope({
   sections,
   enableable = false,
+  worldEnableable = false,
   coerceSection = (section, value) => value,
   worldExtras = () => ({}),
   membershipExtras = () => ({}),
@@ -117,6 +127,7 @@ export function defineScope({
   return Object.freeze({
     sections: Object.freeze([...sections]),
     enableable,
+    worldEnableable: enableable && worldEnableable,
     coerceSection,
     worldExtras,
     membershipExtras,
@@ -160,6 +171,22 @@ function normalizeWorldDefault(entry, scope) {
   const id = trimmedId(entry.id);
   if (!id) return null;
   const normalized = { id };
+  // THE WORLD MASTER SWITCH, AND IT IS ABSENCE-PRESERVING, unlike the membership record's
+  // `enabled` two functions below, which is minted true on every normalize.
+  //
+  // The asymmetry is the whole compatibility story. A membership record only exists because a
+  // GM added the entity to a system, so minting `true` on it states a fact that write already
+  // established. A world default exists on every entity the migration touched, and no GM has
+  // ever seen a world master switch: minting `true` there would rewrite every persisted world
+  // default in the corpus on the next `load()` to say something nobody authored.
+  //
+  // ABSENT therefore stays ABSENT, and `resolveScopedDefinition` reads `!== false`, so an
+  // existing world resolves exactly as it did before this switch existed. A world SETTING
+  // preserves key absence (unlike `setFlag`, whose merge resurrects a removed key), so the
+  // absence survives the round trip rather than only the first read.
+  if (scope.worldEnableable && typeof entry.enabled === 'boolean') {
+    normalized.enabled = entry.enabled;
+  }
   attachAuthoredSections(entry, normalized, scope);
   return Object.assign(normalized, scope.worldExtras(entry));
 }
@@ -318,8 +345,20 @@ export function isSectionInherited(membership, section) {
  * about whether the entity exists in the system.
  *
  * `enabled` is answered ONLY for an enableable entity, and answers `false` for a non-member
- * because it is NOT A MEMBER rather than because it inherited an off: a world default carries no
- * enabled flag, and disabling world-wide is N membership edits, never a fourth layer.
+ * because it is NOT A MEMBER rather than because it inherited an off.
+ *
+ * FOR A `worldEnableable` SCOPE IT IS ALSO THE AND OF TWO FLAGS, and this function is the ONE
+ * place that AND happens. `enabled = worldEnabled && systemEnabled`: a world-disabled entity is
+ * off in every system whatever each system says, and the per-system flag keeps its own meaning
+ * and simply cannot re-enable a world-disabled record. WORLD OFF WINS.
+ *
+ * The two halves are also answered SEPARATELY, as `worldEnabled` and `systemEnabled`, because an
+ * AUTHORING surface needs the layer it writes and a CONSUMER needs the truth. A screen that read
+ * the AND to paint its per-system toggle would draw every system off the moment the world switch
+ * went off, and its writes would then appear to do nothing.
+ *
+ * Nothing above this function re-derives the AND: doing it at a screen is how one scope's answer
+ * and another's diverge.
  *
  * AN OVERRIDING SECTION THAT STORES NOTHING IS NOT AN OVERRIDE, and falls back to the world value.
  * That is still per-SECTION rather than per-FIELD: an ABSENT section is not a partial one, so
@@ -354,8 +393,70 @@ export function resolveScopedDefinition(worldDefault, membership, scope) {
   }
   resolved.member = record !== null;
   resolved.inherited = inherited;
-  if (scope.enableable) resolved.enabled = record ? record.enabled !== false : false;
+  if (scope.enableable) {
+    const systemEnabled = record ? record.enabled !== false : false;
+    if (scope.worldEnableable) {
+      const worldEnabled = isWorldEnabled(worldDefault);
+      resolved.worldEnabled = worldEnabled;
+      resolved.systemEnabled = systemEnabled;
+      resolved.enabled = worldEnabled && systemEnabled;
+    } else {
+      resolved.enabled = systemEnabled;
+    }
+  }
   return resolved;
+}
+
+/**
+ * Whether a world default leaves the entity ENABLED at world scope.
+ *
+ * ABSENT READS AS ENABLED, which is what makes the switch invisible to every world that has
+ * never touched it: the flag is absence-preserving on disk (see `normalizeWorldDefault`), so a
+ * corpus written before the switch existed, and every record a GM has never toggled, answers
+ * `true` here.
+ *
+ * ONLY `false` DISABLES. A non-boolean is not an off — a hand-edited `enabled: "no"` is junk the
+ * normalizer already dropped, and treating junk as a world-wide kill switch would be the worst
+ * possible reading of it.
+ *
+ * @param {object|null|undefined} worldDefault
+ * @returns {boolean}
+ */
+export function isWorldEnabled(worldDefault) {
+  return worldDefault?.enabled !== false;
+}
+
+/**
+ * Re-apply the WORLD master switch over a set of already-merged rows.
+ *
+ * ── WHY THIS EXISTS AT ALL, GIVEN THE RESOLVER ABOVE ALREADY ANDS ───────────────────────────
+ * `unionScopedDefinitions` spreads the IN-SYSTEM record LAST, so while `## CraftingSystem`
+ * requirement 36 holds, the in-system record decides every key it carries — and a normalized
+ * in-system tool carries `enabled` unconditionally. The resolver's AND is therefore overwritten
+ * on the read-union path, exactly as `enabled` already was before this switch existed.
+ *
+ * That precedence is right for a value the system AUTHORED, and wrong for a world-scope VETO:
+ * "world off wins" means the world's off cannot be outvoted by anything. So the veto is
+ * re-applied here, on the merged rows, and it is a VETO ONLY — it never turns a row ON, so a
+ * corpus with no world-disabled record cannot change a single answer.
+ *
+ * The rows array is returned BY IDENTITY when nothing is disabled, which is the same
+ * memo-and-identity concern `scopedEntityReads.js` documents for its unknown-half passthrough.
+ *
+ * @param {Array<object>} rows Merged rows, each keyed by the world entity id.
+ * @param {unknown} worldDefaults The corpus's normalized world-defaults list.
+ * @returns {Array<object>}
+ */
+export function applyWorldEnabledVeto(rows, worldDefaults) {
+  const disabled = new Set();
+  for (const record of Array.isArray(worldDefaults) ? worldDefaults : []) {
+    const recordId = trimmedId(record?.id);
+    if (recordId && record.enabled === false) disabled.add(recordId);
+  }
+  if (disabled.size === 0 || !Array.isArray(rows)) return rows;
+  return rows.map((row) =>
+    disabled.has(trimmedId(row?.id)) && row.enabled !== false ? { ...row, enabled: false } : row
+  );
 }
 
 /**

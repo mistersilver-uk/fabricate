@@ -69,6 +69,16 @@
     triggerImg   — leading portrait image src on the trigger (optional; mirrors
                    how list options render `option.img`), shown before the label
     triggerLabel — current-selection text on the trigger (omitted when empty)
+    triggerMeta  — a SECOND line under `triggerLabel`, inside the trigger button (issue
+                   1373). It is the trigger-side twin of an option's `meta`, and it
+                   exists for the same reason that one does: a trigger whose value is
+                   identified by a FACT as well as by a name — the Tool editors'
+                   replacement-Component tile states where the chosen Component lives
+                   under its name — cannot put that fact in the label without making the
+                   label read as a sentence. Both lines are inside the button, so both
+                   are in its accessible name and a screen-reader user hears the same two
+                   facts. EMPTY BY DEFAULT, and the empty case renders the label span
+                   exactly as before, so every shipped call site's markup is unchanged.
     valueClass   — extra class on the trigger value span
     showChevron  — render the open/closed chevron on the trigger (default true)
     triggerAddMarker — optional value for a `data-recipe-add` attribute on the
@@ -161,12 +171,24 @@
                    popover escapes, so a popover-scoped style needs its own hook)
     *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` feeds
                    `EmptyState`'s `title` slot (its `<h3>`) HERE, so it must stay short:
-                   `EmptyState` renders a title as a 13px/600 serif heading with no width
-                   cap, and a sentence handed to it sets as a multi-line heading under the
-                   hero glyph. This is the opposite mapping from `VocabularyPanel`, whose
-                   own `emptyHint` prop feeds `EmptyState`'s `hint` slot (its `<p>`) — the
-                   two components chose the same prop name for two different `EmptyState`
-                   slots, so read the mapping from this doc rather than from the name alone.
+                   the panel renders it as ONE quiet line (`EmptyState note`, issue 1373),
+                   and a sentence handed to it wraps rather than sets as a heading. This is
+                   the opposite mapping from `VocabularyPanel`, whose own `emptyHint` prop
+                   feeds `EmptyState`'s `hint` slot (its `<p>`) — the two components chose
+                   the same prop name for two different `EmptyState` slots, so read the
+                   mapping from this doc rather than from the name alone.
+
+                   IT ANSWERS FOR ONE OF THE TWO EMPTINESSES ONLY. `emptyHint` is the
+                   sentence for a list that holds NOTHING; a search that filters an
+                   authored list to nothing is a different fact and gets `noMatchesHint`.
+                   The primitive used to show `emptyHint` for both, so a GM who typed `zzz`
+                   into a picker holding twelve tags was told `No tags defined`, which is
+                   false — and `openspec/specs/design-system/spec.md` requires an empty
+                   state to distinguish "an unfiltered emptiness from a filtered one".
+    noMatchesHint — OPTIONAL localized sentence for the FILTERED emptiness. It defaults to
+                   `FABRICATE.Common.Picker.NoMatches` (`No matches`, the design's own words
+                   at `proto:2281`) so no call site has to be edited to stop lying, and a
+                   surface with a more specific sentence can still state one.
     emptyDetail  — OPTIONAL explanatory sentence rendered as `EmptyState`'s `hint` slot
                    (its `<p>`, beneath the `title` slot `emptyHint` feeds). It exists
                    because at least one empty reason is a configuration explanation rather
@@ -174,6 +196,10 @@
                    player-character type" names the module setting to change — and prose
                    belongs in a body, not in a heading. Callers passing only `emptyHint`
                    render exactly as before.
+
+                   IT BELONGS TO `emptyHint` AND IS SUPPRESSED WITH IT. It explains why a
+                   list holds nothing, which is false of a list that holds plenty and was
+                   searched, so the filtered branch renders `noMatchesHint` alone.
     open         — OPTIONAL `$bindable` open state (default false). Bind it when a
                    surface must open the picker from something OTHER than the trigger,
                    or must force it shut from outside — the World > Parties card does
@@ -185,9 +211,27 @@
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
+  import { localize } from '../../util/foundryBridge.js';
   import { portal } from '../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import { overlayHostRect, resolveOverlayHost } from '../../util/overlayHost.js';
+
+  /**
+   * The primitive's OWN localization, which none of its other strings need.
+   *
+   * Every other label here arrives pre-localized from the call site, because every other label
+   * is a fact about that surface — what the picker is for, what it is empty OF. `No matches` is
+   * a fact about this control's own search box and is the same sentence at all 22 sites, so a
+   * new required prop would have been 22 identical edits to say one thing once.
+   *
+   * @param {string} key
+   * @param {string} fallback
+   * @returns {string}
+   */
+  function localizedText(key, fallback) {
+    const translated = localize(key);
+    return translated && translated !== key ? translated : fallback;
+  }
 
   let {
     options = [],
@@ -199,6 +243,7 @@
     triggerIcon = '',
     triggerImg = '',
     triggerLabel = '',
+    triggerMeta = '',
     valueClass = '',
     showChevron = true,
     showSearch = true,
@@ -223,6 +268,7 @@
     searchAriaLabel = '',
     emptyHint = '',
     emptyDetail = '',
+    noMatchesHint = '',
     pickerClass = '',
     minWidth = 240,
     maxWidth = 340,
@@ -275,6 +321,26 @@
       .replace('{matched}', String(filteredOptions.length))
       .replace('{total}', String(options.length))
   );
+
+  // WHICH EMPTINESS THIS IS. A list that holds nothing and a search that matched nothing are
+  // different facts and the design writes them differently — `proto:2262` is the tag picker's
+  // `No tags left.` over its own authored vocabulary, `proto:2281` the sibling popover's
+  // `No matches` under a typed query — and `openspec/specs/design-system/spec.md` requires an
+  // empty state to "distinguish an unfiltered emptiness from a filtered one". The predicate is
+  // the whole distinction: `options` non-empty with `filteredOptions` empty is true if and only
+  // if the SEARCH removed everything, so a picker whose world has authored nothing keeps the
+  // caller's sentence whatever the GM types into it.
+  const filteredToNothing = $derived(options.length > 0 && filteredOptions.length === 0);
+  const noMatchesText = $derived(
+    noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
+  );
+  const emptyMessage = $derived(filteredToNothing ? noMatchesText : emptyHint);
+  // `emptyDetail` goes WITH `emptyHint` and never with the filtered sentence. It exists to
+  // explain why a list holds nothing — the travel-actor picker names the module setting to
+  // change — and that explanation is false of a list that holds plenty and was searched. The
+  // actor bar is the site that proves it: rendered under `No character matches your search`,
+  // its body still read `ask your GM to add its actor type`.
+  const emptyBody = $derived(filteredToNothing ? '' : emptyDetail);
 
   // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
   // mode the trigger is UNMOUNTED while open, so `bind:this` has already nulled
@@ -475,7 +541,13 @@
     {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"
         ><img src={triggerImg} alt="" /></span
       >{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
-    {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span
+    {#if triggerMeta}<span class="manager-travel-picker-copy"
+        ><span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span><span
+          class="manager-travel-picker-meta"
+          data-popover-trigger-meta>{triggerMeta}</span
+        ></span
+      >{:else if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}
+        >{triggerLabel}</span
       >{/if}
     {#if showChevron}<i
         class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
@@ -648,13 +720,22 @@
           {/if}
         </div>
       {:else}
-        <div class="manager-travel-popover-options" role="status" aria-live="polite">
-          <EmptyState
-            compact
-            icon="fas fa-magnifying-glass"
-            title={emptyHint}
-            hint={emptyDetail || undefined}
-          />
+        <!-- ONE QUIET LINE, NOT A NO-STATE PANEL (issue 1373). The design draws this as
+             `padding:7px; font:500 10px var(--sans); color:var(--subtle)` and nothing else
+             (`proto:2262`, and `proto:2281` for the sibling popover); we drew `EmptyState`'s
+             dashed hero — a tiled magnifier over a serif heading, centred in its own bordered
+             box — inside a panel that is already a bordered, shadowed 240px card.
+             `EmptyState`'s `note` variant is that treatment, and it is the DEFAULT rather than
+             an opt-in because every one of this primitive's call sites reaches this branch and
+             five of them pass no `emptyHint` at all: for those the hero panel was a dashed box
+             containing a magnifier and no words.
+
+             The wrapper is its own class rather than `-options`, because the list's inset and
+             scroll belong to a list; the note takes its inset from `EmptyState`. `role=status`
+             and `aria-live` stay on the wrapper — it is the region whose CONTENT changes as the
+             GM types, and the note replaces itself inside it. -->
+        <div class="manager-travel-popover-empty" role="status" aria-live="polite">
+          <EmptyState note title={emptyMessage} hint={emptyBody || undefined} />
         </div>
       {/if}
 
@@ -889,5 +970,35 @@
   .manager-travel-popover.is-compact-option-rows .manager-travel-option-meta {
     font-size: 9.5px;
     font-weight: 400;
+  }
+
+  /* ── THE TWO-LINE TRIGGER (issue 1373) ─────────────────────────────────────
+     The trigger-side twin of `.manager-travel-option-meta` above, and deliberately the same
+     shape: a column that may shrink to nothing, with the second line quiet, capped and
+     ellipsised so a long address cannot widen the control past its container.
+
+     BOTH ELEMENTS ARE WRITTEN BY THIS COMPONENT, so these are ordinary scoped rules — no
+     `:global()` and no dependence on `styles/fabricate.css`, which has no rule for either
+     class. `triggerMeta` is empty at every shipped call site, so neither element exists
+     anywhere but the Tool editors' replacement tile today. */
+  .manager-travel-picker-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .manager-travel-picker-meta {
+    min-width: 0;
+    margin-top: var(--fab-space-2xs);
+    overflow: hidden;
+    color: var(--fab-text-subtle);
+    font-family: var(--fab-font-mono);
+    font-size: 0.6rem;
+    font-weight: 400;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

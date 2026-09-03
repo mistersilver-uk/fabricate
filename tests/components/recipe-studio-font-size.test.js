@@ -67,7 +67,7 @@ const FIXTURE = `
              app base; the flat-picker vs bleed-baseline assertions below prove it no
              longer does. -->
         <div class="manager-recipe-ingredient-option-row">
-          <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fas fa-cubes"></i></span>
+          <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
           <div class="manager-recipe-option-target">
             <div class="manager-recipe-option-component">
               <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
@@ -113,7 +113,7 @@ const FIXTURE = `
              enshrines the implementation. Only the rail's LAYOUT changed here (a 300px
              column became a ~1060px tab), never its type. -->
         <section class="manager-recipe-validation-summary-row">
-          <div class="manager-recipe-rail-summary is-blocked">
+          <div class="manager-recipe-rail-summary is-block">
             <span class="manager-recipe-rail-summary-medallion" data-m="summary-medallion"><i class="fas fa-circle-xmark"></i></span>
             <span class="manager-recipe-rail-summary-copy">
               <span class="manager-recipe-rail-summary-title" data-m="summary-title">Cannot be enabled</span>
@@ -327,7 +327,12 @@ const EXPECTED = {
   // ── The FLAT component picker (issue 676). Same shared rule as the stage/salvage
   // triggers below, so it reads at the same 0.82rem — a flat row and a stage row name a
   // component identically. If these ever diverge from `stage-picker`, the sharing broke.
-  'option-lead': 13.12, // 0.82rem — the type-tinted lead chip's glyph
+  // The requirement row's PLATE (issue 1373, maintainer round 5). It was a 30px tinted tile
+  // whose glyph read at 0.82rem; `proto:2247` and premium's `RewardRow` both draw a neutral
+  // 28px tile at 12px carrying the kind's tinted glyph, so the tile shrank by a rung and its
+  // mark with it. It no longer shares a number with the pickers below, and that is the change
+  // rather than a drift: a plate is a MARK and a picker trigger is a control naming a thing.
+  'option-lead': 12, // 0.75rem — the neutral plate's type-tinted glyph
   'flat-picker': 13.12, // 0.82rem — shared .manager-recipe-component-trigger rule
   'flat-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   // ── The progressive stage row (issue 676). Every number below is the one the salvage

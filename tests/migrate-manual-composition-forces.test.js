@@ -339,8 +339,12 @@ test('the runner runs 1.29.0 from 1.28.0 and bumps the version', async () => {
   const summary = await ladder.run();
 
   assert.equal(summary.aborted, false);
-  assert.equal(summary.ran, 2, '1.29.0 and the 1.30.0 world-scope lift are both pending');
-  assert.equal(ladder.store.get('migrationVersion'), '1.30.0');
+  assert.equal(
+    summary.ran,
+    3,
+    '1.29.0, the 1.30.0 world-scope lift and the 1.31.0 tool-requirement backfill are all pending'
+  );
+  assert.equal(ladder.store.get('migrationVersion'), '1.31.0');
   const migrated = ladder.store.get('gatheringEnvironments')[0];
   assert.deepEqual(migrated.enabledTaskIds, ['task-picked', 'task-forced']);
   assert.ok(!('forcedTaskIds' in migrated));
@@ -350,7 +354,7 @@ test('the runner runs 1.29.0 from 1.28.0 and bumps the version', async () => {
 test('1.29.0 is version-gated: it does not re-enter a world already at or past it', async () => {
   // The SECOND idempotency proof, and a different one from the pure function's: even a
   // migration that was not idempotent could not run twice through the runner.
-  for (const version of ['1.30.0']) {
+  for (const version of ['1.31.0']) {
     const ladder = makeLadder({
       migrationVersion: version,
       gatheringEnvironments: [manualEnvironment()],
@@ -377,8 +381,8 @@ test('1.29.0 composes with the neighbouring 1.28.0 migration in one pass', async
 
   const summary = await ladder.run();
 
-  assert.equal(summary.ran, 3, '1.28.0, 1.29.0 and 1.30.0 all run');
-  assert.equal(ladder.store.get('migrationVersion'), '1.30.0');
+  assert.equal(summary.ran, 4, '1.28.0, 1.29.0, 1.30.0 and 1.31.0 all run');
+  assert.equal(ladder.store.get('migrationVersion'), '1.31.0');
   // 1.28.0's leg still lands …
   assert.deepEqual(
     ladder.store.get('characterLibraries').modifiers.map((entry) => entry.id),

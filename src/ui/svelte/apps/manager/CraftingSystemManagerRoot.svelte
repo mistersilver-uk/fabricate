@@ -16,6 +16,11 @@
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
+  // THE SHARED SOURCE-REFERENCE WALK (issue 1373). One Item is one world Tool, and the union
+  // over `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is how every other reader
+  // in this repository answers "is this record that Item". A fourth comparison written here
+  // would drift from the index the migration grouped by.
+  import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
   import {
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
@@ -73,6 +78,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
+  import { isPlayerCharacterActor } from '../../../../config/playerCharacterTypes.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
@@ -152,6 +158,10 @@
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
+  // The shipped two-step destructive control, for the world Tool entry's header `Delete`
+  // (issue 1373). It is the manager's one destructive idiom, so the header's Delete is guarded
+  // exactly as the row and card ones already are.
+  import ArmedDangerButton from './ArmedDangerButton.svelte';
   import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
@@ -566,7 +576,9 @@
   // User-facing failure text for the gathering-event editor, rendered by the header toolbar
   // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
-  let toolEditorActiveTab = $state('overview');
+  // `breakage`, because the system Tool rules editor has no Overview tab: identity is world
+  // scope's, and `ToolEditorTabs` records why (issue 1373).
+  let toolEditorActiveTab = $state('breakage');
   let toolValidationFocusNonce = $state(0);
 
   // Per-check unified trigger block (issue 419), carried on every check draft so
@@ -864,8 +876,18 @@
   );
   const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
 
+  // WHICH ROUTES NEED THE ITEM ROSTER, which is a WIDER set than the Tool Studio's own (issue
+  // 1373). It was `isToolStudioRoute`, and that left both WORLD tool screens with an empty
+  // roster: the catalogue could not resolve a linked Tool's description off its Item — so every
+  // record read `No description` while wearing a `Linked` chip — and the entry's linked-item card
+  // could show neither the live name nor the live art. Those two screens are exactly where the
+  // link is authored, so they are the ones that most need to resolve it.
+  const needsWorldItemOptions = $derived(
+    isToolStudioRoute || currentView === 'world-tools' || currentView === 'world-tool-entry'
+  );
+
   $effect(() => {
-    if (!isToolStudioRoute) return;
+    if (!needsWorldItemOptions) return;
     let active = true;
     const applyOptions = (options) => {
       if (active) worldItemOptions = Array.isArray(options) ? options : [];
@@ -2870,6 +2892,63 @@
     systemId: selectedSystemId || '',
   });
 
+  // ── THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2) ────────────────────────
+  //
+  // The world Tool entry's Breakage tab authors two answers that NAME OTHER RECORDS: the
+  // Component a broken Tool is replaced by, and the ingredient groups that mend a marked-broken
+  // one. Both were unauthorable at world scope, on the standing reading that a repair group
+  // "names ingredient quantities over the OWNING SYSTEM's components, which world scope cannot
+  // address" — which epic 1357 retired by giving the world its own component and essence
+  // catalogues. A world entity id IS the id a membership record carries, so a world default
+  // naming one resolves in every system that has adopted it.
+  //
+  // THEY ARE NOT IN `toolScopeProps`, and that is deliberate rather than an oversight: that
+  // bundle is ONE family's scope, actions and roster, spread at twelve call sites, and three of
+  // these four values come from a DIFFERENT family's corpus. Folding a component roster into the
+  // tool bundle would hand every tool screen a key its contract does not have.
+  const worldComponentOptions = $derived(
+    (worldScopeState.component?.entries ?? []).map((entry) => ({
+      id: entry.id,
+      name: entry.entity?.name || entry.id,
+      img: entry.entity?.img || '',
+      // CARRIED FOR THE DROP TARGET. `resolveDroppedComponentId` matches a dragged Foundry
+      // document against these two, which is the only way a leaf holding no Foundry global can
+      // answer a drop at all. (The word for that global is deliberately not written here:
+      // `manager-contract.test.js` greps this file's SOURCE for it, comments included.)
+      ...(entry.entity?.registeredItemUuid && {
+        registeredItemUuid: entry.entity.registeredItemUuid,
+      }),
+      ...(entry.entity?.originItemUuid && { originItemUuid: entry.entity.originItemUuid }),
+    }))
+  );
+
+  // WORLD-DISABLED ESSENCES ARE WITHHELD FROM THE OFFER, which is exactly what
+  // `selectableEssenceOptions` does with a system-disabled one: the projection answers `enabled`
+  // from the world master switch, and an ingredient picker must not offer a record the world has
+  // turned off everywhere.
+  const worldEssenceOptions = $derived(
+    (worldScopeState.essence?.entries ?? []).map((entry) => ({
+      ...(entry.entity ?? {}),
+      id: entry.id,
+      enabled: entry.worldEnabled !== false,
+    }))
+  );
+
+  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. `setWorldTags` writes each
+  // world component's own `tags`, and there is no separate world tag roster to read: the
+  // `world-vocabulary` store that will publish one is not registered yet (its projection answers
+  // `total: 0`), so the union of what is actually authored is the honest list. Sorted, so the
+  // picker's order does not follow catalogue order.
+  const worldComponentTags = $derived(
+    [
+      ...new Set(
+        (worldScopeState.component?.entries ?? []).flatMap((entry) =>
+          Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
+        )
+      ),
+    ].sort((left, right) => String(left).localeCompare(String(right)))
+  );
+
   // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
   //
   // The rail states two facts it could not reach before: which LAYER each on-craft section
@@ -3154,6 +3233,148 @@
       : ''
   );
 
+  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL. Same decision as the essence route above,
+  // reached the same way and for the same reason: the reference heads that screen with the
+  // Tool's own tile, its NAME and one line saying what the record IS (`PROTO-tool-entry.png`),
+  // where what shipped was the generic page header every route falls through to. The page
+  // cannot draw it — `.manager-header` is a SIBLING of `.manager-main` — so the RECORD is
+  // resolved here, out of the corpus this shell already publishes to the page.
+  //
+  // A MISSING RECORD FALLS BACK to the generic title and subtitle below rather than printing an
+  // empty header, which is the same guard the essence branch makes.
+  const worldToolEntryRecord = $derived(
+    currentView === 'world-tool-entry'
+      ? ((worldScopeState.tool?.entries ?? []).find(
+          (candidate) => candidate?.id === worldScopedEntryId
+        ) ?? null)
+      : null
+  );
+
+  /**
+   * WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here.
+   *
+   * The page already renders this sentence on its linked-item card, so resolving it a second
+   * time up here would put one pair of copy keys in two files and let the band and the card
+   * disagree about one record. The essence entry states its subtitle here instead because its
+   * subtitle is a COUNT this shell already holds and its page does not draw.
+   *
+   * @type {string}
+   */
+  let worldToolEntrySubtitle = $state('');
+
+  function handleWorldToolEntrySubline(subline) {
+    worldToolEntrySubtitle = typeof subline === 'string' ? subline : '';
+  }
+
+  /**
+   * THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are.
+   *
+   * The tool entry takes the seam the essence entry shipped — `scoped/scopedEntryDraft.js` and
+   * `ScopedEntryHeaderActions` — so this is the twin of the block below rather than a second
+   * design, and every note there applies verbatim. The handle is a LIVE accessor because the
+   * route-exit guard reads it at the moment of a click; the dirty flag is reported separately
+   * because a disabled attribute has to re-render and the handle deliberately never does.
+   *
+   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+   */
+  let worldToolEntryHandle = null;
+  let worldToolEntryDirty = $state(false);
+  let worldToolEntrySaving = $state(false);
+
+  function handleWorldToolEntryDraft(handle) {
+    worldToolEntryHandle = handle ?? null;
+    if (!handle) {
+      worldToolEntryDirty = false;
+      worldToolEntrySubtitle = '';
+    }
+  }
+
+  function handleWorldToolEntryDirty(dirty) {
+    worldToolEntryDirty = dirty === true;
+  }
+
+  /**
+   * THE WORLD TOOL ENTRY'S HEADER `Delete`, which the design draws between Back and Save
+   * (`tmp/proto/tool-entry.png`) and which this screen did not have (issue 1373).
+   *
+   * The page reports an ACTION DESCRIPTOR rather than the shell resolving one: the two labels,
+   * the two consequence sentences and the ordering the write needs all name THIS record and are
+   * derived from values only the editor holds. This half is the arm token, which is the shell's
+   * because `ArmedDangerButton` requires exactly one armed control at a time across the window
+   * and this is where that invariant already lives for every other header action.
+   *
+   * @type {{token: string, label: string, armedLabel: string, idleAriaLabel: string,
+   *   armedAriaLabel: string, run: () => Promise<void>}|null}
+   */
+  let worldToolEntryDelete = $state(null);
+  let worldToolEntryDeleteArmed = $state('');
+
+  function handleWorldToolEntryDelete(descriptor) {
+    worldToolEntryDelete = descriptor ?? null;
+    if (!descriptor) worldToolEntryDeleteArmed = '';
+  }
+
+  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
+  // with the linked-item tile this page draws from the same buffered value. `??` and not `||`:
+  // an editor reporting an EMPTY name is reporting a real authored state, and it falls through
+  // to `viewTitle()` below exactly as an empty persisted name already does.
+  //
+  // READ OFF THE SHARED `scopedEntryDraftIdentity` CHANNEL, which is also what the breadcrumb's
+  // last crumb reads: this route holds no buffered-name rune of its own. That channel is
+  // route-agnostic on purpose (see its own note above), so the crumb, the heading and any later
+  // piece of chrome that names an entry all follow one report rather than three. It is not
+  // ambiguous across routes because only one entry editor is mounted at a time and the page
+  // withdraws its report on unmount.
+  const worldToolEntryName = $derived(
+    worldToolEntryRecord
+      ? (scopedEntryDraftField('name') ?? worldToolEntryRecord.entity?.name ?? '')
+      : ''
+  );
+
+  /**
+   * Flush the world tool entry editor's buffered edit. Same contract as its essence twin: it
+   * answers whether the write landed, because the route-exit guard gates navigation on it.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveWorldToolEntry() {
+    if (!worldToolEntryHandle) return false;
+    worldToolEntrySaving = true;
+    try {
+      return (await worldToolEntryHandle.save()) !== false;
+    } finally {
+      worldToolEntrySaving = false;
+    }
+  }
+
+  /**
+   * The world tool entry editor's route-exit prompt.
+   *
+   * Re-entering the SAME Tool is not leaving it, so it never prompts — `world-tool-entry` is one
+   * of the routes whose view token does not change when its subject does, which is exactly what
+   * `nextRouteId` exists for.
+   *
+   * The prompt is the store's three-way one for this record type. It is not the boolean
+   * `confirmDiscardDirtyToolsDraft` beside it: that one asks about the SYSTEM tool editor's row
+   * draft, answers true/false, and offers no Save — three differences over one word.
+   *
+   * @param {string} nextView
+   * @param {string} nextRouteId
+   * @returns {boolean|Promise<boolean>}
+   */
+  function confirmWorldToolEntryRouteExit(nextView, nextRouteId = '') {
+    if (activeView !== 'world-tool-entry') return true;
+    if (nextView === 'world-tool-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
+      return true;
+    }
+    return confirmScopedEntryExit({
+      dirty: worldToolEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
+      save: () => saveWorldToolEntry(),
+      discard: () => worldToolEntryHandle?.discard?.(),
+    });
+  }
+
   /**
    * Flush the world essence entry editor's buffered edit.
    *
@@ -3258,6 +3479,25 @@
     if (!systemId) return false;
     return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
       activeView = 'essences';
+    });
+  }
+
+  /**
+   * Open one crafting system's TOOL RULES from the world tool catalogue's inspector row.
+   *
+   * The twin of `openSystemEssenceRules` above, and every note it carries applies: the pair
+   * of moves — select the system, then commit the route — already exists separately, and the
+   * entity id is accepted and deliberately unused because the rules list opens on the
+   * system's whole tool list rather than on one Tool.
+   *
+   * @param {string} _entityId the Tool the row belongs to; see above.
+   * @param {string} systemId the crafting system whose rules to open.
+   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   */
+  function openSystemToolRules(_entityId, systemId) {
+    if (!systemId) return false;
+    return afterTruthyResult(selectSystem(systemId, 'tools'), () => {
+      activeView = 'tools';
     });
   }
 
@@ -4356,6 +4596,61 @@
     libraryToolsList.find((tool) => tool.id === focusedToolDraft?.id) || null
   );
 
+  // WHICH WORLD TOOL THE RULES LIST HAS SELECTED THAT THIS SYSTEM HAS NO RECORD FOR.
+  //
+  // Root state because the inspector is rendered by the SHELL's shared aside rather than by
+  // `ToolsBrowserView`, so a selection held inside that view could never reach the panel it is
+  // meant to fill. Cleared by `selectLibraryTool` the moment an adopted Tool is chosen.
+  let unadoptedToolId = $state('');
+  const unadoptedWorldTool = $derived(
+    unadoptedToolId
+      ? ((worldScopeState.tool?.entries ?? []).find((entry) => entry.id === unadoptedToolId) ??
+          null)
+      : null
+  );
+
+  /**
+   * The Tool the browser inspector describes, or `null` while a NON-MEMBER world Tool is
+   * selected (issue 1373).
+   *
+   * `selectedLibraryTool` is derived from the open tool DRAFT, and a world Tool this system
+   * holds no rules for cannot open one - `openToolDraft` returns false and the draft stays on
+   * whatever was selected before. So clicking a `No rules in this system` row set
+   * `unadoptedToolId` correctly and the panel went on describing the PREVIOUS Tool, because
+   * `ToolBrowserInspector` prefers its `tool` prop over its `unadopted` one and both were
+   * populated at once. The two states are mutually exclusive by design; this is where that is
+   * made true.
+   *
+   * It was invisible because no capture case selected a non-member row - which is what
+   * `manager-tool-non-member-selected-1280x720` exists to end.
+   */
+  const inspectedLibraryTool = $derived(unadoptedWorldTool ? null : selectedLibraryTool);
+
+  /**
+   * The selected Tool's per-section INHERIT map, for the browser inspector's `Inheritance`
+   * region (issue 1373).
+   *
+   * Read off the world projection's per-system JOIN, which is the only place that answer
+   * exists: the system's own Tool record carries the RESOLVED values, so it cannot tell an
+   * inherited section from one overridden to an identical value. `ToolsBrowserView` reads the
+   * same join for its per-row `Overrides ...` sentence, and reading it here is what makes the
+   * row and the panel incapable of disagreeing.
+   *
+   * `{}` for a Tool with no membership record: an absent key reads as inheriting everywhere,
+   * and the panel renders the region for members only anyway.
+   */
+  const selectedLibraryToolInherited = $derived.by(() => {
+    const toolId = String(inspectedLibraryTool?.id ?? '');
+    if (!toolId) return {};
+    const entry = (worldScopeState.tool?.entries ?? []).find(
+      (candidate) => String(candidate?.id ?? '') === toolId
+    );
+    const systemRow = (Array.isArray(entry?.systems) ? entry.systems : []).find(
+      (candidate) => String(candidate?.systemId ?? '') === String(selectedSystemId ?? '')
+    );
+    return systemRow?.inherited ?? {};
+  });
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     selectedComponentId = '';
@@ -5436,17 +5731,34 @@
   // companion's navigation guard is being asked about. Every other caller keeps its
   // one-argument shape.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
-    // THE WORLD SCOPED-ENTRY EDITOR IS ASKED FIRST, and the order is immaterial rather than
+    // THE WORLD SCOPED-ENTRY EDITORS ARE ASKED FIRST, and the order is immaterial rather than
     // arbitrary: every guard below is gated on an `activeView` that a world route cannot also
-    // be, so on `world-essence-entry` the whole rest of this cascade is already a synchronous
-    // `true`. Asking first therefore reorders nothing and keeps the new link to one function.
+    // be, so on `world-essence-entry` or `world-tool-entry` the whole rest of this cascade is
+    // already a synchronous `true`. Asking first therefore reorders nothing.
+    //
+    // THE TWO ARE ASKED IN SEQUENCE RATHER THAN COMBINED because each is gated on its own
+    // `activeView` and the two routes are mutually exclusive: exactly one of them can answer
+    // anything but a synchronous `true`, so the pair costs one extra comparison and never two
+    // prompts. Combining them into one guard with a route lookup would put the third entry
+    // editor's wiring somewhere other than beside its own state.
     const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
     if (isPromise(worldEntryConfirmed)) {
       return worldEntryConfirmed.then((value) =>
-        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+        value === false ? false : confirmWorldToolEntryExitThenRest(nextView, nextRouteId)
       );
     }
     if (worldEntryConfirmed === false) return false;
+    return confirmWorldToolEntryExitThenRest(nextView, nextRouteId);
+  }
+
+  function confirmWorldToolEntryExitThenRest(nextView, nextRouteId = '') {
+    const toolEntryConfirmed = confirmWorldToolEntryRouteExit(nextView, nextRouteId);
+    if (isPromise(toolEntryConfirmed)) {
+      return toolEntryConfirmed.then((value) =>
+        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+      );
+    }
+    if (toolEntryConfirmed === false) return false;
     return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
   }
 
@@ -7771,27 +8083,259 @@
     return true;
   }
 
-  async function addToolFromDrop(data) {
+  /**
+   * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
+   *
+   * ── WHY THE UNION AND NOT A FIELD COMPARISON ────────────────────────────────────────────
+   * A world Tool can name its Item through three fields, and `getItemMatchUuids` is the shared
+   * walk over all three — the same one `definitionIndex` builds its source-reference facet with
+   * and the same one the read union matches on. A comparison written here against
+   * `registeredItemUuid` alone would be a fourth answer to a question the repository already
+   * answers once, and it would miss exactly the records that make this check matter: a Tool
+   * whose link was re-pointed keeps the previous uuid as an ALIAS, so the Item a GM is dragging
+   * may be reachable only through `aliasItemUuids`.
+   *
+   * READ OFF `entries` RATHER THAN `entities` because the caller needs `worldEnabled` too, and
+   * that is resolved by the projection through `isWorldEnabled` — an ABSENT flag means enabled,
+   * so a raw entity cannot answer it without restating that rule.
+   *
+   * @param {string} uuid The resolved source Item uuid.
+   * @returns {object|null} The world scope entry, or `null` when no record names that Item.
+   */
+  function worldToolForSourceItem(uuid) {
+    const needle = String(uuid ?? '').trim();
+    if (!needle) return null;
+    return (
+      (worldScopeState.tool?.entries ?? []).find((entry) =>
+        getItemMatchUuids(entry?.entity).includes(needle)
+      ) ?? null
+    );
+  }
+
+  /**
+   * Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry.
+   *
+   * ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────────
+   * The drop RESOLVES before it creates. Minting `store.randomID()` unconditionally made the
+   * same Item dropped twice into two world Tools with identical identity, and
+   * `worldScopeActions.createEntity` cannot catch that: it dedupes on the entity id, and the id
+   * is fresh every time. Both records then show up in every system's catalogue with nothing on
+   * any screen to say which one a recipe means.
+   *
+   * This is the rule the rest of the epic already keeps. `worldScopeEntityGrouping` groups the
+   * migration BY RESOLVED SOURCE ITEM so that one real Item becomes one world record, the
+   * system-scope path this zone replaced upserted rather than inserted, and copy-mode import
+   * reuses the world entity when the source item matches.
+   *
+   * A MATCH NAVIGATES AND SAYS SO, rather than silently doing nothing: a drop that appears to
+   * have no effect is precisely the defect this screen spent a round removing. A world-DISABLED
+   * record is reused on the same terms and told apart in the sentence — `enabled` is the world
+   * master switch, so landing on a Tool that does nothing without being told why is worse than
+   * being told, and a second record would strand the GM's own switch decision on the row they
+   * can no longer find.
+   *
+   * ── WHY THE RESOLUTION HAPPENS HERE ─────────────────────────────────────────────────────
+   * `worldScopeActions` reads no Foundry global by design, and a page cannot reach the
+   * services bag, so nothing below this file can turn a drag payload into a name, an image and
+   * a description. `services.resolveToolSource` is the seam that can; this is the one call
+   * site that has it AND can navigate afterwards.
+   *
+   * ── A DROPPED ITEM MAY BE A COMPENDIUM DOCUMENT ─────────────────────────────────────────
+   * `resolveDropUuid` covers both shipped drag shapes - `{uuid}` from the world sidebar and
+   * `{pack, id}` from a compendium, which carries NO `uuid` at all - and the snapshot resolver
+   * accepts either, because `documentName === 'Item'` is true of a pack document too. A guard
+   * that read `data.uuid` would refuse exactly the module-shipped content this is most often
+   * used on.
+   *
+   * ── NO INVENTED FALLBACK IMAGE ──────────────────────────────────────────────────────────
+   * `img` is written through from the resolved Item or left EMPTY. It is unvalidated by
+   * Foundry, so a guessed path 404s silently and leaves a broken tile with nothing to say why;
+   * an empty `img` makes `Medallion` draw the Tool glyph, which is a real answer.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  async function createWorldToolFromItemDrop(data) {
     if (!data) return false;
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
     const source = await services?.resolveToolSource?.(uuid);
     if (!source) return false;
-    const created = store.createToolDraft?.({}, selectedSystemId);
-    if (!created) return false;
-    store.stageToolDraftSource?.(source.uuid || uuid, source);
-    toolEditorActiveTab = 'overview';
-    activeView = 'tool-edit';
+    const sourceUuid = source.uuid || uuid;
+    const existing = worldToolForSourceItem(sourceUuid);
+    if (existing) {
+      notifyInfo(existingWorldToolMessage(existing));
+      openWorldScopedEntry('world-tool-entry', existing.id);
+      return true;
+    }
+    const entityId = String(store?.randomID?.() || '');
+    if (!entityId) return false;
+    const created = await store?.worldScope?.tool?.createEntity?.({
+      id: entityId,
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: sourceUuid,
+      registeredItemUuid: sourceUuid,
+    });
+    if (created !== true) return false;
+    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
+    // then have to find it in. Routed through the same guard every other entry navigation uses.
+    openWorldScopedEntry('world-tool-entry', entityId);
     return true;
   }
 
-  async function stageToolEditorSourceDrop(data) {
+  /**
+   * What a GM is told when their drop landed on a world Tool that already existed.
+   *
+   * TWO SENTENCES, not one with a clause, because the two states have different consequences:
+   * an enabled record is simply the one they were about to duplicate, while a world-DISABLED one
+   * is a Tool that no system can use until the switch on the screen they just arrived at moves.
+   *
+   * @param {object} entry The matched world scope entry.
+   * @returns {string}
+   */
+  function existingWorldToolMessage(entry) {
+    const name = String(entry?.entity?.name || entry?.id || '');
+    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix. A composed key is a
+    // namespace BASE to the lang-key resolution gate, which can then only check that the base
+    // exists; a complete literal is checked against `en.json` for real. The branch costs two
+    // lines and buys the stronger assertion, which is the trade that gate's own note asks for.
+    // (Its filename is deliberately not written here: the manager source contract greps this
+    // file for bare Foundry global words, and one of them appears inside that path.)
+    const message =
+      entry?.worldEnabled === false
+        ? text(
+            'FABRICATE.Admin.Manager.Scoped.Tool.DropExistingDisabled',
+            '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Scoped.Tool.DropExisting',
+            '{name} already exists for that Item. Opened it instead of creating a second.'
+          );
+    return message.replace('{name}', name);
+  }
+
+  /**
+   * RE-POINT a world Tool at another world Item, from the world Tool entry's linked-item
+   * card (issue 1373).
+   *
+   * ── WHY THE RESOLUTION IS HERE ──────────────────────────────────────────────────────────
+   * The same reason `createWorldToolFromItemDrop` above gives, and this is its sibling rather
+   * than a second design: `worldScopeActions` reads no Foundry global by design and a page
+   * cannot reach the services bag, so nothing below this file can turn a drag payload into a
+   * name, an image and a description. `resolveDropUuid` covers both shipped drag shapes,
+   * including the compendium `{pack, id}` payload that carries no `uuid` at all.
+   *
+   * ── THE SNAPSHOT IS REWRITTEN, WHICH IS WHAT "REPLACE THE LINKED SOURCE" MEANS ──────────
+   * `name`, `img` and `description` are the world record's snapshot OF the linked Item, so
+   * re-pointing the link and keeping the old Item's name would leave the catalogue naming a
+   * document the record no longer references. `img` is written through or left EMPTY — never
+   * guessed, because Foundry does not validate the path and a wrong one 404s silently.
+   *
+   * IT IS IMMEDIATE rather than staged into the entry's buffered draft, on the rule that
+   * screen already states: the draft buffers what the editor AUTHORS, and the source-link
+   * fields are not among them.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  /**
+   * The actors the world Tool entry's `Preview as` region offers.
+   *
+   * ── THE SAME PREDICATE THE CHECKS STUDIO'S PICKER USES, and for the same reason it states:
+   * a real world's actor directory is mostly bestiary, and a crafting Tool is wielded by a
+   * CHARACTER, so an unfiltered roster buries the three actors a GM would ever pick. The
+   * predicate is the shared, GM-configurable one rather than a second `type === 'character'`
+   * test, so the two pickers cannot disagree about who a player character is.
+   *
+   * PROJECTED TO `{id, name, img}` HERE. The page is a leaf with no Foundry in its closure, and
+   * handing it live Actor documents would put one there.
+   *
+   * @returns {Array<{id: string, name: string, img: string}>}
+   */
+  function listWorldToolPreviewActors() {
+    const rows = [];
+    let actors;
+    try {
+      actors = services?.getWorldActors?.() ?? [];
+    } catch {
+      return rows;
+    }
+    for (const actor of actors) {
+      if (!actor?.id || !isPlayerCharacterActor(actor)) continue;
+      rows.push({
+        id: String(actor.id),
+        name: String(actor.name ?? actor.id),
+        img: typeof actor.img === 'string' ? actor.img : '',
+      });
+    }
+    return rows;
+  }
+
+  const worldToolPreviewActors = $derived(
+    currentView === 'world-tool-entry' ? listWorldToolPreviewActors() : []
+  );
+
+  /**
+   * ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites.
+   *
+   * `null` for the `No actor` selection AND for an actor that no longer resolves, which are the
+   * same answer from the readout's point of view: nothing was evaluated. It must NOT degrade to
+   * `{}` — every `@` path would then resolve to zero and a numeric gate would read as FAILED
+   * rather than as unevaluated, which is a plausible wrong answer rather than a missing one.
+   *
+   * @param {string} actorId
+   * @returns {object|null}
+   */
+  function worldToolPreviewRollData(actorId) {
+    if (!actorId) return null;
+    try {
+      const actor = (services?.getWorldActors?.() ?? []).find(
+        (candidate) => String(candidate?.id ?? '') === String(actorId)
+      );
+      return actor?.getRollData?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function relinkWorldToolSource(data) {
+    const entityId = worldScopedEntryId;
+    if (!entityId || !data) return false;
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
-    const snapshot = await services?.resolveToolSource?.(uuid);
-    if (!snapshot) return false;
-    store.stageToolDraftSource?.(snapshot.uuid || uuid, snapshot);
-    return true;
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source) return false;
+    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: source.uuid || uuid,
+      registeredItemUuid: source.uuid || uuid,
+      aliasItemUuids: [],
+    });
+    return patched === true;
+  }
+
+  /**
+   * UNLINK a world Tool from its world Item.
+   *
+   * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
+   * `description` are what the catalogue and every system row render, so blanking them would
+   * turn an unlinked record into an unfindable one. The world entry says so on the card.
+   *
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   */
+  async function unlinkWorldToolSource(entityId) {
+    if (!entityId) return false;
+    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
+      originItemUuid: null,
+      registeredItemUuid: null,
+      aliasItemUuids: [],
+    });
+    return patched === true;
   }
 
   async function toggleFocusedToolEnabled(enabled) {
@@ -8145,7 +8689,7 @@
   }
 
   function enterToolEditor() {
-    toolEditorActiveTab = 'overview';
+    toolEditorActiveTab = 'breakage';
     activeView = 'tool-edit';
   }
 
@@ -8162,7 +8706,33 @@
 
   function selectLibraryTool(toolId) {
     if (!toolId) return false;
-    return store?.openToolDraft?.(toolId, selectedSystemId) ?? false;
+    const id = String(toolId);
+    const opened = store?.openToolDraft?.(id, selectedSystemId) ?? false;
+    // A WORLD TOOL THIS SYSTEM HAS NO RULES RECORD FOR CANNOT OPEN A DRAFT, and that is not a
+    // failure to swallow: it is precisely the state the inspector's `Add {tool} to {system}`
+    // action exists to answer. The subject is therefore RECORDED rather than discarded, so the
+    // panel can describe the Tool a GM just clicked instead of going empty on the one row that
+    // needs an affordance. Selecting an adopted Tool clears it, so only one is ever inspected.
+    unadoptedToolId = opened === false ? id : '';
+    return opened;
+  }
+
+  /**
+   * Adopt a world Tool into this system, and MOVE THE SELECTION ONTO THE RECORD IT CREATED.
+   *
+   * The second half is not polish. `unadoptedToolId` is what routes this panel to the
+   * `No rules here` / `Add {tool} to {system}` branch, and nothing clears it on its own - so
+   * without this the GM presses the button, the Tool becomes a member row in the list behind
+   * the panel, and the panel goes on offering to add a Tool that is already there.
+   * `selectLibraryTool` is the one clearer: the draft now opens because the record exists.
+   *
+   * @param {string} entityId The world tool entity id.
+   * @returns {Promise<boolean>}
+   */
+  async function adoptWorldToolIntoSystem(entityId) {
+    const adopted = await store?.worldScope?.tool?.addToSystem?.(entityId, selectedSystemId);
+    if (adopted !== true) return false;
+    return selectLibraryTool(entityId);
   }
 
   function backToToolsBrowser() {
@@ -8178,14 +8748,51 @@
     return saved;
   }
 
-  async function deleteSelectedLibraryTool() {
-    if (!focusedToolDraft) return false;
-    const confirmed = await services?.confirmDeleteTool?.({ tool: focusedToolDraft });
-    if (confirmed !== true) return false;
-    const deleted = await store?.deleteToolDraft?.();
-    if (deleted !== true) return false;
+  /**
+   * STOP USING THE FOCUSED TOOL IN THE SELECTED SYSTEM (issue 1373).
+   *
+   * THE REPLACEMENT FOR THE EDITOR'S `Delete`, and a different action rather than a renamed one.
+   * `Delete` destroyed the crafting system's Tool record and nothing else, under a label that
+   * read as though it destroyed the Tool; the design puts `Delete` on the world entry, which is
+   * the record that word describes, and gives system scope this — the rules in ONE system, with
+   * the world Tool and every other system untouched. The store owns both halves of that.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function removeFocusedToolFromSystem() {
+    const toolId = String(focusedToolDraft?.id || '');
+    if (!toolId || !selectedSystemId) return false;
+    // NO `confirmDeleteTool` DIALOG, and that is not an omission. The control is an
+    // `ArmedDangerButton`: it already takes two deliberate presses, and the callout it sits in
+    // states the whole consequence in a sentence. `confirmDeleteTool` also asks `Delete <name>?`
+    // over a `Delete` button, which is the WORLD action's wording and the exact confusion this
+    // callout replaced. The service stays for the world Tool entry, which is where a real
+    // deletion is authored.
+    const removed = await store?.removeToolFromSystem?.(toolId, selectedSystemId);
+    if (removed !== true) return false;
     activeView = 'tools';
     return true;
+  }
+
+  /**
+   * Move ONE of the focused Tool's world-default sections between inheriting and overriding.
+   *
+   * Refused for an unpersisted draft on the same rule the enable switch already applies: both
+   * write the LIVE record, and there is no live record to write until the draft has been saved
+   * once.
+   *
+   * @param {string} section
+   * @param {boolean} inherit
+   * @returns {Promise<boolean>}
+   */
+  async function setFocusedToolSectionInherited(section, inherit) {
+    if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
+    return store?.setToolSectionInherited?.(
+      focusedToolDraft.id,
+      section,
+      inherit,
+      selectedSystemId
+    );
   }
 
   function activateGatheringParent() {
@@ -9088,51 +9695,68 @@
     Its gold badge is the PREMIUM signal, and it appears only when a companion module has
     registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
-  {#if !isToolStudioRoute}
-    <div
-      class="manager-titlebar"
-      data-manager-titlebar
-      aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
-    >
-      <!--
-      The layer-group icon and "Crafting Systems" product label used to lead this
-      strip, but the Foundry window's own title bar already names the app — a second
-      copy inside the window was duplicated chrome (issue 643).
+  <!--
+    THE TITLE BAND RENDERS ON THE TOOL ROUTES TOO (issue 1373).
 
-      The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
-      1185): the rail's crafting-system card already names the selected system on every
-      screen, so the strip was repeating it. The slot now carries the one thing nothing
-      else in the chrome says — that a premium companion module is installed and connected
-      — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
-      loud signal is stated exactly once.
-    -->
-      {#if premiumInstalled}
-        <span
-          class="manager-titlebar-badge"
-          data-manager-titlebar-premium
-          title={text(
-            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-            'Fabricate Premium is installed and connected'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-            'Fabricate Premium is installed and connected'
-          )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-        >
-      {/if}
-      {#if selectedSystem}
-        <span
-          class="manager-titlebar-status"
-          data-manager-titlebar-status
-          title={titlebarStatusLabel()}
-          aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-        >
-          <i class="fas fa-dice-d20 manager-titlebar-status-icon" aria-hidden="true"></i>
-          <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-        </span>
-      {/if}
-    </div>
-  {/if}
+    It was gated `{#if !isToolStudioRoute}`, so the two screens the design draws this band on
+    most explicitly were the two that did not draw it: `Tool Rules` and its editor rendered
+    ~18px of empty ground where the reference states the selected system's resolution mode,
+    and the premium slot with it. Nothing about the band is route-specific - the gate below,
+    which suppresses the shared `.manager-header`, is, because both Tool routes render headers
+    of their own.
+
+    THE LEFT-HAND SYSTEM BADGE STAYS RETIRED. The reference puts the system's name here; issue
+    1185 moved it to the rail's crafting-system card because the strip was repeating it on
+    every one of the manager's ~20 routes, and re-adding it on two of them would restore the
+    duplication AND make those two disagree with the other eighteen. Recorded rather than
+    silently skipped.
+  -->
+  <div
+    class="manager-titlebar"
+    data-manager-titlebar
+    aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
+  >
+    <!--
+    The layer-group icon and "Crafting Systems" product label used to lead this
+    strip, but the Foundry window's own title bar already names the app — a second
+    copy inside the window was duplicated chrome (issue 643).
+
+    The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
+    1185): the rail's crafting-system card already names the selected system on every
+    screen, so the strip was repeating it. The slot now carries the one thing nothing
+    else in the chrome says — that a premium companion module is installed and connected
+    — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
+    loud signal is stated exactly once.
+  -->
+    {#if premiumInstalled}
+      <span
+        class="manager-titlebar-badge"
+        data-manager-titlebar-premium
+        title={text(
+          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+          'Fabricate Premium is installed and connected'
+        )}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+          'Fabricate Premium is installed and connected'
+        )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
+      >
+    {/if}
+    {#if selectedSystem}
+      <span
+        class="manager-titlebar-status"
+        data-manager-titlebar-status
+        title={titlebarStatusLabel()}
+        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
+      >
+        <!-- The reference marks this line with an INFORMATION glyph, not a die. What follows
+             it is a statement about how the selected system resolves, which a d20 reads as a
+             dice-roll control rather than as a caption (issue 1373). -->
+        <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
+        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
+      </span>
+    {/if}
+  </div>
 
   {#if !isToolStudioRoute}
     <!--
@@ -9572,6 +10196,27 @@
               <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
             </div>
           </div>
+        {:else if worldToolEntryRecord}
+          <!-- The Tool's own identity header, the twin of the essence branch above. The
+             medallion carries the linked Item's art where there is one; `Medallion` falls back
+             to the glyph when `src` is empty, which is the unlinked case and the one this
+             screen has to draw without inventing a picture for. -->
+          <div class="manager-recipe-edit-heading" data-world-tool-entry-heading>
+            <Medallion
+              src={worldToolEntryRecord.entity?.img ?? ''}
+              icon="fas fa-screwdriver-wrench"
+              size={44}
+              glyph={22}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={worldToolEntryName}>
+                {worldToolEntryName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-world-tool-entry-subline>
+                {worldToolEntrySubtitle}
+              </p>
+            </div>
+          </div>
         {:else if currentView !== 'tool-edit'}
           <h1 class="manager-title">{viewTitle()}</h1>
           <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -9645,7 +10290,7 @@
         So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
         fallthrough — and the other five world scoped routes stay excluded exactly as before.
       -->
-      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry'}
+      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-essence-entry'}
             <!--
@@ -9679,6 +10324,40 @@
               saving={worldEssenceEntrySaving}
               onBack={() => setView('world-essences')}
               onSave={saveWorldEssenceEntry}
+            />
+          {:else if currentView === 'world-tool-entry'}
+            <!--
+              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373). The reference draws
+              `← Back to tools` and `Save tool` on this screen's title line
+              (`PROTO-tool-entry.png`), which is the EDITOR recipe's
+              "action pair with back before save" — so this is the second caller
+              `ScopedEntryHeaderActions` was extracted for rather than a copy of it.
+
+              THE HOOKS ARE PER SITE. The tests and the capture registry address this screen's
+              actions by their own names, which is why the component takes them as props.
+
+              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
+              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
+              three ways out a GM takes.
+
+              DELETE IS HERE, between them (issue 1373). It used to be a danger CARD on the
+              Overview tab, on the argument that a header button has nowhere to state the reach.
+              That argument was answered rather than overruled: the reach is the armed button's
+              accessible name and hover title, which is where a consequence belongs on a control
+              that has one — and the card idiom it borrowed is the SYSTEM rules editor's `Stop
+              using this Tool here`, so the two scopes had swapped their destructive treatments
+              and a GM met the same verb in two different places one route apart.
+            -->
+            <ScopedEntryHeaderActions
+              backAttribute="data-world-tool-back"
+              saveAttribute="data-world-tool-save"
+              backLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.Save', 'Save tool')}
+              saveDisabled={!worldToolEntryDirty}
+              saving={worldToolEntrySaving}
+              onBack={() => setView('world-tools')}
+              onSave={saveWorldToolEntry}
+              danger={worldToolEntryDelete ? worldToolDeleteAction : undefined}
             />
           {:else if currentView === 'world-essences'}
             <!--
@@ -10202,10 +10881,12 @@
           <button type="button" onclick={() => editSystem(selectedSystem.id)}
             >{selectedSystem.name}</button
           >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}
-            >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-          >
+          <!-- NO `Crafting` CRUMB (issue 1373). This trail claimed Tool Rules sits inside the
+               Crafting group, and the rail in the same frame shows that group holding Recipes
+               and Settings with Tool Rules a sibling OUTSIDE it. Two navigations one pane
+               apart disagreed about the shape of the app, and the rail is the one a GM
+               actually clicks. The editor's own trail never had the crumb, so dropping it
+               also makes the two Tool screens agree with each other. -->
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
         </nav>
@@ -10514,7 +11195,14 @@
             <span class="manager-nav-label"
               >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span
             >
-            <span class="manager-nav-count">{toolsNavCount}</span>
+            <!-- NO ZERO BADGE (issue 1373). The rail states counts where there is something to
+                 count; a `0` beside `Tool Rules` on a system that has adopted none is a badge
+                 whose whole content is the absence the row already reads as, and the reference
+                 draws none. Scoped to this row: the other rail counts are the other lanes' and
+                 their reference frames were not read in this pass. -->
+            {#if toolsNavCount > 0}
+              <span class="manager-nav-count">{toolsNavCount}</span>
+            {/if}
           </button>
           <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
             <button
@@ -11292,12 +11980,31 @@
       <WorldToolCataloguePage
         {...toolScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        worldItems={worldItemOptions}
+        onOpenSystemRules={(entityId, systemId) => openSystemToolRules(entityId, systemId)}
+        onCreateFromItemDrop={createWorldToolFromItemDrop}
       />
     {:else if currentView === 'world-tool-entry'}
       <WorldToolEntryPage
         {...toolScopeProps}
         entityId={worldScopedEntryId}
+        worldItems={worldItemOptions}
+        prerequisiteOptions={selectedCharacterPrerequisites}
+        modifierOptions={selectedSystemModifiers}
+        componentOptions={worldComponentOptions}
+        essenceOptions={worldEssenceOptions}
+        itemTags={worldComponentTags}
+        currencyUnits={selectedCurrencyUnits}
+        previewActors={worldToolPreviewActors}
+        getPreviewRollData={worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}
+        onSourceDrop={relinkWorldToolSource}
+        onUnlinkSource={() => unlinkWorldToolSource(worldScopedEntryId)}
+        onDraftChange={handleWorldToolEntryDraft}
+        onDirtyChange={handleWorldToolEntryDirty}
+        onDraftIdentityChange={handleScopedEntryDraftIdentity}
+        onSublineChange={handleWorldToolEntrySubline}
+        onDeleteChange={handleWorldToolEntryDelete}
       />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage
@@ -11695,12 +12402,13 @@
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         breakageSource={selectedSystem?.toolBreakage?.source || 'default'}
+        selectedUnadoptedToolId={unadoptedToolId}
         onSelectTool={selectLibraryTool}
         onEditTool={openToolEditor}
-        onCreateToolDrop={addToolFromDrop}
         onToggleToolEnabled={(id, enabled) =>
           store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
+        onOpenWorldCatalogue={() => setView('world-tools')}
         bind:browserState={managerBrowserState.tools}
       />
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
@@ -11708,6 +12416,7 @@
         {...toolScopeProps}
         tool={focusedToolDraft}
         systemName={selectedSystem.name}
+        breakageSource={selectedSystem?.toolBreakage?.source || 'default'}
         validation={focusedToolValidation}
         dirty={$viewState.toolDraftDirty === true}
         persisted={$viewState.toolDraftBaseline !== null}
@@ -11715,7 +12424,6 @@
         saveError={$viewState.toolDraftSaveError}
         activeTab={toolEditorActiveTab}
         focusValidationNonce={toolValidationFocusNonce}
-        worldItems={worldItemOptions}
         managedItems={selectedSystem?.managedItemOptions || []}
         itemTags={selectedSystem?.itemTags || []}
         essenceOptions={selectedSystem?.features?.essences === true
@@ -11724,21 +12432,24 @@
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        modifierOptions={selectedSystemModifiers}
+        actorOptions={$viewState.actorOptions || []}
+        getActorRollData={(uuid) => store.getActorRollData?.(uuid)}
+        requiredFor={$viewState.toolRequiredFor?.[focusedToolDraft.id] || []}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onOpenSystems={selectSystemAndShowBrowser}
         onOpenSystem={() => editSystem(selectedSystem.id)}
         onOpenTools={backToToolsBrowser}
         onBack={backToToolsBrowser}
-        onDelete={deleteSelectedLibraryTool}
         onSave={saveSelectedToolDraft}
         onTabChange={(tab) => {
           toolEditorActiveTab = tab;
         }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
-        onSourceDrop={stageToolEditorSourceDrop}
         onToggleEnabled={toggleFocusedToolEnabled}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-        onUnlinkSource={() => store.unlinkToolDraftSource?.()}
+        onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        onToggleInherited={setFocusedToolSectionInherited}
+        onRemoveFromSystem={removeFocusedToolFromSystem}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -14739,11 +15450,16 @@
           {/if}
         {:else if currentView === 'tools'}
           <ToolBrowserInspector
-            tool={selectedLibraryTool}
+            tool={inspectedLibraryTool}
             managedItems={selectedSystem?.managedItemOptions || []}
             prerequisiteOptions={selectedCharacterPrerequisites}
             authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+            systemName={selectedSystem?.name || ''}
+            unadopted={unadoptedWorldTool}
+            inherited={selectedLibraryToolInherited}
             onEdit={openToolEditor}
+            onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+            onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}
           />
         {:else if currentView === 'component-edit'}
           <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
@@ -15041,3 +15757,29 @@
         >{/if}{/key}
   </p>
 </div>
+
+<!--
+  THE WORLD TOOL ENTRY'S HEADER `Delete` (issue 1373).
+
+  Rendered into `ScopedEntryHeaderActions`' `danger` slot, which places it between `Back to
+  tools` and `Save tool` — the design's own order. The copy and the write are the PAGE's, and
+  arrive as a descriptor over `onDeleteChange`; what lives here is the arm token, because the
+  manager's invariant is one armed control at a time across the whole window.
+-->
+{#snippet worldToolDeleteAction()}
+  <ArmedDangerButton
+    token={worldToolEntryDelete?.token ?? ''}
+    armed={Boolean(worldToolEntryDelete?.token) &&
+      worldToolEntryDeleteArmed === worldToolEntryDelete.token}
+    idleLabel={worldToolEntryDelete?.label ?? ''}
+    armedLabel={worldToolEntryDelete?.armedLabel ?? ''}
+    idleAriaLabel={worldToolEntryDelete?.idleAriaLabel ?? ''}
+    armedAriaLabel={worldToolEntryDelete?.armedAriaLabel ?? ''}
+    onArm={(token) => (worldToolEntryDeleteArmed = token)}
+    onDisarm={() => (worldToolEntryDeleteArmed = '')}
+    onConfirm={() => {
+      worldToolEntryDeleteArmed = '';
+      worldToolEntryDelete?.run?.();
+    }}
+  />
+{/snippet}
