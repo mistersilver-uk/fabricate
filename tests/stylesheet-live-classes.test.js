@@ -15,9 +15,12 @@
  *
  * WHY THE FILE EXTENSION IS PART OF EACH ROW. Comment stripping is per REGION and the region rules
  * are chosen by extension: a `.svelte` file's markup gets HTML comments only, its `<script>` gets
- * the JavaScript stripper and its `<style>` gets the CSS one. The `markup url` row is the one that
- * would fail if that were flattened to a per-line JavaScript strip — two slashes are not a comment
- * delimiter in markup, so `href="https://x" class="…"` would lose its class.
+ * the JavaScript stripper and its `<style>` gets the CSS one. The `style url` row is the one that
+ * fails if the `<style>` region is handed the JavaScript stripper: two slashes are not a comment
+ * delimiter in CSS, so an unquoted `url(https://…)` blanks the rest of its line and takes any
+ * `:global()` after it. The `markup url` row is the WEAKER half of the same story and says so on
+ * its own line — an `href="…"` is quoted, and the JavaScript stripper skips quoted runs, so that
+ * row pins the markup region rule without being able to fail on the `//` hazard itself.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -71,7 +74,26 @@ const SOURCE_ROWS = [
     file: 'src/ui/svelte/apps/Epsilon.svelte',
     source: '<a href="https://example.invalid/docs" class="epsilon-link">read</a>',
     exact: ['epsilon-link'],
-    because: 'two slashes are not a comment in markup; a per-line JavaScript strip eats the class',
+    because: 'markup is given HTML comments only, and this pins that region rule rather than the'
+      + ' // hazard: the href is QUOTED and the JavaScript stripper skips quoted runs, so the row'
+      + ' below is the one that fails when the style region loses the CSS stripper',
+  },
+  {
+    id: 'style url',
+    file: 'src/ui/svelte/apps/Upsilon.svelte',
+    source: [
+      '<div></div>',
+      '<style>',
+      '  .upsilon-shell { background: url(https://example.invalid/a.png); }'
+        + ' :global(.upsilon-live) { color: red; }',
+      '</style>',
+    ].join('\n'),
+    exact: ['upsilon-live'],
+    because: 'an UNQUOTED url() is the case the JavaScript stripper really does eat — it reads the'
+      + ' // as a line comment and blanks to the end of the line, so the :global() sharing that'
+      + ' line is lost and .upsilon-live is called dead. Both are on one line deliberately: the'
+      + ' blanking stops at the newline, so a row spreading them over two lines stays green with'
+      + ' the style region wired to the JavaScript stripper and proves nothing',
   },
   {
     id: 'class named only in a markup comment',
@@ -173,7 +195,7 @@ test('every liveness rule holds on its synthetic row', () => {
 });
 
 test('the corpus is alive, so the loop above cannot pass by iterating nothing', () => {
-  assert.ok(SOURCE_ROWS.length >= 12, 'the synthetic corpus lost rows');
+  assert.ok(SOURCE_ROWS.length >= 13, 'the synthetic corpus lost rows');
   const covered = SOURCE_ROWS.filter((row) => (row.exact ?? row.live ?? row.dead ?? []).length > 0);
   assert.equal(covered.length, SOURCE_ROWS.length, 'a row asserts nothing at all');
 });
