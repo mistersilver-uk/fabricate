@@ -62,6 +62,14 @@
    - notes: `{ [section]: string }`, the one-line summary of the inherited value. The calling
      editor supplies it: this component never reads a section value, because section values
      are opaque everywhere else in this model too.
+   - noteTone / noteIcon: `{ [section]: string }`, OPTIONAL, both absent by default so every
+     shipped caller renders byte-identically (issue 1371). The note used to paint one ink for
+     every state, which made an INHERITING row and an OVERRIDING row the same grey — and a
+     component lane's `tone: 'info'` / `'warning'` model field a unit-tested constant with no
+     pixel behind it. A caller that distinguishes its states names the family here and the
+     glyph beside it; a caller that does not passes neither and nothing moves. The tone is a
+     FAMILY NAME, never a colour: `info` and `warning` are the only two mapped, and anything
+     else falls through to the shipped muted ink rather than emitting an unstyled class.
    - disabled: while the editor is saving.
    - onToggle(section, nextInherit): the switch. `nextInherit` is a boolean, never a toggle
      of unknown current state, so a stale render cannot invert the write.
@@ -79,6 +87,8 @@
     stateChip = true,
     inherited = {},
     notes = {},
+    noteTone = {},
+    noteIcon = {},
     disabled = false,
     onToggle = () => {},
   } = $props();
@@ -99,6 +109,15 @@
   // as two different controls; `aria-pressed`, which `StatusToggle` derives from `on`, is what
   // carries the position. The old name — "Fall back to the world default" — named the OFF
   // position, which was survivable only while the switch was wired the wrong way round.
+  /**
+   * The two colour families a note may take, WITHOUT the `is-` prefix.
+   *
+   * An unrecognised name is dropped rather than emitted as an unstyled `is-*` class, on the same
+   * rule `Chip` follows for its tones: a typo then shows up as the shipped muted note instead of
+   * silently doing nothing at all.
+   */
+  const NOTE_TONES = new Set(['info', 'warning']);
+
   const toggleName = $derived(
     text(
       'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
@@ -120,7 +139,16 @@
       {/if}
     </div>
     {#if row.note}
-      <p class="manager-scoped-inherit-note" data-scoped-inherit-note={row.section}>{row.note}</p>
+      <p
+        class={`manager-scoped-inherit-note${NOTE_TONES.has(noteTone?.[row.section]) ? ` is-${noteTone[row.section]}` : ''}`}
+        data-scoped-inherit-note={row.section}
+        data-scoped-inherit-note-tone={noteTone?.[row.section] || undefined}
+      >
+        {#if noteIcon?.[row.section]}
+          <i class={noteIcon[row.section]} aria-hidden="true"></i>
+        {/if}
+        <span>{row.note}</span>
+      </p>
     {/if}
     <!--
       THE SENTENCE IS THE ACCESSIBLE NAME, NOT VISIBLE TEXT, SO NO `label` IS PASSED.

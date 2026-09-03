@@ -41,11 +41,12 @@
   grid of bare tag names is ambiguous the moment it leaves visual context.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localize, notifyWarn } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
+  import Callout from '../Callout.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import MembershipActions from './MembershipActions.svelte';
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
@@ -53,6 +54,7 @@
   import {
     componentAttributionNote,
     componentDeleteNote,
+    componentInheritState,
     componentWorldCategoryNote,
     componentWorldScopeDisclosure,
     componentWorldTagNote,
@@ -77,6 +79,10 @@
     onOpenSystemRules = null,
     onSourceDrop = () => {},
     onUnlinkSource = () => {},
+    // COPY THE SOURCE UUID, through the shell's own clipboard seam. D-9's source-identity row
+    // draws it beside the address, and it is the only way a GM gets the uuid out of this screen:
+    // the tile prints it, and printed text in a Foundry app is not selectable in every theme.
+    onCopySourceUuid = () => {},
     // THE BUFFERED EDIT'S THREE WIRES TO THE SHELL, in the shape the two sibling entry editors
     // already report: a LIVE handle read at click time, a reactive dirty flag for the header
     // button's disabled state, and the buffered identity for the chrome that NAMES the component.
@@ -108,6 +114,23 @@
   const IDENTITY_FIELDS = Object.freeze(['name', 'img', 'description']);
 
   let activeTab = $state('definition');
+  // THE COPY ACKNOWLEDGEMENT (`Copy` -> `Copied`), which is the whole feedback this control has:
+  // the clipboard write is silent, so without the label change a GM cannot tell a successful copy
+  // from a dead button. It resets on a timer rather than on a second click, because the state it
+  // reports is "this just happened" rather than a mode.
+  let sourceCopied = $state(false);
+  // THE PER-SYSTEM CARD'S OWN FILTER AND SEARCH (issue 1371, round 2).
+  //
+  // D-9 specifies filters, a search field and a count for this card, and round 1 shipped an
+  // unfiltered, unsearchable, unbounded list carrying only a name and the membership cluster. On
+  // the six-system lab world that survives; on a twenty-system world the card is a wall, and it is
+  // the one surface on this screen whose length is a property of the WORLD rather than of the
+  // component.
+  //
+  // Held locally rather than lifted: this is a filter over rows already in hand, inside one
+  // editing session, and the entry unmounts when the GM leaves the component anyway.
+  let systemFilter = $state('all');
+  let systemSearch = $state('');
   let tagDraft = $state('');
   let aliasDraft = $state('');
 
@@ -227,6 +250,106 @@
   $effect(() => () => onDraftIdentityChange(null));
 
   const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
+
+  /**
+   * The rows the card draws: the membership filter, then the search term.
+   *
+   * `with` and `without` are the two halves of `member`, and `all` is their union — so every
+   * previously reachable row is still reachable, and the counts below are computed over the SAME
+   * arrays rather than restated.
+   */
+  const visibleSystemRows = $derived(
+    systemRows
+      .filter((row) => {
+        if (systemFilter === 'with') return row.member === true;
+        if (systemFilter === 'without') return row.member !== true;
+        return true;
+      })
+      .filter((row) => {
+        const needle = systemSearch.trim().toLowerCase();
+        return (
+          !needle ||
+          String(row.systemName || row.systemId || '')
+            .toLowerCase()
+            .includes(needle)
+        );
+      })
+  );
+
+  const systemFilters = $derived([
+    {
+      id: 'all',
+      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.SystemFilterAll', 'All ({count})', {
+        count: systemRows.length,
+      }),
+    },
+    {
+      id: 'with',
+      label: phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.SystemFilterWith',
+        'With rules ({count})',
+        { count: memberRows.length }
+      ),
+    },
+    {
+      id: 'without',
+      label: phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.SystemFilterWithout',
+        'Without ({count})',
+        { count: systemRows.length - memberRows.length }
+      ),
+    },
+  ]);
+
+  /**
+   * One row's MODE — what decides its category — read off the same projection join the system
+   * rules list reads, so the entry and that screen cannot word one state two ways.
+   *
+   * @param {object} row
+   * @returns {{state: string, label: string}|null}
+   */
+  function systemMode(row) {
+    return componentInheritState(row, phrase);
+  }
+
+  /**
+   * One row's summary line: what this system actually resolves, and how far its own edits reach.
+   *
+   * @param {object} row
+   * @returns {string}
+   */
+  function systemSummary(row) {
+    if (row?.member !== true) {
+      return phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryNone',
+        'No rules here, so nothing in this system resolves to this component.'
+      );
+    }
+    const muteCount = Array.isArray(row.mutedTags) ? row.mutedTags.length : 0;
+    // THE RESOLVED VALUE, WHICH IS THE ROW OVERRIDE ONLY WHEN THERE IS ONE. A membership record
+    // carries `category` only for a system that OVERRIDES it — an inheriting record omits the key
+    // entirely rather than copying the world value — so reading the row alone made every
+    // inheriting system report `No world category` over a world record that plainly has one, on
+    // the row that had just said `Inherits world category` beside it.
+    const resolved =
+      row.inherited?.category === false ? String(row.category ?? '').trim() : worldCategory;
+    const category =
+      resolved ||
+      text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category');
+    return phrase(
+      muteCount === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryMutedOne'
+        : muteCount > 1
+          ? 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryMuted'
+          : 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummary',
+      muteCount === 1
+        ? 'Resolves {category} · mutes {count} world tag'
+        : muteCount > 1
+          ? 'Resolves {category} · mutes {count} world tags'
+          : 'Resolves {category}',
+      { category, count: muteCount }
+    );
+  }
   const memberRows = $derived(systemRows.filter((row) => row?.member === true));
   const memberNames = $derived(
     memberRows.map((row) => String(row?.systemName || row?.systemId || ''))
@@ -269,8 +392,13 @@
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');
   const tagNote = $derived(entry ? componentWorldTagNote(entry, phrase) : '');
   const disclosure = $derived(componentWorldScopeDisclosure(phrase));
+  // THE ENTRY'S OWN SENTENCE, not the system screens' (issue 1371, round 2). The `list` surface
+  // computes "shared with N OTHER systems" — where "other" means "other than the system you are
+  // editing", which is a referent this screen does not have. On the world entry a component held
+  // by three systems read "shared with 2 other systems", and the zero-member and one-member states
+  // rendered identical copy.
   const attribution = $derived(
-    componentAttributionNote({ surface: 'list', memberCount: memberRows.length }, phrase)
+    componentAttributionNote({ surface: 'entry', memberCount: memberRows.length }, phrase)
   );
 
   const validation = $derived(
@@ -293,6 +421,9 @@
     )
   );
   const counts = $derived(validation.counts);
+  // THE WORST THING THE ROWS SAY, which is what the hero exists to state. Written as an
+  // early-return chain rather than a nested ternary, which SonarCloud reports as S3358.
+  const validationStatus = $derived(worstValidationStatus(counts));
 
   const TABS = [
     { id: 'definition', icon: 'fas fa-fingerprint' },
@@ -309,6 +440,18 @@
       label: tab.id === 'definition' ? 'Definition' : 'Validation',
     }))
   );
+
+  /**
+   * The overall status the validation hero paints, from the same counts the rows are grouped by.
+   *
+   * @param {{blocking: number, warnings: number}} current
+   * @returns {'block'|'warn'|'pass'}
+   */
+  function worstValidationStatus(current) {
+    if (current.blocking > 0) return 'block';
+    if (current.warnings > 0) return 'warn';
+    return 'pass';
+  }
 
   /**
    * The Validation tab's badge, in the shape `EditorTabs` takes. Written as an early-return chain
@@ -332,6 +475,11 @@
   // Delete already lands. What differs here is that the armed confirm REFUSES while any system
   // holds a membership record, and states what to do instead.
   const deleteNote = $derived(componentDeleteNote(memberNames, phrase));
+  const armedDeleteLabel = $derived(
+    deleteNote.refused
+      ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
+      : text('FABRICATE.Admin.Manager.Scoped.Component.DeleteConfirm', 'Confirm delete')
+  );
 
   async function runDelete() {
     // THE REFUSAL. `deleteEntity` does not refuse: it removes the entity, its world defaults and
@@ -352,22 +500,68 @@
     onDeleteChange({
       token: `world-component-delete:${entry.id}`,
       label: text('FABRICATE.Admin.Manager.Scoped.Component.Delete', 'Delete'),
-      armedLabel: deleteNote.refused
-        ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
-        : text('FABRICATE.Admin.Manager.Scoped.Component.DeleteConfirm', 'Confirm delete'),
+      armedLabel: armedDeleteLabel,
       idleAriaLabel: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.DeleteAria',
         'Delete {name} from the world catalogue',
         { name }
       ),
-      // THE REACH — or the REFUSAL — IN THE ARMED NAME. This is the sentence a GM reads at the
-      // moment the control becomes destructive, and on a migrated world it is the refusal for
-      // every component they can reach.
-      armedAriaLabel: deleteNote.text,
+      // THE REACH — or the REFUSAL — IN THE ARMED NAME, PREFIXED BY THE VISIBLE LABEL.
+      //
+      // `ArmedDangerButton` requires each aria label to CONTAIN its state's visible label, because
+      // WCAG 2.5.3 makes a control whose name omits the visible string unactivatable by speech
+      // input. Round 1 passed the bare consequence sentence, so the armed face read "Cannot
+      // delete" and announced a sentence that never contained those words.
+      armedAriaLabel: `${armedDeleteLabel} — ${deleteNote.text}`,
       run: runDelete,
     });
   });
   $effect(() => () => onDeleteChange(null));
+
+  /**
+   * Write the world category, or REFUSE the reserved bucket and say so.
+   *
+   * ── A REFUSAL THAT WRITES ABSENCE IS A DELETION (issue 1371, round 2) ────────────────────
+   * The refusal shipped as `offered[0] ?? ''`, so typing `General` into a component that already
+   * had `Refined` forwarded `''` — clearing the authored value, with no message. The GM sees the
+   * field blank and no reason for it.
+   *
+   * BLANK IS STILL A REAL EDIT. An empty input is a GM clearing the category deliberately, and it
+   * must keep working; only a NON-BLANK value the offer list refuses is turned away.
+   *
+   * @param {HTMLInputElement} input
+   * @returns {void}
+   */
+  function commitWorldCategory(input) {
+    const raw = String(input?.value ?? '');
+    const offered = offeredWorldComponentCategories([raw]);
+    if (offered.length === 0 && raw.trim() !== '') {
+      // Put the authored value back, so the control shows what is actually stored.
+      input.value = worldCategory;
+      notifyWarn(
+        text(
+          'FABRICATE.Admin.Manager.Scoped.Component.CategoryReserved',
+          'General is the reserved bucket every component falls back to, so it cannot be a world category. Leave it blank instead.'
+        )
+      );
+      return;
+    }
+    actions?.updateWorldDefaultSection?.(entry?.id ?? '', 'category', offered[0] ?? '');
+  }
+
+  /**
+   * Copy the linked Item's uuid, and say so on the control for a moment.
+   *
+   * @returns {void}
+   */
+  function copySourceUuid() {
+    if (!sourceUuid) return;
+    onCopySourceUuid(sourceUuid);
+    sourceCopied = true;
+    setTimeout(() => {
+      sourceCopied = false;
+    }, 1600);
+  }
 
   function addWorldTag() {
     const tag = tagDraft.trim();
@@ -594,6 +788,23 @@
                   unlinkAttr="data-scoped-entry-source-unlink"
                   onUnlink={sourceLinked ? onUnlinkSource : null}
                 />
+                {#if sourceUuid}
+                  <div class="manager-component-entry-inline">
+                    <span class="manager-component-entry-uuid" data-scoped-entry-source-uuid
+                      >{sourceUuid}</span
+                    >
+                    <ManagerButton data-scoped-entry-source-copy onclick={copySourceUuid}>
+                      <i class={sourceCopied ? 'fas fa-check' : 'far fa-copy'} aria-hidden="true"
+                      ></i>
+                      <span
+                        >{sourceCopied
+                          ? text('FABRICATE.Admin.Manager.Scoped.Component.Copied', 'Copied')
+                          : text('FABRICATE.Admin.Manager.Scoped.Component.Copy', 'Copy')}</span
+                      >
+                    </ManagerButton>
+                  </div>
+                {/if}
+
                 <!--
                   THE ALIAS LIST IS AUTHORED, NOT DISPLAYED. `aliasItemUuids` is a real
                   source-link field that a merge UNIONS across its group, and it is what keeps a
@@ -606,6 +817,16 @@
                       'Also matches'
                     )}</span
                   >
+                  {#if aliasUuids.length === 0}
+                    <span
+                      class="manager-muted manager-component-entry-note"
+                      data-scoped-entry-aliases-empty
+                      >{text(
+                        'FABRICATE.Admin.Manager.Scoped.Component.AliasesEmpty',
+                        'No aliases yet.'
+                      )}</span
+                    >
+                  {/if}
                   {#if aliasUuids.length > 0}
                     <div class="manager-component-entry-chips" data-scoped-entry-aliases={entry.id}>
                       {#each aliasUuids as alias (alias)}
@@ -680,12 +901,7 @@
                       'World category'
                     )}
                     data-scoped-entry-category-input
-                    onchange={(event) =>
-                      actions?.updateWorldDefaultSection?.(
-                        entry.id,
-                        'category',
-                        offeredWorldComponentCategories([event.currentTarget.value])[0] ?? ''
-                      )}
+                    onchange={(event) => commitWorldCategory(event.currentTarget)}
                   />
                   <datalist id="scoped-component-entry-categories">
                     {#each categoryOptions as option (option)}
@@ -757,6 +973,27 @@
               </section>
 
               <!--
+              THE REFUSAL, SAID OUT LOUD (issue 1371, round 2).
+
+              It lived only in the armed control's accessible name, so the SIGHTED flow was: click
+              Delete, watch the label become "Cannot delete", click again — and nothing at all
+              happens. No toast, no sentence, no state change. On a migrated world that is every
+              component a GM can reach, because the migration writes a membership record for every
+              definition in every contributing system.
+
+              D-6 requires the refusal to state what to do instead, and the prototype states it as
+              visible body copy. Moving the control to the header band dropped that statement with
+              nothing replacing it; this is the replacement, beside the rows it names.
+            -->
+              {#if deleteNote.refused}
+                <Callout
+                  tone="warning"
+                  text={deleteNote.text}
+                  dataAttr="data-scoped-entry-delete-refusal"
+                />
+              {/if}
+
+              <!--
                 THE PER-SYSTEM ROWS: membership, and the ONE place per-system tag muting is
                 authored. The mute grid is N tags by M systems, so each chip's accessible name
                 carries BOTH — a grid of bare tag names says nothing out of visual context.
@@ -765,21 +1002,84 @@
                 class="manager-edit-card manager-component-entry-card"
                 data-scoped-entry-systems={entry.id}
               >
-                <p class="manager-kicker">
-                  {phrase(
-                    'FABRICATE.Admin.Manager.Scoped.Component.SystemsCount',
-                    '{count} of {total} systems have rules',
-                    { count: memberRows.length, total: systemRows.length }
-                  )}
-                </p>
+                <div class="manager-component-entry-system-head">
+                  <p class="manager-kicker">
+                    {phrase(
+                      'FABRICATE.Admin.Manager.Scoped.Component.SystemsCount',
+                      '{count} of {total} systems have rules',
+                      { count: memberRows.length, total: systemRows.length }
+                    )}
+                  </p>
+                  <span
+                    class="manager-muted manager-component-entry-system-count"
+                    data-scoped-entry-system-count
+                    >{phrase(
+                      'FABRICATE.Admin.Manager.Scoped.Component.SystemShown',
+                      '{shown} of {total} systems',
+                      { shown: visibleSystemRows.length, total: systemRows.length }
+                    )}</span
+                  >
+                </div>
+
+                <!--
+                  THE CARD'S OWN FILTER AND SEARCH (issue 1371, round 2). Each filter carries its
+                  COUNT, so the widened and narrowed sets are legible before either is chosen —
+                  the same rule the rules list's membership segment follows one route away.
+                -->
+                <div class="manager-component-entry-inline">
+                  <select
+                    class="manager-component-entry-system-filter"
+                    data-scoped-entry-system-filter
+                    value={systemFilter}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.SystemFilterLabel',
+                      'Filter systems by whether they have rules'
+                    )}
+                    onchange={(event) => (systemFilter = event.currentTarget.value)}
+                  >
+                    {#each systemFilters as option (option.id)}
+                      <option value={option.id} data-scoped-entry-system-filter-option={option.id}
+                        >{option.label}</option
+                      >
+                    {/each}
+                  </select>
+                  <input
+                    class="manager-component-entry-system-search"
+                    type="text"
+                    value={systemSearch}
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.SystemSearch',
+                      'Search systems…'
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.SystemSearch',
+                      'Search systems…'
+                    )}
+                    data-scoped-entry-system-search
+                    oninput={(event) => (systemSearch = event.currentTarget.value)}
+                  />
+                </div>
+
                 <ul class="manager-component-entry-systems" role="list">
-                  {#each systemRows as row (row.systemId)}
+                  {#each visibleSystemRows as row (row.systemId)}
                     <li
                       class="manager-component-entry-system"
                       data-scoped-entry-system={row.systemId}
                     >
                       <div class="manager-component-entry-system-head">
                         <span class="manager-component-entry-system-name">{row.systemName}</span>
+                        <!--
+                          THE MODE, from the same projection join the system rules list reads. A
+                          row that states its membership and not what decides its category leaves
+                          the GM to open each system to find out.
+                        -->
+                        {#if systemMode(row)}
+                          <Chip
+                            tone={systemMode(row).state === 'overridden' ? 'warning' : 'info'}
+                            data-scoped-entry-system-mode={row.systemId}
+                            >{systemMode(row).label}</Chip
+                          >
+                        {/if}
                         <MembershipActions
                           entityType="component"
                           entityId={entry.id}
@@ -794,6 +1094,12 @@
                           onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
                         />
                       </div>
+                      <p
+                        class="manager-muted manager-component-entry-system-summary"
+                        data-scoped-entry-system-summary={row.systemId}
+                      >
+                        {systemSummary(row)}
+                      </p>
                       {#if row.member === true && worldTags.length > 0}
                         <div
                           class="manager-component-entry-chips"
@@ -831,6 +1137,16 @@
                           <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
                         </ManagerButton>
                       {/if}
+                    </li>
+                  {:else}
+                    <li
+                      class="manager-muted manager-component-entry-system-empty"
+                      data-scoped-entry-systems-empty
+                    >
+                      {text(
+                        'FABRICATE.Admin.Manager.Scoped.Component.SystemsNoMatch',
+                        'No crafting system matches that filter.'
+                      )}
                     </li>
                   {/each}
                 </ul>
@@ -876,6 +1192,18 @@
             </ScopedEntityPreview>
           </div>
         {:else}
+          <!--
+            THE HERO IS DERIVED, NOT DEFAULTED (issue 1371, round 2). `EditorValidationSurface`
+            falls through to `'pass'` and renders two empty strings when no `summary` is passed,
+            so this tab drew a blank hero with a GREEN TICK over `Blocking 2` — the one place on
+            the screen that states the record's overall health, saying the opposite of the rows
+            beneath it. Both siblings derive it; this one did not.
+
+            THE BLOCK LABEL IS THIS FAMILY'S OWN. It reached the recipe key, which localises to
+            "Blocks enable" — on an entity that HAS no enable switch, because epic decision 10
+            says component membership is binary. The essence sibling reaches its own key for the
+            same reason; the fallback string was already right and the key was wrong.
+          -->
           <ScopedValidationTab
             title={text(
               'FABRICATE.Admin.Manager.Scoped.Component.ValidationTitle',
@@ -885,9 +1213,24 @@
               'FABRICATE.Admin.Manager.Scoped.Component.ValidationIntro',
               'What this world record states, and what every system inheriting it will resolve.'
             )}
+            summary={{
+              status: validationStatus,
+              icon: 'fas fa-clipboard-check',
+              title: text(
+                'FABRICATE.Admin.Manager.Scoped.Component.ValidationSummaryTitle',
+                'World record'
+              ),
+              sub: text(
+                'FABRICATE.Admin.Manager.Scoped.Component.ValidationSummarySub',
+                'What every system inheriting this component resolves from it.'
+              ),
+            }}
             {counts}
             groups={validation.groups}
-            blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'INCOMPLETE')}
+            blockLabel={text(
+              'FABRICATE.Admin.Manager.Scoped.Component.ValidationStatusBlock',
+              'INCOMPLETE'
+            )}
             rowDataAttr="data-scoped-entry-check"
             hookAttribute="data-scoped-entry-validation"
           />
@@ -1036,6 +1379,9 @@
     min-width: 0;
   }
 
+  /* IT SCROLLS. The row count is a property of the WORLD's crafting-system roster rather than of
+     the component, so on a twenty-system world an unbounded list makes this card the whole tab.
+     The cap is generous enough that the six-system lab world never reaches it. */
   .manager-component-entry-systems {
     display: flex;
     flex-direction: column;
@@ -1043,6 +1389,29 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    min-width: 0;
+    max-height: 22rem;
+    overflow-y: auto;
+  }
+
+  .manager-component-entry-system-count,
+  .manager-component-entry-system-summary,
+  .manager-component-entry-system-empty {
+    font-size: 0.62rem;
+    line-height: 1.5;
+  }
+
+  .manager-component-entry-system-summary {
+    margin: 0;
+  }
+
+  .manager-component-entry-system-filter {
+    flex: 0 0 auto;
+    max-width: 180px;
+  }
+
+  .manager-component-entry-system-search {
+    flex: 1 1 10rem;
     min-width: 0;
   }
 
@@ -1067,6 +1436,17 @@
     font-size: 0.75rem;
     font-weight: 600;
     overflow-wrap: break-word;
+  }
+
+  /* The linked Item's own address, in the mono face because it is an identifier a GM copies
+     rather than reads. `tabular-nums` is not wanted here: this is not a column of numerals. */
+  .manager-component-entry-uuid {
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--fab-text-muted);
+    font-family: var(--fab-font-mono);
+    font-size: 0.62rem;
   }
 
   .manager-component-entry-refs {

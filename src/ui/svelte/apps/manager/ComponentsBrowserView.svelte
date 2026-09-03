@@ -968,12 +968,34 @@
           )}
         </span>
       {/if}
+      <!--
+        THE COUNT AND THE BODY AGREE (issue 1371, round 2). The ghost cohort is rendered as its own
+        list after the paginated one — it is a different row shape with a different verb, and
+        folding it into the model would put unadoptable rows through a category grouping and a
+        difficulty sort that mean nothing for them. But the count was computed over the MEMBER page
+        alone, so under `All world components` on an empty system the toolbar read `0–0 of 0` above
+        a body drawing sixty-six rows. That is the same count-versus-body disagreement this
+        screen's own cohort note records as the defect to avoid.
+
+        So the ghost total is STATED BESIDE the member range rather than folded into it: two
+        numbers that are true, rather than one that is true of half the screen.
+      -->
       <span class="manager-component-count" data-component-count>
         {format('FABRICATE.Admin.Manager.Component.CountRange', '{start}–{end} of {total}', {
           start: page.rangeStart,
           end: page.rangeEnd,
           total: page.totalCount,
-        })}
+        })}{#if visibleGhostRows.length > 0}<span data-component-ghost-count
+            >{format(
+              visibleGhostRows.length === 1
+                ? 'FABRICATE.Admin.Manager.Component.GhostCountOne'
+                : 'FABRICATE.Admin.Manager.Component.GhostCount',
+              visibleGhostRows.length === 1
+                ? ' · {count} not in this system'
+                : ' · {count} not in this system',
+              { count: visibleGhostRows.length }
+            )}</span
+          >{/if}
       </span>
     </div>
 

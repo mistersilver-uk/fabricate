@@ -84,6 +84,16 @@ test('1371: adopting a world component writes BOTH halves, membership first', as
   const { store, scope } = await openStore(harness, [LINKED]);
   harness.writes.length = 0;
 
+  // A PROBE ON THE SYSTEM WRITE, so the ORDER is observable rather than inferred. The two halves
+  // land in different places — the membership record in the scope payload, the seeded row through
+  // `updateSystem` — so neither one's presence at the end says which happened first.
+  const membershipAtSystemWrite = [];
+  const shippedUpdateSystem = harness.services.getCraftingSystemManager().updateSystem;
+  harness.services.getCraftingSystemManager().updateSystem = async (id, updates) => {
+    membershipAtSystemWrite.push(...Object.values(scope.payload.membership));
+    return shippedUpdateSystem(id, updates);
+  };
+
   assert.equal(await store.worldScope.component.addToSystem('ingot', 'sys1'), true);
 
   assert.deepEqual(
@@ -96,6 +106,26 @@ test('1371: adopting a world component writes BOTH halves, membership first', as
     Boolean(seeded),
     'and the IN-SYSTEM record does too — without it the read union emits no row at all, so the ' +
       'button writes a record nothing can read'
+  );
+
+  // AND THE ORDER THE TITLE CLAIMS. The membership write goes FIRST because it owns the
+  // already-a-member rule, so the in-system seed does not restate it — and if the seed is then
+  // refused, the membership record is the one that has to be removed again. Round 1 asserted only
+  // that both landed, so swapping the two lines passed.
+  //
+  // The system write is the only one that reaches the harness; the membership write lands in the
+  // scope payload. So the order is read as "the membership record was already there when the
+  // system write happened", which is what the sequence actually has to guarantee.
+  const systemWrites = harness.writes.filter((write) => write.kind === 'updateSystem');
+  assert.equal(systemWrites.length, 1, 'exactly one system write');
+  assert.ok(
+    systemWrites[0].updates.components.some((record) => record.id === 'ingot'),
+    'and it carries the seeded row'
+  );
+  assert.equal(
+    membershipAtSystemWrite.length,
+    1,
+    'the membership record existed BEFORE the in-system seed was written, not after'
   );
 });
 

@@ -23987,3 +23987,21 @@
   flex: 0 0 auto;
   max-width: 180px;
 }
+
+/* THE INHERIT NOTE'S TWO OPTIONAL TONES (issue 1371, round 2). The shipped rule paints one ink for
+   every state, so an INHERITING row and an OVERRIDING row read identically — which made a lane's
+   `tone: 'info'` / `'warning'` model field a unit-tested constant with no pixel behind it. Both are
+   OPT-IN modifiers: a caller that names neither renders exactly the muted note it always did, so
+   the essence and tool rows are byte-identical. Appended rules; the base rule is not edited. */
+.fabricate-manager .manager-scoped-inherit-note.is-info {
+  color: var(--fab-info-text);
+}
+
+.fabricate-manager .manager-scoped-inherit-note.is-warning {
+  color: var(--fab-warning-text);
+}
+
+/* The optional leading glyph sits on the note's own baseline rather than above it. */
+.fabricate-manager .manager-scoped-inherit-note i {
+  margin-right: var(--fab-space-2xs);
+}

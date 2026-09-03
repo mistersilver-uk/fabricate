@@ -46,6 +46,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -172,20 +173,48 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('and REFUSES the reserved bucket rather than forwarding it', async () => {
+    it('REFUSES the reserved bucket, and does not CLEAR the value doing it', async () => {
       // The picker is the enforcement point: nothing below it can refuse the token, and since
       // issue 1372 a world `general` really does reset every inheriting system on the next read.
+      //
+      // BUT A REFUSAL THAT WRITES ABSENCE IS A DELETION. Round 1 forwarded `''`, so typing
+      // `General` into a component that already had `Refined` silently blanked the authored value
+      // with no message — a refusal the GM experiences as data loss.
+      const notices = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { warn: (message) => notices.push(message) } };
+      try {
+        const { target, calls } = await open('ingot');
+        const picker = target.querySelector('[data-scoped-entry-category-input]');
+        picker.value = ' GENERAL ';
+        picker.dispatchEvent(new window.Event('change', { bubbles: true }));
+        await drain();
+
+        assert.deepEqual(
+          calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
+          [],
+          'nothing is written at all, so the authored category survives'
+        );
+        assert.equal(picker.value, 'Refined', 'and the control shows what is actually stored');
+        assert.equal(notices.length, 1, 'and the GM is told why');
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    });
+
+    it('but a BLANK input still clears it, because that is a real edit', async () => {
+      // The positive control on the refusal: an empty field is a GM removing the world category
+      // deliberately, and a guard that refused every non-offered value would break it.
       const { target, calls } = await open('ingot');
       const picker = target.querySelector('[data-scoped-entry-category-input]');
-      picker.value = ' GENERAL ';
+      picker.value = '';
       picker.dispatchEvent(new window.Event('change', { bubbles: true }));
       await drain();
 
-      const written = calls.find((call) => call.verb === 'updateWorldDefaultSection');
-      assert.equal(
-        written.args[2],
-        '',
-        'a variant spelling of the reserved bucket is cleared, never stored'
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
+        [{ verb: 'updateWorldDefaultSection', args: ['ingot', 'category', ''] }]
       );
     });
   });
@@ -297,6 +326,274 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.ok(byId.has('source'), 'the source check renders');
       assert.ok(byId.has('worldCategory'), 'and the world classification checks do too');
       assert.ok(byId.has('worldTags'));
+    });
+  });
+
+  describe('the hero reports the WORST thing the rows say', () => {
+    // E.1 / AC-17. The surface always drew the pass medallion because no `summary.status` was
+    // passed at all, so a record that BLOCKS was headed by a green hero over red rows. The status
+    // reaches the DOM verbatim on the primitive's own hook AND resolves to a class, and both are
+    // asserted: a site that passed the word and a primitive that dropped it look identical from
+    // the model.
+    async function heroOf(entityId) {
+      const { target } = await open(entityId);
+      target.querySelector('[data-scoped-entry-tab="validation"]').click();
+      await drain();
+      const hero = target.querySelector('[data-editor-validation-summary]');
+      assert.ok(Boolean(hero), 'the validation tab renders its hero');
+      return hero;
+    }
+
+    it('blocks over a record with no source Item', async () => {
+      const hero = await heroOf('orphan');
+      assert.equal(hero.getAttribute('data-editor-validation-summary'), 'block');
+      assert.ok(
+        hero.className.includes('is-invalid') || hero.className.includes('is-block'),
+        `and paints the blocking face; it painted "${hero.className}"`
+      );
+    });
+
+    it('and does NOT block over the complete one, so the hero is discriminating', async () => {
+      // The positive control. Without it a hero hard-wired to `block` passes the assertion above.
+      const hero = await heroOf('ingot');
+      assert.notEqual(hero.getAttribute('data-editor-validation-summary'), 'block');
+    });
+  });
+
+  describe('the delete refusal is VISIBLE, and the armed name contains its visible label', () => {
+    // E.3 / AC-16. Round 1 put the refusal only in the armed control's accessible name, so the
+    // sighted flow was: click Delete, watch it read `Cannot delete`, click again, and nothing at
+    // all happens — no toast, no sentence, no state change.
+    it('renders the refusal beside the systems that cause it', async () => {
+      const { target } = await open('ingot');
+      const callout = target.querySelector('[data-scoped-entry-delete-refusal]');
+      assert.ok(Boolean(callout), 'the refusal is body copy, not only an accessible name');
+      assert.match(callout.textContent, /Forge/, 'and it names the systems holding rules');
+    });
+
+    it('and WITHHOLDS it for a component no system has rules for', async () => {
+      // The positive control: an always-rendered callout tells a deletable component it cannot be
+      // deleted, which is the same defect facing the other way.
+      const { target } = await open('resin');
+      assert.ok(!target.querySelector('[data-scoped-entry-delete-refusal]'));
+    });
+
+    it('and the armed accessible name STARTS with the armed visible label', async () => {
+      // WCAG 2.5.3 Label in Name: a control whose accessible name omits its visible string is
+      // unactivatable by speech input. `ArmedDangerButton` states the requirement and cannot
+      // enforce it, because the descriptor is authored here.
+      const { reports } = await open('ingot');
+      const descriptor = reports.deletes.filter(Boolean).at(-1);
+      assert.ok(Boolean(descriptor), 'the page reports a delete descriptor');
+      assert.equal(descriptor.armedLabel, 'Cannot delete');
+      assert.ok(
+        descriptor.armedAriaLabel.startsWith(descriptor.armedLabel),
+        `the armed name must contain its visible label; it read "${descriptor.armedAriaLabel}"`
+      );
+      assert.ok(descriptor.idleAriaLabel.includes(descriptor.label));
+    });
+  });
+
+  describe('the per-system card filters, searches and counts what it draws', () => {
+    // E.5 / D-9. Round 1 shipped an unfiltered, unsearchable, unbounded list. On the two-system
+    // fixture that is invisible; the count and the two narrowing controls are what a twenty-system
+    // world needs, and each is asserted on the ROWS it changes rather than on its own presence.
+    it('states how many of the total it is showing', async () => {
+      const { target } = await open('ingot');
+      const count = target.querySelector('[data-scoped-entry-system-count]');
+      assert.ok(Boolean(count));
+      assert.match(count.textContent, /2 of 2/);
+    });
+
+    it('and the membership filter NARROWS the rows, carrying its own counts', async () => {
+      const { target } = await open('resin');
+      const select = target.querySelector('[data-scoped-entry-system-filter]');
+      assert.ok(Boolean(select), 'the card renders its membership filter');
+      assert.equal(target.querySelectorAll('[data-scoped-entry-system]').length, 2);
+
+      const withRules = target.querySelector('[data-scoped-entry-system-filter-option="with"]');
+      assert.match(withRules.textContent, /\(0\)/, 'the option states the set it would show');
+
+      select.value = 'with';
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      assert.equal(
+        target.querySelectorAll('[data-scoped-entry-system]').length,
+        0,
+        'resin is a member of neither system, so `With rules` shows none of them'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-systems-empty]')),
+        'and the card says so rather than rendering an unexplained void'
+      );
+    });
+
+    it('and the search narrows by system NAME', async () => {
+      const { target } = await open('ingot');
+      const search = target.querySelector('[data-scoped-entry-system-search]');
+      assert.ok(Boolean(search));
+      search.value = 'alch';
+      search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      const rows = [...target.querySelectorAll('[data-scoped-entry-system]')].map((row) =>
+        row.getAttribute('data-scoped-entry-system')
+      );
+      assert.deepEqual(rows, ['sys-alchemy']);
+      assert.match(
+        target.querySelector('[data-scoped-entry-system-count]').textContent,
+        /1 of 2/,
+        'and the count follows the filtered set, not the corpus'
+      );
+    });
+
+    it('and each row states its MODE and what that system resolves', async () => {
+      // The row used to carry a name and a membership cluster and nothing else, so the one
+      // question the card exists to answer — what does THIS system get — needed a route change.
+      const { target } = await open('ingot');
+      const inheriting = target.querySelector('[data-scoped-entry-system-mode="sys-forge"]');
+      const overriding = target.querySelector('[data-scoped-entry-system-mode="sys-alchemy"]');
+      assert.ok(Boolean(inheriting) && Boolean(overriding), 'both rows state a mode');
+      assert.notEqual(
+        inheriting.textContent.trim(),
+        overriding.textContent.trim(),
+        'and the two modes read differently, which is the whole claim'
+      );
+      assert.match(
+        target.querySelector('[data-scoped-entry-system-summary="sys-forge"]').textContent,
+        /Refined/,
+        'the inheriting row resolves the world value'
+      );
+      assert.match(
+        target.querySelector('[data-scoped-entry-system-summary="sys-alchemy"]').textContent,
+        /Resolves/
+      );
+    });
+
+    it('and a NON-MEMBER row says nothing resolves there, rather than naming a category', async () => {
+      const { target } = await open('resin');
+      const summary = target.querySelector('[data-scoped-entry-system-summary="sys-forge"]');
+      assert.match(summary.textContent, /No rules here/);
+    });
+  });
+
+  describe('the source Item block offers its uuid rather than only printing it', () => {
+    // E.9. The uuid is the one string on this screen a GM has to move somewhere else — into a
+    // macro, a bug report, or a sibling module's config — and selecting a `<span>` inside a
+    // Foundry application window is a drag the surrounding drop zones intercept.
+    it('renders the uuid beside a copy control for a linked record', async () => {
+      const { target } = await open('ingot');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-source-uuid]').textContent.trim(),
+        'Item.ingot-source'
+      );
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-source-copy]')));
+    });
+
+    it('and withholds BOTH for a record with no source Item', async () => {
+      const { target } = await open('orphan');
+      assert.ok(!target.querySelector('[data-scoped-entry-source-uuid]'));
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-source-copy]'),
+        'a copy control over nothing is a control that reports success having copied an empty string'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-aliases-empty]')),
+        'and the alias list states its empty case rather than rendering a bare heading'
+      );
+    });
+  });
+
+  describe('the per-system membership controls are ACTUATED, not merely rendered', () => {
+    // AC-28. Round 1 asserted the cluster was PRESENT on each row and stopped there, so a page
+    // that wired Add to `removeFromSystem` — or wired every row to the FIRST row's system — shipped
+    // green. Both mistakes are one identifier, and neither has a rendered symptom: the write
+    // refuses silently for a pair that is already a member, so even the post-state agrees.
+    function rowOf(target, systemId) {
+      const row = target.querySelector(`[data-scoped-entry-system="${systemId}"]`);
+      assert.ok(Boolean(row), `the card renders a row for ${systemId}`);
+      return row;
+    }
+
+    it('Add forwards addToSystem with the row OWN system, not the first row', async () => {
+      // `resin` is a member of neither system, so both rows offer Add and the SECOND one is the
+      // one actuated: a page that closed over the loop's first row passes on the first and fails
+      // here.
+      const { target, calls } = await open('resin');
+      rowOf(target, 'sys-alchemy').querySelector('[data-scoped-membership-add]').click();
+      await drain();
+      assert.deepEqual(calls, [{ verb: 'addToSystem', args: ['resin', 'sys-alchemy'] }]);
+    });
+
+    it('and Remove forwards removeFromSystem, ARMED FIRST, on its own row', async () => {
+      // `ingot` is a member of both. The first click ARMS and must write nothing at all — a
+      // destructive verb that fires on the first click is the defect the armed control exists to
+      // prevent, and an assertion that only checks the end state cannot see it.
+      const { target, calls } = await open('ingot');
+      const remove = rowOf(target, 'sys-alchemy').querySelector('[data-armed]');
+      assert.ok(Boolean(remove), 'the member row renders its armed Remove');
+      assert.equal(remove.getAttribute('data-armed'), 'false');
+
+      remove.click();
+      await drain();
+      assert.deepEqual(calls, [], 'arming writes NOTHING');
+      assert.equal(
+        rowOf(target, 'sys-alchemy').querySelector('[data-armed]').getAttribute('data-armed'),
+        'true',
+        'and the control reports itself armed'
+      );
+
+      rowOf(target, 'sys-alchemy').querySelector('[data-armed]').click();
+      await drain();
+      assert.deepEqual(calls, [{ verb: 'removeFromSystem', args: ['ingot', 'sys-alchemy'] }]);
+    });
+
+    it('and arming one row DISARMS the other, so a stray Enter cannot delete a second', async () => {
+      // The single-armed-token invariant, which this page owns rather than the cluster. Two rows
+      // armed at once is a keyboard hazard specifically: the GM arms one, tabs, and confirms
+      // whichever the browser focused.
+      const { target } = await open('ingot');
+      rowOf(target, 'sys-forge').querySelector('[data-armed]').click();
+      await drain();
+      rowOf(target, 'sys-alchemy').querySelector('[data-armed]').click();
+      await drain();
+      assert.equal(
+        rowOf(target, 'sys-forge').querySelector('[data-armed]').getAttribute('data-armed'),
+        'false'
+      );
+      assert.equal(
+        rowOf(target, 'sys-alchemy').querySelector('[data-armed]').getAttribute('data-armed'),
+        'true'
+      );
+    });
+
+    it('and the armed control is operable from the KEYBOARD, Escape included', async () => {
+      // AC-28's keyboard half. Two separate claims, and the second is the one an implementation
+      // gets wrong: the control is a native `<button type="button">`, so Enter and Space are the
+      // BROWSER'S activation rather than a handler this repo could omit — and Escape disarms
+      // without leaving the control, which IS a handler and would otherwise strand a GM who armed
+      // by mistake with no way out but a mouse.
+      const { target, calls } = await open('ingot');
+      const remove = rowOf(target, 'sys-forge').querySelector('[data-armed]');
+      assert.equal(remove.tagName, 'BUTTON');
+      assert.equal(remove.getAttribute('type'), 'button');
+
+      remove.click();
+      await drain();
+      const armed = rowOf(target, 'sys-forge').querySelector('[data-armed]');
+      const escape = new target.ownerDocument.defaultView.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      armed.dispatchEvent(escape);
+      await drain();
+      assert.equal(
+        rowOf(target, 'sys-forge').querySelector('[data-armed]').getAttribute('data-armed'),
+        'false',
+        'Escape disarms'
+      );
+      assert.equal(escape.defaultPrevented, true, 'and is consumed, so no ancestor surface closes');
+      assert.deepEqual(calls, [], 'and nothing was written on the way through');
     });
   });
 });

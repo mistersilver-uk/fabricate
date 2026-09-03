@@ -154,6 +154,11 @@
     // system's own screen rather than on the world catalogue. Passed through to
     // `SystemRulesRoster`, which owns the row since that panel was extracted.
     systemRowAction = 'manage',
+    // WHAT THE INSPECTOR'S SYSTEM ROSTER SAYS WHEN NO SYSTEM HAS THE ENTITY (issue 1371). Threaded
+    // straight to `SystemRulesRoster`; see its own prop note for why the branch is opt-in rather
+    // than derived. Empty by default, so the essence and tool catalogues render the roster they
+    // always did, and only a lane that names a sentence gets one.
+    rosterEmptyNote = '',
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -329,6 +334,7 @@
     {actions}
     {onOpenSystemRules}
     {systemRowAction}
+    {rosterEmptyNote}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}

@@ -13,6 +13,16 @@
   unfinished one: a name, an image, a description and a source link are per component by nature,
   and one of them written across a selection is a worse answer than no control.
 
+  ── AND THE REFERENCE'S BULK DELETE IS NOT HERE EITHER, WHICH IS RECORDED RATHER THAN LEFT ────
+  `proto:5335` draws `Delete N components…` with an armed `Confirm — delete N from the world`. It
+  is not built, for the reason the sibling tool panel gives for the same omission: the catalogue
+  ROW offers no destructive verb at all, and deleting a world component takes its world defaults
+  and every system's membership record with it. Adding a BULK delete to a screen with no single
+  delete would put the most destructive verb in the product on the surface with the least context
+  for it — and the world entry, which does own that action, refuses it outright while any system
+  holds rules. A bulk form would have to refuse per component and report a partial outcome, which
+  is a different design rather than this one scaled up.
+
   ── THE PANEL STAGES; THE PAGE WRITES ────────────────────────────────────────────────────────
   `onApply` hands the OWNER a staged instruction and nothing else. Every write is a read-modify-
   write of the whole world component payload and every landed write is a replicated setting
@@ -52,7 +62,7 @@
   import SearchablePopover from '../SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { componentBulkWriteCount } from './componentScoped.js';
+  import { componentBulkMembershipModes, componentBulkWriteCount } from './componentScoped.js';
 
   let {
     count = 0,
@@ -128,38 +138,26 @@
         })
   );
 
+  // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT (issue 1371, round 2). The panel used to
+  // spell the same two labels and both mode notes inline while `componentBulkMembershipModes`
+  // stated them in the model with no consumer anywhere — two implementations of one meaning, and
+  // the one the delta said the mounted criterion would read was the dead one.
+  const membershipModes = $derived(componentBulkMembershipModes(phrase));
   const modeSegments = $derived([
     {
       value: UNCHANGED,
       labelKey: 'FABRICATE.Admin.Manager.BulkEdit.Unchanged',
       fallback: 'Unchanged',
     },
-    {
-      value: 'add',
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.BulkAddTo',
-      fallback: 'Add to',
-    },
-    {
-      value: 'remove',
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveFrom',
-      fallback: 'Remove from',
-    },
+    ...membershipModes.map((mode) => ({ value: mode.id, labelKey: '', fallback: mode.label })),
   ]);
 
   // WHAT THE STAGED DIRECTION WILL DO. `Add to` and `Remove from` alone restate the highlighted
   // segment; these state the blast radius, which is the fact a GM is deciding on — and the
   // removal sentence is the one that has to be unambiguous.
   const modeNote = $derived(
-    {
-      add: text(
-        'FABRICATE.Admin.Manager.Scoped.Component.BulkAddNote',
-        'Every selected component gains rules in each chosen system, inheriting the world category.'
-      ),
-      remove: text(
-        'FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveNote',
-        'Every selected component loses its rules in each chosen system. The world record is untouched.'
-      ),
-    }[mode] ?? text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')
+    membershipModes.find((candidate) => candidate.id === mode)?.note ??
+      text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')
   );
 
   const systemOptions = $derived(
@@ -227,20 +225,49 @@
     stagedTags = next;
   }
 
+  // THE TWO DIRECTIONS MUST NOT LOOK ALIKE (issue 1371, round 2). `muted` and `neutral` differ
+  // only in their ink token — same border, no fill on either — so "staged for removal" and "leave
+  // alone" were the same chip, on the one panel whose own header says the directions are one
+  // keystroke apart and destructive in one of them. `warning` is the family that means "this will
+  // take something away", and the glyph carries the state where colour alone should not.
   function tagTone(tag) {
     if (stagedTags[tag] === 'add') return 'info';
-    if (stagedTags[tag] === 'remove') return 'muted';
+    if (stagedTags[tag] === 'remove') return 'warning';
     return 'neutral';
   }
 
-  function tagStateLabel(tag) {
+  function tagGlyph(tag) {
+    if (stagedTags[tag] === 'add') return 'fas fa-plus';
+    if (stagedTags[tag] === 'remove') return 'fas fa-minus';
+    return '';
+  }
+
+  /**
+   * One chip's accessible name, which is where the DIRECTION lives.
+   *
+   * @param {string} tag
+   * @returns {string}
+   */
+  function tagAria(tag) {
     if (stagedTags[tag] === 'add') {
-      return text('FABRICATE.Admin.Manager.Scoped.Component.BulkTagAdd', 'Add');
+      return phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkTagAddAria',
+        '{tag}: add to every selected component',
+        { tag }
+      );
     }
     if (stagedTags[tag] === 'remove') {
-      return text('FABRICATE.Admin.Manager.Scoped.Component.BulkTagRemove', 'Remove');
+      return phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkTagRemoveAria',
+        '{tag}: remove from every selected component',
+        { tag }
+      );
     }
-    return text('FABRICATE.Admin.Manager.BulkEdit.Unchanged', 'Unchanged');
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkTagLeaveAria',
+      '{tag}: leave unchanged',
+      { tag }
+    );
   }
 
   function applyStaged() {
@@ -406,17 +433,21 @@
   {#if tagOptions.length > 0}
     <div class="fab-bulk-component-chips" data-world-component-bulk-tags>
       {#each tagOptions as tag (tag)}
+        <!--
+          `aria-pressed` REPORTS STAGED-VERSUS-UNSTAGED AND NOTHING ELSE, because that is the only
+          thing a two-state attribute can honestly say about a three-state control: it read `true`
+          for both directions, so a screen reader announced "pressed" identically for add and for
+          remove. The DIRECTION is in the accessible NAME, which has room for it.
+        -->
         <Chip
           tag="button"
           type="button"
           tone={tagTone(tag)}
+          icon={tagGlyph(tag)}
           data-world-component-bulk-tag={tag}
+          data-world-component-bulk-tag-state={stagedTags[tag] || 'unchanged'}
           aria-pressed={Boolean(stagedTags[tag])}
-          aria-label={phrase(
-            'FABRICATE.Admin.Manager.Scoped.Component.BulkTagAria',
-            '{tag}: {state}',
-            { tag, state: tagStateLabel(tag) }
-          )}
+          aria-label={tagAria(tag)}
           onclick={() => cycleTag(tag)}>{tag}</Chip
         >
       {/each}

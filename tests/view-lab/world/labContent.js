@@ -4146,7 +4146,7 @@ export function buildLabContent() {
           mutedTags: ['bulk'],
         },
       },
-      },
+    },
     toolScope: {
       entities: [
         ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({

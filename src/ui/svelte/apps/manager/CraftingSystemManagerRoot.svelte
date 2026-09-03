@@ -10740,7 +10740,7 @@
                 'FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogueShort',
                 'Back'
               )}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Component.Save', 'Save component')}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Component.Save', 'Save entry')}
               saveDisabled={!worldComponentEntryDirty}
               saving={worldComponentEntrySaving}
               onBack={() => setView('world-components')}
@@ -12355,6 +12355,7 @@
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onSourceDrop={relinkWorldComponentSource}
         onUnlinkSource={() => unlinkWorldComponentSource(worldScopedEntryId)}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onDraftChange={handleWorldComponentEntryDraft}
         onDirtyChange={handleWorldComponentEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}

@@ -40,6 +40,7 @@
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
     authoredWorldComponentCategories,
+    componentMemberCount,
     componentRowStats,
     componentSearchText,
     componentSorts,
@@ -191,6 +192,13 @@
    * @returns {Promise<void>}
    */
   async function applyBulk(entityIds, staged, clearSelection) {
+    // BELT AND BRACES, AND NOT REACHABLE FROM THIS SURFACE (issue 1371, round 2). The flag it
+    // reads is also threaded to the panel as `applying`, which inerts every staging control and
+    // the Apply itself, and the panel clears its staged instruction the moment it hands one over
+    // — so no second application can be COMPOSED through the DOM while a write is in flight, and
+    // the mounted suite proves that reachable guard instead. This line defends the other callers
+    // of `applyBulk`: a keyboard repeat, a queued event replayed after a re-render, or any future
+    // caller that is not the panel. It is deliberately kept and deliberately untestable from here.
     if (bulkApplying) return;
     bulkApplying = true;
     try {
@@ -273,6 +281,10 @@
     openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Component.RowOpenEntry', 'Edit component')}
     rowSecondLine="meta"
     systemRowAction="navigate"
+    rosterEmptyNote={text(
+      'FABRICATE.Admin.Manager.Scoped.Component.RosterEmpty',
+      'No system has rules for this component yet. It is registered in the world but unused — recipes cannot reference it anywhere.'
+    )}
     membershipFilter={false}
     bind:browserState
     bind:selectedId
@@ -338,12 +350,22 @@
 
 {#snippet componentInspectorBody(entry)}
   <div class="manager-world-component-inspector">
-    <p class="manager-muted manager-world-component-use" data-world-component-use={entry.id}>
-      <span class="manager-world-component-use-lead"
-        >{componentUseSummary(entry, systems, phrase).useText}</span
-      >
-      <span>{componentUseSummary(entry, systems, phrase).useDetail}</span>
-    </p>
+    <!--
+      THE MEMBERSHIP FRACTION IS STATED ONCE (issue 1371, round 2). The roster's own header below
+      already reads `SYSTEM RULES n / m` and lists the systems by name, and this restated both a
+      line above it — `Rules in 1 of 6 systems` plus the same names again. The reference puts the
+      count in the section header and carries no second list.
+      What survives is the ZERO-MEMBER branch, which the roster header cannot say: `0 / 6` is a
+      number, and "no system uses it · registered but unreferenced" is what that number MEANS.
+    -->
+    {#if componentMemberCount(entry) === 0}
+      <p class="manager-muted manager-world-component-use" data-world-component-use={entry.id}>
+        <span class="manager-world-component-use-lead"
+          >{componentUseSummary(entry, systems, phrase).useText}</span
+        >
+        <span>{componentUseSummary(entry, systems, phrase).useDetail}</span>
+      </p>
+    {/if}
     <p class="manager-muted manager-world-component-tags" data-world-component-tag-note={entry.id}>
       {componentWorldTagNote(entry, phrase)}
     </p>
@@ -403,9 +425,12 @@
       >
     {/each}
     {#if row.flag}
-      <span class="manager-world-component-row-flag" data-world-component-row-flag={entry.id}
-        >{row.flag}</span
-      >
+      <!-- A PILL, NOT BARE TEXT (issue 1371, round 2). The reference draws this as a chip on the
+           recessive surface, and painted as unbordered uppercase in the disabled ink it was the
+           least legible thing on the row — the one exception flag reading as noise. The DISABLED
+           INK was right and is what `neutral` keeps; only the missing pill is added, through the
+           manager's one chip rather than a second pill shape. -->
+      <Chip tone="neutral" data-world-component-row-flag={entry.id}>{row.flag}</Chip>
     {/if}
   </span>
 {/snippet}
@@ -433,15 +458,6 @@
     font-family: var(--fab-font-mono);
     font-size: 0.6rem;
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .manager-world-component-row-flag {
-    color: var(--fab-text-disabled);
-    font-size: 0.6rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     white-space: nowrap;
   }
 

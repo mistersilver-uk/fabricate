@@ -177,10 +177,14 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and WITHHOLDS the inherit affordance when no world category is authored', async () => {
-      // The third fixture. `resin` has no world default at all, so offering the switch would
-      // label it with an empty world value — and flipping it resolves back to the in-system value
-      // anyway, which is a control that changes nothing while looking as though it did.
-      const { target } = await openEditor(componentRecord('resin', 'Wildwood Resin', 'general'));
+      // THE FIXTURE IS A MEMBER WITH NO WORLD DEFAULT, and that is the whole point of it.
+      //
+      // It used to be `resin`, which has NO MEMBERSHIP RECORD — and the affordance is withheld for
+      // a non-member first, so the world-value half was never reached and the delta's own
+      // reddening mutation ("render the inherit option unconditionally") survived. `orphan` is a
+      // `sys-forge` member whose world record carries no `category`, which is the only fixture
+      // that isolates the branch this test names.
+      const { target } = await openEditor(componentRecord('orphan', 'Unbound Salt', 'general'));
       assert.ok(
         !target.querySelector('[data-scoped-inherit-toggle="category"]'),
         'the option is ABSENT rather than offered against an unauthored world value'
@@ -193,6 +197,44 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       const note = target.querySelector('[data-component-edit-category-note]');
       assert.ok(Boolean(note), 'the third branch of the note renders in its place');
       assert.match(note.textContent, /No world category is set/);
+    });
+
+    it('and the two states PAINT differently, which is what the tone field was for', async () => {
+      // THE RENDERED CLASS, NOT THE MODEL FIELD. `componentCategoryNote` has answered
+      // `tone: 'info'` / `'warning'` since round 1 and the unit test asserted the string, but the
+      // row dropped the value on the floor: both states painted the one shipped muted ink, so the
+      // whole mapping of the reference's raw hex onto Fabricate's families was a constant with no
+      // pixel behind it. That is the anti-guard shape — an assertion satisfied by a value nothing
+      // consumes — and only a class read off the DOM closes it.
+      const { target: inheriting } = await openEditor(
+        componentRecord('ingot', 'Iron Ingot', 'Refined')
+      );
+      const inheritNote = inheriting.querySelector('[data-scoped-inherit-note="category"]');
+      assert.ok(Boolean(inheritNote), 'the inheriting row renders its note');
+      assert.ok(
+        inheritNote.classList.contains('is-info'),
+        `the inheriting note carries the info family; it carried "${inheritNote.className}"`
+      );
+      assert.ok(
+        Boolean(inheritNote.querySelector('i.fa-earth-americas')),
+        'and the glyph the model names, so the state survives a monochrome render'
+      );
+
+      const { target: overriding } = await openEditor(
+        componentRecord('ingot', 'Iron Ingot', 'Refined'),
+        { systemId: 'sys-alchemy' }
+      );
+      const overrideNote = overriding.querySelector('[data-scoped-inherit-note="category"]');
+      assert.ok(
+        overrideNote.classList.contains('is-warning'),
+        `the overriding note carries the warning family; it carried "${overrideNote.className}"`
+      );
+      assert.notEqual(
+        inheritNote.className,
+        overrideNote.className,
+        'and the two are DIFFERENT, which is the whole claim: a single ink for both passes every ' +
+          'assertion above it'
+      );
     });
   });
 

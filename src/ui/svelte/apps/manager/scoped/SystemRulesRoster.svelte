@@ -78,6 +78,17 @@
     actions = null,
     onOpenSystemRules = null,
     systemRowAction = 'manage',
+    // WHAT A ZERO-MEMBER ROSTER SAYS INSTEAD OF LISTING EVERY SYSTEM (issue 1371, round 2).
+    //
+    // Under `systemRowAction="navigate"` EVERY row is a live `Rules ↗`, which is right for an
+    // entity some system has — and wrong for one none does: the world component catalogue drew
+    // `SYSTEM RULES 0 / 6` over six identical live links into six screens that hold no rules for
+    // it. The reference replaces the roster in that state with a sentence.
+    //
+    // OPT-IN AND EMPTY BY DEFAULT, so the essence and tool catalogues render exactly the roster
+    // they always did: this component is shared by six screens, and a branch that fired for all
+    // of them would change two other lanes' output.
+    rosterEmptyNote = '',
     armedToken = '',
     onArm = () => {},
     onDisarm = () => {},
@@ -219,69 +230,90 @@
       inputAttrs={{ 'data-scoped-list-system-search': '' }}
     />
 
-    <ul class="manager-scoped-roster-systems" role="list">
-      {#each pageRows as row (row.systemId)}
-        <li
-          class="manager-scoped-roster-system"
-          data-scoped-list-system={row.systemId}
-          data-scoped-system={row.systemId}
-          data-scoped-system-state={membershipState(row)}
-        >
-          <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
-          {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
-            <button
-              type="button"
-              class="manager-scoped-roster-system-link"
-              data-scoped-list-system-rules={row.systemId}
-              title={format(
-                'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
-                'Open {system} rules for {entity}',
-                { system: systemLabel(row), entity: entityName || entityId }
-              )}
-              onclick={() => onOpenSystemRules(entityId, row.systemId)}
-            >
-              <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
-              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-            </button>
-          {:else}
-            <MembershipActions
-              {entityType}
-              {entityId}
-              systemId={row.systemId}
-              {entityName}
-              systemName={systemLabel(row)}
-              member={row.member === true}
-              enabled={row.enabled === true}
-              copyable={false}
-              hint={false}
-              compact={true}
-              {armedToken}
-              onArm={(token) => onArm(token)}
-              onDisarm={() => onDisarm()}
-              onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
-              onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
-              onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
-            />
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    {#if rosterEmptyNote && memberCount === 0}
+      <p class="manager-muted manager-scoped-roster-empty" data-scoped-roster-empty>
+        {rosterEmptyNote}
+      </p>
+    {:else}
+      <ul class="manager-scoped-roster-systems" role="list">
+        {#each pageRows as row (row.systemId)}
+          <li
+            class="manager-scoped-roster-system"
+            data-scoped-list-system={row.systemId}
+            data-scoped-system={row.systemId}
+            data-scoped-system-state={membershipState(row)}
+          >
+            <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
+            {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
+              <button
+                type="button"
+                class="manager-scoped-roster-system-link"
+                data-scoped-list-system-rules={row.systemId}
+                title={format(
+                  'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
+                  'Open {system} rules for {entity}',
+                  { system: systemLabel(row), entity: entityName || entityId }
+                )}
+                onclick={() => onOpenSystemRules(entityId, row.systemId)}
+              >
+                <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
+                <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              </button>
+            {:else}
+              <MembershipActions
+                {entityType}
+                {entityId}
+                systemId={row.systemId}
+                {entityName}
+                systemName={systemLabel(row)}
+                member={row.member === true}
+                enabled={row.enabled === true}
+                copyable={false}
+                hint={false}
+                compact={true}
+                {armedToken}
+                onArm={(token) => onArm(token)}
+                onDisarm={() => onDisarm()}
+                onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
+                onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
+                onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
+              />
+            {/if}
+          </li>
+        {/each}
+      </ul>
 
-    <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
+      <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
          because the reference's pager states five, and a size a GM cannot change is not a control
          they need offered. -->
-    <Pagination
-      persistent={true}
-      showPageSize={false}
-      totalCount={visibleRows.length}
-      {pageIndex}
-      pageSize={SYSTEM_PAGE_SIZE}
-      onPageChange={(next) => (systemPageIndex = next)}
-    />
+      <Pagination
+        persistent={true}
+        showPageSize={false}
+        totalCount={visibleRows.length}
+        {pageIndex}
+        pageSize={SYSTEM_PAGE_SIZE}
+        onPageChange={(next) => (systemPageIndex = next)}
+      />
+    {/if}
   </div>
 </section>
 
 <style>
+  /* The zero-member sentence, in place of a roster of dead links (issue 1371, round 2). */
+  .manager-scoped-roster-empty {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  /* A MEMBER ROW IS PAINTED, and until now it was not: `data-scoped-system-state` was emitted and
+     nothing in any sheet read it, so a system that HAS rules and one that does not were
+     pixel-identical in every roster. The marker is a leading rule on the row's inline edge rather
+     than a fill, so the row's own geometry does not move and no other caller's rows shift. */
+  .manager-scoped-roster-system[data-scoped-system-state='member'] {
+    box-shadow: inset 2px 0 0 0 var(--fab-accent);
+  }
+
   /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
      stays at zero.
 

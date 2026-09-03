@@ -328,6 +328,21 @@ describe('the entry validation check set renders at its declared severity', () =
     );
   });
 
+  it('and the gate itself BLOCKS, which nothing asserted', () => {
+    // AC-17 names `No rules in {system}` as blocking. On the blank fixture it PASSES — the
+    // component is a member there — and the `member: false` case above checks presence only, so
+    // demoting the severity to a warning left the whole tree green.
+    const { groups, counts } = componentScopeValidationPresentation(
+      { ...blank, member: false },
+      phrase
+    );
+    const row = groups.flatMap((group) => group.rows).find((entry) => entry.id === 'systemRules');
+    assert.ok(Boolean(row), 'the gate renders a row');
+    assert.equal(row.status, 'block');
+    assert.equal(row.title, 'No rules in Forge');
+    assert.ok(counts.blocking >= 2, 'it counts toward Blocking beside the missing source');
+  });
+
   it('omits the whole system pass when no crafting system is in view', () => {
     const { checks } = componentScopeValidation({ ...blank, systemKnown: false });
     assert.deepEqual(
@@ -336,7 +351,7 @@ describe('the entry validation check set renders at its declared severity', () =
     );
   });
 
-  it('and reports four passes on a complete record, so failure is discriminating', () => {
+  it('and reports SIX passes on a complete record, so failure is discriminating', () => {
     const { counts } = componentScopeValidation({
       name: 'Iron Ingot',
       hasSourceLink: true,

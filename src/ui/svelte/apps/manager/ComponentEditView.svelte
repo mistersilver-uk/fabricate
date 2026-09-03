@@ -1153,11 +1153,21 @@
         exist. It is gated on membership too, because the write refuses silently without one.
       -->
       {#if categoryInheritOffered}
+        <!--
+          THE TONE AND THE GLYPH ARE PASSED, not merely computed (issue 1371, round 2). The model
+          answers `info` for the inheriting branch and `warning` for the overriding one — E-4's
+          mapping of the prototype's raw hex onto Fabricate's families — and round 1 read neither:
+          the row painted one muted ink for both, so the two states were pixel-identical and the
+          only assertion was over the model field the DOM never saw. Both props are opt-in on the
+          shared row, so the essence and tool callers are untouched.
+        -->
         <InheritRow
           entityType="component"
           section="category"
           inherited={{ category: categoryInheriting }}
           notes={{ category: categoryNote.text }}
+          noteTone={{ category: categoryNote.tone }}
+          noteIcon={{ category: categoryNote.icon }}
           disabled={saving}
           onToggle={(section, nextInherit) =>
             actions?.setSectionInherited?.(component?.id, systemId, section, nextInherit)}
@@ -1217,7 +1227,7 @@
           {/each}
         </div>
         <p class="manager-muted" data-component-edit-world-tags-note>
-          {componentWorldScopeDisclosure(format)}
+          {componentWorldScopeDisclosure(format, 'editor')}
         </p>
       </section>
     {/if}

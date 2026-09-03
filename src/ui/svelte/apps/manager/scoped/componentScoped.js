@@ -370,15 +370,39 @@ export function componentCategoryInheritOffered(worldCategory) {
  * does not: identity is re-derived from the in-system record on every row. It states where
  * identity is AUTHORED, which is true today.
  *
+ * ── THE `entry` SURFACE COUNTS DIFFERENTLY, AND IT HAS TO ────────────────────────────────────
+ * The other two subtract one, because "other" means "other than the system you are editing" — a
+ * referent the WORLD ENTRY does not have. On that screen the subtraction made a component held by
+ * three systems read "shared with 2 other systems", and made the zero-member and one-member states
+ * render identical copy. So the entry states the MEMBER count directly, with its own zero branch.
+ *
  * @param {object} options
- * @param {'list'|'editor'} options.surface
+ * @param {'list'|'editor'|'entry'} options.surface
  * @param {number} options.memberCount how many systems hold this component.
  * @param {string} [options.systemName]
  * @param {(key: string, fallback: string, data?: object) => string} phrase
  * @returns {string}
  */
 export function componentAttributionNote({ surface, memberCount, systemName = '' }, phrase) {
-  const others = Math.max(0, (Number(memberCount) || 0) - 1);
+  const members = Number(memberCount) || 0;
+  if (surface === 'entry') {
+    if (members === 0) {
+      return phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.SharedNoteEntryNone',
+        'No system has rules for this component yet.'
+      );
+    }
+    return phrase(
+      members === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Component.SharedNoteEntryOne'
+        : 'FABRICATE.Admin.Manager.Scoped.Component.SharedNoteEntry',
+      members === 1
+        ? 'Shared by the {count} system that has rules for this component.'
+        : 'Shared by the {count} systems that have rules for this component.',
+      { count: members }
+    );
+  }
+  const others = Math.max(0, members - 1);
   const one = others === 1;
   if (surface === 'editor') {
     return phrase(
@@ -412,10 +436,23 @@ export function componentAttributionNote({ surface, memberCount, systemName = ''
  * sentence does not cover and a control that reads its own state back looks live in a way an
  * unwritten field does not.
  *
+ * ── "HERE" IS NOT THE SAME PLACE ON EVERY SCREEN ─────────────────────────────────────────────
+ * One string was rendered verbatim on all three, including the rules EDITOR's read-only world tag
+ * card — where it told the GM the world name, art, description and tag list "are authored here",
+ * and they are authored one route away, on the entry. The deixis is the whole content of the
+ * sentence on that screen, so it takes a surface the way the attribution note does.
+ *
  * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @param {'entry'|'editor'} [surface] where the sentence is being read.
  * @returns {string}
  */
-export function componentWorldScopeDisclosure(phrase) {
+export function componentWorldScopeDisclosure(phrase, surface = 'entry') {
+  if (surface === 'editor') {
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.DisclosureNoteEditor',
+      'The world name, art, description and tag list — and per-system tag muting — are authored in the world catalogue entry, and are not read by any crafting system yet. The world category IS read: this system resolves from it while it inherits.'
+    );
+  }
   return phrase(
     'FABRICATE.Admin.Manager.Scoped.Component.DisclosureNote',
     'The world name, art, description and tag list — and per-system tag muting — are authored here and are not read by any crafting system yet. The world category IS read: every system inheriting it resolves from this value.'
@@ -551,11 +588,27 @@ export function componentInheritState(systemRow, phrase) {
  * @returns {string}
  */
 export function componentTagMergeNote({ effective, muted }, phrase) {
-  return phrase(
-    'FABRICATE.Admin.Manager.Component.TagMergeNote',
-    '{effective} tags in effect here · {muted} world tags muted',
-    { effective: Number(effective) || 0, muted: Number(muted) || 0 }
+  // BOTH COUNTS PLURALISE, INDEPENDENTLY. Every other note in this module does, and this one read
+  // `1 tags in effect here · 1 world tags muted` on the very first frame of the card it heads.
+  // Four keys rather than a shared one, because a composed sentence cannot be reordered by a
+  // translator and these two clauses are joined by a separator a language may not want.
+  const effectiveCount = Number(effective) || 0;
+  const mutedCount = Number(muted) || 0;
+  const left = phrase(
+    effectiveCount === 1
+      ? 'FABRICATE.Admin.Manager.Component.TagMergeEffectiveOne'
+      : 'FABRICATE.Admin.Manager.Component.TagMergeEffective',
+    effectiveCount === 1 ? '{count} tag in effect here' : '{count} tags in effect here',
+    { count: effectiveCount }
   );
+  const right = phrase(
+    mutedCount === 1
+      ? 'FABRICATE.Admin.Manager.Component.TagMergeMutedOne'
+      : 'FABRICATE.Admin.Manager.Component.TagMergeMuted',
+    mutedCount === 1 ? '{count} world tag muted' : '{count} world tags muted',
+    { count: mutedCount }
+  );
+  return `${left} · ${right}`;
 }
 
 /**
@@ -600,43 +653,6 @@ export function authoredWorldComponentCategories(scope) {
   return offeredWorldComponentCategories(
     (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => entry?.defaults?.category)
   );
-}
-
-/**
- * The bulk panel's FOUR staging groups, as a model rather than as markup.
- *
- * The panel renders them; this decides what they are, what each one's inert value is, and which
- * write each staged value forwards to. Keeping the axis list here is what lets the mounted
- * criterion assert the ACTION NAME beside the arguments without reading the panel's internals.
- *
- * @param {(key: string, fallback: string, data?: object) => string} phrase
- * @returns {Array<{id: string, action: string, label: string}>}
- */
-export function componentBulkGroups(phrase) {
-  return [
-    {
-      id: 'membership',
-      // The action is decided by the MODE, so it is stated per mode rather than here; see
-      // `componentBulkMembershipModes`.
-      action: '',
-      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkMembership', 'System membership'),
-    },
-    {
-      id: 'systems',
-      action: '',
-      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkSystems', 'Systems'),
-    },
-    {
-      id: 'category',
-      action: 'updateWorldDefaultSection',
-      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkCategory', 'World category'),
-    },
-    {
-      id: 'tags',
-      action: 'setWorldTags',
-      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkTags', 'World tags'),
-    },
-  ];
 }
 
 /**

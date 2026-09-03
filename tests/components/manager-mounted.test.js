@@ -28241,7 +28241,7 @@ describe('CraftingSystemManager mounted behavior', () => {
        * @param {object} payload the raw drag payload.
        * @returns {Promise<{info: string[], warn: string[]}>} the toasts the drop raised.
        */
-      async function dropPayload(payload) {
+      async function dropPayload(payload, { withParser = true } = {}) {
         const info = [];
         const warn = [];
         const previousUi = globalThis.ui;
@@ -28288,6 +28288,11 @@ describe('CraftingSystemManager mounted behavior', () => {
             },
           },
         };
+        // THE ONE CALLER THAT ASKS FOR NO PARSER AT ALL gets `foundry.utils` WITHOUT the key,
+        // rather than a `parseUuid` set to something falsy: the gate tests `typeof … !== 'function'`
+        // and an absent key is the shape a client actually presents — an older core, a partial
+        // shim, or the gate running before `foundry` is populated.
+        if (!withParser) delete globalThis.foundry.utils.parseUuid;
         try {
           dispatchDrop(target.querySelector('[data-item-drop-zone="component-create"]'), payload);
           await settleDrop();
@@ -28394,6 +28399,35 @@ describe('CraftingSystemManager mounted behavior', () => {
           assert.deepEqual(worldComponentIds(), [], `${uuid} minted nothing`);
           assert.equal(refused.warn.length, 1, `${uuid} told the GM why`);
         }
+      });
+
+      it('and refuses EVERY drop when there is no parser to ask, rather than accepting them', async () => {
+        // THE FAIL-CLOSED DIRECTION, WHICH NOTHING ASSERTED. Round 1 wrote a gate that answered
+        // `false` — "not embedded, go ahead" — whenever `foundry.utils.parseUuid` was missing, and
+        // every test above seeds the parser, so the branch that decides what happens WITHOUT one
+        // was never executed. A gate that fails open on an absent parser is not a gate: the exact
+        // client state that removes the check is the one where the check matters, because nothing
+        // else in this path distinguishes a world Item from an actor's embedded copy.
+        //
+        // The consequence of failing closed is deliberate and is asserted here too: a legitimate
+        // world Item is refused as well. That is the correct trade for a creation path — the GM is
+        // told why and can retry, where the alternative silently mints a world component pointing
+        // at an Item inside somebody's inventory.
+        await openComponentCatalogue([]);
+
+        const refused = await dropPayload({ type: 'Item', uuid: RESIN.uuid }, { withParser: false });
+        assert.deepEqual(
+          worldComponentIds(),
+          [],
+          'with no parser, even a plain world Item mints nothing'
+        );
+        assert.equal(refused.warn.length, 1, 'and the GM is told, rather than left with silence');
+
+        // THE POSITIVE CONTROL ON THE FIXTURE. The very same payload with the parser present is
+        // accepted, so the refusal above is the ABSENT PARSER and not a broken drop fixture.
+        const accepted = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(worldComponentIds().length, 1);
+        assert.deepEqual(accepted.warn, []);
       });
     });
 

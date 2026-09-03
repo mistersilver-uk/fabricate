@@ -49,7 +49,10 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
 
   /** Every module specifier the gateway imports, in source order. */
   function gatewayImportSpecifiers() {
-    return [...rootSource.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
+    // COMMENTS STRIPPED FIRST, as every other scan in this file does. A `from '…component…'`
+    // written inside a comment would red the equality below for a prose reason — the vacuous
+    // shape in reverse, where the scan sees something the module does not import.
+    return [...withoutComments(rootSource).matchAll(/from '([^']+)'/g)].map((match) => match[1]);
   }
 
   it('IMPORT SURFACE: the component-family dependency set is exactly this list', () => {
@@ -120,6 +123,48 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     );
   });
 
+  /**
+   * EVERY route token the gateway enumerated on `origin/main`, pinned as a literal list.
+   *
+   * Read off the parent commit rather than off the file under test, which is the difference
+   * between a pin and a tautology: a scan compared against itself agrees with any tree.
+   */
+  const ROUTE_TOKENS = Object.freeze([
+    'access',
+    'books-scrolls',
+    'component-edit',
+    'components',
+    'crafting-settings',
+    'environment-edit',
+    'environments',
+    'essence-edit',
+    'essences',
+    'gathering-event-edit',
+    'gathering-task-edit',
+    'knowledge',
+    'recipe-edit',
+    'recipe-item-edit',
+    'recipes',
+    'system-edit',
+    'systems',
+    'tags',
+    'tool-edit',
+    'tools',
+    'world',
+    'world-component-entry',
+    'world-components',
+    'world-currency',
+    'world-downtime',
+    'world-essence-entry',
+    'world-essences',
+    'world-modifiers',
+    'world-prerequisites',
+    'world-tool-entry',
+    'world-tools',
+    'world-travel',
+    'world-vocabulary',
+  ]);
+
   it('ROUTE ENUMERATION: the gateway mints no route', () => {
     // The four component routes already existed. A sixth seam that minted one would show up
     // here, which is what distinguishes carrying a seam from building a screen.
@@ -135,12 +180,22 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     ]) {
       assert.ok(tokens.includes(token), `${token} is enumerated`);
     }
+    // THE WHOLE SET, NOT THE COMPONENT SUBSET. A subset comparison passes a sixth seam that mints
+    // a route for some OTHER family, which is exactly the thing requirement 7's enumeration is a
+    // claim about: the correction may carry a seam, and may not mint a route anywhere.
+    const shipped = [...new Set(tokens)].sort();
     assert.deepEqual(
-      [...new Set(tokens.filter((token) => token.includes('component')))].sort(),
+      shipped.filter((token) => token.includes('component')),
       ['component-edit', 'components', 'world-component-entry', 'world-components'],
-      'the component route token set is exactly the four that already existed; a sixth seam ' +
-        'that minted a route would show up here'
+      'the four component routes already existed'
     );
+    assert.equal(
+      shipped.length,
+      ROUTE_TOKENS.length,
+      `the gateway enumerates ${ROUTE_TOKENS.length} route tokens; it now enumerates ` +
+        `${shipped.length}. A seam may carry a value into an existing route and may not mint one.`
+    );
+    assert.deepEqual(shipped, [...ROUTE_TOKENS].sort());
   });
 });
 
