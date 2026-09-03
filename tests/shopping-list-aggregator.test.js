@@ -7,6 +7,24 @@ import assert from 'node:assert/strict';
 
 const { aggregateShoppingList } = await import('../src/ui/svelte/util/shoppingListAggregator.js');
 
+// Issue 1493 needs a REAL evaluation, not a stub: the defect is that the aggregation
+// never told the evaluator who was crafting, and only the real currency probe is
+// actor-bound. The Foundry globals the manager loads against are installed here.
+globalThis.foundry = {
+  utils: {
+    randomID: () => 'aggregator-fixture-id',
+    getProperty: (object, path) =>
+      String(path)
+        .split('.')
+        .reduce((value, key) => (value == null ? undefined : value[key]), object),
+  },
+};
+globalThis.game = { user: { isGM: true }, fabricate: null };
+
+const { RecipeManager } = await import('../src/systems/RecipeManager.js');
+const { Recipe } = await import('../src/models/Recipe.js');
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -532,5 +550,141 @@ describe('aggregateShoppingList', () => {
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
     assert.equal(result.ingredients.length, 1);
     assert.equal(result.ingredients[0].description, 'Any set', 'used the shopping requirement path');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 — the aggregation is evaluated AGAINST THE CRAFTING ACTOR.
+//
+// Asserted on `aggregate.ingredients`, never on the arguments handed to the manager.
+// The defect being fixed is a silent no-op: `evaluateShoppingRequirement`'s third
+// parameter is an OPTIONS BAG, so handing it a bare actor destructures
+// `actor.craftingActor` to `undefined` and the currency probe stays constant-false.
+// An argument spy passes on exactly that mistake.
+// ---------------------------------------------------------------------------
+
+const TOLL_SYSTEM_ID = 'sys-1493-shop';
+
+/**
+ * A real manager over a recipe whose single group offers "two specific planks OR 100 gp",
+ * against a world ladder that resolves. Items are tried before currency, so a player who
+ * holds no plank falls to the coin — IF the evaluation knows whose coin to look at.
+ */
+function makeTollManager() {
+  const system = {
+    id: TOLL_SYSTEM_ID,
+    features: { itemTags: false, essences: false },
+    components: [],
+    managedItems: [],
+    tools: [],
+    essenceDefinitions: [],
+    requirements: { currency: { enabled: true } },
+  };
+  const manager = new RecipeManager({
+    getCraftingSystemManager: () => ({
+      getSystem: (id) => (id === TOLL_SYSTEM_ID ? system : null),
+    }),
+    currencyConfigStore: {
+      get: () => ({
+        spendStrategy: 'actorProperty',
+        units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' }],
+      }),
+    },
+  });
+  manager.recipes.set(
+    'r-toll',
+    new Recipe({
+      id: 'r-toll',
+      name: 'Toll Bridge Plank',
+      craftingSystemId: TOLL_SYSTEM_ID,
+      ingredientSets: [
+        {
+          ingredientGroups: [
+            {
+              id: 'g-toll',
+              name: 'Toll',
+              options: [
+                { itemUuid: 'Item.plank', quantity: 2 },
+                { match: { type: 'currency', unit: 'gp', amount: 100 }, quantity: 1 },
+              ],
+            },
+          ],
+          essences: {},
+        },
+      ],
+      resultGroups: [{ id: 'rg-1', results: [] }],
+    })
+  );
+  return manager;
+}
+
+/** A purse-carrying actor with an empty pack, so only the coin can settle the toll. */
+function makePurseActor(id, gp) {
+  return { id, items: [], system: { currency: { gp } } };
+}
+
+function tollDescriptions(manager, craftingActor, sourceActors) {
+  const aggregate = aggregateShoppingList(
+    [{ recipeId: 'r-toll', quantity: 1 }],
+    manager,
+    sourceActors,
+    { craftingActor }
+  );
+  return aggregate.ingredients.map((ingredient) => ingredient.description);
+}
+
+describe('aggregateShoppingList currency affordability (issue 1493)', () => {
+  it('drops the material from the list when the crafting actor can pay the cost instead', () => {
+    const manager = makeTollManager();
+    const rich = makePurseActor('rich', 1000);
+
+    assert.deepEqual(
+      tollDescriptions(manager, rich, [{ id: 'bag', items: [] }, rich]),
+      ['100 gp'],
+      'the coin settles the group, so nothing has to be bought'
+    );
+  });
+
+  it('puts the material back when the crafting actor cannot pay', () => {
+    const manager = makeTollManager();
+    const poor = makePurseActor('poor', 3);
+
+    assert.deepEqual(
+      tollDescriptions(manager, poor, [{ id: 'bag', items: [] }, poor]),
+      ['2x specific item'],
+      'with no coin and no plank the player is told to buy planks'
+    );
+  });
+
+  it('reports the material for every actor when no crafting actor is supplied at all', () => {
+    // The shipped defect, kept as a regression guard: an aggregation with no crafting
+    // actor cannot afford anything, however rich the source actors are.
+    const manager = makeTollManager();
+    const rich = makePurseActor('rich', 1000);
+
+    assert.deepEqual(tollDescriptions(manager, null, [rich]), ['2x specific item']);
+  });
+
+  it('forwards the crafting actor down the evaluateCraftability fallback too', () => {
+    // A manager that predates `evaluateShoppingRequirement` (the stub shape several
+    // tests above use) takes the other branch, which had the same omission.
+    const manager = makeTollManager();
+    const rich = makePurseActor('rich', 1000);
+    const legacy = {
+      getRecipe: (id) => manager.getRecipe(id),
+      evaluateCraftability: (actors, recipe, options) =>
+        manager.evaluateCraftability(actors, recipe, options),
+    };
+
+    const aggregate = aggregateShoppingList(
+      [{ recipeId: 'r-toll', quantity: 1 }],
+      legacy,
+      [{ id: 'bag', items: [] }, rich],
+      { craftingActor: rich }
+    );
+    assert.deepEqual(
+      aggregate.ingredients.map((ingredient) => ingredient.description),
+      ['100 gp']
+    );
   });
 });

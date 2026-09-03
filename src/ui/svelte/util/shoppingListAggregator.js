@@ -57,6 +57,14 @@ function isNonblankIcon(value) {
  * @param {Array<{recipeId: string, quantity: number}>} entries
  * @param {object} recipeManager - Must expose getRecipe() and evaluateCraftability()
  * @param {Array} componentSourceActors - Actor inventory sources for have/need calcs
+ * @param {object} [options]
+ * @param {object|null} [options.craftingActor] - The actor the craft would run AS.
+ *   Currency affordability is bound to that actor and to no one else (issue 1493): the
+ *   probe `evaluateShoppingRequirement` builds is constant-`false` without it, so an
+ *   aggregation that supplies nothing reports every currency requirement as missing no
+ *   matter how much the player is carrying, and the shopping list tells them to buy the
+ *   materials they could simply have paid for. It is NOT one of the component-source
+ *   actors' roles — a source actor lends items, the crafting actor spends coin.
  * @returns {{
  *   ingredients: Array,
  *   essences: Array,
@@ -66,7 +74,12 @@ function isNonblankIcon(value) {
  *   totalQuantity: number
  * }}
  */
-export function aggregateShoppingList(entries, recipeManager, componentSourceActors) {
+export function aggregateShoppingList(
+  entries,
+  recipeManager,
+  componentSourceActors,
+  { craftingActor = null } = {}
+) {
   if (!entries || entries.length === 0) {
     return {
       ingredients: [],
@@ -98,10 +111,14 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
     // Prefer the shopping requirement (materials to craft once via ANY ingredient
     // set — max need per component across sets), falling back to single-set
     // craftability when the manager does not expose it (e.g. test stubs).
+    // `{ craftingActor }` is an OPTIONS BAG on both seams, never a positional third
+    // argument: passing the actor bare destructures `actor.craftingActor` to `undefined`
+    // and the currency probe stays constant-false — the fix ships as a silent no-op that
+    // an argument-count assertion would happily pass.
     const evaluation = componentSourceActors && componentSourceActors.length > 0
       ? (typeof recipeManager.evaluateShoppingRequirement === 'function'
-          ? recipeManager.evaluateShoppingRequirement(componentSourceActors, recipe)
-          : recipeManager.evaluateCraftability(componentSourceActors, recipe))
+          ? recipeManager.evaluateShoppingRequirement(componentSourceActors, recipe, { craftingActor })
+          : recipeManager.evaluateCraftability(componentSourceActors, recipe, { craftingActor }))
       : { ingredientStates: [], essenceStates: [], toolStates: [] };
 
     const ingredientStates = evaluation?.ingredientStates ?? [];

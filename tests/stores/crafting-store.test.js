@@ -429,6 +429,68 @@ describe('craftingStore', () => {
     assert.equal(wood.satisfied, false);
   });
 
+  // Issue 1493. Currency affordability is bound to the crafting ACTOR, so an aggregation
+  // that supplies none reports every currency requirement as missing however rich the
+  // player is. Asserted through the aggregate the store publishes — a spy on the third
+  // argument passes on the positional-argument no-op this replaces.
+  //
+  // The fake answers with the actor it was HANDED, so a bare positional actor (whose
+  // `.craftingActor` is undefined) and a missing bag are both distinguishable from the
+  // real thing.
+  function makeActorEchoingManager() {
+    return {
+      getRecipe: (id) => ({ id, name: `Recipe ${id}` }),
+      evaluateShoppingRequirement: (_sources, _recipe, { craftingActor = null } = {}) => ({
+        ingredientStates: [
+          {
+            componentId: 'toll',
+            description: craftingActor ? `paid by ${craftingActor.id}` : 'no crafting actor',
+            need: 1,
+            have: 0,
+            satisfied: false,
+          },
+        ],
+        essenceStates: [],
+        toolStates: [],
+      }),
+    };
+  }
+
+  it('aggregates the shopping list against the selected crafting actor, matched by id', async () => {
+    // `getCraftingSourceActors` only unshifts the crafting actor when it is NOT already a
+    // component source, so index 0 is the lender here — the commonest real arrangement,
+    // and the one a positional read gets wrong.
+    const { services } = makeServices({
+      recipeManager: makeActorEchoingManager(),
+      sourceActors: [{ id: 'lender', items: [] }, { id: 'hero', items: [] }],
+      actorId: 'hero',
+    });
+    const store = createCraftingStore({ services });
+
+    store.addToShoppingList('r1', 1);
+    flushSync();
+
+    assert.equal(store.shoppingAggregate.ingredients[0].description, 'paid by hero');
+  });
+
+  it('supplies no crafting actor when the remembered selection is not among the sources', async () => {
+    const { services } = makeServices({
+      recipeManager: makeActorEchoingManager(),
+      sourceActors: [{ id: 'lender', items: [] }],
+      actorId: 'hero',
+    });
+    const store = createCraftingStore({ services });
+
+    store.addToShoppingList('r1', 1);
+    flushSync();
+
+    assert.equal(
+      store.shoppingAggregate.ingredients[0].description,
+      'no crafting actor',
+      'a stale remembered id resolves to null rather than to whichever actor is first'
+    );
+  });
+
   it('removes and clears shopping list entries', async () => {
     const { services } = makeServices();
     const store = createCraftingStore({ services });
