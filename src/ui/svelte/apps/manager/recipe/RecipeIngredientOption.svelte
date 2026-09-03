@@ -60,6 +60,31 @@
   AND-required BY POSITION; the pill spent a slot on every standalone row restating what the
   absence of the group already said, and said nothing at all on the rows where the algebra is
   actually worth stating.
+
+  == WHERE PREMIUM AND THE DESIGN DISAGREE, WE FOLLOW PREMIUM ===============================
+  Six values below follow `fabricate-premium`'s shipped `RewardRow` rather than the design, and
+  each was a deliberate choice rather than a miss. They are written down because the next audit
+  measuring this row against `proto:` alone would read all six as drift and "correct" them back,
+  which would put this row out of step with the fourth instance of the same idea.
+
+  The argument is the same one in every case: the design is a fixed-width mockup with no
+  running implementation, and premium is a shipped control a GM already uses. Where the two
+  disagree on a value that a GM can SEE ACROSS BOTH PRODUCTS in one session, the shipped one
+  wins, because the cost of the mismatch is paid at the seam and not against the mockup.
+
+    1. Control height 30px, not the design's 28 (`proto:2248`). 30 is Fabricate's shipped
+       control-height rung, so 28 would make this the one row on the screen off the ladder.
+    2. The resting search border is `--fab-border-strong`, accenting only WHILE TYPING. The
+       design draws it accented at rest, which reads as a field already holding a value.
+    3. The plate glyph is 12px, not 11.
+    4. The suggestion panel is offset 33px.
+    5. The kind select renders at 11px.
+    6. The tint is per KIND, not per entity. Note this is NOT a departure from the design —
+       `proto:4624`'s KINDMETA table tints per kind too; it is recorded here only because an
+       earlier round misread `proto:4658` and reported the tinting as premium-only.
+
+  The seventh disagreement — what Enter commits — is argued in full further up, and is the one
+  case where a Fabricate requirement's ID-valued shape forces the divergence rather than taste.
 -->
 <script module>
   // Alternatives carry no id (the parent keys them by index), so the tag-match radio
