@@ -104,6 +104,7 @@
   import ToolRequirementsTab from '../tools/ToolRequirementsTab.svelte';
   import {
     toolBreakageChanceBand,
+    toolBreakageChoice,
     toolBreakageSummary,
     toolSourceSnapshot,
   } from '../tools/toolStudio.js';
@@ -287,7 +288,33 @@
    */
   const IDENTITY_FIELDS = Object.freeze(['name']);
 
-  const BREAKAGE_MODES = ['limitedUses', 'breakageChance', 'diceExpression'];
+  /**
+   * THE FOUR ANSWERS A GM AUTHORS, not the three `breakage.mode` values (issue 1373).
+   *
+   * `limitedUses` carries TWO of them: `maxUses: null` is the UNLIMITED state - the copy is
+   * never used up, so it never breaks - and `src/models/Tool.js` has always said so.
+   * `toolBreakageChoice` is the one place that splits them, and the system editor's Breakage
+   * tab already offers exactly this set.
+   *
+   * WHAT THIS SCREEN DID BEFORE, stated so nobody restores it: it offered three modes, selected
+   * them off `breakage.mode` alone, and drew a null `maxUses` as `1` against a `min={1}`
+   * stepper. So the world's own fixture Tool read `Limited uses` on the card, `1` in the
+   * stepper, `Unlimited uses` in the summary beside it and a Validation warning under all
+   * three - and the stepper had no reachable value that put the `null` back, so a GM who
+   * nudged it converted an unlimited Tool into a one-use Tool for every system inheriting it.
+   *
+   * `unlimited` LEADS, for the reason the system editor gives: it is the model's default, the
+   * state a Tool made by dropping an Item opens in, and the only one of the four naming an
+   * ABSENCE of a mechanic.
+   *
+   * @type {readonly string[]}
+   */
+  const BREAKAGE_CHOICES = Object.freeze([
+    'unlimited',
+    'limitedUses',
+    'breakageChance',
+    'diceExpression',
+  ]);
   const DEFAULT_BREAK_MODE = 'toolSpecific';
   const ON_BREAK_MODES = ['destroy', 'flagBroken', 'replaceWith'];
 
@@ -584,24 +611,25 @@
   });
 
   /**
-   * The two mode choices as RADIO CARDS rather than a segmented track.
+   * The four breakage choices as RADIO CARDS rather than a segmented track.
    *
    * A SEGMENTED TRACK WAS THE WRONG CONTROL, and the design's picture is what says so: it
-   * offers each mode as a card carrying a glyph, a bold name and the sentence explaining what
-   * it does. A three-segment track states three bare labels and asks a GM to already know
-   * which of `Limited uses`, `Breakage chance` and `Dice expression` they want.
+   * offers each choice as a card carrying a glyph, a bold name and the sentence explaining
+   * what it does. A bare-label track asks a GM to already know which of `Unlimited uses`,
+   * `Limited uses`, `Breakage chance` and `Dice expression` they want.
    *
    * `RadioCardGroup` is the shipped primitive for exactly this, and `tools/ToolBreakageTab`
    * already renders these same two groups through it at SYSTEM scope. Reusing it - and the
-   * hint and glyph vocabulary it reads - is what stops world scope describing the same three
-   * modes differently from the system editor a GM reaches from the row beside it.
+   * hint and glyph vocabulary it reads - is what stops world scope describing the same four
+   * choices differently from the system editor a GM reaches from the row beside it.
    */
   const breakageModeOptions = $derived(
-    BREAKAGE_MODES.map((mode) => ({
+    BREAKAGE_CHOICES.map((mode) => ({
       value: mode,
       label: breakageModeLabel(mode),
       description: breakageModeDescription(mode),
       icon: {
+        unlimited: 'fas fa-infinity',
         limitedUses: 'fas fa-hourglass-half',
         breakageChance: 'fas fa-percent',
         diceExpression: 'fas fa-dice-d20',
@@ -624,6 +652,10 @@
 
   function breakageModeDescription(mode) {
     return {
+      unlimited: text(
+        'FABRICATE.Admin.Manager.Tools.BreakageUnlimitedHint',
+        'It is never used up, so it never breaks.'
+      ),
       limitedUses: text(
         'FABRICATE.Admin.Manager.Tools.BreakageLimitedUsesHint',
         'A fixed number of uses, then it breaks.'
@@ -670,6 +702,9 @@
 
   function breakageModeLabel(mode) {
     return {
+      // THE EXACT STRING THE RAIL, THE ROW BADGE AND THE SUMMARY ALREADY PRINT for this state,
+      // so the four surfaces read as one answer rather than as four opinions.
+      unlimited: text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses'),
       limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses'),
       breakageChance: text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance'),
       diceExpression: text('FABRICATE.Admin.Manager.Tools.BreakageDice', 'Dice expression'),
@@ -765,6 +800,52 @@
   // world scope.
   const breakMode = $derived(defaults.breakage?.mode ?? 'limitedUses');
   const breakFormula = $derived(String(defaults.breakage?.formula ?? ''));
+
+  /**
+   * WHICH OF THE FOUR the world default authors, resolved by the shared helper.
+   *
+   * `toolSpecific` IS PASSED UNCONDITIONALLY, and it is not a guess about the world authority:
+   * `toolBreakageChoice` answers `breakable` / `immune` under `checkDriven`, and this card
+   * offers the four MODE cards whatever the authority is - so handing it the live authority
+   * would leave the group with a selected value none of its four options carries. The authority
+   * band above the card is where that fact is stated on this screen.
+   */
+  const breakageChoice = $derived(
+    toolBreakageChoice({ breakage: defaults.breakage ?? null }, 'toolSpecific')
+  );
+
+  /**
+   * Author one of the four choices, as a WHOLE mode-and-value answer.
+   *
+   * The mode cards used to write `{ mode }` alone, which was right while the mode WAS the
+   * answer and is wrong now that two of the four share `limitedUses`: picking `Limited uses`
+   * over an unlimited record would have merged onto the `maxUses: null` already stored and
+   * landed the GM straight back on the option they just left.
+   *
+   * So `unlimited` writes the null explicitly - the one control on this screen that can reach
+   * it - and `limitedUses` SEEDS AT 1 rather than at null. Both are the rule
+   * `ToolBreakageTab`'s `createBreakageConfigs` states at system scope, so one meaning has one
+   * behaviour across the two scopes. The other two still patch the mode alone, which is what
+   * preserves the value each was carrying across a switch.
+   *
+   * @param {string} choice one of {@link BREAKAGE_CHOICES}.
+   * @returns {void}
+   */
+  function changeBreakageChoice(choice) {
+    if (choice === 'unlimited') {
+      patchSection('breakage', { mode: 'limitedUses', maxUses: null });
+      return;
+    }
+    if (choice === 'limitedUses') {
+      const current = Number(defaults.breakage?.maxUses);
+      patchSection('breakage', {
+        mode: 'limitedUses',
+        maxUses: Number.isInteger(current) && current > 0 ? current : 1,
+      });
+      return;
+    }
+    patchSection('breakage', { mode: choice });
+  }
 
   /**
    * Whether the authored dice expression can actually be ROLLED.
@@ -887,6 +968,11 @@
    * cards alone cannot show, which is why this is a check rather than a hint.
    */
   const breakageValueStatus = $derived.by(() => {
+    // AN AUTHORED ANSWER, NOT A MISSING ONE (issue 1373). `limitedUses` with a null `maxUses`
+    // IS `Unlimited uses`, which every reading surface already prints - so reporting it as a
+    // mode with nothing behind it made the Validation tab contradict the summary two tabs away
+    // over the state a brand-new Tool opens in.
+    if (breakageChoice === 'unlimited') return 'pass';
     if (breakMode === 'diceExpression') {
       if (breakFormula.trim() === '') return 'warn';
       return formulaRollable ? 'pass' : 'block';
@@ -1412,79 +1498,107 @@
             <p class="manager-kicker">
               {text('FABRICATE.Admin.Manager.Tools.Editor.HowItBreaks', 'How this Tool breaks')}
             </p>
+            <!-- FOUR CARDS ON TWO ROWS, not three on one. `columns={2}` is the system editor's
+                 own figure for the identical set, so the two scopes lay the same four choices out
+                 the same way. -->
             <RadioCardGroup
               options={breakageModeOptions}
-              selectedValue={defaults.breakage?.mode ?? 'limitedUses'}
+              selectedValue={breakageChoice}
               groupName="world-tool-breakage-mode"
-              columns={3}
+              columns={2}
               legend={sectionLabel('breakage')}
               dataGroup="world-tool-breakage-mode"
               optionDataAttr="data-world-tool-entry-breakage-mode"
-              onChange={(mode) => patchSection('breakage', { mode })}
+              onChange={changeBreakageChoice}
             />
             <!--
               THE VALUE EDITOR FOR THE SELECTED MODE, one per mode, which the screen had none of.
 
-              The mode cards above author `breakage.mode` and nothing else, so a world default
-              reading `Breakage chance` was stuck at whatever `breakageChance` it happened to be
-              seeded with and a GM had no way to move it. Each control writes into the SAME
-              section object as the mode - `patchSection` merges - so switching modes never
-              erases the value the other mode was carrying.
+              The mode cards above used to author `breakage.mode` and nothing else, so a world
+              default reading `Breakage chance` was stuck at whatever `breakageChance` it
+              happened to be seeded with and a GM had no way to move it. Each control writes into
+              the SAME section object as the mode - `patchSection` merges - so switching modes
+              never erases the value the other mode was carrying.
 
               The controls are the SHIPPED ones the system Tool Rules editor already renders for
-              the same three modes, so one meaning has one control across the two scopes.
+              the same modes, so one meaning has one control across the two scopes.
             -->
-            <div class="manager-world-tool-entry-break-value" data-world-tool-entry-breakage-value>
-              {#if breakMode === 'limitedUses'}
-                <div class="manager-world-tool-entry-field-row">
-                  <div class="manager-world-tool-entry-field-copy">
-                    <span class="manager-kicker"
-                      >{text(
-                        'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy',
-                        'Uses per copy'
-                      )}</span
-                    >
-                    <small class="manager-muted"
-                      >{text(
-                        'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopyHint',
-                        'A fresh copy starts with this many uses.'
-                      )}</small
-                    >
+            <!-- `unlimited` CONFIGURES NOTHING, so the inset is absent rather than empty: an
+                 empty one draws a bordered panel with a padding-height void in it. The system
+                 editor drops its divider on the same branch for the same reason. -->
+            {#if breakageChoice !== 'unlimited'}
+              <div
+                class="manager-world-tool-entry-break-value"
+                data-world-tool-entry-breakage-value
+              >
+                {#if breakageChoice === 'limitedUses'}
+                  <div class="manager-world-tool-entry-field-row">
+                    <div class="manager-world-tool-entry-field-copy">
+                      <!-- NOT AN EYEBROW, AND THE DESIGN IS EXPLICIT ABOUT IT (issue 1373).
+                           `proto:2134` states this label as `600 11.5px var(--sans)` in
+                           `--text` - a sentence-case title over its own note - where every
+                           actual eyebrow on this screen is `700 8.5px` tracked `.11em` in
+                           `--subtle` (`proto:2121`, `proto:2160`). Wearing `manager-kicker`
+                           made it uppercase micro-copy, so the value editor's own heading read
+                           quieter than the card heading three lines above it. The class is
+                           REMOVED rather than resized: this is a different kind of label, not
+                           an eyebrow at the wrong size. -->
+                      <span class="manager-world-tool-entry-field-title"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy',
+                          'Uses per copy'
+                        )}</span
+                      >
+                      <small class="manager-muted"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopyHint',
+                          'A fresh copy starts with this many uses.'
+                        )}</small
+                      >
+                    </div>
+                    <!-- NO `?? 1` FALLBACK, and that is the whole of issue 1373's world-scope
+                       data-loss defect. This block renders only while the CHOICE is
+                       `limitedUses`, which is exactly the case a non-null `maxUses` defines,
+                       so the fallback that used to sit here could only ever fire for the
+                       UNLIMITED state - and drew it as `1` against a `min={1}` stepper with no
+                       reachable value that put the null back. `Unlimited uses` is a CARD now,
+                       so the control that restores the null is the one that authors it. -->
+                    <Stepper
+                      value={defaults.breakage?.maxUses}
+                      min={1}
+                      {...stepperLabels(
+                        text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')
+                      )}
+                      inputProps={{ 'data-world-tool-entry-max-uses': '' }}
+                      onChange={(maxUses) => patchSection('breakage', { maxUses })}
+                    />
                   </div>
-                  <Stepper
-                    value={defaults.breakage?.maxUses ?? 1}
-                    min={1}
-                    {...stepperLabels(
-                      text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')
-                    )}
-                    inputProps={{ 'data-world-tool-entry-max-uses': '' }}
-                    onChange={(maxUses) => patchSection('breakage', { maxUses })}
-                  />
-                </div>
-              {:else if breakMode === 'breakageChance'}
-                <div class="manager-world-tool-entry-chance-head">
-                  <div class="manager-world-tool-entry-field-copy">
-                    <span class="manager-kicker"
-                      >{text(
-                        'FABRICATE.Admin.Manager.Tools.BreakageChancePerUse',
-                        'Break chance per use'
-                      )}</span
-                    >
-                    <small class="manager-muted"
-                      >{text(
-                        'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
-                        'Each time the Tool is used, this percentage is its chance to break.'
-                      )}</small
-                    >
-                  </div>
-                  <!-- THE PLAIN-LANGUAGE BAND (issue 1373, maintainer round 2). `5%` is a
+                {:else if breakageChoice === 'breakageChance'}
+                  <div class="manager-world-tool-entry-chance-head">
+                    <div class="manager-world-tool-entry-field-copy">
+                      <!-- NOT AN EYEBROW: `proto:2145` states the same `600 11.5px` /
+                           `--text` title the uses label above takes, for the same reason. -->
+                      <span class="manager-world-tool-entry-field-title"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Tools.BreakageChancePerUse',
+                          'Break chance per use'
+                        )}</span
+                      >
+                      <small class="manager-muted"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
+                          'Each time the Tool is used, this percentage is its chance to break.'
+                        )}</small
+                      >
+                    </div>
+                    <!-- THE PLAIN-LANGUAGE BAND (issue 1373, maintainer round 2). `5%` is a
                        quantity; `Rarely breaks` is the decision a GM was actually making, and
                        the design states both. Its five cuts are `proto:4618`'s. -->
-                  <Chip tone={chanceBand.tone} data-world-tool-entry-chance-band={chanceBand.tone}
-                    >{chanceBand.label}</Chip
-                  >
-                </div>
-                <!--
+                    <Chip tone={chanceBand.tone} data-world-tool-entry-chance-band={chanceBand.tone}
+                      >{chanceBand.label}</Chip
+                    >
+                  </div>
+                  <!--
                   THE TRACK RUNS THE RAMP, AND AN EARLIER ROUND WAS WRONG TO REMOVE IT (issue
                   1373, maintainer round 2).
 
@@ -1503,71 +1617,72 @@
                   already published and both resolve through `--fab-success` / `--fab-warning` /
                   `--fab-badge-gold` / `--fab-danger`, so all seven themes keep their own ramp.
                 -->
-                <ChanceSlider
-                  value={defaults.breakage?.breakageChance ?? 0}
-                  numberLabel={text(
-                    'FABRICATE.Admin.Manager.Tools.BreakageChancePercent',
-                    'Break chance percent'
-                  )}
-                  rangeLabel={text(
-                    'FABRICATE.Admin.Manager.Tools.BreakageChance',
-                    'Breakage chance'
-                  )}
-                  resolveColor={toolBreakageChanceColor}
-                  trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
-                  controlClass="manager-tool-breakage-chance-control"
-                  numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
-                  rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
-                  onChange={(breakageChance) => patchSection('breakage', { breakageChance })}
-                />
-              {:else}
-                <div class="manager-world-tool-entry-field-row">
-                  <Field as="label" class="manager-world-tool-entry-formula">
-                    <span class="manager-kicker"
-                      >{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span
-                    >
-                    <input
-                      type="text"
-                      data-world-tool-entry-formula
-                      aria-invalid={formulaRollable ? undefined : 'true'}
-                      value={breakFormula}
-                      oninput={(event) =>
-                        patchSection('breakage', { formula: event.currentTarget.value })}
-                    />
-                  </Field>
-                  <div class="manager-world-tool-entry-field-copy">
-                    <span class="manager-kicker"
-                      >{text(
-                        'FABRICATE.Admin.Manager.Tools.BreakageThreshold',
-                        'Break below'
-                      )}</span
-                    >
-                    <Stepper
-                      value={defaults.breakage?.threshold ?? 0}
-                      step={1}
-                      {...stepperLabels(
-                        text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')
-                      )}
-                      inputProps={{ 'data-world-tool-entry-threshold': '' }}
-                      onChange={(threshold) => patchSection('breakage', { threshold })}
-                    />
+                  <ChanceSlider
+                    value={defaults.breakage?.breakageChance ?? 0}
+                    numberLabel={text(
+                      'FABRICATE.Admin.Manager.Tools.BreakageChancePercent',
+                      'Break chance percent'
+                    )}
+                    rangeLabel={text(
+                      'FABRICATE.Admin.Manager.Tools.BreakageChance',
+                      'Breakage chance'
+                    )}
+                    resolveColor={toolBreakageChanceColor}
+                    trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                    controlClass="manager-tool-breakage-chance-control"
+                    numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
+                    rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
+                    onChange={(breakageChance) => patchSection('breakage', { breakageChance })}
+                  />
+                {:else}
+                  <div class="manager-world-tool-entry-field-row">
+                    <Field as="label" class="manager-world-tool-entry-formula">
+                      <span class="manager-kicker"
+                        >{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span
+                      >
+                      <input
+                        type="text"
+                        data-world-tool-entry-formula
+                        aria-invalid={formulaRollable ? undefined : 'true'}
+                        value={breakFormula}
+                        oninput={(event) =>
+                          patchSection('breakage', { formula: event.currentTarget.value })}
+                      />
+                    </Field>
+                    <div class="manager-world-tool-entry-field-copy">
+                      <span class="manager-kicker"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Tools.BreakageThreshold',
+                          'Break below'
+                        )}</span
+                      >
+                      <Stepper
+                        value={defaults.breakage?.threshold ?? 0}
+                        step={1}
+                        {...stepperLabels(
+                          text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')
+                        )}
+                        inputProps={{ 'data-world-tool-entry-threshold': '' }}
+                        onChange={(threshold) => patchSection('breakage', { threshold })}
+                      />
+                    </div>
                   </div>
-                </div>
-                <!-- ROLLED, NOT PARSED. `Roll.validate` returns true for expressions that throw
+                  <!-- ROLLED, NOT PARSED. `Roll.validate` returns true for expressions that throw
                      the moment a craft evaluates them, so the guard evaluates the formula with
                      every term maximized and requires a finite total. It FAILS OPEN with no
                      dice engine, so nothing red appears in a headless render. -->
-                {#if !formulaRollable}
-                  <p class="manager-muted is-danger" data-world-tool-entry-formula-error>
-                    <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-                    {text(
-                      'FABRICATE.Admin.Manager.Tools.BreakageFormulaUnrollable',
-                      'This expression parses but cannot be rolled, so every attempt that consults it fails.'
-                    )}
-                  </p>
+                  {#if !formulaRollable}
+                    <p class="manager-muted is-danger" data-world-tool-entry-formula-error>
+                      <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Tools.BreakageFormulaUnrollable',
+                        'This expression parses but cannot be rolled, so every attempt that consults it fails.'
+                      )}
+                    </p>
+                  {/if}
                 {/if}
-              {/if}
-            </div>
+              </div>
+            {/if}
             <!-- THE VALUE, not the mode. The card above already names the mode; this states
                  what it currently resolves to, which no card can. The on-break section has no
                  counterpart line because its mode IS its whole answer, and a line repeating
@@ -1714,12 +1829,17 @@
             />
           </div>
         {:else}
+          <!-- NO HEADING AND NO INTRO, WHICH IS THE OPT-OUT THIS PR ADDED AND WORLD SCOPE DID
+               NOT TAKE (issue 1373). `proto:2372` opens the Validation tab on the summary head
+               and its counts; there is no title above it and no explanatory line. Passing both
+               drew a heading the design does not have AND restated the tab label a GM had just
+               clicked, directly under it. `tools/ToolValidationTab` passes neither for the same
+               reason, so the two scopes now open this tab the same way.
+
+               OMITTED RATHER THAN PASSED EMPTY: `ScopedValidationTab` defaults both to `''` and
+               forwards them, which is what overrides `EditorValidationSurface`'s own
+               `title = 'Validation'` default. -->
           <ScopedValidationTab
-            title={text('FABRICATE.Admin.Manager.Scoped.Entry.TabValidation', 'Validation')}
-            intro={text(
-              'FABRICATE.Admin.Manager.Scoped.Entry.ValidationIntro',
-              'What this world record still needs before every system that has it reads a complete answer.'
-            )}
             summary={validationSummary}
             counts={validationCounts}
             groups={[
@@ -2108,6 +2228,22 @@
 
   .manager-world-tool-entry-field-copy small {
     font-size: 0.6rem;
+  }
+
+  /* THE VALUE EDITOR'S OWN TITLE, WHICH IS NOT AN EYEBROW (issue 1373). `proto:2134` and
+     `proto:2145` both state `font: 600 11.5px var(--sans); color: var(--text)` for these two
+     labels - a sentence-case title, the same type the mode cards beside them use for their own
+     names - against the tracked uppercase `--subtle` micro-label every real eyebrow on this
+     screen wears. 11.5px is `0.72rem` at the manager's 16px root.
+
+     It is a class rather than a bare element rule because `.manager-world-tool-entry-field-copy`
+     also holds the `Formula` and `Break below` cells, and `proto:2160` and `proto:2164` say
+     those two ARE eyebrows - so the cell cannot decide the treatment for its children. */
+  .manager-world-tool-entry-field-title {
+    color: var(--fab-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    min-width: 0;
   }
 
   /* `:global()` because `Field` (issue 1428) writes this element, not this template: the class

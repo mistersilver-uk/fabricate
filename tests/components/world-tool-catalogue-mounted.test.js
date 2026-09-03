@@ -155,7 +155,9 @@ describe('world Tools Catalogue (issue 1373)', () => {
       'a linked row states no badge: being linked is what every row here is'
     );
 
-    const orphan = target.querySelector('[data-scoped-list-row="orphan"] [data-scoped-list-source]');
+    const orphan = target.querySelector(
+      '[data-scoped-list-row="orphan"] [data-scoped-list-source]'
+    );
     assert.ok(Boolean(orphan), 'the record with no source reference IS flagged');
     assert.equal(
       orphan.getAttribute('data-scoped-list-source'),
@@ -274,9 +276,9 @@ describe('world Tools Catalogue (issue 1373)', () => {
     const segments = [...target.querySelectorAll('[data-world-tool-break-segment]')];
     assert.equal(segments.length, 2, 'the world authors this value, so there is no third option');
     assert.deepEqual(
-      segments.filter((segment) => segment.classList.contains('is-selected')).map(
-        (segment) => segment.dataset.worldToolBreakSegment
-      ),
+      segments
+        .filter((segment) => segment.classList.contains('is-selected'))
+        .map((segment) => segment.dataset.worldToolBreakSegment),
       ['checkDriven']
     );
   });
@@ -614,5 +616,155 @@ describe('world Tools Catalogue (issue 1373)', () => {
       .querySelector('[data-world-tool-break-segment="checkDriven"] input[type="radio"]')
       .click();
     assert.deepEqual(calls, ['checkDriven']);
+  });
+
+  /**
+   * ── THE TOOLBAR, WHICH NOTHING HAD EVER LOOKED AT (issue 1373) ───────────────────────────
+   *
+   * `data-scoped-list-search`, `-sort`, `-direction` and `-clear-filters` had ZERO hits across
+   * the whole 306-case View Lab registry and no assertion anywhere: every frame photographs
+   * this bar at rest. So a typed search, both non-default sort keys, the descending direction,
+   * the filtered-to-nothing hero and the inert direction toggle were all shipped states that
+   * nothing in this repository had ever rendered.
+   *
+   * These drive each of them through the controls a GM uses rather than through the frame's
+   * state prop, because the defect class the coverage gap hides is a control WIRED to nothing.
+   */
+  describe('the filter, sort and direction controls (issue 1373)', () => {
+    /**
+     * The row ids currently on the page, in the order they are drawn.
+     *
+     * @param {HTMLElement} target
+     * @returns {string[]}
+     */
+    function rowIds(target) {
+      return [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+        row.getAttribute('data-scoped-list-row')
+      );
+    }
+
+    /**
+     * Type into the toolbar's search box.
+     *
+     * @param {HTMLElement} target
+     * @param {string} value
+     * @returns {Promise<void>}
+     */
+    async function search(target, value) {
+      const input = target.querySelector('[data-scoped-list-search]');
+      assert.ok(Boolean(input), 'the toolbar still carries a search box');
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await harness.setProps({});
+    }
+
+    /**
+     * Choose a sort key from the toolbar's select.
+     *
+     * @param {HTMLElement} target
+     * @param {string} value
+     * @returns {Promise<void>}
+     */
+    async function sortBy(target, value) {
+      const select = target.querySelector('[data-scoped-list-sort]');
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await harness.setProps({});
+    }
+
+    it('narrows the list as a GM types, and says so in the count', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      assert.deepEqual(rowIds(target).sort(), ['hammer', 'orphan']);
+      assert.match(
+        target.querySelector('[data-scoped-list-count]').textContent,
+        /2 of 2 tools/,
+        'the resting count states the filtered set against the corpus'
+      );
+
+      await search(target, 'awl');
+      assert.deepEqual(rowIds(target), ['orphan'], 'the search reaches the rows');
+      assert.match(
+        target.querySelector('[data-scoped-list-count]').textContent,
+        /1 of 2 tools/,
+        'and the count says how many the filter is hiding, which is the pair it exists for'
+      );
+    });
+
+    it('draws the filtered-to-nothing hero, and its Clear filters puts the list back', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      await search(target, 'nothing matches this');
+
+      const hero = target.querySelector('[data-scoped-list-state="filtered"]');
+      assert.ok(Boolean(hero), 'a search matching nothing states WHY the list is empty');
+      assert.ok(
+        !target.querySelector('[data-scoped-list-state="empty"]'),
+        'and it is the filtered hero, not the `No Tools yet` one - the catalogue is not empty'
+      );
+
+      const clear = target.querySelector('[data-scoped-list-clear-filters]');
+      assert.ok(Boolean(clear), 'and it offers the one action that resolves the state');
+      clear.click();
+      await harness.setProps({});
+      assert.deepEqual(rowIds(target).sort(), ['hammer', 'orphan'], 'Clear filters is wired');
+      assert.equal(
+        target.querySelector('[data-scoped-list-search]').value,
+        '',
+        'and it empties the box a GM would otherwise have to clear by hand'
+      );
+    });
+
+    it('reorders on BOTH non-default keys and on the direction, glyph included', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      const direction = target.querySelector('[data-scoped-list-direction]');
+
+      assert.deepEqual(rowIds(target), ['hammer', 'orphan'], 'name ascending');
+      assert.equal(direction.getAttribute('data-scoped-list-direction'), 'asc');
+      const ascendingGlyph = direction.querySelector('i').className;
+
+      direction.click();
+      await harness.setProps({});
+      assert.deepEqual(rowIds(target), ['orphan', 'hammer'], 'name descending');
+      assert.match(direction.textContent, /Desc/);
+      // THE GLYPH TURNS WITH IT. `proto:1971` binds this icon to a per-direction value; it drew
+      // one arrow in both positions, so the descending state asserted the ascending order.
+      assert.notEqual(
+        direction.querySelector('i').className,
+        ascendingGlyph,
+        'the direction glyph is the same in both positions'
+      );
+
+      direction.click();
+      await harness.setProps({});
+      await sortBy(target, 'systems');
+      // `orphan` is in no system and `hammer` is in one, so the membership key is a genuinely
+      // different order from the name key rather than the same one under another label.
+      assert.deepEqual(rowIds(target), ['orphan', 'hammer'], 'fewest systems first');
+      target.querySelector('[data-scoped-list-direction]').click();
+      await harness.setProps({});
+      assert.deepEqual(rowIds(target), ['hammer', 'orphan'], 'most systems first');
+    });
+
+    it('goes INERT, visibly, against the lane sort that owns its own whole order', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      assert.equal(
+        target.querySelector('[data-scoped-list-direction]').disabled,
+        false,
+        'the toggle is live against a built-in key'
+      );
+
+      await sortBy(target, 'break-asc');
+      const direction = target.querySelector('[data-scoped-list-direction]');
+      // A lane descriptor supplies ONE `compare`, not a pair, so composing a direction onto its
+      // id would produce an id the model does not know and fall back silently to name order.
+      // `disabled` - never hidden - is what lets a GM see that reversing is what the control
+      // does and that it cannot be reversed here.
+      assert.equal(direction.disabled, true, 'the toggle states its own inertness');
+      assert.ok(Boolean(direction.querySelector('span').textContent.trim()), 'and keeps its label');
+      assert.deepEqual(
+        rowIds(target),
+        ['hammer', 'orphan'],
+        'the lane order is what the list is actually in'
+      );
+    });
   });
 });

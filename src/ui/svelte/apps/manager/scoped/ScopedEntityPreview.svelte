@@ -131,12 +131,25 @@
     <ul class={`${classPrefix}-rules`}>
       {#each rules as rule (rule.id)}
         <li {...ruleAttributes(rule)}>
+          <!-- `density="rule"` IS THE VARIANT THIS ROW IS, and it already shipped unasked-for
+               (issue 1373). `IconFactRow` publishes it for exactly "the reference's
+               EFFECTIVE-RULES inset on the two Tool inspector rails", and this shell has exactly
+               two callers, both of which ARE those rails: the world Tool entry's and
+               `tools/ToolBehaviorPreview`'s. Taking the default missed five of the six values
+               `proto:2559` states - gap 10, padding 10/11, radius 10, an 11.5px/600 title and a
+               9.5px `--fab-text-subtle` note - and missed the FILL by a rung, raising the inset
+               where `proto:2014` recesses it below the aside that holds it.
+
+               It is stated here rather than made a prop because it is a fact about the ROW, not
+               about a caller's surface the way `tile` is: both callers draw the same effective-
+               rules inset, so a prop would be one value passed twice. -->
           <IconFactRow
             icon={rule.icon}
             title={rule.title}
             subtitle={rule.subtitle}
             titleAttr={rule.titleAttr || ''}
             tile={ruleTile}
+            density="rule"
           />
         </li>
       {/each}

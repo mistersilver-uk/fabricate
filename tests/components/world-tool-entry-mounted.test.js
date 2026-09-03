@@ -826,9 +826,9 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       // Comments are stripped first: a `{` inside one would split a rule at the wrong place and
       // the gate would report a missing rule that is present.
-      const rules = [...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
-        ([, selector, body]) => ({ selector: selector.trim().replaceAll(/\s+/g, ' '), body })
-      );
+      const rules = [
+        ...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g),
+      ].map(([, selector, body]) => ({ selector: selector.trim().replaceAll(/\s+/g, ' '), body }));
       const serif = rules.find(
         ({ selector, body }) =>
           selector.includes('.manager-item-drop-zone-copy strong') &&
@@ -1029,7 +1029,10 @@ describe('the world Tool entry (issue 1373)', () => {
       });
 
       const rows = [...target.querySelectorAll('[data-tool-prerequisite-row]')];
-      assert.deepEqual(rows.map((row) => row.dataset.toolPrerequisiteRow), ['trained', 'strong']);
+      assert.deepEqual(
+        rows.map((row) => row.dataset.toolPrerequisiteRow),
+        ['trained', 'strong']
+      );
       assert.deepEqual(
         rows.map((row) => row.classList.contains('manager-modifier-readonly-row')),
         [true, true],
@@ -1062,10 +1065,7 @@ describe('the world Tool entry (issue 1373)', () => {
       // `legendVisible` is what paints `RadioCardGroup`'s own legend, by adding
       // `is-legend-visible` to the fieldset; the `<legend>` element is present either way and
       // carries the group's accessible name, which is the part that must survive.
-      assert.ok(
-        !card.querySelector('.is-legend-visible'),
-        'the gate pair paints no heading'
-      );
+      assert.ok(!card.querySelector('.is-legend-visible'), 'the gate pair paints no heading');
       assert.equal(
         card.querySelector('.manager-resolution-mode-legend').textContent.trim(),
         'When prerequisites fail',
@@ -1695,10 +1695,7 @@ describe('the world Tool entry (issue 1373)', () => {
     // THE COUNT'S EMPTY FACE, which is a different word rather than a zero: `none yet`.
     it('states `none yet` when the repair set is empty', async () => {
       const target = await mountBreakage({ mode: 'flagBroken' });
-      assert.equal(
-        target.querySelector('[data-tool-repair-count]').textContent.trim(),
-        'none yet'
-      );
+      assert.equal(target.querySelector('[data-tool-repair-count]').textContent.trim(), 'none yet');
     });
 
     // THE CHOICE-GROUP NOTE IS THE REPAIR SENTENCE, not the recipe editor's enumeration of the
@@ -1800,7 +1797,9 @@ describe('the world Tool entry (issue 1373)', () => {
               },
               {
                 id: 'g2',
-                options: [{ quantity: 1, match: { type: 'tags', tags: ['rare'], tagMatch: 'all' } }],
+                options: [
+                  { quantity: 1, match: { type: 'tags', tags: ['rare'], tagMatch: 'all' } },
+                ],
               },
             ],
           },
@@ -1841,7 +1840,9 @@ describe('the world Tool entry (issue 1373)', () => {
               },
               {
                 id: 'g2',
-                options: [{ quantity: 1, match: { type: 'essence', essenceId: 'sm-fire', amount: 2 } }],
+                options: [
+                  { quantity: 1, match: { type: 'essence', essenceId: 'sm-fire', amount: 2 } },
+                ],
               },
               {
                 id: 'g3',
@@ -1878,6 +1879,142 @@ describe('the world Tool entry (issue 1373)', () => {
       const target = await mountBreakage({ mode: 'destroy' });
       assert.ok(!target.querySelector('[data-tool-replacement-target]'));
       assert.ok(!target.querySelector('[data-tool-repair-requirements]'));
+    });
+  });
+
+  /**
+   * ── `Unlimited uses` IS AUTHORABLE, AND THE STEPPER NO LONGER DESTROYS IT ────────────────
+   *
+   * The world half of issue 1373's four-choice split. `breakage.mode: 'limitedUses'` carries
+   * TWO answers: a number, and `maxUses: null`, which `src/models/Tool.js` has always defined
+   * as UNLIMITED. The system editor split them into four radio cards in this same issue; world
+   * scope kept three, selected them off `breakage.mode` alone, and drew the null through a
+   * `?? 1` fallback into a `min={1}` stepper.
+   *
+   * That produced THREE ANSWERS TO ONE FIELD on the screen at once — `Limited uses` on the
+   * card, `1` in the stepper, `Unlimited uses` in the summary directly under it — and a fourth
+   * in the Validation tab, which reported the world's own default state as a warning. Worst of
+   * all, `min={1}` meant no reachable stepper value put the `null` back: a GM who nudged the
+   * control converted an unlimited Tool into a one-use Tool for EVERY system inheriting it.
+   *
+   * It is the FIRST-RUN state, not an edge case — a Tool made by dropping an Item defaults to
+   * `limitedUses` / `null` — which is why every one of these cases opens on that record.
+   */
+  describe('the unlimited world default (issue 1373)', () => {
+    const UNLIMITED = { breakage: { mode: 'limitedUses', maxUses: null } };
+
+    /**
+     * The one selected breakage card's value.
+     *
+     * @param {HTMLElement} target
+     * @returns {string}
+     */
+    function selectedChoice(target) {
+      const chosen = [...target.querySelectorAll('[data-world-tool-entry-breakage-mode]')].find(
+        (option) => option.querySelector('input[type="radio"]')?.checked === true
+      );
+      return chosen?.getAttribute('data-world-tool-entry-breakage-mode') ?? '';
+    }
+
+    it('selects `Unlimited uses` rather than `Limited uses` with nothing behind it', async () => {
+      const target = await mountTab({ scope: scopeFor(UNLIMITED), tab: 'breakage' });
+
+      assert.deepEqual(
+        [...target.querySelectorAll('[data-world-tool-entry-breakage-mode]')].map((option) =>
+          option.getAttribute('data-world-tool-entry-breakage-mode')
+        ),
+        ['unlimited', 'limitedUses', 'breakageChance', 'diceExpression'],
+        'the world editor offers the same FOUR choices the system editor does'
+      );
+      assert.equal(selectedChoice(target), 'unlimited');
+      assert.ok(
+        !target.querySelector('[data-world-tool-entry-max-uses]'),
+        'the unlimited state configures nothing, so it draws no uses stepper to contradict'
+      );
+    });
+
+    it('says the same thing on the card, in the summary and in the rail', async () => {
+      const target = await mountTab({ scope: scopeFor(UNLIMITED), tab: 'breakage' });
+      const chosen = target.querySelector('[data-world-tool-entry-breakage-mode="unlimited"]');
+      assert.match(chosen.textContent, /Unlimited uses/);
+      assert.match(
+        target.querySelector('[data-world-tool-entry-breakage-summary]').textContent,
+        /Unlimited uses/,
+        'the summary under the cards used to disagree with the card above it'
+      );
+      assert.match(
+        target.querySelector('[data-tool-preview-breakage]').textContent,
+        /Unlimited uses/,
+        'and the rail beside them, which always read this state correctly'
+      );
+    });
+
+    it('reports the world default state as complete rather than as a warning', async () => {
+      const target = await mountTab({ scope: scopeFor(UNLIMITED), tab: 'validation' });
+      const row = target.querySelector('[data-world-tool-entry-check="breakage-value"]');
+      assert.ok(Boolean(row), 'the breakage-value check still runs');
+      assert.equal(
+        row.className.includes('is-warn') || row.className.includes('is-warning'),
+        false,
+        'an authored `Unlimited uses` was reported as a mode with no value behind it'
+      );
+      assert.match(
+        row.textContent,
+        /The breakage mode has a value/,
+        'and the row states the passing wording rather than the missing one'
+      );
+    });
+
+    it('SEEDS `Limited uses` at 1 instead of landing back on the option just left', async () => {
+      const calls = [];
+      const target = await mountTab({
+        scope: scopeFor(UNLIMITED),
+        actions: {
+          updateWorldDefaultSection: (id, section, value) => calls.push([id, section, value]),
+        },
+        tab: 'breakage',
+      });
+      target
+        .querySelector('[data-world-tool-entry-breakage-mode="limitedUses"] input[type="radio"]')
+        .click();
+      await tick();
+
+      assert.equal(selectedChoice(target), 'limitedUses', 'the choice actually moved');
+      const stepper = target.querySelector('[data-world-tool-entry-max-uses]');
+      assert.ok(Boolean(stepper), 'and its value editor arrived with it');
+      assert.equal(stepper.value, '1', 'seeded at 1, never at the null it just left');
+
+      await flushDraft();
+      assert.deepEqual(calls.at(-1), ['pick', 'breakage', { mode: 'limitedUses', maxUses: 1 }]);
+    });
+
+    it('RESTORES the null, which is the control the screen had none of', async () => {
+      const calls = [];
+      const target = await mountTab({
+        scope: scopeFor({ breakage: { mode: 'limitedUses', maxUses: 4 } }),
+        actions: {
+          updateWorldDefaultSection: (id, section, value) => calls.push([id, section, value]),
+        },
+        tab: 'breakage',
+      });
+      assert.equal(selectedChoice(target), 'limitedUses');
+      assert.equal(target.querySelector('[data-world-tool-entry-max-uses]').value, '4');
+
+      target
+        .querySelector('[data-world-tool-entry-breakage-mode="unlimited"] input[type="radio"]')
+        .click();
+      await tick();
+
+      assert.ok(
+        !target.querySelector('[data-world-tool-entry-max-uses]'),
+        'the stepper goes with the state it configures'
+      );
+      await flushDraft();
+      assert.deepEqual(
+        calls.at(-1),
+        ['pick', 'breakage', { mode: 'limitedUses', maxUses: null }],
+        'the null a GM could not previously reach is what the choice writes'
+      );
     });
   });
 });

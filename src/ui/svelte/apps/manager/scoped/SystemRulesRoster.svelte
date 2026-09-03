@@ -397,10 +397,20 @@
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
-    /* NO FILL. The reference draws every card in the content area on the pane's own surface and
-       separates them with a 1px border alone; a fill here put a fifth grey on a screen that has
-       one. */
-    background: transparent;
+    /* AND ITS FILL (`proto:2029`), WHICH THE PANE ARGUMENT DID NOT COVER (issue 1373).
+
+       The note here read "no fill: the reference draws every card in the CONTENT AREA on the
+       pane's own surface". True of the content area, and this row is not in it - it is inside the
+       inspector aside, which is `--fab-bg-1`, so `proto:2029`'s `--bg1` recess is reachable as
+       `--fab-bg-0`. Transparent painted the row the aside's own colour and left the hairline
+       doing all the work in a column the design builds from two surfaces.
+
+       THE CARD AROUND IT STAYS UNFILLED, and that is stated rather than left as an oversight:
+       `proto:2021` draws the card at `--bg0`, a rung BELOW the row, and this theme's ramp has
+       no counterpart for it - `--fab-bg-0` is already the design's `--bg1`. So the row takes
+       the design's own absolute value and the card keeps the aside's, which is the closest this
+       ramp reaches. */
+    background: var(--fab-bg-0);
     min-width: 0;
   }
 
@@ -534,10 +544,11 @@
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
-    /* NO FILL, for the reason the row rule above gives: the reference recesses this card one
-       rung and lifts its parts one rung above it, and this route's pane is on the bottom rung
-       already — so every part of the card is drawn by its border alone. */
-    background: transparent;
+    /* AND ITS FILL (`proto:2037`), on the row rule's own corrected argument: the pager is a part
+       of the card in the ASIDE, not in the pane, so `--bg1` maps to `--fab-bg-0` and the recess
+       is reachable. The old note reasoned from "this route's pane is on the bottom rung already",
+       which is true and beside the point for an element the pane does not hold. */
+    background: var(--fab-bg-0);
     font-size: 0.62rem;
   }
 

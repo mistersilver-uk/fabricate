@@ -801,17 +801,23 @@
 
      The labels keep `flex: 1 1 0` and `min-width: 0` so the two segments stay equal width,
      which is the parity with `.manager-tools-authority-segments` the note above commits to. */
-  /* ── NO FILL, AND THAT IS MEASURED ──────────────────────────────────────────────────────
-     The design's whole content area is one flat surface, and a region reads as a region
-     because of its 1px border rather than because it is tinted. Sampled pixel by pixel out
-     of the design's own catalogue frame, its segmented track paints the PANE colour inside a
-     card one rung lighter, with a plain border doing the separation.
+  /* ── THE OBSERVATION WAS RIGHT AND THE CONCLUSION DID NOT FOLLOW (issue 1373) ───────────
+     The note here read: "sampled pixel by pixel, the design's segmented track paints the PANE
+     colour inside a card one rung lighter" - and `proto:1965` confirms it exactly, declaring
+     `background: var(--bg1)` on a track inside a `--bg2` card. `--bg1` is this theme's
+     `--fab-bg-0`, which is what `[data-manager-view='world-tools'] .manager-main` paints, so
+     the design's track really is the pane's own colour.
 
-     `--fab-overlay-dark-08` was painting a surface the design does not have, and painting it
-     faintly: sampled against our own frame it moved the track about eight units away from
-     its card, where the design has a full ramp rung. So the fill goes and the border stays.
+     What did not follow is "so the fill goes". A track with NO fill does not show the pane; it
+     shows whatever is behind it, and behind it is the card - `.manager-inspector-card`'s
+     lightening overlay. Removing the declaration therefore painted the track the CARD's colour,
+     which is the one value `proto:1965` says it is not. The rung the earlier note went looking
+     for is stated rather than inherited.
 
-     That border names `--fab-border` directly, since the legacy alias it used to be written
+     `--fab-overlay-dark-08`, the value before that, was a different miss: it moved the track
+     about eight units off its card where the design has a whole ramp rung.
+
+     The border names `--fab-border` directly, since the legacy alias it used to be written
      with was collapsed into that token (issue 1399). */
   .manager-world-tool-break-segments {
     display: flex;
@@ -821,6 +827,7 @@
     padding: var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
+    background: var(--fab-bg-0);
     min-width: 0;
   }
 
