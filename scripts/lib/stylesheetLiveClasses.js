@@ -75,25 +75,13 @@ export const LIVE_CLASS_SOURCE_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svel
  * which is what stops it from silently becoming a place to park a name and move on.
  */
 export const FOUNDRY_CORE_CLASSES = Object.freeze([
-  'application',
   'checkbox-label',
   'dialog-buttons',
-  'dialog-content',
-  'flexcol',
-  'flexrow',
-  'form-fields',
   'form-footer',
   'form-group',
   'hint',
-  'notes',
   'span-2',
-  'standard-form',
-  'tab',
-  'w3',
-  'window-app',
   'window-content',
-  'window-header',
-  'window-title',
 ]);
 
 /**
