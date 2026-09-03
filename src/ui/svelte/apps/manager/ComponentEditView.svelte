@@ -47,6 +47,24 @@
   } from './component/salvageDcPresets.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
   import IconButton from '../../components/IconButton.svelte';
+  import InheritRow from './scoped/InheritRow.svelte';
+  import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';
+  import {
+    componentAttributionNote,
+    componentCategoryInheritOffered,
+    componentCategoryNote,
+    componentTagMergeNote,
+    componentWorldScopeDisclosure,
+  } from './scoped/componentScoped.js';
+
+  /**
+   * The world entry route this screen deep-links to, through the attribution banner's own exit.
+   *
+   * A MODULE CONSTANT for the reason the browser view states beside its twin: it is the one
+   * string that decides whether the navigation resolves at all, and a token that does not
+   * resolve lands on nothing without erroring.
+   */
+  const WORLD_ENTRY_ROUTE = 'world-component-entry';
 
   let {
     component = null,
@@ -125,7 +143,65 @@
     // through confirmRouteExit — NOT `setView('component-edit')`, which no-ops without
     // a selectedSystem and would prompt the discard dialog then change nothing.
     onOpenComponent = () => {},
+    // ── THE WORLD SCOPE'S OWN PROJECTION, ITS WRITE FAMILY, AND THIS SYSTEM ──────────────────
+    // Three of the four keys the call site's component bundle spreads; `systems` stays
+    // undeclared for the reason the browser view's twin block states.
+    //
+    // `actions` IS the component write family, and it carries `setMutedTags`. This view holds a
+    // live write path to it after issue 1371 and DELIBERATELY DOES NOT USE IT: muting is
+    // authored on the world entry, and the world-tag card below is read-only. The read-only-ness
+    // is therefore a decision this file makes rather than a structural impossibility, which is
+    // why it is asserted rather than assumed.
+    scope = null,
+    actions = null,
+    systemId = '',
+    // THE DEEP LINK, through the banner's OWN exit rather than a second navigation control beside
+    // the read-only tag card. Called with the ROUTE TOKEN and the entity id.
+    onOpenWorldEntry = () => {},
   } = $props();
+
+  // ── THE WORLD LAYER THIS SYSTEM'S RULES SIT OVER ─────────────────────────────────────────
+  // Read off the world projection's own JOIN, which is the only place the INHERIT state lives:
+  // the in-system record carries the RESOLVED value and cannot tell an inherited category from
+  // an identical overriding one.
+  const worldEntry = $derived(
+    (Array.isArray(scope?.entries) ? scope.entries : []).find(
+      (entry) => String(entry?.id ?? '') === String(component?.id ?? '')
+    ) ?? null
+  );
+  const worldSystemRow = $derived(
+    (Array.isArray(worldEntry?.systems) ? worldEntry.systems : []).find(
+      (row) => row?.systemId === systemId
+    ) ?? null
+  );
+  const worldCategory = $derived(String(worldEntry?.defaults?.category ?? '').trim());
+  const worldTags = $derived(
+    Array.isArray(worldEntry?.defaults?.tags) ? worldEntry.defaults.tags : []
+  );
+  const worldMutedTags = $derived(
+    Array.isArray(worldSystemRow?.mutedTags) ? worldSystemRow.mutedTags : []
+  );
+  const worldMember = $derived(worldSystemRow?.member === true);
+  // AN ABSENT `inherit` KEY READS AS INHERITING, matching the resolver: that is the state a
+  // record created by "add to this system" is in.
+  const categoryInheriting = $derived(worldSystemRow?.inherited?.category !== false);
+  // THE OPTION IS WITHHELD WHEN NO WORLD VALUE IS AUTHORED. Offering it would label the control
+  // with an empty world value, and flipping it resolves back to the in-system value anyway — a
+  // control that changes nothing while looking as though it did.
+  const categoryInheritOffered = $derived(
+    worldMember && componentCategoryInheritOffered(worldCategory)
+  );
+  const categoryLocked = $derived(categoryInheritOffered && categoryInheriting);
+  const categoryNote = $derived(
+    componentCategoryNote(
+      {
+        worldCategory,
+        inheriting: categoryInheriting,
+        systemName: String(worldSystemRow?.systemName ?? systemId),
+      },
+      format
+    )
+  );
 
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
@@ -225,6 +301,22 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  /**
+   * The interpolating localizer the shared component-scope model takes.
+   *
+   * @param {string} key
+   * @param {string} fallback
+   * @param {object} [data]
+   * @returns {string}
+   */
+  function format(key, fallback, data) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(data ?? {})) {
+      result = result.replaceAll(`{${token}}`, String(value));
+    }
+    return result;
   }
 
   // `general` first, then the system's authored vocabulary. The reserved bucket is
@@ -974,6 +1066,38 @@
       {onCopySourceUuid}
     />
 
+    <!--
+      THE CATALOGUE ATTRIBUTION BANNER, in its editor shape: it says where identity is authored
+      AND that everything below belongs to this system alone, which is the split this whole screen
+      is organised around. Its count is CLAMPED at zero, so a component with no membership record
+      reads `0 other systems` rather than `-1`.
+
+      ITS EXIT IS THE SCREEN'S ONE ROUTE TO THE WORLD ENTRY. The read-only world-tag card below
+      deliberately carries no navigation control of its own: two ways out to the same place, one
+      of them beside a card that looks editable, is how a GM learns to expect the card to be.
+    -->
+    {#if worldEntry}
+      <SharedDefinitionCallout
+        name={worldEntry.entity?.name || component?.name || worldEntry.id}
+        icon="fas fa-cube"
+        pillLabel={text('FABRICATE.Admin.Manager.Scoped.Component.WorldPill', 'World definition')}
+        note={componentAttributionNote(
+          {
+            surface: 'editor',
+            memberCount: Number(worldEntry.membershipCount) || 0,
+            systemName: String(worldSystemRow?.systemName ?? systemId),
+          },
+          format
+        )}
+        actionLabel={text(
+          'FABRICATE.Admin.Manager.Component.OpenSharedDefinition',
+          'Edit shared definition'
+        )}
+        disabled={saving}
+        onOpen={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, worldEntry.id)}
+      />
+    {/if}
+
     <!-- Heading LEFT, control RIGHT, on one line (issue 676). A label stacked above a
          full-width select made a one-word choice occupy a whole panel and read as the
          start of a form; the category is a single inline decision, so it renders as one.
@@ -994,23 +1118,109 @@
             )}
           </p>
         </div>
+        <!--
+          THE VALUE IS LOCKED WHILE THE SECTION IS INHERITED, and that is not decoration: the
+          read union applies an inheriting `category` from the world default AFTER the in-system
+          re-spread, so a value typed here while inheriting is discarded on the very next read.
+          An editable control over a value the system does not own offers a change that silently
+          does not happen.
+        -->
         <select
           class="manager-input manager-component-inline-control"
-          value={categoryDraft}
+          value={categoryLocked ? worldCategory : categoryDraft}
           data-component-edit-category
+          data-component-edit-category-locked={categoryLocked}
           aria-label={text(
             'FABRICATE.Admin.Manager.Component.Category.Label',
             'Component category'
           )}
           onchange={(event) => setCategory(event.currentTarget.value)}
-          disabled={saving}
+          disabled={saving || categoryLocked}
         >
-          {#each effectiveCategoryOptions as option (option)}
-            <option value={option}>{categoryLabel(option)}</option>
-          {/each}
+          {#if categoryLocked}
+            <option value={worldCategory}>{categoryLabel(worldCategory)}</option>
+          {:else}
+            {#each effectiveCategoryOptions as option (option)}
+              <option value={option}>{categoryLabel(option)}</option>
+            {/each}
+          {/if}
         </select>
       </div>
+      <!--
+        THE INHERIT SWITCH, which is REAL: it decides which layer answers, and the answer changes
+        when the world default moves. It is WITHHELD entirely when no world value is authored —
+        see `categoryInheritOffered` — so this system is never offered a parent that does not
+        exist. It is gated on membership too, because the write refuses silently without one.
+      -->
+      {#if categoryInheritOffered}
+        <InheritRow
+          entityType="component"
+          section="category"
+          inherited={{ category: categoryInheriting }}
+          notes={{ category: categoryNote.text }}
+          disabled={saving}
+          onToggle={(section, overridden) =>
+            actions?.setSectionInherited?.(component?.id, systemId, section, !overridden)}
+        />
+      {:else}
+        <p
+          class="manager-muted manager-component-cat-note"
+          data-component-edit-category-note={categoryNote.state}
+        >
+          <i class={categoryNote.icon} aria-hidden="true"></i>
+          <span>{categoryNote.text}</span>
+        </p>
+      {/if}
     </section>
+
+    <!--
+      THE WORLD TAG LIST, READ-ONLY, beside the disclosure that explains why.
+
+      IT IS A CARD OF ITS OWN and never the writable in-system tag card below: those chips are
+      real toggles BY DESIGN and write `updates.tags` on the IN-SYSTEM record, so world tags
+      rendered into them would look like the same kind of thing and write the wrong record.
+
+      NOTHING HERE IS A BUTTON. Muting is authored on the world entry, which is where the world
+      tag list and its exceptions are visible together and where the projection reads the mute
+      state back. This card shows the state where a GM looks for it and routes them there through
+      the banner's exit above.
+    -->
+    {#if worldEntry && worldTags.length > 0}
+      <section class="manager-component-panel" data-component-edit-section="world-tags">
+        <div class="manager-task-card-heading">
+          <div>
+            <h3>
+              {text('FABRICATE.Admin.Manager.Component.WorldTags.Title', 'World tags')}
+            </h3>
+            <p class="manager-muted">
+              {componentTagMergeNote(
+                {
+                  effective: tagDraft.filter((option) => option.checked).length,
+                  muted: worldMutedTags.length,
+                },
+                format
+              )}
+            </p>
+          </div>
+        </div>
+        <div class="manager-component-tag-run" data-component-edit-world-tags>
+          {#each worldTags as tag (tag)}
+            <!-- NOT `tag="button"`, and NOT `disabled`: `Chip`'s `is-disabled` is joined to the
+                 WARNING family and would paint a muted tag amber, reading as a hazard the GM
+                 must act on. `muted` is the tone that means exactly "dimmed and not in play". -->
+            <Chip
+              tone={worldMutedTags.includes(tag) ? 'muted' : 'info'}
+              icon={worldMutedTags.includes(tag) ? 'fas fa-eye-slash' : 'fas fa-earth-americas'}
+              data-component-edit-world-tag={tag}
+              data-component-world-tag-muted={worldMutedTags.includes(tag)}>{tag}</Chip
+            >
+          {/each}
+        </div>
+        <p class="manager-muted" data-component-edit-world-tags-note>
+          {componentWorldScopeDisclosure(format)}
+        </p>
+      </section>
+    {/if}
 
     {#if showDifficulty}
       <!-- "This component's Progressive DC" (issue 676). Rehomed out of the deleted
@@ -2167,5 +2377,20 @@
      the title above already takes the free space in this band. */
   .manager-salvage-stage-complications-head .manager-salvage-stage-edit {
     flex: 0 0 auto;
+  }
+  /* THE UNAUTHORED-WORLD-VALUE BRANCH of the category note (issue 1371). It renders only where
+     no inherit switch is offered, so it is the row's whole explanation rather than a caption
+     under a control. Static class name, so `lint:svelte:warnings` stays at zero. */
+  .manager-component-cat-note {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  .manager-component-cat-note i {
+    color: var(--fab-text-subtle);
   }
 </style>

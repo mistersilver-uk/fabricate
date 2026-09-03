@@ -68,7 +68,10 @@
     toBulkRecipeEdit,
   } from '../../../../utils/recipeBulkEditModel.js';
   import { createEssenceBrowserState } from '../../../../utils/essenceBrowserModel.js';
-  import { createManagerBrowserViewStates } from '../../../../utils/managerBrowserViewState.js';
+  import {
+    createManagerBrowserViewStates,
+    createScopedListBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
   import {
     createEssenceBulkDraft,
     toBulkEssenceEdit,
@@ -467,6 +470,12 @@
   // about — Knowledge and Grant access — are exactly this case: their parents survive every
   // in-surface interaction and die on the route change.
   let managerBrowserState = $state(createManagerBrowserViewStates());
+  // THE WORLD COMPONENT CATALOGUE'S LIST SLOT (issue 1371), seeded HERE rather than added to the
+  // shared factory, which this change does not open. It is the same `createScopedListBrowserState`
+  // shape the world essence catalogue's slot holds, so the catalogue's search, filters, sort and
+  // page survive the trip out to an entry and back exactly as its sibling's do. A follow-up moves
+  // the key onto the factory beside the other thirteen.
+  managerBrowserState.worldComponentCatalogue = createScopedListBrowserState();
   // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings
   // are: the panel is unmounted the moment the selection empties, so a panel-owned draft
   // would be destroyed by the very transition that is supposed to DISCARD it.
@@ -882,8 +891,17 @@
   // record read `No description` while wearing a `Linked` chip — and the entry's linked-item card
   // could show neither the live name nor the live art. Those two screens are exactly where the
   // link is authored, so they are the ones that most need to resolve it.
+  // THE TWO WORLD COMPONENT SCREENS JOIN THE SET (issue 1371), for exactly the reason the two
+  // world Tool screens did: both AUTHOR the link between a world record and a game-world Item —
+  // the catalogue's create-from-drop zone resolves one, the entry's card re-points one — and a
+  // `worldItems` prop handed over without extending this derived is an EMPTY ARRAY, which is the
+  // defect the note above records rather than a hypothetical.
   const needsWorldItemOptions = $derived(
-    isToolStudioRoute || currentView === 'world-tools' || currentView === 'world-tool-entry'
+    isToolStudioRoute ||
+      currentView === 'world-tools' ||
+      currentView === 'world-tool-entry' ||
+      currentView === 'world-components' ||
+      currentView === 'world-component-entry'
   );
 
   $effect(() => {
@@ -3385,6 +3403,89 @@
   }
 
   /**
+   * THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371), in the shape both siblings already
+   * report: a LIVE handle the route-exit guard reads at the moment of a click, and a separate
+   * reactive dirty flag because a disabled attribute has to re-render and the handle deliberately
+   * never does.
+   *
+   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+   */
+  let worldComponentEntryHandle = null;
+  let worldComponentEntryDirty = $state(false);
+  let worldComponentEntrySaving = $state(false);
+
+  function handleWorldComponentEntryDraft(handle) {
+    worldComponentEntryHandle = handle ?? null;
+    if (!handle) worldComponentEntryDirty = false;
+  }
+
+  function handleWorldComponentEntryDirty(dirty) {
+    worldComponentEntryDirty = dirty === true;
+  }
+
+  /**
+   * The world component entry's header `Delete`, reported by the page as an ACTION DESCRIPTOR.
+   *
+   * The page owns the labels, the consequence sentences and — uniquely on this entity type — the
+   * REFUSAL, because all three are derived from values only the editor holds. This half is the arm
+   * token, which is the shell's because exactly one armed control at a time is a window-wide
+   * invariant and this is where that invariant already lives.
+   *
+   * @type {{token: string, label: string, armedLabel: string, idleAriaLabel: string,
+   *   armedAriaLabel: string, run: () => Promise<void>}|null}
+   */
+  let worldComponentEntryDelete = $state(null);
+  let worldComponentEntryDeleteArmed = $state('');
+
+  function handleWorldComponentEntryDelete(descriptor) {
+    worldComponentEntryDelete = descriptor ?? null;
+    if (!descriptor) worldComponentEntryDeleteArmed = '';
+  }
+
+  /**
+   * Flush the world component entry editor's buffered edit.
+   *
+   * Same contract as its two siblings: it answers whether the write landed, because the
+   * route-exit guard gates navigation on it — a Save a write refused must leave the GM on the
+   * editor with the edit still in front of them.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveWorldComponentEntry() {
+    if (!worldComponentEntryHandle) return false;
+    worldComponentEntrySaving = true;
+    try {
+      return (await worldComponentEntryHandle.save()) !== false;
+    } finally {
+      worldComponentEntrySaving = false;
+    }
+  }
+
+  /**
+   * The world component entry editor's route-exit prompt.
+   *
+   * Re-entering the SAME component is not leaving it, so it never prompts — `world-component-entry`
+   * is one of the routes whose view token does not change when its subject does, which is exactly
+   * what `nextRouteId` exists for.
+   *
+   * @param {string} nextView
+   * @param {string} nextRouteId
+   * @returns {boolean|Promise<boolean>}
+   */
+  function confirmWorldComponentEntryRouteExit(nextView, nextRouteId = '') {
+    if (activeView !== 'world-component-entry') return true;
+    if (nextView === 'world-component-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
+      return true;
+    }
+    return confirmScopedEntryExit({
+      dirty: worldComponentEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyComponentDraft?.(),
+      save: () => saveWorldComponentEntry(),
+      discard: () => worldComponentEntryHandle?.discard?.(),
+    });
+  }
+
+  /**
    * Flush the world essence entry editor's buffered edit.
    *
    * Answers whether it landed, because the route-exit guard gates navigation on it: a Save that a
@@ -3507,6 +3608,25 @@
     if (!systemId) return false;
     return afterTruthyResult(selectSystem(systemId, 'tools'), () => {
       activeView = 'tools';
+    });
+  }
+
+  /**
+   * Open one crafting system's COMPONENT RULES list, from a world catalogue row (issue 1371).
+   *
+   * The twin of `openSystemEssenceRules` and `openSystemToolRules`, and it takes the same
+   * two-argument shape the shell's `onOpenSystemRules` seam declares: the entity id is accepted
+   * and deliberately unused, because the rules list opens on the system's whole component library
+   * rather than on one component.
+   *
+   * @param {string} _entityId the component the row belongs to; see above.
+   * @param {string} systemId the crafting system whose rules to open.
+   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   */
+  function openSystemComponentRules(_entityId, systemId) {
+    if (!systemId) return false;
+    return afterTruthyResult(selectSystem(systemId, 'components'), () => {
+      activeView = 'components';
     });
   }
 
@@ -4766,6 +4886,22 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  /**
+   * The interpolating localizer, for the notices this shell composes itself.
+   *
+   * @param {string} key
+   * @param {string} fallback
+   * @param {object} [data]
+   * @returns {string}
+   */
+  function format(key, fallback, data) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(data ?? {})) {
+      result = result.replaceAll(`{${token}}`, String(value));
+    }
+    return result;
+  }
+
   function updateSelectedGatheringRules(updates) {
     if (!selectedSystemId) return;
     store.updateGatheringRules?.(selectedSystemId, updates);
@@ -5764,10 +5900,28 @@
     const toolEntryConfirmed = confirmWorldToolEntryRouteExit(nextView, nextRouteId);
     if (isPromise(toolEntryConfirmed)) {
       return toolEntryConfirmed.then((value) =>
-        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+        value === false ? false : confirmWorldComponentEntryExitThenRest(nextView, nextRouteId)
       );
     }
     if (toolEntryConfirmed === false) return false;
+    return confirmWorldComponentEntryExitThenRest(nextView, nextRouteId);
+  }
+
+  // THE THIRD ENTRY EDITOR IN THE SAME CHAIN (issue 1371). Added as its own link rather than
+  // folded into either sibling, on the reason the chain's own note gives: each is gated on its
+  // own `activeView` and the three routes are mutually exclusive, so exactly one of them can
+  // answer anything but a synchronous `true` and the chain costs one comparison per link.
+  //
+  // WITHOUT IT AN UNSAVED COMPONENT EDIT IS LOST IN SILENCE by the rail, the breadcrumb and the
+  // header Back alike — all three navigate through this one gate.
+  function confirmWorldComponentEntryExitThenRest(nextView, nextRouteId = '') {
+    const componentEntryConfirmed = confirmWorldComponentEntryRouteExit(nextView, nextRouteId);
+    if (isPromise(componentEntryConfirmed)) {
+      return componentEntryConfirmed.then((value) =>
+        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+      );
+    }
+    if (componentEntryConfirmed === false) return false;
     return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
   }
 
@@ -8347,6 +8501,187 @@
     return patched === true;
   }
 
+  /**
+   * Whether a uuid names an Item EMBEDDED in another document (issue 1371).
+   *
+   * ── WHY THIS IS NOT A PREFIX TEST ───────────────────────────────────────────────────────
+   * Foundry composes an embedded uuid as `<parentUuid>.Item.<id>`, so the shapes are
+   * `Actor.a.Item.b`, `Scene.s.Token.t.Actor.a.Item.b` for an unlinked token's sheet, and
+   * `Compendium.p.Actor.a.Item.b`. A `startsWith('Actor.')` test catches only the first, and the
+   * token shape is exactly the one a GM reaches by dragging off a token sheet.
+   *
+   * ── AND WHY THE REASON IS NOT ROSTER MEMBERSHIP ─────────────────────────────────────────
+   * A compendium uuid is equally absent from the world Item roster and this zone ACCEPTS it. The
+   * reason is that an embedded Item is a per-actor — and for an unlinked token, per-scene-instance
+   * — COPY rather than a world-addressable definition source: its uuid dies with its parent, while
+   * a compendium Item resolves on every client.
+   *
+   * ── IT FAILS CLOSED ─────────────────────────────────────────────────────────────────────
+   * An unparseable uuid is REFUSED, not accepted. The fail-open idiom is right for a snapshot and
+   * wrong for a refusal: a parse that threw and was read as "not embedded" would admit exactly the
+   * payloads this gate exists to turn away. The parser reads three globals unguarded, which is why
+   * this lives here rather than in a pure module.
+   *
+   * @param {string} uuid
+   * @returns {boolean}
+   */
+  function isEmbeddedItemUuid(uuid) {
+    const parseUuid = globalThis.foundry?.utils?.parseUuid;
+    if (typeof parseUuid !== 'function') return true;
+    try {
+      return Number(parseUuid(uuid)?.embedded?.length) > 0;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * The world component whose source-link fields already name one Item, or `null`.
+   *
+   * Matched through `getItemMatchUuids` over the record's THREE source fields, never by comparing
+   * `registeredItemUuid` alone: a re-pointed link keeps the previous uuid as an ALIAS, so an
+   * equality test on one field mints a duplicate for exactly the records a GM has already tidied.
+   *
+   * @param {string} uuid The resolved source Item uuid.
+   * @returns {object|null}
+   */
+  function worldComponentForSourceItem(uuid) {
+    const needle = String(uuid ?? '').trim();
+    if (!needle) return null;
+    return (
+      (worldScopeState.component?.entries ?? []).find((entry) =>
+        getItemMatchUuids(entry?.entity).includes(needle)
+      ) ?? null
+    );
+  }
+
+  /**
+   * Create a WORLD component from an Item dropped on the world Component Catalogue, and open its
+   * entry (issue 1371).
+   *
+   * ── IT RESOLVES BEFORE IT MINTS ─────────────────────────────────────────────────────────
+   * `worldScopeActions.createEntity` dedupes on the entity id and the id is fresh every time, so
+   * an unresolved drop turns one game-world Item into two world components with identical
+   * identity, and nothing on any screen says which one a recipe means. A MATCH navigates and says
+   * so, rather than silently doing nothing.
+   *
+   * ── THE SNAPSHOT COMES FROM THE SHIPPED GENERIC RESOLVER ────────────────────────────────
+   * `services.resolveToolSource` IS `resolveItemSourceSnapshot`: it answers `{uuid, name, img,
+   * description}` for any Item document, world or compendium. No new service is minted for this,
+   * and specifically not a `resolveComponentSource`, which is already bound to the tool-breakage
+   * replacement source elsewhere in the engine and would collide by name.
+   *
+   * ── AN EMBEDDED ITEM IS REFUSED ─────────────────────────────────────────────────────────
+   * See `isEmbeddedItemUuid`. This is new behaviour on ONE zone: no shipped drop path refuses an
+   * embedded payload today.
+   *
+   * ── NO INVENTED FALLBACK IMAGE ──────────────────────────────────────────────────────────
+   * `img` is written through from the resolved Item or left EMPTY. It is unvalidated, so a guessed
+   * path 404s silently and leaves a broken tile with nothing to say why.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  async function createWorldComponentFromItemDrop(data) {
+    if (!data) return false;
+    // The payload arrives UNRESOLVED — a compendium drag carries `{pack, id}` and no `uuid` at
+    // all — so the drop shape is normalised before anything reads it.
+    const uuid = resolveDropUuid(data);
+    if (!uuid) return false;
+    if (isEmbeddedItemUuid(uuid)) {
+      notifyWarn(
+        text(
+          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
+          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
+        )
+      );
+      return false;
+    }
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source) return false;
+    const sourceUuid = source.uuid || uuid;
+    const existing = worldComponentForSourceItem(sourceUuid);
+    if (existing) {
+      notifyInfo(
+        format(
+          'FABRICATE.Admin.Manager.Scoped.Component.DropExisting',
+          '{name} is already a world component, so this drop opened it instead of making a second one.',
+          { name: String(existing.entity?.name || existing.id || '') }
+        )
+      );
+      openWorldScopedEntry('world-component-entry', existing.id);
+      return true;
+    }
+    const entityId = String(store?.randomID?.() || '');
+    if (!entityId) return false;
+    const created = await store?.worldScope?.component?.createEntity?.({
+      id: entityId,
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: sourceUuid,
+      registeredItemUuid: sourceUuid,
+    });
+    if (created !== true) return false;
+    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
+    // then have to find it in. Routed through the same guard every other entry navigation uses.
+    openWorldScopedEntry('world-component-entry', entityId);
+    return true;
+  }
+
+  /**
+   * RE-POINT a world component at a different game-world Item, from the entry's own card.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  async function relinkWorldComponentSource(data) {
+    const entityId = worldScopedEntryId;
+    if (!entityId || !data) return false;
+    const uuid = resolveDropUuid(data);
+    if (!uuid) return false;
+    if (isEmbeddedItemUuid(uuid)) {
+      notifyWarn(
+        text(
+          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
+          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
+        )
+      );
+      return false;
+    }
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source) return false;
+    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: source.uuid || uuid,
+      registeredItemUuid: source.uuid || uuid,
+      aliasItemUuids: [],
+    });
+    return patched === true;
+  }
+
+  /**
+   * UNLINK a world component from its game-world Item.
+   *
+   * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
+   * `description` are what the catalogue and every system row render, so blanking them would turn
+   * an unlinked record into an unfindable one.
+   *
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   */
+  async function unlinkWorldComponentSource(entityId) {
+    if (!entityId) return false;
+    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
+      originItemUuid: null,
+      registeredItemUuid: null,
+      aliasItemUuids: [],
+    });
+    return patched === true;
+  }
+
   async function toggleFocusedToolEnabled(enabled) {
     if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
     return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
@@ -10299,7 +10634,7 @@
         So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
         fallthrough — and the other five world scoped routes stay excluded exactly as before.
       -->
-      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry'}
+      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-essence-entry'}
             <!--
@@ -10367,6 +10702,39 @@
               onBack={() => setView('world-tools')}
               onSave={saveWorldToolEntry}
               danger={worldToolEntryDelete ? worldToolDeleteAction : undefined}
+            />
+          {:else if currentView === 'world-component-entry'}
+            <!--
+              THE THIRD CALLER OF THE SAME PAIR (issue 1371). `### Scoped entity editor patterns`
+              requirement 14 makes an explicit Save MANDATORY for a world entry editor and states
+              that the pair is ONE shared component rendered by this shell, because
+              `.manager-header` is a SIBLING of `.manager-main` and no page can render into it.
+              Until this branch existed the component entry was the only entry route with no way
+              to save at all.
+
+              DELETE IS BETWEEN THEM, on the placement `### GM World Tool Screens` requirement 5
+              settled — and on this entity type it REFUSES while any system has rules for the
+              component, which is epic decision 7. The refusal itself is the PAGE's, because it is
+              derived from the membership rows only the editor holds; what this branch owns is the
+              slot and the arm token.
+
+              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit gate
+              as the rail and the breadcrumb, so an unsaved edit prompts whichever of the three
+              ways out a GM takes.
+            -->
+            <ScopedEntryHeaderActions
+              backAttribute="data-world-component-back"
+              saveAttribute="data-world-component-save"
+              backLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogueShort',
+                'Back'
+              )}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Component.Save', 'Save component')}
+              saveDisabled={!worldComponentEntryDirty}
+              saving={worldComponentEntrySaving}
+              onBack={() => setView('world-components')}
+              onSave={saveWorldComponentEntry}
+              danger={worldComponentEntryDelete ? worldComponentDeleteAction : undefined}
             />
           {:else if currentView === 'world-essences'}
             <!--
@@ -11962,12 +12330,24 @@
       <WorldComponentCataloguePage
         {...componentScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
+        onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
+        onCreateFromItemDrop={createWorldComponentFromItemDrop}
+        worldItems={worldItemOptions}
+        bind:browserState={managerBrowserState.worldComponentCatalogue}
       />
     {:else if currentView === 'world-component-entry'}
       <WorldComponentEntryPage
         {...componentScopeProps}
         entityId={worldScopedEntryId}
+        worldItems={worldItemOptions}
         onBackToCatalogue={() => setView('world-components')}
+        onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
+        onSourceDrop={relinkWorldComponentSource}
+        onUnlinkSource={() => unlinkWorldComponentSource(worldScopedEntryId)}
+        onDraftChange={handleWorldComponentEntryDraft}
+        onDirtyChange={handleWorldComponentEntryDirty}
+        onDraftIdentityChange={handleScopedEntryDraftIdentity}
+        onDeleteChange={handleWorldComponentEntryDelete}
       />
     {:else if currentView === 'world-essences'}
       <WorldEssenceCataloguePage
@@ -12549,6 +12929,7 @@
           onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
           onManageCheckPresets={openSalvageCheckPresets}
           onOpenComponent={(componentId) => editComponent(componentId)}
+          onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
           onSave={saveComponentEdit}
           onDirtyChange={(dirty) => {
             componentEditDirty = dirty;
@@ -12586,6 +12967,7 @@
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
+        onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
         onSelectionCleared={() =>
           announceBulkSelectionEmptied('components', selectionClearedAnnouncement())}
       />
@@ -15776,6 +16158,32 @@
   arrive as a descriptor over `onDeleteChange`; what lives here is the arm token, because the
   manager's invariant is one armed control at a time across the whole window.
 -->
+{#snippet worldComponentDeleteAction()}
+  <!--
+    THE ARMED CONTROL STAYS ENABLED EVEN WHEN THE DELETE WILL BE REFUSED, and that is the whole
+    point: `armedAriaLabel` is the refusal sentence, and it names the systems to remove the
+    component from first. A `disabled` button would satisfy any assertion about the call never
+    happening while leaving the GM with no explanation at all — and on a migrated world, where the
+    migration wrote a membership record for every definition in every contributing system, that is
+    every component they can reach.
+  -->
+  <ArmedDangerButton
+    token={worldComponentEntryDelete?.token ?? ''}
+    armed={Boolean(worldComponentEntryDelete?.token) &&
+      worldComponentEntryDeleteArmed === worldComponentEntryDelete.token}
+    idleLabel={worldComponentEntryDelete?.label ?? ''}
+    armedLabel={worldComponentEntryDelete?.armedLabel ?? ''}
+    idleAriaLabel={worldComponentEntryDelete?.idleAriaLabel ?? ''}
+    armedAriaLabel={worldComponentEntryDelete?.armedAriaLabel ?? ''}
+    onArm={(token) => (worldComponentEntryDeleteArmed = token)}
+    onDisarm={() => (worldComponentEntryDeleteArmed = '')}
+    onConfirm={() => {
+      worldComponentEntryDeleteArmed = '';
+      worldComponentEntryDelete?.run?.();
+    }}
+  />
+{/snippet}
+
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
     token={worldToolEntryDelete?.token ?? ''}

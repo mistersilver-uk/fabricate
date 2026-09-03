@@ -28,12 +28,42 @@
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
   } from '../../../../utils/componentCategories.js';
+  import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';
+  import {
+    componentAttributionNote,
+    componentInheritState,
+    componentMembershipFilters,
+  } from './scoped/componentScoped.js';
+
+  /**
+   * The world entry route this screen deep-links to.
+   *
+   * A MODULE CONSTANT rather than an inline literal, because it is the one string that decides
+   * whether the link resolves at all: the issue body named `world-component-edit`, which appears
+   * nowhere in the route table, and a token that does not resolve loses the breadcrumb's middle
+   * crumb and lands the navigation on nothing without erroring.
+   */
+  const WORLD_ENTRY_ROUTE = 'world-component-entry';
 
   let {
     itemCards = [],
     itemSearchTerm = '',
     selectedComponentId = '',
     selectedSystemId = '',
+    // ── THE WORLD SCOPE'S OWN PROJECTION, ITS WRITE FAMILY, AND THE SYSTEM THIS SCREEN IS ON ──
+    // Three of the four keys the call site's component bundle spreads. `systems` stays
+    // undeclared, as the sibling Tool Rules list leaves it: declaring a name the site does not
+    // pass makes the lookup fall THROUGH to the spread and turns every reader of that prop into
+    // a live subscriber to the whole bundle, including `scope`, which is a new object on every
+    // publish. All three of these ARE passed, so none of them does.
+    //
+    // `systemId` is read rather than inferred: `scope.entries[].systems[]` is the world
+    // projection's own JOIN, and picking this system's row out of it is the only way a row can
+    // state whether it INHERITS the world category or overrides it — the system's own component
+    // record carries the resolved value and cannot tell the two apart.
+    scope = null,
+    actions = null,
+    systemId = '',
     // eslint-disable-next-line no-unused-vars -- deliberately reader-less; see the note below
     selectedSystemResolutionMode = 'simple',
     // Whether the system is progressive on ANY axis that reads `component.difficulty` —
@@ -60,6 +90,10 @@
     // announcement and the focus hop belong to something that outlives both. Optional, so a
     // standalone mount clears exactly as it did.
     onSelectionCleared = null,
+    // THE DEEP LINK OUT OF THIS SCREEN, into the world entry that AUTHORS the identity the
+    // attribution banner names. Called with the ROUTE TOKEN and the entity id, because the token
+    // is the half that decides whether the navigation resolves and a page cannot route.
+    onOpenWorldEntry = () => {},
     // The filter / sort / group / paginate view-state (issue 676). The manager root
     // LIFTS this up and binds it here so it survives the editor round-trip: opening a
     // component unmounts this browser, and remounting it with the controls reset to
@@ -125,7 +159,7 @@
   // projection is page-scoped a pipeline assembled at the call site is exactly where
   // "count the array in scope" — the page — gets written.
   const model = $derived(
-    buildComponentBrowserModel(itemCards || [], {
+    buildComponentBrowserModel(cohortCards(), {
       category: ui.categoryFilter,
       essence: ui.essenceFilter,
       // Not applied as a filter here (the store searches before projecting); it feeds the
@@ -348,6 +382,158 @@
     };
   }
 
+  // ── THE WORLD PROJECTION'S PER-SYSTEM JOIN, indexed by world entity id ──────────────────
+  // Read as a Map rather than scanned per row: `scope` republishes a NEW object on every
+  // world-scope edit, and a `find` per row would walk the whole corpus once per component on
+  // every one of them.
+  const worldRowsByComponentId = $derived(
+    new Map(
+      (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => [
+        String(entry?.id ?? ''),
+        (Array.isArray(entry?.systems) ? entry.systems : []).find(
+          (row) => row?.systemId === systemId
+        ) ?? null,
+      ])
+    )
+  );
+
+  const worldEntriesById = $derived(
+    new Map(
+      (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => [
+        String(entry?.id ?? ''),
+        entry,
+      ])
+    )
+  );
+
+  /**
+   * What one row says about its relationship to the world default, or `null` when the world
+   * corpus has no record of this component and there is therefore nothing to inherit FROM.
+   *
+   * @param {string} componentId
+   * @returns {{state: string, label: string}|null}
+   */
+  function inheritState(componentId) {
+    return componentInheritState(worldRowsByComponentId.get(String(componentId || '')), format);
+  }
+
+  // ── THE THREE MEMBERSHIP FILTERS ────────────────────────────────────────────────────────
+  // `all` is the one that changes what a row IS. Search, category and essence narrow a list of
+  // THIS system's components; `All world components` widens it past them, to world records this
+  // system has no rules for at all — which is the only route on this screen to adopt a component
+  // a GM has not added yet.
+  //
+  // HELD LOCALLY RATHER THAN LIFTED, and that is a scope decision rather than a preference: the
+  // lifted browser state is minted by `createComponentBrowserState`, in a file this change does
+  // not open, so a lifted axis would be a key that object does not declare. The consequence is
+  // that this one filter resets on the editor round trip while the other five survive it; the
+  // follow-up is one field on that factory.
+  let membershipFilter = $state('in');
+
+  const systemComponentIds = $derived(
+    new Set((itemCards || []).map((item) => String(item?.id ?? '')))
+  );
+
+  /**
+   * The world records this system has NO component for, projected into a row shape of their own.
+   *
+   * They are `member: false` and carry NO category, essence, difficulty or salvage answer,
+   * because this system has authored none: everything a row states about behaviour is a
+   * MEMBERSHIP fact, and inventing one from the world default would claim rules that do not
+   * exist here.
+   */
+  const ghostRows = $derived(
+    (Array.isArray(scope?.entries) ? scope.entries : [])
+      .filter((entry) => !systemComponentIds.has(String(entry?.id ?? '')))
+      .map((entry) => ({
+        id: String(entry?.id ?? ''),
+        member: false,
+        name: entry?.entity?.name || String(entry?.id ?? ''),
+        img: entry?.entity?.img || '',
+        description: entry?.entity?.description || '',
+        search: `${entry?.entity?.name ?? ''} ${entry?.entity?.description ?? ''}`.toLowerCase(),
+      }))
+  );
+
+  const membershipFilters = $derived(
+    componentMembershipFilters(
+      {
+        members: (itemCards || []).length,
+        world: (itemCards || []).length + ghostRows.length,
+      },
+      format
+    )
+  );
+
+  /**
+   * THE GHOST HALF OF THE COHORT, after the membership segment and the search term.
+   *
+   * A superset of the member rows in every case, so every previously reachable state is reached
+   * identically: `all` widens, `in` and `over` show none of these at all.
+   *
+   * THE ZERO STATE IS GATED ON THE COHORT AND NOT ON THE RAW PROP, which is the whole point of
+   * naming this. The sibling Tool Rules list records what happens otherwise: for a system that
+   * has adopted nothing, the toolbar reads `3 shown` over a body drawing the zero state, because
+   * `itemCards.length === 0` is true and stays true whatever the segment says — and the ONE route
+   * in the product to adopt a component into an empty system becomes unreachable.
+   */
+  const visibleGhostRows = $derived(
+    membershipFilter === 'all'
+      ? ghostRows.filter((row) => {
+          const needle = String(itemSearchTerm || '')
+            .trim()
+            .toLowerCase();
+          return !needle || row.search.includes(needle);
+        })
+      : []
+  );
+
+  /**
+   * The MEMBER half of the cohort, before the model's own filter, sort and page.
+   *
+   * A FUNCTION DECLARATION rather than a `$derived`, because the browser model above is declared
+   * earlier in this file and reads it: a `const` would be in its temporal dead zone at parse
+   * order, while a hoisted function is called only when the model is first evaluated, which is
+   * during render and therefore after every top-level statement has run.
+   *
+   * @returns {object[]}
+   */
+  function cohortCards() {
+    const cards = itemCards || [];
+    if (membershipFilter !== 'over') return cards;
+    return cards.filter((item) => inheritState(item?.id)?.state === 'overridden');
+  }
+
+  const cohortRows = $derived([...cohortCards(), ...visibleGhostRows]);
+
+  /**
+   * How many of THIS system's components inherit the world category, and how many override it.
+   *
+   * `known` is the denominator and is what gates the line: a system whose components the world
+   * corpus holds no record of has nothing to inherit FROM, and a `0 inherit · 0 override` line
+   * over such a library states a relationship that does not exist rather than a missing one.
+   */
+  const inheritSummary = $derived(
+    (itemCards || []).reduce(
+      (totals, item) => {
+        const state = inheritState(item?.id)?.state;
+        if (!state) return totals;
+        return {
+          known: totals.known + 1,
+          inheriting: totals.inheriting + (state === 'inherited' ? 1 : 0),
+          overriding: totals.overriding + (state === 'overridden' ? 1 : 0),
+        };
+      },
+      { known: 0, inheriting: 0, overriding: 0 }
+    )
+  );
+
+  const bannerEntry = $derived(
+    worldEntriesById.get(String(selectedComponentId || '')) ??
+      worldEntriesById.get(String(cohortRows[0]?.id ?? '')) ??
+      null
+  );
+
   function isSelectedComponent(item) {
     return !!selectedComponentId && item.id === selectedComponentId;
   }
@@ -493,8 +679,37 @@
 -->
 <main
   class="manager-main"
+  data-component-library
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
+  <!--
+    THE CATALOGUE ATTRIBUTION BANNER. Everything a GM reads on this screen names a component
+    whose identity is authored ONE ROUTE AWAY, in the world catalogue, and shared with every
+    other system that has rules for it — so without this the screen offers no signal at all that
+    a name here is not a name this system owns.
+
+    It does NOT claim the displayed name comes from the catalogue, because under the read union
+    it does not: identity is re-derived from the in-system record on every row. It states where
+    identity is AUTHORED, and the count of other systems is CLAMPED at zero — a component with no
+    membership record would otherwise read as shared with negative one.
+  -->
+  {#if bannerEntry}
+    <SharedDefinitionCallout
+      name={bannerEntry.entity?.name || bannerEntry.id}
+      icon="fas fa-cube"
+      pillLabel={text('FABRICATE.Admin.Manager.Scoped.Component.WorldPill', 'World definition')}
+      note={componentAttributionNote(
+        { surface: 'list', memberCount: Number(bannerEntry.membershipCount) || 0 },
+        format
+      )}
+      actionLabel={text(
+        'FABRICATE.Admin.Manager.Component.OpenSharedDefinition',
+        'Edit shared definition'
+      )}
+      onOpen={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, bannerEntry.id)}
+    />
+  {/if}
+
   <section
     class="manager-component-drop-zone"
     use:dragDrop={{
@@ -582,6 +797,31 @@
     </div>
 
     <div class="manager-component-filter-row is-secondary">
+      <!--
+        THE MEMBERSHIP SEGMENT. `All world components` is the one option that changes what a row
+        IS: it widens the list past this system's own components to world records it has no rules
+        for, which is the only route on this screen to adopt one.
+      -->
+      <select
+        class="manager-component-membership-filter"
+        data-component-membership-filter
+        value={membershipFilter}
+        onchange={(event) => {
+          membershipFilter = event.currentTarget.value;
+          ui.pageIndex = 0;
+        }}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Component.MembershipFilterLabel',
+          'Filter components by world membership'
+        )}
+      >
+        {#each membershipFilters as option (option.id)}
+          <option value={option.id} data-component-membership-option={option.id}
+            >{option.label}</option
+          >
+        {/each}
+      </select>
+      <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <select
         class="manager-component-category-filter"
         data-component-category-filter
@@ -682,6 +922,21 @@
         has computed `rangeStart`/`rangeEnd` since it was written and nothing read them —
         because "6 of 6" never told the GM which page they were looking at.
       -->
+      <!--
+        WHAT THIS SYSTEM'S ROWS RESOLVE THEIR CATEGORY FROM, summarised. The per-row line the
+        design draws needs a prop on the shared row component, which this change does not open;
+        the summary and the `Overriding` filter beside it are the two surfaces that state the same
+        fact from inside this file. See the lane report's deviations.
+      -->
+      {#if inheritSummary.known > 0}
+        <span class="manager-component-inherit-summary" data-component-inherit-summary>
+          {format(
+            'FABRICATE.Admin.Manager.Component.InheritSummary',
+            '{inheriting} inherit the world category · {overriding} override it',
+            inheritSummary
+          )}
+        </span>
+      {/if}
       <span class="manager-component-count" data-component-count>
         {format('FABRICATE.Admin.Manager.Component.CountRange', '{start}–{end} of {total}', {
           start: page.rangeStart,
@@ -719,7 +974,13 @@
     class="manager-table-scroll"
     aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
   >
-    {#if (itemCards || []).length === 0}
+    <!--
+      THE ZERO STATE IS GATED ON THE COHORT, NEVER ON THE RAW PROP. See `visibleGhostRows` for
+      the measured defect that gate exists to prevent: an empty system under `All world
+      components` drew the zero state over a toolbar counting three rows, and the only route in
+      the product to adopt a component into an empty system became unreachable.
+    -->
+    {#if cohortRows.length === 0}
       <EmptyState
         icon="fas fa-box-open"
         title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
@@ -728,7 +989,7 @@
           'Drop Foundry items into this page to add components to the selected system.'
         )}
       />
-    {:else if filteredComponents.length === 0}
+    {:else if filteredComponents.length === 0 && visibleGhostRows.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the full
            empty-panel apparatus: one dashed panel says it, and Clear filters is the way
            out (the Recipe Studio's treatment). -->
@@ -785,6 +1046,58 @@
             {/each}
           </ul>
         {/if}
+
+        <!--
+          THE GHOST COHORT: world components this system has NO rules record for.
+
+          They state NO behaviour at all — no category, no essences, no difficulty, no salvage —
+          because everything a row says about behaviour is a MEMBERSHIP fact, and inventing one
+          from the world default would claim rules that do not exist here. What they carry is the
+          one verb they exist for.
+
+          ADOPTION IS TWO WRITES AND THIS CALLS ONE KEY. `actions.addToSystem` is the COMPOSED
+          verb: the published component family replaces the generic membership-only write under
+          that key, so this button writes the membership record AND the in-system record the read
+          union's row set is built from. A membership record written alone names a component no
+          reader can see.
+        -->
+        {#if visibleGhostRows.length > 0}
+          <ul
+            class="manager-component-group-body manager-component-ghost-body"
+            role="list"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Component.GhostListLabel',
+              'World components this system has no rules for'
+            )}
+          >
+            {#each visibleGhostRows as ghost (ghost.id)}
+              <li class="manager-component-ghost-row" data-component-ghost-row={ghost.id}>
+                <span class="manager-component-ghost-identity">
+                  <span class="manager-component-ghost-name">{ghost.name}</span>
+                  <span class="manager-muted manager-component-ghost-note"
+                    >{text(
+                      'FABRICATE.Admin.Manager.Component.GhostNote',
+                      'No rules in this system yet'
+                    )}</span
+                  >
+                </span>
+                <ManagerButton
+                  role="primary"
+                  data-component-ghost-add={ghost.id}
+                  aria-label={format(
+                    'FABRICATE.Admin.Manager.Component.GhostAddNamed',
+                    'Add {name} to this system',
+                    { name: ghost.name }
+                  )}
+                  onclick={() => actions?.addToSystem?.(ghost.id, systemId)}
+                >
+                  <i class="fas fa-plus" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.Manager.Component.GhostAdd', 'Add')}</span>
+                </ManagerButton>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
     {/if}
   </section>
@@ -800,3 +1113,58 @@
     }}
   />
 </main>
+
+<style>
+  /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
+     stays at zero. Everything this view drew before issue 1371 keeps its rules in
+     `styles/fabricate.css`; only the two surfaces this change ADDS are declared here, which is
+     where a per-component override belongs — a component's `css: 'injected'` block lands
+     UNLAYERED and therefore beats the host sheet at any specificity, so a rule authored in both
+     places would silently resolve here anyway. */
+
+  .manager-component-inherit-summary {
+    margin-left: auto;
+    color: var(--fab-text-muted);
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* The ghost cohort reads QUIETER than an adopted row, because it is a record this system does
+     not have: a dashed edge and the recessive surface say "available" where a solid card says
+     "yours". */
+  .manager-component-ghost-body {
+    margin-top: var(--fab-space-2);
+  }
+
+  .manager-component-ghost-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px dashed var(--fab-border);
+    border-radius: 9px;
+    background: none;
+    min-width: 0;
+  }
+
+  .manager-component-ghost-identity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    min-width: 0;
+  }
+
+  .manager-component-ghost-name {
+    color: var(--fab-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+
+  .manager-component-ghost-note {
+    font-size: 0.62rem;
+  }
+</style>
