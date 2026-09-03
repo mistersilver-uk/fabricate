@@ -20268,10 +20268,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       !target.querySelector('[data-tool-library-empty]'),
       'a list drawing three rows must not also claim there is nothing here'
     );
+    // READ FROM THE REGISTRY, NOT RESTATED (issue 1373). This is the exact selector
+    // `manager-tool-zero-state-browse-world-1280x720` publishes its frame on, and a restated
+    // copy is the drift `labCaseSelector` exists to stop: the copy goes on passing after the
+    // case it mirrors changes, and the frame is then published on a state nothing asserts.
     assert.equal(
-      target.querySelectorAll('[data-tool-row-member="absent"] [data-tool-add-to-system]').length,
+      target.querySelectorAll(labCaseSelector('manager-tool-zero-state-browse-world-1280x720'))
+        .length,
       3,
-      'every unadopted row carries the one action it exists for'
+      'every unadopted row carries the one action it exists for, under the selector the ' +
+        'capture case itself waits on'
     );
     assertResultCountMatchesRows('after the zero state button is pressed');
     assert.deepEqual(
@@ -20319,6 +20325,127 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
       'a single page still draws no bar inside that slot'
+    );
+  });
+
+  // TWELVE world Tools, named so name-ascending order is the authored order and a page
+  // boundary is readable at a glance. Twelve rather than nine because eight is the page size:
+  // nine proves two pages exist and twelve proves the SECOND page is a real slice rather than
+  // one stray row, which is the difference between a bar that renders and a bar that works.
+  const TWELVE_WORLD_TOOLS = Array.from({ length: 12 }, (_, index) => [
+    `world-page-${String(index + 1).padStart(2, '0')}`,
+    `World Tool ${String(index + 1).padStart(2, '0')}`,
+  ]);
+
+  it('PAGES a widened ghost-only cohort, which is the state the slot repair exists for', async () => {
+    // THE STATE THE PAGER FIX ACTUALLY UNBLOCKS, and until this case nothing asserted it.
+    // The two cases above widen to THREE ghosts — one page — so the only thing they can say
+    // about the bar is that it is ABSENT, and a predicate that never renders the slot at all
+    // satisfies that perfectly. Twelve world Tools at a page size of eight is where the old
+    // and new predicates give different answers: gated on `tools.length`, a zero-member system
+    // got no slot, the `multiPageOnly` bar had nowhere to draw, and pages 2+ of the widened
+    // cohort were unreachable by every control on the screen.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(TWELVE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    assert.ok(
+      Boolean(bar),
+      'twelve world Tools over eight rows a page is two pages, so the bar must RENDER — ' +
+        'asserting only its absence at three rows is satisfied by never rendering the slot'
+    );
+    assert.equal(
+      bar.querySelector('[data-pagination-summary]').textContent.trim(),
+      'Showing 1–8 of 12'
+    );
+    assert.equal(bar.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
+    assertResultCountMatchesRows('on page one of a widened ghost-only cohort');
+
+    // AND PAGE TWO IS REACHABLE, which is the half a rendered-but-inert bar would fail. The
+    // four remaining ghosts are the tail of the sort, so a slice that silently re-read page one
+    // cannot pass here.
+    bar.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      libraryRowStates(),
+      [
+        'world-page-09:absent',
+        'world-page-10:absent',
+        'world-page-11:absent',
+        'world-page-12:absent',
+      ],
+      'the second page of a cohort this system has adopted none of must be reachable'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-library-empty]'),
+      'page two of a widened cohort is rows, not the zero state'
+    );
+    assertResultCountMatchesRows('on page two of a widened ghost-only cohort');
+  });
+
+  it('LEAVES for the world catalogue when the zero state’s farther route is pressed', async () => {
+    // THE TWIN OF THE DEFECT ABOVE, and it sat immediately beside it:
+    // `data-tool-empty-open-catalogue` was named by two View Lab cases as an `expectContained`
+    // target and clicked by nothing anywhere, which is the same "proven to EXIST, never proven
+    // to ACT" shape the maintainer found by hand on `data-tool-empty-browse-world`.
+    //
+    // BOTH BRANCHES, because the panel renders two different shapes and each has its own View
+    // Lab case: the ONE-CTA branch a freshly installed world is in, and the two-button branch
+    // where this control is the fallback beside the widening primary.
+    const opened = [];
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope([]),
+      onOpenWorldCatalogue: () => opened.push('one-cta'),
+    });
+    await tick();
+    flushSync();
+
+    const soleRoute = target.querySelector('[data-tool-empty-open-catalogue]');
+    assert.ok(
+      Boolean(soleRoute),
+      'a world holding no Tools at all offers the catalogue as its only route out'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-empty-browse-world]'),
+      'there is nothing to widen to, so this really is the one-CTA branch'
+    );
+    soleRoute.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      opened,
+      ['one-cta'],
+      'the only route out of an empty world must actually navigate'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+      onOpenWorldCatalogue: () => opened.push('two-button'),
+    });
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-empty-browse-world]')),
+      'the widening primary renders, so this is the OTHER branch'
+    );
+    target.querySelector('[data-tool-empty-open-catalogue]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      opened,
+      ['one-cta', 'two-button'],
+      'the fallback route works in the branch where it is a fallback too'
     );
   });
 
@@ -27748,6 +27875,205 @@ describe('CraftingSystemManager mounted behavior', () => {
           'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
             '"nothing typed"'
         );
+      });
+    });
+
+    // ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────
+    //
+    // The catalogue's creation zone minted `store.randomID()` unconditionally and wrote the
+    // dropped uuid into BOTH source fields, so dragging the same Item on twice produced two
+    // world Tools with identical identity. `worldScopeActions.createEntity` cannot catch that:
+    // it dedupes on the entity ID and the id is fresh every time. Both records then appear in
+    // every system's catalogue and nothing on any screen says which one a recipe means.
+    //
+    // It is also the rule the rest of the epic already follows. `worldScopeEntityGrouping`
+    // groups the migration BY RESOLVED SOURCE ITEM precisely so one real Item becomes one world
+    // record, and the system-scope path this zone replaced upserted — `_findToolForUpsert`
+    // resolves a drop by requested id, then by a durable flag, then by the source references.
+    //
+    // NESTED HERE because `mountWithRealStore` is declared in this describe and is the only
+    // harness in the repository that drives the shell over a REAL world-scope corpus. A fake
+    // `worldScope.tool` would answer whatever the test told it to and could not see a second
+    // entity land in the corpus at all.
+    describe('world Tool creation from an Item drop (issue 1373)', () => {
+      const HAMMER = Object.freeze({
+        uuid: 'Item.smith-hammer',
+        name: 'Smith Hammer',
+        img: 'icons/tools/smithing/hammer-worn-steel-grey.webp',
+        description: 'A well-balanced forge hammer.',
+      });
+      const AWL = Object.freeze({
+        uuid: 'Compendium.fabricate.tools.Item.bone-awl',
+        name: 'Bone Awl',
+        img: '',
+        description: '',
+      });
+      const SOURCES = Object.freeze({ [HAMMER.uuid]: HAMMER, [AWL.uuid]: AWL });
+
+      async function settleDrop() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      async function goToToolCatalogue() {
+        worldNavItem('tool-catalogue').click();
+        await settleDrop();
+        assert.ok(
+          Boolean(target.querySelector('[data-item-drop-zone="tool-create"]')),
+          'the catalogue rendered no creation drop zone, so nothing below drops anywhere'
+        );
+      }
+
+      /**
+       * Open the world Tools Catalogue over a real corpus, with the resolver seam wired.
+       *
+       * @param {Array<object>} worldTools the world tool corpus to start from.
+       * @returns {Promise<object>} the mounted admin store.
+       */
+      async function openToolCatalogue(worldTools) {
+        const store = await mountWithRealStore({
+          worldTools,
+          componentServices: { resolveToolSource: async (uuid) => SOURCES[uuid] ?? null },
+        });
+        await goToToolCatalogue();
+        return store;
+      }
+
+      const worldToolIds = () =>
+        scopeStores.tool.corpus().entities.map((entity) => String(entity?.id ?? ''));
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+      const entryName = () => target.querySelector('[data-world-tool-entry-name]')?.value ?? '';
+
+      /**
+       * Drop one Item on the creation zone, capturing what the GM is told while it happens.
+       *
+       * `ui.notifications` is installed per drop and removed again: nothing else in this
+       * describe needs the Foundry `ui` global, and a standing one is something a neighbouring
+       * test comes to depend on.
+       *
+       * @param {string} uuid
+       * @returns {Promise<string[]>} the info toasts raised by the drop.
+       */
+      async function dropItem(uuid) {
+        const messages = [];
+        const previousUi = globalThis.ui;
+        globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+        try {
+          dispatchDrop(target.querySelector('[data-item-drop-zone="tool-create"]'), {
+            type: 'Item',
+            uuid,
+          });
+          await settleDrop();
+          return messages;
+        } finally {
+          if (previousUi === undefined) delete globalThis.ui;
+          else globalThis.ui = previousUi;
+        }
+      }
+
+      it('mints ONE world Tool when the same Item is dropped twice', async () => {
+        await openToolCatalogue([]);
+
+        const firstDrop = await dropItem(HAMMER.uuid);
+        assert.deepEqual(firstDrop, [], 'the first drop is a plain creation and says nothing');
+        assert.equal(worldToolIds().length, 1, 'the first drop creates the record');
+        assert.equal(managerView(), 'world-tool-entry', 'and lands the GM on it');
+        const created = worldToolIds()[0];
+
+        // BACK TO THE CATALOGUE AND DROP THE SAME ITEM AGAIN, which is exactly what a GM does
+        // when they cannot remember whether they already made a Tool for this Item.
+        await goToToolCatalogue();
+        const secondDrop = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(
+          worldToolIds(),
+          [created],
+          'a second drop of the SAME Item must not mint a second world Tool: the id is fresh ' +
+            'every time, so `createEntity`’s id dedupe cannot see the collision'
+        );
+        assert.equal(
+          managerView(),
+          'world-tool-entry',
+          'the drop still goes somewhere — a drop that appears to do nothing is the defect ' +
+            'this screen just spent a round removing'
+        );
+        assert.equal(entryName(), HAMMER.name, 'and it is the record the Item already had');
+        assert.equal(secondDrop.length, 1, 'the GM is TOLD they landed on an existing record');
+        assert.match(secondDrop[0], /Smith Hammer/, 'and the toast names it');
+      });
+
+      it('resolves the drop through the whole source-reference union, not one field', async () => {
+        // THE UNION IS THE SHARED WALK, not a fourth comparison written at the call site.
+        // `getItemMatchUuids` reads `registeredItemUuid`, `originItemUuid` AND `aliasItemUuids`,
+        // and a record whose link was re-pointed keeps the old uuid as an alias — so a match on
+        // the alias alone is a real world in which a naive `registeredItemUuid ===` test mints
+        // the duplicate this block exists to refuse.
+        await openToolCatalogue([
+          {
+            id: 'legacy-hammer',
+            name: 'Legacy Hammer',
+            registeredItemUuid: 'Item.some-other-item',
+            aliasItemUuids: [HAMMER.uuid],
+          },
+        ]);
+
+        const messages = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(
+          worldToolIds(),
+          ['legacy-hammer'],
+          'an ALIAS reference is still this Item’s world Tool'
+        );
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.equal(entryName(), 'Legacy Hammer');
+        assert.match(messages[0] ?? '', /Legacy Hammer/);
+      });
+
+      it('reuses a world-DISABLED record, and says that is what happened', async () => {
+        // THE DECISION, PINNED. `enabled` is the world master switch, so opening a disabled
+        // record silently leaves a GM on a screen whose Tool does nothing with no reason given —
+        // and minting a second record instead would put two rows behind one Item and strand the
+        // GM's own switch decision on the one they can no longer find. So it is the SAME reuse
+        // with a DIFFERENT sentence: the record opens, and the toast names the switch, on the
+        // one screen where that switch can be moved.
+        const store = await openToolCatalogue([
+          { id: 'shelved', name: 'Shelved Hammer', originItemUuid: HAMMER.uuid },
+        ]);
+        // Disabled through the REAL write family, so the state under test is the one the
+        // projection publishes rather than a hand-stamped field the projection never reads.
+        assert.equal(await store.worldScope.tool.setWorldEnabled('shelved', false), true);
+        await settleDrop();
+
+        const messages = await dropItem(HAMMER.uuid);
+
+        assert.deepEqual(worldToolIds(), ['shelved'], 'a disabled record is still the record');
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.match(messages[0] ?? '', /Shelved Hammer/, 'the toast names the record');
+        assert.match(
+          messages[0] ?? '',
+          /disabled/i,
+          'and it names the master switch, which is the whole difference from the enabled case'
+        );
+      });
+
+      it('still creates a SECOND world Tool for a DIFFERENT Item', async () => {
+        // THE NON-VACUITY HALF, and without it the repair is satisfiable by a zone that refuses
+        // every drop. Two different Items are two world Tools, which is the whole premise of a
+        // catalogue whose records each ARE a game-world Item.
+        await openToolCatalogue([]);
+        await dropItem(HAMMER.uuid);
+        await goToToolCatalogue();
+        await dropItem(AWL.uuid);
+
+        assert.equal(
+          worldToolIds().length,
+          2,
+          'a different source Item is a different world Tool'
+        );
+        assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
       });
     });
 
