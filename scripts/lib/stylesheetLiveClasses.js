@@ -108,10 +108,6 @@ const GLOBAL_SELECTOR = /:global\(\s*\.([A-Za-z_][\w-]*)/gu;
 /** A `const`/`let`/`var` binding, captured for {@link constantDefinitions}. */
 const BINDING = /(?:^|[;{})\s])(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*/gu;
 
-/** A `key: 'value'` entry of an object literal, for frozen string-map resolution. */
-const MAP_ENTRY =
-  /(?:^|[{,\s])(?:'([^']*)'|"([^"]*)"|[A-Za-z_$][\w$]*)\s*:\s*(?:'([^']*)'|"([^"]*)")/gu;
-
 /** A quoted string literal, spelled once so the equality pattern below can reuse it. */
 const QUOTED = '(?:\'[^\']*\'|"[^"]*")';
 
@@ -445,21 +441,6 @@ function statementEnd(text, from) {
 }
 
 /**
- * The string values of an object literal's `key: 'value'` entries.
- *
- * @param {string} expression
- * @returns {string[]}
- */
-function mapValuesIn(expression) {
-  const values = [];
-  MAP_ENTRY.lastIndex = 0;
-  for (let match = MAP_ENTRY.exec(expression); match; match = MAP_ENTRY.exec(expression)) {
-    values.push(match[3] ?? match[4]);
-  }
-  return values;
-}
-
-/**
  * The bare identifiers an expression names, with quoted text removed first.
  *
  * @param {string} expression
@@ -479,6 +460,13 @@ function identifiersIn(expression) {
  * and a union answers all three without a parser. It is a union of CANDIDATES, never a claim to
  * exhaustiveness — see the module note on why the hole survives its own resolution.
  *
+ * A frozen map needs no entry parser of its own, and issue 1498 shipped one anyway: a `key: 'value'`
+ * matcher that no mutation could red, because {@link quotedTemplatesIn} sweeps EVERY quoted run of
+ * the expression first. `{ craft: 'lambda-chat' }` therefore yields its value through the same
+ * channel a bare string literal takes, and the matcher could only re-add a subset of that. Do not
+ * reintroduce it to keep a quoted KEY out of the union either: it never removed anything, it only
+ * added, so the keys were candidates with it in place too.
+ *
  * @param {string} expression
  * @param {Map<string, string[]>} definitions
  * @param {Set<string>} seen Identifiers already being resolved, so a cycle terminates.
@@ -494,7 +482,6 @@ function resolvePatterns(expression, definitions, seen, depth = 0) {
       patterns.add(pattern);
     }
   }
-  for (const value of mapValuesIn(candidateText)) patterns.add(value);
   for (const name of identifiersIn(expression)) {
     if (seen.has(name)) continue;
     seen.add(name);
