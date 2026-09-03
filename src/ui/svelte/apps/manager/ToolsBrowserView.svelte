@@ -1178,9 +1178,29 @@
     min-width: 0;
   }
 
-  /* A world Tool with no rules here is present but not adopted, and reads that way. */
+  /* A world Tool with no rules here is present but not adopted, and reads that way.
+
+     IT DECLARES NO `background`, AND THAT IS THE WHOLE OF THE RULE (issue 1373). It used to
+     declare `background: transparent`, which is the file's own layer trap for the fifth time:
+     `styles/fabricate.css` is imported at `layer(modules)` and this block is UNLAYERED, so an
+     unlayered declaration beats a layered one at ANY specificity. That discarded the sheet's
+     `.manager-tools-library-list > article.is-selected { background: var(--fab-surface-active) }`
+     and did NOT discard its `border-color`, because `.is-unadopted` never declared one - so a
+     CHOSEN unadopted row drew an accent edge around no fill at all, on exactly the row whose
+     selection is the point of the widened cohort.
+
+     Ceding the declaration rather than out-specifying it is deliberate: a more specific
+     unlayered `.is-unadopted.is-selected` rule is how this component accumulated the other four
+     occurrences, and it would put the two selected states in two different layers. The fill for
+     both is arbitrated in the sheet, in one place.
+
+     NOTHING ABOUT THE RESTING ROW MOVES, which is why the whole declaration goes rather than
+     only its selected case. The sheet ALREADY clears the resting fill for this route -
+     `[data-manager-view='tools'] .manager-tools-row { background: transparent }`, at (0,3,0),
+     which the (0,3,1) selected rule outranks - so this was a duplicate of that at rest and a
+     defeat of the selected rule when chosen. `opacity` was always what said "not adopted".
+     `tool-rules-list-parity.test.js` measures all four adopted x selected combinations. */
   .manager-tools-row.is-unadopted {
-    background: transparent;
     opacity: 0.72;
   }
 </style>

@@ -204,6 +204,8 @@ const LIST_SCREEN = `
               ${row('selected-hovered', 'is-selected', "Smith's Anvil")}
               ${row('resting', '', 'Bellows')}
               ${row('resting-hovered', '', 'Tongs')}
+              ${row('unadopted-selected', 'is-selected is-unadopted', 'Aegis Crucible')}
+              ${row('unadopted-resting', 'is-unadopted', 'Star Loom')}
             </div>
           </div>
         </section>
@@ -481,6 +483,94 @@ test('hovering an already-selected Tool row does not repaint it', async () => {
       hoveredResting,
       resting,
       'an unselected row still answers the pointer, so the fix is not a deletion'
+    );
+  } finally {
+    await close();
+  }
+});
+
+test('a chosen row is filled whether or not this system has adopted it', async () => {
+  // THE FIFTH OCCURRENCE OF THIS FILE'S OWN LAYER TRAP (issue 1373). `styles/fabricate.css`
+  // is imported at `layer(modules)` and a component's `css: 'injected'` block is UNLAYERED, so
+  // an unlayered declaration beats a layered one at ANY specificity. `ToolsBrowserView`'s own
+  // block declared `.manager-tools-row.is-unadopted { background: transparent }`, which
+  // discarded the sheet's layered `article.is-selected { background: var(--fab-surface-active) }`
+  // — and did NOT discard `border-color`, which `.is-unadopted` never declares. A selected
+  // unadopted row therefore drew an accent EDGE with no FILL: degraded selection feedback on
+  // exactly the row whose selection is the point of the widened cohort.
+  //
+  // It predates the widening, and was unreachable while the cohort's zero point hid every
+  // ghost row — so it is a pre-existing defect that repair newly surfaces.
+  //
+  // THE FIX IS THE COMPONENT NOT DECLARING `background` AT ALL, so the sheet arbitrates both
+  // states in one layer. A more specific unlayered override is how this file accumulated the
+  // other four, and this case is written so that one would still fail: it asserts the resting
+  // unadopted row is the same fill as the resting ADOPTED row, which a hand-written
+  // `.is-unadopted.is-selected` rule would have to restate a second time to satisfy.
+  const { page, close } = await renderListScreen();
+  try {
+    const measured = await page.evaluate(READ_PROBES);
+    const tokens = await page.evaluate(READ_TOKENS, [
+      '--fab-surface-active',
+      '--fab-accent-border',
+    ]);
+
+    // ALL FOUR COMBINATIONS, so deleting the rule cannot pass for a fix.
+    assert.equal(
+      measured['selected-still'].background,
+      tokens['--fab-surface-active'],
+      'the baseline: an adopted chosen row wears the active surface'
+    );
+    assert.equal(
+      measured['unadopted-selected'].background,
+      tokens['--fab-surface-active'],
+      'THE DEFECT — a chosen row this system has not adopted must wear the same fill. The ' +
+        'component declared an UNLAYERED transparent background, which discards the layered ' +
+        'selected-row rule in the sheet at any specificity'
+    );
+    assert.equal(
+      measured['unadopted-resting'].background,
+      measured['resting'].background,
+      'and a RESTING unadopted row is the same fill as a resting adopted one, so the repair ' +
+        'is the component ceding the declaration rather than a second override beside it'
+    );
+
+    // THE EDGE WAS NEVER THE BROKEN HALF, and asserting it is what names the asymmetry that
+    // made this hard to see: the accent border arrived on a row with no fill at all.
+    assert.equal(measured['selected-still'].borderTopColor, tokens['--fab-accent-border']);
+    assert.equal(measured['unadopted-selected'].borderTopColor, tokens['--fab-accent-border']);
+    assert.equal(
+      measured['unadopted-resting'].borderTopColor,
+      measured['resting'].borderTopColor,
+      'a resting row keeps the default edge whether or not it is adopted'
+    );
+
+    // AND THE POINTER DOES NOT UNDO IT EITHER. The sheet's hover rule already excludes
+    // `.is-selected`, so ceding the fill repairs the hovered state in the same edit — measured
+    // rather than argued, because that exclusion is one selector away from being lost.
+    await page.hover('[data-probe="unadopted-selected"]');
+    assert.equal(
+      await page.evaluate(
+        () =>
+          getComputedStyle(document.querySelector('[data-probe="unadopted-selected"]'))
+            .backgroundColor
+      ),
+      tokens['--fab-surface-active'],
+      'a chosen unadopted row keeps its fill under the pointer'
+    );
+
+    // AND IT STILL READS AS NOT-ADOPTED, which is the whole reason the rule existed. `opacity`
+    // carries that on its own, so the fill can be ceded to the sheet without the row losing the
+    // one thing it was saying.
+    const dimmed = await page.evaluate(() =>
+      ['unadopted-selected', 'unadopted-resting', 'resting'].map(
+        (probe) => getComputedStyle(document.querySelector(`[data-probe="${probe}"]`)).opacity
+      )
+    );
+    assert.deepEqual(
+      dimmed,
+      ['0.72', '0.72', '1'],
+      'both unadopted rows stay visibly unadopted and an adopted row is untouched'
     );
   } finally {
     await close();
