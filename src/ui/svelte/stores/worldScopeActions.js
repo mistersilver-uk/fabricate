@@ -54,6 +54,13 @@ import {
   TOOL_SCOPE,
   TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
+import {
+  isWorldVocabularyKind,
+  normalizeWorldVocabularyEntries,
+  planWorldCategoryClear,
+  planWorldTagStrip,
+  WORLD_VOCABULARY_KINDS,
+} from '../../../systems/worldVocabulary.js';
 
 /**
  * What each entity type's write path is allowed to do.
@@ -668,10 +675,188 @@ function cloneMembership(record) {
 }
 
 /**
- * Build the write path for all three entity types.
+ * Build the WORLD VOCABULARY write path (issue 1392, epic 1357, PR 7a).
+ *
+ * ## A SEPARATE BUILDER, not a fourth `WRITE_DESCRIPTORS` entry
+ *
+ * Every verb the generic builder mints - `createEntity`, `addToSystem`, `setSection`,
+ * `setSectionInherited`, `setWorldEnabled` - presupposes an entity roster, world defaults and
+ * membership records. The World Vocabulary has none of the three: it holds VALUES the scoped
+ * entities draw from, not entities. A fourth descriptor would therefore publish a family whose
+ * key set is mostly verbs that cannot mean anything here, and `createEntity` would appear on it -
+ * which `tests/world-scope-projection.test.js` asserts it does not.
+ *
+ * ## `removeEntry` IS A TWO-STORE CASCADE, AND THE SECOND WRITE IS GATED ON THE FIRST
+ *
+ * Deleting a world component category or tag also clears it from the world component DEFAULTS
+ * that carry it, in `fabricate.componentScope`. Those are two separate settings and therefore two
+ * non-atomic writes, so the ORDER and the GATE are both load-bearing:
+ *
+ * - DEFAULTS FIRST, AWAITED. A torn write then leaves an unused vocabulary entry - re-deletable,
+ *   and leg 1 is idempotent so retrying converges - rather than a world default naming an entry
+ *   no vocabulary offers, a state only re-authoring fixes.
+ * - THE VOCABULARY WRITE IS ISSUED ONLY ON THE FIRST'S SUCCESS. Ordering alone buys nothing:
+ *   `mutate` above has no `try`/`catch`, `VocabularyPanel` calls `onRemove(row)` UNAWAITED, and a
+ *   world-setting write really can reject (Foundry gates `Setting` create/update on
+ *   `SETTINGS_MODIFY`). The gate is also the only thing that guarantees a remote client sees the
+ *   two `updateSetting` broadcasts in the authored order, since Foundry replicates two `Setting`
+ *   documents as two independent operations ordered only by the order the writer issued them.
+ *
+ * A world default's `category` is CLEARED, never reassigned to `general` - `### Component scope`
+ * requirement 2 forbids the reassignment, and clearing is what lets each inheriting system's own
+ * local value fall through. Nothing else cascades: a system's own `componentCategories`,
+ * `categories` and `itemTags` arrays, its components and its recipes are untouched, and a
+ * membership record's `mutedTags` entry naming a deleted tag is left in place and is inert.
+ *
+ * ## IT POSTS NO NOTICE, AND THAT IS DELIBERATE
+ *
+ * Both legs are wrapped so a rejected `game.settings.set` becomes `false` rather than an
+ * unhandled rejection, and the FAILURE IS REPORTED BY THE PAGE (`### GM World Vocabulary Route`
+ * requirement 7). This module has no notification seam and must not grow one: Foundry already
+ * posts `ui.notifications.error` for a server-refused write, so a second notice here would
+ * double-notify on the commonest failure.
  *
  * @param {object} options
- * @param {Record<string, () => object|null>} options.getStores `{component, essence, tool}`.
+ * @param {() => object|null} options.getStore Resolves the world vocabulary store, or `null`.
+ * @param {() => object|null} options.getComponentStore Resolves the world COMPONENT scope store,
+ *   whose defaults the deletion cascade rewrites, or `null`.
+ * @returns {object} The action family.
+ */
+export function createWorldVocabularyActions({ getStore, getComponentStore }) {
+  const resolve = (getter) => {
+    try {
+      return getter?.() ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Persist one payload, answering `false` for a rejected write rather than throwing.
+   *
+   * @param {object} store
+   * @param {object} payload
+   * @returns {Promise<boolean>}
+   */
+  async function persist(store, payload) {
+    try {
+      await store.save(payload);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The vocabulary payload in its persisted shape, with one kind guaranteed to be a list.
+   *
+   * @param {object} store
+   * @param {string} kind
+   * @returns {{payload: object, list: Array<object>}|null}
+   */
+  function readVocabulary(store, kind) {
+    let payload;
+    try {
+      payload = plain(store.get?.());
+    } catch {
+      return null;
+    }
+    const list = Array.isArray(payload[kind]) ? [...payload[kind]] : [];
+    return { payload: { ...payload }, list };
+  }
+
+  /**
+   * Clear one entry out of the world component defaults, awaited.
+   *
+   * Answers `true` when there was nothing to rewrite, so a missing component store or an
+   * unaffected corpus does not abandon a deletion that has no cascade to perform.
+   *
+   * @param {string} kind
+   * @param {string} entryId
+   * @returns {Promise<boolean>}
+   */
+  async function clearWorldDefaults(kind, entryId) {
+    if (kind === 'recipeCategories') return true;
+    const componentStore = resolve(getComponentStore);
+    if (!componentStore) return true;
+    let payload;
+    try {
+      payload = persistedShape(componentStore.get?.());
+    } catch {
+      return false;
+    }
+    const plan =
+      kind === 'componentCategories'
+        ? planWorldCategoryClear(payload.defaults, entryId)
+        : planWorldTagStrip(payload.defaults, entryId);
+    if (plan.affectedIds.length === 0) return true;
+    // The planner answers a LIST and `save()` re-keys it: `ScopedDefinitionStore#_normalize`
+    // reads its sub-keys through `subKeyEntries`, which takes an array or a map, and
+    // `_persistedShape` keys the normalized records back off the records themselves.
+    payload.defaults = plan.defaults;
+    return persist(componentStore, payload);
+  }
+
+  return {
+    /** The vocabularies this family writes. @type {readonly string[]} */
+    kinds: WORLD_VOCABULARY_KINDS,
+
+    /**
+     * Add one entry to one vocabulary.
+     *
+     * Refuses a kind this vocabulary does not carry, a blank name, a reserved general bucket
+     * (through the shipped guards, for the two category kinds) and a name whose derived id is
+     * already taken. Every refusal answers `false`.
+     *
+     * @param {string} kind
+     * @param {string} name
+     * @returns {Promise<boolean>}
+     */
+    async addEntry(kind, name) {
+      if (!isWorldVocabularyKind(kind)) return false;
+      const store = resolve(getStore);
+      if (!store) return false;
+      const [entry] = normalizeWorldVocabularyEntries(kind, [name]);
+      if (!entry) return false;
+      const read = readVocabulary(store, kind);
+      if (!read) return false;
+      if (read.list.some((existing) => existing?.id === entry.id)) return false;
+      read.payload[kind] = [...read.list, entry];
+      return persist(store, read.payload);
+    },
+
+    /**
+     * Delete one entry from one vocabulary, cascading into the world component defaults first.
+     *
+     * @param {string} kind
+     * @param {string} entryId
+     * @returns {Promise<boolean>}
+     */
+    async removeEntry(kind, entryId) {
+      if (!isWorldVocabularyKind(kind)) return false;
+      const store = resolve(getStore);
+      if (!store) return false;
+      const targetId = id(entryId).toLowerCase();
+      if (!targetId) return false;
+      const read = readVocabulary(store, kind);
+      if (!read) return false;
+      if (!read.list.some((existing) => existing?.id === targetId)) return false;
+      // LEG ONE, AWAITED AND GATED. An abandoned cascade changes nothing at all: the vocabulary
+      // write below is never issued.
+      const cleared = await clearWorldDefaults(kind, targetId);
+      if (!cleared) return false;
+      read.payload[kind] = read.list.filter((existing) => existing?.id !== targetId);
+      return persist(store, read.payload);
+    },
+  };
+}
+
+/**
+ * Build the write path for all three entity types, plus the world vocabulary.
+ *
+ * @param {object} options
+ * @param {Record<string, () => object|null>} options.getStores `{component, essence, tool,
+ *   vocabulary}`.
  * @returns {Record<string, object>}
  */
 export function createWorldScopeActions({ getStores }) {
@@ -682,5 +867,12 @@ export function createWorldScopeActions({ getStores }) {
       getStore: getStores?.[entityType] ?? (() => null),
     });
   }
+  // ATTACHED AFTER THE DESCRIPTOR LOOP, NEVER INSIDE IT (issue 1392). The vocabulary is not a
+  // scoped-entity type and mints a different key set entirely; see `createWorldVocabularyActions`.
+  actions.vocabulary = createWorldVocabularyActions({
+    getStore: getStores?.vocabulary ?? (() => null),
+    getComponentStore: getStores?.component ?? (() => null),
+  });
   return actions;
 }
+

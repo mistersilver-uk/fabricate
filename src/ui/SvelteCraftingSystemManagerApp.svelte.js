@@ -181,6 +181,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getComponentScopeStore: () => game?.fabricate?.getComponentScopeStore?.() ?? null,
       getEssenceScopeStore: () => game?.fabricate?.getEssenceScopeStore?.() ?? null,
       getToolScopeStore: () => game?.fabricate?.getToolScopeStore?.() ?? null,
+      // The world VOCABULARY store (issue 1392, epic 1357, PR 7a). THE FIFTH WIRING EDIT, and
+      // the one with no test of its own until this change: without it the vocabulary leg is
+      // `null` forever, `projectWorldVocabulary` publishes `{available: false, total: 0}` — a
+      // legitimate published shape — and every adminStore unit test stays green, because each
+      // injects its own services bag. `tests/components/manager-contract.test.js` slices this
+      // method and asserts the line.
+      getVocabularyScopeStore: () => game?.fabricate?.getVocabularyScopeStore?.() ?? null,
       getGatheringRealmStore: () => game?.fabricate?.getGatheringRealmStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getCurrentSceneRegions: () =>

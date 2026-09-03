@@ -68,12 +68,33 @@ export const SETTING_KEYS = Object.freeze({
   //
   // ADDITIVE UNTIL THE MIGRATION. Nothing writes these yet, so every world reads the registered
   // default and `## CraftingSystem`'s `components` / `essenceDefinitions` / `tools` stay live and
-  // authoritative. `fabricate.worldVocabulary` is deliberately NOT registered here: epic 1357
-  // models the World Vocabulary in PR 7, and a persisted key whose values carry no canonical
-  // meaning is a live shape with no description.
+  // authoritative.
   COMPONENT_SCOPE: 'componentScope',
   ESSENCE_SCOPE: 'essenceScope',
   TOOL_SCOPE: 'toolScope',
+  // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY — component categories, component tags
+  // and recipe categories, authored once for the world instead of once per crafting system.
+  //
+  // A FOURTH WORLD KEY, NOT A FOURTH SCOPED-ENTITY LAYER. `## Scoped Entity Definitions`
+  // requirement 12 states the World Vocabulary is a separate concern, so it is deliberately
+  // absent from that requirement's three-key table and is modelled by `## World Vocabulary` in
+  // `data-models`. It holds VALUES the scoped entities draw from — it has no entity roster, no
+  // world defaults and no membership records.
+  //
+  // ONE KEY FOR THREE VOCABULARIES, which is the OPPOSITE of the three-key decision above, and
+  // the reason is that the hazard those three keys exist to avoid does not arise here. That
+  // hazard is a shared key making `isSeeded()` dishonest per entity type and arming a
+  // DESTRUCTIVE prune. This key arms none: `CraftingSystemManager._vocabularyBasis` deliberately
+  // does not consult it (`## World Vocabulary` requirement 6), and `WorldVocabularyStore` keeps
+  // seededness honest anyway by OMITTING a kind that has never been written from the payload it
+  // persists, so key absence per kind survives a round trip.
+  //
+  // `type: Object` and NOT a `DataModel`, and that is load-bearing rather than conventional.
+  // Foundry 14.365 applies no schema to a plain-constructor type — `ClientSettings##cleanJSON`
+  // hands the value straight to `JSON.stringify` into the `Setting` document's `JSONField` — so
+  // an absent sub-key stays absent on disk. A `DataModel`-typed setting would run `fromSource`
+  // and fill every declared key back in, which is exactly what the store must not have.
+  WORLD_VOCABULARY: 'worldVocabulary',
   // Issue 1363 (epic 1357, PR 3): the `1.30.0` migration's DURABLE DECISION RECORD — the
   // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
   // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
@@ -234,6 +255,15 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.TOOL_SCOPE]: {
     name: 'World Tool Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1392 (epic 1357, PR 7a). `scope: 'world'` admits it to the DERIVED
+  // `WORLD_SCOPED_SETTING_KEYS` below exactly as the three above, so nothing restates it there.
+  [SETTING_KEYS.WORLD_VOCABULARY]: {
+    name: 'World Vocabulary',
     scope: 'world',
     config: false,
     type: Object,

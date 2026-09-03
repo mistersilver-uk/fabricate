@@ -35,6 +35,11 @@ import {
   resolveScopedDefinition,
 } from '../../../systems/scopedDefinitions.js';
 import { TOOL_SCOPE, TOOL_SECTIONS } from '../../../systems/toolScope.js';
+import {
+  WORLD_VOCABULARY_KINDS,
+  worldDefaultsAffectedByDeletion,
+} from '../../../systems/worldVocabulary.js';
+import { buildVocabularyUsage } from '../../../utils/vocabularyUsage.js';
 
 /**
  * The three entity types, in the order the rail lists their world screens.
@@ -193,13 +198,13 @@ export function emptyWorldScopeEntityState(entityType) {
  * entities draw FROM - so it has no sections, no membership and no per-system rows, and it is
  * projected by its own function rather than through {@link projectWorldScopeEntity}.
  *
- * @type {readonly string[]}
+ * RE-EXPORTED since issue 1392, and no longer declared here. `src/systems/worldVocabulary.js`
+ * owns it now, because this projection needs that module's deletion planners to state a
+ * deletion's second number and declaring the list on this side would make the two modules
+ * import each other. Re-exporting keeps every existing importer of this name - including
+ * `tests/world-scope-projection.test.js` - reading exactly one definition.
  */
-export const WORLD_VOCABULARY_KINDS = Object.freeze([
-  'componentCategories',
-  'componentTags',
-  'recipeCategories',
-]);
+export { WORLD_VOCABULARY_KINDS };
 
 /**
  * The World Vocabulary projection when no vocabulary store is registered.
@@ -231,19 +236,155 @@ export function emptyWorldVocabularyState() {
  * that happen to share a label are two entries in the world's vocabulary, and the prototype's
  * own badge is the same sum of its three lists.
  *
+ * ## What each entry carries since issue 1392, and why it is COUNTED rather than derived
+ *
+ * `totalUsage` is HOW MANY RECORDS ANYWHERE IN THE WORLD NAME THIS ENTRY. It is
+ * `buildVocabularyUsage` - the counter the system-scope Tags & Categories screen already uses,
+ * unmodified - run over every crafting system's components and the world's whole recipe corpus
+ * instead of one system's. The prototype's `h % 24` string hash is deliberately not copied: a
+ * fabricated number in front of a GM deciding whether a deletion is safe is worse than none.
+ *
+ * THE COUNT IS PER KIND, AND ONE EXCLUSION IS ASYMMETRIC, so nobody generalises it:
+ *
+ * - The world component defaults' `category` is EXCLUDED. A migrated world elects a world
+ *   default category from a system that already carries it, and every membership record carries
+ *   that system's `category` verbatim, so `systems[].components` already counts it and counting
+ *   both would double-count every migrated component.
+ * - The world component defaults' `tags` are INCLUDED, and the reason is NON-MIRRORING rather
+ *   than exclusivity: the migration deliberately left world `tags` unauthored because the tag
+ *   merge is additive, so a GM-authored world tag is a world-scope grant that no membership
+ *   record mirrors. Excluding them would publish `totalUsage: 0` for a tag granted to every
+ *   member system - and a zero-usage row offers a ONE-CLICK delete.
+ *
+ * ## `silentlyDeletable` is a CONJUNCTION, and it is computed HERE
+ *
+ * An entry deletes in one click only when NOTHING NAMES IT **and** its deletion rewrites nothing
+ * anywhere in the world. That is strictly narrower than either half:
+ *
+ * - a recipe category named by forty recipes rewrites nothing on deletion (the world corpus
+ *   holds no recipe record) and must still open the confirm, because forty records name it;
+ * - a world component category referenced by no in-system component but carried by five world
+ *   defaults reads `0 references` and must still open the confirm, because the cascade rewrites
+ *   those five.
+ *
+ * It is computed here rather than left to `VocabularyPanel`'s default because the panel's
+ * default is `totalUsage === 0`, which is exactly wrong on the second case - and the failure is
+ * silent: the row renders `Unused` under a red one-click delete and then silently rewrites the
+ * world.
+ *
+ * ## New rows in NEW arrays
+ *
+ * `corpus[kind]` is the STORE's published array, and `WorldVocabularyStore` replaces its corpus
+ * wholesale precisely so nothing mutates it. Stamping the decoration onto those entries would
+ * write the projection's per-row fields into the store's cache.
+ *
  * @param {{componentCategories?: unknown, componentTags?: unknown, recipeCategories?: unknown}
  *   |null} corpus
+ * @param {object} [context] The corpora the counts are taken over. Every field is optional and
+ *   an absent one answers 0, which is what a caller that has not wired it sees.
+ * @param {unknown} [context.systems] The crafting-system roster.
+ * @param {Array<object>} [context.recipes] Every recipe in the world, as MODELS rather than
+ *   projected rows: `ingredientSets` and `steps` are detail-tier fields on a projected row and
+ *   walking them there materialises the whole detail tier before first paint.
+ * @param {Array<object>} [context.componentEntries] The already-projected world COMPONENT leg's
+ *   `entries`, for the inheriting-system count a category's deletion warning states.
+ * @param {Array<object>} [context.componentDefaults] The world component defaults corpus.
  * @returns {object}
  */
-export function projectWorldVocabulary(corpus) {
+export function projectWorldVocabulary(corpus, context = {}) {
   if (!corpus || typeof corpus !== 'object') return emptyWorldVocabularyState();
+  const systems = Array.isArray(context?.systems) ? context.systems : [];
+  const recipes = Array.isArray(context?.recipes) ? context.recipes : [];
+  const componentDefaults = Array.isArray(context?.componentDefaults)
+    ? context.componentDefaults
+    : [];
+  const inheritCounts = categoryInheritCountsById(context?.componentEntries);
+  const usage = buildVocabularyUsage(
+    recipes,
+    systems.flatMap((system) => (Array.isArray(system?.components) ? system.components : []))
+  );
+  const usageByKind = {
+    componentCategories: usage.componentCategoryUsage,
+    componentTags: usage.tagUsage,
+    recipeCategories: usage.categoryUsage,
+  };
   const state = { available: true, total: 0 };
   for (const kind of WORLD_VOCABULARY_KINDS) {
     const entries = Array.isArray(corpus[kind]) ? corpus[kind] : [];
-    state[kind] = entries;
+    state[kind] = entries.map((entry) =>
+      decorateVocabularyEntry(kind, entry, {
+        usage: usageByKind[kind],
+        componentDefaults,
+        inheritCounts,
+      })
+    );
     state.total += entries.length;
   }
   return state;
+}
+
+/**
+ * `entryId -> inheritCounts.category` for the projected world component entries.
+ *
+ * Read off the leg this publish has ALREADY built rather than re-derived from the membership
+ * records, so the number the deletion warning states is the same one the world component entry
+ * screen shows for that entity.
+ *
+ * @param {unknown} componentEntries
+ * @returns {Map<string, number>}
+ */
+function categoryInheritCountsById(componentEntries) {
+  const counts = new Map();
+  for (const entry of Array.isArray(componentEntries) ? componentEntries : []) {
+    counts.set(entry?.id, Number(entry?.inheritCounts?.category) || 0);
+  }
+  return counts;
+}
+
+/**
+ * One decorated vocabulary row.
+ *
+ * @param {string} kind
+ * @param {{id?: string, name?: string}} entry
+ * @param {{usage: Map<string, number>|undefined, componentDefaults: Array<object>,
+ *   inheritCounts: Map<string, number>}} context
+ * @returns {object}
+ */
+function decorateVocabularyEntry(kind, entry, { usage, componentDefaults, inheritCounts }) {
+  const id = String(entry?.id ?? '');
+  const affectedIds = worldDefaultsAffectedByDeletion(kind, componentDefaults, id);
+  // The world defaults' tags are part of the tag count and their category is not; see the
+  // module note above for why the asymmetry is not an oversight.
+  const counted = Number(usage?.get?.(id)) || 0;
+  const totalUsage = kind === 'componentTags' ? counted + affectedIds.length : counted;
+  const inheritingCount =
+    kind === 'componentCategories'
+      ? affectedIds.reduce((total, defaultId) => total + (inheritCounts.get(defaultId) || 0), 0)
+      : 0;
+  return {
+    id,
+    name: String(entry?.name ?? id),
+    totalUsage,
+    // The confirm sentence's SECOND number, per kind, merged over `{name}` and `{count}` by
+    // `VocabularyPanel`. A recipe category has none: nothing is rewritten, and its sentence
+    // says exactly that.
+    confirmTokens: confirmTokensFor(kind, affectedIds.length, inheritingCount),
+    silentlyDeletable: totalUsage === 0 && inheritingCount === 0 && affectedIds.length === 0,
+  };
+}
+
+/**
+ * @param {string} kind
+ * @param {number} affectedDefaultCount
+ * @param {number} inheritingCount
+ * @returns {Record<string, number>}
+ */
+function confirmTokensFor(kind, affectedDefaultCount, inheritingCount) {
+  if (kind === 'componentCategories') {
+    return { defaults: affectedDefaultCount, inheriting: inheritingCount };
+  }
+  if (kind === 'componentTags') return { components: affectedDefaultCount };
+  return {};
 }
 
 /**
@@ -567,11 +708,16 @@ function readCorpus(store) {
  * @param {Record<string, object|null>} [options.stores] `{component, essence, tool, vocabulary}`
  *   scope stores; `vocabulary` may be absent.
  * @param {unknown} [options.systems] The crafting-system roster.
+ * @param {Array<object>} [options.recipes] Every recipe in the world (issue 1392). The FOURTH
+ *   input, and the one the gateway closure's enumeration did not name: nothing in
+ *   `{stores, systems, usage}` can answer a world-wide recipe question, so the World
+ *   Vocabulary's recipe-category reference count was underivable without it. `adminStore`
+ *   supplies it from `_allRecipes()`, which it already invokes on every publish.
  * @param {Record<string, Record<string, object>>} [options.usage] Per-entity-type reference
  *   counts, keyed by entity type then entity id.
  * @returns {{worldScope: object}}
  */
-export function buildWorldScopeState({ stores = {}, systems = [], usage = {} } = {}) {
+export function buildWorldScopeState({ stores = {}, systems = [], recipes = [], usage = {} } = {}) {
   const worldScope = {};
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     worldScope[entityType] = projectWorldScopeEntity({
@@ -581,6 +727,18 @@ export function buildWorldScopeState({ stores = {}, systems = [], usage = {} } =
       ...readCorpus(stores?.[entityType] ?? null),
     });
   }
-  worldScope.vocabulary = projectWorldVocabulary(readCorpus(stores?.vocabulary ?? null).corpus);
+  // THE VOCABULARY LEG READS THE COMPONENT LEG THIS PUBLISH JUST BUILT. A world component
+  // category's deletion warning states how many crafting systems INHERIT the defaults it
+  // clears, and `buildEntry` has already counted that per entity; re-deriving it from the
+  // membership records here would be a second answer to one question.
+  const componentCorpus = readCorpus(stores?.component ?? null).corpus;
+  worldScope.vocabulary = projectWorldVocabulary(readCorpus(stores?.vocabulary ?? null).corpus, {
+    // The RAW roster, not `projectSystems`' `{id, name}` rows: the count is taken over each
+    // system's `components`, which that projection deliberately drops.
+    systems,
+    recipes,
+    componentEntries: worldScope.component?.entries ?? [],
+    componentDefaults: Array.isArray(componentCorpus?.defaults) ? componentCorpus.defaults : [],
+  });
   return { worldScope };
 }

@@ -13,6 +13,7 @@ const CHARACTER_LIBRARIES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.
 const COMPONENT_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.COMPONENT_SCOPE}`;
 const ESSENCE_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ESSENCE_SCOPE}`;
 const TOOL_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TOOL_SCOPE}`;
+const WORLD_VOCABULARY_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.WORLD_VOCABULARY}`;
 
 /**
  * The invalidation scopes a world travel edit produces (issue 1282).
@@ -91,6 +92,20 @@ const CHARACTER_LIBRARY_DOMAINS = Object.freeze([
 const COMPONENT_SCOPE_DOMAINS = domainsForSystemFields(['components']);
 const ESSENCE_SCOPE_DOMAINS = domainsForSystemFields(['essenceDefinitions']);
 const TOOL_SCOPE_DOMAINS = domainsForSystemFields(['tools']);
+/**
+ * The domains a WORLD VOCABULARY edit announces (issue 1392, epic 1357, PR 7a).
+ *
+ * DERIVED, on the same rule as the three above, and from THREE in-system fields rather than one:
+ * this key shadows `componentCategories`, `categories` and `itemTags` at once, so the honest
+ * answer is the union of their rows. `SYSTEM_FIELD_DOMAINS` must NOT gain a `worldVocabulary`
+ * row — that map classifies top-level keys of a persisted crafting-system record, and a world
+ * setting is not one.
+ */
+const WORLD_VOCABULARY_DOMAINS = domainsForSystemFields([
+  'componentCategories',
+  'categories',
+  'itemTags',
+]);
 
 /**
  * The invalidation scopes a world currency edit produces (issue 1278).
@@ -199,6 +214,15 @@ const WORLD_STORE_LEGS = Object.freeze([
     store: 'toolScopeStore',
     scopes: (manager) => everySystemScopes(manager, TOOL_SCOPE_DOMAINS),
   },
+  // Issue 1392 (epic 1357, PR 7a). The World Vocabulary is not a scoped-entity layer, but its
+  // replication problem is identical: a client that booted before the GM authored an entry keeps
+  // an unseeded vocabulary for the whole session, so its world Tags & Categories screen and the
+  // rail badge above it stay empty while every other client sees the entry.
+  {
+    key: WORLD_VOCABULARY_KEY,
+    store: 'worldVocabularyStore',
+    scopes: (manager) => everySystemScopes(manager, WORLD_VOCABULARY_DOMAINS),
+  },
 ]);
 
 /**
@@ -256,6 +280,8 @@ function runWorldStoreLeg(leg, targets) {
  *   a client keeps an unseeded world corpus for the whole session.
  * @param {{ load: () => any }} [deps.essenceScopeStore] The world essence scope store (issue 1359).
  * @param {{ load: () => any }} [deps.toolScopeStore] The world tool scope store (issue 1359).
+ * @param {{ load: () => any }} [deps.worldVocabularyStore] The world vocabulary store (issue
+ *   1392), reloaded so a GM's world category or tag edit is visible on every client.
  * @param {(hook: string, payload: any) => void} deps.callAll Bound `Hooks.callAll`.
  * @returns {boolean} `true` when `settingKey` was a handled Fabricate data setting.
  */
