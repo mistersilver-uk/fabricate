@@ -1,0 +1,1045 @@
+[
+  {
+    "path": "src/ui/svelte/apps/manager/ArmedDangerButton.svelte",
+    "root": "manager",
+    "note": "THE ARM CANNOT BE CLOSED BY A WRITE-BACK, and that is a property of the component's callbacks rather than of this row. `onArm`, `onDisarm` and `onConfirm` are all called with the arm TOKEN — the identity of the thing being deleted — and never with the next armed state, so an event knob writing back into `armed` would put the string `delete:iron-sword` into a boolean. The `armed` and `busy` knobs are therefore the honest way to reach the three faces, and clicking the specimen logs the token and moves nothing.",
+    "states": {
+      "rest": true,
+      "hover": "No prop. `:hover` is not settable from a prop at all — read the plinth's live pseudo-class readout instead.",
+      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab to the button on the plinth.",
+      "disabled": true,
+      "loading": "Reachable through `busy`, which is one of the very few shipped controls that genuinely sets `aria-busy=\"true\"` — and it is a caller-owned flag rather than a state derived from `armed`, for the blur race the component's own header records.",
+      "invalid": "No prop. A button holds no value that could be invalid.",
+      "readonly": "No prop. `disabled` and `busy` are the two inert states and neither is read-only.",
+      "empty": "Not applicable: it renders exactly one glyph and one label, never a collection."
+    },
+    "knobs": [
+      { "prop": "armed", "type": "boolean", "value": false, "default": false },
+      { "prop": "busy", "type": "boolean", "value": false, "default": false },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      { "prop": "showTitle", "type": "boolean", "value": true, "default": true },
+      { "prop": "token", "type": "text", "value": "delete:iron-sword", "default": "" },
+      { "prop": "idleLabel", "type": "text", "value": "Delete", "default": "" },
+      { "prop": "armedLabel", "type": "text", "value": "Confirm?", "default": "" },
+      { "prop": "busyLabel", "type": "text", "value": "Deleting...", "default": "" },
+      { "prop": "idleIcon", "type": "text", "value": "fas fa-trash", "default": "fas fa-trash" },
+      {
+        "prop": "armedIcon",
+        "type": "text",
+        "value": "fas fa-triangle-exclamation",
+        "default": "fas fa-triangle-exclamation"
+      },
+      {
+        "prop": "busyIcon",
+        "type": "text",
+        "value": "fas fa-spinner fa-spin",
+        "default": "fas fa-spinner fa-spin"
+      },
+      {
+        "prop": "idleAriaLabel",
+        "type": "text",
+        "value": "Delete the recipe Iron sword",
+        "default": ""
+      },
+      {
+        "prop": "armedAriaLabel",
+        "type": "text",
+        "value": "Confirm? Deleting the recipe Iron sword cannot be undone",
+        "default": ""
+      },
+      { "prop": "onArm", "type": "event" },
+      { "prop": "onDisarm", "type": "event" },
+      { "prop": "onConfirm", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "describedBy",
+        "why": "The DOM id of a consequence list the CALLER renders — `BulkDeleteCard`'s impact list. Nothing on the plinth carries that id, so any value would be a dangling `aria-describedby` that announces nothing, which is worse than the absent attribute the component already emits."
+      }
+    ],
+    "stories": [
+      { "title": "The three faces", "matrix": { "armed": "*", "busy": "*" } },
+      { "title": "Armed, and armed while disabled", "matrix": { "armed": "*", "disabled": "*" } }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/BulkDeleteCard.svelte",
+    "root": "manager",
+    "note": "The three announcement props are waived rather than driven, and `outcomeAnnouncement` is the one that matters: setting it runs `announceAfterFocusMove`, which MOVES FOCUS to this card's own confirm button whenever `document.activeElement` is `<body>`. On a page of fifty-seven specimens that is a control stealing the keyboard from whatever the reader was doing, on a knob change made somewhere else entirely.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the arm inside it is a `<button>` and the plinth's pseudo-class readout is where hover is observed.",
+      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium.",
+      "disabled": true,
+      "loading": "Reachable through `busy`, which reaches the arm's own `aria-busy=\"true\"` face.",
+      "invalid": "No prop. The card states an impact and arms a verb; it holds no value that could be invalid.",
+      "readonly": "No prop. `disabled` and `busy` are the two inert states.",
+      "empty": "Reachable by clearing `rows`, which renders the heading and the arm over an empty impact list. The component's own header calls that state OUTSIDE its carve-out — an arm with no statement of consequence — and nothing in the code refuses it, so the lab can draw a card no caller is allowed to ship."
+    },
+    "knobs": [
+      { "prop": "heading", "type": "text", "value": "Delete selected recipes", "default": "" },
+      {
+        "prop": "rows",
+        "type": "json",
+        "default": null,
+        "value": [
+          { "key": "recipes", "text": "3 recipes will be deleted.", "count": 3 },
+          {
+            "key": "components",
+            "text": "2 components are used only by these recipes.",
+            "count": 2
+          },
+          { "key": "books", "text": "0 recipe books will be rewritten.", "count": 0 }
+        ]
+      },
+      {
+        "prop": "standingHint",
+        "type": "text",
+        "value": "Deleting a recipe does not delete the Items it references.",
+        "default": ""
+      },
+      { "prop": "idleLabel", "type": "text", "value": "Delete recipes", "default": "" },
+      { "prop": "armedLabel", "type": "text", "value": "Confirm delete", "default": "" },
+      { "prop": "busyLabel", "type": "text", "value": "Deleting...", "default": "" },
+      {
+        "prop": "idleAriaLabel",
+        "type": "text",
+        "value": "Delete recipes: 3 recipe(s)",
+        "default": ""
+      },
+      {
+        "prop": "armedAriaLabel",
+        "type": "text",
+        "value": "Confirm delete of 3 recipe(s)",
+        "default": ""
+      },
+      { "prop": "token", "type": "text", "value": "bulk-delete:recipes", "default": "" },
+      { "prop": "armed", "type": "boolean", "value": false, "default": false },
+      { "prop": "busy", "type": "boolean", "value": false, "default": false },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      { "prop": "onArm", "type": "event" },
+      { "prop": "onDisarm", "type": "event" },
+      { "prop": "onConfirm", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "armedAnnouncement",
+        "why": "A live-region sentence. It renders into a visually hidden region, so a knob for it changes nothing anybody can see on the plinth — and the region's whole contract is that it speaks on a TRANSITION, which a knob edit is not."
+      },
+      {
+        "prop": "disarmedAnnouncement",
+        "why": "The same region, on the cancel edge. Same reason."
+      },
+      {
+        "prop": "outcomeAnnouncement",
+        "why": "The same region, and additionally the one prop here with a side effect on the whole page: setting it runs `announceAfterFocusMove`, which returns focus to this card's confirm button whenever focus is on `<body>`. A specimen that grabs the keyboard when a knob changes is not something the lab may offer."
+      },
+      {
+        "prop": "cardAttr",
+        "why": "The NAME of a test hook attribute. It has no visual consequence at all — it decides which `data-*` a caller's own selectors can find the root by."
+      },
+      { "prop": "impactAttr", "why": "The same, on the impact list." },
+      { "prop": "rowAttr", "why": "The same, on each impact row, valued by the row key." },
+      { "prop": "announceAttr", "why": "The same, on the live region." }
+    ],
+    "stories": [{ "title": "Idle, armed, in flight", "matrix": { "armed": "*", "busy": "*" } }]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/BulkEditSection.svelte",
+    "root": "manager",
+    "note": "IT WRAPS NOTHING. The heading, the hint row and the sub-hint are emitted as SIBLINGS, so the specimen is loose blocks rather than a section element — the rhythm between them belongs to `BulkEditPanelShell`'s flex gap, which is not on the plinth. A `hint` or a `trailing` snippet is what promotes the plain label to a label ROW, so those two knobs change the element tree rather than only its content.",
+    "states": {
+      "rest": true,
+      "hover": "No prop, and nothing here is interactive: the section is a heading and the control it heads stays with the caller.",
+      "focus-visible": "No prop, and no focusable element of its own.",
+      "disabled": "No prop. The section heads a control it does not own, so the off state belongs to that control.",
+      "loading": "No prop. It renders three already-localized strings.",
+      "invalid": "No prop. It holds no value.",
+      "readonly": "Not applicable: a heading is read-only by construction.",
+      "empty": "Reachable: with `label`, `hint`, `subhint` and `trailing` all empty it renders one empty `<p>` and nothing else, which is exactly what a caller that forgot the label gets."
+    },
+    "knobs": [
+      { "prop": "label", "type": "text", "value": "TAGS", "default": "" },
+      { "prop": "hint", "type": "text", "value": "3 recipes selected", "default": "" },
+      {
+        "prop": "subhint",
+        "type": "text",
+        "value": "None of the selected recipes carries a tag yet.",
+        "default": ""
+      },
+      { "prop": "trailing", "type": "snippet", "value": "chips", "default": "" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "subhintAttr",
+        "why": "The NAME of a test hook attribute on the sub-hint. No visual consequence — it decides which `data-*` a caller's own suites can find that sentence by."
+      },
+      {
+        "prop": "subhintValue",
+        "why": "That hook's VALUE, and it defaults to the empty string rather than `true` on purpose, because Svelte serializes `true` as `=\"true\"` and the shipped hook is a bare attribute. Driving it would let the lab emit a byte a caller cannot."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Plain label, or a label row",
+        "matrix": { "hint": ["", "3 recipes selected"], "trailing": ["", "chips"] }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/BulkEditSelect.svelte",
+    "root": "manager",
+    "note": "THIS SPECIMEN RENDERS AN EMPTY SELECT, and the row is honest about it rather than faking one. The OPTIONS are the caller's — the leave-unchanged sentinel means something different per studio and per axis, which is why the component takes them as `children` and owns none of them — and `tests/view-lab/primitives/fillers.js` declares no filler that emits `<option>` elements. So the shell, its opaque background and its full-width geometry are all real and driveable, while `value` and `onChange` stay inert until a filler exists that can fill it. Recorded as a finding rather than papered over with a filler whose content a `<select>` drops.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's live pseudo-class readout.",
+      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab to the select on the plinth.",
+      "disabled": true,
+      "loading": "No prop. The option list arrives already rendered by the caller, so the control never awaits anything.",
+      "invalid": "No prop. A native select over a closed list cannot hold a value outside it; an unmatched `value` simply selects nothing.",
+      "readonly": "No prop, and `readonly` has no effect on a `<select>` in any browser — `disabled` is the only off state the element has.",
+      "empty": "Reached by default here rather than by choice: with no `children` the select renders zero options, which is a state a caller can only produce by mistake."
+    },
+    "knobs": [
+      { "prop": "value", "type": "text", "value": "", "default": "" },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      { "prop": "ariaLabel", "type": "text", "value": "Difficulty", "default": "" },
+      { "prop": "onChange", "type": "event", "writes": "value" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "children",
+        "why": "The `<option>` list, and no filler can supply one: every entry in `FILLER_IDS` renders a span, a glyph, a paragraph or a shipped component, and a `<select>` drops all of them. A filler that emitted options would be the fix; standing in a span that renders nowhere would make the empty select look like a component that draws nothing."
+      },
+      {
+        "prop": "...rest",
+        "why": "Every other attribute is forwarded verbatim onto the real `<select>`, which is what a caller queries and what a test drives. Driving the bag would let the lab put arbitrary attributes — including a second `class` — on a shipped control."
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte",
+    "root": "manager",
+    "note": "The `player` variant renders under `.fabricate-app` in the product and this plinth wears the manager root, so that variant is drawn here in a cascade it does not normally meet: `authoring` is the default and the two GM variants are what the manager paints. `onToggle(!expanded)` is called with the NEXT state, so the disclosure genuinely opens and closes; `onDelete()` carries nothing and only logs.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the row is a `<div>` and its disclosure is the only `<button>`. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab to the disclosure or the delete control on the plinth.",
+      "disabled": true,
+      "loading": "No prop. Every string arrives already resolved by the caller.",
+      "invalid": "No prop, and deliberately so: `severity` is a NARRATIVE gravity axis and the component's own header refuses to route it through the validation vocabulary. A severe complication is not an invalid row.",
+      "readonly": "Reachable as `variant`: `readonly-gm` and `player` are the read-only faces — they drop the disclosure and the delete control — while `authoring` is the editable one. It is a variant rather than a `readonly` flag because the three also differ in which body they render.",
+      "empty": "Reachable by clearing `activities`, which releases the glyph run. The row itself always draws a severity tile and a name, so there is no empty row."
+    },
+    "knobs": [
+      {
+        "prop": "variant",
+        "type": "select",
+        "options": ["authoring", "readonly-gm", "player"],
+        "value": "authoring",
+        "default": "authoring"
+      },
+      {
+        "prop": "nameEmphasis",
+        "type": "select",
+        "options": ["display", "inline"],
+        "value": "display",
+        "default": "display"
+      },
+      { "prop": "name", "type": "text", "value": "Quenching crack", "default": "" },
+      {
+        "prop": "severity",
+        "type": "select",
+        "options": ["minor", "major", "severe"],
+        "value": "major",
+        "default": "minor"
+      },
+      { "prop": "severityLabel", "type": "text", "value": "Major", "default": "" },
+      {
+        "prop": "visibility",
+        "type": "select",
+        "options": ["gmOnly", "visible"],
+        "value": "visible",
+        "default": "gmOnly"
+      },
+      { "prop": "playerLabel", "type": "text", "value": "Player", "default": "" },
+      {
+        "prop": "triggerSentence",
+        "type": "text",
+        "value": "When the smithing check is missed or 1d20 = 1 · rolls 2d6",
+        "default": ""
+      },
+      {
+        "prop": "description",
+        "type": "text",
+        "value": "The blade cools too fast and takes a hairline crack along the spine.",
+        "default": ""
+      },
+      { "prop": "eyebrow", "type": "text", "value": "From Forge a blade", "default": "" },
+      { "prop": "statusLabel", "type": "text", "value": "This can go wrong", "default": "" },
+      {
+        "prop": "statusTone",
+        "type": "select",
+        "options": ["neutral", "info", "warning", "danger", "accent"],
+        "value": "neutral",
+        "default": "neutral"
+      },
+      { "prop": "bodyClamp", "type": "number", "value": 0, "default": 0, "min": 0, "max": 4 },
+      {
+        "prop": "activities",
+        "type": "json",
+        "default": null,
+        "value": [
+          { "icon": "fas fa-hammer", "title": "Crafting" },
+          { "icon": "fas fa-recycle", "title": "Salvage" },
+          { "icon": "fas fa-leaf", "title": "Gathering", "dim": true }
+        ]
+      },
+      { "prop": "expanded", "type": "boolean", "value": false, "default": false },
+      { "prop": "disclosureLabel", "type": "text", "value": "Edit Quenching crack", "default": "" },
+      { "prop": "deleteLabel", "type": "text", "value": "Remove complication", "default": "" },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      { "prop": "children", "type": "snippet", "value": "paragraph", "default": "" },
+      { "prop": "onToggle", "type": "event", "writes": "expanded" },
+      { "prop": "onDelete", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "controls",
+        "why": "The DOM id the disclosure points `aria-controls` at, and the id the expanded detail region is then given. Both ends are inside this component, so a value only matters to a caller wiring something else to the same id — and one id shared by the several instances this page mounts of one row would be a document-global collision."
+      },
+      {
+        "prop": "playerTitle",
+        "why": "A pointer tooltip on the Player pill. Real, but it renders in browser chrome outside the plinth and cannot be seen beside the specimen."
+      },
+      {
+        "prop": "dataAttr",
+        "why": "The NAME of a test hook attribute on the row. No visual consequence."
+      },
+      { "prop": "dataValue", "why": "That hook's value. Same reason." }
+    ],
+    "stories": [
+      { "title": "Every severity", "matrix": { "severity": "*" } },
+      { "title": "Every variant", "matrix": { "variant": "*" } },
+      { "title": "One line, or clamped to three", "matrix": { "bodyClamp": [0, 3] } }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/EditorValidationSurface.svelte",
+    "root": "manager",
+    "note": "One component covering BOTH library roles — the aggregate header the library calls `<ValidationSummary>` and the grouped row stack it calls `<ValidationList>` — which is why its manifest row leaves the correspondence unmade. `counts` is the surface's own vocabulary filter rather than a caller-ordered list: delete the `warnings` key and the Warnings tile disappears, which is how the two-state recipe-item studio gets a two-tile rail.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; a row's View button is the only hover target. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab to a row's View button on the plinth.",
+      "disabled": "No prop anywhere on this surface. It reports a verdict and offers a deep link; there is no off state for either, and a row whose `target` is absent simply renders no View button.",
+      "loading": "No prop. Every count and every row arrives already computed by the caller's validator.",
+      "invalid": "Reachable through the row `status` vocabulary: a `block` row emits `is-invalid` on its `<li>`, which is this surface's own spelling of the invalid state. It is data rather than a flag, because a validation surface REPORTS invalidity rather than being in it.",
+      "readonly": "Not applicable, and deliberately: the whole surface is read-only by contract. It shows consequences and links out, and never hosts the editing controls.",
+      "empty": "Reachable by clearing `groups`, which renders the header and the count rail over nothing. That is a real product state — an editor with no checks — and the surface draws no empty-state message for it."
+    },
+    "knobs": [
+      { "prop": "title", "type": "text", "value": "Validation", "default": "Validation" },
+      {
+        "prop": "intro",
+        "type": "text",
+        "value": "What this recipe still needs before players can craft it.",
+        "default": ""
+      },
+      {
+        "prop": "summary",
+        "type": "json",
+        "default": null,
+        "value": {
+          "status": "warning",
+          "icon": "fas fa-triangle-exclamation",
+          "title": "Craftable, with warnings",
+          "sub": "1 warning and 1 blocker across 2 groups"
+        }
+      },
+      {
+        "prop": "counts",
+        "type": "json",
+        "default": null,
+        "value": { "passing": 4, "warnings": 1, "blocking": 1 }
+      },
+      {
+        "prop": "countLabels",
+        "type": "json",
+        "default": null,
+        "value": { "passing": "Passing", "warnings": "Warnings", "blocking": "Blocking" }
+      },
+      {
+        "prop": "statusLabels",
+        "type": "json",
+        "default": null,
+        "value": { "pass": "PASS", "warn": "WARNING", "block": "BLOCKS ENABLE" }
+      },
+      {
+        "prop": "groups",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "id": "ingredients",
+            "icon": "fas fa-cube",
+            "label": "Ingredients",
+            "rows": [
+              {
+                "id": "has-option",
+                "status": "pass",
+                "title": "Every requirement option names an ingredient or an essence."
+              },
+              {
+                "id": "iron-linked",
+                "status": "warn",
+                "title": "Iron ingot is not linked to an Item.",
+                "detail": "Players will see the placeholder art until it is linked.",
+                "target": "ingredients"
+              }
+            ]
+          },
+          {
+            "id": "results",
+            "icon": "fas fa-gift",
+            "label": "Results",
+            "rows": [
+              {
+                "id": "has-result",
+                "status": "block",
+                "title": "This recipe produces nothing.",
+                "detail": "Add at least one result before enabling it.",
+                "target": "results"
+              },
+              {
+                "id": "quantities",
+                "status": "pass",
+                "title": "Every result quantity is positive."
+              }
+            ]
+          }
+        ]
+      },
+      { "prop": "viewLabel", "type": "text", "value": "View", "default": "View" },
+      { "prop": "onSelectIssue", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "class",
+        "why": "An EXTRA class appended to this surface's own, so a converted call site keeps the classes its shipped rules match on. Driving it would let the lab paint a surface the design system does not draw."
+      },
+      {
+        "prop": "hookAttrs",
+        "why": "The per-region `data-*` bag, keyed on the closed set root / summaryRow / summary / counts. It decides which attributes a caller's suites can find the chrome by, has no visual consequence, and a typo in a region key is silent — which is why the component guards it with a source contract rather than at render."
+      },
+      { "prop": "countAttrs", "why": "The same bag, keyed by count instead of by region." },
+      {
+        "prop": "rowDataAttr",
+        "why": "The NAME of one attribute, carrying the row id, stamped on every row. A test hook with no visual consequence."
+      },
+      {
+        "prop": "viewDataAttr",
+        "why": "The same, on a row's View button. Supplied by one caller today and defaulted everywhere else."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Three-state rail, and the two-state one",
+        "matrix": {
+          "counts": [
+            { "passing": 4, "warnings": 1, "blocking": 1 },
+            { "passing": 4, "blocking": 1 }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/ExplainerCard.svelte",
+    "root": "manager",
+    "note": "The guidance list is a `<ul>` and not an `<ol>`: these are a SET of independent facts about a screen, not a numbered procedure. A `links` entry needs BOTH an `href` and a `label` or the card drops it, which is the one piece of data validation on this row worth driving — clear either field on an entry and it disappears.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the docs links are the only hover targets. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab to a docs link on the plinth.",
+      "disabled": "No prop. The card is standing explanation; nothing on it can be turned off.",
+      "loading": "No prop. Every string arrives already localized by the caller.",
+      "invalid": "No prop. It holds no value.",
+      "readonly": "Not applicable: the whole card is read-only by construction.",
+      "empty": "Reachable by clearing `items`, which renders the title over an empty `<ul>` — the card keeps its border and its padding, so an explainer whose caller supplied no guidance draws as a titled empty box."
+    },
+    "knobs": [
+      { "prop": "icon", "type": "text", "value": "fas fa-circle-question", "default": "" },
+      { "prop": "title", "type": "text", "value": "How gathering works", "default": "" },
+      {
+        "prop": "items",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "icon": "fas fa-leaf",
+            "lead": "Tasks are the verbs.",
+            "text": "A gathering task says what a character does and which check it rolls."
+          },
+          {
+            "icon": "fas fa-map-location-dot",
+            "lead": "Environments are the where.",
+            "text": "An environment composes the tasks and events a location offers, either by matching tags or by an explicit pick."
+          },
+          {
+            "icon": "fas fa-clock",
+            "text": "Time of day and weather come from the world clock, so a task can be available only at dusk."
+          }
+        ]
+      },
+      {
+        "prop": "links",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "href": "https://misterpotts.github.io/fabricate/gathering/",
+            "label": "Gathering guide"
+          },
+          {
+            "href": "https://misterpotts.github.io/fabricate/quickstart/",
+            "label": "Quickstart",
+            "icon": "fas fa-rocket"
+          }
+        ]
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "dataAttr",
+        "why": "The NAME of a test hook attribute on the card root. No visual consequence."
+      },
+      { "prop": "dataValue", "why": "That hook's value. Same reason." }
+    ],
+    "stories": [
+      {
+        "title": "No links, one link, two",
+        "matrix": {
+          "links": [
+            [],
+            [
+              {
+                "href": "https://misterpotts.github.io/fabricate/gathering/",
+                "label": "Gathering guide"
+              }
+            ],
+            [
+              {
+                "href": "https://misterpotts.github.io/fabricate/gathering/",
+                "label": "Gathering guide"
+              },
+              {
+                "href": "https://misterpotts.github.io/fabricate/quickstart/",
+                "label": "Quickstart",
+                "icon": "fas fa-rocket"
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/IconFactRow.svelte",
+    "root": "manager",
+    "note": "Clearing `icon` RELEASES the glyph column rather than leaving it blank, which is the difference between this row and the two hand-rolled copies it replaced. The row owns its own well and nothing about how a container stacks a run of them, so a single specimen on a plinth is the whole component.",
+    "states": {
+      "rest": true,
+      "hover": "No prop, and nothing here is interactive: the row states one derived fact and offers no affordance.",
+      "focus-visible": "No prop, and no focusable element of its own.",
+      "disabled": "No prop. It reports a fact rather than offering a control, so there is nothing to turn off.",
+      "loading": "No prop. Both strings arrive already resolved by the caller's projection.",
+      "invalid": "No prop. It holds no value.",
+      "readonly": "Not applicable: it is read-only by construction.",
+      "empty": "Reachable by clearing `title` and `subtitle`, which draws the well and the glyph over nothing — a real failure mode for a caller whose projection returned no fact, and one the row does not guard against."
+    },
+    "knobs": [
+      { "prop": "icon", "type": "text", "value": "fas fa-dice-d20", "default": "" },
+      { "prop": "title", "type": "text", "value": "Roll to break", "default": "" },
+      {
+        "prop": "subtitle",
+        "type": "text",
+        "value": "Check-driven — follows the crafting roll",
+        "default": ""
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "titleAttr",
+        "why": "The NAME of a test hook stamped on the `<strong>`, so a caller can assert the rendered value of ONE named fact. No visual consequence."
+      },
+      { "prop": "dataAttr", "why": "The same, on the row itself." },
+      { "prop": "dataValue", "why": "That hook's value. Same reason." }
+    ],
+    "stories": [
+      { "title": "With a glyph, and without", "matrix": { "icon": ["fas fa-dice-d20", ""] } },
+      {
+        "title": "One line, or a qualified fact",
+        "matrix": { "subtitle": ["", "Check-driven — follows the crafting roll"] }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte",
+    "root": "manager",
+    "note": "THE LIVE HINT MACHINE IS A FUNCTION AND THE CATALOGUE HAS NO FUNCTION KNOB. `describeInput`, `normalize` and `successFeedback` are all callables, and JSON cannot carry one, so the specimen runs the component's own defaults: no hint, a trimming normalizer and no success sentence. The typed-and-blocked branch — the reason this form exists — is therefore the one state the lab cannot reach, and that is a gap in the knob vocabulary rather than in this row. `showIcon` opens the shared `IconPicker`, so this specimen also proves the portaled overlay path from inside another component.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the Add button and the icon trigger are the hover targets. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab into the field on the plinth. The form also returns focus to the input after every submit attempt, which is observable there.",
+      "disabled": "No prop of its own. The Add button disables ITSELF while the field is empty, while the live hint blocks, and while a submit is in flight — three states the component owns rather than the caller.",
+      "loading": "Reachable only by SUBMITTING: `submitting` is internal state that disables the Add button while `onAdd` is awaited. The lab's recorder returns immediately, so the state exists and flashes rather than being holdable.",
+      "invalid": "NOT REACHABLE from any prop this row can express. The invalid state is `describeInput` returning `{tone: 'danger', blocked: true}`, and that is a function prop — see the note. Everything downstream of it, including the refusal to submit, is unreachable with it.",
+      "readonly": "No prop. The form is either accepting input or has its Add button refused; neither is read-only.",
+      "empty": "Its OWN rest state: the field opens empty and the Add button is disabled until it holds something. That is the state a GM meets, not an edge case."
+    },
+    "knobs": [
+      { "prop": "inputId", "type": "text", "value": "pl-vocabulary-add", "default": "" },
+      { "prop": "inputLabel", "type": "text", "value": "New category", "default": "" },
+      { "prop": "inputPlaceholder", "type": "text", "value": "Blacksmithing", "default": "" },
+      { "prop": "addLabel", "type": "text", "value": "Add category", "default": "" },
+      { "prop": "showIcon", "type": "boolean", "value": true, "default": false },
+      { "prop": "iconLabel", "type": "text", "value": "Icon", "default": "" },
+      {
+        "prop": "changeIconLabel",
+        "type": "text",
+        "value": "Choose a category icon",
+        "default": ""
+      },
+      {
+        "prop": "defaultIcon",
+        "type": "text",
+        "value": "fas fa-folder",
+        "default": "fas fa-folder"
+      },
+      {
+        "prop": "addFailedFeedback",
+        "type": "text",
+        "value": "That category already exists.",
+        "default": ""
+      },
+      { "prop": "onAdd", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "describeInput",
+        "why": "A FUNCTION: `(raw) => {tone, message, blocked}`, the live validation machine both callers own. The catalogue's knob types are select, boolean, text, number, colour, json, snippet and event, and none of them can carry a callable, so the component's own no-hint default stands. The states this puts out of reach are recorded under `invalid`."
+      },
+      {
+        "prop": "normalize",
+        "why": "A FUNCTION, `(raw) => value`, deciding what is actually emitted to `onAdd`. Same reason; the component's own trim stands."
+      },
+      {
+        "prop": "successFeedback",
+        "why": "A FUNCTION, `(value, raw) => sentence`. Same reason; a knob would have to be the sentence rather than the function that builds it, which is a different prop."
+      }
+    ],
+    "stories": [{ "title": "With and without the icon field", "matrix": { "showIcon": "*" } }]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/InspectorActionButton.svelte",
+    "root": "manager",
+    "note": "Its four tones are four of the six ROLES `library.html` specifies on the single button primitive, and it exists anyway because it could not be `.manager-button`: the global sheet's `.fabricate-manager .manager-button.is-primary` is three classes against a scoped rule's two, so reusing the class would put this primitive's own tones behind the global sheet's. It is FULL WIDTH by contract, so the plinth shows it filling the stage rather than sized to its label.",
+    "states": {
+      "rest": true,
+      "hover": "No prop. `:hover` is not settable from a prop — read the plinth's live pseudo-class readout.",
+      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab to the button on the plinth.",
+      "disabled": true,
+      "loading": "No prop, and no way to set `aria-busy` — which the spec requires of a loading control. Every verb in a right-hand rail either opens a sheet or starts a write the caller awaits somewhere else, so the pending state has nowhere to be drawn.",
+      "invalid": "Not applicable: a button holds no value that could be invalid.",
+      "readonly": "Not applicable: a button holds no value that could be read-only.",
+      "empty": "Not applicable: it renders one glyph and one label, never a collection."
+    },
+    "knobs": [
+      {
+        "prop": "tone",
+        "type": "select",
+        "options": ["neutral", "primary", "danger", "warning"],
+        "value": "primary",
+        "default": "neutral"
+      },
+      { "prop": "icon", "type": "text", "value": "fas fa-pen-to-square", "default": "" },
+      { "prop": "label", "type": "text", "value": "Edit essence", "default": "" },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      { "prop": "ariaLabel", "type": "text", "value": "", "default": "" },
+      { "prop": "onClick", "type": "event" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "title",
+        "why": "A pointer tooltip. Real, but it renders in browser chrome outside the plinth and cannot be captured beside the specimen."
+      },
+      {
+        "prop": "...rest",
+        "why": "Every other attribute is forwarded onto the `<button>` so a converted call site keeps its own selectors. Driving the bag would let the lab put arbitrary attributes — including a second `class` — on a shipped control, which is the one thing this page must never do."
+      }
+    ],
+    "stories": [
+      { "title": "Every tone", "matrix": { "tone": "*" } },
+      { "title": "Every tone, disabled", "matrix": { "tone": "*", "disabled": [true] } }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/ResolutionModeCard.svelte",
+    "root": "manager",
+    "note": "ONE RADIO NAME IS ONE GROUP FOR THE WHOLE DOCUMENT, and this page mounts the row several times — on the workbench, once per theme and once per story cell. They all share the `groupName` knob, so a click in one plinth is a native de-selection in every other. Nothing is left inconsistent, because every radio is CONTROLLED by `selectedValue` and `onChange` writes back into it, so the next render restores them all to the same answer. The `*Key` props are localization keys and are waived: the card falls back to the `*Fallback` strings whenever a key resolves to itself, and the fallbacks are what the lab renders.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; each option row is a `<label>` around a real radio. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab into the group on the plinth. The ring is the shipped `:focus-visible` treatment the global sheet declares on the radio.",
+      "disabled": "Reachable per OPTION rather than per card: an option carrying `disabled: true` renders a real disabled radio, an `is-disabled` row and a visible Coming soon badge, and clicking it never fires `onChange`. The card itself has no disabled prop.",
+      "loading": "No prop. The mode list is a static vocabulary the caller states.",
+      "invalid": "No prop. A radio group over a closed set cannot hold an invalid value; a `selectedValue` matching no option simply checks nothing, which the component records as an honest unset state.",
+      "readonly": "No prop, and `readonly` has no effect on a radio in any browser — a disabled option is the only off state here.",
+      "empty": "Reachable by clearing `options`, which renders the legend and the hint over no rows at all — an honest picture of a resolution surface whose modes have not been declared."
+    },
+    "knobs": [
+      {
+        "prop": "legendFallback",
+        "type": "text",
+        "value": "How crafting is resolved",
+        "default": ""
+      },
+      {
+        "prop": "hintFallback",
+        "type": "text",
+        "value": "Changing this does not rewrite recipes that already carry outcomes.",
+        "default": ""
+      },
+      {
+        "prop": "options",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "value": "always-succeed",
+            "fallback": "Always succeeds",
+            "descFallback": "Crafting consumes the ingredients and produces the results, with no roll.",
+            "icon": "fas fa-circle-check"
+          },
+          {
+            "value": "check",
+            "fallback": "Check-driven",
+            "descFallback": "A character rolls the system check; the outcome tier decides what is produced.",
+            "icon": "fas fa-dice-d20"
+          },
+          {
+            "value": "chance",
+            "fallback": "Chance-driven",
+            "descFallback": "Each result carries its own percentage chance of being produced.",
+            "icon": "fas fa-percent"
+          },
+          {
+            "value": "contest",
+            "fallback": "Contested",
+            "descFallback": "Two characters roll against one another.",
+            "icon": "fas fa-scale-balanced",
+            "disabled": true,
+            "badgeFallback": "Coming soon"
+          }
+        ]
+      },
+      { "prop": "selectedValue", "type": "text", "value": "check", "default": "" },
+      { "prop": "groupName", "type": "text", "value": "pl-resolution-mode", "default": "" },
+      {
+        "prop": "variant",
+        "type": "select",
+        "options": ["", "config-card"],
+        "value": "config-card",
+        "default": ""
+      },
+      { "prop": "onChange", "type": "event", "writes": "selectedValue" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "legendKey",
+        "why": "A localization KEY. The card renders the key's translation when there is one and `legendFallback` otherwise, so driving both would let the lab show a legend neither knob names — the lab's world carries the shipped translations, so a real key silently outranks the fallback on screen."
+      },
+      { "prop": "hintKey", "why": "The same, for the hint." },
+      {
+        "prop": "cardId",
+        "why": "A DOM id on the `<fieldset>`, for a caller associating its own heading with the card. This page mounts the row several times, so one id would be a document-global collision."
+      },
+      {
+        "prop": "dataAttr",
+        "why": "The NAME of a test hook attribute on the fieldset. No visual consequence."
+      },
+      { "prop": "optionDataAttr", "why": "The same, on each option row, valued by the option." }
+    ],
+    "stories": [{ "title": "Config cards, and the compact rows", "matrix": { "variant": "*" } }]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/SubjectModifierPicker.svelte",
+    "root": "manager",
+    "note": "THE ONE ROW HERE WHOSE WRITE-BACK IS EXACT. `onChange(nextIdsOrNull)` is called with the whole next value — `null` restores inheritance, an array (including an empty one) authors a pick — so `writes: selectedIds` closes the loop and the specimen behaves like the product: the checkbox flips between the inherited sentence and the pill row, and each pill add or remove lands back in the knob. The distinction the component exists to make is visible on the plinth: an ABSENT array inherits the activity default set, an AUTHORED EMPTY array is a real pick of zero, and they are different rolls. It also imports `systems/checkModifierResolver.js` for the cap, which is a pure module and mounts with no world.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the checkbox, the pills and the add trigger are the hover targets. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab into the control on the plinth. Removing a pill also moves focus to its neighbour, which is observable there.",
+      "disabled": true,
+      "loading": "No prop. The catalogue arrives already resolved from the system record.",
+      "invalid": "No prop. Every pick is a member of `options` by construction, and an id naming nothing is DROPPED exactly as the resolver drops it rather than marked invalid.",
+      "readonly": "Reachable as a data state rather than a flag: with `selectedIds` null the record inherits, so the pill row is replaced by the named inherited set and there is nothing to author. `disabled` is the only true off state.",
+      "empty": "TWO different empties, and both are reachable. `selectedIds: []` is an authored pick of zero and renders `noneSelectedLabel` on the nested pill row; `options: []` hides the whole surface, because a system with no modifier catalogue has nothing to offer."
+    },
+    "knobs": [
+      {
+        "prop": "options",
+        "type": "json",
+        "default": null,
+        "value": [
+          { "id": "smiths-tools", "label": "Smiths tools", "icon": "fas fa-hammer" },
+          { "id": "herbalism-kit", "label": "Herbalism kit", "icon": "fas fa-mortar-pestle" },
+          { "id": "medicine", "label": "Medicine", "icon": "fas fa-kit-medical" },
+          { "id": "alchemy", "label": "Alchemy", "icon": "fas fa-flask" },
+          { "id": "forge-heat", "label": "A hot forge", "icon": "fas fa-fire" }
+        ]
+      },
+      { "prop": "selectedIds", "type": "json", "default": null, "value": ["smiths-tools"] },
+      {
+        "prop": "inheritedIds",
+        "type": "json",
+        "default": null,
+        "value": ["medicine", "herbalism-kit"]
+      },
+      {
+        "prop": "maxPicks",
+        "type": "number",
+        "value": 2,
+        "default": null,
+        "allowUnset": true,
+        "min": 0,
+        "max": 5
+      },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      {
+        "prop": "subject",
+        "type": "select",
+        "options": ["component", "task"],
+        "value": "component",
+        "default": "component"
+      },
+      { "prop": "onChange", "type": "event", "writes": "selectedIds" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "testId",
+        "why": "The `data-subject-modifier-*` hook VALUE, so a suite can tell the salvage picker from the gathering one. It is handed to the nested `ModifierPillSelect` as its own hook too, and neither has a visual consequence."
+      }
+    ],
+    "stories": [
+      { "title": "Both subjects", "matrix": { "subject": "*" } },
+      {
+        "title": "Inheriting, an authored zero, and an authored pick",
+        "matrix": { "selectedIds": [null, [], ["smiths-tools", "alchemy"]] }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/ToggleCard.svelte",
+    "root": "manager",
+    "note": "A COMPOSITION of two library entries rather than an entry itself: `<Card>` is the container and `<Toggle>` is the bare control, and this card is the two together with an icon and a sub-line. `onToggle(!on)` is called with the NEXT state, so `writes: on` closes the loop and the switch actually moves — the card's own `is-on` / `is-off` class changes with it, which a static specimen could never show.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; the switch is the only hover target. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab to the switch on the plinth.",
+      "disabled": true,
+      "loading": "No prop, and no `aria-busy` anywhere. A card whose switch starts an awaited write has nowhere to say so, which is a gap in the component rather than in this row.",
+      "invalid": "No prop. A binary control cannot hold an invalid value; a caller that must refuse the ON position uses `disabled` plus `toggleTitle` to say why.",
+      "readonly": "No prop. `disabled` is the only off state, and the component's header records that a disabled switch plus a conditional tooltip is the shipped idiom for a refusal.",
+      "empty": "Reachable by clearing `sub`, which still renders the sub-line paragraph — that element is unconditional, so an empty sub-line is a blank row rather than a released one, unlike `icon`, which genuinely drops its slot."
+    },
+    "knobs": [
+      { "prop": "title", "type": "text", "value": "Enabled", "default": "" },
+      { "prop": "sub", "type": "text", "value": "Players can craft this recipe.", "default": "" },
+      {
+        "prop": "icon",
+        "type": "text",
+        "value": "fas fa-circle-check",
+        "default": "fas fa-circle"
+      },
+      { "prop": "on", "type": "boolean", "value": true, "default": false },
+      { "prop": "disabled", "type": "boolean", "value": false, "default": false },
+      {
+        "prop": "variant",
+        "type": "select",
+        "options": ["", "is-info", "is-enabled", "is-locked"],
+        "value": "is-enabled",
+        "default": ""
+      },
+      { "prop": "toggleLabel", "type": "text", "value": "Enable this recipe", "default": "" },
+      { "prop": "onToggle", "type": "event", "writes": "on" }
+    ],
+    "unknobbed": [
+      {
+        "prop": "toggleTitle",
+        "why": "A pointer tooltip on the SWITCH — the only explanation a GM gets for why the switch is disabled when validation blocks enabling. Real and load-bearing, but it renders in browser chrome outside the plinth and cannot be seen beside the specimen."
+      },
+      {
+        "prop": "section",
+        "why": "The VALUE of the card's `data-recipe-section` hook. No visual consequence."
+      },
+      {
+        "prop": "field",
+        "why": "The value of the switch's `data-recipe-field` hook. Same reason."
+      },
+      {
+        "prop": "subAttr",
+        "why": "The NAME of a hook attribute on the sub-line, emitted bare rather than as `=\"true\"`. Driving it would let the lab emit a byte a caller cannot."
+      },
+      { "prop": "toggleAttr", "why": "The same, on the switch." }
+    ],
+    "stories": [
+      { "title": "On and off", "matrix": { "on": "*" } },
+      { "title": "Every variant", "matrix": { "variant": "*", "on": [true] } }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
+    "root": "manager",
+    "note": "THE HEAVIEST SPECIMEN ON THE PAGE, and it mounts against props alone: it imports two `src/systems/` modules, the gathering image defaults and seven sibling components, all of which are pure browser modules. It renders FOUR sections and never all four at once — `automatic` draws Included, Excluded and Non-matching, `manual` replaces the last two with Available to add — which is the measurement its manifest row makes against `<ListRow>`. `onSelect(kind, id)` reports the id as its SECOND argument, so `arg: 1` is what makes row selection actually move; every other callback reports `(kind, id)` or `(kind, from, to)` and can write nothing back into `records`, so include, exclude, restore, force-add and reorder log and leave the list where it was. The row images are real harvested Foundry core art, because the lab may not invent an asset path.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; rows, quick actions and menu triggers are all hover targets. Read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; tab into the list on the plinth. Each row body is a `role=\"button\"` with `tabindex=\"0\"`, and the action menu moves focus into its own items on open.",
+      "disabled": "No prop of its own, and the closest thing is DATA: a record in `libraryDisabled` offers a disabled `menuitem` note instead of an add verb. There is no way to turn the whole list off, which is right — a composition editor with nothing operable would be a report.",
+      "loading": "No prop. Every record arrives already projected by the environment model.",
+      "invalid": "No prop, and the vocabulary refuses the idea: a record that does not match is `notMatching`, which is a composition STATE with its own section and its own force-add verb, not an error.",
+      "readonly": "No prop. Both modes are editable; what changes between them is which verbs each section offers.",
+      "empty": "Reachable per section by clearing `records`, and it is worth reaching: every one of the four sections draws its own `EmptyState` with its own glyph and its own sentence, which is four distinct empties in one component."
+    },
+    "knobs": [
+      {
+        "prop": "kind",
+        "type": "select",
+        "options": ["task", "event"],
+        "value": "task",
+        "default": "task"
+      },
+      {
+        "prop": "mode",
+        "type": "select",
+        "options": ["automatic", "manual"],
+        "value": "automatic",
+        "default": "automatic"
+      },
+      {
+        "prop": "selectionMode",
+        "type": "select",
+        "options": ["targeted", "blind"],
+        "value": "blind",
+        "default": "targeted"
+      },
+      {
+        "prop": "eventSelectionMode",
+        "type": "select",
+        "options": ["allDrops", "highestRankedDrop"],
+        "value": "allDrops",
+        "default": "allDrops"
+      },
+      {
+        "prop": "records",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "id": "gather-riverbank-herbs",
+            "compositionState": "includedByMatch",
+            "runtimeState": "available",
+            "conditionsMet": true,
+            "hasDropRateAdjustment": false,
+            "record": {
+              "name": "Gather riverbank herbs",
+              "description": "Search the shallows for basil, dill and river mint.",
+              "img": "icons/consumables/plants/basil-herb-green.webp"
+            }
+          },
+          {
+            "id": "strip-oak-bark",
+            "compositionState": "explicitlyIncluded",
+            "runtimeState": "available",
+            "conditionsMet": true,
+            "hasDropRateAdjustment": true,
+            "record": {
+              "name": "Strip oak bark",
+              "description": "Take bark from a fallen oak without killing the tree.",
+              "img": "icons/commodities/wood/bark-brown.webp"
+            }
+          },
+          {
+            "id": "quarry-flint",
+            "compositionState": "forceIncluded",
+            "runtimeState": "unavailable",
+            "conditionsMet": false,
+            "hasDropRateAdjustment": false,
+            "record": {
+              "name": "Quarry flint",
+              "description": "Break nodules out of the chalk face. Needs a hammer.",
+              "img": "icons/tools/smithing/anvil.webp"
+            }
+          },
+          {
+            "id": "net-the-shallows",
+            "compositionState": "excluded",
+            "runtimeState": "unavailable",
+            "conditionsMet": true,
+            "hasDropRateAdjustment": false,
+            "record": {
+              "name": "Net the shallows",
+              "description": "Excluded by the GM: this forest has no standing water.",
+              "img": "icons/magic/nature/cornucopia-orange.webp"
+            }
+          },
+          {
+            "id": "tap-desert-succulents",
+            "compositionState": "notMatching",
+            "runtimeState": "unavailable",
+            "conditionsMet": false,
+            "hasDropRateAdjustment": false,
+            "record": {
+              "name": "Tap desert succulents",
+              "description": "Tagged arid; this environment is tagged temperate forest.",
+              "img": "icons/consumables/plants/aloe-succulent-green.webp"
+            }
+          },
+          {
+            "id": "salvage-a-wreck",
+            "compositionState": "libraryDisabled",
+            "runtimeState": "unavailable",
+            "conditionsMet": false,
+            "hasDropRateAdjustment": false,
+            "record": {
+              "name": "Salvage a wreck",
+              "description": "Switched off in the task library, so no environment can offer it."
+            }
+          }
+        ]
+      },
+      {
+        "prop": "weights",
+        "type": "json",
+        "default": null,
+        "value": { "gather-riverbank-herbs": 3, "strip-oak-bark": 2, "quarry-flint": 1 }
+      },
+      { "prop": "selectedId", "type": "text", "value": "strip-oak-bark", "default": "" },
+      { "prop": "onSelect", "type": "event", "writes": "selectedId", "arg": 1 },
+      { "prop": "onWeightChange", "type": "event" },
+      { "prop": "onInclude", "type": "event" },
+      { "prop": "onForceInclude", "type": "event" },
+      { "prop": "onExclude", "type": "event" },
+      { "prop": "onRestore", "type": "event" },
+      { "prop": "onReorder", "type": "event" },
+      { "prop": "onOpenSource", "type": "event" }
+    ],
+    "stories": [
+      { "title": "Automatic, and manual", "matrix": { "mode": "*" } },
+      { "title": "Targeted, and blind weights", "matrix": { "selectionMode": "*" } },
+      { "title": "Tasks, and ranked events", "matrix": { "kind": "*", "eventSelectionMode": "*" } }
+    ]
+  }
+]
