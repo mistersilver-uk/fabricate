@@ -28,15 +28,15 @@
   against a set of one is a seam for a variation the product does not contain.
 
   ── WHAT THIS COMPONENT DOES NOT OWN ──────────────────────────────────────────────
-  No variant prop, and that is a deliberate scope line. The card has four painted
+  No variant prop, and that is a deliberate scope line. The card has three painted
   treatments in the sheet and they are not one vocabulary: the base box;
   `.manager-checks-card` (radius 11, padding 0, `--fab-bg-2`; `fabricate.css:2500`),
-  keyed on the card's own modifier class; the Checks rail's box (`:3308`) and its
+  keyed on the card's own modifier class; and the Checks rail's box (`:3308`) and its
   `.is-rail-list` compaction (`:3447`), the first of which is keyed on an ANCESTOR
-  (`.manager-checks-rail`) and reaches cards carrying no modifier at all; and
-  `.is-sticky` (`:5404`), which is a positioning state rather than a treatment AND
-  has no call site anywhere under `src/` — measured, not assumed. A closed `variant`
-  set spanning three different anchors, one of which nothing renders, is a design
+  (`.manager-checks-rail`) and reaches cards carrying no modifier at all. A fourth,
+  `.is-sticky`, had no call site anywhere under `src/` — measured, not assumed — and
+  was deleted from the sheet in issue 1498. A closed `variant`
+  set spanning three different anchors is a design
   ruling; landing one inside an 80-site sweep whose entire acceptance bar is that no
   frame moves puts it exactly where nobody can review it. Every modifier therefore
   travels as a pass-through on `class`, spelled as it is spelled today, and the

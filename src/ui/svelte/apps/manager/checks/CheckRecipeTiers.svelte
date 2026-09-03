@@ -26,8 +26,7 @@
 
   Drag is the pointer half. The grip is also a real BUTTON that moves its row with the arrow
   keys, because HTML5 drag-and-drop has no keyboard path at all and reordering would
-  otherwise be mouse-only — the same failure `manager-recipe-result-move` exists to avoid on
-  the progressive result list. The prototype draws one affordance, so this is one affordance
+  otherwise be mouse-only. The prototype draws one affordance, so this is one affordance
   that answers both inputs rather than a grip plus a visible chevron rocker.
 -->
 <script>

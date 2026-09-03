@@ -330,7 +330,7 @@
      rule forbids. So the slot's pin stays and the primitive learns to fill it.
 
      `--fab-stepper-fill-height` defaults to 36px, the height `.manager-field
-     input`/`select` and `.manager-checks-outcome-row input` both resolve to. It is a
+     input`/`select` resolves to. It is a
      custom property rather than a constant because the candidate layout contexts do
      NOT agree: 30px on the economy actor cells, 34px on the tool inline fields, 28px
      on the environment composition weight field. Taking a SIZE from the layout context

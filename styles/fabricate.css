@@ -1316,7 +1316,6 @@
   background: var(--fab-success);
 }
 
-
 /* ==========================================
    Image path picker (environment editor)
    ========================================== */
@@ -3075,13 +3074,6 @@
   cursor: grabbing;
 }
 
-/* The catalogue's standing statement about where the list comes from, glyph-led on the same
-   rule as the band strip's hint: a decoration on prose, at the sentence's own size. */
-.fabricate-manager .manager-modifier-catalogue-intro > i {
-  margin-right: var(--fab-space-chip);
-  color: var(--fab-info);
-}
-
 /* The preset row. Each preset is the dashed ADD role, because that is what it does — it
    appends a row to the list below — and the row wraps rather than scrolling, so a narrow
    pane stacks them instead of hiding the second one. */
@@ -4070,18 +4062,6 @@
    (issue 855), so they carry the `manager-resolution-mode-card is-config-cards`
    contract rather than a bespoke grid of their own. */
 
-.fabricate-manager .manager-checks-dice {
-  display: grid;
-  gap: var(--fab-space-1);
-  margin-top: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-checks-outcome-table {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 /* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050.
    That is the shared `Stepper`'s own natural width — 54px of fixed chrome (two 22px
    adjuncts, 2x2px gap, 2x2px padding, 2x1px border) plus its 48px input. The `fill`
@@ -4089,54 +4069,6 @@
    DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
    not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
    they are the least-used columns. */
-
-/* The leading 12px track is the BAND SWATCH: the tier row's own colour on the strip above
-   it, so the ramp on the track has a key. It is the narrowest column by a wide margin
-   because it carries no text and no target — it is a legend, not a control.
-
-   12px, not the 10px it shipped at, because the swatch is a 12x12 DOT: the track is the dot's
-   own diameter, so the four literals below move with the rule that draws it. */
-.fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 124px 40px;
-}
-
-.fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 124px 40px;
-}
-
-/* checkDriven authority drops the per-outcome break-tools column (tool breakage is
-   authored via the CheckBreakage editor instead). */
-.fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 40px;
-}
-
-.fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 40px;
-}
-
-/* A 12x12 ROUND DOT in the band's own SATURATED hue — not the mixed fill the band paints
-   (issue 1096). The band is a 26% mix into `--fab-bg-0` because it has to carry a tier NAME at
-   AA; the dot carries no text, so it can show the hue at full strength, and the two read as the
-   same key precisely because the dot is the undiluted version of the band's tone. It also needs
-   no border: a saturated dot separates from the row surface on its own, where the pale 10x24
-   mixed bar it replaced did not and had to be outlined to be seen at all.
-
-   Painted from an inline custom property rather than an inline `background`: the declared
-   fallback means an absent colour paints the neutral surface instead of nothing, and it is the
-   only shape a `color-mix()` survives happy-dom's `cssText` parser in — so the pairing stays
-   testable even though this rule now takes a plain token. */
-.fabricate-manager .manager-checks-outcome-swatch {
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--fab-outcome-swatch, var(--fab-surface-active));
-}
-
-/* Simple-check recipe tiers: Name + DC + remove. */
-.fabricate-manager .manager-checks-outcome-table.is-tier {
-  grid-template-columns: minmax(140px, 1fr) 102px 40px;
-}
 
 /* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ──────
    A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition
@@ -4520,37 +4452,6 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-checks-force-outcome {
-  display: flex;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-checks-force-outcome .manager-checks-state-pill {
-  flex: 1 1 0;
-  width: auto;
-}
-
-.fabricate-manager .manager-checks-crit-group {
-  display: grid;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-checks-crit-group-head {
-  margin-bottom: 0;
-}
-
-.fabricate-manager .manager-checks-crit-die {
-  font-weight: 700;
-}
-
-/* Per-group hint copy: the multi-die group-total explainer and the modified-pool
-   crit-ineligibility hint (see issue 443). Reuses the muted-copy treatment so it
-   wraps cleanly at narrow widths. */
-.fabricate-manager .manager-checks-crit-hint {
-  color: var(--fab-text-muted);
-}
-
 /* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
    Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the
    suggestion chips. Every value is the prototype's, authored in px for the reason the
@@ -4695,27 +4596,6 @@
   line-height: 1.5;
 }
 
-/* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a
-   compact inline layout for the linked-macro name + unlink control. */
-.fabricate-manager .manager-checks-macro-drop-zone {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-checks-macro-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-checks-macro-name.is-missing {
-  color: var(--fab-danger-text);
-}
-
 /* Tier state controls are red/green pills that flip on click: the label shows
    the current state (Success/Failure, Break/Don't break) and the colour reflects
    its valence (green = success / keeps tools, red = failure / breaks tools). */
@@ -4748,60 +4628,6 @@
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
-}
-
-.fabricate-manager .manager-checks-outcome-head,
-.fabricate-manager .manager-checks-outcome-row {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: subgrid;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-checks-outcome-head {
-  padding: 0 var(--fab-space-2) var(--fab-space-2xs);
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-checks-outcome-row {
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-}
-
-.fabricate-manager .manager-checks-outcome-row.is-invalid {
-  border-color: var(--fab-danger);
-}
-
-/* `:not(.fab-stepper-input)` — same collision, same reason as the `.manager-field` rule at
-   :7854, on the outcome rows the checks editors build by hand. This rule is
-   `.fabricate-manager .manager-checks-outcome-row input` at (0,3,0), which out-specifies the
-   Stepper's own scoped `.fab-stepper-input` chrome, so a migrated DC / Start / End field
-   would be re-bordered and stretched to a 36px box INSIDE the stepper's own bordered box.
-   The stepper takes the row's 36px on its WRAPPER instead, via the `fill` variant. */
-.fabricate-manager .manager-checks-outcome-row input:not(.fab-stepper-input) {
-  width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-checks-validation {
-  list-style: none;
-  margin: var(--fab-space-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
 }
 
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
@@ -4872,43 +4698,6 @@
   align-items: center;
   flex: 0 0 auto;
   margin-left: auto;
-}
-
-/*
-  Whole-section collapse (issue 768) — a chevron toggle in each settings-list card
-  header, mirroring the category-collapse affordance. The wrapped body preserves the
-  card's own column gap so collapsing/expanding never reflows the inner spacing.
-
-  A bare chevron — no box — so the section header title/hint/actions stay flush with
-  the card body (and the chevron aligns vertically with the accordion-row chevrons
-  below it) instead of being indented by a boxed button. `margin-top` nudges it onto
-  the title's first line since the header aligns its cross axis to flex-start.
-*/
-.fabricate-manager .manager-section-collapse-toggle {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 12px;
-  margin-top: 2px;
-  padding: 0;
-  border: 0;
-  color: var(--fab-text-subtle);
-  background: none;
-  font-size: 0.78rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-section-collapse-toggle:hover {
-  color: var(--fab-text-secondary);
-}
-
-.fabricate-manager .manager-section-collapse-toggle:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-section-body {
@@ -5288,14 +5077,6 @@
   background: var(--fab-bg-3);
 }
 
-.fabricate-manager .manager-character-modifier-customized-badge {
-  font-size: 0.7rem;
-  border: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
-  padding: var(--fab-space-2xs) var(--fab-space-chip);
-  border-radius: 999px;
-}
-
 .fabricate-manager .manager-character-modifier-stale-warning {
   color: var(--fab-danger);
   font-size: 0.75rem;
@@ -5537,17 +5318,6 @@
   min-height: 0;
   padding-top: var(--fab-space-3);
   overflow: hidden auto;
-}
-
-.fabricate-manager .manager-inspector-card.is-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--fab-bg-2);
-  border-bottom: 1px solid var(--fab-border);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  box-shadow: 0 2px 6px var(--fab-overlay-dark-25);
 }
 
 .fabricate-manager .manager-drop-editor-header-card {
@@ -5832,14 +5602,6 @@
   overflow-y: auto;
 }
 
-.fabricate-manager .manager-toolbar-primary {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
 .fabricate-manager .manager-toolbar-pills {
   display: flex;
   align-items: center;
@@ -5894,12 +5656,6 @@
   max-width: 320px;
 }
 
-.fabricate-manager .manager-tag-search-label {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  width: 100%;
-}
-
 .fabricate-manager .manager-tag-search input {
   min-width: 0;
   height: 34px;
@@ -5945,13 +5701,6 @@
 .fabricate-manager .manager-tag-suggestion:focus-visible {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-tag-no-matches {
-  padding: var(--fab-space-1) var(--fab-space-2);
-  color: var(--fab-text-muted);
-  font-size: 0.78rem;
-  font-weight: 600;
 }
 
 .fabricate-manager .manager-selected-tag-row {
@@ -8558,7 +8307,6 @@
   flex: 0 0 auto;
 }
 
-
 .fabricate-manager .manager-recipe-preview {
   width: 56px;
   height: 56px;
@@ -8645,11 +8393,6 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-system-inspector-heading {
-  display: block;
-  min-width: 0;
-}
-
 .fabricate-manager .manager-system-description {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -8682,10 +8425,6 @@
   gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
-}
-
-.fabricate-manager .manager-stat {
-  font-weight: 700;
 }
 
 .fabricate-manager .manager-recipe-status {
@@ -9150,20 +8889,6 @@
   overflow-wrap: break-word;
 }
 
-.fabricate-manager .manager-essence-source-panel {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-essence-source-stack {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 /* TWO tracks, not three (issue 1036, maintainer round 2). The third reserved a 34px cell for
    an inline clear button, and the ONE surface that rendered one — the editor's On-craft tab —
    now renders the Tool Studio's `ItemDropZone` card instead, whose grouped actions are the
@@ -9528,23 +9253,6 @@
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-  color: var(--fab-text-muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-toggle input {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  accent-color: var(--fab-accent);
-}
-
 .fabricate-manager .manager-requirements-list,
 .fabricate-manager .manager-inspector-actions {
   display: flex;
@@ -9626,16 +9334,6 @@
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-environment-editor-shell .environments-panel {
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
-}
-
-.fabricate-manager .manager-environment-editor-shell .environment-foundation {
-  min-width: 0;
 }
 
 /* The two-column editor routes. `component-edit` joined this list in issue 676:
@@ -10196,396 +9894,7 @@
   min-height: 0;
 }
 
-.fabricate-manager .manager-environment-details-band,
-.fabricate-manager .manager-environment-fields-card,
-.fabricate-manager .manager-environment-scene-card,
-.fabricate-manager .manager-environment-status-card,
-.fabricate-manager .manager-environment-validation-band,
-.fabricate-manager .manager-environment-task-rail,
-.fabricate-manager .manager-environment-task-editor {
-  min-width: 0;
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-environment-details-band {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-task-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-tabs button {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-chip);
-  min-height: 32px;
-  min-width: 0;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-dark-16);
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-task-tabs button.active {
-  border-color: var(--fab-border-strong);
-  color: var(--fab-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-task-tabs button[data-environment-invalid="true"] {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .manager-environment-details-grid {
-  display: grid;
-  grid-template-columns: minmax(300px, 1.02fr) minmax(360px, 1.1fr) minmax(230px, 0.58fr);
-  gap: var(--fab-space-3);
-  min-width: 0;
-  align-items: stretch;
-}
-
-.fabricate-manager .manager-environment-fields-card,
-.fabricate-manager .manager-environment-status-card {
-  padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-field.span-2 {
-  grid-column: 1 / -1;
-}
-
-.fabricate-manager .manager-environment-scene-card {
-  display: grid;
-  grid-template-columns: 154px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-environment-scene-card img {
-  grid-row: 1 / 4;
-  width: 154px;
-  height: 100%;
-  min-height: 154px;
-  object-fit: cover;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-24);
-}
-
-.fabricate-manager .manager-environment-scene-card img:not(.is-linked) {
-  object-fit: contain;
-  padding: var(--fab-space-6);
-}
-
-.fabricate-manager .manager-environment-scene-card h3 {
-  margin: 0 0 var(--fab-space-2);
-  font-size: 1rem;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-scene-drop-zone {
-  grid-column: 2;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-4);
-  min-height: 96px;
-  border: 1px dashed var(--fab-border-strong);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-12);
-  color: var(--fab-text-muted);
-  text-align: center;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-scene-drop-zone:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
-.fabricate-manager .manager-scene-drop-zone i {
-  font-size: 1.25rem;
-  opacity: 0.7;
-}
-
-.fabricate-manager .manager-scene-drop-zone .manager-scene-drop-hint {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
-
-.fabricate-manager .manager-scene-drop-zone.is-active {
-  border-color: var(--fab-accent);
-  background: var(--fab-success-soft);
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-scene-drop-zone.is-linked {
-  border-style: solid;
-  border-color: var(--fab-success-border);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-scene-drop-zone.is-warning {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-manager .manager-scene-warning {
-  grid-column: 2;
-}
-
-.fabricate-manager .manager-environment-status-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-environment-status-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-environment-status-meta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-environment-status-meta strong {
-  font-size: 0.95rem;
-  line-height: 1.2;
-}
-
-.fabricate-manager .manager-environment-status-meta small {
-  color: var(--fab-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.3;
-}
-
-.fabricate-manager .manager-environment-validation-band {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: 0;
-}
-
-.fabricate-manager .manager-environment-validation-toggle {
-  appearance: none;
-  -webkit-appearance: none;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  width: 100%;
-  padding: var(--fab-space-3) var(--fab-space-3);
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--fab-text);
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-environment-validation-toggle:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
-.fabricate-manager .manager-environment-validation-toggle .manager-environment-validation-chevron {
-  margin-left: auto;
-  opacity: 0.7;
-}
-
-.fabricate-manager .manager-environment-validation-band.is-open .manager-environment-validation-toggle {
-  border-bottom: 1px solid var(--fab-border);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.fabricate-manager .manager-environment-validation-body {
-  padding: var(--fab-space-3) var(--fab-space-3) var(--fab-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-environment-task-rail,
-.fabricate-manager .manager-environment-task-editor {
-  min-height: 0;
-  overflow: auto;
-  padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-task-rail-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-rail-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px 34px;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  min-width: 0;
-  padding: var(--fab-space-chip);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-task-rail-row.is-active {
-  border-color: var(--fab-border-strong);
-  box-shadow: inset 3px 0 0 var(--fab-accent);
-}
-
-.fabricate-manager .manager-task-rail-row[data-environment-invalid="true"] {
-  border-color: var(--fab-danger-border);
-}
-
-.fabricate-manager .manager-task-rail-select {
-  appearance: none;
-  -webkit-appearance: none;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: start;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  color: var(--fab-text);
-  background: transparent;
-  text-align: left;
-}
-
-.fabricate-manager .manager-task-rail-select span {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-rail-select strong,
-.fabricate-manager .manager-task-rail-select small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-task-rail-select small,
-.fabricate-manager .manager-task-rail-handle {
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-task-editor-header {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 34px;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-  margin-bottom: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-task-editor-header img {
-  width: 58px;
-  height: 58px;
-  object-fit: cover;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-24);
-}
-
-.fabricate-manager .manager-task-editor-header h3 {
-  margin: 0 0 var(--fab-space-chip);
-  font-size: 1.04rem;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-environment-task-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  margin-top: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-environment-task-panel details {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-environment-task-panel summary.environment-task-header {
-  cursor: default;
-}
-
-.fabricate-manager .manager-environment-task-panel .environment-base-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-resolution-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-progressive-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-visibility-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-catalyst-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-result-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-time-authoring,
-.fabricate-manager .manager-environment-task-panel .environment-failure-authoring {
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .environment-fields,
-.fabricate-manager .environment-result-group-list,
-.fabricate-manager .environment-catalyst-table,
-.fabricate-manager .environment-result-table,
-.fabricate-manager .environment-result-collection {
-  min-width: 0;
-}
-
-.fabricate-manager .environment-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .environment-fields .span-2,
-.fabricate-manager .environment-empty-action,
-.fabricate-manager .environment-result-group-list,
-.fabricate-manager .environment-result-collection {
   grid-column: 1 / -1;
 }
 
@@ -10637,23 +9946,6 @@
   accent-color: var(--fab-accent);
 }
 
-.fabricate-manager .environment-task-header,
-.fabricate-manager .environment-result-group-header,
-.fabricate-manager .environment-result-group-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .environment-task-header h5,
-.fabricate-manager .environment-result-group-title {
-  margin: 0;
-  color: var(--fab-text);
-  font-size: 0.86rem;
-}
-
 .fabricate-manager .hint {
   color: var(--fab-text-muted);
   font-size: 0.76rem;
@@ -10668,120 +9960,6 @@
 
 .fabricate-manager .environment-stale-warning {
   color: var(--fab-danger-text);
-}
-
-.fabricate-manager .environment-empty-action,
-.fabricate-manager .environment-empty-action.compact {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-border);
-  border-radius: 8px;
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .environment-empty-action p,
-.fabricate-manager .environment-empty-action strong {
-  margin: 0;
-}
-
-.fabricate-manager .environment-selected-item {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .environment-selected-item-img {
-  width: 38px;
-  height: 38px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-.fabricate-manager .environment-result-row,
-.fabricate-manager .environment-catalyst-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) minmax(88px, 0.35fr) auto;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-  padding: var(--fab-space-2) 0;
-  border-top: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .environment-catalyst-row {
-  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) minmax(120px, 0.5fr) minmax(120px, 0.5fr) minmax(88px, 0.35fr) auto;
-}
-
-.fabricate-manager .environment-result-actions {
-  margin-top: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-validation-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-validation-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-validation-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-validation-group-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-validation-group-heading strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-validation-list li {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  color: var(--fab-warning-text);
-}
-
-.fabricate-manager .environment-validation-link {
-  appearance: none;
-  -webkit-appearance: none;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-  text-decoration: underline;
-  cursor: pointer;
 }
 
 .fabricate-manager .manager-edit-card {
@@ -11569,37 +10747,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-recipe-req-label,
-.fabricate-manager .manager-recipe-tool-label {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-/* A required-tool row leads with the backing component's image (a small rounded
-   thumbnail) so the tool is recognisable at a glance, matching the system Tools
-   library browser rather than a generic wrench glyph. */
-.fabricate-manager .manager-recipe-tool-thumb {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--fab-surface-raised);
-}
-
-.fabricate-manager .manager-recipe-tool-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* ── Recipe editor tab intro + rebuilt Tools tab (issue 643 §D) ─────────────── */
@@ -12561,11 +11708,6 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-salvage-result-quantity {
-  flex: 0 0 5rem;
-  width: 5rem;
-}
-
 .fabricate-manager .manager-salvage-routing-list {
   display: flex;
   flex-direction: column;
@@ -12704,13 +11846,6 @@
 
 .fabricate-manager .manager-recipe-ingredient-set-empty {
   margin: 0;
-}
-
-/* Routed result-set routing: ingredient-set / outcome-tier chip multi-select that
-   replaces the result-set name input, plus the spacer that keeps the remove button
-   right-aligned when the ingredient-set name is hidden (check mode). */
-.fabricate-manager .manager-recipe-ingredient-set-name-spacer {
-  flex: 1 1 auto;
 }
 
 /* Read-only default set name shown in routed check mode (no editable input). */
@@ -13471,31 +12606,6 @@
   color: var(--fab-accent);
 }
 
-/* Progressive result rows: keyboard move controls beside the drag grip. Reorder was
-   drag-ONLY, with no keyboard path at all — and order is load-bearing in progressive
-   mode, so these are real buttons, disabled at the ends. */
-.fabricate-manager .manager-recipe-result-move {
-  display: inline-flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.fabricate-manager .manager-recipe-result-move .manager-icon-button {
-  /* Flatter + wider (issue 643): the two stacked chevrons keep the compact stage row low
-     rather than forcing its height, and read as a squat rocker rather than tall buttons.
-     `flex: 0 0 auto` is load-bearing — the base .manager-icon-button sets `flex: 0 0 34px`,
-     whose flex-BASIS is the MAIN (vertical) size in this column, so it would override
-     `height` and stretch each chevron to 34px. */
-  flex: 0 0 auto;
-  width: 30px;
-  height: 13px;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  font-size: 0.58rem;
-}
-
 /* The READ-ONLY difficulty badge on a progressive result row. It deep-links to the
    component editor rather than editing in place: component.difficulty has four
    consumers, so an inline stepper would write across an aggregate boundary. */
@@ -13611,56 +12721,6 @@
 
 .fabricate-manager .manager-button.is-subtle {
   background: var(--fab-overlay-light-04);
-}
-
-/* §B3: per-set essence requirement rows (essence-tinted requirement rows). */
-.fabricate-manager .manager-recipe-essence-rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-recipe-essence-medallion {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  color: var(--fab-info);
-  background: var(--fab-bg-3);
-  font-size: 0.82rem;
-}
-
-.fabricate-manager .manager-recipe-essence-copy {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-essence-name {
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-recipe-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  clip-path: inset(50%);
 }
 
 .fabricate-manager .manager-field textarea {
@@ -15060,18 +14120,6 @@
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-danger-tag-input-row {
-  display: flex;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  margin-top: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-danger-tag-input-row input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .fabricate-manager .manager-gathering-event-edit-view {
   display: flex;
   flex-direction: column;
@@ -15198,48 +14246,11 @@
   resize: vertical;
 }
 
-.fabricate-manager .manager-gathering-event-character-modifiers-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-gathering-event-character-modifier-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) 90px 90px 90px minmax(0, 1.4fr) 40px;
-  align-items: end;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-bg-3);
-}
-
-.fabricate-manager .manager-gathering-event-character-modifier-summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-gathering-event-character-modifier-override {
-  grid-column: span 1;
-}
-
 .fabricate-manager .manager-field-error {
   display: block;
   margin-top: var(--fab-space-1);
   color: var(--fab-danger-border, var(--fab-warning-border));
   font-size: 0.78rem;
-}
-
-.fabricate-manager .manager-gathering-panel-tools {
-  grid-template-rows: auto;
-  padding: var(--fab-space-3);
-  overflow: auto;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view {
@@ -15306,12 +14317,6 @@
   accent-color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-task-workspace-header {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-link-button {
   display: inline-flex;
   align-items: center;
@@ -15327,106 +14332,6 @@
 
 .fabricate-manager .manager-link-button:hover {
   color: var(--fab-text);
-}
-
-.fabricate-manager .manager-task-title-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.24fr);
-  gap: var(--fab-space-3);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-gathering-task-large-icon {
-  width: 34px;
-  height: 34px;
-  object-fit: contain;
-}
-
-.fabricate-manager .manager-task-title-copy {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-title-line {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-title-input,
-.fabricate-manager .manager-task-description-input {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  color: var(--fab-text);
-  background: transparent;
-  box-shadow: none;
-}
-
-.fabricate-manager.fabricate-manager .manager-gathering-task-edit-view .manager-task-title-input,
-.fabricate-manager.fabricate-manager .manager-gathering-task-edit-view .manager-task-description-input {
-  min-height: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.fabricate-manager .manager-task-title-input {
-  font-size: 1.55rem;
-  line-height: 1.12;
-  font-weight: 800;
-  color: var(--fab-warning-text);
-}
-
-.fabricate-manager .manager-task-description-input {
-  min-height: 34px;
-  resize: none;
-  color: var(--fab-text-muted);
-  font-size: 0.9rem;
-}
-
-.fabricate-manager .manager-task-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-check-row {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-height: 32px;
-  color: var(--fab-text);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-task-editor-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-4);
-  min-width: 0;
-  border-bottom: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-task-editor-tabs button {
-  min-height: 36px;
-  padding: 0 var(--fab-space-2xs);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--fab-text-muted);
-  background: transparent;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-task-editor-tabs button.is-active {
-  color: var(--fab-warning-text);
-  border-bottom-color: var(--fab-warning-text);
 }
 
 .fabricate-manager .manager-task-core-card,
@@ -15889,32 +14794,6 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-task-overview-card {
-  display: grid;
-  grid-template-columns: minmax(230px, 0.88fr) minmax(280px, 1.18fr) minmax(180px, 0.64fr);
-  gap: var(--fab-space-4);
-  padding: var(--fab-space-3) var(--fab-space-4);
-}
-
-.fabricate-manager .manager-task-basic-info,
-.fabricate-manager .manager-task-availability-summary,
-.fabricate-manager .manager-task-status-summary {
-  display: grid;
-  align-content: start;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-availability-summary,
-.fabricate-manager .manager-task-status-summary {
-  border-left: 1px solid var(--fab-border);
-  padding-left: var(--fab-space-4);
-}
-
-.fabricate-manager .manager-task-availability-summary .manager-chip-field {
-  display: none;
-}
-
 .fabricate-manager .manager-task-overview-card h3,
 .fabricate-manager .manager-task-card-header h3,
 .fabricate-manager .manager-selected-drop-editor h3,
@@ -15922,70 +14801,6 @@
   margin: 0;
   color: var(--fab-text);
   font-size: 1rem;
-}
-
-.fabricate-manager .manager-task-overview-card label,
-.fabricate-manager .manager-selected-drop-fields label {
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: start;
-}
-
-.fabricate-manager .manager-selected-drop-fields label {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.fabricate-manager .manager-task-overview-card h3 span {
-  color: var(--fab-text-muted);
-  font-size: 0.78rem;
-}
-
-.fabricate-manager .manager-task-condition-line {
-  display: grid;
-  grid-template-columns: 24px minmax(90px, 0.5fr) minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-task-condition-line span {
-  color: var(--fab-success-text);
-  text-align: right;
-}
-
-.fabricate-manager .manager-chip-field {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  margin: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-bg-3);
-}
-
-.fabricate-manager .manager-chip-field legend {
-  padding: 0 var(--fab-space-1);
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-check-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  min-height: 26px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  color: var(--fab-text);
-  background: var(--fab-overlay-light-06);
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .fabricate-manager .manager-task-card-header {
@@ -16084,100 +14899,6 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-component-browser-card {
-  display: grid;
-  grid-template-rows: auto minmax(96px, 1fr) auto;
-  gap: 0;
-  height: clamp(300px, 54vh, 440px);
-  min-height: 0;
-  max-height: none;
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-tool-inspector-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-component-browser-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-  padding: 0 0 var(--fab-space-3);
-}
-
-.fabricate-manager .manager-tools-component-browser-card .manager-search.is-compact {
-  position: relative;
-  display: block;
-  flex: 0 0 auto;
-  width: 100%;
-  min-width: 0;
-  min-height: 32px;
-}
-
-.fabricate-manager .manager-tools-component-browser-card .manager-search.is-compact input {
-  padding-left: 36px;
-}
-
-.fabricate-manager .manager-tools-component-browser-scroll {
-  min-height: 0;
-  padding: var(--fab-space-3) 0 var(--fab-space-3);
-  overflow: hidden auto;
-}
-
-.fabricate-manager .manager-tools-component-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer {
-  display: block;
-  min-width: 0;
-  padding: var(--fab-space-2) 0 0;
-  border-top: 1px solid var(--fab-border);
-  background: transparent;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  gap: var(--fab-space-2);
-  width: 100%;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination-summary {
-  width: 100%;
-  max-width: 100%;
-  text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.25;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination-nav,
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination-size {
-  justify-content: center;
-  width: 100%;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination-size select {
-  width: 52px;
-  min-width: 52px;
-}
-
-.fabricate-manager .manager-tools-component-browser-footer .manager-pagination-page {
   min-width: 0;
 }
 
@@ -16924,45 +15645,6 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .manager-empty-drop-cell {
-  display: grid;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  width: 100%;
-}
-
-.fabricate-manager .manager-empty-drop-action {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-empty-drop-action:hover,
-.fabricate-manager .manager-empty-drop-action:focus-visible {
-  color: var(--fab-warning-text);
-  border-color: var(--fab-warning-border);
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager .manager-quantity-input {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-quantity-input span {
-  color: var(--fab-text-subtle);
-  font-size: 0.68rem;
-}
-
 .fabricate-manager .manager-inline-drop-zone.is-drop-active {
   color: var(--fab-text);
   border-color: var(--fab-success-border);
@@ -17022,49 +15704,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fabricate-manager .manager-rank-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: max-content;
-  max-width: 100%;
-  min-height: 24px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-info-border);
-  border-radius: 6px;
-  color: var(--fab-info-text);
-  background: var(--fab-info-soft);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-selected-drop-editor {
-  display: grid;
-  min-height: 0;
-}
-
-.fabricate-manager .manager-selected-drop-fields {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 0.7fr) minmax(120px, 0.5fr);
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-3) var(--fab-space-4);
-}
-
-.fabricate-manager .manager-drop-modifier-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-3);
-  min-width: 0;
-  padding: 0 var(--fab-space-3) var(--fab-space-4);
-}
-
-.fabricate-manager .manager-drop-modifier-panel {
-  min-width: 0;
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
 }
 
 .fabricate-manager .manager-drop-editor-card {
@@ -17250,49 +15889,6 @@
   box-shadow: none;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.fabricate-manager .manager-inspector-subhead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-inspector-subhead h4 {
-  margin: 0;
-  color: var(--fab-warning-text);
-  font-size: 0.9rem;
-}
-
-.fabricate-manager .manager-task-summary-card h4,
-.fabricate-manager .manager-drop-preview-card h4 {
-  margin: var(--fab-space-3) 0 0;
-  color: var(--fab-text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.fabricate-manager .manager-current-conditions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-current-conditions span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-matching-logic-card ol {
-  display: grid;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding-left: var(--fab-space-4);
-  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-gathering-placeholder {
@@ -17782,168 +16378,9 @@
   max-width: 160px;
 }
 
-/* Recipe Visibility card: List mode and Knowledge-based are inline subheading
-   sections within the parent card; the knowledge OPTION cards share one
-   equal-height 3-column grid (align-items: stretch) below them. */
-.fabricate-manager .manager-recipe-visibility-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-  align-items: stretch;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-subcard {
-  gap: var(--fab-space-2xs);
-}
-
-/* A labelled section (List mode / Knowledge-based) inside the parent card: an
-   uppercase subheading, its select, and a note — no bordered frame. */
-.fabricate-manager .manager-recipe-visibility-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-subheading {
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* Keep the section selects at a readable width rather than edge to edge. */
-.fabricate-manager
-  .manager-recipe-visibility-section
-  .manager-recipe-visibility-control
-  select {
-  max-width: 28rem;
-}
-
-/* The per-mode List mode note sits under the select. */
-.fabricate-manager .manager-recipe-visibility-list-mode-note {
-  margin-top: var(--fab-space-2);
-}
-
-/* The Limited-uses card stacks its toggle row above the Maximum-uses stepper,
-   which stays visible but faded and disabled until limited uses is enabled so
-   the card never changes size. */
-.fabricate-manager .manager-recipe-visibility-item-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-2xs);
-  padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-border);
-}
-
-/* Enabled + Delete-exhausted toggles share one row, splitting the width evenly. */
-.fabricate-manager .manager-recipe-visibility-item-toggle-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--fab-space-4);
-  min-width: 0;
-}
-
-.fabricate-manager
-  .manager-recipe-visibility-item-toggle-row
-  .manager-recipe-visibility-item-cell {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-/* Learn-option cards pin their toggle to the top-right — the same head layout as
-   the Optional-features tiles — with the description below. An explicit two-column
-   grid (label | toggle) keeps a guaranteed gap so a wrapping legend never crowds
-   the pill: the legend wraps inside the first column and the toggle sits in its
-   own auto column. */
-.fabricate-manager .manager-recipe-visibility-toggle-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--fab-space-6);
-  align-items: start;
-  min-width: 0;
-}
-
-.fabricate-manager
-  .manager-recipe-visibility-toggle-head
-  .manager-resolution-mode-legend {
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-item-cell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-item-cell .manager-recipe-visibility-stepper {
-  min-width: 132px;
-}
-
-/* Faded, non-interactive gated inputs when limited uses is off. */
-.fabricate-manager .manager-recipe-visibility-item-cell.is-disabled {
-  opacity: 0.45;
-}
-
 .fabricate-manager .manager-status-toggle.is-disabled,
 .fabricate-manager .manager-status-toggle:disabled {
   cursor: not-allowed;
-}
-
-.fabricate-manager .manager-recipe-visibility-subcard-desc {
-  margin: 0;
-  color: var(--fab-text-muted);
-  font-size: 0.75rem;
-  line-height: 1.3;
-}
-
-.fabricate-manager .manager-recipe-visibility-control {
-  padding-top: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-/* Label above each stacked control inside the Limited-uses card. */
-.fabricate-manager .manager-recipe-visibility-nested-label {
-  color: var(--fab-text);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-recipe-visibility-control select {
-  width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-weight: 400;
-}
-
-.fabricate-manager .manager-recipe-visibility-stepper {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-stepper input {
-  width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-weight: 400;
-  text-align: center;
 }
 
 /* The no-state panel's own appearance now lives in its component's scoped block
@@ -18261,11 +16698,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fabricate-manager .manager-environment-task-rail,
-  .fabricate-manager .manager-environment-task-editor {
-    overflow: visible;
-  }
-
   .fabricate-manager .manager-table-head,
   .fabricate-manager .manager-recipe-table-head {
     display: none;
@@ -18339,10 +16771,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fabricate-manager .manager-recipe-visibility-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   /* Downtime is a bounded workspace, unlike the stacked reading surfaces above.
      Keep the permanent rail beside it and reserve the remaining row for the host's
      own preview scroller. */
@@ -18373,10 +16801,6 @@
 }
 
 @container fabricate-manager (max-width: 680px) {
-  .fabricate-manager .manager-recipe-visibility-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .fabricate-manager .manager-header,
   .fabricate-manager .manager-section-header {
     align-items: stretch;
@@ -18445,25 +16869,6 @@
   .fabricate-manager .manager-edit-card-heading {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .fabricate-manager .manager-environment-scene-card,
-  .fabricate-manager .environment-result-row,
-  .fabricate-manager .environment-catalyst-row,
-  .fabricate-manager .environment-empty-action,
-  .fabricate-manager .environment-empty-action.compact {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-environment-scene-card img {
-    grid-row: auto;
-    width: 100%;
-    height: 160px;
-  }
-
-  .fabricate-manager .manager-scene-actions {
-    grid-template-columns: minmax(0, 1fr);
-    grid-column: auto;
   }
 
 }
@@ -18642,19 +17047,6 @@
   font-size: 0.72rem;
 }
 
-.fabricate-manager .manager-tool-edit-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-  color: var(--fab-success-text);
-  font-size: 0.68rem;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tool-edit-status.is-warning {
-  color: var(--fab-warning-text);
-}
-
 .fabricate-manager .manager-tool-editor-tabs {
   padding: var(--fab-space-3) var(--fab-space-4) 0;
   grid-column: 2;
@@ -18831,118 +17223,6 @@
   line-height: 1.2;
 }
 
-.fabricate-manager .manager-tool-editor-card-heading {
-  justify-content: space-between;
-}
-
-.fabricate-manager .manager-tool-source-card {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: var(--fab-space-3);
-  min-height: 70px;
-  padding: 14px 15px;
-  border: 1px dashed var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-surface-soft);
-}
-
-.fabricate-manager .manager-tool-source-card.is-drop-active {
-  border-color: var(--fab-accent);
-  box-shadow: inset 0 0 0 1px var(--fab-accent);
-}
-
-.fabricate-manager .manager-tool-source-card > img {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-tool-source-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-source-copy > strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tool-source-copy > small {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--fab-space-1);
-  color: var(--fab-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.3;
-}
-
-.fabricate-manager .manager-tool-source-copy > small > i {
-  flex: 0 0 auto;
-  margin-top: 0.15em;
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-tool-source-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-tool-source-replace > summary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  color: var(--fab-accent);
-  background: var(--fab-overlay-light-04);
-  cursor: pointer;
-  list-style: none;
-}
-
-.fabricate-manager .manager-tool-source-replace > summary::-webkit-details-marker {
-  display: none;
-}
-
-.fabricate-manager .manager-tool-source-replace[open] > .manager-tool-source-picker {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% + var(--fab-space-2));
-  right: 0;
-  width: 260px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-bg-1);
-  box-shadow: var(--fab-shadow-md);
-}
-
-.fabricate-manager .manager-tool-source-card code {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  background: transparent;
-  box-shadow: none;
-  color: var(--fab-text-muted);
-  font-family: var(--fab-font-mono);
-  font-size: 0.64rem;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .fabricate-manager .manager-tool-source-card p,
 .fabricate-manager .manager-tool-info-strip p {
   margin: 0;
@@ -19001,31 +17281,6 @@
   overflow-wrap: anywhere;
 }
 
-.fabricate-manager .manager-tool-segments {
-  display: flex;
-  flex-flow: row wrap;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  margin: 0;
-  padding: var(--fab-space-1);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-}
-
-.fabricate-manager .manager-tool-segments > label {
-  display: inline-flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: var(--fab-space-1);
-  padding: var(--fab-space-2);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-segments > label.is-selected {
-  background: var(--fab-accent-soft);
-  color: var(--fab-accent);
-}
-
 /* `align-items: end` bottom-aligns the two fields, so the migrated Break-below stepper
    has to stand exactly as tall as the sibling Formula text input (34px, see the
    `.manager-recipe-field input` rule below) or the pair reads as two control heights.
@@ -19043,44 +17298,6 @@
 .fabricate-manager .manager-tool-repair-group:disabled,
 .fabricate-manager .manager-tool-prerequisite-list:disabled {
   opacity: 0.64;
-}
-
-.fabricate-manager .manager-tool-repair-group {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  margin: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  overflow-x: clip;
-}
-
-.fabricate-manager .manager-tool-repair-group > .manager-icon-button {
-  position: absolute;
-  top: var(--fab-space-2);
-  right: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-repair-option {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) 100px max-content;
-  align-items: end;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-repair-option > label,
-.fabricate-manager .manager-tool-repair-add-option {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-tool-repair .manager-recipe-ingredient-requirement,
@@ -19112,29 +17329,6 @@
    sheet overriding the component it hosted, with nothing saying so. (The retired row's class is
    NOT written here even as prose: `manager-layout.test.js` ratchets it by substring over this
    whole file, which is what makes the removal provable.) */
-
-.fabricate-manager .manager-tool-validation-checks {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-tool-validation-checks > li {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-  font-weight: 400;
-  line-height: 1.3;
-}
-
-.fabricate-manager .manager-tool-validation-checks > li.is-invalid {
-  color: var(--fab-danger-text);
-}
 
 .fabricate-manager .manager-tool-editor-tabs > button > span.is-valid {
   border-color: var(--fab-success-border);
@@ -19708,27 +17902,11 @@
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-tool-source-description {
-  min-height: 58px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
-  color: var(--fab-text-muted);
-  font-size: 0.76rem;
-  line-height: 1.5;
-}
-
 /* The Tool Studio's checklist row is GONE with its component (issue 1373, round 5). Its only
    caller was the prerequisite list, which the maintainer ruled onto the SAME row the bonus list
    below it draws — `proto:4741` and `proto:4752` state the two byte-identically — so the row,
    its icon cell and its copy cell went with `ChecklistCardRow.svelte` rather than being left in
    the sheet for a fourth row to be copied from. `manager-layout.test.js` ratchets the names. */
-
-.fabricate-manager .manager-tool-inspector-sections {
-  display: grid;
-  gap: var(--fab-space-3);
-}
 
 .fabricate-manager .manager-tool-replacement-card {
   width: 100%;
@@ -19948,63 +18126,6 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-tool-bonus-field {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-bonus-field > small {
-  color: var(--fab-text-muted);
-  font-size: 0.68rem;
-  line-height: 1.4;
-}
-
-.fabricate-manager .manager-tool-bonus-field .manager-roll-data-expression-input {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
-.fabricate-manager .manager-tool-validation {
-  display: grid;
-  justify-items: start;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-validation-heading {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-validation-heading h3 {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-validation-chip {
-  width: max-content;
-}
-
-.fabricate-manager .manager-tool-validation-errors h3 {
-  margin: 0;
-  font-family: var(--fab-font-serif);
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.fabricate-manager .manager-tool-validation-checks > li > i {
-  color: var(--fab-success-text);
-  font-size: 0.66rem;
-}
-
-.fabricate-manager .manager-tool-validation-checks > li.is-invalid > i {
-  color: var(--fab-danger-text);
-}
-
 .fabricate-manager .manager-tool-setting-toggle {
   position: relative;
   flex: 0 0 34px;
@@ -20048,9 +18169,6 @@
     padding-left: var(--fab-space-2xs);
   }
 
-  .fabricate-manager .manager-tool-section-heading > p {
-    margin-top: 0;
-  }
 }
 
 @container fabricate-manager (max-width: 980px) {
@@ -20143,13 +18261,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fabricate-manager .manager-tool-repair-option {
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
-  }
-
-  .fabricate-manager .manager-tool-repair-option > label {
-    grid-column: 1 / -1;
-  }
 }
 
 .fabricate-manager .manager-component-edit-main {
@@ -20597,36 +18708,6 @@
   overflow-y: auto;
 }
 
-.fabricate-manager .manager-tools-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-tools-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--fab-space-4);
-}
-
-.fabricate-manager .manager-tools-card-header > div {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-empty {
-  margin-top: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-tools-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
 /* The reference row for issue 883. Its edge, corner and fill now live in the one
    browser-row treatment that every manager row joins, so only what is specific to this
    row — the column stack that carries the inline editor, the dirty-pip anchor and the
@@ -20645,25 +18726,6 @@
   box-shadow: none;
 }
 
-.fabricate-manager .manager-tools-row-body {
-  display: grid;
-  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;
-  gap: var(--fab-space-2);
-  align-items: center;
-  padding: var(--fab-space-3);
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  text-align: left;
-  color: inherit;
-  border-radius: 8px;
-}
-
-.fabricate-manager .manager-tools-row-body:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
 .fabricate-manager .manager-tools-identity {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -20671,384 +18733,6 @@
   align-items: center;
   width: 100%;
   min-width: 0;
-}
-
-.fabricate-manager .manager-tools-identity.is-component-drop-zone {
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px dashed var(--fab-border-strong);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-tools-identity.is-component-drop-zone.is-drop-active {
-  border-color: var(--fab-accent);
-  background: var(--fab-success-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-accent);
-}
-
-.fabricate-manager .manager-tools-thumb {
-  width: 42px;
-  height: 42px;
-  border-radius: 6px;
-  border: 1px solid var(--fab-border);
-  background: var(--fab-overlay-light-04);
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-tools-identity-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--fab-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tools-secondary {
-  font-size: 0.82rem;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-tools-row-summary {
-  display: flex;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  min-width: 0;
-  max-height: 58px;
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-tools-row-summary .manager-chip {
-  min-height: 26px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tools-row-actions {
-  display: grid;
-  grid-template-columns: 34px;
-  align-items: center;
-  justify-content: end;
-  justify-self: end;
-  min-width: 34px;
-  max-width: 34px;
-}
-
-.fabricate-manager .manager-tools-row-dirty-slot {
-  position: absolute;
-  top: 0;
-  left: 10px;
-  z-index: 4;
-  display: flex;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.fabricate-manager .manager-tools-dirty-chip {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-bg-2);
-  gap: var(--fab-space-1);
-  white-space: nowrap;
-  box-shadow:
-    inset 0 0 0 999px var(--fab-warning-soft),
-    0 2px 8px var(--fab-overlay-dark-28);
-}
-
-.fabricate-manager .manager-tool-inspector-heading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-row-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-4);
-  padding: var(--fab-space-4);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-overlay-light-04);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.fabricate-manager .manager-tools-section {
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  padding: var(--fab-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin: 0;
-}
-
-.fabricate-manager .manager-tools-section > legend {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fab-text-muted);
-  padding: 0 var(--fab-space-1);
-}
-
-/* Tool breakage authority radios (issue 419): the option name is a distinct,
-   bold line above its muted description so the two never run together. The icon
-   aligns to the top of the two-line body (scoped here so single-line radios
-   elsewhere keep their centered alignment). The card header already frames this
-   group, so drop the fieldset's own bordered box (kept for the per-tool
-   fieldsets that still carry a visible legend). */
-.fabricate-manager [data-manager-tools-authority] .manager-tools-section {
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-}
-
-.fabricate-manager [data-manager-tools-authority] .manager-radio-option {
-  align-items: flex-start;
-}
-
-.fabricate-manager .manager-radio-option-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-radio-option-name {
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-radio-option-desc {
-  font-size: 0.82rem;
-  line-height: 1.35;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-tools-inline-field {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  column-gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tools-inline-field > span:first-child {
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tools-inline-field > input[type="number"] {
-  max-width: 122px;
-}
-
-.fabricate-manager .manager-tools-inline-field > .manager-tools-max-uses-input {
-  max-width: 190px;
-}
-
-.fabricate-manager .manager-tools-inline-field > .manager-tool-component-row {
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-replacement-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: stretch;
-  width: 100%;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-replacement-field > .manager-tool-component-row {
-  width: 100%;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-requirement-expression input {
-  width: 100%;
-}
-
-.fabricate-manager .manager-tools-requirement-help {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  color: var(--fab-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-
-.fabricate-manager .manager-tools-requirement-help p,
-.fabricate-manager .manager-tools-requirement-help ul {
-  margin: 0;
-}
-
-.fabricate-manager .manager-tools-requirement-help ul {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  padding-left: var(--fab-space-4);
-}
-
-.fabricate-manager .manager-tools-inline-fields {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);
-  gap: var(--fab-space-3);
-  align-items: center;
-}
-
-.fabricate-manager .manager-tools-identity-row {
-  display: flex;
-  gap: var(--fab-space-3);
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.fabricate-manager .manager-tools-identity-row > .manager-field {
-  flex: 1 1 240px;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-component-row {
-  display: block;
-  position: relative;
-}
-
-.fabricate-manager .manager-tool-component-row.is-drop-active {
-  outline: 2px dashed var(--fab-accent);
-  outline-offset: 2px;
-  border-radius: 8px;
-}
-
-.fabricate-manager .manager-tools-row-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tools-empty-stub {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2);
-  width: 100%;
-  min-height: 58px;
-  padding: var(--fab-space-4) var(--fab-space-4);
-  border: 1px dashed var(--fab-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--fab-text-muted);
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
-}
-
-.fabricate-manager .manager-tools-empty-stub:hover,
-.fabricate-manager .manager-tools-empty-stub:focus-visible,
-.fabricate-manager .manager-tools-empty-stub.is-drop-active {
-  border-color: var(--fab-accent);
-  color: var(--fab-text);
-  background: var(--fab-overlay-light-04);
-  outline: none;
-}
-
-/* ==========================================================================
- * Manager — Radio group (segmented control)
- * ========================================================================== */
-
-.fabricate-manager .manager-radio-group {
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  padding: var(--fab-space-3) var(--fab-space-3);
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-radio-group-legend {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fab-text-muted);
-  padding: 0 var(--fab-space-1);
-}
-
-.fabricate-manager .manager-radio-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-radio-option {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-03);
-  color: var(--fab-text);
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
-}
-
-.fabricate-manager .manager-radio-option:hover {
-  border-color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-radio-option > input[type="radio"] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.fabricate-manager .manager-radio-option.is-selected {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-radio-option:focus-within {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
-/* Tools editor — compact 28 px control sizing for visual density.
- * Excludes input[type="range"] so the breakage-chance slider keeps its tuned
- * 18 px height and zero horizontal padding; otherwise the custom track ends
- * extend past the narrower native track and render as visible nibs. */
-.fabricate-manager .manager-tools-row-editor .manager-field input:not([type="range"]),
-.fabricate-manager .manager-tools-row-editor .manager-field select {
-  height: 28px;
-  min-height: 28px;
-}
-
-.fabricate-manager .manager-tools-row-editor .manager-drop-rate-percent input[type="text"] {
-  padding: 0 var(--fab-space-2) 0 0;
-}
-
-.fabricate-manager .manager-tools-row-editor .manager-icon-button {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-}
-
-.fabricate-manager .manager-tools-row-editor .manager-radio-option {
-  padding: var(--fab-space-chip) var(--fab-space-3);
 }
 
 /* ---------------------------------------------------------------------------
@@ -21060,26 +18744,6 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-height: 0;
-}
-
-.fabricate-manager .manager-environment-details-band-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-  flex-wrap: wrap;
-}
-
-.fabricate-manager .manager-environment-status-pills {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  flex-wrap: wrap;
-}
-
-.fabricate-manager .manager-environment-short-description {
-  margin: 0;
-  max-width: 70ch;
 }
 
 .fabricate-manager .manager-environment-tabs {
@@ -21177,10 +18841,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-bg-3);
-}
-
-.fabricate-manager .manager-environment-tab-intro {
-  margin: 0 0 var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-overview-stack {
@@ -21326,28 +18986,6 @@
   margin-top: var(--fab-space-2);
 }
 
-
-.fabricate-manager .manager-environment-composition {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-environment-section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin-bottom: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-environment-section-head h4 {
-  margin: 0;
-  font-size: 0.95em;
-  color: var(--fab-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 .fabricate-manager .manager-environment-evidence {
   list-style: none;
   margin: var(--fab-space-1) 0 0;
@@ -21360,33 +18998,6 @@
 .fabricate-manager .manager-environment-evidence-label {
   font-weight: 700;
   opacity: 0.75;
-}
-
-.fabricate-manager .manager-environment-diagnostics {
-  border: 1px dashed var(--fab-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-environment-diagnostics-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  width: 100%;
-  padding: var(--fab-space-2) var(--fab-space-2);
-  background: none;
-  border: none;
-  color: var(--fab-text-muted);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-environment-diagnostics-title {
-  flex: 1;
-  text-align: left;
-}
-
-.fabricate-manager .manager-environment-diagnostics-body {
-  padding: 0 var(--fab-space-2) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-layer-list,
@@ -21419,11 +19030,6 @@
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-environment-layer-label {
-  flex: 1;
-  font-weight: 700;
 }
 
 .fabricate-manager .manager-environment-layer.is-ok > i,
@@ -21525,39 +19131,6 @@
   padding-right: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-editor-check-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--fab-space-chip) var(--fab-space-4);
-}
-
-.fabricate-manager .manager-editor-check {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-editor-check.is-satisfied > i {
-  color: var(--fab-success, var(--fab-accent));
-}
-
-.fabricate-manager .manager-editor-check.is-unsatisfied > i {
-  color: var(--fab-warning);
-}
-
-.fabricate-manager .manager-editor-issue {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-16);
-}
-
 /* Recipe editor tab shell + validation helpers built on the shared primitives. */
 .fabricate-manager .manager-recipe-edit-view {
   display: flex;
@@ -21617,26 +19190,6 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-issue-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-recipe-issue-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-environment-inspector-facts {
-  display: flex;
-  gap: var(--fab-space-2);
-  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-environment-scene-dropzone {
@@ -21724,12 +19277,6 @@
 .fabricate-manager .manager-environment-runtime-grid .manager-fact,
 .fabricate-manager .manager-environment-inspector-facts .manager-fact {
   min-width: 0;
-}
-
-.fabricate-manager .manager-fact-grid-inline .manager-fact {
-  display: flex;
-  align-items: baseline;
-  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-field.is-disabled {
@@ -21941,15 +19488,6 @@
   cursor: default;
 }
 
-/* Heading above the per-step tools accordion on the Tools tab. */
-.fabricate-manager .manager-recipe-tools-steps-title {
-  margin: var(--fab-space-2) 0 0;
-  font-size: 0.95em;
-  color: var(--fab-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 /* The order pip is a NUMBER (a step index / a progressive result's position), so it
    is set in the mono face with tabular figures (issue 643): 10 and 11 must not shift
    the grip beside them. */
@@ -22022,17 +19560,6 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-environment-waiting-for {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  margin-top: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-environment-waiting-for .manager-kicker {
-  margin: 0;
-}
-
 .fabricate-manager .manager-environment-comp-weight {
   display: flex;
   align-items: center;
@@ -22051,11 +19578,6 @@
 
   flex: 0 0 102px;
   margin: 0;
-}
-
-.fabricate-manager .manager-environment-comp-weight-label {
-  font-size: 0.72rem;
-  color: var(--fab-text-muted);
 }
 
 /* The bare-input box treatment that used to live here is deleted, not guarded: the
@@ -22499,25 +20021,6 @@
   color: var(--fab-text);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
-}
-
-.fabricate-manager .manager-environment-drop-adjustment-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-environment-drop-adjustment-copy strong,
-.fabricate-manager .manager-environment-drop-adjustment-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-environment-drop-adjustment-copy span {
-  color: var(--fab-text-muted);
-  font-size: 0.82rem;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-input {
@@ -25194,12 +22697,6 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager .manager-tools-authority-caption {
-  color: var(--fab-text-muted);
-  font-size: 0.62rem;
-  text-align: left;
-}
-
 /* AN UNSELECTED SEGMENT RECEDES (issue 1373). No `color` was declared, so every segment
    inherited the card's `--fab-text` and the strip read as though all three were selected -
    the selected one is distinguished by its ACCENT FILL alone, which is a fill a GM has to
@@ -25260,120 +22757,6 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-tools-create-card.is-drop-active {
-  border-color: var(--fab-accent);
-  box-shadow: inset 0 0 0 1px var(--fab-accent);
-}
-
-.fabricate-manager .manager-tools-create-card {
-  position: relative;
-  display: flex;
-  min-height: 66px;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) 48px var(--fab-space-2) var(--fab-space-3);
-  border-style: dashed;
-}
-
-.fabricate-manager .manager-tools-create-disclosure {
-  position: absolute;
-  top: 50%;
-  right: var(--fab-space-3);
-  align-self: auto;
-  font-size: 0.64rem;
-  transform: translateY(-50%);
-}
-
-.fabricate-manager .manager-tools-create-disclosure > summary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  color: var(--fab-accent);
-  cursor: pointer;
-  list-style: none;
-}
-
-.fabricate-manager .manager-tools-create-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.fabricate-manager .manager-tools-create-disclosure > summary:hover,
-.fabricate-manager .manager-tools-create-disclosure > summary:focus-visible {
-  background: var(--fab-surface-soft);
-}
-
-.fabricate-manager .manager-tools-create-disclosure[open] {
-  position: static;
-  width: 100%;
-  transform: none;
-}
-
-.fabricate-manager .manager-tools-create-disclosure[open] > summary {
-  position: absolute;
-  top: var(--fab-space-2);
-  right: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-tools-create-prompt {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-create-icon {
-  display: inline-flex;
-  flex: 0 0 38px;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--fab-surface-active);
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-tools-create-prompt > div {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tools-create-prompt strong {
-  font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tools-create-prompt span:not(.manager-tools-create-icon) {
-  color: var(--fab-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.25;
-}
-
-/* `.manager-tools-create-actions` IS GONE FROM THIS SHEET (issue 1118). No element in any
-   component carries the class — the row it was written for is not rendered any more — so its
-   three rules were dead: this group's flex context, a `select` sizing rule, and its own
-   `flex-wrap`. The cascade reconciliation retired its fourth,
-   `.manager-tools-create-actions .manager-button`, and MERGED that rule's declarations into
-   the `select` one on the way past, which left the retirement half done and the dead rule
-   looking freshly maintained. Retiring the class outright is what the first edit meant.
-
-   `.manager-tools-create-prompt`, `.manager-tools-item-shortcuts` and
-   `.manager-tools-library-toolbar` are dead by the same grep and are NOT retired here: they
-   are a separate container family and belong to a dead-CSS sweep of their own, not to a
-   button conversion. `.manager-tools-library-actions` is live — `ToolsBrowserView` renders
-   it — which is why this group survives at all. */
-.fabricate-manager .manager-tools-item-shortcuts,
-.fabricate-manager .manager-tools-library-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
 /* `proto:2527` runs the row's own children at an 11px gap, which takes the scale's 12px. The
    right inset keeps the action cluster off the row's own edge. */
 .fabricate-manager .manager-tools-library-actions {
@@ -25381,37 +22764,6 @@
   align-items: center;
   gap: var(--fab-space-3);
   padding-right: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-tools-item-shortcuts {
-  flex-wrap: wrap;
-  width: 100%;
-}
-
-.fabricate-manager .manager-tools-item-shortcuts button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  max-width: 142px;
-  min-height: 24px;
-  padding: var(--fab-space-2xs) var(--fab-space-chip);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-03);
-  color: inherit;
-  font-size: 0.68rem;
-}
-
-.fabricate-manager .manager-tools-item-shortcuts img {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-tools-library-toolbar {
-  justify-content: space-between;
 }
 
 .fabricate-manager [data-manager-tools-search] .manager-search {
@@ -25802,95 +23154,14 @@
   line-height: 1.4;
 }
 
-.fabricate-manager .manager-tool-inspector-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-inspector-facts > div {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-inspector-facts > div > strong {
-  order: -1;
-}
-
-.fabricate-manager .manager-tool-inspector-facts span,
-.fabricate-manager .manager-tool-inspector-mini-list {
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-tool-inspector-facts span {
-  font-size: 0.64rem;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-tool-inspector-facts strong {
-  font-size: 0.76rem;
-  line-height: 1.25;
-}
-
 /* The Tool inspector's section kickers state their own margin AND their own type in
    `ToolBrowserInspector.svelte`'s scoped block (issue 1373), which is unlayered and therefore
    beats this sheet at any specificity. A margin declared here would be dead, so it is not
    declared here. */
 
-.fabricate-manager .manager-tool-inspector-sections > section {
-  display: grid;
-  gap: var(--fab-space-2);
-}
-
 /* The tool inspector rule-card rules are gone: the library inspector renders the SAME
    `IconFactRow.svelte` the editor's behavior preview does, from the same behavior-fact
    projection, so the two geometries this class used to hold apart are one (issue 881). */
-
-.fabricate-manager .manager-tool-inspector-details {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-inspector-details > div {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-height: 42px;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-inspector-details > div > i {
-  width: 16px;
-  color: var(--fab-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-inspector-details > div > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-tool-inspector-details strong {
-  color: var(--fab-text);
-  font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tool-inspector-details small {
-  overflow: hidden;
-  color: var(--fab-text-muted);
-  font-size: 0.62rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 @container fabricate-manager (max-width: 831px) {
   .fabricate-manager[data-manager-view="tools"] .manager-body,
@@ -25926,10 +23197,6 @@
     max-width: none;
   }
 
-  .fabricate-manager .manager-tools-create-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .fabricate-manager .manager-tools-library-list > article {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -25939,9 +23206,6 @@
     padding: 0 var(--fab-space-3) var(--fab-space-3);
   }
 
-  .fabricate-manager .manager-tool-inspector-facts {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* ========================================================================== *
