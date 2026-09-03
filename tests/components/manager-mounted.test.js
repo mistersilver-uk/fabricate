@@ -20012,6 +20012,80 @@ describe('CraftingSystemManager mounted behavior', () => {
   const namedTools = (labels) =>
     labels.map((label, index) => ({ ...toolRouteFixture, id: `tool-order-${index}`, label }));
 
+  /**
+   * The world Tool projection this screen widens its list with, built from `[id, name]` pairs.
+   *
+   * ONE FACTORY FOR EVERY WIDENING CASE (issue 1373). `scope.entries[]` is the world corpus's
+   * per-entity join, its shape is fixed, and a second hand-written copy of it is a second place
+   * for that shape to drift — and one Sonar counts as duplicated however the names inside it
+   * differ, because CPD matches by shape and normalizes literals.
+   *
+   * `systems: []` is the state every widening case needs: no per-system row at all, which is
+   * exactly what makes an entry a GHOST in whichever system is mounted.
+   *
+   * @param {Array<[string, string]>} entries Ordered `[id, name]` pairs.
+   * @returns {object} A world tool scope projection.
+   */
+  const worldToolScope = (entries) => ({
+    entityType: 'tool',
+    available: true,
+    entries: entries.map(([id, name]) => ({ id, entity: { id, name }, systems: [] })),
+  });
+
+  /**
+   * Mount the Tool rules list on its own, onto the shared `target`/`mounted` the suite tears
+   * down in `afterEach`. Mounting the VIEW rather than the root is what keeps a selection open
+   * while the membership filter moves; the root answers `onSelectTool` by feeding a valid
+   * `selectedToolId` back, and the auto-select effect's still-valid-selection early return would
+   * then stop before the widened list was ever consulted.
+   *
+   * @param {object} props Props overriding the shared defaults.
+   * @returns {void}
+   */
+  function mountToolsBrowser(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        systemId: 'sys-forge',
+        ...props,
+      },
+    });
+    flushSync();
+  }
+
+  const libraryRowStates = () =>
+    [...target.querySelectorAll('.manager-tools-row')].map(
+      (row) => `${row.dataset.managerToolId}:${row.dataset.toolRowMember}`
+    );
+
+  /**
+   * THE PANE-LEVEL INVARIANT this defect broke, written once (issue 1373).
+   *
+   * `{shown}` in `3 shown · 0 of 3 in this system` IS `pagedTools.length`, and the list body
+   * draws `pagedTools`. So a toolbar claiming rows the body does not draw is the WHOLE class of
+   * defect in one comparison, rather than the single instance the cases below pin. The shipped
+   * bug made this summary read `3 shown` above a rendered zero state and nothing anywhere
+   * compared the two numbers.
+   *
+   * It holds in every state, including both zero states: with nothing to page, `{shown}` is `0`
+   * and the body draws no rows.
+   *
+   * @param {string} why What the pane was doing when the invariant was checked.
+   * @returns {void}
+   */
+  const assertResultCountMatchesRows = (why) => {
+    const summary = target.querySelector('[data-tool-result-count]')?.textContent ?? '';
+    const drawn = target.querySelectorAll('.manager-tools-row').length;
+    assert.equal(
+      Number(/^(\d+) shown/.exec(summary)?.[1]),
+      drawn,
+      `${why}: the result summary reads "${summary}" over ${drawn} drawn row(s)`
+    );
+  };
+
   it('auto-selects the row at the top of the SORTED PAGE, not the first authored Tool', async () => {
     // Nine Tools, authored with the alphabetically LAST one first. Name-ascending pages the
     // first eight of them, so the authored-first Tool is not merely further down the list - it
@@ -20105,38 +20179,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     // and the effect's still-valid-selection early return would then stop before the widened
     // list was ever consulted.
     const selections = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(ToolsBrowserViewComponent, {
-      target,
-      props: {
-        tools: [
-          { ...toolRouteFixture, id: 'tool-zephyr', label: 'Zephyr Kiln' },
-          { ...toolRouteFixture, id: 'tool-basalt', label: 'Basalt Mortar' },
-        ],
-        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
-        systemId: 'sys-forge',
-        scope: {
-          entityType: 'tool',
-          available: true,
-          entries: [
-            { id: 'tool-zephyr', entity: { id: 'tool-zephyr', name: 'Zephyr Kiln' }, systems: [] },
-            {
-              id: 'tool-basalt',
-              entity: { id: 'tool-basalt', name: 'Basalt Mortar' },
-              systems: [],
-            },
-            {
-              id: 'world-aegis',
-              entity: { id: 'world-aegis', name: 'Aegis Crucible' },
-              systems: [],
-            },
-          ],
-        },
-        onSelectTool: (id) => selections.push(id),
-      },
+    mountToolsBrowser({
+      tools: [
+        { ...toolRouteFixture, id: 'tool-zephyr', label: 'Zephyr Kiln' },
+        { ...toolRouteFixture, id: 'tool-basalt', label: 'Basalt Mortar' },
+      ],
+      scope: worldToolScope([
+        ['tool-zephyr', 'Zephyr Kiln'],
+        ['tool-basalt', 'Basalt Mortar'],
+        ['world-aegis', 'Aegis Crucible'],
+      ]),
+      onSelectTool: (id) => selections.push(id),
     });
-    flushSync();
     await tick();
     flushSync();
 
@@ -20145,9 +20199,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(
-      [...target.querySelectorAll('.manager-tools-row')].map(
-        (row) => `${row.dataset.managerToolId}:${row.dataset.toolRowMember}`
-      ),
+      libraryRowStates(),
       ['world-aegis:absent', 'tool-basalt:member', 'tool-zephyr:member'],
       'the widened list really does draw an unadopted world row above every member'
     );
@@ -20156,6 +20208,237 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['tool-basalt'],
       'the first MEMBER row is selected once, and the unadopted row above it is never pushed through onSelectTool'
     );
+  });
+
+  // ── THE COHORT'S ZERO POINT (issue 1373) ────────────────────────────────────────────────
+  // The case above mounts TWO adopted Tools, and that is precisely why it could not see the
+  // defect these three pin. The list body's three-way branch gated its zero state on the raw
+  // `tools` prop — THIS system's adopted Tools — while the counts, the rows, the pager and the
+  // result summary were all computed over the widened cohort. With members present the two
+  // never disagree; with none adopted, `tools.length === 0` is true and STAYS true whatever the
+  // membership segment says, so the zero state won unconditionally and the ghost rows were
+  // derived, counted, sorted, paged and then thrown away.
+  //
+  // Zero members is the only place the widened branch and the empty branch can disagree, and it
+  // is also the state a GM is in the first time they open this screen in a world-scoped world —
+  // where widening is the ONLY route in the product to adopting a world Tool into a system.
+  //
+  // TWO CONTROLS REACH IT AND BOTH ARE PINNED, because they are separate call sites: the
+  // segment sets the filter directly, and the zero state's own primary button sets it from
+  // INSIDE the branch the filter was supposed to leave. The maintainer reported both symptoms.
+  const THREE_WORLD_TOOLS = [
+    ['world-aegis', 'Aegis Crucible'],
+    ['world-loom', 'Star Loom'],
+    ['world-anvil', 'Deep Anvil'],
+  ];
+  const WIDENED_GHOST_ROWS = ['world-aegis:absent', 'world-anvil:absent', 'world-loom:absent'];
+
+  it('reaches the world Tools from the zero state BUTTON when the system has adopted none', async () => {
+    const selections = [];
+    mountToolsBrowser({
+      tools: [],
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+      onSelectTool: (id) => selections.push(id),
+    });
+    await tick();
+    flushSync();
+
+    // THE BUTTON'S OWN PRESENCE IS THE PRECONDITION, so it is asserted rather than assumed: it
+    // renders only inside the empty branch and only when `ghostRows.length > 0`, so finding it
+    // here proves the mount really is in the state the defect was reported from.
+    const browseWorld = target.querySelector('[data-tool-empty-browse-world]');
+    assert.ok(Boolean(browseWorld), 'the zero state offers its near route into the world Tools');
+    assert.equal(browseWorld.dataset.toolEmptyBrowseWorld, '3');
+    assert.match(browseWorld.textContent, /Show the 3 world Tools you can add/);
+    assertResultCountMatchesRows('before the zero state button is pressed');
+
+    browseWorld.click();
+    await tick();
+    flushSync();
+
+    // PRESSING IT MUST DO SOMETHING, and this is the assertion that did not exist: the hook was
+    // named by two View Lab terminals and clicked by nothing, so it was proven to EXIST and
+    // never proven to ACT.
+    assert.deepEqual(
+      libraryRowStates(),
+      WIDENED_GHOST_ROWS,
+      'the button the panel offers must draw the world Tools it promises'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-library-empty]'),
+      'a list drawing three rows must not also claim there is nothing here'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-tool-row-member="absent"] [data-tool-add-to-system]').length,
+      3,
+      'every unadopted row carries the one action it exists for'
+    );
+    assertResultCountMatchesRows('after the zero state button is pressed');
+    assert.deepEqual(
+      selections,
+      [],
+      'a page holding no member row selects nothing rather than pushing a ghost id through the adopted-Tool callback'
+    );
+  });
+
+  it('reaches the world Tools from the membership SEGMENT when the system has adopted none', async () => {
+    // THE SECOND SYMPTOM, and it is not inferable from the first: the button sets the same
+    // state, but a GM who never sees the button — or who reads the segment's `All world tools
+    // (3)` and clicks that instead — took a different route to the same broken body.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map((option) =>
+        option.textContent.trim()
+      ),
+      ['In this system (0)', 'All world tools (3)', 'Overriding'],
+      'the segment states a cohort of three against a membership of none'
+    );
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-tool-membership-filter]').dataset.toolMembershipFilter,
+      'all'
+    );
+    assert.deepEqual(libraryRowStates(), WIDENED_GHOST_ROWS);
+    assert.ok(!target.querySelector('[data-tool-library-empty]'));
+    assertResultCountMatchesRows('after the membership segment is widened');
+    // THE FOOT PAGER SLOT FOLLOWS THE COHORT TOO. It was gated on the same raw prop one layer
+    // down, so the slot stayed absent for a zero-member system even once the rows above it drew.
+    // The slot is the bottom-pinned layout element that decides whether the browser card is
+    // `:last-child`; the BAR inside it stays `multiPageOnly` and three rows is one page.
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-browser-pagination]')),
+      'the widened list gets its layout slot back'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      'a single page still draws no bar inside that slot'
+    );
+  });
+
+  it('keeps the zero state for the cohorts that really are empty, and names the filtered one', async () => {
+    // THE NEGATIVE HALF, without which the repair above is satisfiable by deleting the zero
+    // state outright. Three states must NOT become a row list, and one must become the FILTERED
+    // panel rather than the zero state.
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-library-empty]')),
+      '`In this system` on a system holding none is a real zero state'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination]'),
+      'an empty cohort keeps the list card content-sized, exactly as before'
+    );
+
+    // `Overriding` WITH NOTHING ADOPTED KEEPS THE ZERO STATE. With nothing adopted the panel's
+    // two routes out are the useful answer, and `Nothing matches that filter` is not.
+    target.querySelector('[data-tool-membership-option="over"] input').click();
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+    assert.ok(Boolean(target.querySelector('[data-tool-empty-browse-world]')));
+
+    // A WORLD HOLDING NO TOOLS EITHER keeps the one-route zero state under every segment.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope([]) });
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+    assert.ok(
+      !target.querySelector('[data-tool-empty-browse-world]'),
+      'there is nothing to widen to, so the near route is not offered'
+    );
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
+
+    // A COHORT NARROWED TO NOTHING BY THE SEARCH IS THE FILTERED STATE, not the zero state —
+    // and that is what makes the zero state's primary route honest in every state it renders in.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    const search = target.querySelector('[data-manager-tools-search] input[type="search"]');
+    search.value = 'quenching trough';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-library-filtered-empty]')),
+      'a cohort that was non-empty before the search term states that, rather than claiming the system holds nothing'
+    );
+    assert.ok(!target.querySelector('[data-tool-library-empty]'));
+    assertResultCountMatchesRows('with the widened cohort searched down to nothing');
+  });
+
+  it('never claims more rows in the result summary than the list body draws', async () => {
+    // THE PANE-LEVEL INVARIANT, swept across the states that can break it. This is the guard
+    // that would have caught the whole CLASS rather than this one instance: a toolbar counting
+    // `pagedTools` above a body that draws something else is a contradiction visible without
+    // knowing which branch is at fault.
+    mountToolsBrowser({
+      tools: namedTools([
+        'Zephyr Kiln',
+        "Alchemist's Supplies",
+        'Arcane Forge',
+        'Ley-Line Nexus',
+        "Master's Anvil",
+        'Moonwell',
+        "Smith's Hammer",
+        'Volcanic Vent',
+        'Woodcarving Tools',
+      ]),
+      scope: worldToolScope(THREE_WORLD_TOOLS),
+    });
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a paged single-system list');
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a paged widened list');
+
+    const search = target.querySelector('[data-manager-tools-search] input[type="search"]');
+    search.value = 'aegis';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a widened list searched down to one world Tool');
+    assert.deepEqual(libraryRowStates(), ['world-aegis:absent']);
+
+    // AND AT THE COHORT'S ZERO POINT, which is the state that made the invariant worth writing:
+    // the shipped summary read `3 shown` above a body drawing nothing at all. Every state above
+    // holds a member, and with members present the two numbers cannot disagree — so without
+    // this remount the invariant would be green on the very defect it exists to catch.
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a system holding no Tools of its own');
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assertResultCountMatchesRows('on a widened list belonging to a system holding none');
   });
 
   it('projects configured Tool values into the compact library inspector', async () => {

@@ -277,8 +277,31 @@
     },
   ]);
 
+  /**
+   * THE SET THE MEMBERSHIP SEGMENT SELECTED, before the search term and before the page.
+   *
+   * NAMED RATHER THAN INLINED, and that is the whole repair (issue 1373). Three places asked
+   * "is there anything on this screen" and all three answered with the raw `tools` prop —
+   * THIS SYSTEM'S ADOPTED TOOLS — while the counts, the list, the pager's total and the result
+   * summary were all computed over the widened cohort. For a system that has adopted nothing
+   * the two disagree the moment the segment moves to `All world tools`: the toolbar read
+   * `3 shown · 0 of 3 in this system` over a body drawing the zero state, because
+   * `tools.length === 0` was true and stayed true whatever the segment said. The ghost rows
+   * were derived, counted, sorted and paged, and then discarded by one boolean.
+   *
+   * That made the ONE route in the product to adopt a world Tool into a system holding none
+   * unreachable — by the segment AND by the zero state's own primary button, which sets that
+   * segment and could therefore only ever re-render the panel that hid its result.
+   *
+   * A superset of `memberRows` in every case, so every previously reachable state is reached
+   * identically: `all` widens, `in` and `over` are `memberRows` exactly.
+   */
+  const cohortRows = $derived(
+    membershipFilter === 'all' ? [...memberRows, ...ghostRows] : memberRows
+  );
+
   const filteredRows = $derived(
-    (membershipFilter === 'all' ? [...memberRows, ...ghostRows] : memberRows)
+    cohortRows
       .filter((row) => membershipFilter !== 'over' || inheritState(row.id)?.state === 'overridden')
       .filter((row) => {
         const needle = searchTerm.trim().toLowerCase();
@@ -551,8 +574,18 @@
 
     <section class="manager-tools-library-card" data-manager-tools-browser>
       <div class="manager-tools-library-scroll" data-tool-library-scroll>
-        {#if tools.length === 0}
+        {#if cohortRows.length === 0}
           <!--
+            THE ZERO STATE IS A FACT ABOUT THE SELECTED COHORT, not about `tools` (issue 1373).
+            Gated on the raw prop, this branch won unconditionally for a system that had adopted
+            nothing — so the two controls that widen the cohort, the segment above and this
+            panel's own primary button below, both moved a filter whose result the panel then
+            hid. `cohortRows` is what the list draws, so the predicate and the list are now the
+            same set rather than two expressions that happened to agree.
+
+            A cohort that is non-empty BEFORE the search term and empty after it is the FILTERED
+            state, and falls through to the branch below.
+
             THE EMPTY STATE NAMES A DESTINATION, SO IT OFFERS ONE (issue 1373).
 
             It read `Add a Tool from the world Tools Catalogue, where Tools are created.` and
@@ -810,8 +843,13 @@
        own auto margin.
 
        The Foundry smoke's `assertToolLibraryPagination` phase reads the BAR rather than this
-       slot for the same reason. -->
-  {#if tools.length > 0}
+       slot for the same reason.
+
+       "GIVEN ANY TOOLS AT ALL" IS THE SELECTED COHORT, not the `tools` prop (issue 1373). Read
+       off the prop, the slot stayed absent for a zero-member system even once the widened list
+       drew rows above it — the same raw-prop proxy the list body used, with the same effect one
+       layer down. -->
+  {#if cohortRows.length > 0}
     <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
       <Pagination
         totalCount={filteredTools.length}
