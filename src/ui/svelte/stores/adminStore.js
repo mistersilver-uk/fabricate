@@ -5347,7 +5347,41 @@ export function createAdminStore(services) {
    *   requiredBy: Array<{id: string, name: string, kind: string, systemId: string,
    *   systemName: string}>}>}
    */
-  function _worldToolUsage() {
+  /**
+   * One crafting system's recipe cohort, read AT MOST ONCE PER REFRESH.
+   *
+   * ── WHY A CACHE RATHER THAN TWO READS (issue 1371) ────────────────────────────────────────
+   * Both world-scope usage legs walk every system's recipes: the tool leg counts tool references
+   * and the component leg counts ingredient and result references. Reading the cohort in each of
+   * them doubles the per-refresh recipe fetch and scales it by the crafting-system count — which
+   * `adminStore.test.js` bounds as a fixed budget precisely so a second consumer cannot spend it
+   * silently. One read, two consumers.
+   *
+   * The cache is per CALL of `buildWorldScopeState`, never a module-level memo: a stale recipe
+   * list would outlive the write that changed it, and the whole point of re-projecting is that it
+   * re-reads.
+   *
+   * GUARDED, on the same rule the two legs already followed: a recipe manager that throws must
+   * degrade to "no recipes here" rather than take the whole publish down.
+   *
+   * @param {object|null} recipeManager
+   * @param {Map<string, object[]>} cache
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  function _recipeCohort(recipeManager, cache, systemId) {
+    if (cache.has(systemId)) return cache.get(systemId);
+    let recipes = [];
+    try {
+      recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+    } catch {
+      recipes = [];
+    }
+    cache.set(systemId, recipes);
+    return recipes;
+  }
+
+  function _worldToolUsage(recipeCache = new Map()) {
     const usage = {};
     const recipeManager = services.getRecipeManager?.();
     const entryFor = (toolId) =>
@@ -5365,12 +5399,7 @@ export function createAdminStore(services) {
       const systemId = String(system?.id ?? '');
       if (!systemId) continue;
       const systemName = String(system?.name ?? systemId);
-      let recipes = [];
-      try {
-        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
-      } catch {
-        recipes = [];
-      }
+      const recipes = _recipeCohort(recipeManager, recipeCache, systemId);
       for (const recipe of recipes) {
         for (const toolId of _recipeToolIds(recipe)) {
           record(toolId, systemId);
@@ -5477,7 +5506,7 @@ export function createAdminStore(services) {
    * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
    *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
    */
-  function _worldComponentUsage() {
+  function _worldComponentUsage(recipeCache = new Map()) {
     const usage = {};
     const recipeManager = services.getRecipeManager?.();
     const entryFor = (componentId) =>
@@ -5500,12 +5529,7 @@ export function createAdminStore(services) {
       const systemId = String(system?.id ?? '');
       if (!systemId) continue;
       const systemName = String(system?.name ?? systemId);
-      let recipes = [];
-      try {
-        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
-      } catch {
-        recipes = [];
-      }
+      const recipes = _recipeCohort(recipeManager, recipeCache, systemId);
       for (const recipe of recipes) {
         const { required, produced } = _recipeComponentIds(recipe);
         const named = {
@@ -5552,6 +5576,11 @@ export function createAdminStore(services) {
   }
 
   function buildWorldScopeState() {
+    // ONE RECIPE COHORT READ PER SYSTEM, SHARED BY BOTH LEGS THAT WALK IT. See `_recipeCohort`:
+    // the per-refresh recipe fetch is a bounded budget, and a second consumer reading it again
+    // scales that budget by the crafting-system count.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-call cache, never state
+    const recipeCache = new Map();
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
@@ -5564,9 +5593,9 @@ export function createAdminStore(services) {
       // itself lives in `worldScopeProjection.js`, an open file.
       recipes: _allRecipes(),
       usage: {
-        component: _worldComponentUsage(),
+        component: _worldComponentUsage(recipeCache),
         essence: _worldEssenceUsage(),
-        tool: _worldToolUsage(),
+        tool: _worldToolUsage(recipeCache),
       },
     });
   }
