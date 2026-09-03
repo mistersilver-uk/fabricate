@@ -1637,6 +1637,15 @@
   const selectedCurrencyUnits = $derived(
     Array.isArray(worldCurrency.units) ? worldCurrency.units : []
   );
+  // The derived `validateCurrencyProfile` report (issue 1493). Its OWN derivation, deliberately
+  // NOT a fifth key inside the `worldCurrency` fallback above: that literal is a `CurrencyConfig`,
+  // which is exactly four keys, so a report hung inside it would stop being one.
+  const worldCurrencyValidation = $derived(
+    $viewState.worldCurrencyValidation || { valid: true, errors: [] }
+  );
+  const currencyValidationErrors = $derived(
+    Array.isArray(worldCurrencyValidation.errors) ? worldCurrencyValidation.errors : []
+  );
   // Units exist world-wide regardless of any one system, so the recipe editor must gate cost
   // affordances on the SYSTEM's explicit enable flag, not on unit presence. Threaded alongside
   // the units so existing requirements can render read-only (rather than vanish) when the
@@ -9543,6 +9552,7 @@
       >
         <WorldCurrencyTab
           currencyUnits={selectedCurrencyUnits}
+          {currencyValidationErrors}
           {currencyPresetsSupported}
           {currencySpendStrategy}
           {currencyProviderId}

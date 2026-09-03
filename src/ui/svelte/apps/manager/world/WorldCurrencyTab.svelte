@@ -26,6 +26,10 @@
 
   let {
     currencyUnits = [],
+    // The world profile's `validateCurrencyProfile` errors (issue 1493), computed in `adminStore`
+    // and threaded in as plain data. This component does NOT import `currencyProfile.js`: the
+    // heavier systems module stays out of the Svelte layer (see `util/recipeCurrency.js`).
+    currencyValidationErrors = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
     currencyProviderId = '',
@@ -323,6 +327,20 @@
       currencyExpandedUnitId = '';
     }
   });
+
+  // Suppressed while the ladder is empty. `validateCurrencyProfile([])` reports "No currency units
+  // are configured.", which is true but is not a mistake: the route already greets a fresh world
+  // with a friendly empty state, and stacking an error on top of it tells a GM they are wrong for
+  // having authored nothing yet.
+  //
+  // Errors that appear the moment the spend strategy changes are CORRECT, not a glitch: a macro
+  // ladder with no macros linked yet, or an actorInventory ladder whose denominations are not pf2e
+  // coin keys, genuinely cannot be spent against until the GM finishes the switch.
+  const currencyValidationIssues = $derived(
+    currencyUnits.length > 0 && Array.isArray(currencyValidationErrors)
+      ? currencyValidationErrors.filter((issue) => String(issue || '').trim() !== '')
+      : []
+  );
 </script>
 
 <div class="manager-world-currency" data-world-currency-page>
@@ -532,6 +550,54 @@
                 <small>{text(field.hintKey, field.hintFallback)}</small>
               </div>
             {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!--
+        The report is a live region that is ALWAYS in the DOM, with the `{#if}` inside it. A
+        region inserted in the same tick as its content is not announced, so conditionally
+        rendering the element that carries `aria-live` would announce nothing at the only moment
+        that matters — when a strategy change makes the ladder unspendable.
+
+        `manager-currency-subunit-warning` ALONE. Composing it with
+        `manager-environment-comp-callout`, as the sibling callouts do, overrides the amber
+        warning tone with a neutral accent, because that rule is later in the sheet at equal
+        specificity — and this one is a warning.
+      -->
+      <div
+        class="currency-validation-region"
+        class:is-silent={currencyValidationIssues.length === 0}
+        role="status"
+        aria-live="polite"
+        data-world-currency-validation
+      >
+        {#if currencyValidationIssues.length > 0}
+          <div
+            class="manager-currency-subunit-warning"
+            role="note"
+            data-world-currency-validation-note
+          >
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <div class="currency-validation-copy">
+              <strong
+                >{text(
+                  'FABRICATE.Admin.Manager.CurrencyUnits.ValidationTitle',
+                  "This ladder can't be spent against yet"
+                )}</strong
+              >
+              <ul class="currency-validation-list">
+                {#each currencyValidationIssues as issue (issue)}
+                  <li data-world-currency-validation-error>{issue}</li>
+                {/each}
+              </ul>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.CurrencyUnits.ValidationHint',
+                  'Crafting cannot price or spend currency until these are fixed. Changing the spend strategy can raise new ones, because the ladder has to match it. Nothing here blocks saving.'
+                )}</span
+              >
+            </div>
           </div>
         {/if}
       </div>
@@ -918,3 +984,26 @@
     </div>
   </section>
 </div>
+
+<style>
+  /* Issue 1493. The region outlives its content, so while it is silent it must not leave a phantom
+     row in the section body's gapped flex column. It is NEVER hidden and never `display: contents`:
+     both take a live region out of the accessibility tree in at least one shipping browser, which
+     is the same no-op this markup exists to avoid. A negative start margin cancels exactly the one
+     flex gap a zero-height item earns, and unwinds itself the moment the report has something to
+     say. */
+  .currency-validation-region.is-silent {
+    margin-block-start: calc(-1 * var(--fab-space-3));
+  }
+
+  .currency-validation-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+  }
+
+  .currency-validation-list {
+    margin: 0;
+    padding-inline-start: var(--fab-space-4);
+  }
+</style>

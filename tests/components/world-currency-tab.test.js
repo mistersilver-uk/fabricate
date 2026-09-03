@@ -158,4 +158,99 @@ describe('World > Currency tab (mounted)', () => {
     assert.equal(root.querySelector('[data-move-currency-down="gp"]').disabled, false);
     assert.equal(root.querySelector('[data-move-currency-up="sp"]').disabled, false);
   });
+
+  /**
+   * The world profile's validation report (issue 1493).
+   *
+   * `validateCurrencyProfile` had no caller in the manager at all, so a ladder that could not be
+   * spent against looked perfectly healthy on the page that authors it. The errors arrive as plain
+   * strings from `adminStore`; this component deliberately does not import `currencyProfile.js`.
+   */
+  it('renders the validation errors, each one, where the ladder is authored', async () => {
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: [
+        'Currency unit "Gold" is missing an actor data path.',
+        'Currency unit "Silver" is missing an actor data path.'
+      ]
+    });
+
+    const note = root.querySelector('[data-world-currency-validation-note]');
+    assert.ok(note, 'the report renders');
+    const errors = [...root.querySelectorAll('[data-world-currency-validation-error]')].map(
+      (item) => item.textContent.trim()
+    );
+    assert.deepEqual(errors, [
+      'Currency unit "Gold" is missing an actor data path.',
+      'Currency unit "Silver" is missing an actor data path.'
+    ]);
+  });
+
+  it('keeps the live region in the DOM while it has nothing to say', async () => {
+    // The whole point of the wrapper. A live region inserted in the same tick as its content is
+    // not announced, so rendering the element that carries `aria-live` conditionally would
+    // announce nothing at the one moment that matters — the strategy switch that breaks the
+    // ladder. The region outlives its content; only the note inside it comes and goes.
+    const healthy = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
+
+    const region = healthy.querySelector('[data-world-currency-validation]');
+    assert.ok(region, 'the region is present with no errors to report');
+    assert.equal(region.getAttribute('role'), 'status');
+    assert.equal(region.getAttribute('aria-live'), 'polite');
+    assertNoElement(
+      healthy,
+      '[data-world-currency-validation-note]',
+      'but it says nothing while the ladder is sound'
+    );
+
+    harness.remount();
+    const broken = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+    const spoken = broken.querySelector('[data-world-currency-validation]');
+    assert.ok(
+      spoken.querySelector('[data-world-currency-validation-note]'),
+      'and the note appears INSIDE the region rather than beside it'
+    );
+  });
+
+  it('says nothing at all to a GM who has authored no coins yet', async () => {
+    // `validateCurrencyProfile([])` reports "No currency units are configured." — true, but not a
+    // mistake. The route already greets a fresh world with a friendly empty state, and stacking an
+    // error on top of it tells a new GM they are wrong for having done nothing yet.
+    const root = await harness.mount({
+      currencyUnits: [],
+      currencyValidationErrors: ['No currency units are configured.']
+    });
+
+    assert.ok(
+      root.querySelector('[data-world-currency-validation]'),
+      'the region is still present, so a later report is still announceable'
+    );
+    assertNoElement(
+      root,
+      '[data-world-currency-validation-note]',
+      'the empty ladder is not an error the GM has made'
+    );
+  });
+
+  it('wears the warning tone alone, never composed with the neutral callout class', async () => {
+    // `manager-environment-comp-callout` is later in the sheet at equal specificity and overrides
+    // the amber warning tone with a neutral accent. The sibling callouts on this page compose the
+    // two deliberately; this one must not, because it is the only one that reports a fault.
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+
+    const note = root.querySelector('[data-world-currency-validation-note]');
+    assert.equal(note.classList.contains('manager-currency-subunit-warning'), true);
+    assert.equal(
+      note.classList.contains('manager-environment-comp-callout'),
+      false,
+      'composing the neutral callout class would repaint the warning as an accent'
+    );
+    assert.equal(note.getAttribute('role'), 'note');
+  });
 });

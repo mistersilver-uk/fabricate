@@ -4068,6 +4068,8 @@
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",
           "MacroConversionHint": "Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.",
+          "ValidationTitle": "This ladder can't be spent against yet",
+          "ValidationHint": "Crafting cannot price or spend currency until these are fixed. Changing the spend strategy can raise new ones, because the ladder has to match it. Nothing here blocks saving.",
           "ProviderManagedTitle": "Provider-managed denominations",
           "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements."
         },
