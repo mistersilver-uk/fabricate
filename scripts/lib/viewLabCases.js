@@ -551,6 +551,30 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-recipe-edit-ingredients-or-menu',
   ]),
+  // THE overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
+  // the environment editor and one `SearchablePopover` in the component editor that was announcing
+  // two commands as selectable options. NEITHER representative frame can contain it, and that is
+  // established from the static import closure rather than by looking at a frame: walking every
+  // transitive `.svelte` import, `ComponentsBrowserView` reaches neither `environment/`
+  // `CompositionList` nor `component/ComponentIdentityStrip`, and `FabricateAppRoot` is the PLAYER
+  // window and reaches neither either. Only `CraftingSystemManagerRoot`'s closure holds them. So a
+  // restyle of the menu published two frames that structurally could not contain one.
+  //
+  // ONE entry, because a menu is only visible while it is OPEN and exactly one published frame
+  // opens one. `manager-environment-edit-automatic-force-add` is that frame: its last step clicks
+  // a Non-matching row's kebab, and its `expectSelector` is the Force add INSIDE the open panel.
+  // Every other environment and component frame draws the trigger closed, where the whole
+  // conversion is an unchanged 34px icon button.
+  //
+  // Still uncovered, and named rather than left to be discovered: the DANGER item (`is-danger`,
+  // the red Exclude / Remove from environment) and the DISABLED note ("Enable in library first").
+  // Both live in menus this frame does not open — the danger verb in an Included row's menu, the
+  // note on a library-disabled row — and only one menu can be open in one frame, so neither can be
+  // added here without a case that opens a different row. A change to either treatment publishes
+  // this frame and it does not contain them.
+  'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
+    'manager-environment-edit-automatic-force-add',
+  ]),
   // The player window's shared top bar (issue 1475). It sits under `components/`, so the directory
   // leg of `BROAD_SIGNAL_PATTERN` claims it and it published only the representative pair — in
   // which its actor picker appears exclusively CLOSED. `fabricate-app-shell` IS one of that pair
@@ -6849,8 +6873,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The open menu's Force add itself, not the section that holds it. The section renders for any
     // automatic environment with a rejected record and would be satisfied by the very state this
     // case exists to prove is over: a Non-matching list offering nothing to do about it.
-    expectSelector:
-      '.fabricate-manager [data-section-row="non-matching"] .manager-environment-comp-menu [data-action="force-include"]',
+    //
+    // NOT NESTED IN THE ROW ANY MORE (issue 1477). The menu is `<ActionMenu>` now and its panel is
+    // PORTALED to `.fabricate-manager`, so it is a sibling of the editor rather than a descendant
+    // of the row that opened it — a row-scoped selector would wait forever and take every frame in
+    // this run with it. Exactly one menu is open at a time and `force-include` is offered by no
+    // other menu in the file, so the panel-scoped form is as discriminating as the row-scoped one
+    // was.
+    expectSelector: '.fabricate-manager .fabricate-action-menu-panel [data-action="force-include"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/environment\//,

@@ -78,6 +78,10 @@ const sharedComponentNames = [
   // both render the shared pill multi-select (issue 770). A `.svelte` the tree renders
   // but the allowlist omits HANGS the suite (# cancelled) rather than failing it.
   'ModifierPillSelect',
+  // THE shared overflow action menu (issue 1477). The root reaches it two ways — the
+  // environment editor's four composition row menus and the component editor's identity
+  // strip — and it renders `IconButton`, which this tree already compiles.
+  'ActionMenu',
 ];
 
 let tempRoot;
@@ -638,6 +642,9 @@ function compileManagerRoot() {
     'foundryIconVocabulary.js',
     'foundryIconCatalogue.js',
     'iconPickerPopover.js',
+    // `ActionMenu`'s placement helper (issue 1477). Separate from `iconPickerPopover.js` because
+    // a picker's layout DECIDES the panel width and an overflow menu's width is its longest verb.
+    'actionMenuLayout.js',
     // The shared portal-host resolver (issue 1466): every picker in this tree imports it
     // statically to find the application root its overlay is portaled into. This suite has
     // no dependency validator, so an omission HANGS it (# cancelled) rather than naming it.
@@ -10300,18 +10307,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     // AC3: unlink lives in the OVERFLOW (rare + destructive — what a kebab is for), so
     // it must be opened first. The menu is portaled to the `.fabricate-manager` host to
     // escape the scrolling column's `overflow: hidden`, so query from the root, not the
-    // strip. Options are addressed by their label: SearchablePopover is a shared
-    // component and gives options no per-caller data hook.
-    const overflowOption = (label) =>
-      Array.from(root.querySelectorAll('.manager-travel-option')).find((button) =>
+    // strip. Rows are addressed by their label: `ActionMenu` is a shared component and
+    // gives items no per-caller data hook unless the caller asks for one.
+    //
+    // `role="menuitem"`, not `.manager-travel-option` (issue 1477). These are COMMANDS, and the
+    // picker they used to be announced them as selectable options in a listbox.
+    const overflowItem = (label) =>
+      Array.from(root.querySelectorAll('[role="menuitem"]')).find((button) =>
         button.textContent.includes(label)
       );
 
     target.querySelector('.manager-component-overflow-trigger').click();
     await tick();
     flushSync();
-    assert.ok(overflowOption('Copy source UUID'), 'the overflow carries Copy source UUID');
-    overflowOption('Unlink Source Item').click();
+    assert.ok(overflowItem('Copy source UUID'), 'the overflow carries Copy source UUID');
+    assert.ok(
+      !root.querySelector('.manager-component-identity-strip [role="listbox"]'),
+      'and it is no longer a listbox anywhere in the strip'
+    );
+    overflowItem('Unlink Source Item').click();
     flushSync();
     assert.deepEqual(
       unlinked,

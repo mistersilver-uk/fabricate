@@ -21874,15 +21874,41 @@
   flex: 0 0 34px;
 }
 
-.fabricate-manager .manager-environment-comp-menu-wrap {
+/* ── THE SHARED OVERFLOW ACTION MENU (issue 1477) ─────────────────────────────────────────────
+   This family used to be `.manager-environment-comp-menu*`, rooted at `.fabricate-manager` and
+   named for ONE of its two callers. `components/ActionMenu.svelte` is the primitive now, so the
+   family is rooted at the two namespace classes THAT COMPONENT WRITES, per
+   `design-system/spec.md` requirement "A shared primitive's class family is rooted at the
+   primitive, not at an app".
+
+   TWO roots rather than one, and the count is a property of the portal shape rather than a
+   convention to copy: the component portals its panel out of its own root, so the two nodes end
+   up in different subtrees and a class family painted across both needs a root at each.
+   `.fabricate-action-menu` is the component's own element; `.fabricate-action-menu-panel` is the
+   panel, which keeps its classes and loses its ancestors the moment `use:portal` moves it.
+
+   The root is REPLACED and never deleted: this sheet is loaded page-wide into the Foundry
+   document and `tests/styles-namespacing.test.js` requires every selector in it to begin with
+   `.fabricate`. `tests/components/searchable-popover-area-scope.test.js` covers this primitive
+   alongside the four pickers and fails if either root stops being emitted or is swapped back for
+   an application root.
+
+   The item rules keep their `button` type selector so that re-rooting is specificity-NEUTRAL:
+   `.fabricate-manager .manager-environment-comp-menu button` was (0,2,1) and
+   `.fabricate-action-menu-panel button.manager-action-menu-item` is (0,2,1) as well, so nothing
+   in the environment editor's cascade moves. */
+.fabricate-action-menu.manager-action-menu {
   position: relative;
+  min-width: 0;
 }
 
-.fabricate-manager .manager-environment-comp-menu {
+/* No `right`/`top` here: the panel is portaled, so its placement is measured against the host it
+   lands in and written inline by `computeActionMenuLayout`. `z-index` matches the shared picker's
+   panel (`.fabricate-picker-popover`), because the two are siblings in the same portal host now
+   rather than one being nested in a row. */
+.fabricate-action-menu-panel.manager-action-menu-panel {
   position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 30;
+  z-index: 4000;
   width: max-content;
   max-width: min(260px, calc(100vw - 32px));
   min-width: 176px;
@@ -21897,7 +21923,7 @@
   box-shadow: var(--fab-shadow-md);
 }
 
-.fabricate-manager .manager-environment-comp-menu button {
+.fabricate-action-menu-panel button.manager-action-menu-item {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
   place-items: center start;
@@ -21917,11 +21943,14 @@
   font-weight: 500;
 }
 
-.fabricate-manager .manager-environment-comp-menu button > i {
+/* The icon cell is rendered for EVERY item, with or without a glyph. That is what retires the
+   old `.manager-environment-comp-menu-note::before` spacer: a disabled note used to need a
+   pseudo-element to hold the 18px column open, and now the empty `<i>` holds it. */
+.fabricate-action-menu-panel button.manager-action-menu-item > i {
   justify-self: center;
 }
 
-.fabricate-manager .manager-environment-comp-menu button > span {
+.fabricate-action-menu-panel button.manager-action-menu-item > span {
   display: block;
   min-width: 0;
   max-width: 100%;
@@ -21929,37 +21958,28 @@
   text-overflow: ellipsis;
 }
 
-.fabricate-manager .manager-environment-comp-menu button:hover:not(:disabled) {
+.fabricate-action-menu-panel button.manager-action-menu-item:hover:not(:disabled) {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-environment-comp-menu button:disabled {
+.fabricate-action-menu-panel button.manager-action-menu-item:focus-visible {
+  background: var(--fab-overlay-light-04);
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+/* NO `color` here, deliberately. `.manager-environment-comp-menu-note` declared
+   `color: var(--fab-text-muted)` and it was DEAD: at (0,2,0) it lost to the item rule's
+   `color: var(--fab-text)` at (0,2,1), so a disabled note has always rendered as ordinary ink at
+   45% opacity. Reinstating the intent would be a visual change this conversion did not ask for,
+   so the dead declaration is recorded and dropped rather than quietly honoured. */
+.fabricate-action-menu-panel button.manager-action-menu-item:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.fabricate-manager .manager-environment-comp-menu button.is-danger {
+.fabricate-action-menu-panel button.manager-action-menu-item.is-danger {
   color: var(--fab-danger);
-}
-
-.fabricate-manager .manager-environment-comp-menu-note {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  place-items: center start;
-  justify-content: start;
-  column-gap: var(--fab-space-2);
-  width: 100%;
-  min-width: 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  color: var(--fab-text-muted);
-  white-space: nowrap;
-  font-size: 0.82rem;
-  font-weight: 500;
-}
-
-.fabricate-manager .manager-environment-comp-menu-note::before {
-  content: "";
-  width: 18px;
 }
 
 /* Matching evidence — chips (compact) + table (inspector) */

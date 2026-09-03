@@ -90,6 +90,41 @@
         padding: 24px;
         overflow: auto;
       }
+
+      /*
+        The clipping column the ACTION MENU case mounts into (issue 1477), standing in for
+        `.manager-environment-tab-panel` — which is `overflow: auto` in the shipped sheet and is
+        what a row menu had to escape. It is SHORT on purpose: a menu opened near the bottom of a
+        tall scroller fits inside it whether or not it was portaled, so the measurement would pass
+        on the unfixed tree. The spacer pushes the trigger to the column's last few pixels.
+
+        These two are fixture chrome and are deliberately NOT in `styles/fabricate.css`: the sheet
+        is served raw here, and adding a rule to it to serve a fixture would be the fixture
+        changing what the product measures.
+      */
+      .clipping-column {
+        position: relative;
+        width: 420px;
+        height: 120px;
+        overflow: auto;
+        border: 1px solid #3b3a48;
+      }
+
+      .clipping-spacer {
+        height: 78px;
+      }
+
+      /*
+        The trigger sits at the column's RIGHT end, where a row's action cluster puts it in the
+        product. It is not decoration: the menu is right-aligned to its trigger, so a trigger a few
+        dozen pixels from the host's left edge cannot be right-aligned against at all and the
+        layout's clamp correctly pushes the panel rightwards — which would make the alignment
+        clause below measure the clamp rather than the alignment.
+      */
+      .clipping-column > .fixture-mount {
+        width: max-content;
+        margin-left: auto;
+      }
     </style>
   </head>
   <body class="vtt game theme-dark">

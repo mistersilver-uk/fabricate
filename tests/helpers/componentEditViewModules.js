@@ -51,6 +51,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  // `ActionMenu`'s own placement helper (issue 1477). Separate from `iconPickerPopover.js`
+  // because a picker's layout DECIDES the panel width while an overflow menu's width is its
+  // longest verb — the identity strip's overflow reaches this one.
+  'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',
   // The complications section (issue 1286). Four leaves, each reached only through it:
   // the persisted vocabulary it seeds a new complication from, the ONE localized trigger
@@ -94,6 +98,11 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // extraction, so it is in this tree's static import closure whether or not a given test
   // turns the essences section on.
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
+  // THE shared overflow action menu (issue 1477), which the identity strip below renders for
+  // its source commands. It replaced `SearchablePopover` at that site — the picker was
+  // announcing two commands as selectable options — and it is a leaf TWO rungs down from this
+  // tree's root, so omitting it HANGS every suite built on this list.
+  'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
   // The SHARED subject check-modifier picker (issue 1095), rendered inside the salvage
   // block. A `.svelte` the tree renders but this list omits HANGS the suite.

@@ -15,14 +15,23 @@
  *   ?host=none      a positioned container inside NO application root
  *
  * `?component=` picks `popover` (SearchablePopover), `icon` (IconPicker), `source`
- * (EssenceSourceSelector), `color` (ManagerColorPicker) or `actorbar` (ActorSelectTopBar — a real
- * PRODUCT surface rather than a bare primitive, mounted only in the player host it ships in).
+ * (EssenceSourceSelector), `color` (ManagerColorPicker), `actorbar` (ActorSelectTopBar — a
+ * real PRODUCT surface rather than a bare primitive, mounted only in the player host it ships
+ * in) or `menu` (ActionMenu).
+ *
+ * `menu` is the only one mounted inside a SHORT, CLIPPING scroller rather than the shared tall
+ * one, because the question it answers is different: every picker above asks whether a panel
+ * lands at its trigger, and the action menu additionally asks whether it ESCAPES the scrolling
+ * column its trigger sits in. `.manager-environment-tab-panel` is `overflow: auto` in the
+ * product, so a row menu opened near the bottom of a long Tasks list was cut off by the panel's
+ * own edge before issue 1477 portaled it.
  * `?frameLeft=` / `?frameTop=` place the window, so the test can assert against a host whose
  * origin is far from the viewport's — which is the entire discriminating fact. With the frame at
  * the origin every arrangement looks identical.
  */
 import { mount } from 'svelte';
 
+import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
 import ActorSelectTopBar from '../../../src/ui/svelte/components/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
@@ -105,7 +114,22 @@ const target = buildHost();
 target.append(element('div', 'fixture-spacer', { height: '90px' }));
 
 const mountPoint = element('div', 'fixture-mount');
-target.append(mountPoint);
+
+// ── THE CLIPPING COLUMN (issue 1477) ────────────────────────────────────────────────────────
+// For the action menu only, the trigger is put inside a SHORT `overflow: auto` box, near its
+// bottom edge, and the box is the element the test measures the panel against. That box is the
+// fixture's stand-in for `.manager-environment-tab-panel`, the scroller the composition list
+// actually lives in — and it is what makes the clipping question askable at all. Mounted into the
+// shared tall scroller the menu would fit whether or not it was portaled, and the measurement
+// would pass on the unfixed tree.
+if (componentKind === 'menu') {
+  const column = element('div', 'clipping-column');
+  const spacer = element('div', 'clipping-spacer');
+  column.append(spacer, mountPoint);
+  target.append(column);
+} else {
+  target.append(mountPoint);
+}
 
 /**
  * A stand-in for `services.actorBar`, matching the read surface `ActorSelectTopBar` uses.
@@ -138,7 +162,7 @@ function actorBarStore() {
 }
 
 /**
- * The five overlay subjects this fixture can mount, by `?component=`.
+ * The six overlay subjects this fixture can mount, by `?component=`.
  *
  * All three of the `src/ui/svelte/components/` pickers are here rather than only `IconPicker`
  * (issue 1470), because the CSS half of the defect is PER FAMILY: each carries its own class
@@ -159,6 +183,22 @@ const COMPONENTS = {
     },
   ],
   color: [ManagerColorPicker, { colorToken: 'sage', buttonTitle: 'Choose a colour' }],
+  // THE overflow action menu (issue 1477). Four verbs, so the panel is decisively taller than the
+  // 120px clipping column it opens inside: a panel that had NOT escaped could not extend past the
+  // column's bottom edge, which is the first of the test's two readings.
+  menu: [
+    ActionMenu,
+    {
+      items: [
+        { id: 'open-source', label: 'Open source task', icon: 'fas fa-up-right-from-square' },
+        { id: 'force-include', label: 'Force add', icon: 'fas fa-plus' },
+        { id: 'restore', label: 'Restore', icon: 'fas fa-rotate-left' },
+        { id: 'exclude', label: 'Exclude from environment', icon: 'fas fa-ban', danger: true },
+      ],
+      triggerLabel: 'More actions',
+      onSelect: () => {},
+    },
+  ],
   popover: [
     SearchablePopover,
     {

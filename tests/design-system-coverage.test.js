@@ -316,6 +316,12 @@ test('no library entry recorded as unbuilt ships as a component', () => {
  * adjudication rather than a primitive that shipped undocumented.
  */
 const UNDOCUMENTED_ROWS = [
+  // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
+  // the set that no `library.html` specimen names. Its row records that `<Menu>` was considered
+  // and why the correspondence is not made — that entry is the kind-choice menu `<PickerRow>`'s
+  // `allowAny` opens, which is a `SearchablePopover` today — so this is a stated debt rather than
+  // a primitive that shipped unrecorded.
+  //
   // Two of the three that arrived together at issue 1458 are adjudicated NON-MEMBERS rather than
   // undocumented PRIMITIVES, recorded with the measurement that ruled them out of the
   // `SearchablePopover` conversion — a multi-select checklist in the player window, and two
@@ -351,6 +357,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+  'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',

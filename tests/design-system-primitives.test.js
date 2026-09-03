@@ -152,6 +152,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
+  // OPENS a menu, which is the only state in which the primitive is visible at all.
+  'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 1475: the player window's shared top bar, and the FIRST entry on this list whose
   // override names a player frame. Converting its actor picker onto `SearchablePopover` moved the
   // whole of what changed into the OPEN panel, and both representative frames draw the picker
@@ -242,8 +245,11 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * Each later primitive extraction in this programme removes its own entry, and the only accepted
  * edit is a REMOVAL. `ModifierPillSelect` left it that way at issue 1458, when its add menu became
  * a `SearchablePopover` and the at-cap trigger treatment it was left holding acquired an override
- * naming the one frame that draws it. `SelectionCheckbox` left it at issue 1373's round 5, when
- * the Tool Studio's prerequisite list gained a frame and with it the `sm` size's only rendering.
+ * naming the one frame that draws it. `ActorSelectTopBar` left it the same way at issue 1475,
+ * and it is the first to leave WITHOUT becoming or extracting a primitive: it stays a
+ * `NOT_A_PRIMITIVE` row, and what earned it a frame is ADOPTING one. `SelectionCheckbox` left
+ * it at issue 1373's round 5, when the Tool Studio's prerequisite list gained a frame and with
+ * it the `sm` size's only rendering.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -282,7 +288,7 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 46, 'the shipped primitive set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
@@ -485,7 +491,8 @@ const COUNT_WORDS = new Map([
  * `\s+` rather than `[\s-]+` is deliberate. `two-caller bar` names the RULE, not this row's count,
  * and a hyphen is what distinguishes the two throughout this corpus.
  */
-const PROSE_CALLER_COUNT = /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+callers?\b/gi;
+const PROSE_CALLER_COUNT =
+  /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+callers?\b/gi;
 
 /** A backticked component path or partial path, as the `why` prose writes one. */
 const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
@@ -601,7 +608,10 @@ test('(d) every shipped primitive still clears the membership bar', () => {
   // independent rows, each measured against the tree. A row that fell to one caller is a primitive
   // whose second adopter was deleted or renamed, and it belongs on NOT_A_PRIMITIVE with the
   // measurement that put it there — the register moves in both directions.
-  assert.ok(DESIGN_SYSTEM_PRIMITIVES.length > 0, 'the member table is empty, so this has no domain');
+  assert.ok(
+    DESIGN_SYSTEM_PRIMITIVES.length > 0,
+    'the member table is empty, so this has no domain'
+  );
   for (const row of DESIGN_SYSTEM_PRIMITIVES) {
     const measured = IMPORTERS.importersOf(row.path);
     assert.ok(

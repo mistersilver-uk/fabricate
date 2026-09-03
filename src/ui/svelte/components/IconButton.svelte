@@ -135,6 +135,12 @@
     // outright and silently unstyle the control while every `data-*` selector in the tests
     // kept resolving.
     class: extraClass = '',
+    // OPTIONAL `$bindable` handle on the rendered `<button>` (issue 1477, default `null` so all
+    // 36 existing callers are unaffected). `ActionMenu` needs it for two things a class cannot
+    // give it: the element it MEASURES the portaled panel against, and the element focus returns
+    // to when the menu closes. `Chip.svelte` carries the same prop for the same reason, which is
+    // how `SearchablePopover` gets a handle on its own chip-shaped trigger.
+    element = $bindable(null),
     ...rest
   } = $props();
 
@@ -146,6 +152,12 @@
   const accessibleName = $derived(ariaLabel || undefined);
 </script>
 
-<button type="button" class={classes} aria-label={accessibleName} {disabled} {onclick} {...rest}
-  >{@render children?.()}</button
+<button
+  bind:this={element}
+  type="button"
+  class={classes}
+  aria-label={accessibleName}
+  {disabled}
+  {onclick}
+  {...rest}>{@render children?.()}</button
 >
