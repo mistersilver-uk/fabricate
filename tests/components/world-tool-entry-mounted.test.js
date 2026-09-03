@@ -75,6 +75,12 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    // The manager's standing-statement strip. `ToolRequirementsTab` imports it STATICALLY for
+    // the system editor's opening info strip (issue 1373, `proto:2855`), and this page renders
+    // that tab. World scope passes no `intro`, so the strip never appears here — but a static
+    // import is in the tree's graph whether or not its branch is taken, and a `.svelte` the
+    // harness omits HANGS this suite and reports `# cancelled` rather than `# fail`.
+    'src/ui/svelte/apps/manager/Callout.svelte',
     // The world modifier library's row. Since issue 1373's round 5 the prerequisite list
     // and the bonus list are both this one component, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
@@ -1285,6 +1291,20 @@ describe('the world Tool entry (issue 1373)', () => {
           'a section inside the card draws no box of its own'
         );
       }
+    });
+
+    // THE SYSTEM EDITOR’S OPENING INFO STRIP IS NOT DRAWN HERE (issue 1373). `proto:2855`
+    // gives the SYSTEM Tool rules editor’s Requirements card a `--info-soft` strip naming the
+    // crafting system whose rules those are; it is the one element distinguishing the two
+    // scopes’ otherwise identical card, and the world entry has no system to name. The strip
+    // is a caller’s sentence rather than a scope test inside the shared tab, so its absence
+    // here is what proves this page passes none - `tool-studio-mounted` asserts its presence.
+    it('draws no scope strip, which is the system editor’s own', async () => {
+      const target = await mountTab({ scope: scopeFor(), tab: 'requirements' });
+      assert.ok(
+        !target.querySelector('[data-tool-requirements-intro]'),
+        'the world entry names no crafting system, so it opens with no strip'
+      );
     });
 
     // AND THE TAB IS NOT WRAPPED IN A CARD OF ITS OWN. `ToolRequirementsTab` draws a

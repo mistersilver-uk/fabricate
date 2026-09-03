@@ -8422,56 +8422,84 @@ test('the small selection box is the reference box', () => {
   );
 });
 
-// ── THE REQUIREMENTS CARD HEAD IS THE REFERENCE'S EYEBROW, NOT `.manager-kicker` (round 5) ──
+// ── NO TOOL SCREEN RESTATES THE SHARED KICKER'S TYPE (issue 1373) ───────────────────────────
 //
-// `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
-// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`. The shared
-// `.manager-kicker` is `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so
-// the two section heads read as small headings rather than as the quiet rules they are.
+// `proto:2324`, `:2356`, `:2550`, `:2556` and `:2566` state every eyebrow the reference draws
+// with ONE string — `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform:
+// uppercase; color: var(--subtle)` — so it is `.manager-kicker`'s value and belongs on
+// `.manager-kicker`. Three tool components had each re-achieved it locally instead, which left
+// the shared class rendering 11.52px untracked in the muted ink on every screen nobody had
+// patched: the world Tool entry drew `PREREQUISITES` at 8.5px and `LINKED ITEM` at 11.52px on
+// one screen, one tab apart. The value is stated once now, at the source.
 //
-// NARROWED IN THE CARD, never on the shared class: `.manager-kicker` has callers on every other
-// manager screen and their own reference frames measured them. This is the treatment
-// `ToolBrowserInspector.svelte` already applies to the Tool inspector rail and
-// `styles/fabricate.css:3316` to the Checks rail — a third site, stated the same way.
-//
-// The cascade happens to favour a scoped rule here (the sheet is layered, this block is not),
-// but the assertion reads the COMPILED scoped CSS rather than the source, so what it pins is
-// what Svelte emits.
-test('the Tool rule card eyebrow carries the reference type, not the shared kicker size', () => {
-  const { css: cardCss } = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte')
-  );
-  const flat = cardCss.replace(/\.svelte-[a-z0-9]+/g, '');
-  const start = flat.indexOf('.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow');
-  assert.ok(start >= 0, 'the eyebrow keeps a block of its own');
-  const declarations = flat.slice(start, flat.indexOf('}', start));
-  assert.match(declarations, /font-size: 8\.5px/, '`proto:2324` sets the eyebrow at 8.5px');
-  assert.match(declarations, /letter-spacing: 0\.11em/, 'and tracks it at .11em');
-  assert.match(
-    declarations,
-    /color: var\(--fab-text-subtle\)/,
-    'and inks it `--subtle`, one rung quieter than the muted the shared class gives'
-  );
-  assert.equal(
-    css.includes('.fabricate-manager .manager-kicker {\n  margin: 0 0 var(--fab-space-2xs);'),
-    true,
-    'and the shared kicker is untouched for every other screen that draws one'
-  );
+// THIS TEST IS THE GUARD AGAINST THE FOURTEENTH NARROWING RULE, and it has to read the COMPILED
+// scoped CSS rather than the source, because that is what the browser gets. It also has to be
+// stated as an ABSENCE: `styles/fabricate.css` is imported at `layer(modules)` while a
+// component's block is injected UNLAYERED, so a single type declaration in one of these blocks
+// silently discards the shared class's rule for that property, at any specificity, with no
+// error and no other failing test.
+test('no Tool screen restates the shared kicker type in its own scoped block', () => {
+  // The three blocks that used to narrow it, each named with the classes it is anchored on.
+  const eyebrowBlocks = [
+    {
+      file: 'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
+      selector: '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow',
+      // The card head is a three-row grid placed by rule rather than by source order, so this
+      // block still has to place the eyebrow's row. That is LAYOUT, and it stays.
+      keeps: ['grid-column: 1', 'grid-row: 1'],
+    },
+    {
+      file: 'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+      selector: '.manager-tool-inspector-kicker,',
+      keeps: ['min-width: 0'],
+    },
+    {
+      file: 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+      selector: '.manager-tool-bonus-kicker {',
+      // `proto:2355`-`2357` puts a hairline beside this one, which needs the row to be a flex
+      // line. Also layout, also stays.
+      keeps: ['display: flex'],
+    },
+  ];
 
-  // AND THE ONE EYEBROW INSIDE THE CARD BODY TAKES THE SAME TREATMENT. `proto:2356` states the
-  // bonus list's `World modifiers` label with the SAME string `proto:2324` states the two
-  // section eyebrows with, so narrowing only the head would put two uppercase micro-labels at
-  // two sizes inside one card — a worse reading than the one this repair started from.
-  const { css: tabCss } = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte')
-  );
-  const tabFlat = tabCss.replace(/\.svelte-[a-z0-9]+/g, '');
-  const kickerStart = tabFlat.indexOf('.manager-tool-bonus-kicker {');
-  assert.ok(kickerStart >= 0, 'the bonus eyebrow keeps a block of its own');
-  const kickerDeclarations = tabFlat.slice(kickerStart, tabFlat.indexOf('}', kickerStart));
-  assert.match(kickerDeclarations, /font-size: 8\.5px/);
-  assert.match(kickerDeclarations, /letter-spacing: 0\.11em/);
-  assert.match(kickerDeclarations, /color: var\(--fab-text-subtle\)/);
+  for (const block of eyebrowBlocks) {
+    const { css: blockCss } = scopedComponentCss(resolve(__dirname, '../..', block.file));
+    const flat = blockCss.replace(/\.svelte-[a-z0-9]+/g, '');
+    const start = flat.indexOf(block.selector);
+    assert.ok(start >= 0, `${block.file} keeps a block for ${block.selector}`);
+    const declarations = flat.slice(start, flat.indexOf('}', start));
+
+    for (const kept of block.keeps) {
+      assert.ok(
+        declarations.includes(kept),
+        `${block.file} keeps ${kept}, which is layout rather than type`
+      );
+    }
+    for (const property of ['font-size', 'font-weight', 'letter-spacing', 'text-transform']) {
+      assert.ok(
+        !declarations.includes(`${property}:`),
+        `${block.file} states no ${property} — the shared kicker owns the eyebrow's type`
+      );
+    }
+    assert.ok(
+      !declarations.includes('color:'),
+      `${block.file} states no colour — the shared kicker owns the eyebrow's ink`
+    );
+  }
+
+  // AND THE MARKUP STILL CARRIES THE SHARED CLASS, or the absences above would be an eyebrow
+  // that has simply stopped being one. Both files write it into the class attribute directly.
+  for (const file of [
+    'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+  ]) {
+    const source = readFileSync(resolve(__dirname, '../..', file), 'utf8');
+    assert.ok(
+      source.includes('manager-kicker'),
+      `${file} still renders its eyebrows through the shared class`
+    );
+  }
 });
 
 test('the locked activation indicator offers no hover affordance', async () => {

@@ -446,9 +446,17 @@
       contextClass="manager-tool-actor-note"
       dataAttr="data-tool-preview-gate"
     />
+    <!-- THE `rule` DENSITY, WHICH ALREADY EXISTED (issue 1373). `proto:3004` draws this well
+         through `proto:6205`'s style string - `gap: 11px; padding: 12px 13px; border-radius:
+         11px; background: var(--bg1)` over a `600 11.5px var(--sans)` line in `--text` - which
+         is the variant `IconFactRow` shipped for the two Tool rails. The default row missed five
+         of its six values, and the fill by a RUNG: the design recesses an inset below the aside
+         holding it, and the default raises it. The list inspector one screen over already passes
+         this, so the two rails stating one fact were drawing it two ways. -->
     <IconFactRow
       icon={usabilityFact.icon}
       title={usabilityFact.title}
+      density="rule"
       dataAttr="data-tool-preview-usability"
     />
   </section>

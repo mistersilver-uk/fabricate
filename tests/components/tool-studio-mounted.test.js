@@ -1350,6 +1350,97 @@ describe('Tool Studio editor (mounted)', () => {
     );
   };
 
+  // ── THE DESIGN'S OWN TREATMENTS, WHERE THIS SCREEN HAD ITS OWN (issue 1373) ─────────────
+  //
+  // Each case below pins a value the design states once that this repository was stating
+  // twice, or in a vocabulary the design does not use at all.
+  it('draws both header verbs as one treatment, and keeps the primary primary', async () => {
+    // `proto:2601` and `proto:2602` are ONE style string - transparent over a border - so the
+    // two verbs that leave this screen render alike. `World Tool` took the neutral role, which
+    // is a FILLED control, standing beside a ghost `Back to Tool Rules`.
+    const root = await harness.mount(props());
+    for (const hook of ['[data-tool-editor-world-tool]', '[data-tool-editor-back]']) {
+      assert.ok(
+        root.querySelector(hook).classList.contains('is-ghost'),
+        `${hook} takes the design's transparent-over-a-border treatment`
+      );
+    }
+    // The green Save is a standing maintainer ruling and is not what this converges.
+    assert.ok(root.querySelector('[data-tool-editor-save]').classList.contains('is-primary'));
+  });
+
+  it('draws the two breakage configuration labels as titles rather than eyebrows', async () => {
+    // `proto:2645` and `proto:2656` state both as `font: 600 11.5px var(--sans);
+    // color: var(--text)` - sentence case in the body ink. Both were `.manager-kicker`, which
+    // is the uppercase micro-label the reference keeps for a SECTION head; neither heads one.
+    const root = await harness.mount(props());
+    const usesTitle = root.querySelector('[data-tool-limited-uses-copy] > p');
+    assert.equal(usesTitle.textContent.trim(), 'Uses per copy');
+    assert.ok(
+      !usesTitle.classList.contains('manager-kicker'),
+      '`proto:2645` draws a title, not an eyebrow'
+    );
+    assert.ok(usesTitle.classList.contains('manager-tool-breakage-config-title'));
+  });
+
+  it('sizes the repair count pill as the design’s in-line count chip', async () => {
+    // `proto:4696`: `padding: 1px 8px; border-radius: 999px; font: 600 9px var(--sans)`, which
+    // is `Chip`'s `list` density value for value. It rendered the base 20px chip scale and
+    // outweighed the eyebrow it counts.
+    const root = await harness.mount(
+      props({ tool: tool({ onBreak: { mode: 'flagBroken' }, repairRequirements: [] }) })
+    );
+    assert.ok(
+      root.querySelector('[data-tool-repair-count]').classList.contains('is-list'),
+      'the count pill takes the list density'
+    );
+  });
+
+  it('states the inheritance pill in the design’s two colour families', async () => {
+    // `proto:4912` builds this pill from the INFO family while a section inherits and from the
+    // WARNING family once it is overridden, and the Tool Rules list inspector already reads that
+    // string. This card read `neutral` / `accent` - one model, two vocabularies, one click apart.
+    const inheriting = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        scope: toolScope({ inherited: { ...OVERRIDES_EVERYTHING, prerequisites: true } }),
+      })
+    );
+    const inheritingPill = inheriting.querySelector('[data-tool-rule-chip="inheriting"]');
+    assert.ok(Boolean(inheritingPill), 'an inheriting section carries its pill');
+    assert.ok(inheritingPill.classList.contains('is-info'), '`Inheriting` is the info family');
+    assert.ok(!inheritingPill.classList.contains('is-neutral'));
+  });
+
+  it('states an overridden section’s pill in the warning family', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+    const pill = root.querySelector('[data-tool-rule-chip="overridden"]');
+    assert.ok(Boolean(pill), 'an overridden section carries its pill');
+    assert.ok(pill.classList.contains('is-warning'), '`Overridden` is the warning family');
+    assert.ok(!pill.classList.contains('is-accent'));
+  });
+
+  it('opens the Requirements card with the scope strip the design gives system scope', async () => {
+    // `proto:2855`. It is the ONE element distinguishing this card from the world entry's
+    // otherwise identical one, and `world-tool-entry-mounted` asserts its absence there.
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', systemName: 'The Herbalist' })
+    );
+    const strip = root.querySelector('[data-tool-requirements-intro]');
+    assert.ok(Boolean(strip), 'the system Requirements card opens with the info strip');
+    assert.equal(strip.dataset.calloutTone, 'info');
+    // The design's own sentence describes a model with no inheritance; ours inherits for real,
+    // so the strip names the system it belongs to and says what following the world Tool means.
+    assert.match(strip.textContent, /The Herbalist/);
+    assert.match(strip.textContent, /follows the world Tool until you override it here/);
+    // AND IT OPENS THE CARD, which is the half a presence check cannot see.
+    const card = root.querySelector('.manager-tool-requirements-card');
+    assert.ok(
+      card.firstElementChild.matches('[data-tool-requirements-intro]'),
+      'the strip is the first thing in the card'
+    );
+  });
+
   it('separates the breakage tab sibling blocks with exactly one whitespace run', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 

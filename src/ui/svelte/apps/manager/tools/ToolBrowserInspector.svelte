@@ -365,33 +365,26 @@
   /* THE PANEL'S OWN HEAD, spanning the column above the medallion rather than sitting in the
      copy cell beside it.
 
-     -- AND ITS TYPE, WHICH `.manager-kicker` GETS WRONG FOR THIS RAIL (issue 1373) --------
+     -- AND ITS TYPE IS THE SHARED CLASS'S (issue 1373) -----------------------------------
      `proto:2550`, `:2556` and `:2566` state every kicker in this panel identically:
      `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform: uppercase; color:
-     var(--subtle)`. The shared `.manager-kicker` is 0.72rem - 11.52px, 35% over - with NO
-     tracking at all and the muted ink, so three section heads read as small headings rather
-     than as the quiet rules they are. Nothing narrowed it for this screen: this block set only
-     margin and min-width, and the sheet's section-kicker rule set only margin.
+     var(--subtle)` - which is the reference's value for EVERY eyebrow it draws, not this
+     rail's own. This block restated it while `.manager-kicker` went on rendering 11.52px
+     untracked in the muted ink everywhere nobody had patched, so the rail measured correct
+     and the screens one click away did not.
 
-     The Checks Studio rail already does exactly this, at `styles/fabricate.css:3316`, and for
-     the same reason: the Tool Studio owns the STRUCTURE (a flat uppercase head with cards
-     directly beneath) and the reference owns the metrics. This states the reference's own
-     figures for this rail rather than borrowing that rail's 9px/.14em, which is its own
-     frame's measurement and not this one's.
+     The class carries the reference's type at the source now, and this block keeps only the
+     LAYOUT the panel head needs: the margin the surrounding flow supplies instead, and the
+     `min-width` a flex child needs before it is allowed to shrink.
 
-     Written here rather than route-scoped in the global sheet because these two classes are
-     this component's own markup, so the rules carry its scoping hash and cannot leak - and
-     because the sheet is layered while this block is not, so a global rule would lose to
-     nothing today and to the next scoped declaration tomorrow. */
+     Restating the type here would have made that source fix unreachable rather than merely
+     redundant: the sheet is imported at `layer(modules)` and this block is injected
+     unlayered, so an unlayered declaration beats a layered one at ANY specificity, with no
+     error and no failing test to say so. */
   .manager-tool-inspector-kicker,
   .manager-tool-inspector-section-kicker {
     margin: 0;
     min-width: 0;
-    color: var(--fab-text-subtle);
-    font-size: 8.5px;
-    font-weight: 700;
-    letter-spacing: 0.11em;
-    text-transform: uppercase;
   }
 
   .manager-tool-inspector-rules {
