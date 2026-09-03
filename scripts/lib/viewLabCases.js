@@ -1454,17 +1454,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     //
     // `sm-iron-ingot` is the row whose world default is SEEDED and whose smithing membership
     // record INHERITS it, which is the state the card's inherit count exists to state.
-      // NARROW THE LIST FIRST, OR THE ROW HAS NO HOOK AT ALL (issue 1371, round 2).
-      //
-      // The shared frame PAGES at ten rows and sorts `name-asc`, and the lab world holds 68 world
-      // components — so `sm-coal` is on page 2, `sm-iron-ingot` on page 4 and `lab-unbound-salt`
-      // on page 7, and none of their row hooks is in the DOM at rest. The capture driver throws
-      // by name on a selector that matches nothing and aborts the WHOLE run, so these four cases
-      // published nothing and took every other case's frame down with them.
-      //
-      // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
-      // to sort onto page one was the alternative and is worse: it would bend the corpus around
-      // the capture rather than driving the screen the way the screen is driven.
+    // NARROW THE LIST FIRST, OR THE ROW HAS NO HOOK AT ALL (issue 1371, round 2).
+    //
+    // The shared frame PAGES at ten rows and sorts `name-asc`, and the lab world holds 68 world
+    // components — so `sm-coal` is on page 2, `sm-iron-ingot` on page 4 and `lab-unbound-salt`
+    // on page 7, and none of their row hooks is in the DOM at rest. The capture driver throws
+    // by name on a selector that matches nothing and aborts the WHOLE run, so these four cases
+    // published nothing and took every other case's frame down with them.
+    //
+    // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
+    // to sort onto page one was the alternative and is worse: it would bend the corpus around
+    // the capture rather than driving the screen the way the screen is driven.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
