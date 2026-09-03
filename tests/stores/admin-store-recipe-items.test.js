@@ -273,6 +273,120 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.equal(recipeItemById(vs, 'codex').learnedByCount, 1);
   });
 
+  // -------------------------------------------------------------------------
+  // The recipe-library search must not reach book membership (issue 1462)
+  // -------------------------------------------------------------------------
+  //
+  // `setRecipeSearch` awaits a full `refresh()`, so the poisoned projection was published
+  // from the moment the GM typed — while they were still standing in the recipe library,
+  // long before they navigated to Books & Scrolls and saw every row read `Incomplete`.
+  // The store, not the surface, is where this is asserted.
+  //
+  // Every case below carries a CONTROL proving the search is live. Without it the whole
+  // block passes just as happily on a store where the term silently did nothing, which is
+  // the failure mode a regression here would actually take.
+
+  const NO_MATCH = 'zzzz-matches-nothing';
+
+  function bookSystem(overrides = {}) {
+    return makeSystem({
+      membershipResolvesByRecipeIds: true,
+      recipeItemDefinitions: [
+        { id: 'book-a', name: 'Book A', originItemUuid: 'Item.aaa', recipeIds: ['r1', 'r2'], caps: {} }
+      ],
+      ...overrides
+    });
+  }
+
+  const BOOK_RECIPES = () => [
+    makeRecipe({ id: 'r1', name: 'Smelt Copper' }),
+    makeRecipe({ id: 'r2', name: 'Forge Rivets' })
+  ];
+
+  it('resolves book membership over the whole roster while a search matching nothing is live', async () => {
+    const store = createAdminStore(createServices(bookSystem(), BOOK_RECIPES(), []));
+    await store.selectSystem('sys1');
+    await store.setRecipeSearch(NO_MATCH);
+    const vs = get(store.viewState);
+
+    assert.equal(vs.recipes.length, 0, 'control: the search IS live and the browser rows are filtered to nothing');
+
+    const bookA = recipeItemById(vs, 'book-a');
+    assert.deepEqual(
+      bookA.recipes.map((r) => r.id).sort(),
+      ['r1', 'r2'],
+      'membership is a fact about the book, resolved over the roster rather than the filtered rows'
+    );
+    assert.equal(bookA.derivedType, 'Book', 'a two-recipe book stays a Book rather than falling to Incomplete');
+  });
+
+  it('keeps the learned-by count of a book intact while a search matching nothing is live', async () => {
+    // A POSITIVE control first, in the same test. The learner index resolves the doubly
+    // nested `flags.fabricate.fabricate.learnedRecipes` path, so a fixture that got the
+    // shape wrong yields an index resolving nothing and "unchanged under a search" is then
+    // satisfied by 0 === 0 — a green test over a broken assertion.
+    globalThis.game.actors.contents = [
+      makeFlaggedActor({ id: 'a1', flags: { fabricate: { fabricate: { learnedRecipes: { r1: 1 } } } } })
+    ];
+    const store = createAdminStore(createServices(bookSystem(), BOOK_RECIPES(), []));
+    await store.selectSystem('sys1');
+
+    assert.equal(
+      recipeItemById(get(store.viewState), 'book-a').learnedByCount,
+      1,
+      'positive control: one world actor has learned r1 and the count sees it with no search active'
+    );
+
+    await store.setRecipeSearch(NO_MATCH);
+    const vs = get(store.viewState);
+    assert.equal(vs.recipes.length, 0, 'control: the search IS live');
+    assert.equal(
+      recipeItemById(vs, 'book-a').learnedByCount,
+      1,
+      '"Learned by N" is accumulated from the same array and must not collapse with the search'
+    );
+  });
+
+  // The legacy-basis guard. This PASSES today and must keep passing; it exists to fail
+  // against the substitution the issue itself proposed — handing the enrichment the raw
+  // `systemRecipes` already in scope at the call site.
+  //
+  // Raw manager models carry the `recipeItemId` scalar only. The PROJECTED rows derive it
+  // through `recipeItemDefinitionsContaining`, which falls back from that scalar to
+  // `linkedRecipeItemUuid` → `originItemUuid`. Here the uuid leg is the ONLY thing joining
+  // the recipe to the book, so raw models yield 0 where this demands 1: a permanent
+  // membership regression on every un-migrated world, traded for a search-only one.
+  //
+  // Its mutation proof is therefore NOT reverting the `rosterRecipes` argument. No search is
+  // active here, so `rosterRecipes` and `recipes` are the same array and that revert is a
+  // no-op for this test. The mutation is the raw substitution.
+  it('resolves legacy uuid-only book membership from projected rows, not raw recipe models', async () => {
+    const system = makeSystem({
+      recipeItemDefinitions: [
+        { id: 'book-legacy', name: 'Old Tome', originItemUuid: 'Item.aaa', recipeIds: [], caps: {} }
+      ]
+    });
+    const recipes = [
+      makeRecipe({ id: 'r1', name: 'Smelt Copper', recipeItemId: '', linkedRecipeItemUuid: 'Item.aaa' })
+    ];
+    const store = createAdminStore(createServices(system, recipes, []));
+    await store.refresh();
+    const vs = get(store.viewState);
+
+    assert.notEqual(
+      system.membershipResolvesByRecipeIds,
+      true,
+      'control: the fixture is on the LEGACY basis, which is the only basis this leg exists under'
+    );
+    assert.equal(vs.recipes[0].recipeItemId, 'book-legacy', 'control: the PROJECTION derived the scalar the raw model lacks');
+    assert.equal(recipes[0].recipeItemId, '', 'control: the raw model carries no scalar, so it could not answer this');
+
+    const book = recipeItemById(vs, 'book-legacy');
+    assert.equal(book.recipes.length, 1, 'the book resolves its uuid-linked member');
+    assert.equal(book.recipes[0].id, 'r1');
+    assert.equal(book.derivedType, 'Scroll');
+  });
+
   it('setRecipeItemEnabled persists only the enabled flag and refreshes', async () => {
     const capture = [];
     const store = buildStore(capture);

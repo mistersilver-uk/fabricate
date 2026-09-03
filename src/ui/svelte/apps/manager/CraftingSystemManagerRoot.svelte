@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
@@ -6098,6 +6098,63 @@
   function browserViewForScopeChange(view) {
     return SCOPE_BROWSER_BY_VIEW[view] || view;
   }
+
+  // ---- Route-scoped library search clear (issue 1462) -----------------------------
+  //
+  // A library search survived every navigation, so a term typed into the recipe library kept
+  // filtering `$viewState.recipes` on screens that render no search box for it: the Tags &
+  // Categories reference counts, the recipe-item editor's available-recipes pool, the rail
+  // badge. A filter the GM cannot see is a filter they cannot clear, which is the failure
+  // issue 676 recorded on the salvage yield picker, repaired there, and left open as a class.
+  // The search is now scoped to the browser that owns it plus that browser's own detail
+  // editor, which is the one round trip the maintainer's rule preserves.
+  //
+  // The scope is `browserViewForScopeChange` UNCHANGED and nothing else. That map already
+  // pairs every browser with its detail editor, so `recipes` and `recipe-edit` collapse to one
+  // scope and the round trip falls out of it; adding a third store-backed search later needs no
+  // edit here at all. There is deliberately NO set of "browsers worth clearing for" beside it:
+  // that would be a second source of truth about which routes own a search, and the transition
+  // it silently collapses is Access -> Tags & Categories — the Access surface writes the recipe
+  // search from its own box, and Tags renders reference counts over the filtered rows where an
+  // `Unused` row deletes in one click with no confirm strip. Every scope change therefore calls
+  // the action unconditionally and the store's short-circuit decides whether anything happens,
+  // so the cost of a no-op navigation is one `get` per store rather than a `refresh()`.
+  //
+  // The seam is an effect on `currentView` — the RESULTING route — rather than
+  // `confirmRouteExit`. `activeView` is assigned directly from ~40 places, several of which
+  // bypass that guard; `normalizedActiveView` reconciles the route at READ time and invokes no
+  // guard at all, so a feature toggle or a cross-client edit can move the GM off the library
+  // with nothing running; and the guard is an async veto whose answer may be "no", which would
+  // clear a search for a navigation the GM then cancels. Observing the outcome is total by
+  // construction: a future direct assignment is covered without the author doing anything.
+  // `store.setKnowledgeActive?.(currentView === 'knowledge')` above is the same shape.
+  //
+  // `lastSearchScope` is a plain `let`, NOT `$state`: writing a rune inside its own effect
+  // re-triggers it. It is SEEDED at declaration, so no clear fires at mount. Left at a sentinel
+  // it would fire once on every route before any navigation happened, which is both a spurious
+  // refresh and — because it makes a "was it called?" assertion true for the wrong reason — the
+  // thing that would let this feature's tests pass while the navigation clear did nothing.
+  // `RecipesBrowserView` records that failure for issue 806, on its own systemId sentinel.
+  //
+  // The seed reads `currentView` through `untrack` because that read is a one-off snapshot at
+  // component init, not a subscription. Read bare it is `state_referenced_locally`, and the
+  // compiler-warning gate's bar is zero — so unwrapping it fails `lint:svelte:warnings`
+  // rather than merely reading untidily.
+  //
+  // The effect's only reactive dependency is `currentView`. `clearLibrarySearches` triggers a
+  // `refresh()` that republishes `$viewState`, which this effect does not read, so it does not
+  // re-enter.
+  function searchScopeForView(view) {
+    return browserViewForScopeChange(view);
+  }
+
+  let lastSearchScope = untrack(() => searchScopeForView(currentView));
+  $effect(() => {
+    const scope = searchScopeForView(currentView);
+    if (scope === lastSearchScope) return;
+    lastSearchScope = scope;
+    store.clearLibrarySearches?.();
+  });
 
   // Scope-select change: route to the corresponding browser for the new system, running
   // the dirty-exit guard first (the different-system path in selectSystem skips it), so

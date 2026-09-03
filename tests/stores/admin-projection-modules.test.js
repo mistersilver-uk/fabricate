@@ -380,10 +380,117 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   it('returns the empty shape with no selected system', () => {
     assert.deepEqual(buildRecipeList(null, makeRecipeManager([]), null, ''), {
       recipes: [],
+      rosterRecipes: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
     });
+  });
+
+  // --- The two recipe cohorts (issue 1462) ---------------------------------
+  //
+  // `recipes` is the search-filtered COHORT the GM library lists. `rosterRecipes` is the
+  // whole projected roster, and it exists so the Books & Scrolls enrichment has a
+  // RESOLUTION TABLE to map a book's stored `recipeIds` through: filtering that table does
+  // not report a different number, it reports a false one.
+  //
+  // These pin the properties the restructure has to preserve. Acceptance criterion 3 asked
+  // for "byte-identical to before", which cannot be asserted once the change has landed;
+  // these are the named invariants that replace it.
+
+  it('returns the unfiltered projected cohort alongside the filtered rows', () => {
+    const recipes = [makeRecipe({ id: 'r-1' }), makeRecipe({ id: 'r-2', name: 'Steel Bar' })];
+    const manager = makeRecipeManager(recipes);
+
+    const unsearched = buildRecipeList(null, manager, makeSystem(), '');
+    assert.equal(
+      unsearched.rosterRecipes,
+      unsearched.recipes,
+      'with no term the two are the SAME array, not a copy, so the no-search cost is unchanged'
+    );
+
+    const searched = buildRecipeList(null, manager, makeSystem(), 'steel');
+    assert.deepEqual(
+      searched.recipes.map((row) => row.id),
+      ['r-2'],
+      'the browser rows stay filtered'
+    );
+    assert.deepEqual(
+      searched.rosterRecipes.map((row) => row.id),
+      ['r-1', 'r-2'],
+      'the roster cohort is unfiltered and in roster order'
+    );
+  });
+
+  it('selects the filtered rows positionally, so two recipes sharing an id both survive', () => {
+    // An id-keyed selection would collapse these into one row referenced twice, changing
+    // the length and the identities the browser renders. Recipe ids are not guaranteed
+    // unique across a hand-authored or copy-imported system.
+    const recipes = [
+      makeRecipe({ id: 'r-dup', name: 'Iron Ingot' }),
+      makeRecipe({ id: 'r-dup', name: 'Iron Rivet' }),
+    ];
+    const result = buildRecipeList(null, makeRecipeManager(recipes), makeSystem(), 'iron');
+
+    assert.equal(result.recipes.length, 2, 'both matching rows are kept');
+    assert.notEqual(result.recipes[0], result.recipes[1], 'and they are distinct row objects');
+    assert.deepEqual(
+      result.recipes.map((row) => row.name),
+      ['Iron Ingot', 'Iron Rivet']
+    );
+  });
+
+  it('keeps the search predicate over the recipe MODELS, not the trimmed projected rows', () => {
+    // `makeRecipe`'s description is `'  padded  '` and `_createRecipeRow` TRIMS it, so a term
+    // carrying significant surrounding whitespace matches the model and not the row. Filtering
+    // the rows instead of the models is the natural mistake after the restructure, and this is
+    // the only assertion in the suite that can see it.
+    const result = buildRecipeList(null, makeRecipeManager([makeRecipe()]), makeSystem(), ' padded ');
+
+    assert.equal(result.recipes[0]?.description, 'padded', 'control: the ROW description is trimmed');
+    assert.deepEqual(
+      result.recipes.map((row) => row.id),
+      ['r-1'],
+      'the term still selects the row, because the predicate reads the untrimmed model'
+    );
+  });
+
+  it('keeps recipeTagPlaceholderCounts over the FILTERED cohort', () => {
+    // The deliberately-filtered half, pinned against an over-correction. This number is
+    // rendered on the Tags & Categories screen; issue 1191 owns whether it should be
+    // roster-wide, and this change does not decide it.
+    const tagged = makeRecipe({
+      id: 'r-tag',
+      name: 'Herbal Brew',
+      ingredientSets: [
+        {
+          id: 'set-tag',
+          ingredientGroups: [
+            { id: 'g-tag', options: [{ componentId: 'c-1', match: { type: 'tags', tags: ['herb'] } }] },
+          ],
+        },
+      ],
+    });
+    const manager = makeRecipeManager([tagged, makeRecipe({ id: 'r-2', name: 'Steel Bar' })]);
+
+    assert.deepEqual(
+      buildRecipeList(null, manager, makeSystem(), '').recipeTagPlaceholderCounts,
+      { herb: 1 },
+      'control: the placeholder is counted with no search active'
+    );
+    assert.deepEqual(
+      buildRecipeList(null, manager, makeSystem(), 'steel').recipeTagPlaceholderCounts,
+      {},
+      'a tag referenced only by a non-matching recipe still contributes nothing'
+    );
+  });
+
+  it('keeps showVisibilitySummary identical with and without a search term', () => {
+    const system = makeSystem({ recipeVisibility: { listMode: 'player' } });
+    const manager = makeRecipeManager([makeRecipe()]);
+
+    assert.equal(buildRecipeList(null, manager, system, '').showVisibilitySummary, true);
+    assert.equal(buildRecipeList(null, manager, system, 'zzz-no-match').showVisibilitySummary, true);
   });
 });
 

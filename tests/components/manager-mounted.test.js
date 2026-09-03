@@ -987,6 +987,18 @@ function compileManagerRoot() {
   }
 }
 
+// Every recorded store call EXCEPT the route-scoped search clear (issue 1462).
+//
+// The root calls `store.clearLibrarySearches?.()` on every change of navigation scope and
+// lets the store's short-circuit decide whether anything happens, so a navigation the real
+// store answers as a no-op still shows up here. Cases whose subject is "which store seams did
+// this interaction reach" read through this so they keep policing the seam they named rather
+// than the total length of the array. The clear itself is asserted, positively and as a call
+// DELTA, by the `route-scoped library search clear` cases.
+function callsWithoutRouteScopedClear(calls) {
+  return calls.filter((call) => call[0] !== 'clearLibrarySearches');
+}
+
 // AN EXACT LABEL MATCH, SCOPED TO ONE RAIL SECTION (issue 1362). This resolved a rail button
 // by `textContent.includes(...)` over EVERY `.manager-nav-button`, which the world scoped-entity
 // leaves broke three separate ways: `Tools` became a substring of `Tools Catalogue`,
@@ -2723,6 +2735,11 @@ function createStore(calls = [], options = {}) {
       return options.deleteRecipeResult ?? true;
     },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
+    // Called by the root's route effect on every scope change (issue 1462). The real store
+    // short-circuits internally, so the component calls it unconditionally and this records
+    // every call — which is why the cases assert call DELTAS across one click rather than
+    // presence.
+    clearLibrarySearches: () => calls.push(['clearLibrarySearches']),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
     // The set delete (issue 1129). `describeComponentDelete` is a SYNCHRONOUS selector the
     // root `$derived`s the panel's impact from, so the double returns a literal rather than a
@@ -7382,14 +7399,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(returnButton.getAttribute('title'), 'Return to System Library');
     assert.match(returnButton.textContent, /All crafting systems/);
 
-    const callsBeforeReturn = calls.length;
+    const callsBeforeReturn = callsWithoutRouteScopedClear(calls).length;
     returnButton.click();
     await Promise.resolve();
     await tick();
     flushSync();
 
     assert.equal(
-      calls.length,
+      callsWithoutRouteScopedClear(calls).length,
       callsBeforeReturn,
       'returning to system library should not call selectSystem'
     );
@@ -15466,7 +15483,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
     assert.equal(cta.target, '_blank');
     assert.equal(cta.rel, 'noopener noreferrer');
-    assert.deepEqual(calls, [], 'the Core preview and tab interactions call no store write seam');
+    assert.deepEqual(
+      callsWithoutRouteScopedClear(calls),
+      [],
+      'the Core preview and tab interactions call no store write seam'
+    );
     globalThis.game.i18n.localize = originalLocalize;
   });
 
@@ -15605,7 +15626,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [null, null, null, 'true']
     );
-    assert.deepEqual(calls, [], 'the rail preview navigation calls no store write seam');
+    assert.deepEqual(
+      callsWithoutRouteScopedClear(calls),
+      [],
+      'the rail preview navigation calls no store write seam'
+    );
   });
 
   it('titles the Downtime route after the preview on screen, in the header and the breadcrumb', async () => {
@@ -22624,7 +22649,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.ok(target.querySelector('.manager-system-edit-form'));
-    assert.deepEqual(calls.slice(-4), [
+    assert.deepEqual(callsWithoutRouteScopedClear(calls).slice(-4), [
       ['selectSystem', 'smithing'],
       ['selectSystem', 'smithing'],
       ['exportSystem', 'smithing'],
@@ -28344,6 +28369,152 @@ describe('CraftingSystemManager mounted behavior', () => {
             'and the player preview both moved to the buffered one'
         );
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Leaving a library's route clears its search (issue 1462)
+  // ---------------------------------------------------------------------------
+  //
+  // Every case asserts a call DELTA across the ONE click under test, never presence.
+  // Presence is forbidden here and that is not style. The root's scope sentinel is SEEDED at
+  // declaration so no clear fires at mount, but a presence assertion would still be satisfied
+  // by the `systems` -> `recipes` hop each case uses to reach its starting route, and would
+  // then pass while the transition actually under test did nothing at all.
+  //
+  // For the same reason every Recipes-origin case routes `systems` -> `recipes` -> target and
+  // asserts it is on `recipes` first. `openTagsScreen` hops `systems` -> `tags` directly and
+  // never performs the transition these cases are about.
+  describe('route-scoped library search clear', () => {
+    function clearCallCount(calls) {
+      return calls.filter((call) => call[0] === 'clearLibrarySearches').length;
+    }
+
+    function currentManagerView() {
+      return target.querySelector('.fabricate-manager').dataset.managerView;
+    }
+
+    // Perform ONE click and report the `clearLibrarySearches` delta it produced, plus the
+    // route it landed on. Snapshotting immediately before the click is what makes the number
+    // attributable to that click and nothing else.
+    async function clickForClearDelta(calls, resolveButton, label) {
+      const button = resolveButton();
+      assert.ok(button, `the navigation target under test is rendered (${label})`);
+      const before = clearCallCount(calls);
+      button.click();
+      await tick();
+      flushSync();
+      return { delta: clearCallCount(calls) - before, view: currentManagerView() };
+    }
+
+    // Mount and route to the recipe library, asserting arrival: a silently missing entry
+    // would leave every later assertion reading the previous screen.
+    async function openRecipeLibrary(calls, storeOptions = {}) {
+      mountManager(calls, { experimentalFeaturesEnabled: true, ...storeOptions });
+      craftingParent().click();
+      await tick();
+      flushSync();
+      assert.equal(currentManagerView(), 'recipes', 'the case starts on the recipe library');
+    }
+
+    it('mounting calls nothing, because the scope sentinel is seeded at declaration', async () => {
+      // The complement of every delta case, and the only assertion that can see the sentinel
+      // regress to an unseeded value. Left at a sentinel the effect fires once at mount on
+      // EVERY route before any navigation happens — a spurious refresh, and, worse, a call
+      // that makes a "was it called?" assertion true for the wrong reason. That is why every
+      // other case here measures a delta; this one measures the mount.
+      const calls = [];
+      mountManager(calls, { experimentalFeaturesEnabled: true });
+      await tick();
+      flushSync();
+
+      assert.equal(currentManagerView(), 'systems', 'the manager mounts on the system library');
+      assert.equal(clearCallCount(calls), 0, 'no clear is attempted before the GM navigates');
+    });
+
+    it('Recipes -> Components clears the library searches', async () => {
+      const calls = [];
+      await openRecipeLibrary(calls);
+      const outcome = await clickForClearDelta(calls, () => navButton('Component Rules'), 'Component Rules');
+
+      assert.equal(outcome.view, 'components');
+      assert.equal(outcome.delta, 1, 'a different browser is a different scope, so the term is cleared');
+    });
+
+    it('Recipes -> Books & Scrolls clears the library searches', async () => {
+      const calls = [];
+      await openRecipeLibrary(calls);
+      const outcome = await clickForClearDelta(
+        calls,
+        () => craftingSubitem('Books & Scrolls'),
+        'Books & Scrolls'
+      );
+
+      assert.equal(outcome.view, 'books-scrolls');
+      assert.equal(
+        outcome.delta,
+        1,
+        'the reported symptom: the destination reads the recipe cohort and renders no search box'
+      );
+    });
+
+    it('Recipes -> Access clears the library searches', async () => {
+      // Access binds the same recipe search pair as the recipe browser and renders its own
+      // box, so this is a real behaviour change on a surface nobody reported. It is the
+      // maintainer's own rule applied literally: the search is preserved for the browser's
+      // detail editor and for nothing else, and Access is a sibling library.
+      const calls = [];
+      await openRecipeLibrary(calls, { selectedSystemOverrides: { visibilityMode: 'restricted' } });
+      const outcome = await clickForClearDelta(calls, () => craftingSubitem('Access'), 'Access');
+
+      assert.equal(outcome.view, 'access');
+      assert.equal(outcome.delta, 1);
+    });
+
+    it('Access -> Tags & Categories clears the library searches', async () => {
+      // The hole a first draft of this feature shipped. Access WRITES the recipe search from
+      // its own box, and Tags & Categories counts vocabulary references over the filtered
+      // rows, where a referenced entry reading `Unused` deletes in one click with no confirm
+      // strip. A design that collapsed both routes to one "not a search-scoped browser"
+      // bucket compared that bucket with itself and cleared nothing on this exact hop.
+      const calls = [];
+      await openRecipeLibrary(calls, { selectedSystemOverrides: { visibilityMode: 'restricted' } });
+      const toAccess = await clickForClearDelta(calls, () => craftingSubitem('Access'), 'Access');
+      assert.equal(toAccess.view, 'access', 'arranged: the GM is on Access, where a term is typable');
+
+      const outcome = await clickForClearDelta(
+        calls,
+        () => navButton('Tags & Categories'),
+        'Tags & Categories'
+      );
+      assert.equal(outcome.view, 'tags');
+      assert.equal(outcome.delta, 1, 'Access and Tags are distinct scopes, so the hop clears');
+    });
+
+    it('the Recipes -> recipe-edit -> Recipes round trip preserves the search', async () => {
+      // The one preserved case, asserted in BOTH directions. `SCOPE_BROWSER_BY_VIEW` maps
+      // `recipe-edit` onto `recipes`, so neither hop changes scope.
+      const calls = [];
+      await openRecipeLibrary(calls);
+
+      const intoEditor = await clickForClearDelta(
+        calls,
+        () => target.querySelector('[data-recipe-id="r1"] [data-recipe-edit]'),
+        'the row Edit action'
+      );
+      assert.equal(intoEditor.view, 'recipe-edit');
+      assert.equal(intoEditor.delta, 0, 'opening the detail editor is inside the library scope');
+
+      const backToLibrary = await clickForClearDelta(
+        calls,
+        () =>
+          Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(
+            (button) => button.textContent.includes('Back to recipes')
+          ),
+        'Back to recipes'
+      );
+      assert.equal(backToLibrary.view, 'recipes');
+      assert.equal(backToLibrary.delta, 0, 'and returning from it is too');
     });
   });
 });

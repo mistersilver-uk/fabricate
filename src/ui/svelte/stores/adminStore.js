@@ -4920,6 +4920,7 @@ export function createAdminStore(services) {
     let toolRequiredFor = {};
     let recipeListData = {
       recipes: [],
+      rosterRecipes: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -5080,9 +5081,27 @@ export function createAdminStore(services) {
         // and does not carry the field. Reading it from the projection would yield a
         // silently `undefined` marker that fails open to the legacy index, which is
         // exactly the failure the parameter exists to prevent (issue 1011).
+        // The UNFILTERED projected cohort, never `recipeListData.recipes` (issue 1462).
+        // A book's `recipeIds` is authored, persisted data and this call resolves those ids
+        // to names: handing it the search-filtered rows does not select a different cohort,
+        // it makes the lookup MISS, and the miss is then reported as a fact about the book
+        // — every book read `Incomplete` with "Learned by 0" while a non-matching search was
+        // live, from the moment the GM typed, because `setRecipeSearch` awaits this refresh.
+        //
+        // And NOT the raw manager cohort the issue proposed substituting here (`systemRecipes`,
+        // built a few lines above and scoped to that block), which is unsafe whether it is
+        // hoisted or re-fetched. These rows carry a `recipeItemId` DERIVED through
+        // `recipeItemDefinitionsContaining`, which falls back from the legacy scalar to
+        // `linkedRecipeItemUuid` → `originItemUuid`; a raw manager model carries only the
+        // scalar. On an un-migrated system — where `_legacyRecipeItemIndex` is the basis —
+        // raw models would drop every recipe that resolves only through the uuid leg,
+        // trading a search-only defect for a permanent one.
+        //
+        // With no search active this IS `recipeListData.recipes`, the same array rather than
+        // a copy, and nothing mutates either of them in place.
         recipeItemDefinitions: await _enrichRecipeItemLibrary(
           selectedSystemData.recipeItemDefinitions,
-          recipeListData.recipes,
+          recipeListData.rosterRecipes,
           selectedSystem?.membershipResolvesByRecipeIds,
           // The SAME index the delete describer reads, so "Learned by 4" on a book and
           // "4 characters will forget them" on the delete card are one derivation.
@@ -6144,6 +6163,34 @@ export function createAdminStore(services) {
     recipeSearch.set('');
     itemSearch.set('');
     graphSearch.set('');
+  }
+
+  // Leaving a library's route clears that library's search (issue 1462). The reason above,
+  // one axis over: a term typed into the recipe or component library keeps filtering
+  // `viewState.recipes` / `viewState.itemCards` on every screen that reads them — including
+  // the ones rendering no search box for it, which therefore give the GM nothing to see or
+  // clear. That is the invisible-filter failure issue 676 recorded on one surface, repaired
+  // there, and did not close; the state itself is removed here instead.
+  //
+  // `graphSearch` is deliberately NOT cleared: the graph is an `activeTab` value rather than a
+  // route, so the route-scoped caller cannot observe it being left, and no other surface reads
+  // it. Clearing it here would be a state change no navigation justifies.
+  //
+  // The short-circuit is load-bearing rather than an optimisation. The caller is a route
+  // effect that fires on EVERY manager navigation, so without it each rail click would cost a
+  // full `refresh()`. The operator is `&&`: a GM has typed in ONE library, not both, so `||`
+  // would short-circuit on the empty sibling and the feature would never clear anything.
+  //
+  // Reaches the phase-1 publish of `refresh()` with no `await` in between, so a caller that
+  // does not await it still observes `viewState.recipes` unfiltered in the same task.
+  //
+  // @returns {Promise<boolean>} whether anything was cleared.
+  async function clearLibrarySearches() {
+    if (!get(recipeSearch) && !get(itemSearch)) return false;
+    recipeSearch.set('');
+    itemSearch.set('');
+    await refresh();
+    return true;
   }
 
   async function selectSystem(systemId) {
@@ -10794,6 +10841,7 @@ export function createAdminStore(services) {
     applyRecipeBulkEdit,
     setRecipeSearch,
     setItemSearch,
+    clearLibrarySearches,
     setGraphSearch,
     // --- Travel (parties + per-system current-realm overrides) ---
     refreshTravelParties: travel.refreshTravelParties,
