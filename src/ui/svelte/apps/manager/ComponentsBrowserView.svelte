@@ -794,7 +794,7 @@
            a specific component types into this field rather than depending on where that
            component happens to sort; the primitive routes an unknown `data-*` onto its label. -->
       <ManagerSearchField
-        data-component-search
+        data-component-search=""
         value={itemSearchTerm || ''}
         onInput={(next) => onSearchChange(next)}
         placeholder={text(

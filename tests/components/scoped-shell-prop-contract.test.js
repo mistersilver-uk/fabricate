@@ -111,6 +111,10 @@ const CATALOGUE_PROPS = [
   'openEntryLabel',
   'restingHint',
   'restingTitle',
+  // The zero-member roster's sentence (issue 1371). Threaded through to `SystemRulesRoster` and
+  // EMPTY by default, so the essence and tool catalogues render the roster they always did; only
+  // a lane whose rows can legitimately belong to no system at all names one.
+  'rosterEmptyNote',
   'rowMeta',
   'rowSecondLine',
   'rowTrailing',
@@ -215,6 +219,10 @@ describe('the shells declare the pinned prop sets', () => {
       'openEntryLabel',
       'restingHint',
       'restingTitle',
+      // AND THE ZERO-MEMBER ROSTER SENTENCE (issue 1371), catalogue-only for the same reason as
+      // `systemRowAction` above: it is the INSPECTOR's roster that would otherwise draw one dead
+      // link per system in the world, and the rules-list shell has no inspector to draw it in.
+      'rosterEmptyNote',
       'rowSecondLine',
       'rowTrailing',
       'searchPlaceholder',
