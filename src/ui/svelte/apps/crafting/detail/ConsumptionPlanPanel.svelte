@@ -82,10 +82,21 @@
               </span>
             {/if}
           </span>
-          <span class="consumption-plan-owned">
-            {localize('FABRICATE.App.Crafting.ConsumptionPlan.Owned', { count: row.owned })}
-          </span>
-          <span class="consumption-plan-qty" class:is-short={!row.sufficient}>×{row.quantity}</span>
+          <!--
+            A CURRENCY row states its whole cost in its NAME ("100 gp"), so it renders
+            neither span (issue 1493). Its `owned` is the evaluation's placeholder rather
+            than a coin balance, and its `quantity` is the price in coin units — together
+            they read "100 gp … You own 0 … ×100" for a player who may be carrying ten
+            times the price. The row itself stays: a currency cost IS spent by the craft.
+          -->
+          {#if !row.isCurrency}
+            <span class="consumption-plan-owned">
+              {localize('FABRICATE.App.Crafting.ConsumptionPlan.Owned', { count: row.owned })}
+            </span>
+            <span class="consumption-plan-qty" class:is-short={!row.sufficient}
+              >×{row.quantity}</span
+            >
+          {/if}
         </li>
       {/each}
     </ul>

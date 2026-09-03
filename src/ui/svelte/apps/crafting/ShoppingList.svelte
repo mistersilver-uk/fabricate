@@ -43,6 +43,11 @@
         img: ing.img ?? null,
         isEssence: ing.isEssence === true,
         icon: ing.icon ?? null,
+        // A CURRENCY cost (issue 1493). `have`/`need` are carried for shape parity with
+        // every other row but MUST NOT be rendered for one: `have` is the evaluation's
+        // placeholder, so the shared ratio chip read "0 / 100 owned" in the danger tone
+        // for a player who simply cannot pay — asserting a coin balance nobody measured.
+        isCurrency: ing.isCurrency === true,
         have: ing.have ?? 0,
         need: ing.totalNeed ?? 0,
       })),
@@ -75,6 +80,25 @@
 
   function ownedLabel(row) {
     return localize('FABRICATE.App.Crafting.Shopping.Owned', { have: row.have, need: row.need });
+  }
+
+  // The same missing-key fallback `RequirementRail.svelte` uses, so this branch is correct
+  // before `Shopping.CurrencyShort` lands in `lang/en.json` (issue 1493). A missing key
+  // localizes to ITSELF, which is the only signal available here, and a chip reading as a
+  // dotted key is worse than English. Deliberately local rather than shared: it is a shim
+  // that degenerates to a plain `localize` once the key ships.
+  function text(key, data, fallback) {
+    const translated = localize(key, data);
+    return translated && !translated.startsWith(key) ? translated : fallback;
+  }
+
+  // A currency row's NAME is already the whole cost ("100 gp"), so its chip states only
+  // the verdict — naming neither a balance nor a price.
+  function currencyLabel() {
+    return text('FABRICATE.App.Crafting.Shopping.CurrencyShort', undefined, "Can't afford");
+  }
+  function chipLabel(row) {
+    return row.isCurrency ? currencyLabel() : ownedLabel(row);
   }
   function onEntryContext(recipeId, event) {
     event.preventDefault();
@@ -204,7 +228,12 @@
                   <CraftingThumb src={row.img} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
-                <span class="crafting-shopping-chip tone-danger">{ownedLabel(row)}</span>
+                <span
+                  class="crafting-shopping-chip tone-danger"
+                  data-shopping-chip={row.isCurrency ? 'currency' : 'ratio'}
+                >
+                  {chipLabel(row)}
+                </span>
               </li>
             {/each}
           </ul>

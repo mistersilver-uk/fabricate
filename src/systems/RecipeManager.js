@@ -1718,7 +1718,7 @@ export class RecipeManager {
         availableItems,
         currencyIssue
       )) {
-        const key = state.componentId ?? state.description ?? state.name;
+        const key = this._shoppingIngredientKey(state);
         const existing = ingredientByKey.get(key);
         if (!existing || (state.need ?? 0) > (existing.need ?? 0)) {
           ingredientByKey.set(key, { ...state });
@@ -1755,7 +1755,16 @@ export class RecipeManager {
     // no `have` — its plan-scoped `delivered` is capped at `need` and would always
     // read satisfied — so the shopping projection restates its `owned` (the uncapped
     // essence amount held) as the `have` the aggregator shops against.
+    //
+    // A CURRENCY requirement is exempt (issue 1493). Its verdict is the RESOLVER's,
+    // taken from this group's presence in `missingGroups` by
+    // `_buildCurrencyIngredientState`, and it is not recoverable from `have`/`need`:
+    // `have` is a documented PLACEHOLDER, never a coin balance, and `need` is a PRICE.
+    // Re-deriving `0 >= 100` here discarded that verdict and reported every currency
+    // requirement as unaffordable — a player carrying 500 gp was told to go and buy the
+    // materials they could simply have paid for.
     const ingredientStates = [...ingredientByKey.values()].map((state) => {
+      if (state.isCurrency === true) return { ...state };
       const held = state.isEssence === true ? (state.owned ?? 0) : (state.have ?? 0);
       return { ...state, have: held, satisfied: held >= (state.need ?? 0) };
     });
@@ -1765,6 +1774,29 @@ export class RecipeManager {
     }));
 
     return { ingredientStates, essenceStates, toolStates: [...toolByKey.values()] };
+  }
+
+  /**
+   * The dedup key one ingredient state merges under in {@link evaluateShoppingRequirement}.
+   *
+   * Kind-qualified, because the merge that follows keeps the state with the HIGHER `need`
+   * and `need` does not mean the same thing across kinds (issue 1493): a component's is a
+   * quantity, a currency option's is a PRICE. Only a managed component carries an id, so a
+   * tag option and a currency option both fell back to `description` and two states of
+   * different kinds sharing a description would have been merged by comparing a price
+   * against an occurrence count — keeping whichever number happened to be larger and
+   * stamping one kind's `isCurrency` flag onto the other's numbers.
+   *
+   * @private
+   * @param {object} state
+   * @returns {string}
+   */
+  _shoppingIngredientKey(state) {
+    if (state.componentId) return `cid:${state.componentId}`;
+    const label = state.description ?? state.name ?? '';
+    if (state.isCurrency === true) return `currency:${label}`;
+    if (state.isEssence === true) return `essence:${label}`;
+    return `desc:${label}`;
   }
 
   /**

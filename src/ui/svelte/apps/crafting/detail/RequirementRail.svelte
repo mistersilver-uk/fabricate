@@ -69,21 +69,32 @@
   function currencyTileLabel(slot) {
     // A cost the world's configuration cannot resolve is NOT a shortfall, and announcing
     // "you cannot afford this" to a player carrying ten times the price is the original
-    // defect in a new voice. Composed rather than keyed: both halves are already
-    // non-localized here by design — the caption comes from `formatCurrencyRequirement`
-    // and the reason from the affordance layer — so this adds a separator, not copy.
-    if (slot.issue) return `${slot.name}. ${slot.issue}`;
+    // defect in a new voice. Keyed like the other two rather than composed: both halves
+    // arrive non-localized (the caption from `formatCurrencyRequirement`, the reason from
+    // the affordance layer), but the SENTENCE that joins them is copy, and a composed one
+    // is the single accessible name on this path that a translator cannot reach.
+    if (slot.issue) {
+      return text(
+        'FABRICATE.App.Crafting.Slots.TileCurrencyUnavailable',
+        { name: slot.name, issue: slot.issue },
+        `${slot.name}. ${slot.issue}`
+      );
+    }
+    // The fallbacks BYTE-MATCH the shipped copy in `lang/en.json`. Two sentences for one
+    // state is a maintenance trap: whichever of the pair a reader finds first, they read
+    // the other as dead, and a key that ever fails to resolve then silently changes the
+    // wording rather than degrading to it.
     if (slot.state === SLOT_STATE.MET) {
       return text(
         CURRENCY_LABEL_KEYS[SLOT_STATE.MET],
         { name: slot.name },
-        `${slot.name} is affordable.`
+        `${slot.name}. You can afford this.`
       );
     }
     return text(
       CURRENCY_LABEL_KEYS[SLOT_STATE.SHORT],
       { name: slot.name },
-      `${slot.name} is more than you can pay.`
+      `${slot.name}. You can't afford this.`
     );
   }
 

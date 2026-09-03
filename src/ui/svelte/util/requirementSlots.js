@@ -212,12 +212,23 @@ export function resolveOpenSlotId({ slots = [], scopeKey = null, rememberedKey =
   return firstUnsatisfiedSlotId(slots, ids);
 }
 
+/**
+ * One non-essence plan row.
+ *
+ * `quantity` and `owned` are projected for shape parity with the essence carrier rows,
+ * but a CURRENCY row reports NEITHER (issue 1493) and carries the discriminator that says
+ * so. Its `owned` is the evaluation's placeholder `0`, not a coin balance, and its
+ * `quantity` is the PRICE the name already spells out — so the shared markup rendered a
+ * 100 gp cost as "100 gp … You own 0 … ×100", restating the price in coin units beside a
+ * balance nobody measured. The name is the complete statement of what the craft spends.
+ */
 function planRowFor(slot) {
   return {
     key: slot.key,
     name: slot.name,
     img: slot.img,
     isEssence: false,
+    isCurrency: slot.isCurrency === true,
     quantity: slot.need,
     owned: slot.have,
     sufficient: slot.state === SLOT_STATE.MET,
@@ -253,6 +264,8 @@ function carrierPlanRows(pool) {
       name: toText(carrier?.name),
       img: carrier?.img ?? null,
       isEssence: true,
+      // A pool carrier is an ITEM, never a coin, so it always reports its ratio.
+      isCurrency: false,
       quantity: toCount(carrier.allocatedUnits),
       owned: toCount(carrier.ownedUnits),
       sufficient: toCount(carrier.allocatedUnits) <= toCount(carrier.ownedUnits),

@@ -10,7 +10,13 @@
 
 /**
  * Build a stable deduplication key for an ingredient state.
- * Priority: componentId > itemUuid > description (tag-based fallback)
+ * Priority: componentId > itemUuid > currency description > description (tag fallback)
+ *
+ * A CURRENCY requirement is namespaced separately (issue 1493) even though it falls back
+ * to the same `description`: the merge below sums `need` into one `totalNeed`, and a price
+ * and an item quantity are not summable into one number. Only a managed component carries
+ * an id, so without the namespace a currency cost and a tag requirement that happened to
+ * describe identically would aggregate into a single row of neither kind.
  *
  * @param {object} ingredientState
  * @returns {string}
@@ -18,7 +24,24 @@
 function _buildIngredientKey(ingredientState) {
   if (ingredientState.componentId) return `cid:${ingredientState.componentId}`;
   if (ingredientState.itemUuid) return `uuid:${ingredientState.itemUuid}`;
-  return `desc:${ingredientState.description ?? 'unknown'}`;
+  const description = ingredientState.description ?? 'unknown';
+  if (ingredientState.isCurrency === true) return `cur:${description}`;
+  return `desc:${description}`;
+}
+
+/**
+ * Whether an ingredient state's cost is one the crafting actor can meet.
+ *
+ * Read off the evaluation's own `affordable` verdict, falling back to `satisfied` for a
+ * duck-typed state from an older manager. Never re-derived from `have`/`need`: a currency
+ * state's `have` is a documented placeholder and its `need` is a price.
+ *
+ * @param {object} ingredientState
+ * @returns {boolean}
+ */
+function _isAffordable(ingredientState) {
+  if (typeof ingredientState.affordable === 'boolean') return ingredientState.affordable;
+  return ingredientState.satisfied === true;
 }
 
 /**
@@ -36,6 +59,12 @@ function _mergeIngredient(existing, incoming, recipeId, recipeName, recipeQuanti
   // `have` is shared inventory — always reflect the latest evaluation value
   existing.have = incoming.have ?? 0;
   if (incoming.isEssence === true) existing.isEssence = true;
+  // Affordability is a conjunction across the recipes that name the same cost: one
+  // queued recipe the actor cannot pay for makes the aggregated requirement unmet.
+  if (incoming.isCurrency === true) {
+    existing.isCurrency = true;
+    existing.affordable = existing.affordable && _isAffordable(incoming);
+  }
   if (!isNonblankIcon(existing.icon) && isNonblankIcon(incoming.icon)) {
     existing.icon = incoming.icon;
   }
@@ -139,6 +168,14 @@ export function aggregateShoppingList(
           description: ing.description ?? '',
           totalNeed: 0,
           have: ing.have ?? 0,
+          // A CURRENCY cost (issue 1493), carried so the shopping list can branch. Its
+          // `have`/`totalNeed` are projected for shape parity with every other entry, but
+          // neither may be REPORTED: `have` is the evaluation's placeholder, never a coin
+          // balance, so "0 / 100 owned" states a balance the player does not have.
+          isCurrency: ing.isCurrency === true,
+          // Meaningful only for a currency entry; `true` for every other kind, which is
+          // shopped for on the have/need ratio below and never on affordability.
+          affordable: ing.isCurrency === true ? _isAffordable(ing) : true,
           recipeBreakdown: []
         });
       }
@@ -191,7 +228,14 @@ export function aggregateShoppingList(
   }
 
   // --- Finalise ingredients ---
+  // A currency requirement is settled by AFFORDABILITY, not by a shortfall count (issue
+  // 1493). `totalNeed - have` would read `100 - 0` for a player carrying a thousand gold,
+  // so the ratio decides nothing here; `missing` is pinned to 0 because there is no
+  // quantity of anything to go and acquire, and `satisfied` carries the whole verdict.
   const ingredients = Array.from(ingredientMap.values()).map(ing => {
+    if (ing.isCurrency === true) {
+      return { ...ing, missing: 0, satisfied: ing.affordable === true };
+    }
     const missing = Math.max(0, ing.totalNeed - ing.have);
     return {
       ...ing,

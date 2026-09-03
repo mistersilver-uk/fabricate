@@ -9,12 +9,20 @@
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { buildRequirementSlots } from '../../src/ui/svelte/util/requirementSlots.js';
+import {
+  SPENDABLE_GOLD_UNITS,
+  UNSPENDABLE_GOLD_UNITS,
+  makeCurrencyRecipeManager,
+  currencyOption,
+} from '../helpers/currencyRequirementFixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const RAIL_PATH = 'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte';
 
 // ---------------------------------------------------------------------------
 // Issue 1493 — the currency fixture is evaluated END TO END, not hand-written.
@@ -52,20 +60,9 @@ const CURRENCY_SYSTEM_ID = 'sys-1493-rail';
  *   misconfiguration under test: the unit exists but cannot be read off any actor.
  */
 function craftabilityFor(units) {
-  const system = {
-    id: CURRENCY_SYSTEM_ID,
-    features: { itemTags: false, essences: false },
-    components: [],
-    managedItems: [],
-    tools: [],
-    essenceDefinitions: [],
-    requirements: { currency: { enabled: true } },
-  };
-  const manager = new RecipeManager({
-    getCraftingSystemManager: () => ({
-      getSystem: (id) => (id === CURRENCY_SYSTEM_ID ? system : null),
-    }),
-    currencyConfigStore: { get: () => ({ spendStrategy: 'actorProperty', units }) },
+  const manager = makeCurrencyRecipeManager(RecipeManager, {
+    systemId: CURRENCY_SYSTEM_ID,
+    units,
   });
   const recipe = new Recipe({
     name: 'Toll Bridge Plank',
@@ -77,7 +74,7 @@ function craftabilityFor(units) {
           {
             id: 'g-toll',
             name: 'Toll',
-            options: [{ match: { type: 'currency', unit: 'gp', amount: 100 }, quantity: 1 }],
+            options: [currencyOption(100)],
           },
         ],
         essences: {},
@@ -100,10 +97,6 @@ function craftabilityFor(units) {
   return manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
 }
 
-const SPENDABLE_LADDER = [
-  { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' },
-];
-const BROKEN_LADDER = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -122,7 +115,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
+  componentPath: RAIL_PATH,
 });
 
 const STATES = [
@@ -347,7 +340,7 @@ describe('RequirementRail mounted behavior', () => {
   // -------------------------------------------------------------------------
 
   it('draws no have/need pip on a currency tile, affordable or not', async () => {
-    for (const ladder of [SPENDABLE_LADDER, BROKEN_LADDER]) {
+    for (const ladder of [SPENDABLE_GOLD_UNITS, UNSPENDABLE_GOLD_UNITS]) {
       const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(ladder)) });
       const [plank, toll] = tilesIn(target);
       assert.ok(plank.querySelector('.requirement-slot-pip'), 'an item tile keeps its ratio');
@@ -362,7 +355,7 @@ describe('RequirementRail mounted behavior', () => {
 
   it('names a currency tile by its cost and verdict, never by a have/need ratio', async () => {
     const target = await harness.mount({
-      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_LADDER)),
+      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_GOLD_UNITS)),
     });
     const label = tilesIn(target)[1].getAttribute('aria-label');
     // The pip is aria-hidden, so this sentence is what a screen-reader user actually
@@ -375,7 +368,7 @@ describe('RequirementRail mounted behavior', () => {
 
   it('names an unresolvable currency tile by its reason, never by a shortfall', async () => {
     const target = await harness.mount({
-      slots: buildRequirementSlots(craftabilityFor(BROKEN_LADDER)),
+      slots: buildRequirementSlots(craftabilityFor(UNSPENDABLE_GOLD_UNITS)),
     });
     const label = tilesIn(target)[1].getAttribute('aria-label');
     // The player is carrying 1000 gp. Telling them they cannot afford 100 gp is the
@@ -386,7 +379,7 @@ describe('RequirementRail mounted behavior', () => {
   });
 
   it('renders the world currency reason ONCE for the rail, not once per tile', async () => {
-    const craftability = craftabilityFor(BROKEN_LADDER);
+    const craftability = craftabilityFor(UNSPENDABLE_GOLD_UNITS);
     // Two currency requirements from one broken world: the reason is a property of the
     // configuration, so repeating it per tile would assert it of each.
     const doubled = {
@@ -410,9 +403,61 @@ describe('RequirementRail mounted behavior', () => {
     );
   });
 
+  // -------------------------------------------------------------------------
+  // Issue 1493 (revision 2) — every currency accessible name is on a KEYED path, and
+  // the English fallbacks byte-match the shipped copy.
+  // -------------------------------------------------------------------------
+
+  it('reads the unresolvable currency name through its localization key', async () => {
+    // Proves the sentence is keyed rather than composed. The harness returns the key for
+    // a missing string, so the fallback would render either way and the DOM alone cannot
+    // tell the two apart — a resolving `format` is what distinguishes them.
+    const original = globalThis.game.i18n.format;
+    globalThis.game.i18n.format = (key, data) =>
+      key === 'FABRICATE.App.Crafting.Slots.TileCurrencyUnavailable'
+        ? `TRANSLATED ${data.name} :: ${data.issue}`
+        : `${key}:${JSON.stringify(data)}`;
+    try {
+      const target = await harness.mount({
+        slots: buildRequirementSlots(craftabilityFor(UNSPENDABLE_GOLD_UNITS)),
+      });
+      const label = tilesIn(target)[1].getAttribute('aria-label');
+      assert.match(label, /^TRANSLATED 100 gp :: /, 'the key owns the sentence, not a join');
+      assert.match(label, /Currency configuration is invalid/, 'and the reason is interpolated');
+    } finally {
+      globalThis.game.i18n.format = original;
+    }
+  });
+
+  // A hand-maintained mirror: the component keeps English fallbacks so it is correct
+  // before a key lands, and two different sentences for one state is a maintenance trap
+  // — whichever a reader finds first, they read the other as dead. Guarded rather than
+  // trusted, because nothing else fails when the pair drifts.
+  it('keeps its currency fallbacks byte-identical to the shipped copy', () => {
+    const source = readFileSync(resolve(repoRoot, RAIL_PATH), 'utf8');
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const slotKeys = lang.FABRICATE.App.Crafting.Slots;
+
+    for (const [key, expression] of [
+      ['TileCurrencyMet', '${slot.name}. '],
+      ['TileCurrencyShort', '${slot.name}. '],
+    ]) {
+      const shipped = slotKeys[key];
+      assert.equal(typeof shipped, 'string', `${key} must be a string leaf in lang/en.json`);
+      // The shipped copy interpolates `{name}`; the fallback interpolates `${slot.name}`.
+      const asFallback = shipped.replace('{name}', '${slot.name}');
+      assert.ok(
+        source.includes(`\`${asFallback}\``),
+        `the ${key} fallback must read exactly "${shipped}" with {name} substituted, `
+          + `so a key that fails to resolve degrades to the copy rather than replacing it`
+      );
+      assert.ok(asFallback.startsWith(expression), 'the fallback leads with the slot name');
+    }
+  });
+
   it('renders no reason line for a rail whose currency resolves', async () => {
     const target = await harness.mount({
-      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_LADDER)),
+      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_GOLD_UNITS)),
     });
     assert.ok(!target.querySelector('[data-requirement-rail-issue]'));
   });

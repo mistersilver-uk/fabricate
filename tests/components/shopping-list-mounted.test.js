@@ -347,3 +347,110 @@ describe('ShoppingList mounted behavior', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 1493 — a currency row states its VERDICT, never a ratio.
+//
+// A currency ingredient entry carries `have: 0` as a documented placeholder against a
+// `totalNeed` that is a PRICE, so the shared chip rendered "0 / 100 owned" in the danger
+// tone: a coin balance nobody measured, beside a price the row's NAME already spells out.
+// Asserted against the mounted DOM, because this is a render defect — the projection can
+// be entirely correct while the markup keeps reading the wrong two fields.
+//
+// The harness's `game.i18n` returns the KEY for a missing string, which is what the
+// component's `text()` fallback keys off, so the chip renders the English fallback here.
+// The second test patches `localize` to prove the keyed path is the one being consulted.
+// ---------------------------------------------------------------------------
+
+const CURRENCY_ENTRY = Object.freeze({
+  componentId: null,
+  itemUuid: null,
+  name: '100 gp',
+  img: 'icons/commodities/currency/coin-embossed-cobalt.webp',
+  description: '100 gp',
+  isEssence: false,
+  isCurrency: true,
+  affordable: false,
+  totalNeed: 100,
+  have: 0,
+  missing: 0,
+  satisfied: false
+});
+
+describe('ShoppingList currency rows (issue 1493)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  it('states the verdict on a currency row and reports neither balance nor price', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({ ingredients: [CURRENCY_ENTRY] }),
+      entries: [ENTRY]
+    });
+
+    const row = target.querySelector('.crafting-shopping-acquire-row');
+    assert.ok(Boolean(row), 'an unaffordable cost still belongs on the acquire list');
+    assert.match(row.textContent, /100 gp/, 'the row NAME is the whole statement of the cost');
+
+    // Asserted on the CHIP ITSELF before any marker attribute, so the guard bites on the
+    // rendered words rather than on a data attribute a fix could add without changing
+    // what the player reads.
+    const chip = row.querySelector('.crafting-shopping-chip');
+    assert.ok(Boolean(chip), 'the row still carries a chip');
+    assert.equal(chip.textContent.trim(), "Can't afford");
+    assert.ok(
+      !/Shopping\.Owned/.test(chip.textContent),
+      'the chip must not go through the have/need owned key'
+    );
+    assert.ok(
+      !/\bhave\b|\bneed\b|\b0\b|\b100\b/.test(chip.textContent),
+      `the chip must name neither the placeholder balance nor the price: "${chip.textContent}"`
+    );
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'currency');
+    assert.ok(!row.querySelector('[data-shopping-chip="ratio"]'), 'and never the ratio chip');
+  });
+
+  it('reads the currency chip through its localization key', async () => {
+    // Proves the branch is KEYED rather than hardcoded: with the key present, the chip
+    // must render the translation, not the English fallback.
+    const original = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = (key) =>
+      key === 'FABRICATE.App.Crafting.Shopping.CurrencyShort' ? 'TRANSLATED-SHORT' : key;
+    try {
+      const target = await harness.mount({
+        aggregate: aggregate({ ingredients: [CURRENCY_ENTRY] }),
+        entries: [ENTRY]
+      });
+      assert.equal(
+        target.querySelector('[data-shopping-chip="currency"]').textContent.trim(),
+        'TRANSLATED-SHORT'
+      );
+    } finally {
+      globalThis.game.i18n.localize = original;
+    }
+  });
+
+  it('drops an affordable cost from the acquire list entirely', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [{ ...CURRENCY_ENTRY, affordable: true, satisfied: true }],
+        allSatisfied: true
+      }),
+      entries: [ENTRY]
+    });
+    assert.ok(
+      !target.querySelector('[data-shopping-acquire-components]'),
+      'a cost the player can pay is not something to go shopping for'
+    );
+    assert.equal(summaryCount(target, 'components'), '0');
+  });
+
+  it('still renders the have/need ratio chip for an ordinary component', async () => {
+    // The control: the currency branch must not swallow the ordinary chip.
+    const target = await harness.mount({ aggregate: aggregate(), entries: [ENTRY] });
+    const chip = target.querySelector('.crafting-shopping-acquire-row .crafting-shopping-chip');
+    assert.match(chip.textContent, /Shopping\.Owned/, 'a component row keeps the owned-ratio chip');
+    assert.match(chip.textContent, /"have":2,"need":4/);
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'ratio');
+  });
+});

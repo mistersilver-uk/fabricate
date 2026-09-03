@@ -24,6 +24,12 @@ globalThis.game = { user: { isGM: true }, fabricate: null };
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 
+// Global-free fixture module, so it may be imported statically alongside the dynamic
+// imports above.
+const { makeCurrencyRecipeManager, makePurseActor, currencyOption } = await import(
+  './helpers/currencyRequirementFixtures.js'
+);
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -571,26 +577,7 @@ const TOLL_SYSTEM_ID = 'sys-1493-shop';
  * holds no plank falls to the coin — IF the evaluation knows whose coin to look at.
  */
 function makeTollManager() {
-  const system = {
-    id: TOLL_SYSTEM_ID,
-    features: { itemTags: false, essences: false },
-    components: [],
-    managedItems: [],
-    tools: [],
-    essenceDefinitions: [],
-    requirements: { currency: { enabled: true } },
-  };
-  const manager = new RecipeManager({
-    getCraftingSystemManager: () => ({
-      getSystem: (id) => (id === TOLL_SYSTEM_ID ? system : null),
-    }),
-    currencyConfigStore: {
-      get: () => ({
-        spendStrategy: 'actorProperty',
-        units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' }],
-      }),
-    },
-  });
+  const manager = makeCurrencyRecipeManager(RecipeManager, { systemId: TOLL_SYSTEM_ID });
   manager.recipes.set(
     'r-toll',
     new Recipe({
@@ -605,7 +592,7 @@ function makeTollManager() {
               name: 'Toll',
               options: [
                 { itemUuid: 'Item.plank', quantity: 2 },
-                { match: { type: 'currency', unit: 'gp', amount: 100 }, quantity: 1 },
+                currencyOption(100),
               ],
             },
           ],
@@ -618,10 +605,6 @@ function makeTollManager() {
   return manager;
 }
 
-/** A purse-carrying actor with an empty pack, so only the coin can settle the toll. */
-function makePurseActor(id, gp) {
-  return { id, items: [], system: { currency: { gp } } };
-}
 
 function tollDescriptions(manager, craftingActor, sourceActors) {
   const aggregate = aggregateShoppingList(
@@ -636,7 +619,7 @@ function tollDescriptions(manager, craftingActor, sourceActors) {
 describe('aggregateShoppingList currency affordability (issue 1493)', () => {
   it('drops the material from the list when the crafting actor can pay the cost instead', () => {
     const manager = makeTollManager();
-    const rich = makePurseActor('rich', 1000);
+    const rich = makePurseActor({ id: 'rich', gp: 1000 });
 
     assert.deepEqual(
       tollDescriptions(manager, rich, [{ id: 'bag', items: [] }, rich]),
@@ -647,7 +630,7 @@ describe('aggregateShoppingList currency affordability (issue 1493)', () => {
 
   it('puts the material back when the crafting actor cannot pay', () => {
     const manager = makeTollManager();
-    const poor = makePurseActor('poor', 3);
+    const poor = makePurseActor({ id: 'poor', gp: 3 });
 
     assert.deepEqual(
       tollDescriptions(manager, poor, [{ id: 'bag', items: [] }, poor]),
@@ -660,7 +643,7 @@ describe('aggregateShoppingList currency affordability (issue 1493)', () => {
     // The shipped defect, kept as a regression guard: an aggregation with no crafting
     // actor cannot afford anything, however rich the source actors are.
     const manager = makeTollManager();
-    const rich = makePurseActor('rich', 1000);
+    const rich = makePurseActor({ id: 'rich', gp: 1000 });
 
     assert.deepEqual(tollDescriptions(manager, null, [rich]), ['2x specific item']);
   });
@@ -669,7 +652,7 @@ describe('aggregateShoppingList currency affordability (issue 1493)', () => {
     // A manager that predates `evaluateShoppingRequirement` (the stub shape several
     // tests above use) takes the other branch, which had the same omission.
     const manager = makeTollManager();
-    const rich = makePurseActor('rich', 1000);
+    const rich = makePurseActor({ id: 'rich', gp: 1000 });
     const legacy = {
       getRecipe: (id) => manager.getRecipe(id),
       evaluateCraftability: (actors, recipe, options) =>
@@ -686,5 +669,95 @@ describe('aggregateShoppingList currency affordability (issue 1493)', () => {
       aggregate.ingredients.map((ingredient) => ingredient.description),
       ['100 gp']
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2) — a currency requirement is settled by AFFORDABILITY, and the
+// entry carries the discriminator the shopping list branches on.
+//
+// The aggregation derived `satisfied` from `totalNeed - have` for every entry, and a
+// currency state's `have` is a documented placeholder against a `need` that is a price.
+// So a cost the player can trivially pay aggregated to `missing: 100, satisfied: false`
+// and the shopping list told them to acquire a hundred of something.
+// ---------------------------------------------------------------------------
+
+function tollAggregate(manager, craftingActor, sourceActors) {
+  return aggregateShoppingList(
+    [{ recipeId: 'r-toll', quantity: 1 }],
+    manager,
+    sourceActors,
+    { craftingActor }
+  );
+}
+
+/** A manager over a recipe whose single group offers ONLY a 100 gp cost. */
+function makeCoinOnlyManager() {
+  const manager = makeCurrencyRecipeManager(RecipeManager, { systemId: TOLL_SYSTEM_ID });
+  manager.recipes.set(
+    'r-coin',
+    new Recipe({
+      id: 'r-coin',
+      name: 'Bridge Toll',
+      craftingSystemId: TOLL_SYSTEM_ID,
+      ingredientSets: [
+        {
+          ingredientGroups: [{ id: 'g-coin', name: 'Toll', options: [currencyOption(100)] }],
+          essences: {},
+        },
+      ],
+      resultGroups: [{ id: 'rg-1', results: [] }],
+    })
+  );
+  return manager;
+}
+
+function currencyEntry(aggregate) {
+  return aggregate.ingredients.find((ingredient) => ingredient.isCurrency === true) ?? null;
+}
+
+describe('aggregateShoppingList currency entries (issue 1493)', () => {
+  it('marks an affordable cost satisfied, so it never reaches the acquire list', () => {
+    const manager = makeTollManager();
+    const rich = makePurseActor({ id: 'rich', gp: 1000 });
+
+    const entry = currencyEntry(tollAggregate(manager, rich, [{ id: 'bag', items: [] }, rich]));
+
+    assert.ok(Boolean(entry), 'the currency requirement is carried as a currency entry');
+    assert.equal(entry.affordable, true);
+    assert.equal(entry.satisfied, true, 'a payable cost is met, not a shortfall of 100');
+    assert.equal(entry.missing, 0, 'there is no quantity of anything to go and acquire');
+  });
+
+  it('keeps an unaffordable cost on the list without inventing a shortfall count', () => {
+    // A coin-ONLY requirement, because a "planks OR 100 gp" group resolves to the plank
+    // option when the coin is out of reach and produces no currency state at all.
+    const manager = makeCoinOnlyManager();
+    const poor = makePurseActor({ id: 'poor', gp: 3 });
+
+    const entry = currencyEntry(
+      aggregateShoppingList([{ recipeId: 'r-coin', quantity: 1 }], manager, [poor], {
+        craftingActor: poor,
+      })
+    );
+
+    assert.ok(Boolean(entry));
+    assert.equal(entry.affordable, false);
+    assert.equal(entry.satisfied, false, 'a player who cannot pay still needs telling');
+    assert.equal(entry.missing, 0, 'but "buy 100 of it" is not the shortfall');
+  });
+
+  it('still shops a non-currency entry on its have/need ratio', () => {
+    // The control: the currency branch must not swallow the ordinary path.
+    const manager = makeTollManager();
+    const poor = makePurseActor({ id: 'poor', gp: 3 });
+
+    const plank = tollAggregate(manager, poor, [{ id: 'bag', items: [] }, poor]).ingredients.find(
+      (ingredient) => ingredient.isCurrency !== true
+    );
+
+    assert.equal(plank.isCurrency, false);
+    assert.equal(plank.missing, 2, 'two planks still to buy');
+    assert.equal(plank.satisfied, false);
   });
 });

@@ -16,6 +16,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+// Global-free fixture module (it takes `RecipeManager` as a parameter), so a static
+// import here is safe despite the "imports after globals" rule below.
+import {
+  SPENDABLE_GOLD_UNITS,
+  UNSPENDABLE_GOLD_UNITS,
+  makeCurrencyRecipeManager,
+  makePurseActor,
+} from './helpers/currencyRequirementFixtures.js';
+
 // ---------------------------------------------------------------------------
 // Foundry globals required for module load
 // ---------------------------------------------------------------------------
@@ -1660,24 +1669,13 @@ test('_validateEssenceReferences flags an essence OPTION referencing a deleted e
 /**
  * A manager whose crafting system has currency ENABLED, over an injected world ladder.
  *
- * Both scopes go through the constructor seams rather than the `game.fabricate` global
- * that `makeRecipeManagerWithSystem` installs, because these fixtures need to vary the
- * WORLD half per test while every other suite in this file shares one global.
+ * Both scopes go through the constructor seams (the shared fixture in
+ * `helpers/currencyRequirementFixtures.js`) rather than the `game.fabricate` global that
+ * `makeRecipeManagerWithSystem` installs, because these fixtures need to vary the WORLD
+ * half per test while every other suite in this file shares one global.
  */
-function makeCurrencyManager(systemId, spendStrategy, units) {
-  const system = {
-    id: systemId,
-    features: { itemTags: false, essences: false },
-    components: [],
-    managedItems: [],
-    tools: [],
-    essenceDefinitions: [],
-    requirements: { currency: { enabled: true } },
-  };
-  return new RecipeManager({
-    getCraftingSystemManager: () => ({ getSystem: (id) => (id === systemId ? system : null) }),
-    currencyConfigStore: { get: () => ({ spendStrategy, units }) },
-  });
+function makeCurrencyManager(systemId, units) {
+  return makeCurrencyRecipeManager(RecipeManager, { systemId, units });
 }
 
 function makeCurrencyRecipe(systemId, options) {
@@ -1689,23 +1687,13 @@ function makeCurrencyRecipe(systemId, options) {
   });
 }
 
-const SPENDABLE_GOLD = [
-  { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' },
-];
-// The same ladder with the actor path cleared: present but unusable, which is what
-// `validateCurrencyProfile` rejects and what the whole issue is about.
-const UNSPENDABLE_GOLD = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
-
-function makePurse(gp) {
-  return { items: [], system: { currency: { gp } } };
-}
 
 test('issue 1493: an affordable currency requirement reports its COST and no held count', () => {
   const systemId = 'sys-1493-afford';
-  const manager = makeCurrencyManager(systemId, 'actorProperty', SPENDABLE_GOLD);
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
   const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
 
-  const purse = makePurse(500);
+  const purse = makePurseActor({ gp: 500 });
   const [state] = manager.evaluateCraftability([purse], recipe, {
     craftingActor: purse,
   }).ingredientStates;
@@ -1724,10 +1712,10 @@ test('issue 1493: an affordable currency requirement reports its COST and no hel
 
 test('issue 1493: an unaffordable currency requirement still reports the cost, not a 0/1 ratio', () => {
   const systemId = 'sys-1493-poor';
-  const manager = makeCurrencyManager(systemId, 'actorProperty', SPENDABLE_GOLD);
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
   const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
 
-  const purse = makePurse(3);
+  const purse = makePurseActor({ gp: 3 });
   const [state] = manager.evaluateCraftability([purse], recipe, {
     craftingActor: purse,
   }).ingredientStates;
@@ -1741,12 +1729,12 @@ test('issue 1493: an unaffordable currency requirement still reports the cost, n
 
 test('issue 1493: a currency requirement the world cannot resolve carries the reason, not a shortfall', () => {
   const systemId = 'sys-1493-broken';
-  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const manager = makeCurrencyManager(systemId, UNSPENDABLE_GOLD_UNITS);
   const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
 
   // A player who could pay ten times over. Without the reason the surface tells them
   // they are poor, and tells the GM nothing at all.
-  const purse = makePurse(1000);
+  const purse = makePurseActor({ gp: 1000 });
   const result = manager.evaluateCraftability([purse], recipe, { craftingActor: purse });
   const [state] = result.ingredientStates;
 
@@ -1758,10 +1746,10 @@ test('issue 1493: a currency requirement the world cannot resolve carries the re
 
 test('issue 1493: the shopping requirement carries the same currency cost and reason', () => {
   const systemId = 'sys-1493-shopping';
-  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const manager = makeCurrencyManager(systemId, UNSPENDABLE_GOLD_UNITS);
   const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 250)]);
 
-  const purse = makePurse(1000);
+  const purse = makePurseActor({ gp: 1000 });
   const [state] = manager.evaluateShoppingRequirement([purse], recipe, {
     craftingActor: purse,
   }).ingredientStates;
@@ -1772,7 +1760,7 @@ test('issue 1493: the shopping requirement carries the same currency cost and re
 
 test('issue 1493: a non-currency requirement is not marked as currency and carries no reason', () => {
   const systemId = 'sys-1493-item';
-  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const manager = makeCurrencyManager(systemId, UNSPENDABLE_GOLD_UNITS);
   const recipe = makeCurrencyRecipe(systemId, [makeIngredientData('Item.plank', 2)]);
 
   const [state] = manager.evaluateCraftability(
@@ -1784,4 +1772,102 @@ test('issue 1493: a non-currency requirement is not marked as currency and carri
   assert.equal(state.issue, undefined);
   assert.equal(state.need, 2, 'an item requirement still reports a quantity ratio');
   assert.equal(state.have, 2);
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2): the SHOPPING projection must not re-derive a currency
+// requirement's verdict. `_buildCurrencyIngredientState` takes `satisfied` from the
+// resolver's own `missingGroups` result; the shopping projection then re-derived every
+// state's satisfaction from `have >= need`, and a currency state's `have` is a documented
+// placeholder (always 0) against a `need` that is a PRICE. So every currency requirement
+// read unaffordable, and a player carrying 500 gp was told to buy the materials instead.
+// ---------------------------------------------------------------------------
+
+test('issue 1493: the shopping requirement keeps the resolver verdict for an affordable cost', () => {
+  const systemId = 'sys-1493-shop-afford';
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
+
+  const purse = makePurseActor({ gp: 500 });
+  const [state] = manager.evaluateShoppingRequirement([purse], recipe, {
+    craftingActor: purse,
+  }).ingredientStates;
+
+  assert.equal(state.isCurrency, true);
+  assert.equal(state.affordable, true, 'the resolver said the actor can pay');
+  assert.equal(
+    state.satisfied,
+    true,
+    'and the shopping projection reports that verdict, not `0 >= 100`'
+  );
+  assert.equal(state.need, 100, 'the price is untouched');
+  assert.equal(state.have, 0, 'the placeholder is untouched — it is not a coin balance');
+});
+
+test('issue 1493: the shopping requirement still reports a genuinely unaffordable cost', () => {
+  // The control for the test above: passing the verdict through must not make every
+  // currency requirement read satisfied.
+  const systemId = 'sys-1493-shop-poor';
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
+
+  const purse = makePurseActor({ gp: 3 });
+  const [state] = manager.evaluateShoppingRequirement([purse], recipe, {
+    craftingActor: purse,
+  }).ingredientStates;
+
+  assert.equal(state.isCurrency, true);
+  assert.equal(state.affordable, false);
+  assert.equal(state.satisfied, false);
+});
+
+test('issue 1493: a non-currency shopping state is still re-derived against the merged max need', () => {
+  // The other control: the currency exemption must not exempt anything else. A player
+  // holding one plank against a two-plank requirement still reads short.
+  const systemId = 'sys-1493-shop-item';
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
+  const recipe = makeCurrencyRecipe(systemId, [makeIngredientData('Item.plank', 2)]);
+
+  const [state] = manager.evaluateShoppingRequirement(
+    [makeActor([makeItem('Item.plank', 1)])],
+    recipe
+  ).ingredientStates;
+
+  assert.equal(state.satisfied, false);
+  assert.equal(state.have, 1);
+  assert.equal(state.need, 2);
+});
+
+test('issue 1493: a currency cost never merges with an item requirement describing identically', () => {
+  // Reachable, not hypothetical. An INCOMPLETE currency match (the misconfiguration this
+  // whole issue is about) falls back to `Ingredient#getDescription()`, which reads
+  // "Unknown ingredient" — and so does any option with no match at all. Only a managed
+  // component carries an id, so both states keyed on that shared description, and the
+  // max-need merge then compared a price against an occurrence count and kept ONE of
+  // them: the currency requirement vanished from the shopping list entirely.
+  const systemId = 'sys-1493-key';
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
+  const recipe = new Recipe({
+    name: 'Ambiguous Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [
+      makeIngredientSet([
+        makeGroupData([{ match: { type: 'currency', amount: 0 }, quantity: 1 }], 'g-coin'),
+        makeGroupData([{ quantity: 4 }], 'g-nameless'),
+      ]).toJSON(),
+    ],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const purse = makePurseActor({ gp: 1000 });
+  const { ingredientStates } = manager.evaluateShoppingRequirement([purse], recipe, {
+    craftingActor: purse,
+  });
+
+  assert.equal(ingredientStates.length, 2, 'two requirements stay two rows');
+  assert.deepEqual(
+    ingredientStates.map((state) => state.isCurrency === true),
+    [true, false],
+    'and each keeps its own kind'
+  );
 });

@@ -450,3 +450,63 @@ describe('suggestChoiceOverrides', () => {
     assert.deepEqual(suggestChoiceOverrides(null), {});
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2) — a currency PLAN ROW carries the discriminator the panel
+// branches on. The row keeps its place (a currency cost IS spent by the craft) but its
+// `quantity` is the price and its `owned` is the evaluation's placeholder, so the panel
+// rendered "100 gp … You own 0 … ×100" — a balance nobody measured beside a restatement
+// of the price the name already spells out.
+// ---------------------------------------------------------------------------
+
+describe('buildConsumptionPlan currency rows (issue 1493)', () => {
+  const currencyState = {
+    groupId: 'g-toll',
+    name: '100 gp',
+    description: '100 gp',
+    img: 'icons/coin.webp',
+    need: 100,
+    have: 0,
+    satisfied: true,
+    isCurrency: true,
+    affordable: true,
+    issue: '',
+  };
+
+  it('keeps the currency row in the plan and marks it as currency', () => {
+    const { rows } = buildConsumptionPlan({
+      ingredientStates: [fixedState(), currencyState],
+    });
+
+    assert.deepEqual(
+      rows.map((row) => [row.name, row.isCurrency]),
+      [
+        ['Spring Water', false],
+        ['100 gp', true],
+      ],
+      'the currency cost is spent, so it stays — flagged, not filtered'
+    );
+  });
+
+  it('marks an essence carrier row as not-currency', () => {
+    const { rows } = buildConsumptionPlan({
+      ingredientStates: [],
+      essencePool: {
+        requirements: [{ essenceId: 'fire', name: 'Fire', icon: null, colorToken: null }],
+        carriers: [
+          {
+            itemKey: 'ember',
+            name: 'Ember',
+            img: null,
+            allocatedUnits: 2,
+            ownedUnits: 3,
+            perUnit: { fire: 1 },
+          },
+        ],
+      },
+    });
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].isCurrency, false, 'a pool carrier is an item, never a coin');
+  });
+});
