@@ -1361,7 +1361,9 @@ There is no Tool Kind field, filter, selector, pill, icon taxonomy, or persisted
 
 The library uses the Manager three-column shell at `210px | 1fr | 340px`.
 It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
-The center library accepts an Item drop to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
+The center library accepts no Item drop.
+Creating a Tool from an Item is a WORLD-scope act and its drop zone lives on the World Tools Catalogue, because a Tool's identity is one world record that every crafting system adopts rather than a per-system copy.
+That zone rejects non-Items, snapshots source name, image and description, and uses durable Tool identity rather than name matching.
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
 The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
 The Tool editor's own rail states five regions in a fixed order: how the Tool behaves, its effective rules, how players see one copy of it, a per-actor preview, and what requires it in this system.
@@ -1370,7 +1372,9 @@ The per-actor preview evaluates the Tool's selected character prerequisites agai
 The required-for region lists this system's recipes and gathering tasks that reference the Tool, each with its kind, and states its empty case rather than rendering an empty region.
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
-When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
+When Tools exist and the current selection is absent or stale, the library selects the first MEMBER row of the rendered page exactly once, reading the membership filter, search term, sort key, sort direction and page slice the GM is actually looking at rather than the unsorted authored array.
+It skips unadopted world rows, so a deliberate selection of one is never snapped away from the `Add {tool} to {system}` action that is its only purpose.
+A valid current selection is preserved and an empty library emits no selection.
 The result list scrolls independently above a full-width pagination footer that remains outside the scrolling region, and that footer's bar renders only for a multi-page result set, so a single page draws no pagination band.
 
 **The membership segment selects the list's COHORT, and the zero state is a fact about that cohort rather than about the system's own Tool array.**
