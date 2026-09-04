@@ -19,6 +19,7 @@ import { get } from 'svelte/store';
 
 import { makeEssence, makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { describeEssenceDeleteImpact } from '../../src/utils/essenceBulkEditModel.js';
+import { makeWorldScopeStoreFake } from '../helpers/worldScopeStoreFixture.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -325,38 +326,11 @@ test('1372: the store publishes no essence duplicate verb', async () => {
 // ---------------------------------------------------------------------------
 
 /**
- * A world-scope essence store over an in-memory payload, in the persisted shape the write path
- * reads: entities as an array, defaults and membership as maps.
- *
- * @param {object[]} entities
- * @returns {{store: object, payload: object}}
+ * THE STORE FAKE IS SHARED (issue 1371, round 3). This suite's copy and the component suite's were
+ * byte-identical; the shape belongs to the scope store rather than to either family. Aliased so
+ * the call sites below still read as the essence store they drive.
  */
-function makeEssenceScopeStore(entities) {
-  const payload = { entities: [...entities], defaults: {}, membership: {} };
-  return {
-    payload,
-    store: {
-      get: () => JSON.parse(JSON.stringify(payload)),
-      // THE PUBLISHED CORPUS IS THE ARRAY SHAPE, and the persisted value is the MAP shape. The
-      // real store converts between them on `load()` and `save()`, and a fake that published the
-      // map made `projectWorldScopeEntity` see NO memberships at all - so every world-scope
-      // projection read `member: false` and `inherited` all-true, which reads exactly like a
-      // switch that will not move. It is also a NEW object per publish, because the resolved-union
-      // memo keys on the corpus object's identity.
-      corpus: () => ({
-        entities: [...payload.entities],
-        defaults: Object.values(payload.defaults),
-        membership: Object.values(payload.membership),
-      }),
-      isSeeded: () => payload.entities.length > 0,
-      save: async (next) => {
-        payload.entities = next.entities;
-        payload.defaults = next.defaults;
-        payload.membership = next.membership;
-      },
-    },
-  };
-}
+const makeEssenceScopeStore = makeWorldScopeStoreFake;
 
 test('1372: joining a world essence to a system writes the in-system record too', async () => {
   const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });

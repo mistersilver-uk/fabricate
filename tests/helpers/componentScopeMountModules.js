@@ -23,15 +23,29 @@
  * self-reporting.
  */
 
+import { createMountedComponentHarness } from './svelte-component-harness.js';
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+
 /**
- * The world-scope model closure every component-scope tree reads.
+ * THE COMPONENT SCOPE LEAVES, which three separate manifests used to spell out longhand.
  *
- * The projection is the entry point; underneath it are the three scope descriptors, the shared
- * resolution machinery and the migration module holding the ONE lifted-identity field list.
+ * Both system-scope component screens read the world projection — the rules list for its ghost
+ * cohort and its inherit summary, the rules editor for the category inherit switch and the
+ * read-only world tag card — and so do both world-scope screens. Every one of these is in the
+ * STATIC graph, so an omission does not fail one test: it HANGS the suite and is reported as
+ * `# cancelled` rather than `# fail`.
+ *
+ * It is a tier of its own rather than part of the one below because a THIRD manifest reads it:
+ * `componentEditViewModules.js`, whose tree needs the leaves and not the world-scope screens'
+ * validation or category vocabulary. Three byte-identical copies of a ten-line list is exactly
+ * the shape SonarCloud's copy-paste detector counts against the gate, and it counts `tests/**`
+ * like `src/**`.
  *
  * @type {readonly string[]}
  */
-export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
+export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
@@ -40,10 +54,18 @@ export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
   'src/systems/toolScope.js',
   'src/migration/worldScopeEntityGrouping.js',
   'src/utils/sourceReferenceUnion.js',
+]);
+
+/**
+ * The world-scope model closure every component-scope tree reads: the leaves above, the Foundry
+ * bridge, and the two pieces only a world-scope screen needs — the entry's validation check set
+ * and the category vocabulary its offered-set builder refuses through.
+ *
+ * @type {readonly string[]}
+ */
+export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
+  ...COMPONENT_SCOPE_LEAF_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
-  // The two pure leaves this lane added: the component presentation model and the entry's
-  // validation check set, plus the category vocabulary the offered-set builder refuses through.
-  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
   'src/utils/componentScopeValidation.js',
   'src/utils/componentCategories.js',
 ]);
@@ -57,10 +79,11 @@ export const SCOPED_LIST_RAW_MODULES = Object.freeze([
   'src/utils/scopedEntityListModel.js',
   'src/utils/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
-  // The frame's lifted view-state factory, and the shared answer to "what is this entity type
-  // called" every scoped screen reads rather than testing `entityType` at a call site.
+  // The frame's lifted view-state factory. `scopedStudio.js` — the shared answer to "what is this
+  // entity type called", which every scoped screen reads rather than testing `entityType` at a
+  // call site — moved into `COMPONENT_SCOPE_LEAF_MODULES` above, because the two trees that read
+  // it without this tier need it too.
   'src/utils/managerBrowserViewState.js',
-  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
 ]);
 
 /**
@@ -96,6 +119,79 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
 ]);
+
+/**
+ * One mounted harness over a world-scope COMPONENT screen, assembled from the tiers above.
+ *
+ * WHY A FACTORY AND NOT TWO DECLARATIONS. The catalogue suite and the entry suite each opened
+ * with the same thirty-line arrangement — the same `createMountedComponentHarness` call spreading
+ * the same three tiers, then the same `scopeFor` projection wrapper, then the same microtask
+ * drain. SonarCloud's copy-paste detector matches by token SHAPE rather than by literal, so two
+ * manifests listing DIFFERENT `.svelte` paths in the same arrangement are still duplicated lines
+ * against the quality gate — and, gate aside, an arrangement restated per suite is one a new suite
+ * copies again.
+ *
+ * WHAT STAYS PER SUITE is the only thing that differs: the component under test and the modules
+ * ITS tree reaches that the tiers do not carry. Those are passed as extras and named inline, which
+ * is the same "compose, do not prune" rule the tiers themselves follow — the harness validator
+ * throws for a module the tree imports and the manifest omits, but says NOTHING about a declared
+ * module the tree does not import, so an over-broad tier is invisible rather than self-reporting.
+ *
+ * @param {object} args
+ * @param {string} args.repoRoot
+ * @param {string} args.tmpPrefix
+ * @param {string} args.componentPath the `.svelte` under test; also compiled automatically.
+ * @param {readonly string[]} [args.rawExtras] raw modules only this tree reaches.
+ * @param {readonly string[]} [args.compiledExtras] `.svelte` modules only this tree renders.
+ * @returns {object} the shared harness handle.
+ */
+export function createComponentScopeHarness({
+  repoRoot,
+  tmpPrefix,
+  componentPath,
+  rawExtras = [],
+  compiledExtras = [],
+}) {
+  return createMountedComponentHarness({
+    repoRoot,
+    tmpPrefix,
+    componentPath,
+    rawModules: [
+      ...WORLD_COMPONENT_SCOPE_RAW_MODULES,
+      ...SCOPED_LIST_RAW_MODULES,
+      ...rawExtras,
+    ],
+    compiledModules: [...SCOPED_SHARED_COMPILED_MODULES, componentPath, ...compiledExtras],
+  });
+}
+
+/**
+ * The world-scope projection over {@link componentCorpus}, which every mounted assertion in both
+ * world-component suites is driven from.
+ *
+ * @param {object} [overrides] passed straight to `componentCorpus`.
+ * @returns {object} the projected scope.
+ */
+export function componentScopeFor(overrides) {
+  return projectWorldScopeEntity({
+    entityType: 'component',
+    corpus: componentCorpus(overrides),
+    systems: COMPONENT_SYSTEMS,
+  });
+}
+
+/**
+ * Drain the microtask queue the sequential write loops await through.
+ *
+ * Forty turns rather than a `tick()`: the catalogue's apply loop awaits one promise per write per
+ * selected component, and a fake that resolved synchronously would let a `Promise.all`
+ * implementation pass an ordering assertion.
+ *
+ * @returns {Promise<void>}
+ */
+export async function drainMicrotasks() {
+  for (let index = 0; index < 40; index += 1) await Promise.resolve();
+}
 
 /**
  * A world component corpus in the shape the scope store persists.

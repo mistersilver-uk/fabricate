@@ -16,6 +16,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  COMPONENT_SCOPE_LEAF_MODULES,
+  SCOPED_SHARED_COMPILED_MODULES,
+} from '../helpers/componentScopeMountModules.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
@@ -26,22 +30,14 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const browser = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-components-browser-',
+  // COMPOSED FROM THE SHARED TIERS (issue 1371, round 3), not spelled out again. The ten
+  // component-scope leaves and the eleven design-system primitives below were literal lists here,
+  // in `componentEditViewModules.js` and in two world-scope suites — four copies of one
+  // arrangement, which is what SonarCloud's copy-paste detector reports and what a fifth suite
+  // would copy next. A missing entry HANGS the suite (`# cancelled`) rather than failing it, so an
+  // arrangement nobody can read back is the worst place for a manifest to drift.
   rawModules: [
-  // -- THE COMPONENT SCOPE LEAVES (issue 1371) --------------------------------------------
-  // Both system-scope component screens now read the world projection: the rules list for its
-  // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
-  // the read-only world tag card. These are the pure leaves behind that, and every one of them
-  // is in the STATIC graph - so an omission here does not fail one test, it HANGS the suite.
-  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
-  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-  'src/ui/svelte/stores/worldScopeProjection.js',
-  'src/systems/scopedDefinitions.js',
-  'src/systems/scopedDefinitionStore.js',
-  'src/systems/componentScope.js',
-  'src/systems/essenceScope.js',
-  'src/systems/toolScope.js',
-  'src/migration/worldScopeEntityGrouping.js',
-  'src/utils/sourceReferenceUnion.js',
+    ...COMPONENT_SCOPE_LEAF_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -57,43 +53,22 @@ const browser = createMountedComponentHarness({
     'src/utils/componentBulkEditModel.js',
     // Its shared leaf (issue 1010): those selection helpers now live here and
     // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
-    'src/utils/bulkSelectionModel.js'
+    'src/utils/bulkSelectionModel.js',
   ],
   compiledModules: [
-  // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
-  // the two system-scope component screens.
-  'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
-  'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
-  'src/ui/svelte/components/StatusToggle.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
+    ...SCOPED_SHARED_COMPILED_MODULES,
+    // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
+    // the two system-scope component screens.
+    'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
+    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-    // The manager's ONE selection control and the manager's ONE multi-select row
-    // (issue 772; the row extracted to a shared primitive under `apps/manager/` for
-    // issue 1010, so this path moved out of the browser's own `components/` directory).
-    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    // The manager's ONE multi-select row (issue 772; extracted to a shared primitive under
+    // `apps/manager/` for issue 1010, so this path moved out of the browser's own directory).
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
-    // The manager's ONE labelled push-button (issue 1118): the sort-direction toggle and the
-    // filtered empty state's Clear filters both render it. Omitting it HANGS this suite.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
-    'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
+    'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
 });
 
 function makeComponent(overrides = {}) {

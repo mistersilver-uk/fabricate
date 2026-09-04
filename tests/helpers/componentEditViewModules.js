@@ -12,6 +12,8 @@
  * `tests/**` duplication like `src/`, and its Automatic Analysis ignores `cpd.exclusions`.
  */
 
+import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
+
 /**
  * Raw (uncompiled) modules the harness copies into the temp tree verbatim.
  *
@@ -19,21 +21,9 @@
  * throws for it up front.
  */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
-  // -- THE COMPONENT SCOPE LEAVES (issue 1371) --------------------------------------------
-  // Both system-scope component screens now read the world projection: the rules list for its
-  // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
-  // the read-only world tag card. These are the pure leaves behind that, and every one of them
-  // is in the STATIC graph - so an omission here does not fail one test, it HANGS the suite.
-  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
-  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-  'src/ui/svelte/stores/worldScopeProjection.js',
-  'src/systems/scopedDefinitions.js',
-  'src/systems/scopedDefinitionStore.js',
-  'src/systems/componentScope.js',
-  'src/systems/essenceScope.js',
-  'src/systems/toolScope.js',
-  'src/migration/worldScopeEntityGrouping.js',
-  'src/utils/sourceReferenceUnion.js',
+  // THE COMPONENT SCOPE LEAVES, spread from their own tier rather than restated (issue 1371,
+  // round 3). Four manifests carried this list verbatim; see `COMPONENT_SCOPE_LEAF_MODULES`.
+  ...COMPONENT_SCOPE_LEAF_MODULES,
   // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
   'src/systems/characterLibraries.js',

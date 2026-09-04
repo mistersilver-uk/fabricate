@@ -24,37 +24,15 @@ import { get } from 'svelte/store';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { getItemMatchUuids } from '../../src/utils/sourceReferenceUnion.js';
+import { makeWorldScopeStoreFake } from '../helpers/worldScopeStoreFixture.js';
 
 /**
- * A component scope store fake in the shape `projectWorldScopeEntity` and the actions both read.
- *
- * The published corpus is the ARRAY shape and the persisted value is the MAP shape, exactly as
- * its essence twin records: a fake that published the map makes every projection read
- * `member: false`, which looks precisely like a switch that will not move.
- *
- * @param {object[]} entities
- * @returns {{payload: object, store: object}}
+ * THE STORE FAKE IS SHARED (issue 1371, round 3). Its body was byte-identical to the essence
+ * suite's, which Sonar's copy-paste detector counts against the gate — and rightly, because the
+ * scope store is generic over the entity family and the two copies were one contract twice.
+ * Aliased locally so every call site below reads as the component store it is driving.
  */
-function makeComponentScopeStore(entities) {
-  const payload = { entities: [...entities], defaults: {}, membership: {} };
-  return {
-    payload,
-    store: {
-      get: () => JSON.parse(JSON.stringify(payload)),
-      corpus: () => ({
-        entities: [...payload.entities],
-        defaults: Object.values(payload.defaults),
-        membership: Object.values(payload.membership),
-      }),
-      isSeeded: () => payload.entities.length > 0,
-      save: async (next) => {
-        payload.entities = next.entities;
-        payload.defaults = next.defaults;
-        payload.membership = next.membership;
-      },
-    },
-  };
-}
+const makeComponentScopeStore = makeWorldScopeStoreFake;
 
 /** The world component the seed is taken from: linked, with an alias, and fully identified. */
 const LINKED = {
