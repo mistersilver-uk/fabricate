@@ -155,6 +155,14 @@ function readParams() {
     // world-scope pass LIFTS each crafting system's own tools into world records, so the systems'
     // libraries have to go with the corpus. `stripTools` in `labWorld.js` owns that and says why.
     noTools: params.get('noTools') === '1',
+    // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty
+    // and — with `clearSystem` beside it — its component catalogue is too (issue 1540). It is a
+    // SECOND flag rather than a widening of `clearSystem` because the corpus has two independent
+    // sources: the migration lifts one world record per crafting system component, which
+    // `clearSystem` already removes, and the fixture authors one world-only record that no
+    // deletion of systems can reach. `stripAuthoredWorldComponents` in `labWorld.js` owns that
+    // and says why folding the two together would state something false.
+    noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
@@ -869,6 +877,7 @@ async function boot() {
         clearSystem: params.clearSystem,
         noParties: params.noParties,
         noTools: params.noTools,
+        noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

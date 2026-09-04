@@ -271,6 +271,37 @@ function stripTools(content) {
 }
 
 /**
+ * Remove the world's OWN authored component records, leaving the migration's lifted ones
+ * (issue 1540).
+ *
+ * ── WHY THIS IS A SEPARATE INPUT FROM `clearSystem`, AND NOT PART OF IT ──────────────────────
+ * The world component corpus has TWO sources and they are independent. `1.30.0`'s world-scope
+ * pass LIFTS one world record out of each crafting system's own `components[]`, so `clearSystem`
+ * — a world with no crafting systems — already empties that half. What it cannot touch is the
+ * half the fixture AUTHORS: `lab-world-component-curio` is a world-only record no system has
+ * adopted, seeded by issue 1392 so the world Tags & Categories screen can photograph a category
+ * with `0 references` that is still confirm-gated and a tag whose only reference is a world
+ * default. Nothing lifted it, so removing the systems leaves it exactly where it was.
+ *
+ * Folding this into `clearSystem` would therefore state something false — a world-only record
+ * surviving the deletion of every crafting system IS the honest state, and three other cases
+ * photograph `clearSystem` worlds that have no quarrel with it. This flag is the other half, and
+ * a case that needs a world which has authored nothing at all asks for both.
+ *
+ * BOTH HALVES OF THE SEED GO, entities and defaults together. The defaults carry the tag `moss`,
+ * which is the entire world tag vocabulary the Tool repair route's `+ Tag` picker lists, so a
+ * frame of an EMPTY picker needs the defaults gone; and an entity with no default would leave a
+ * catalogue row behind, which is what a frame of an EMPTY catalogue cannot have. `membership` is
+ * not seeded for this scope at all, so there is none to clear.
+ *
+ * @param {object} content the built lab content, mutated in place.
+ * @returns {void}
+ */
+function stripAuthoredWorldComponents(content) {
+  content.componentScope = { entities: [], defaults: {} };
+}
+
+/**
  * Build the lab world and boot the real Fabricate facade against it.
  *
  * @param {object} [options] Options.
@@ -280,6 +311,10 @@ function stripTools(content) {
  *   persisted setting, so seeding `[]` is both the shortest path and the truthful one.
  * @param {boolean} [options.noTools] Build a world with NO Tools anywhere. See
  *   {@link stripTools} for why an empty `toolScope` alone would not produce one.
+ * @param {boolean} [options.noAuthoredWorldComponents] Seed NO world component records of the
+ *   lab's own. This does NOT empty the world component catalogue by itself — the migration still
+ *   lifts one record per crafting system component — so a case wanting an empty catalogue pairs
+ *   it with `clearSystem`. See {@link stripAuthoredWorldComponents}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -290,9 +325,11 @@ export async function buildLabWorld({
   longTravelLabels = false,
   noParties = false,
   noTools = false,
+  noAuthoredWorldComponents = false,
 } = {}) {
   const content = buildLabContent();
   if (noTools) stripTools(content);
+  if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   // The dedicated World Parties no-selection case therefore needs the truthful world state that
   // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
