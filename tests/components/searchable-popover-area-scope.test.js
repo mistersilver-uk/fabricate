@@ -811,6 +811,9 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     Object.entries(sources).map(([file, text]) => [file, stripComments(text)])
   );
   const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
+  const rootExemptions = FIXTURE_ALLOWLIST.filter(
+    (entry) => !PRIMITIVES.some((p) => p.roots.some((r) => entry.classes.split(/\s+/).includes(r)))
+  );
   const exemptHits = new Map();
   const allowlistHits = new Map();
   const offenders = [];
@@ -824,7 +827,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
           if (!classes.includes(anchor)) continue;
           attributes += 1;
           if (classes.includes(root)) continue;
-          const allowlisted = FIXTURE_ALLOWLIST.find(
+          const allowlisted = rootExemptions.find(
             (entry) => entry.file === file && entry.classes === value
           );
           if (allowlisted) {
@@ -871,19 +874,22 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   // The ManagerButton unconverted-probe exemptions are a SEPARATE, larger ledger, imported
+  // so they skip the allowlist check (lines 826–828); only the root-less entries are expected to
+  // register hits.
   // rather than hand-listed twice (issue 1502) — cross-checked here by both TOTAL and per-entry
   // count, so a fixture that drifts from its recorded `classes` string is as loud as one removed
   // outright.
+  const expectedAllowlistAttributeCount = rootExemptions.reduce((total, entry) => total + entry.count, 0);
   const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
   assert.equal(
     totalAllowlistHits,
-    FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
-    `this gate matched ${totalAllowlistHits} of the ${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} ` +
+    expectedAllowlistAttributeCount,
+    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistAttributeCount} ` +
       '`FIXTURE_ALLOWLIST` attributes recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
       'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
       'without updating the ledger.'
   );
-  for (const entry of FIXTURE_ALLOWLIST) {
+  for (const entry of rootExemptions) {
     const hits = allowlistHits.get(entry) ?? 0;
     assert.equal(
       hits,
@@ -917,6 +923,9 @@ test('every fixture element in a picker’s family sits under one of its namespa
   const exempt = new Set(
     DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
   );
+  const rootExemptions = FIXTURE_ALLOWLIST.filter(
+    (entry) => !PRIMITIVES.some((p) => p.roots.some((r) => entry.classes.split(/\s+/).includes(r)))
+  );
   const exemptHits = new Map();
   const allowlistHits = new Map();
   const offenders = [];
@@ -930,7 +939,7 @@ test('every fixture element in a picker’s family sits under one of its namespa
         if (copied.length === 0) continue;
         elements += 1;
         if (element.ancestry.some((cls) => primitive.roots.includes(cls))) continue;
-        const allowlisted = FIXTURE_ALLOWLIST.find(
+        const allowlisted = rootExemptions.find(
           (entry) => entry.file === file && entry.classes === element.classes.join(' ')
         );
         if (allowlisted) {
@@ -976,16 +985,17 @@ test('every fixture element in a picker’s family sits under one of its namespa
     );
   }
 
+  const expectedAllowlistElementCount = rootExemptions.reduce((total, entry) => total + entry.count, 0);
   const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
   assert.equal(
     totalAllowlistHits,
-    FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
+    expectedAllowlistElementCount,
     `this gate matched ${totalAllowlistHits} of the ${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} ` +
       '`FIXTURE_ALLOWLIST` elements recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
       'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
       'without updating the ledger.'
   );
-  for (const entry of FIXTURE_ALLOWLIST) {
+  for (const entry of rootExemptions) {
     const hits = allowlistHits.get(entry) ?? 0;
     assert.equal(
       hits,
