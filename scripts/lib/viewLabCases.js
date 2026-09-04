@@ -1465,10 +1465,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
     // to sort onto page one was the alternative and is worse: it would bend the corpus around
     // the capture rather than driving the screen the way the screen is driven.
+    //
+    // AND THE SEARCH IS CLEARED AGAIN BEFORE THE SHUTTER (issue 1371, round 3). Narrowing to one
+    // row is how the inspection is REACHED; leaving it narrowed is what the frame then shows, and
+    // a browse screen photographed at one row is not a frame of a browse screen. Clearing restores
+    // the full sixty-seven — ten rows, `67 of 67 components`, and the pager reading
+    // `Showing 1-10 of 67 - Page 1 of 7` — while the inspection SURVIVES, because the frame holds
+    // the inspected id on the browser view-state rather than on the rendered row.
+    //
+    // A cleared search is safe HERE and would not be on the sibling case below; see its own note.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
       { selector: '[data-scoped-list-inspect="sm-iron-ingot"]' },
+      { selector: '[data-scoped-list-search]', fill: '' },
     ],
     expectView: 'world-components',
     // The page's own hook, so a route that silently fell back to the systems library fails the
@@ -1491,6 +1501,14 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         container: '#manager-world-nav-tool-catalogue',
         target: '#manager-world-nav-tool-catalogue > i',
+      },
+      // THE PAGER, WHICH IS THE CLEARED SEARCH'S OWN WITNESS. `Pagination` is `multiPageOnly`, so
+      // it renders only over a corpus longer than one page: a frame still narrowed to the one
+      // searched row draws no pager at all and fails here. That makes the clear step assertable
+      // rather than merely written down.
+      {
+        container: '[data-scoped-page="world-components"]',
+        target: '[data-pagination-page]',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -1518,15 +1536,31 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Component catalogue, bulk selection',
     reaches: 'beyond',
     smokeLabels: [],
-    // TWO SEARCHES, ONE PER ROW, and the selection SURVIVES the second one: the frame holds the
-    // ticked set on the browser view-state rather than on the rendered page, which is what makes a
-    // selection spanning two searches — and, in the product, two pages — a real state.
+    // ONE SEARCH OVER BOTH SUBJECTS, AND A STAGED INSTRUCTION (issue 1371, round 3).
+    //
+    // The steps used to search twice, once per row, on the claim that the selection SURVIVES the
+    // second search. It does not: `EntityListInspectorFrame.svelte:421-428` prunes `selectedIds`
+    // against the FILTERED rows, so the second search silently dropped the first tick and the
+    // frame published `1 component selected` under a comment asserting two. Paging does not prune
+    // — the prune is on the filter, not on the slice — so the "spans two pages" half of that claim
+    // was true and the "spans two searches" half was never true.
+    //
+    // `salt` matches three rows and TWO of them are the subjects, so one search reaches both. And
+    // for the same pruning reason there is NO trailing `fill: ''` here: clearing the search is a
+    // filter change like any other, and it would prune the very selection this case exists to
+    // photograph.
+    //
+    // A REMOVAL IS STAGED, because an unstaged panel is a panel at rest and this case's whole
+    // subject is the staging model. `Remove from` is the destructive direction — the one whose
+    // note and chip tone round 2 made legible — and one tag staged for addition puts a second
+    // axis and the write count (`Apply 2 changes`) in the same frame.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
-      { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
-      { selector: '[data-scoped-list-select="sm-iron-ingot"]' },
-      { selector: '[data-scoped-list-search]', fill: 'Coal' },
-      { selector: '[data-scoped-list-select="sm-coal"]' },
+      { selector: '[data-scoped-list-search]', fill: 'salt' },
+      { selector: '[data-scoped-list-select="tw-brine-salt"]' },
+      { selector: '[data-scoped-list-select="al-saltpetre"]' },
+      { selector: '[data-world-component-bulk-mode-option="remove"]' },
+      { selector: '[data-world-component-bulk-tag="fuel"]' },
     ],
     expectView: 'world-components',
     expectSelector: '[data-world-component-bulk-panel]',
@@ -1538,6 +1572,18 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-apply]',
+      },
+      // THE TWO STAGED AXES, so the frame is asserted to hold the CHANGED panel rather than the
+      // resting one. The mode note is what `Remove from` swaps in, and the tag stager is the
+      // second axis; a panel that reverted to `Unchanged` still renders the mode track and the
+      // Apply dock above, so those two alone cannot tell the states apart.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-mode-state]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-tag="fuel"]',
       },
     ],
     position: { width: 1280, height: 900 },
