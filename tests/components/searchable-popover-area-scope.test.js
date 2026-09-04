@@ -812,7 +812,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   );
   const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
   const rootExemptions = FIXTURE_ALLOWLIST.filter(
-    (entry) => !PRIMITIVES.some((p) => p.roots.some((r) => entry.classes.split(/\s+/).includes(r)))
+    (entry) => PRIMITIVES.every((p) => p.roots.every((r) => !entry.classes.split(/\s+/).includes(r)))
   );
   const exemptHits = new Map();
   const allowlistHits = new Map();
@@ -924,7 +924,7 @@ test('every fixture element in a picker’s family sits under one of its namespa
     DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
   );
   const rootExemptions = FIXTURE_ALLOWLIST.filter(
-    (entry) => !PRIMITIVES.some((p) => p.roots.some((r) => entry.classes.split(/\s+/).includes(r)))
+    (entry) => PRIMITIVES.every((p) => p.roots.every((r) => !entry.classes.split(/\s+/).includes(r)))
   );
   const exemptHits = new Map();
   const allowlistHits = new Map();
