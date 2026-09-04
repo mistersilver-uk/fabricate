@@ -18,7 +18,8 @@
 // Fonts
 // -----------------------------------------------------------------------------------------
 //
-// Self-hosted from docs/assets/fonts, copied from the module's own assets/fonts. Only the
+// Self-hosted from docs/assets/fonts, mostly copied from the module's own assets/fonts; the
+// site also keeps a Spectral 400 face that the module no longer ships. Only the
 // weights actually requested below are shipped. The body face is left as the theme's system
 // stack: the module's UI face is Foundry's Signika, which this repository does not carry, and
 // a system stack reads better than either at paragraph length.
