@@ -115,7 +115,7 @@
   <SearchablePopover
     options={availableToolOptions}
     pickerClass="manager-recipe-tools-picker"
-    triggerClass="manager-button is-dashed manager-recipe-tools-trigger"
+    triggerClass="fabricate-button manager-button is-dashed manager-recipe-tools-trigger"
     triggerIcon="fas fa-plus"
     triggerLabel={addToolLabel}
     triggerAriaLabel={addToolLabel}

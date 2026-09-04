@@ -280,29 +280,48 @@ test('route chrome and header actions are validated as shape, not as content', (
 // treatments Core's own editors use — a ghost Back, a danger Delete, a primary Save — not just
 // `primary`. The class strings are the contract: these are the very classes
 // `CraftingSystemManagerRoot` writes for its own recipe-editor controls.
+//
+// `fabricate-button` LEADS every one of them (issue 1502). It is the button family's root —
+// the class the shared primitive emits and the class every rule in the sheet now keys on — so
+// a list that opened `manager-button` would render a companion's header action with no button
+// chrome at all. It is spelled out in full here rather than built from a shared constant
+// because these equalities ARE the seam's contract, and a contract that computes its own
+// expectation cannot fail when the seam changes.
 test('an action tone renders the Manager button class Core uses for its own controls', () => {
-  assert.equal(managerHeaderActionClass({ tone: 'primary' }), 'manager-button is-primary');
-  assert.equal(managerHeaderActionClass({ tone: 'ghost' }), 'manager-button is-ghost');
-  assert.equal(managerHeaderActionClass({ tone: 'danger' }), 'manager-button is-danger');
-  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'manager-button');
+  assert.equal(
+    managerHeaderActionClass({ tone: 'primary' }),
+    'fabricate-button manager-button is-primary'
+  );
+  assert.equal(
+    managerHeaderActionClass({ tone: 'ghost' }),
+    'fabricate-button manager-button is-ghost'
+  );
+  assert.equal(
+    managerHeaderActionClass({ tone: 'danger' }),
+    'fabricate-button manager-button is-danger'
+  );
+  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'fabricate-button manager-button');
   assert.equal(
     managerHeaderActionClass({ primary: true }),
-    'manager-button is-primary',
+    'fabricate-button manager-button is-primary',
     'the shipped `primary` spelling keeps its shipped rendering'
   );
-  assert.equal(managerHeaderActionClass({}), 'manager-button');
-  assert.equal(managerHeaderActionClass(undefined), 'manager-button');
+  assert.equal(managerHeaderActionClass({}), 'fabricate-button manager-button');
+  assert.equal(managerHeaderActionClass(undefined), 'fabricate-button manager-button');
 
   // The teeth: EVERY declared tone must map to something. A tone added to the list without a
-  // class would otherwise render as a bare button and read as a stylesheet oversight.
+  // class would otherwise render as a bare button and read as a stylesheet oversight. The
+  // `startsWith` half also pins the ORDER: the family root leads, and a builder that appended
+  // it instead would still contain both classes and still be unstyled by every re-rooted rule
+  // that is written root-first.
   for (const tone of ACTION_TONES) {
     const rendered = managerHeaderActionClass({ tone });
     assert.ok(
-      rendered.startsWith('manager-button'),
+      rendered.startsWith('fabricate-button manager-button'),
       `${tone} must render through the Manager's own button`
     );
     assert.ok(
-      tone === 'neutral' || rendered !== 'manager-button',
+      tone === 'neutral' || rendered !== 'fabricate-button manager-button',
       `${tone} declares a treatment, so it must add a modifier class`
     );
   }
