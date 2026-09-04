@@ -830,3 +830,93 @@ actions.copyMembership(entry.id, row.systemId);`),
     );
   });
 });
+
+/**
+ * THE ROSTER'S TWO SURFACE DECISIONS ARE OPT-IN (issue 1371, parity round 5, reviewer finding 7).
+ *
+ * `SystemRulesRoster` is composed by six screens — the three world catalogues and the three system
+ * rules rails. Round 4 landed a parity finding raised against the world COMPONENT catalogue as two
+ * UNCONDITIONAL declarations in this file's scoped block: the card's `--fab-bg-0` recess and a
+ * lifted `--fab-bg-1` well behind its search input. Both therefore repainted the merged world
+ * Essence catalogue and the world Tool catalogue too, which are two other lanes' approved screens.
+ *
+ * The standing rule is that a shared primitive which has to behave differently at a second site
+ * takes a PROP, and this file already has three of them (`rosterEmptyNote`, and the shells'
+ * `showWorldDefaults` / `inspectorBodyPlacement`). So the two become `recessed` and `searchWell`,
+ * defaulting to the surface those screens rendered BEFORE this work.
+ *
+ * WHAT THESE ASSERTIONS ARE FOR, given a mounted render proves the classes appear and disappear:
+ * they pin the DEFAULT and the SELECTOR. A prop that defaulted to `true` would satisfy every
+ * class-emission assertion while repainting all six screens, and a rule still written against
+ * `.manager-scoped-roster-search` — the class every caller passes — would satisfy the prop
+ * assertions while doing exactly what round 4 did.
+ */
+describe('the system-rules roster states its surfaces as opt-in props', () => {
+  const SURFACE_PROPS = ['recessed', 'searchWell'];
+
+  it('declares both, and defaults both to OFF', () => {
+    const source = sourceOf(ROSTER);
+    const declared = declaredProps(source);
+    for (const prop of SURFACE_PROPS) {
+      assert.ok(declared.includes(prop), `the roster declares \`${prop}\``);
+      assert.match(
+        source,
+        new RegExp(String.raw`\n\s*${prop} = false,`),
+        `and \`${prop}\` defaults to false, so five other screens are unchanged by a finding raised against one`
+      );
+    }
+  });
+
+  it('gates the recess on its own class rather than on the card', () => {
+    const source = sourceOf(ROSTER);
+    assert.match(
+      source,
+      /class:is-recessed=\{recessed\}/,
+      'the card takes a state class from the prop'
+    );
+    assert.match(
+      source,
+      /\.manager-scoped-roster-card\.is-recessed \{\s*background: var\(--fab-bg-0\);/,
+      'and the recess is stated on that class'
+    );
+    // The one that matters: the BASE card rule must state no fill at all, or the opt-in is
+    // decoration over a repaint that already happened.
+    const base = source.slice(
+      source.indexOf('.manager-scoped-roster-card {'),
+      source.indexOf('}', source.indexOf('.manager-scoped-roster-card {'))
+    );
+    assert.ok(
+      !/background:/.test(base),
+      'an unrecessed card states no fill and takes the pane’s, which is what it did before this work'
+    );
+  });
+
+  it('gates the search well on a SECOND class, not on the one every caller passes', () => {
+    const source = sourceOf(ROSTER);
+    assert.match(
+      source,
+      /manager-scoped-roster-search manager-scoped-roster-search-well/,
+      'the well is a second class appended beside the shared one'
+    );
+    assert.match(
+      source,
+      /:global\(\.manager-search\.manager-scoped-roster-search-well input\)/,
+      'and the surface rule is selected on it'
+    );
+    // Round 4's exact spelling, as a negative: a `background`, `border` or `border-radius` written
+    // against the SHARED class is the finding, whatever else this file also declares. The sizing
+    // rules that legitimately use it state a height and nothing else.
+    const shared = [
+      ...source.matchAll(
+        /:global\(\.manager-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
+      )
+    ].map(([, body]) => body);
+    assert.ok(shared.length >= 2, 'NON-VACUITY: the shared class still has rules of its own');
+    for (const body of shared) {
+      assert.ok(
+        !/(?:^|;|\n)\s*(?:background|border|border-radius)\s*:/.test(body),
+        `a rule on the shared class states a surface, which reaches all six screens: ${body.trim()}`
+      );
+    }
+  });
+});

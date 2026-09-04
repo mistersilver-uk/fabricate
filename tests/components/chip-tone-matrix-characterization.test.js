@@ -478,3 +478,123 @@ describe('1371 Chip — the outlined emphasis and the secondary tone', () => {
     );
   });
 });
+
+/**
+ * THE LIT EMPHASIS (issue 1371, parity round 5, UX finding F10).
+ *
+ * The reference's lit world-tag chip is its purple at sixteen percent behind an edge of the same
+ * purple at fifty, with the LABEL in that purple at full strength (`proto:5401`, `proto:5665`).
+ * The shipped `tone="tag"` states the edge exactly right and the other two wrong, and the round-4
+ * record claimed all three were right — so this axis exists because a measurement contradicted a
+ * docblock, and these assertions are that measurement written down:
+ *
+ *   entry-tag-chip.backgroundColor  subject color(srgb 0.274196 0.315451 0.384784)
+ *                                != prototype rgba(201, 160, 220, 0.16)
+ *   entry-tag-chip.color            subject rgb(241, 209, 181) != prototype rgb(201, 160, 220)
+ *
+ * The grey-blue is what `color-mix(… var(--fab-purple) 16%, var(--fab-bg-3))` resolves to: the
+ * tone mixes its wash into an OPAQUE surface token rather than into what is behind the chip.
+ *
+ * WHY IT IS A SECOND EMPHASIS AND NOT A REPAINT OF `is-tag`. That tone has shipped callers on
+ * other screens; a shared primitive taking a second site's treatment takes a PROP. And why it is
+ * SELECTED on `is-tag` and `has-swatch` rather than on `.manager-chip.is-lit` alone: those are the
+ * two classes that declare `--fab-chip-color`, and a chip with no colour of its own cannot be lit
+ * in one. A bare selector would have to invent a fallback fill, and every fallback is still a
+ * mix — so a toneless lit chip would lose the fill it shipped with. Unmatched is the only no-op.
+ */
+describe('1371 Chip — the lit emphasis', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /** Where the lit rule's head begins in the block. -1 when it has none. */
+  function litRuleIndex() {
+    return styleBlock.search(/\.manager-chip\.is-tag\.is-lit(?![\w-])/);
+  }
+
+  /** The lit rule's body, comments already absent because the head is inside the block. */
+  function litRule() {
+    const open = litRuleIndex();
+    assert.notEqual(open, -1, 'the lit emphasis has a rule of its own');
+    return styleBlock.slice(open, styleBlock.indexOf('}', open));
+  }
+
+  it('emits is-lit only when asked, and composes with the tone and the scale', async () => {
+    const shipped = await harness.mount({ tone: 'tag' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-tag'],
+      'a tag chip that does not ask for the lit face is exactly what shipped'
+    );
+    harness.remount();
+
+    const lit = await harness.mount({ tone: 'tag', emphasis: 'lit', density: 'tag-run' });
+    assert.deepEqual(
+      [...chipNode(lit).classList].filter((name) => name.startsWith('is-')).toSorted((a, b) => a.localeCompare(b)),
+      ['is-lit', 'is-tag', 'is-tag-run'],
+      'the run draws its lit chip as tone + emphasis + scale, three axes and three classes'
+    );
+  });
+
+  it('is accepted as an emphasis, so an unrecognised one still falls back beside it', async () => {
+    // The vocabulary is closed, and it now has two members: a value dropped from `EMPHASES` but
+    // kept in the style block renders as the shipped chip while every rule assertion below still
+    // passes, which is exactly the failure the emission check exists for.
+    const target = await harness.mount({ tone: 'tag', emphasis: 'lit ' });
+    assert.ok(
+      !chipNode(target).classList.contains('is-lit'),
+      'a value that is not spelled exactly renders the shipped chip'
+    );
+  });
+
+  it('states the reference face: the family colour on the INK and a 16% wash of it, over NOTHING', () => {
+    const rule = litRule();
+    assert.match(
+      rule,
+      /color:\s*var\(--fab-chip-color\)/,
+      'the label takes the family colour at full strength — the line the round-4 record got wrong'
+    );
+    assert.match(
+      rule,
+      /background:\s*color-mix\(in srgb, var\(--fab-chip-color\) 16%, transparent\)/,
+      'and the wash is that colour at the reference sixteen percent over TRANSPARENT, not mixed into an opaque surface token'
+    );
+    assert.ok(
+      !/border-color:/.test(rule),
+      'the edge is untouched, because `is-tag` already states the reference fifty percent'
+    );
+    assert.ok(
+      !/(?:padding|font-size|font-weight|min-height|border-radius):/.test(rule),
+      'and no geometry: the scale is `density`, which is what lets one run draw lit, unlit and struck chips at one size'
+    );
+  });
+
+  it('is selected ONLY on the two classes that declare a chip colour', () => {
+    // A bare `.manager-chip.is-lit` rule would reach a chip with no `--fab-chip-color` at all,
+    // where `color: var(--fab-chip-color)` is an invalid-at-computed-value-time ink and the mix
+    // resolves against nothing. The precondition belongs in the selector.
+    assert.equal(
+      styleBlock.search(/\.manager-chip\.is-lit(?![\w-])/),
+      -1,
+      'there is no unqualified lit rule'
+    );
+    assert.notEqual(
+      styleBlock.search(/\.manager-chip\.has-swatch\.is-lit(?![\w-])/),
+      -1,
+      'and the swatch, which is the other class that declares `--fab-chip-color`, is lit by the same rule'
+    );
+  });
+
+  it('is written AFTER the tag tone and after the outlined plate, so its fill wins', () => {
+    // `is-tag` states a fill and `is-outlined` states a fill. This rule is (0,3,0) and beats both
+    // on specificity, but the tone rules are the ones a later edit is likely to move, so the order
+    // is pinned as well: a tag rule written below this would take the fill back at equal weight if
+    // the selector were ever simplified.
+    const lit = litRuleIndex();
+    assert.ok(lit > 0, 'the lit emphasis has a rule');
+    assert.ok(ruleIndex('is-tag') < lit, 'the tag tone is written first');
+    assert.ok(ruleIndex('is-outlined') < lit, 'and so is the plate');
+  });
+});

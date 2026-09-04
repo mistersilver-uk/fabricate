@@ -29,13 +29,20 @@
      `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
      `secondary`, `tag`, or '' for the default neutral fill. Tone is colour only and never
      changes the size; a tone that resized would reintroduce the drift this component removes.
-   - emphasis: '' (the shipped chip) or 'outlined' — the chip as a FLAT PLATE rather than a
-     tinted wash, for a badge that has to stand ON a panel of its own colour family
-     (`proto:1313`). It is a SECOND AXIS and not a tenth tone: `tone` says which family the
-     chip belongs to, `emphasis` says whether that family arrives as a wash or as a plate, and
-     the two compose. Anything else resolves to '', exactly as an unrecognised `tone` does, so
-     a chip that does not ask for it is byte-identical to what shipped. Its rule is the last in
-     the style block, and carries the full note.
+   - emphasis: '' (the shipped chip), 'outlined' or 'lit'. It is a SECOND AXIS and not an
+     eleventh tone: `tone` says which family the chip belongs to, `emphasis` says HOW that
+     family arrives. Anything else resolves to '', exactly as an unrecognised `tone` does, so a
+     chip that does not ask for one is byte-identical to what shipped. Both rules are the last
+     in the style block and carry the full notes.
+     · 'outlined' — the chip as a FLAT PLATE rather than a tinted wash, for a badge that has to
+       stand ON a panel of its own colour family (`proto:1313`).
+     · 'lit' — the family's colour on the INK too, over a 16% wash of it and nothing else
+       (issue 1371). The reference's lit world-tag chip is purple ink on a purple tint behind a
+       purple edge (`proto:5401`, `proto:5665`); `tone="tag"` alone states the edge correctly,
+       inks `--fab-text` and mixes its wash into the opaque `--fab-bg-3`. It applies to the two
+       chips that declare a colour of their own — `tone="tag"` and any `swatch` — because those
+       are the ones with a colour to be lit in; on any other chip the rule does not match and
+       nothing moves.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
@@ -87,11 +94,16 @@
      the two vertical insets stay open by 1px under the spacing-scale deviation below, and
      the remaining 3 are the caller's `tone`, not this scale's.
 
-     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws is its own purple
-     at sixteen percent behind an edge of the same purple at fifty — which is the SHIPPED
-     `tone="tag"`, mixing `--fab-purple` at exactly those two ratios; the unlit and the
-     switched-off faces are `tone`/`struck`. Keeping the two axes apart is what lets one run draw lit, unlit
-     and struck chips at one size, which is what that run is.
+     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws is its own purple at
+     sixteen percent behind an edge of the same purple at fifty and a LABEL in that purple at full
+     strength; that face is `tone="tag" emphasis="lit"`, and the second half of it is corrected
+     here (issue 1371, parity round 5). This note used to say `tone="tag"` alone stated the whole
+     of it. It does not, and the harness measured the difference rather than inferring it: that
+     tone mixes its sixteen percent into the OPAQUE `--fab-bg-3` rather than into what is behind
+     the chip, so the fill measures a grey-blue, and it inks the label `--fab-text` rather than
+     the purple. The edge was right all along. `emphasis="lit"` states the other two. The unlit
+     and switched-off faces stay `tone`/`struck`; keeping paint and scale on separate axes is what
+     lets one run draw lit, unlit and struck chips at one size, which is what that run is.
 
      THE REFERENCE'S MICRO PILL IS ALREADY HERE, and is deliberately not a second value. Both
      lanes also asked for a `micro` scale for the `World catalogue` badge (`proto:1313`) and the
@@ -200,7 +212,7 @@
    *
    * @type {ReadonlySet<string>}
    */
-  const EMPHASES = new Set(['outlined']);
+  const EMPHASES = new Set(['outlined', 'lit']);
 
   const classes = $derived(
     [
@@ -705,5 +717,41 @@
      today. */
   .manager-chip.is-outlined {
     background: var(--fab-bg-1);
+  }
+
+  /* THE LIT EMPHASIS (issue 1371, parity round 5, UX finding F10): the chip's own colour on the
+     INK as well as on the edge, over a wash of that colour and nothing else.
+
+     WHAT IT CLOSES. The reference's lit world-tag chip is one colour said three ways — the
+     `--fab-purple` token at sixteen percent on the fill, at fifty on the edge, and at full
+     strength ON THE LABEL (`proto:5401`, `proto:5665`). The shipped `tone="tag"` states the edge
+     at fifty and is exactly right; it states the FILL as that purple at sixteen mixed into the
+     OPAQUE `--fab-bg-3`, and the ink as `--fab-text` — so a parity run measured the entry's tag
+     chip as a grey-blue fill under a cream label against a purple tint under a purple one. Two of
+     those three lines are this rule; the third was never wrong.
+
+     WHY IT IS NOT AN IN-PLACE REPAINT OF `is-tag`. That tone has shipped callers on other
+     screens, and a shared primitive that takes a second site's treatment takes a PROP rather than
+     an edit — the standing rule this whole round is applying. `emphasis` is the axis that already
+     says how a family arrives, so this is its second value rather than a thirteenth tone.
+
+     IT READS `--fab-chip-color`, AND IT IS SELECTED ON THE TWO CLASSES THAT DECLARE ONE. That
+     property is the vehicle the tag tone and the `swatch` dot already share, and it is the whole
+     of this emphasis's generality: a chip has to have a colour of its own before it can be lit in
+     it. Writing the precondition into the SELECTOR rather than into a `var()` fallback is the
+     honest form — `background: color-mix(…, var(--fab-chip-color, <something>) 16%, transparent)`
+     is a mix whatever the fallback is, so a toneless lit chip would lose its fill to a 16% wash
+     of it rather than keep it. Unmatched is the only genuine no-op, which is `Medallion`'s
+     `has-tint` reasoning applied one component over.
+
+     WRITTEN LAST, AFTER `is-outlined`, and that is load-bearing exactly as its neighbour's own
+     note says: every tone rule is (0,2,0) and decides its fill by order, so a rule that repaints
+     `is-tag`'s fill must stand after it. At (0,3,0) these two selectors also beat `is-outlined`
+     outright, which is correct — a plate and a wash are the two answers to one question, so the
+     two emphases are alternatives rather than a composition, and no caller pairs them. */
+  .manager-chip.is-tag.is-lit,
+  .manager-chip.has-swatch.is-lit {
+    color: var(--fab-chip-color);
+    background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
   }
 </style>

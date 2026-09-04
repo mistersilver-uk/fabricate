@@ -9474,6 +9474,15 @@ test('all three browser sort-direction toggles render as one control', async () 
     // the essence toggle measured before this rule, so if it matched the three below, the
     // rule would be reaching nothing and every equality here would hold trivially.
     const bare = `<button type="button" class="${base}" data-probe="bare"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    // AND A SECOND CONTROL, added when the primitive's own control rule took the 34-38px band's
+    // 9px corner (issue 1371, maintainer ruling M12a). Before that, `borderRadius` was the
+    // discriminator this test used to prove the toolbar rule had reached its fixture at all: 9px
+    // against the bare primitive's 6px. The primitive is 9px now, so that half of the control has
+    // been superseded rather than lost — `fontWeight` still discriminates (600 against 700), and
+    // this probe carries `manager-button` WITHOUT `fab-manager-button`, which is what an
+    // unconverted hand-written button is and is still on the base rule's 6px. So the corner is
+    // measured in a real browser on both sides of the conversion boundary instead.
+    const unconverted = `<button type="button" class="manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
       <!doctype html>
@@ -9488,7 +9497,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="manager-toolbar">${toggles}${bare}</div>
+            <div class="manager-toolbar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -9509,20 +9518,37 @@ test('all three browser sort-direction toggles render as one control', async () 
         };
       };
       return Object.fromEntries(
-        ['recipe', 'component', 'essence', 'bare'].map((probe) => [probe, read(probe)])
+        ['recipe', 'component', 'essence', 'bare', 'unconverted'].map((probe) => [
+          probe,
+          read(probe)
+        ])
       );
     });
 
-    for (const probe of ['recipe', 'component', 'essence', 'bare']) {
+    for (const probe of ['recipe', 'component', 'essence', 'bare', 'unconverted']) {
       assert.ok(measured[probe], `the ${probe} probe rendered`);
     }
 
-    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares, and
-    // the base control declares 6px and 700, so agreeing on these two is what "the rule
-    // matched" means here.
+    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares; the
+    // bare PRIMITIVE declares 700 and, since issue 1371's M12a ruling, the same 9px — so weight
+    // is the discriminator and the corner is now the thing the third probe measures.
     assert.equal(measured.recipe.borderRadius, '9px', 'the toolbar rule reached the fixture');
-    assert.equal(measured.bare.borderRadius, '6px', 'and the bare primitive is still at 6px');
-    assert.equal(measured.bare.fontWeight, '700', 'and at the base weight');
+    assert.equal(measured.bare.fontWeight, '700', 'and the bare primitive is at the base weight');
+    assert.notEqual(
+      measured.bare.fontWeight,
+      measured.recipe.fontWeight,
+      'so the bare probe still discriminates — an equality that held for every property would mean the rule was reaching nothing'
+    );
+
+    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner and the
+    // unconverted hand-written button is still on the base rule's 6px, so the ruling moved the
+    // primitive and not the whole `.manager-button` family.
+    assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
+    assert.equal(
+      measured.unconverted.borderRadius,
+      '6px',
+      'and an unconverted hand-written one still paints the base control, so the edit is scoped to the primitive'
+    );
 
     for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
       assert.equal(

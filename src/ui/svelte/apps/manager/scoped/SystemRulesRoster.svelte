@@ -57,6 +57,18 @@
      immediately below for why the tool catalogue takes the second one.
    - armedToken / onArm / onDisarm: the shared arm latch, threaded through so one armed Remove at
      a time survives across the whole screen rather than per row.
+   - recessed / searchWell: the reference's two SURFACE decisions for this card, both opt-in and
+     both absent by default (issue 1371, parity round 5, reviewer finding 7). `recessed` drops the
+     card one ramp rung to `--fab-bg-0`; `searchWell` lifts its search field back up to a
+     `--fab-bg-1` box with a hairline and the rows' own 7px corner, so a recessed card reads as a
+     container holding two kinds of lifted thing.
+
+     THEY ARE PROPS BECAUSE SIX SCREENS COMPOSE THIS COMPONENT. Round 4 landed both as
+     UNCONDITIONAL declarations, which repainted the merged world Essence catalogue and the world
+     Tool catalogue — two other lanes' approved screens — as a side effect of a component parity
+     ruling. A shared primitive that has to behave differently at a second site takes a prop; the
+     default is what those screens rendered before this work, which is a card on the pane's own
+     surface with a bare input on it.
    - resetKey: any value that identifies the SUBJECT. When it changes, the search term and the
      page index reset — without it the panel keeps the previous entity's page three and search
      term and shows an empty system list under a full inspector.
@@ -89,6 +101,10 @@
     // they always did: this component is shared by six screens, and a branch that fired for all
     // of them would change two other lanes' output.
     rosterEmptyNote = '',
+    // The card's two surface decisions, OFF by default so the essence and tool catalogues render
+    // exactly the card they rendered before this work. See the props block above.
+    recessed = false,
+    searchWell = false,
     armedToken = '',
     onArm = () => {},
     onDisarm = () => {},
@@ -211,19 +227,27 @@
     one object read as three unrelated ones, its pager floated against the pinned foot action
     with nothing between them, and a short roster left no boundary at all.
 
-    AND ITS SURFACE IS THE RECESS AFTER ALL (issue 1371, maintainer parity round 4). Round 3 of
-    the sibling lane recorded "our ramp has nowhere to go" and drew the card with no fill. That
-    was an adaptation argument rather than a measurement: `--fab-bg-0` exists, it IS a rung below
-    the `--fab-bg-2` this inspector pane is painted in, and the reference recesses the card to it
-    while lifting each part inside to `--fab-bg-1`. Three surfaces, three tokens, all published.
-    The maintainer's parity ruling voids every "our ramp is different" exemption, and this is one.
+    AND ITS SURFACE IS THE RECESS WHERE A CALLER ASKS FOR ONE (issue 1371, parity rounds 4 and 5).
+    Round 3 of the sibling lane recorded "our ramp has nowhere to go" and drew the card with no
+    fill. That was an adaptation argument rather than a measurement: `--fab-bg-0` exists, it IS a
+    rung below the `--fab-bg-2` this inspector pane is painted in, and the reference recesses the
+    card to it while lifting each part inside to `--fab-bg-1`. Three surfaces, three tokens, all
+    published, and the maintainer's parity ruling voids every "our ramp is different" exemption.
+
+    ROUND 4 THEN STATED IT UNCONDITIONALLY, WHICH IS THE HALF THAT IS CORRECTED HERE. Six screens
+    compose this component; a parity finding raised against ONE of them is not a licence to
+    repaint the other five. It is `recessed` now, with `searchWell` for the lifted field that
+    makes the recess legible, and both default to the surface the essence and tool catalogues have
+    always drawn.
   -->
-  <div class="manager-scoped-roster-card">
+  <div class="manager-scoped-roster-card" class:is-recessed={recessed}>
     <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
          on all six screens that draw this card; the trailing `…` was this panel's own addition
          and was the one string in the card that differed from the reference. -->
     <ManagerSearchField
-      class="manager-scoped-roster-search"
+      class={searchWell
+        ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
+        : 'manager-scoped-roster-search'}
       value={systemQuery}
       onInput={(next) => changeSystemQuery(next)}
       placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
@@ -376,9 +400,14 @@
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
-    /* THE RECESS. One rung below the `--fab-bg-2` pane this card sits in, which is what makes the
-       `--fab-bg-1` search well and the `--fab-bg-1` rows inside it read as lifted. See the head
-       comment for why the earlier "nowhere to go" reading is void. */
+  }
+
+  /* THE RECESS, OPT-IN. One rung below the `--fab-bg-2` pane this card sits in, which is what
+     makes the `--fab-bg-1` search well and the `--fab-bg-1` rows inside it read as lifted. It is
+     a SEPARATE RULE rather than a `background` on the base one because the base one is what five
+     other screens render: an unrecessed card states no fill at all and takes the pane's, which is
+     what it did before this work and what it still does. See the head comment. */
+  .manager-scoped-roster-card.is-recessed {
     background: var(--fab-bg-0);
   }
 
@@ -410,11 +439,18 @@
     min-height: 28px;
   }
 
-  /* AND IT IS A WELL, not a bare input on the recess (issue 1371, round 4). The reference draws
+  /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE (issue 1371, rounds 4 and 5). The reference draws
      the search as a lifted `--fab-bg-1` box with a hairline and a 7px radius — the same treatment
-     as the rows below it — so that the recessed card reads as a container holding two kinds of
-     lifted thing. Without a fill and a border it read as a caption floating on the card. */
-  :global(.manager-search.manager-scoped-roster-search input) {
+     as the rows below it — so that a recessed card reads as a container holding two kinds of
+     lifted thing. Without a fill and a border it read as a caption floating on the card.
+
+     SELECTED ON A SECOND CLASS, not on the one above it. Round 4 wrote this against
+     `.manager-scoped-roster-search`, which is the class EVERY caller passes, so the well landed on
+     the merged world Essence catalogue and the world Tool catalogue too. The `searchWell` prop
+     appends `manager-scoped-roster-search-well` beside it, so the sizing rule above stays shared
+     and only the surface is opted into. `:global` for the reason the two rules above give — the
+     `<input>` belongs to `ManagerSearchField` and never carries this file's scope hash. */
+  :global(.manager-search.manager-scoped-roster-search-well input) {
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);

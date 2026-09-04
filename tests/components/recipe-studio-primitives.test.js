@@ -263,6 +263,21 @@ describe('StatusPill (mounted)', () => {
  * coloured panel it sits on, so its emphasis neutralises the FILL and keeps the tone's edge and
  * ink. A later change that "harmonised" the two would break one of those screens, so the
  * inversion is pinned as deliberate rather than left to read as an oversight.
+ *
+ * ── AND IT IS AN ASYMMETRY RATCHET, NOT AN EQUALITY (issue 1371, parity round 5) ─────────────
+ * It began as `deepEqual(Chip, StatusPill)`, which says the two vocabularies must be the SAME
+ * LIST. That is the wrong shape, and round 5 is where it showed: the reference draws a lit face
+ * — the family's colour on the ink over a wash of itself — on the world-tag CHIP and on nothing
+ * else, so `Chip` grows `lit` and `StatusPill` has no reference asking it for one. Under an
+ * equality the only ways to land that are to add a second dead value to `StatusPill` (dead API
+ * on a shared primitive, which is the finding this same round is closing one file over) or to
+ * delete the guard.
+ *
+ * So the guard keeps its teeth by pinning the DIFFERENCE instead. A value present in both must
+ * be spelled identically — that is the rename and the `outlined`/`outline` typo, which is what
+ * the mirror was written for — and a value present in only one is listed here BY NAME with its
+ * reason. Adding a third value to either side still reds, because the pin does not know about
+ * it; what it no longer does is force a primitive to grow a face nothing draws.
  */
 describe('emphasis is one axis across the two primitives that have it', () => {
   const SOURCES = {
@@ -303,12 +318,61 @@ describe('emphasis is one axis across the two primitives that have it', () => {
     return [...body.matchAll(/(?:^|\n)\s*([a-z-]+)\s*:/g)].map(([, property]) => property);
   }
 
-  it('spells the SAME vocabulary in both, so one word means one thing', () => {
-    assert.deepEqual(
-      declaredEmphases('Chip'),
-      declaredEmphases('StatusPill'),
-      'the two emphasis ramps are a mirror — a value added, renamed or dropped on one side must be answered on the other'
+  /**
+   * The values one primitive draws and the other does not, with the reason each is asymmetric.
+   *
+   * A value NOT listed here must be spelled the same on both sides. Growing this map is the
+   * deliberate act the guard asks for: an entry has to be written, which is where the reason for
+   * a one-sided face gets recorded instead of being inferred from a green run.
+   */
+  const ASYMMETRIC = {
+    // `Chip` only. The reference's lit world-tag chip inks the label in the family's own colour
+    // over a wash of it (`proto:5401`, `proto:5665`); no `StatusPill` in the reference does that,
+    // and the pill has no `--fab-chip-color` vehicle to do it through.
+    Chip: ['lit'],
+    StatusPill: []
+  };
+
+  it('spells the SAME word for every face BOTH primitives draw', () => {
+    const chip = declaredEmphases('Chip');
+    const pill = declaredEmphases('StatusPill');
+    const shared = chip.filter((value) => pill.includes(value));
+
+    // POSITIVE FIRST: an empty intersection would satisfy every equality below while meaning the
+    // two prop vocabularies had stopped overlapping entirely, which is the failure this pair was
+    // written against.
+    assert.ok(
+      shared.includes('outlined'),
+      'both still draw the outlined face, which is the value the pair was written for'
     );
+    assert.deepEqual(
+      chip.filter((value) => !ASYMMETRIC.Chip.includes(value)),
+      shared,
+      'every Chip emphasis except the pinned one-sided ones is answered on StatusPill — a rename or a near-miss spelling reds here'
+    );
+    assert.deepEqual(
+      pill.filter((value) => !ASYMMETRIC.StatusPill.includes(value)),
+      shared,
+      'and every StatusPill emphasis except its own pinned ones is answered on Chip'
+    );
+  });
+
+  it('and every one-sided value is PINNED with a reason, not merely tolerated', () => {
+    // The ratchet half. Without this, the two assertions above would pass on a pin that named a
+    // value neither primitive declares, and would keep passing after a third one-sided value was
+    // added if the pin happened to be widened without being read.
+    for (const [name, oneSided] of Object.entries(ASYMMETRIC)) {
+      const declared = declaredEmphases(name);
+      const other = name === 'Chip' ? 'StatusPill' : 'Chip';
+      const otherDeclared = declaredEmphases(other);
+      for (const value of oneSided) {
+        assert.ok(declared.includes(value), `${name} still declares the pinned one-sided \`${value}\``);
+        assert.ok(
+          !otherDeclared.includes(value),
+          `and \`${value}\` is still one-sided — once ${other} draws it too, delete the pin rather than keeping both`
+        );
+      }
+    }
   });
 
   it('supersedes the OPPOSITE axis in each, which is deliberate and stays pinned', () => {
@@ -355,6 +419,108 @@ describe('Medallion (mounted)', () => {
     const root = await harnessFor('Medallion').mount({ src: '', size: 52 });
     const style = root.querySelector('[data-medallion]').getAttribute('style').replace(/\s+/g, '');
     assert.match(style, /width:52px;height:52px/);
+  });
+});
+
+/**
+ * THE GLYPH-CHIP VARIANT (issue 1371, parity round 5, UX finding F12).
+ *
+ * The reference's list rows draw their leading chip as a BORDERLESS rounded square carrying a
+ * tinted glyph on one shared slate surface (`proto:600` at 38px, `proto:1078`'s cohort at 40px).
+ * The shipped tile is that shape with a hairline around it and, once tinted, a per-category wash
+ * behind the glyph. One parity run measured that single difference as fourteen `compare` lines
+ * across three regions on three screens.
+ *
+ * The variant is OPT-IN, so the assertion that matters most is the negative one: a medallion that
+ * does not ask for it must render exactly the tile ~40 call sites across the manager render today.
+ * The rest of the geometry is the caller's — `size` and `glyph` are existing props and the variant
+ * deliberately restates neither, because a primitive that took the row's dimensions as an
+ * argument and then hard-coded them in a variant would hold two answers to one question.
+ */
+describe('Medallion glyph-chip variant (mounted)', () => {
+  const medallionSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/components/Medallion.svelte'),
+    'utf8'
+  );
+  const styleBlock = medallionSource.slice(medallionSource.search(/^<style>$/m));
+
+  /**
+   * The declarations one rule states, comments stripped so a paragraph naming a property cannot
+   * answer for a declaration that states it.
+   *
+   * @param {string} head the rule's full selector, e.g. `.fab-medallion.is-glyph-chip`
+   * @returns {string[]} `property: value` pairs, in source order
+   */
+  function declarationsOf(head) {
+    const block = styleBlock.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+    const open = block.indexOf(`${head} {`);
+    assert.notEqual(open, -1, `the style block declares \`${head}\``);
+    return block
+      .slice(block.indexOf('{', open) + 1, block.indexOf('}', open))
+      .split(';')
+      .map((declaration) => declaration.trim().replace(/\s+/g, ' '))
+      .filter(Boolean);
+  }
+
+  it('emits NOTHING by default, so every shipped medallion is unchanged', async () => {
+    const root = await harnessFor('Medallion').mount({ src: '', icon: 'fas fa-flask' });
+    const classes = [...root.querySelector('[data-medallion]').classList].filter(
+      (name) => !name.startsWith('svelte-')
+    );
+    assert.deepEqual(
+      classes,
+      ['fab-medallion'],
+      'an unset variant is the hook class and nothing else — a leaked class here repaints every call site at once'
+    );
+  });
+
+  it('adds is-glyph-chip when asked, and composes with the tint', async () => {
+    const root = await harnessFor('Medallion').mount({ variant: 'glyph-chip', tint: 'sage' });
+    const classes = [...root.querySelector('[data-medallion]').classList].filter(
+      (name) => !name.startsWith('svelte-')
+    );
+    assert.deepEqual(
+      classes.toSorted((a, b) => a.localeCompare(b)),
+      ['fab-medallion', 'has-tint', 'is-glyph-chip'],
+      'the variant and the tint are two axes, and a row chip needs both'
+    );
+  });
+
+  it('DROPS an unrecognised variant rather than emitting a dead class', async () => {
+    const root = await harnessFor('Medallion').mount({ variant: 'borderless' });
+    const classes = [...root.querySelector('[data-medallion]').classList].filter(
+      (name) => !name.startsWith('svelte-')
+    );
+    assert.deepEqual(classes, ['fab-medallion'], 'a typo renders the shipped tile');
+  });
+
+  it('states the borderless edge and NO geometry of its own', () => {
+    // `border-width: 0` rather than `border: 0`: the shorthand would carry the style and the
+    // colour with it, and `has-tint` states a `border-color` this rule deliberately leaves alone
+    // (a colour on a zero-width edge paints nothing). And no size: 38 and 40 are the CALLER's
+    // `size`, so a width or a height here would be a second copy of the row's geometry.
+    assert.deepEqual(declarationsOf('.fab-medallion.is-glyph-chip'), ['border-width: 0']);
+  });
+
+  it('cancels the tint WASH while keeping the tinted glyph, at a specificity that decides it', () => {
+    // The reference's row chips all share one surface and differ only in the glyph's colour, so a
+    // per-category wash would be this repo's invention. The cancellation is (0,3,0) against
+    // `has-tint`'s (0,2,0), so it does not depend on which rule is written later.
+    assert.deepEqual(declarationsOf('.fab-medallion.is-glyph-chip.has-tint'), [
+      'background: var(--fab-bg-3)'
+    ]);
+    assert.ok(
+      declarationsOf('.fab-medallion.has-tint').some((declaration) =>
+        declaration.startsWith('background:')
+      ),
+      'and the wash it cancels is really there, so the cancellation is not answering an absence'
+    );
+    assert.ok(
+      !declarationsOf('.fab-medallion.is-glyph-chip.has-tint').some((declaration) =>
+        declaration.startsWith('color:')
+      ),
+      'while the GLYPH colour is untouched — the tint is the whole point of the reference chip'
+    );
   });
 });
 

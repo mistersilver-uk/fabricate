@@ -1803,9 +1803,31 @@
    (0,3,0) wins outright, which is what lifts the Modifiers card.
    `manager-layout.test.js` measures the result in a real browser rather than trusting
    that arithmetic. */
+
+/* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px
+   control and no corner, so every converted manager button fell through to the base
+   `.fabricate-manager .manager-button` rule's 6px — and `design-system/spec.md`'s radius ladder
+   puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. A 34px button at 6px
+   was off the ladder everywhere at once, which four parity regions across three screens measured
+   as the same one-line drift (`cat-inspector-foot-action`, `sys-header-action`,
+   `sys-inspector-foot-action`, `entry-header-back`/`-save`).
+
+   IT IS DECLARED HERE AND NOT ON THE BASE RULE, and the distinction is the height: this is the
+   rule that says a manager button is 34px, so it is the rule the 34-38px rung's corner belongs
+   to. `.manager-icon-button` shares the base rule's 6px and is a different control at a different
+   size, and the hand-written `.manager-button` strings that never gain this class (the
+   `SearchablePopover` triggers, `ArmedDangerButton`) keep whatever their own site states.
+
+   TWO CONVERTED SITES SIT BELOW THE BAND and would have inherited this corner: `.manager-clear-
+   filters` at 30px and the drop inspector's stack at 28px, both of which declare a height and no
+   radius. They take the ladder's 7px for the 26-32px band in the appended block at the foot of
+   this file rather than this rule's 9 — this edit's blast radius is the 34-38px band, and a
+   30px control taking a 34px control's corner would be the same off-ladder mistake in the
+   opposite direction. */
 .fabricate-manager .manager-button.fab-manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
+  border-radius: 9px;
   font-size: 0.72rem;
 }
 
@@ -23926,24 +23948,6 @@
   background: var(--fab-surface-active);
 }
 
-/* THE INHERIT NOTE'S TWO OPTIONAL TONES (issue 1371, round 2). The shipped rule paints one ink for
-   every state, so an INHERITING row and an OVERRIDING row read identically — which made a lane's
-   `tone: 'info'` / `'warning'` model field a unit-tested constant with no pixel behind it. Both are
-   OPT-IN modifiers: a caller that names neither renders exactly the muted note it always did, so
-   the essence and tool rows are byte-identical. Appended rules; the base rule is not edited. */
-.fabricate-manager .manager-scoped-inherit-note.is-info {
-  color: var(--fab-info-text);
-}
-
-.fabricate-manager .manager-scoped-inherit-note.is-warning {
-  color: var(--fab-warning-text);
-}
-
-/* The optional leading glyph sits on the note's own baseline rather than above it. */
-.fabricate-manager .manager-scoped-inherit-note i {
-  margin-right: var(--fab-space-2xs);
-}
-
 /* THE WORLD COMPONENT ENTRY'S PER-SYSTEM `Open rules` EXIT (issue 1371, round 3).
    It shares the row head with the system name, the mode chip and the membership cluster, and the
    head is a flex row whose name takes the slack — so without an explicit basis the control either
@@ -25906,4 +25910,55 @@
   height: 7px;
   border-radius: 50%;
   background: var(--fab-warning);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r8-prim — the shared primitives' opt-in sizes, and the two corners the M12a edit
+   would otherwise have moved off the ladder. Appended; no rule above is edited by this block.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.manager-button.fab-manager-button` now
+   declares the 34-38px rung's 9px corner, and both of these declare a height under that band and
+   no corner of their own, so without this they would take a 34px control's corner at 30px and
+   28px. `design-system/spec.md`'s ladder puts a 26-32px control on 7px, which is what they take.
+   Each selector is (0,4,0) and beats the primitive's (0,3,0) on specificity rather than on where
+   in this file it stands. */
+.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters,
+.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button {
+  border-radius: 7px;
+}
+
+/* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ──────────────────────────────
+   38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired),
+   and the reference draws the catalogue toolbar's search and membership filter and the system
+   rules list's search and two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the
+   34px these controls ship at. That is a size the ladder already publishes and nothing licensed
+   the drop, so the size becomes reachable rather than the reference being adapted to it.
+
+   IT IS OPT-IN AND ABSENT BY DEFAULT. `ManagerSearchField` emits `is-size-38` from its `size`
+   prop; a `<select>` in a toolbar carries the class directly, because the manager has no select
+   COMPONENT — `ManagerToolbar`'s own header records that the control beside the field is three
+   different things across eleven bars and that the bar deliberately takes a slot rather than
+   choosing between them, so the contract a caller opts into is this class rather than a prop on
+   a primitive that does not exist.
+
+   THE CLASS IS `is-size-38`, NOT `is-38`. The token names the AXIS as well as the rung: read in
+   a class list beside `is-compact` and `is-selection`, a bare `is-38` states a number and not
+   what the number is of.
+
+   SPECIFICITY, NOT SOURCE ORDER. `.manager-search input` and `.manager-scoped-list-toolbar
+   select` are both (0,2,1) and both declare the 34px height; each selector below adds a class, so
+   the size wins at (0,3,1) wherever it is written. Radius 9 is the band's ladder partner and is
+   stated with the height, because a control that changed rung and kept its old corner is the
+   defect M12a exists to close one rule up. */
+.fabricate-manager .manager-search.is-size-38 input {
+  height: 38px;
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-filter.is-size-38 select,
+.fabricate-manager .manager-toolbar select.is-size-38,
+.fabricate-manager .manager-scoped-list-toolbar select.is-size-38 {
+  height: 38px;
+  border-radius: 9px;
 }
