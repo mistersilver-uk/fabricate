@@ -2,6 +2,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  KNOWN_FORMLESS_BUTTONS,
+  KNOWN_FORMLESS_BUTTON_TOTAL,
+  KNOWN_ROLE_FOCUS_TARGETS,
+  KNOWN_ROLE_FOCUS_TARGET_TOTAL,
+} from './components/design-system-known-debt.js';
+import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
+import {
   UI_TEMPLATE_ROOT,
   attributeText,
   parsedTemplates,
@@ -82,54 +89,100 @@ function templates() {
 }
 
 /**
- * Every non-form element in the UI corpus that carries `tabindex="-1"`, with what it declares.
+ * The roles that make a non-form element an interactive control, for clause (a).
  *
- * @returns {{file: string, tag: string, declared: string|null}[]}
+ * Each of these announces to assistive technology that the element is operated by the keyboard,
+ * which is a promise the element cannot keep in a Foundry window unless it also declares itself
+ * focused. `role="tabpanel"` is in the set because the tab pattern moves focus INTO the panel on
+ * activation, which is the whole reason it carries a `tabindex` at all.
  */
-function focusTargets() {
-  const targets = [];
+const INTERACTIVE_ROLES = new Set(['button', 'row', 'option', 'tab', 'tabpanel']);
+
+/** A statically written `tabindex="0"`, as opposed to a roving expression. */
+const STATIC_TABINDEX_ZERO = /=\s*["']0["']/u;
+
+/** The declaration this whole file is about. */
+const DECLARATION = 'data-keyboard-focus';
+
+/**
+ * Every element the widened gate looks at, in the three clauses that make it up.
+ *
+ * ONE WALK, THREE POPULATIONS. They are collected together rather than by three separate walks
+ * because the corpus is 300 files of parsed AST, and because a second walk is a second place for
+ * the `inForm` flag to be threaded differently — which is the distinction the whole carve-out
+ * turns on.
+ *
+ * @returns {{negativeOne: object[], roleZero: object[], formlessButtons: object[],
+ *   roving: object[]}}
+ */
+function focusPopulations() {
+  const negativeOne = [];
+  const roleZero = [];
+  const formlessButtons = [];
+  const roving = [];
   for (const { file, source, ast } of templates()) {
     walkElements(ast.fragment, (element, inForm) => {
       const tag = element.name.toLowerCase();
-      if (SELF_DECLARING_TAGS.has(tag)) return;
-      if (tag === 'button' && inForm) return;
+      const declared = attributeText(source, element, DECLARATION);
       const tabindex = attributeText(source, element, 'tabindex');
-      if (tabindex === null || !/-1/.test(tabindex)) return;
-      if (attributeText(source, element, 'contenteditable') !== null) return;
-      targets.push({
+      const roleText = attributeText(source, element, 'role');
+      const role = roleText === null ? null : (/=\s*["']([^"']+)["']/u.exec(roleText) ?? [])[1];
+      const target = {
         file,
         tag: element.name,
-        declared: attributeText(source, element, 'data-keyboard-focus'),
-      });
+        declared,
+        line: source.slice(0, element.start).split('\n').length,
+      };
+
+      // (c) the shipped clause: a programmatic focus target.
+      if (
+        tabindex !== null &&
+        /-1/u.test(tabindex) &&
+        !SELF_DECLARING_TAGS.has(tag) &&
+        !(tag === 'button' && inForm) &&
+        attributeText(source, element, 'contenteditable') === null
+      ) {
+        negativeOne.push(target);
+      }
+
+      // (a) an element that has put itself in the tab order and announced a control role.
+      if (tabindex !== null && !SELF_DECLARING_TAGS.has(tag)) {
+        if (role !== null && INTERACTIVE_ROLES.has(role)) {
+          if (STATIC_TABINDEX_ZERO.test(tabindex)) roleZero.push({ ...target, role });
+        }
+        if (!STATIC_TABINDEX_ZERO.test(tabindex) && /\{/u.test(tabindex) && /0/u.test(tabindex)) {
+          roving.push({ ...target, role });
+        }
+      }
+
+      // (b) a button Foundry does not recognise, because it has no form.
+      if (element.type === 'RegularElement' && tag === 'button' && !inForm) {
+        formlessButtons.push(target);
+      }
     });
   }
-  return targets;
+  return { negativeOne, roleZero, formlessButtons, roving };
 }
 
+/** The undeclared members of a population — the debt, as opposed to the compliant sites. */
+const undeclaredIn = (population) => population.filter((target) => target.declared === null);
+
 describe('design system: a programmatic focus target declares itself focused to Foundry', () => {
-  // THE FLOOR MOVES DOWN AS THE CORPUS CONVERGES, and that is not the same thing as debt being
-  // paid or a gate being loosened. A programmatic focus target is an ELEMENT, so five tab strips
-  // that each rendered their own roving-tabindex button are five targets, and converting them all
-  // onto `EditorTabs` leaves one. Three changes did exactly that: issue 1038 converted the recipe,
-  // essence and tool strips, issue 1429's first half converted the Checks section strip and the
-  // Knowledge tabs, and its second half converted `TagsCategoriesView`'s inlined vocabulary strip
-  // — the last hand-rolled one, which had to be EXTRACTED as `VocabularyTabs` before it could be
-  // converted, which is why it outlived the other five.
+  // (C) IS A FLOOR AND NOT A PIN, AND THAT IS A JUDGEMENT ABOUT WHAT IT MEASURES rather than
+  // leniency. Every one of these targets is COMPLIANT — the clause below finds none undeclared —
+  // so there is no debt here to ratchet. What the number guards is that the walk is neither EMPTY
+  // nor TRUNCATED, and a real truncation loses far more than the slack this floor leaves.
   //
-  // THE COUNT IS NOT A RUNNING TOTAL OF THOSE CONVERSIONS, and reading it as one is how this
-  // comment went stale. Convergence takes targets away and ordinary feature work adds them back:
-  // between the two halves of issue 1429 the world essence surfaces and the toolbar extraction
-  // added targets of their own, so the walk stood at 22 before this conversion rather than at the
-  // 21 the subtraction predicted, and it stands at 21 after it. Re-lowering the floor per
-  // conversion would be the cheapest-repair anti-pattern, so the slack is stated once and bounded
-  // instead: ONE hand-rolled strip remains on this surface (`WorldDowntimeTabs`, whose row in
-  // `scripts/lib/designSystemPrimitives.json` records conversion-pending work rather than a
-  // justified divergence), so converging every remaining strip reaches 20 — which is this gate,
-  // deliberately, rather than 19 with a fresh unit of slack cut for it. The property this guards
-  // is that the walk is neither EMPTY nor TRUNCATED, and a real truncation loses far more than the
-  // one strip that is left.
+  // A per-file pin would be actively wrong for this population. A programmatic focus target is an
+  // ELEMENT, so extracting one component into two, or converting five hand-rolled tab strips onto
+  // `EditorTabs`, moves the count without changing anything this file is about; issues 1038 and
+  // 1429 did exactly that six times between them. Pinning it would turn every innocent extraction
+  // into a baseline edit and teach the next author that this file's numbers are noise.
+  //
+  // The clauses BELOW it are pinned, because they measure something else: debt. Every element they
+  // count is a site that can hold focus and does not say so.
   it('finds programmatic focus targets, so the assertions below are not vacuous', () => {
-    const targets = focusTargets();
+    const targets = focusPopulations().negativeOne;
     assert.ok(
       targets.length >= 20,
       `the walk reached ${targets.length} focus targets. A walk that reaches an empty or ` +
@@ -138,9 +191,9 @@ describe('design system: a programmatic focus target declares itself focused to 
   });
 
   it('finds no non-form focus target that fails to declare itself', () => {
-    const undeclared = focusTargets()
-      .filter((target) => target.declared === null)
-      .map((target) => `${target.file} <${target.tag}>`);
+    const undeclared = undeclaredIn(focusPopulations().negativeOne).map(
+      (target) => `${target.file} <${target.tag}>`
+    );
     assert.deepEqual(
       undeclared,
       [],
@@ -154,13 +207,125 @@ describe('design system: a programmatic focus target declares itself focused to 
     // `hasFocus` returns FALSE for `data-keyboard-focus="false"`. The attribute is an opt-in whose
     // value matters as much as its presence, so a `false` on an element that exists to receive
     // focus is a defect wearing compliance — and a presence-only assertion would pass it.
-    const optedOut = focusTargets()
-      .filter((target) => target.declared !== null && /=\s*["']false["']/.test(target.declared))
+    const optedOut = focusPopulations()
+      .negativeOne.filter(
+        (target) => target.declared !== null && /=\s*["']false["']/u.test(target.declared)
+      )
       .map((target) => `${target.file} <${target.tag}>`);
     assert.deepEqual(
       optedOut,
       [],
       'a programmatic focus target must not opt OUT of being treated as focused'
     );
+  });
+
+  // ── THE TWO POPULATIONS THE `tabindex="-1"` CLAUSE NEVER REACHED ────────────────────────
+  //
+  // `tabindex="-1"` is only ONE of the three ways an element in this corpus can hold focus, and it
+  // is the rarest: 24 elements, all compliant. The other two are 21 role-bearing elements that put
+  // themselves IN the tab order, and 290 buttons with no ancestor form — and not one of the 301
+  // was looked at by anything until issue 1497.
+  //
+  // The consequence is identical in all three cases and is not about the element handling keys.
+  // `KeyboardManager#hasFocus` returns false, so EVERY Foundry keybinding fires while the element
+  // holds focus: Space pauses the game, the arrows pan the canvas behind the window, Tab walks out
+  // of the application. The element does not have to listen for those keys for that to happen.
+  //
+  // WHY ROVING TABINDEX SITES ARE NOT IN (a). Ten elements in this corpus write
+  // `tabindex={active ? 0 : -1}` — the standard tab-strip pattern, where one item is reachable and
+  // the rest are not. Every one of them either carries no STATIC `role` attribute for clause (a) to
+  // read, or is a `<button>` that clause (b) already counts. They are collected by the walk anyway
+  // and asserted to stay outside (a) by construction, so the day one is written with a static role
+  // is the day this comment stops being true and says so.
+  it('the roving-tabindex sites stay outside clause (a) by construction', () => {
+    const { roving, roleZero } = focusPopulations();
+    assert.ok(
+      roving.length > 0,
+      'no element writes a roving `tabindex={active ? 0 : -1}` any more, so this control has no ' +
+        'domain and the paragraph above it is describing a pattern the corpus no longer uses'
+    );
+    const overlap = roving.filter((target) =>
+      roleZero.some((other) => other.file === target.file && other.line === target.line)
+    );
+    assert.deepEqual(
+      overlap.map((target) => `${target.file}:${target.line} <${target.tag}>`),
+      [],
+      'a roving-tabindex element has been counted by clause (a). The two populations are defined ' +
+        'to be disjoint — (a) reads a STATIC `tabindex="0"` — so this is the pattern matcher ' +
+        'having widened, not the corpus having changed.'
+    );
+  });
+
+  it('no role-bearing element joins the tab order without declaring itself', () => {
+    const { roleZero } = focusPopulations();
+    const undeclared = undeclaredIn(roleZero);
+
+    assert.ok(
+      roleZero.length >= 15,
+      `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
+        'role, against the 21 this tree holds. An absence check over an empty population passes ' +
+        'forever.'
+    );
+
+    assertRatchet({
+      label: 'role-bearing focus targets that do not declare themselves',
+      baseline: KNOWN_ROLE_FOCUS_TARGETS,
+      pinnedTotal: KNOWN_ROLE_FOCUS_TARGET_TOTAL,
+      observed: tallyByKey(undeclared, (target) => target.file),
+      scanned: templates().length,
+      floor: 250,
+      guidance:
+        `Add ${DECLARATION}="true". An element with \`tabindex="0"\` and \`role="button"\` has ` +
+        'told the user it is a control and put itself in the tab order, and Foundry still treats ' +
+        'the window as unfocused while it holds focus — so Space pauses the game and the arrows ' +
+        'pan the canvas behind the open application. Better still, render the shared primitive ' +
+        'that already declares it rather than a div wearing a role.',
+    });
+  });
+
+  it('no button outside a form joins the tab order without declaring itself', () => {
+    // THE LARGEST POPULATION IN THIS FILE AND THE LEAST OBVIOUS. `hasFocus` returns
+    // `!!focused.form` for a BUTTON, so a `<button>` is recognised ONLY when it has an ancestor
+    // `<form>` — and this application renders almost none. Every ordinary toolbar button, every
+    // card action, every tab in a hand-rolled strip is therefore exactly as unrecognised as a bare
+    // `div`, which is precisely why `SELF_DECLARING_TAGS` does not contain `button`.
+    //
+    // Ten of the 290 already declare and are correctly absent from the baseline. `ActionMenu` is
+    // the one worth naming: it emits the attribute on the trigger it opens with, so a gate keying
+    // on the population rather than on the DEBT would have listed it as owing something it does
+    // not. This is what a ratchet over compliant sites would get wrong, and it is why the rows are
+    // the undeclared ones.
+    //
+    // It is meant to collapse rather than to be paid file by file. Once the shared primitives emit
+    // the attribute — issues 1502 and 1508 — most of these stop being buttons this file can see.
+    const { formlessButtons } = focusPopulations();
+    const undeclared = undeclaredIn(formlessButtons);
+
+    assert.ok(
+      formlessButtons.length >= 200,
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 290 ` +
+        'this tree holds'
+    );
+    assert.ok(
+      formlessButtons.length - undeclared.length >= 5,
+      `only ${formlessButtons.length - undeclared.length} formless buttons declare ` +
+        `\`${DECLARATION}\`. With none, this clause cannot tell "the fix works" from "nothing has ` +
+        'been fixed", and the compliant shape has no live example for a reader to copy.'
+    );
+
+    assertRatchet({
+      label: 'formless buttons that do not declare themselves',
+      baseline: KNOWN_FORMLESS_BUTTONS,
+      pinnedTotal: KNOWN_FORMLESS_BUTTON_TOTAL,
+      observed: tallyByKey(undeclared, (target) => target.file),
+      scanned: templates().length,
+      floor: 250,
+      guidance:
+        `Add ${DECLARATION}="true", or render a shared primitive that already does. Foundry ` +
+        'recognises a BUTTON only when it has an ancestor `<form>` — `hasFocus` literally returns ' +
+        '`!!focused.form` — and this application renders almost no forms, so a focused toolbar ' +
+        'button leaves every keybinding live: Space pauses the game and the arrows pan the canvas ' +
+        'behind the window.',
+    });
   });
 });

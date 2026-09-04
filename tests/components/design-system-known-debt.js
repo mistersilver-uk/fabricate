@@ -269,36 +269,49 @@ export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 5;
 /**
  * A name-bearing prop defaulting to untranslated English, keyed `file | prop | default`.
  *
- * MEASURED at `6a2c3b46b` over the 26 flat `src/ui/svelte/components/*.svelte` files and the 31
- * manifest rows under `apps/manager/`. Each of these ships a hard-coded English string as the
- * accessible name of a control, which no world can translate.
+ * MEASURED at `6a2c3b46b` by `tests/design-system-required-names.test.js`, over the 26 flat
+ * `src/ui/svelte/components/*.svelte` files and the 31 manifest rows under `apps/manager/`. Each
+ * of these ships a hard-coded English string as the accessible name of a control, which no world
+ * can translate: `game.i18n` never sees a default written into a `$props()` destructuring.
  *
- * A LOCALIZATION KEY default is not untranslated text and is correctly absent: `DropZone`
- * defaults its label to `'FABRICATE.DropZone.DefaultLabel'`, which resolves through the lang
- * files like any other key.
+ * A LOCALIZATION KEY default is not untranslated text and is correctly absent: `DropZone` defaults
+ * its label to `'FABRICATE.DropZone.DefaultLabel'`, which resolves through the lang files like any
+ * other key.
+ *
+ * The issue predicted eight rows and the gate measures TEN, on the same defects. The difference is
+ * granularity rather than scope: the key is (file, prop, text), so `ManagerColorPicker`'s two
+ * defaults and `ManagerColorPopover`'s three are five rows here where the issue's prose collapsed
+ * them into one sentence naming three strings. The finer key is what stops a swap inside one file
+ * — 'Custom hex' becoming 'Hex value' — from leaving the count unmoved.
  */
 export const KNOWN_UNTRANSLATED_NAME_DEFAULTS = knownDebt('untranslatedNameDefaults');
 
 /** @see KNOWN_UNTRANSLATED_NAME_DEFAULTS */
-export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 8;
+export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 10;
 
 /**
  * An `aria-label` bound to a prop that defaults to the empty string, keyed `file | expression`.
  *
- * MEASURED at `6a2c3b46b`: exactly one, of 45 `aria-label` bindings in the corpus. Ten of the 45
- * are already written `aria-label={x || undefined}`, seven of the 35 unguarded ones are
- * prop-backed, and only this one's prop defaults to `''` — which renders `aria-label=""` and
- * SUPPRESSES the element's accessible name rather than leaving it to the content.
+ * MEASURED at `6a2c3b46b`: two, of the 45 `aria-label` bindings in the corpus. Ten of the 45 are
+ * already written `aria-label={x || undefined}`, and only these two bind a prop that defaults to
+ * `''` — which renders `aria-label=""` and SUPPRESSES the element's accessible name rather than
+ * leaving it to the content. Every other unguarded binding defaults to `undefined` or to a
+ * non-empty string, neither of which can render an empty attribute, so none of them is a violation
+ * of this obligation and none is a row.
  *
- * The other six unguarded prop-backed bindings default to `undefined` or to a non-empty string,
- * neither of which can render an empty attribute, so they are not violations of this obligation
- * and are deliberately not rows. `IconButton` and `SelectionCheckbox` already ship the guarded
- * shape and are the pattern to follow.
+ * `RowDisclosure` is the one the issue predicted. `ManagerModal` is the one it did not, and it is
+ * the worse of the two: the binding is on a `role="dialog" aria-modal="true"` root, so a modal
+ * opened without a title announces as an UNNAMED DIALOG — the case a screen-reader user has no way
+ * to recover from, because the surrounding page is inert. The issue's audit missed it because it
+ * matched `aria-label` only against props whose NAME looked like a label, and this prop is called
+ * `title`.
+ *
+ * `IconButton` and `SelectionCheckbox` already ship the guarded shape and are the pattern.
  */
 export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
 
 /** @see KNOWN_EMPTY_NAME_BINDINGS */
-export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
+export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
 
 /**
  * A non-form element with `tabindex="0"` and an interactive role, keyed `file`.
@@ -319,10 +332,11 @@ export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
  *
- * MEASURED at `6a2c3b46b`: 280 elements in 101 files. The corpus holds 290 formless buttons and
- * ten of them already declare, so those ten are compliant and correctly absent —
- * `ActionMenu.svelte` is the case worth naming, because it emits the attribute on the menu button
- * it opens with and would otherwise appear here as debt it does not owe.
+ * MEASURED at `6a2c3b46b`: 280 elements in 97 file rows. The corpus holds 290 formless buttons
+ * across 103 files and ten of them already declare, so those ten are compliant and correctly
+ * absent. `ActionMenu.svelte` is the case worth naming: it emits the attribute on the trigger it
+ * opens with, and a baseline keyed on the POPULATION rather than on the debt would have listed it
+ * as owing something it does not.
  *
  * `hasFocus` returns `!!focused.form` for a BUTTON, so a button with no ancestor form is exactly
  * as unrecognised as a bare `div`. This is the largest single row set in this file and it is

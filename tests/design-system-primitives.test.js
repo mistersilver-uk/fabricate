@@ -68,6 +68,11 @@ import {
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
 import { VIEW_RECIPES } from '../scripts/ui-pr-screenshot-evidence.mjs';
+import {
+  KNOWN_UNREGISTERED_SHARED_COMPONENTS,
+  KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
+} from './components/design-system-known-debt.js';
+import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -826,5 +831,125 @@ test('the broad-signal components that no frame renders are exactly the known ba
     'the set of broad-signal components with no frame that renders them changed. Adding one is ' +
       'a regression: that component now publishes two frames that may not contain it. Removing ' +
       'one means an override was added, which is the direction this list is meant to move.'
+  );
+});
+
+/* ── (e) the closed vocabulary is closed over the WHOLE UI tree, not one directory ────────── */
+
+/** The UI root every shared Svelte component lives under. */
+const UI_ROOT = 'src/ui/svelte/';
+
+/** The flat directory the primitive set has been read as being about. */
+const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
+
+/** The bar `spec.md` sets for membership: two or more independent callers. */
+const MEMBERSHIP_BAR = 2;
+
+/**
+ * Every `.svelte` outside `components/` that clears the membership bar and has no manifest row.
+ *
+ * THE DOMAIN QUESTION ISSUE 1481 RAISES, ANSWERED AS A TABLE (issue 1497). `spec.md`'s "primitive
+ * set is a closed, versioned vocabulary" requirement puts a candidate INTO the set at two or more
+ * independent callers, and it does not say the candidate has to live in `components/` — but every
+ * gate that read it did, so a component under `apps/` could acquire twenty callers without
+ * anything asking whether it belonged in the vocabulary. `CraftingThumb` has twenty-one.
+ *
+ * The register below is therefore the EXCLUSION MECHANISM rather than a list of offenders. A path
+ * leaves it only by gaining a manifest row — in EITHER table, because recording a component as a
+ * non-member is an adjudication and adjudicating is the point — and enters it only by being added
+ * here. So a name arriving or departing unrecorded is a failure, in both directions, and the
+ * question "is this component part of the vocabulary" gets asked once per component rather than
+ * never.
+ *
+ * `RULED_OUT` plays no part and is not consulted. It is keyed by NAME rather than by path and
+ * matches none of these; treating it as a third exclusion table would silently exempt a future
+ * component that happened to share a name with a declined candidate.
+ */
+function unregisteredSharedComponents() {
+  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
+  return RENDER_FILES.filter(
+    (file) =>
+      file.startsWith(UI_ROOT) &&
+      file.endsWith('.svelte') &&
+      !file.startsWith(PRIMITIVE_DIRECTORY) &&
+      !registered.has(file) &&
+      IMPORTERS.importersOf(file).length >= MEMBERSHIP_BAR
+  );
+}
+
+test('(e) the register of unadjudicated shared components is exactly what is recorded', () => {
+  const domain = RENDER_FILES.filter(
+    (file) =>
+      file.startsWith(UI_ROOT) &&
+      file.endsWith('.svelte') &&
+      !file.startsWith(PRIMITIVE_DIRECTORY) &&
+      IMPORTERS.importersOf(file).length >= MEMBERSHIP_BAR
+  );
+
+  // Non-vacuity in the direction that matters. The walk's own floors are asserted in `the importer
+  // scan is measuring a populated tree`; what this adds is that the DOMAIN is populated — a filter
+  // that had stopped matching would leave an empty register and a green gate, and would read
+  // exactly like a tree where every shared component had been adjudicated.
+  assert.ok(
+    domain.length >= 60,
+    `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
+      `caller bar, against the 75 this tree holds. With none, the register below is empty and ` +
+      'this property is satisfied by a broken scan.'
+  );
+  assert.ok(
+    domain.some((file) => MANIFEST_ROWS.some((row) => row.path === file)),
+    'no component outside the primitive directory carries a manifest row, so the exclusion ' +
+      'mechanism this register relies on is not being exercised by the tree at all'
+  );
+
+  assertRatchet({
+    label: 'shared components outside components/ with no manifest row',
+    baseline: KNOWN_UNREGISTERED_SHARED_COMPONENTS,
+    pinnedTotal: KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
+    observed: tallyByKey(unregisteredSharedComponents(), (file) => file),
+    scanned: IMPORTERS.fileCount,
+    floor: 500,
+    guidance:
+      'A component with two or more independent callers is a candidate for the shared vocabulary, ' +
+      'wherever it lives — see the "primitive set is a closed, versioned vocabulary" requirement ' +
+      'in `openspec/specs/design-system/spec.md`, which sets the bar by CALLER COUNT and not by ' +
+      'directory. A name arriving here means one more component crossed the bar without anyone ' +
+      'deciding: either promote it, with its `library` adjudication and its `evidence` ' +
+      'derivation, or record it on `notAPrimitive` with the measurement that put it there. A name ' +
+      'LEAVING here without a manifest row means it dropped below the bar, which is worth a ' +
+      'sentence of its own.',
+  });
+});
+
+test('(e) every registered path is a real, unadjudicated component', () => {
+  // THE MIRROR GUARD. A register keyed on a path rots the moment a file is renamed, and
+  // `assertRatchet` would report that as VANISHED — correct, but in the language of counts rather
+  // than of the mistake. These say it in the language of the mistake, and they say the two halves
+  // separately because the repairs are opposite: a stale path is deleted, and a path that has
+  // since GAINED a manifest row is deleted too but for the good reason.
+  const onDisk = new Set(RENDER_FILES);
+  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
+  const paths = KNOWN_UNREGISTERED_SHARED_COMPONENTS.map((row) => row.key);
+
+  assert.deepEqual(
+    paths.filter((file) => !onDisk.has(file)),
+    [],
+    'a register row names a file that is not on disk. A renamed component leaves a row that can ' +
+      'never match anything, and the next author reads it as a component nobody has adjudicated ' +
+      'when in fact nobody can find it.'
+  );
+  assert.deepEqual(
+    paths.filter((file) => registered.has(file)),
+    [],
+    'a register row names a component that now HAS a manifest row. That is the register working ' +
+      '— the component was adjudicated — and the row should have been deleted by the change that ' +
+      'adjudicated it, with the pinned total lowered to match.'
+  );
+  assert.deepEqual(
+    paths.filter((file) => file.startsWith(PRIMITIVE_DIRECTORY)),
+    [],
+    `a register row names a file under ${PRIMITIVE_DIRECTORY}, which is outside this property's ` +
+      'domain entirely — those are covered by the manifest clauses above, and a row here would be ' +
+      'checked by nothing while looking checked'
   );
 });
