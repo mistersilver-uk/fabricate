@@ -940,9 +940,48 @@ describe('CraftingSystemManager source contract', () => {
       '{onSetCurrencyProvider}',
       '{onSetCurrencyMacro}',
       '{onClearCurrencyMacro}',
+      // The world currency validation report (issue 1493).
+      '{currencyValidationErrors}',
     ]) {
       assert.ok(rootSource.includes(prop), `root should thread ${prop} to WorldCurrencyTab`);
     }
+    // --- The world currency validation join (issue 1493) ---------------------------------
+    // `validateCurrencyProfile` shipped with ZERO callers in the manager, so a world whose
+    // currency profile could not be spent against said nothing at all on the page that authors
+    // it. What makes it visible is a THREE-link join: `adminStore` publishes
+    // `worldCurrencyValidation`, the root derives `currencyValidationErrors` off it, and the
+    // root threads that to `WorldCurrencyTab`.
+    //
+    // Every link is asserted separately because a break in any of them is SILENT. The tab
+    // defaults the prop to `[]`, so a root that stops passing it renders a permanently healthy
+    // page — and the mounted suite passes the prop in by hand, so it cannot see that at all.
+    // The bare `rootSource.includes(...)` above is a WHOLE-FILE match on a 9,000-line component,
+    // so it stays green for a `{currencyValidationErrors}` written anywhere in it — including on
+    // some other child's tag. This one pins the attribute to the WorldCurrencyTab TAG.
+    const worldCurrencyTag = /<WorldCurrencyTab\b[\s\S]*?\/>/.exec(rootSource)?.[0] ?? '';
+    assert.ok(worldCurrencyTag.length > 0, 'root should render a self-closing <WorldCurrencyTab />');
+    assert.ok(
+      worldCurrencyTag.includes('{currencyValidationErrors}'),
+      'root should thread {currencyValidationErrors} on the WorldCurrencyTab tag itself'
+    );
+    assert.ok(
+      /currencyValidationErrors\s*=\s*\[\]/.test(worldCurrencySource),
+      'WorldCurrencyTab should DECLARE currencyValidationErrors in its $props(); an undeclared prop is silently dropped'
+    );
+    assert.ok(
+      worldCurrencySource.includes('data-world-currency-validation'),
+      'WorldCurrencyTab should render the validation live region the threaded errors feed'
+    );
+    assert.ok(
+      rootSource.includes('$viewState.worldCurrencyValidation'),
+      'root should read the store-published worldCurrencyValidation report, not invent its own'
+    );
+    assert.ok(
+      /const currencyValidationErrors = \$derived\([\s\S]{0,200}?worldCurrencyValidation\.errors/.test(
+        rootSource
+      ),
+      'root should derive currencyValidationErrors FROM the published report'
+    );
     // The removed nested inventory-mode setter must no longer be threaded.
     assert.ok(
       !rootSource.includes('onSetCurrencyInventoryMode'),

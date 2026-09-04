@@ -24,7 +24,11 @@ import {
   PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
-import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
+import {
+  buildCurrencyAffordProbe,
+  getCurrencyRequirementConfig,
+  resolveCurrencyContext,
+} from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
@@ -1440,6 +1444,11 @@ export class RecipeManager {
     // and works even when currency is disabled/invalid.
     const currencyUnits = this._resolveNormalizedCurrencyUnits(recipe);
 
+    // …and the reason the world's currency cannot be resolved, if there is one, so a
+    // currency requirement refused for a CONFIGURATION reason can say so instead of
+    // reading as a shortfall (issue 1493). Resolved once per evaluation, not per group.
+    const currencyIssue = this._resolveCurrencyIssue(recipe);
+
     // Bind the component-aware essence resolver so an essence GROUP option can draw
     // down items carrying that essence (issue 649). Byte-for-byte for recipes with no
     // essence options; a capability increase for those that do.
@@ -1557,7 +1566,8 @@ export class RecipeManager {
       recipe,
       displayIngredientSet,
       displaySelection,
-      availableItems
+      availableItems,
+      currencyIssue
     );
 
     // Per-group player-facing option/stack choices (issue 552). Empty unless a group
@@ -1675,6 +1685,9 @@ export class RecipeManager {
     const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
     const features = this._getSystemFeatures(recipe);
     const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
+    // Once per evaluation, shared by every set below (issue 1493) — the reason is a
+    // property of the WORLD's currency configuration, not of a set or a group.
+    const currencyIssue = this._resolveCurrencyIssue(recipe);
     const resolveItemEssencesForSet = this._buildEssenceOptionResolver(recipe);
 
     const ingredientByKey = new Map();
@@ -1698,8 +1711,14 @@ export class RecipeManager {
             };
 
       // Keep the highest-need state per component (need = worst-case single set).
-      for (const state of this._buildIngredientStates(recipe, set, selection, availableItems)) {
-        const key = state.componentId ?? state.description ?? state.name;
+      for (const state of this._buildIngredientStates(
+        recipe,
+        set,
+        selection,
+        availableItems,
+        currencyIssue
+      )) {
+        const key = this._shoppingIngredientKey(state);
         const existing = ingredientByKey.get(key);
         if (!existing || (state.need ?? 0) > (existing.need ?? 0)) {
           ingredientByKey.set(key, { ...state });
@@ -1736,7 +1755,16 @@ export class RecipeManager {
     // no `have` — its plan-scoped `delivered` is capped at `need` and would always
     // read satisfied — so the shopping projection restates its `owned` (the uncapped
     // essence amount held) as the `have` the aggregator shops against.
+    //
+    // A CURRENCY requirement is exempt (issue 1493). Its verdict is the RESOLVER's,
+    // taken from this group's presence in `missingGroups` by
+    // `_buildCurrencyIngredientState`, and it is not recoverable from `have`/`need`:
+    // `have` is a documented PLACEHOLDER, never a coin balance, and `need` is a PRICE.
+    // Re-deriving `0 >= 100` here discarded that verdict and reported every currency
+    // requirement as unaffordable — a player carrying 500 gp was told to go and buy the
+    // materials they could simply have paid for.
     const ingredientStates = [...ingredientByKey.values()].map((state) => {
+      if (state.isCurrency === true) return { ...state };
       const held = state.isEssence === true ? (state.owned ?? 0) : (state.have ?? 0);
       return { ...state, have: held, satisfied: held >= (state.need ?? 0) };
     });
@@ -1746,6 +1774,29 @@ export class RecipeManager {
     }));
 
     return { ingredientStates, essenceStates, toolStates: [...toolByKey.values()] };
+  }
+
+  /**
+   * The dedup key one ingredient state merges under in {@link evaluateShoppingRequirement}.
+   *
+   * Kind-qualified, because the merge that follows keeps the state with the HIGHER `need`
+   * and `need` does not mean the same thing across kinds (issue 1493): a component's is a
+   * quantity, a currency option's is a PRICE. Only a managed component carries an id, so a
+   * tag option and a currency option both fell back to `description` and two states of
+   * different kinds sharing a description would have been merged by comparing a price
+   * against an occurrence count — keeping whichever number happened to be larger and
+   * stamping one kind's `isCurrency` flag onto the other's numbers.
+   *
+   * @private
+   * @param {object} state
+   * @returns {string}
+   */
+  _shoppingIngredientKey(state) {
+    if (state.componentId) return `cid:${state.componentId}`;
+    const label = state.description ?? state.name ?? '';
+    if (state.isCurrency === true) return `currency:${label}`;
+    if (state.isEssence === true) return `essence:${label}`;
+    return `desc:${label}`;
   }
 
   /**
@@ -1890,15 +1941,19 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have?: number, delivered?: number, owned?: number, satisfied: boolean, isEssence?: boolean, icon?: string|null }>}
+   * @param {string} [currencyIssue] The world-scoped reason currency cannot be resolved
+   *   ({@link _resolveCurrencyIssue}), resolved ONCE per evaluation by the caller rather
+   *   than per set or per group.
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have?: number, delivered?: number, owned?: number, satisfied: boolean, isEssence?: boolean, isCurrency?: boolean, issue?: string, icon?: string|null }>}
    * @private
    */
-  _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
+  _buildIngredientStates(recipe, ingredientSet, selection, availableItems, currencyIssue = '') {
     if (!ingredientSet) return [];
 
     const context = {
       availableItems,
       selection,
+      currencyIssue,
       missingByGroup: this._missingEntriesByGroupId(selection),
       // The option the engine chose per group (issue 553), so the tile always mirrors
       // the option/stack the craft consumes.
@@ -1970,6 +2025,13 @@ export class RecipeManager {
       });
     }
 
+    if (chosenOption?.match?.type === 'currency') {
+      return this._buildCurrencyIngredientState(recipe, chosenOption, context, {
+        ...base,
+        isMissing: Boolean(missingEntry),
+      });
+    }
+
     if (missingEntry) {
       return {
         ...this._resolveIngredientVisual(recipe, chosenOption, context.availableItems),
@@ -1993,6 +2055,50 @@ export class RecipeManager {
       need: Number(chosenOption?.quantity || 1),
       have: matching.reduce((sum, item) => sum + readStackQuantity(item), 0),
       satisfied: true,
+    };
+  }
+
+  /**
+   * The display state for a group whose chosen option is a CURRENCY cost (issue 1493).
+   *
+   * Copies the shape `_buildOptionChoice` already emits for the same option a few
+   * hundred lines below — `need` is the authored COST, `have` is `0`, `satisfied`
+   * mirrors `affordable` — rather than inventing a second currency shape that the two
+   * sibling projections would then have to be kept in agreement by hand.
+   *
+   * Neither number is REPORTED anywhere. Before this branch existed a currency group
+   * fell through to the generic paths, where `need` was the group's occurrence count and
+   * `have` the number of matching inventory items — so a hundred-gold cost surfaced as
+   * "have 0, need 1", which states neither the price nor the shortfall. An occurrence
+   * count is not a price and a coin balance is not an item count, so the rail omits the
+   * pip for a currency slot entirely and the caption (already `100 gp`, via
+   * `formatCurrencyRequirement`) is the only statement of the cost. The numbers stay on
+   * the state for parity with the sibling projection, and for a consumer that needs the
+   * cost as a number rather than a sentence.
+   *
+   * `affordable` is read off the RESOLVER's own verdict (this group's presence in
+   * `missingGroups`), never re-derived: the resolver is what decided whether the craft
+   * takes this option, and a second affordability derivation here could disagree with
+   * the plan the engine executes.
+   *
+   * @private
+   */
+  _buildCurrencyIngredientState(recipe, option, context, { isMissing, ...base }) {
+    const handler = getMatchHandler(option.match);
+    const spend = handler.isComplete(option.match) ? handler.getCurrencySpend(option.match) : null;
+    const affordable = !isMissing;
+    return {
+      ...this._resolveIngredientVisual(recipe, option, context.availableItems),
+      ...base,
+      need: spend?.amount ?? 0,
+      have: 0,
+      satisfied: affordable,
+      isCurrency: true,
+      affordable,
+      // The world-scoped reason the option could not be resolved at all. A refusal for a
+      // configuration reason must not present as an affordability shortfall, and this is
+      // the only place the player surface can learn which of the two it is.
+      issue: context.currencyIssue || '',
     };
   }
 
@@ -2102,6 +2208,41 @@ export class RecipeManager {
   _resolveNormalizedCurrencyUnits(recipe) {
     const units = getCurrencyRequirementConfig(recipe, this._currencySeams())?.units || [];
     return units.map((unit) => normalizeCurrencyUnit(unit)).filter(Boolean);
+  }
+
+  /**
+   * The WORLD-scoped reason this recipe's currency cannot be resolved, or `''` when it
+   * resolves (or when the system does not use currency at all).
+   *
+   * `buildCurrencyAffordProbe` reduces exactly this to a constant-`false` probe (issue
+   * 1493), so a currency option refused because the ladder is unauthored is
+   * indistinguishable, downstream, from one the player genuinely cannot afford: the
+   * option is never selected, no spend is ever listed, and the player is told they are
+   * poor while the GM is told nothing. Resolving the context HERE is what lets the
+   * display carry the cause instead.
+   *
+   * Deliberately a SECOND `resolveCurrencyContext` call rather than a reach into the
+   * probe's own: the probe returns a probe, not a context, and mirroring its internals
+   * here would be a second implementation of the resolution rule. The extra work is a
+   * pure in-memory `validateCurrencyProfile` pass over the unit list — the corpus-scaled
+   * read the affordance layer documents is the system-manager lookup, not this.
+   *
+   * The reason is NOT localized, matching every other sentence on this path (the
+   * affordance layer's own errors, the engine's currency messages, and the tile caption
+   * this sits beside, which `formatCurrencyRequirement` already composes in English).
+   *
+   * @param {Recipe} recipe
+   * @returns {string}
+   * @private
+   */
+  _resolveCurrencyIssue(recipe) {
+    const context = resolveCurrencyContext(recipe, this._currencySeams());
+    if (!context?.enabled) return '';
+    // `spenderUnavailableReason` is the no-usable-spender half of the same fact; reading
+    // both keeps this correct whether the refusal came from profile validation or from
+    // spender resolution.
+    const reason = context.error || context.spenderUnavailableReason;
+    return typeof reason === 'string' ? reason : '';
   }
 
   /**

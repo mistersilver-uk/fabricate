@@ -9,6 +9,8 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
+import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -345,5 +347,298 @@ describe('ShoppingList mounted behavior', () => {
       /\.crafting-shopping-entry:has\(\.crafting-shopping-entry-main:focus-visible\)/,
       'the row draws the focus ring for the button it contains'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 — a currency row states its VERDICT, never a ratio, and never a verdict
+// nobody established.
+//
+// A currency ingredient entry carries `have: 0` as a documented placeholder against a
+// `totalNeed` that is a PRICE, so the shared chip rendered "0 / 100 owned" in the danger
+// tone: a coin balance nobody measured, beside a price the row's NAME already spells out.
+// Asserted against the mounted DOM, because these are render defects — the projection can
+// be entirely correct while the markup keeps reading the wrong two fields.
+//
+// `game.i18n` is backed by the real `lang/en.json` for this block, so every assertion below
+// is on the SHIPPED copy. A renamed key renders as its dotted self and a reworded one
+// renders the new words, and both fail here — which is why the components carry no inline
+// English fallbacks to drift from.
+// ---------------------------------------------------------------------------
+
+const CURRENCY_ENTRY = Object.freeze({
+  key: 'cur:100 gp',
+  componentId: null,
+  itemUuid: null,
+  name: '100 gp',
+  img: 'icons/commodities/currency/coin-embossed-cobalt.webp',
+  description: '100 gp',
+  isEssence: false,
+  isCurrency: true,
+  affordable: false,
+  affordabilityChecked: true,
+  costRepeats: 1,
+  issue: '',
+  totalNeed: 100,
+  have: 0,
+  missing: 0,
+  satisfied: false
+});
+
+const CURRENCY_REASON =
+  'Currency configuration is invalid: Currency unit "Gold" is missing an actor data path.';
+
+function chipIn(target) {
+  return target.querySelector('.crafting-shopping-acquire-row .crafting-shopping-chip');
+}
+
+describe('ShoppingList currency rows (issue 1493)', () => {
+  let restoreI18n = () => {};
+
+  before(async () => {
+    await harness.setup();
+    restoreI18n = installLangBackedI18n(repoRoot);
+  });
+  after(() => {
+    restoreI18n();
+    harness.teardown();
+  });
+  afterEach(harness.remount);
+
+  it('states the verdict on a currency row and reports neither balance nor price', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({ ingredients: [CURRENCY_ENTRY] }),
+      entries: [ENTRY]
+    });
+
+    const row = target.querySelector('.crafting-shopping-acquire-row');
+    assert.ok(Boolean(row), 'an unaffordable cost still belongs on the acquire list');
+    assert.match(row.textContent, /100 gp/, 'the row NAME is the whole statement of the cost');
+
+    // Asserted on the CHIP ITSELF before any marker attribute, so the guard bites on the
+    // rendered words rather than on a data attribute a fix could add without changing
+    // what the player reads.
+    const chip = chipIn(target);
+    assert.ok(Boolean(chip), 'the row still carries a chip');
+    assert.equal(chip.textContent.trim(), "Can't afford", 'the shipped copy, read by key');
+    assert.ok(
+      !/Shopping\.Owned/.test(chip.textContent),
+      'the chip must not go through the have/need owned key'
+    );
+    assert.ok(
+      !/\bhave\b|\bneed\b|\b0\b|\b100\b/.test(chip.textContent),
+      `the chip must name neither the placeholder balance nor the price: "${chip.textContent}"`
+    );
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'currency');
+    assert.ok(chip.classList.contains('tone-danger'), 'a real shortfall is a danger chip');
+    assert.ok(!row.querySelector('[data-shopping-chip="ratio"]'), 'and never the ratio chip');
+  });
+
+  it('drops an affordable cost from the acquire list entirely', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [{ ...CURRENCY_ENTRY, affordable: true, satisfied: true }],
+        allSatisfied: true
+      }),
+      entries: [ENTRY]
+    });
+    assert.ok(
+      !target.querySelector('[data-shopping-acquire-components]'),
+      'a cost the player can pay is not something to go shopping for'
+    );
+    assert.equal(summaryCount(target, 'components'), '0');
+  });
+
+  it('still renders the have/need ratio chip for an ordinary component', async () => {
+    // The control: the currency branch must not swallow the ordinary chip.
+    const target = await harness.mount({ aggregate: aggregate(), entries: [ENTRY] });
+    const chip = chipIn(target);
+    assert.equal(chip.textContent.trim(), '2 / 4 owned', 'a component row keeps its ratio');
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'ratio');
+    assert.ok(chip.classList.contains('tone-danger'));
+  });
+
+  // -------------------------------------------------------------------------
+  // A cost refused for a CONFIGURATION reason (revision 3).
+  //
+  // `RecipeManager` populates `issue` and the rail consumes it, but the aggregate entry
+  // dropped it — so a player carrying 1000 gp against a cleared `gp` actorPath read
+  // "100 gp — Can't afford" in red. That is the original defect in a new voice, and it
+  // violates the MUST this change itself added to the ui-integration spec.
+  // -------------------------------------------------------------------------
+
+  it('names a configuration refusal as setup, in the warning tone, not as a shortfall', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [{ ...CURRENCY_ENTRY, issue: CURRENCY_REASON }]
+      }),
+      entries: [ENTRY]
+    });
+
+    const chip = chipIn(target);
+    assert.equal(chip.textContent.trim(), 'Setup needed');
+    assert.ok(
+      !/afford/i.test(chip.textContent),
+      `a solvent player must not be told they cannot pay: "${chip.textContent}"`
+    );
+    assert.ok(
+      chip.classList.contains('tone-warning'),
+      'the world is misconfigured — that is not the player\'s fault, so it is not danger'
+    );
+    assert.ok(!chip.classList.contains('tone-danger'));
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'currency-unavailable');
+    assert.equal(chip.getAttribute('title'), CURRENCY_REASON, 'hovering names the reason');
+  });
+
+  it('keeps a configuration refusal out of the red missing-components count', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [{ ...CURRENCY_ENTRY, issue: CURRENCY_REASON }]
+      }),
+      entries: [ENTRY]
+    });
+
+    assert.ok(
+      target.querySelector('[data-shopping-acquire-components]'),
+      'the requirement stays VISIBLE — it is unresolved and the player must learn that'
+    );
+    assert.equal(
+      summaryCount(target, 'components'),
+      '0',
+      'but nothing the player can buy clears a GM setup problem, so it is not their debt'
+    );
+    assert.ok(
+      !target.querySelector('[data-summary="components"]').classList.contains('is-alert'),
+      'and it must not redden the card that means "go and acquire these"'
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // A verdict that does not reach the aggregate (revision 3).
+  //
+  // `totalNeed` is multiplied by the queued quantity; `affordable` is a SINGLE craft's
+  // verdict. Reporting one against the other told a player with 150 gp that a queue of
+  // five 100 gp crafts was covered.
+  // -------------------------------------------------------------------------
+
+  it('states how many times an unchecked cost recurs, with no verdict and no danger tone', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [
+          {
+            ...CURRENCY_ENTRY,
+            affordable: true,
+            affordabilityChecked: false,
+            costRepeats: 5,
+            totalNeed: 500
+          }
+        ]
+      }),
+      entries: [ENTRY]
+    });
+
+    const chip = chipIn(target);
+    assert.equal(chip.textContent.trim(), '×5', 'the row states the repeat, not a verdict');
+    assert.ok(
+      !/afford/i.test(chip.textContent),
+      `neither verdict was established, so neither may be shown: "${chip.textContent}"`
+    );
+    assert.ok(chip.classList.contains('tone-neutral'));
+    assert.ok(!chip.classList.contains('tone-danger'));
+    assert.ok(!chip.classList.contains('tone-warning'));
+    assert.equal(chip.getAttribute('data-shopping-chip'), 'currency-unchecked');
+    assert.equal(
+      chip.getAttribute('title'),
+      'Fabricate checked whether you can afford one craft. This plan spends that cost 5 times.',
+      'and the hover says exactly what was and was not checked'
+    );
+    assert.equal(
+      summaryCount(target, 'components'),
+      '0',
+      'an unanswered question is not a measured shortfall'
+    );
+  });
+
+  it('counts a CHECKED currency shortfall toward the missing-components card', async () => {
+    // The control for the two exclusions above: a real, measured shortfall still counts.
+    const target = await harness.mount({
+      aggregate: aggregate({ ingredients: [CURRENCY_ENTRY] }),
+      entries: [ENTRY]
+    });
+    assert.equal(summaryCount(target, 'components'), '1');
+    assert.ok(target.querySelector('[data-summary="components"]').classList.contains('is-alert'));
+  });
+
+  // -------------------------------------------------------------------------
+  // The `{#each}` key (revision 3).
+  //
+  // This list re-derived the aggregator's dedup rule with a coarser one that was not
+  // kind-qualified, so the two entries the aggregator deliberately SPLIT collapsed back
+  // onto one key. Svelte throws `each_key_duplicate` in the production branch as well as
+  // the dev one, and nothing under `src/` is wrapped in a `<svelte:boundary>` — so this
+  // took down the crafting app's render, not the row.
+  //
+  // Built by the REAL aggregator: a fixture with the keys typed in by hand would prove
+  // only that this component can render two objects.
+  // -------------------------------------------------------------------------
+
+  it('renders two same-description entries of different kinds without a duplicate key', async () => {
+    const nameless = { description: 'Unknown ingredient', need: 4, have: 0, satisfied: false };
+    const coin = {
+      description: 'Unknown ingredient',
+      name: 'Unknown ingredient',
+      need: 100,
+      have: 0,
+      isCurrency: true,
+      affordable: false,
+      satisfied: false,
+      issue: ''
+    };
+    const built = aggregateShoppingList(
+      [{ recipeId: 'r-1', quantity: 1 }],
+      {
+        getRecipe: (id) => ({ id, name: 'Ambiguous Recipe' }),
+        evaluateCraftability: () => ({
+          ingredientStates: [coin, nameless],
+          essenceStates: [],
+          toolStates: []
+        })
+      },
+      [{ id: 'a', items: [] }]
+    );
+
+    assert.equal(built.ingredients.length, 2, 'the aggregation split them; check the fixture');
+
+    const target = await harness.mount({ aggregate: built, entries: [ENTRY] });
+    const rows = target.querySelectorAll('.crafting-shopping-acquire-row');
+    assert.equal(rows.length, 2, 'both rows render, and mounting did not throw');
+    assert.deepEqual(
+      [...rows].map((row) => row.querySelector('[data-shopping-chip]').getAttribute('data-shopping-chip')),
+      ['currency', 'ratio'],
+      'each row keeps its own kind of chip'
+    );
+  });
+
+  it('still renders a hand-built aggregate that carries no keys at all', async () => {
+    // The positional fallback. It is not a second identity rule — it only guarantees the
+    // folded list cannot repeat a key, so an aggregate assembled anywhere but the
+    // aggregator degrades to lost DOM identity rather than to a crash.
+    const target = await harness.mount({
+      aggregate: {
+        ingredients: [
+          { name: 'Iron', description: 'Iron', totalNeed: 2, have: 0, missing: 2, satisfied: false },
+          { name: 'Iron', description: 'Iron', totalNeed: 3, have: 0, missing: 3, satisfied: false }
+        ],
+        essences: [
+          { type: 'Iron', name: 'Iron', totalNeed: 1, have: 0, missing: 1, satisfied: false }
+        ],
+        tools: [],
+        allSatisfied: false,
+        totalRecipes: 1,
+        totalQuantity: 1
+      },
+      entries: [ENTRY]
+    });
+    assert.equal(target.querySelectorAll('.crafting-shopping-acquire-row').length, 3);
   });
 });

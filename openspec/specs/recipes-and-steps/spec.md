@@ -333,6 +333,9 @@ The dead-end memory is distinct from run history: it is leak-safe (a fizzle matc
 - Runtime execution normalizes duration fields to a world-time target timestamp for gate checks.
 - A step with time gating is incomplete until world time reaches the target completion timestamp.
 - Fabricate listens to the `updateWorldTime` hook, and checks game time on startup, to mark recipes and steps with a time requirement as completed, and subsequently notify users.
+- A craft blocked because the world's currency configuration cannot be resolved MUST report that configuration reason, not a missing-materials shortfall.
+  This holds on the path where no currency spend was ever selected — the misconfiguration prevents selection, so a gate that only inspects selected spends never runs and the player is otherwise told they cannot afford a cost the system could not price.
+- A currency requirement's failure message MUST state the cost and MUST NOT state a have/need ratio, because those numbers count ingredient occurrences rather than coins.
 
 ## Effect Transfer Semantics
 

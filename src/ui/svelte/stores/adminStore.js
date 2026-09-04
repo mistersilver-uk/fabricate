@@ -81,6 +81,7 @@ import {
   CURRENCY_MACRO_KEYS,
   normalizeCurrencyUnit,
   normalizeWorldCurrencyConfig,
+  validateCurrencyProfile,
 } from '../../../systems/currencyProfile.js';
 import {
   authoredCheckModifierIds,
@@ -1171,6 +1172,30 @@ function _emptyWorldCurrencyState() {
       macros: { canAfford: '', increment: '', decrement: '' },
       units: [],
     },
+    worldCurrencyValidation: _emptyWorldCurrencyValidation(),
+  };
+}
+
+// The derived `validateCurrencyProfile` report for the world ladder (issue 1493). A TOP-LEVEL
+// sibling of `worldCurrency`, never a fifth key inside it: `CurrencyConfig` is exactly the four
+// keys above, and a normalizer that must emit all four cannot also emit a derived report. The
+// shipped precedent for a derived-report sibling is `systemValidation`.
+//
+// Only `valid` and `errors` are published. `validateCurrencyProfile` also returns the normalized
+// units and a `metadata` Map; a Map in viewstate is neither plain nor structurally comparable,
+// and no surface reads either.
+function _emptyWorldCurrencyValidation() {
+  return { valid: true, errors: [] };
+}
+
+function _buildWorldCurrencyValidation(config) {
+  const report = validateCurrencyProfile(config?.units, {
+    spendStrategy: config?.spendStrategy,
+    macros: config?.macros,
+  });
+  return {
+    valid: report?.valid === true,
+    errors: Array.isArray(report?.errors) ? [...report.errors] : [],
   };
 }
 
@@ -4723,7 +4748,10 @@ export function createAdminStore(services) {
   function buildWorldCurrencyState() {
     const store = services.getCurrencyConfigStore?.();
     if (!store) return _emptyWorldCurrencyState();
-    return { worldCurrency: normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID }) };
+    const worldCurrency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
+    // Validated on every publish, off the SAME normalized config the editor renders, so the
+    // report can never describe a ladder the GM is not looking at. Pure in-memory work.
+    return { worldCurrency, worldCurrencyValidation: _buildWorldCurrencyValidation(worldCurrency) };
   }
 
   // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ nav_order: 3.4
 # World Currency
 
 Currency is a world setting, not a per-system one.
-A world runs a single game system, so there is exactly one way its actors store coins, and every crafting system that opts in shares the same coin ladder.
+A world runs a single game system, so there is exactly one way its actors store coins, and every crafting system that opts in shares the same currency units.
 GMs author it in **World > Currency**, a tab in the manager rail directly under **World > Parties**.
 
 {: .gm }
@@ -19,7 +19,7 @@ The page subtitle tells you how many coins you have defined, and how many of you
 
 ## Turning currency on for a system
 
-The coin ladder configured here only matters to a crafting system once that system's own **Currency** toggle is switched on.
+The currency units configured here only matter to a crafting system once that system's own **Currency** toggle is switched on.
 That toggle lives in the **Optional features** section of the system's System Settings tab, and it decides only whether the system participates.
 See [Currency Requirements]({% link crafting-systems.md %}#currency-requirements) for what participation enables on a recipe.
 
@@ -76,15 +76,38 @@ When you leave it blank, the cost shows the unit's full label instead.
 You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
 A unit with no breakdown is treated as a base denomination.
 
-To get started quickly, use **Seed presets** to add the standard coin ladder for your world.
+To get started quickly, use **Seed presets** to add the standard set of currency units for your world.
 Seeding in a Dungeons & Dragons 5e world adds units on the actor data path strategy.
 Seeding in a Pathfinder 2e world adds inventory units and selects the Pathfinder 2e provider.
 Preset seeding is only available in Dungeons & Dragons 5e or Pathfinder 2e worlds.
 
+## Checking your currency setup
+
+As you edit your currency units, Fabricate checks whether crafting could actually spend against the setup you have built, and shows you what it finds right on this page.
+
+When something is wrong, a note titled **Currency can't be spent yet** lists each problem by the unit it names.
+Fix what it lists and the note clears.
+Saving still works while the note is showing.
+Fabricate never refuses to save partway through, because reaching a working setup often takes several small edits.
+
+The note stays hidden until you have defined at least one currency unit.
+It can reappear the moment you switch spend strategy, if the new strategy needs something your existing units do not provide yet.
+
+{: .warning }
+> This check cannot catch every mistake.
+> If a unit's actor data path points at the wrong field, one that exists on the character sheet but does not hold the balance you meant, Fabricate has no way to tell the field is wrong just by looking at it.
+> Crafting still fails for any actor using that field, but only for that actor, so a player reporting they cannot pay for something you believe they can afford is telling you to check that unit's actor data path.
+
+## What players see when a cost can't be priced
+
+If a player tries to craft something with a currency cost before your setup is ready, Fabricate does not tell them they are short on coin.
+Instead, it tells them the currency setup is incomplete and that a GM needs to finish it in **World > Currency**.
+The crafting window shows the same message next to the affected cost before they even attempt the craft, so a player reporting this to you is describing your setup, not their purse.
+
 ## Upgrading from an earlier version of Fabricate
 
 Earlier versions of Fabricate configured currency separately on each crafting system.
-The first time an upgraded world loads, Fabricate combines every system's coins into the single ladder shown here automatically, keeping the spend strategy, provider, and macros from the first system that had currency switched on.
+The first time an upgraded world loads, Fabricate combines every system's coins into the single set of currency units shown here automatically, keeping the spend strategy, provider, and macros from the first system that had currency switched on.
 If two systems had defined the very same coin, only one definition is kept, but every recipe and salvage cost that referenced it keeps working.
 Each system keeps its own **Currency** toggle exactly as you had it.
 

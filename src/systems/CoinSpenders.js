@@ -225,6 +225,26 @@ export class ActorInventoryCoinSpender {
   }
 
   /**
+   * Why this spender cannot spend at all in the ACTIVE GAME SYSTEM, or `null` when it can.
+   *
+   * Actor-independent by construction: {@link _resolveAdapter} reads the system id and takes no
+   * actor, so this answers "is this world able to spend coins" and never "does this actor's sheet
+   * carry the field". The per-actor sentence stays in {@link readCoins}, where the actor is known.
+   * Conflating the two would tell a GM whose world is misconfigured to go and look at a character
+   * sheet.
+   *
+   * Reuses `_resolveAdapter`, whose system-id resolver already guards the Foundry global, so this
+   * adds no new lifecycle exposure. Called from `resolveCurrencyContext` on the craftability path.
+   *
+   * @returns {string|null}
+   */
+  describeUnavailable() {
+    const { systemId, adapter } = this._resolveAdapter();
+    if (adapter) return null;
+    return `No currency inventory adapter is registered for system "${systemId || 'unknown'}".`;
+  }
+
+  /**
    * @param {object} actor
    * @param {{ unit: object }} profileContext
    * @returns {{ valid: boolean, copperValue?: number, message?: string }}
