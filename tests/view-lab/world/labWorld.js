@@ -72,11 +72,17 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // beside `toolScope` for its reason and read from `labContent`, where the fixture states what
   // each record exists to make photographable.
   //
-  // `componentScope` here is a PARTIAL seed - one world-only record and its default, with no
-  // `membership` key at all - and the partiality is deliberate rather than an omission, matching
-  // the `essenceScope` seed below. `1.30.0`'s world-scope pass lifts the rest out of the systems
-  // on every lab build, and its per-pair guard skips an entity whose default is already present,
-  // so this record survives the pass rather than being overwritten by it.
+  // `componentScope` is a PARTIAL seed, and the partiality is deliberate rather than an omission:
+  // `1.30.0`'s world-scope pass lifts the rest out of the systems on every lab build, and its
+  // per-pair guard skips an entity whose default is already present, so every record seeded here
+  // survives the pass rather than being overwritten by it. Issue 1371 added the `membership` half
+  // this comment once said the key did not carry, for the inheriting-category pair `labContent`
+  // states its reasons on; issue 1392's own world-only record is one of the `entities` beside it.
+  //
+  // ONE `put` FOR THE KEY, and it is this one. Issue 1371 seeded the same literal again below the
+  // `essenceScope` put, which was idempotent and therefore invisible; the capture-registry guard
+  // that reason names resolves a clicked component row against `content.componentScope`, so it
+  // reads the same literal wherever the put sits.
   //
   // POSITION AMONG THE PUTS IS COSMETIC. The shim's settings map answers a SEEDED key with its
   // seed whether or not `registerSettings()` has declared it, so nothing here depends on the
@@ -197,10 +203,6 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
       },
     },
   });
-  // THE WORLD COMPONENT CORPUS SEED (issue 1371). Built in `labContent.js` beside the tool
-  // corpus and put here, so the capture-registry guard can resolve a clicked component row
-  // against the same literal the world boots from rather than against a copy of it.
-  put('componentScope', content.componentScope);
   // Selection preferences, so the player app opens on a populated actor and system rather than on
   // an empty-state prompt that says nothing about the UI.
   put('lastCraftingActor', characterActors[0].id);
