@@ -629,7 +629,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // them the two halves are covered and their COMBINATION is not — which is exactly where the
   // width floor bit: the shared box declares `min-width: 240px`, so a caller asking for 150 got
   // 240 with its own inline width sitting there looking honoured.
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
+  'src/ui/svelte/components/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
     'manager-gathering-task-availability-menu',
@@ -662,12 +662,6 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
   ]),
-  // The player window's shared top bar (issue 1475). It sits under `components/`, so the directory
-  // leg of `BROAD_SIGNAL_PATTERN` claims it and it published only the representative pair — in
-  // which its actor picker appears exclusively CLOSED. `fabricate-app-shell` IS one of that pair
-  // and draws the bar, so the closed trigger is already covered; what it cannot show is the panel,
-  // which is where the whole of the conversion lives.
-  'src/ui/svelte/components/ActorSelectTopBar.svelte': Object.freeze(['player-actor-picker']),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
   // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
   // whatever anyone thinks of it — and until now it published only the representative pair, in
@@ -8995,6 +8989,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+      // The bar this frame draws, named EXPLICITLY as of issue 1500. It used to arrive here for
+      // free: it lived under `components/`, and a broad signal selects the representative pair,
+      // of which this is one. Moving it to `apps/` took it out of both legs of
+      // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 594-line screen region
+      // would publish only the frame that opens its picker and never the frame that draws it
+      // closed — which is where its own 18 scoped rules are visible.
+      /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
     ],
   }),
   // THE PRIMITIVE'S FIRST PLAYER-WINDOW FRAME (issue 1475). Every other player case draws the
@@ -9005,12 +9006,14 @@ export const VIEW_LAB_CASES = Object.freeze([
   // `reaches: 'beyond'` + `smokeLabels: []`: the live smoke opens no actor picker, so there is no
   // counterpart to fall short of, and a `beyond` case must claim zero labels.
   //
-  // `sourceMatches` names `FabricateAppRoot` rather than `ActorSelectTopBar`, and the difference is
-  // mechanical rather than editorial: the bar lives under `src/ui/svelte/components/`, which
-  // `BROAD_SIGNAL_PATTERN` claims, so `selectRenderFileCases` never consults any case's
-  // `sourceMatches` for it — a pattern naming it would be configuration that cannot fire, which is
-  // the failure `BROAD_SIGNAL_CASE_OVERRIDES` documents at length. The bar is routed here by that
-  // table instead, alongside `SearchablePopover` itself. `FabricateAppRoot` is the surface that
+  // `sourceMatches` names BOTH `FabricateAppRoot` and the bar itself, and the pairing is mechanical
+  // rather than editorial. Until issue 1500 the bar lived under `src/ui/svelte/components/`, which
+  // `BROAD_SIGNAL_PATTERN` claims through its directory leg, so `selectRenderFileCases` never
+  // consulted any case's `sourceMatches` for it — a pattern naming it would have been
+  // configuration that could not fire, and it was routed here by `BROAD_SIGNAL_CASE_OVERRIDES`
+  // instead. That move put it under `apps/`, where it matches NEITHER leg, so the override became
+  // the dead configuration and this pattern became the live one. The routing outcome is unchanged;
+  // only the table it comes from is. `FabricateAppRoot` stays because it is the surface that
   // places the bar, and a change that moved it is a change this frame answers for.
   //
   // The selector asserts the three facts the conversion is: the panel is a CHILD OF THE
@@ -9030,7 +9033,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has(.manager-travel-popover-search)' +
       ' .manager-travel-option',
     kinds: ['player', 'crafting'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+    ],
   }),
   playerCase({
     id: 'player-inventory',

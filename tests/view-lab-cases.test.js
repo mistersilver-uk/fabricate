@@ -2043,7 +2043,7 @@ test('changed files map to the windows they affect', () => {
 
 test('the broad SearchablePopover signal captures every deliberate picker state, in both apps', () => {
   const selected = mapChangedFilesToCases([
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
 
   // Three overrides, not one, because the primitive has three modes and no frame shows
@@ -2102,17 +2102,20 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-test('the player top bar routes to the frame that opens its picker, not only to the pair', () => {
-  // `src/ui/svelte/components/` is a broad signal, so before issue 1475 this file published the
-  // representative pair and nothing else — and in both of those frames the picker is CLOSED. The
-  // override is what makes a change to the bar publish the state it changed.
+test('the player top bar routes to the frame that opens its picker, not only to the one that draws it', () => {
+  // Before issue 1475 the bar sat under `src/ui/svelte/components/`, a broad signal, so it
+  // published the representative pair and nothing else — and in both of those frames the picker is
+  // CLOSED. An override added the frame that opens it. Issue 1500 moved the file to `apps/`, where
+  // it is a broad signal no longer: the override went, and the two frames it actually appears in
+  // name it themselves. `manager-components-normal` is deliberately NOT among them — it is the
+  // MANAGER, and it drew this player bar only ever as a side effect of the broad-signal pair.
   const selected = mapChangedFilesToCases([
-    'src/ui/svelte/components/ActorSelectTopBar.svelte',
+    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   ]).map((viewCase) => viewCase.id);
 
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
-    ['fabricate-app-shell', 'manager-components-normal', 'player-actor-picker']
+    ['fabricate-app-shell', 'player-actor-picker']
   );
 });
 

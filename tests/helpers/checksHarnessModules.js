@@ -186,7 +186,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // the rail compiles it — omit it and those suites HANG (`# cancelled`), they do not fail.
   // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
   // `portal.js`) is already declared here for other reasons.
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.

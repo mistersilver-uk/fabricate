@@ -52,9 +52,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  componentPath: 'src/ui/svelte/components/SearchablePopover.svelte',
 });
 
 const mountPicker = (props) =>

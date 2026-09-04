@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SearchablePopover|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -156,16 +156,15 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
-  // Issue 1475: the player window's shared top bar, and the FIRST entry on this list whose
-  // override names a player frame. Converting its actor picker onto `SearchablePopover` moved the
-  // whole of what changed into the OPEN panel, and both representative frames draw the picker
-  // closed — `fabricate-app-shell` is one of them and renders the bar itself, so the closed trigger
-  // was never the gap. Its override names `player-actor-picker`.
-  'src/ui/svelte/components/ActorSelectTopBar.svelte',
+  // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
+  // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
+  // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
+  // leg, so the override could no longer fire and `player-actor-picker` names it in
+  // `sourceMatches` instead. The routing outcome is identical; only the table changed. Putting it
+  // back here without moving the file back would be an entry `selectRenderFileCases` never reads.
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
@@ -177,6 +176,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   // Its override names the one frame that draws the capped reading.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
+  // sits here rather than four lines up because issue 1500 moved the file from
+  // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
+  // override itself and everything about where it sorts.
+  'src/ui/svelte/components/SearchablePopover.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -313,7 +317,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 284);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 266);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

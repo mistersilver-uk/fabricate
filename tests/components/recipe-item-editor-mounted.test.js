@@ -86,7 +86,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
     // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
     // `Chip`, `EmptyState` and the popover's raw dependencies are already listed above.
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The

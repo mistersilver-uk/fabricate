@@ -129,7 +129,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
     // The two pickers those three render: the component/essence/tag search popover (which the
     // replacement card also uses) and the per-row match-type segmented control.
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/StatusPill.svelte',

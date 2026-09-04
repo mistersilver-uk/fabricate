@@ -204,7 +204,7 @@ test('the portal population is the set of components that actually portal', () =
   const files = portalingFiles(corpus);
 
   for (const anchor of [
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     // Reached through the `portalTarget` PROP rather than the action, which is the second route

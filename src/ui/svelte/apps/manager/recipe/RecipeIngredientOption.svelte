@@ -106,7 +106,7 @@
     currencyUnitIcon,
     findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE kind table (`proto:4624`). The plate's glyph and tint, and the kind select's four

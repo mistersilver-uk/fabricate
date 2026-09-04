@@ -8,7 +8,7 @@
   import Stepper from '../../components/Stepper.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import SearchablePopover from './SearchablePopover.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   // The progressive-complications authoring section (issue 1286). It owns its OWN
   // visibility gate — it renders nothing unless the system resolves some activity

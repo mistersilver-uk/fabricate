@@ -34,7 +34,7 @@
   // system whose essences are all disabled — including the ability to see and clear the ones
   // it already has, which issue 1036/2 ruled against.)
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   // The ONE kind table (`proto:4624`), shared with the row's own plate and kind select. The
   // `or…` menu's four entries and the choice group's four adders both read their glyph, their

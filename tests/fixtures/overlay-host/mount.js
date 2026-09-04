@@ -32,11 +32,11 @@
 import { mount } from 'svelte';
 
 import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
-import ActorSelectTopBar from '../../../src/ui/svelte/components/ActorSelectTopBar.svelte';
+import ActorSelectTopBar from '../../../src/ui/svelte/apps/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
 import ManagerColorPicker from '../../../src/ui/svelte/components/ManagerColorPicker.svelte';
-import SearchablePopover from '../../../src/ui/svelte/apps/manager/SearchablePopover.svelte';
+import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';

@@ -87,7 +87,7 @@ const STYLESHEET = 'styles/fabricate.css';
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     name: 'SearchablePopover',
-    components: Object.freeze(['src/ui/svelte/apps/manager/SearchablePopover.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/SearchablePopover.svelte']),
     roots: Object.freeze(['fabricate-picker', 'fabricate-picker-popover']),
     family: 'manager-travel-[\\w-]+',
     anchors: Object.freeze([

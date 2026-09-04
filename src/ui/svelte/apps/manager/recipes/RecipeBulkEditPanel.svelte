@@ -125,7 +125,7 @@
 <script>
   import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import Callout from '../Callout.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';

@@ -208,13 +208,13 @@
 -->
 <script>
   import { tick } from 'svelte';
-  import Chip from './Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
-  import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import { localize } from '../../util/foundryBridge.js';
-  import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
-  import { pickerScrollerBounds } from '../../util/overlayBounds.js';
+  import Chip from '../apps/manager/Chip.svelte';
+  import EmptyState from '../apps/manager/EmptyState.svelte';
+  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
+  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { localize } from '../util/foundryBridge.js';
+  import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { pickerScrollerBounds } from '../util/overlayBounds.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 

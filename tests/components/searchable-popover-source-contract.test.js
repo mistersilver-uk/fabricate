@@ -51,7 +51,7 @@ import assert from 'node:assert/strict';
 
 import { definePrimitiveAdoptionContract } from '../helpers/primitiveAdoptionContract.js';
 
-const POPOVER_PATH = 'src/ui/svelte/apps/manager/SearchablePopover.svelte';
+const POPOVER_PATH = 'src/ui/svelte/components/SearchablePopover.svelte';
 
 /**
  * The primitive itself, and it is the WHOLE allowlist.
@@ -100,7 +100,7 @@ const DETECTOR_FIXTURE = [
   '  Prose mentioning manager-travel-picker, which is how this primitive documents itself.',
   '-->',
   '<script>',
-  "  import SearchablePopover from '../apps/manager/SearchablePopover.svelte';",
+  "  import SearchablePopover from '../../components/SearchablePopover.svelte';",
   '</script>',
   '',
   '<div class="manager-travel-picker">a converted-looking site that is still raw</div>',
@@ -143,7 +143,7 @@ const popover = definePrimitiveAdoptionContract({
   },
   rawRemedy:
     'these components hand-roll the trigger-plus-popover that ' +
-    '`src/ui/svelte/apps/manager/SearchablePopover.svelte` owns. Render `<SearchablePopover ' +
+    '`src/ui/svelte/components/SearchablePopover.svelte` owns. Render `<SearchablePopover ' +
     'options={…} onChoose={…}>` instead — a per-site modifier travels on `triggerClass`, ' +
     '`popoverClass`, `valueClass` or `pickerClass`, a `data-*` hook on the trigger rides ' +
     '`triggerData` and one on an option rides that option`s `data` map. If the site is a ' +

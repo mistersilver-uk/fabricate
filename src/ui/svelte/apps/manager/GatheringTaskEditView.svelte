@@ -16,7 +16,7 @@
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import SearchablePopover from './SearchablePopover.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
 
   let {
     task = null,

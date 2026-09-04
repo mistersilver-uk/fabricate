@@ -305,7 +305,7 @@ const gatheringHarness = createMountedComponentHarness({
     // The three availability add menus, and `ModifierPillSelect`'s, are this primitive
     // (issue 1458). `Chip` and `EmptyState` are already above; an omission of this one
     // cancels every test in the suite rather than failing one.
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],

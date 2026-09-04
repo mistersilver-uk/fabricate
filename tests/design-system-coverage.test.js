@@ -616,6 +616,9 @@ const UNDOCUMENTED_ROWS = [
   // against three entries — so it stays on THIS list, and for the ordinary reason: it is a member
   // of the set that no `library.html` specimen names. Its four `role="menu"` action menus are
   // still a recorded non-conversion; a component can be a primitive and carry one.
+  // Sorted, and this entry moved rather than arrived: issue 1500 relocated the player top bar from
+  // `components/` to `apps/`, which changes where it sorts and nothing about its adjudication.
+  'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
@@ -646,7 +649,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
-  'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',

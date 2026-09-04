@@ -61,7 +61,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     // The three card components the parties rebuild added (issue 1182), each imported

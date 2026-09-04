@@ -351,7 +351,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
   // The World > Parties card tree (issue 1182). `PartyExpandedBody` imports all three of
   // these, and this suite hand-rolls its compile list with no dependency validator, so an

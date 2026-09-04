@@ -65,7 +65,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import IconButton from '../../../components/IconButton.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import { resolveDroppedComponentId } from './toolStudio.js';
 
   let {

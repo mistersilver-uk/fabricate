@@ -33,7 +33,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
@@ -535,7 +535,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-travel-parties/);
 
     const source = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/SearchablePopover.svelte'),
+      resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte'),
       'utf8'
     );
     assert.match(
