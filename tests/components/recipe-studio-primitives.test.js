@@ -573,12 +573,19 @@ describe('Medallion glyph-chip variant (mounted)', () => {
     assert.deepEqual(classes, ['fab-medallion'], 'a typo renders the shipped tile');
   });
 
-  it('states the borderless edge and NO geometry of its own', () => {
-    // `border-width: 0` rather than `border: 0`: the shorthand would carry the style and the
-    // colour with it, and `has-tint` states a `border-color` this rule deliberately leaves alone
-    // (a colour on a zero-width edge paints nothing). And no size: 38 and 40 are the CALLER's
-    // `size`, so a width or a height here would be a second copy of the row's geometry.
-    assert.deepEqual(declarationsOf('.fab-medallion.is-glyph-chip'), ['border-width: 0']);
+  it('states the borderless edge as `border: 0`, so the STYLE goes too', () => {
+    // `border: 0` rather than `border-width: 0`, and the shorthand is the point rather than a
+    // shortening of one. `border-width: 0` shipped first and left the base rule's `solid` and
+    // its `var(--fab-border)` standing under a zero-width edge — invisible, and still two of the
+    // four properties the parity oracle reads for a `border` region, so it reported
+    // `borderTopStyle: solid !== none` against a reference chip that declares no border at all
+    // (`proto:5242`). The shorthand resets the style to `none` and the colour to `currentcolor`,
+    // which is what the reference computes.
+    //
+    // The assertion is the WHOLE declaration list, not a substring, for the same reason it was
+    // before: this rule states the edge and NO geometry: 38 and 40 are the CALLER's `size`, so a
+    // width or a height here would be a second copy of the row's geometry.
+    assert.deepEqual(declarationsOf('.fab-medallion.is-glyph-chip'), ['border: 0']);
   });
 
   it('cancels the tint WASH while keeping the tinted glyph, at a specificity that decides it', () => {

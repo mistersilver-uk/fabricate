@@ -156,10 +156,20 @@
   /* THE GLYPH-CHIP VARIANT (issue 1371). Two declarations, and each of them is one of the two
      things the existing props cannot say.
 
-     `border-width: 0` rather than `border: 0`: the base rule's `border-style` and `border-color`
-     are inert at zero width, and a shorthand here would also have to be restated by anything that
-     ever wanted the edge back. `has-tint` states a `border-color` and this rule does not contest
-     it — a colour on a zero-width edge paints nothing.
+     `border: 0`, NOT `border-width: 0`, and the difference is measurable rather than stylistic.
+     This variant states that the chip HAS NO EDGE, and the reference's chip has none — it
+     declares no `border` at all (`proto:5242`), so it computes `border-style: none` and takes
+     `currentcolor`. `border-width: 0` shipped first and left the base rule's `solid` and its
+     `var(--fab-border)` standing underneath: inert to the eye, but `borderTopStyle` and
+     `borderTopColor` are two of the four properties the parity oracle reads for a `border`
+     region, so the run reported `solid !== none` on a chip that draws nothing, on every screen
+     the variant reaches. A property nobody can see is still a property the comparison asks
+     about, and a zero-width edge with a colour is a claim this variant does not mean to make.
+     It DOES now overrule `has-tint`'s `border-color`, which the width-only form left standing:
+     both are (0,2,0) and this rule is written later, so the shorthand's `currentcolor` wins. That
+     changes nothing anyone can see — a colour on an absent edge paints nothing — and it is the
+     reference's own computed value, so the comparison and the screen agree instead of differing
+     in the one place only the comparison looks.
 
      THE SECOND RULE IS THE WASH, CANCELLED. `tint` washes the surface as well as recolouring the
      glyph, which is right for the artwork tile it was written for and wrong here: the reference's
@@ -168,7 +178,7 @@
      `has-tint`'s (0,2,0), so the cancellation is decided by specificity and not by which of the
      two rules is written later. */
   .fab-medallion.is-glyph-chip {
-    border-width: 0;
+    border: 0;
   }
 
   .fab-medallion.is-glyph-chip.has-tint {
