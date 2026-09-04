@@ -560,6 +560,27 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     harness.remount();
   });
 
+  it('AC5: and it is the SECONDARY tone — a quiet fact, not a state to act on', async () => {
+    // `proto:5721` builds the pill from the prototype's own `pill()` helper (`proto:3893`) with
+    // three arguments: the subtle surface, the plain `--fab-border` hairline and the SECONDARY
+    // ink. `tone="neutral"` — what this pill shipped with for a round — is genuinely a different
+    // statement: it inks `--fab-text-muted`, declares no fill at all, and reads as "a fact that
+    // is merely present". The mode is a step louder than that. It names the rule that decides
+    // this whole panel's shape, on a surface of its own, and it is a step quieter than any
+    // semantic family, because it is not a state the GM has to act on.
+    const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
+    const pill = target.querySelector('[data-salvage-mode]');
+    assert.ok(
+      pill.classList.contains('is-secondary'),
+      `the mode pill takes the secondary tone; it carried "${pill.className}"`
+    );
+    assert.ok(
+      !pill.classList.contains('is-neutral'),
+      'and not neutral, which paints no fill and would leave the pill on the card behind it'
+    );
+    harness.remount();
+  });
+
   it('AC5: each mode names itself', async () => {
     for (const [mode, label] of [
       ['simple', /Simple/],

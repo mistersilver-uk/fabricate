@@ -25394,9 +25394,13 @@
    `font-weight` and `font-size` ALL landing on `Chip.svelte`'s own defaults. Layers decide, not
    specificity: `module.json` gives this sheet no layer so Foundry imports it at
    `layer(modules)`, `Chip`'s `css: 'injected'` block lands unlayered, and an unlayered
-   declaration beats a layered one at any specificity. The pill's SCALE now comes from
-   `density="list"` on the primitive; its colours need a tone `Chip` does not yet have, which is
-   a finding against that component rather than a rule to write here. */
+   declaration beats a layered one at any specificity.
+
+   ALL SIX NOW COME FROM THE PRIMITIVE (parity round 7). The scale is `density="list"`, and the
+   three colours the round-6 note left open as a finding are `tone="info"` composed with
+   `emphasis="outlined"` — the emphasis states only the fill, so the tone keeps the info
+   hairline and the info ink and the plate lands on `--fab-bg-1`. Nothing is left for this sheet
+   to say about that pill, which is why there is a note here and no rule. */
 
 /* ── D4. CATEGORY ALONGSIDE TAGS (`proto:1319`) ──────────────────────────────────────────── */
 .fabricate-manager .manager-component-rules-duo {

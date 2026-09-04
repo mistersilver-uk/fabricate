@@ -263,15 +263,24 @@
                      this run had world purple and own neutral, so the two screens disagreed
                      about what purple means. Measured by the `sys-inspector-tag-chip` region.
 
-                     THE SCALE IS THE DEFAULT CHIP, deliberately, and that is a measurement:
-                     `proto:5663` draws this pill at `padding: 3px 9px; border-radius: 999px;
-                     font: 600 10px` with no line-height, which lays out ~20px tall — exactly the
-                     default chip's height, and at 20px a 999px corner and the default's 10px are
-                     the same rendered corner. Neither shipped variant is nearer: `list` would
-                     draw it 13px tall and `tag-run` 25px. The residue is the base scale's own
-                     weight and horizontal inset, which belong to `Chip`, not to this caller. -->
+                     THE SCALE IS THE DEFAULT CHIP SPOKEN MORE QUIETLY, and that is a
+                     measurement rather than a preference. `proto:5663` draws this pill at
+                     `padding: 3px 9px; border-radius: 999px; font: 600 10px` with no
+                     line-height, which lays out ~20px tall — exactly the default chip's height.
+                     Neither micro variant is nearer: `list` would draw it 13px tall and
+                     `tag-run` 25px. What a `compare` run actually measured open was never a
+                     size: it was the base scale's `font-weight: 700` against the reference's
+                     600, its `0.62rem` against 10px, and its `--fab-space-chip` inset against a
+                     wider one — which is `density="inspector"`, the primitive's name for this
+                     exact pill, added rather than a fourth micro scale invented.
+
+                     IT GOES ON BOTH HALVES, and the density is deliberately geometry-only: the
+                     run's two halves are DIFFERENTLY toned on purpose, and a scale applied to
+                     one of them would draw the run at two sizes and read as the origin split
+                     the colours already state. -->
                 <Chip
                   tone={entry.source === 'world' ? 'info' : 'tag'}
+                  density="inspector"
                   data-component-tag={entry.tag}
                   data-component-tag-source={entry.source}
                   title={entry.source === 'world'

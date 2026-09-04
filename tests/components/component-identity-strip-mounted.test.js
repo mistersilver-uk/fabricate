@@ -154,6 +154,37 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
     harness.remount();
   });
 
+  it('and it is a FLAT PLATE in the info family, not a wash on a panel of that family', async () => {
+    // `proto:1313` draws this badge INSIDE the reference's info-soft callout and does not tint
+    // it: a flat `--bg1` surface behind an info hairline with info ink, so it reads as a
+    // separate surface sitting ON the panel. `tone="info"` alone cannot say that — it would put
+    // an info-soft fill on an info-soft callout, which the parity run MEASURED equal rather
+    // than estimated equal, and the badge would dissolve into the card. That is gap-list row
+    // 131, and it is why this pill shipped toneless for a round.
+    //
+    // `emphasis="outlined"` is the axis that closes it. `Chip`'s outlined emphasis states ONLY
+    // the fill, so `tone` keeps the edge and the ink — which is the MIRROR of `StatusPill`'s
+    // emphasis of the same name, and the reason the two classes are asserted together here
+    // rather than one standing in for the other.
+    const { props } = track();
+    const target = await harness.mount(props);
+    const pill = target.querySelector('[data-component-world-pill]');
+    assert.ok(
+      pill.classList.contains('is-info'),
+      `the badge belongs to the info family, which owns its hairline and its ink; ` +
+        `it carried "${pill.className}"`
+    );
+    assert.ok(
+      pill.classList.contains('is-outlined'),
+      `and that family arrives as a PLATE rather than a wash; it carried "${pill.className}"`
+    );
+    assert.ok(
+      pill.classList.contains('is-list'),
+      'and both paint axes compose with the micro scale rather than displacing it'
+    );
+    harness.remount();
+  });
+
   it('has no source drop target, no source kebab and no premise note', async () => {
     // The removal, stated. Every one of these was a per-capability case in this suite before
     // parity round 4; the source Item is authored on the world entry now.

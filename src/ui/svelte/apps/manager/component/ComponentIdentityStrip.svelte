@@ -103,17 +103,36 @@
              `Chip.svelte` records: `1px 8px`, radius 999, 9px/600. It is deliberately not a new
              `micro` value, for the reason that component's docblock gives.
 
-             AND THE PAINT IS NOT WIRED, because no shipped tone expresses it. The reference
-             draws a FLAT `--bg1` plate inside an info hairline with info ink, so the pill reads
-             as a separate surface from the `info-soft` callout it sits on; `tone="info"` would
-             put an `info-soft` fill on an `info-soft` callout, which is the very defect gap-list
-             row 131 records. A `manager-component-world-pill` rule in `styles/fabricate.css`
-             used to state the reference's three colours at two classes and was INERT —
-             that sheet is imported at `layer(modules)` and `Chip`'s own block is unlayered, so
-             all six of its declarations lost — and this round's `compare` measured every one of
-             them landing on the primitive's default instead. It is deleted rather than carried;
-             the three colour lines are a finding against `Chip`'s tone catalogue. -->
-        <Chip density="list" icon="fas fa-globe" data-component-world-pill>
+             AND THE PAINT IS TWO AXES, not one. The reference draws a FLAT `--bg1` plate
+             inside an info hairline with info ink, so the pill reads as a separate surface from
+             the `info-soft` callout it sits on. `tone="info"` ALONE cannot say that: it would
+             put an `info-soft` fill on an `info-soft` callout — a `compare` run measured those
+             two equal rather than estimating them equal — and the badge would dissolve into the
+             card, which is the very defect gap-list row 131 records. So the family is `info` and
+             `emphasis="outlined"` says that family arrives as a PLATE: `Chip`'s outlined
+             emphasis states ONLY the fill, so the tone keeps the edge and the ink, and the three
+             colours land as `--fab-info-border` / `--fab-info-text` on `--fab-bg-1`.
+
+             Note that this is the MIRROR of `StatusPill`'s emphasis of the same name, which
+             supersedes the edge and the ink and keeps the fill. Each matches its own reference;
+             `Chip.svelte`'s emphasis rule carries the note, and a test pins the inversion.
+
+             None of it can be stated from `styles/fabricate.css`. A
+             `manager-component-world-pill` rule there, written against the primitive's own root
+             class, said these very colours and was INERT — that sheet is imported at
+             `layer(modules)` while the primitive's block is unlayered, so all six of its
+             declarations lost, and a `compare` run measured every one of them landing on the
+             default. It was deleted, not carried, and the paint arrives through the primitive's
+             own vocabulary instead. (The rule is named in prose rather than quoted, because
+             `manager-layout.test.js`'s hand-rolled-chip ratchet greps this file for the
+             primitive's bare root token and must stay at empty.) -->
+        <Chip
+          tone="info"
+          emphasis="outlined"
+          density="list"
+          icon="fas fa-globe"
+          data-component-world-pill
+        >
           <span
             >{text('FABRICATE.Admin.Manager.Component.WorldCataloguePill', 'World catalogue')}</span
           >

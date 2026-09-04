@@ -1836,11 +1836,19 @@
                    mode is a fact about the system, not a state the GM must act on.
 
                    `density="list"` is that micro scale on the primitive, as it is for the
-                   identity pill above; the remaining half-pixel of type and the one percentage
-                   point of fill are the primitive's, not this call site's. -->
+                   identity pill above; the remaining half-pixel of type is the primitive's, not
+                   this call site's.
+
+                   `tone="secondary"` is the helper's three colours, and it is genuinely a
+                   different statement from the `neutral` this shipped with for a round. Neutral
+                   inks `--fab-text-muted`, declares no fill at all, and has two dozen callers
+                   meaning "a fact that is merely present", so the pill sat on whatever surface
+                   was behind it. The mode is a step louder — it names the rule that decides this
+                   panel's shape, on a surface of its own — and a step quieter than every
+                   semantic family. -->
                 <Chip
                   density="list"
-                  tone="neutral"
+                  tone="secondary"
                   icon={salvageModeOption?.icon || ''}
                   class="manager-salvage-mode-pill"
                   data-salvage-mode={salvageResolutionMode}

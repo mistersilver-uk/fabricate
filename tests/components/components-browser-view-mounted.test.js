@@ -1046,6 +1046,32 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     );
   });
 
+  it('and draws BOTH halves of the run at the primitive’s INSPECTOR scale', async () => {
+    // `proto:5663` and `proto:5665` draw the two halves at ONE geometry — `padding: 3px 9px`,
+    // a stadium corner, `600 10px` — while inking them differently, which is the whole shape of
+    // this run: one size, two origins. The default chip is that height (a 10px face in an
+    // unauthored line box is ~12px, so 3 + 12 + 3 is the base rule's 20px floor) but not that
+    // weight, corner or inset: it is 700 at `--fab-space-chip` with a 10px radius.
+    //
+    // `density="inspector"` is the primitive's name for exactly that — the default pill spoken
+    // more quietly — and it is asserted on BOTH chips because a density applied to one half
+    // would draw the run at two sizes and read as the origin split it is not.
+    const root = await mountCoal();
+    const chip = (tag) => root.querySelector(`[data-component-tag="${tag}"]`);
+
+    for (const tag of ['fuel', 'sooty']) {
+      assert.ok(
+        chip(tag).classList.contains('is-inspector'),
+        `the "${tag}" chip takes the inspector scale; it carried "${chip(tag).className}"`
+      );
+      assert.ok(
+        !chip(tag).classList.contains('is-list') && !chip(tag).classList.contains('is-tag-run'),
+        `and neither micro pill nor the clickable tag run, which are 15px and 25px against ` +
+          `this run's 20; "${tag}" carried "${chip(tag).className}"`
+      );
+    }
+  });
+
   it('draws the dangling-source warning in a class the stylesheet actually paints', async () => {
     // A DRIFT GUARD, not a style assertion. On `main` this paragraph carried
     // `environment-stale-warning` and borrowed that rule's danger ink; the C7 rebuild renamed it
