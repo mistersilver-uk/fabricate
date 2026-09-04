@@ -433,7 +433,7 @@
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+      triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
       triggerIcon="fas fa-plus"
       triggerLabel={progressive
         ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')

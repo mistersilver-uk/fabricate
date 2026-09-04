@@ -199,7 +199,7 @@
             options={componentPickerOptions}
             value={componentId}
             pickerClass="manager-recipe-component-picker"
-            triggerClass={`manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
+            triggerClass={`fabricate-button manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
             triggerImg={selectedComponent?.img || ''}
             triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
             triggerLabel={selectedComponent?.name ||

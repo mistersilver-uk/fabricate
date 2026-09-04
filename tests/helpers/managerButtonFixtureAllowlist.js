@@ -86,7 +86,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
     // The provenance, checked rather than asserted in prose above — see the loop below.
     stillRenderedBy: Object.freeze({
       file: 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
-      literal: 'triggerClass="manager-button"',
+      literal: 'triggerClass="fabricate-button manager-button"',
     }),
   }),
   Object.freeze({

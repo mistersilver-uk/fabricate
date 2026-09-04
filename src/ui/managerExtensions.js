@@ -48,6 +48,18 @@ const BOOLEAN_ACTION_FIELDS = Object.freeze(['primary', 'disabled']);
  */
 export const ACTION_TONES = Object.freeze(['primary', 'ghost', 'danger', 'neutral']);
 /**
+ * The two classes every header action's control carries before any tone modifier.
+ *
+ * `fabricate-button` is the button family's ROOT — the class the shared `ManagerButton`
+ * primitive emits and every re-rooted rule in the sheet keys on — and it leads because the
+ * root always leads. `manager-button` stays beside it as the family's contract class, the one
+ * a companion's own stylesheet may read. What does NOT appear is `fab-manager-button`: that
+ * marks a control the primitive itself rendered, and this builder hands a class list to a
+ * `<button>` the Manager root writes by hand.
+ */
+const HEADER_ACTION_BASE_CLASSES = 'fabricate-button manager-button';
+
+/**
  * The Manager button modifier each tone paints, declared beside the tones themselves.
  *
  * It lives with the contract rather than in the renderer because a copy in the component
@@ -479,12 +491,13 @@ function validateActions(actions, label) {
  * validator refuses a descriptor that states both, so this never has to pick a winner.
  *
  * @param {WorldNavProviderAction} action Validated action descriptor.
- * @returns {string} Space-separated class list, always beginning `manager-button`.
+ * @returns {string} Space-separated class list, always beginning
+ *   `fabricate-button manager-button`.
  */
 export function managerHeaderActionClass(action) {
   const tone = action?.tone ?? (action?.primary === true ? 'primary' : 'neutral');
   const modifier = ACTION_TONE_CLASSES[tone] ?? '';
-  return modifier ? `manager-button ${modifier}` : 'manager-button';
+  return modifier ? `${HEADER_ACTION_BASE_CLASSES} ${modifier}` : HEADER_ACTION_BASE_CLASSES;
 }
 
 /**
