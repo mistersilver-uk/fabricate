@@ -315,16 +315,22 @@ describe('the world entry notes count MEMBERS only', () => {
       phrase
     );
     // The non-member's muted list is NOT counted: it names a record the resolver never reaches.
-    assert.match(note, /2 world tags applied · muted in 1 system/);
+    assert.match(note, /2 world tags set on this record · muted in 1 system/);
   });
 
-  it('and says the list reaches every member when none of them mutes one', () => {
-    assert.match(
-      componentWorldTagNote(
-        { defaults: { tags: ['ore'] }, systems: [{ member: true, mutedTags: [] }] },
-        phrase
-      ),
-      /1 world tag applied in every system that has rules/
+  it('and CLAIMS NO REACH when nothing is muted, because the tags reach nothing yet', () => {
+    // It used to close ` in every system that has rules`, and that was false: world tags are
+    // merged by the resolver only and the read union discards them, so no system sees this list.
+    // `setMutedTags` has no caller under `src/` either, so a note asserting reach was telling the
+    // GM to tag here instead of in the system that actually reads a tag.
+    const note = componentWorldTagNote(
+      { defaults: { tags: ['ore'] }, systems: [{ member: true, mutedTags: [] }] },
+      phrase
+    );
+    assert.equal(note, '1 world tag set on this record');
+    assert.ok(
+      !/every system/.test(note),
+      `the sentence claims no reach, and read "${note}"`
     );
   });
 });

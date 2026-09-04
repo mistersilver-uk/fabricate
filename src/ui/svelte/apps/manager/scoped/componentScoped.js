@@ -353,7 +353,19 @@ export function componentWorldCategoryNote(entry, phrase) {
 }
 
 /**
- * The world entry's tag note, which states the reach of the tag list and its exceptions.
+ * The world entry's tag note: how many world tags this record carries, and any mute against them.
+ *
+ * ── IT DOES NOT CLAIM REACH, AND THAT IS THE POINT ───────────────────────────────────────────
+ * It used to close ` in every system that has rules` whenever nothing was muted, and that
+ * sentence was FALSE. World tags are merged by the resolver only; the read union discards them,
+ * so no system sees this list yet. A note that told the GM the opposite is worse than no note —
+ * it invites them to tag here instead of in the system that actually reads a tag.
+ *
+ * The mute clause SURVIVES, because it is a statement about DATA rather than about reach: a
+ * world migrated from an earlier version can carry `mutedTags` on a membership record, and while
+ * `setMutedTags` has no caller anywhere under `src/` (grep: the definition and three comments,
+ * no call site) the entry draws no mute surface, so this note is the only place that data is
+ * visible at all. Deleting the clause would hide it rather than correct it.
  *
  * @param {object|null} entry
  * @param {(key: string, fallback: string, data?: object) => string} phrase
@@ -370,13 +382,19 @@ export function componentWorldTagNote(entry, phrase) {
   const muting = (Array.isArray(entry?.systems) ? entry.systems : []).filter(
     (row) => row?.member === true && Array.isArray(row?.mutedTags) && row.mutedTags.length > 0
   ).length;
+  // `WorldTagsSet`, not `…Applied`: the key is renamed with the sentence on purpose. A key still
+  // named for the claim the sentence used to make is how the claim comes back.
   const applied = phrase(
     tags.length === 1
-      ? 'FABRICATE.Admin.Manager.Scoped.Component.WorldTagsAppliedOne'
-      : 'FABRICATE.Admin.Manager.Scoped.Component.WorldTagsApplied',
-    tags.length === 1 ? '{count} world tag applied' : '{count} world tags applied',
+      ? 'FABRICATE.Admin.Manager.Scoped.Component.WorldTagsSetOne'
+      : 'FABRICATE.Admin.Manager.Scoped.Component.WorldTagsSet',
+    tags.length === 1
+      ? '{count} world tag set on this record'
+      : '{count} world tags set on this record',
     { count: tags.length }
   );
+  // NO `else` BRANCH. "Nothing is muted" is not news, and the sentence that used to fill this
+  // slot was the false reach claim; an empty qualifier leaves a note that says only what is true.
   const qualifier =
     muting > 0
       ? phrase(
@@ -386,10 +404,7 @@ export function componentWorldTagNote(entry, phrase) {
           muting === 1 ? ' · muted in {count} system' : ' · muted in {count} systems',
           { count: muting }
         )
-      : phrase(
-          'FABRICATE.Admin.Manager.Scoped.Component.WorldTagsEverywhere',
-          ' in every system that has rules'
-        );
+      : '';
   return `${applied}${qualifier}`;
 }
 
@@ -519,39 +534,6 @@ export function componentAttributionNote({ surface, memberCount, systemName = ''
       ? 'Name, art and description are authored in the world catalogue and shared with {count} other system.'
       : 'Name, art and description are authored in the world catalogue and shared with {count} other systems.',
     { count: others }
-  );
-}
-
-/**
- * The standing disclosure both scopes carry.
- *
- * It is narrower than "nothing here is read" and narrower than "everything here is read", because
- * both would be false: the world `category` IS consumed by every system whose switch is on, while
- * the world identity and the world tag list are authored here and displayed nowhere else yet.
- * MUTING is named explicitly, because a per-system mute is a membership write the identity
- * sentence does not cover and a control that reads its own state back looks live in a way an
- * unwritten field does not.
- *
- * ── "HERE" IS NOT THE SAME PLACE ON EVERY SCREEN ─────────────────────────────────────────────
- * One string was rendered verbatim on all three, including the rules EDITOR's read-only world tag
- * card — where it told the GM the world name, art, description and tag list "are authored here",
- * and they are authored one route away, on the entry. The deixis is the whole content of the
- * sentence on that screen, so it takes a surface the way the attribution note does.
- *
- * @param {(key: string, fallback: string, data?: object) => string} phrase
- * @param {'entry'|'editor'} [surface] where the sentence is being read.
- * @returns {string}
- */
-export function componentWorldScopeDisclosure(phrase, surface = 'entry') {
-  if (surface === 'editor') {
-    return phrase(
-      'FABRICATE.Admin.Manager.Scoped.Component.DisclosureNoteEditor',
-      'The world name, art, description and tag list — and per-system tag muting — are authored in the world catalogue entry, and are not read by any crafting system yet. The world category IS read: this system resolves from it while it inherits.'
-    );
-  }
-  return phrase(
-    'FABRICATE.Admin.Manager.Scoped.Component.DisclosureNote',
-    'The world name, art, description and tag list — and per-system tag muting — are authored here and are not read by any crafting system yet. The world category IS read: every system inheriting it resolves from this value.'
   );
 }
 

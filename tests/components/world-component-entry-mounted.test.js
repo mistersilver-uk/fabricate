@@ -326,6 +326,38 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.ok(!target.querySelector('[data-scoped-entry-tag-input]'));
       assert.ok(!target.querySelector('[data-scoped-entry-tag-add]'));
     });
+
+    it('and the note under it CLAIMS NO REACH, because the tags reach no system yet', async () => {
+      // The rendered half of the same ruling the model test pins. World tags are merged by the
+      // resolver only and the read union discards them, so the note used to close ` in every
+      // system that has rules` about a list nothing reads. `setMutedTags` has no caller under
+      // `src/` either — the mute clause survives only because a MIGRATED world can carry
+      // `mutedTags` on a membership record, and this note is the one place that data is visible.
+      //
+      // BOTH BRANCHES, and the second is the one that matters. The fixture's `coal` is muted in
+      // `sys-forge`, so it takes the mute clause and never reaches the `else` the false sentence
+      // lived in — an assertion on `coal` alone passes with that sentence restored, which makes
+      // it no guard at all. The no-mute face needs a record carrying tags and no mute, so the
+      // defaults are overridden to put one on `ingot`.
+      const { target: muted } = await open('coal');
+      assert.equal(
+        muted.querySelector('[data-scoped-entry-tag-note]').textContent.trim(),
+        '2 world tags set on this record · muted in 1 system'
+      );
+
+      const { target: plain } = await open('ingot', {
+        defaults: [
+          { id: 'ingot', category: 'Refined', tags: ['ore'] },
+          { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+        ],
+      });
+      const sentence = plain.querySelector('[data-scoped-entry-tag-note]').textContent.trim();
+      assert.equal(sentence, '1 world tag set on this record');
+      assert.ok(
+        !/every system/.test(sentence),
+        `it promises the GM no reach it cannot deliver, and read "${sentence}"`
+      );
+    });
   });
 
   describe('deleting a component any system has rules for is REFUSED', () => {
