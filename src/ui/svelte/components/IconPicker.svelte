@@ -225,6 +225,10 @@
         component: 'IconPicker',
         trigger: triggerButton,
         layout: popoverLayout,
+        // `iconOnly` is read INSIDE this closure, so it is not a dependency of the action's
+        // `update`: the closure is re-run on the next measure rather than when the prop changes.
+        // That is what `measurePopoverMetrics()` wants — it must re-measure every pass — and
+        // `iconOnly` is fixed for the life of one open at every call site, so the two share it.
         layoutOptions: () => ({
           horizontalAlign: iconOnly ? 'left' : 'right',
           ...measurePopoverMetrics(),

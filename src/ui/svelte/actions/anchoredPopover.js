@@ -113,6 +113,11 @@ export function hostRelativePopoverLayout(compute) {
  *   REQUIRED. See the header for why there is no default.
  * @param {() => object} [params.layoutOptions] Called on EVERY measure, so a caller whose options
  *   are themselves measured (`IconPicker`'s row pitch and popover chrome) keeps re-measuring.
+ *   A value read only INSIDE this closure is not a dependency of the action's `update`: the
+ *   closure is re-run on the next measure, not when the value changes, so a caller whose option
+ *   can change while the panel is OPEN must re-measure it (an event, or an `$effect` that reads
+ *   it and re-applies the action). Every shipped caller's options are fixed for the life of one
+ *   open, which is why none of them do.
  * @param {string|((hostRect: object, anchor: HTMLElement|null) => object)} [params.bounds] The
  *   clipping boundary. A string is `anchor.closest(selector)`, contributing nothing when it
  *   misses; a function is a caller-supplied resolver.

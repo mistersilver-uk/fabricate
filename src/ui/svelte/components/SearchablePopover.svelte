@@ -516,6 +516,10 @@
         // style and drift on scroll. Both are read EAGERLY, so the swap re-runs the measure.
         trigger: triggerButton ?? pickerRoot,
         layout: popoverLayout,
+        // `minWidth`/`maxWidth` are read INSIDE this closure, so they are not dependencies of the
+        // action's `update`: the action re-runs the closure on its next measure rather than when
+        // either prop changes. Both are fixed for the life of one open here, so nothing is owed;
+        // a caller that needed to change a width band mid-open would have to re-measure it.
         layoutOptions: () => ({ horizontalAlign: 'left', minWidth, maxWidth }),
         maxHeightCap: maxHeight,
         bounds,
