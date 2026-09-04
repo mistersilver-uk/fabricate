@@ -45,7 +45,7 @@
     {
       "path": "src/ui/svelte/apps/manager/Callout.svelte",
       "library": "<Callout>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
       "why": "Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice."
     },
@@ -122,7 +122,7 @@
     {
       "path": "src/ui/svelte/apps/manager/ManagerModal.svelte",
       "library": "<Modal>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:1104` and `:1137` name it and its two callers — the import folder-mapping step and the import report — and `:1137` records that ruling it out as single-caller was wrong."
     },
@@ -227,7 +227,7 @@
     {
       "path": "src/ui/svelte/components/IconButton.svelte",
       "library": "<IconButton>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
       "why": "The manager's icon-only push-button (36 callers, issue 1422), extracted from 82 hand-rolled `class=\"manager-icon-button\"` sites across 37 components. `library.html:570` heads one specimen `<Button> <IconButton>` and specifies the icon size on that ladder (`icon 28x28 - radius 7`) with `ariaLabel` REQUIRED when icon-only, which is the entry this row names. Two divergences from that specimen are deliberate and are recorded rather than smoothed over: the shipped control is 34px (`fabricate.css:13935`), 28px only inside `.manager-pagination`, so the ladder value and the shipped pixel disagree and this change does not repaint 82 sites to settle it; and it takes NO `role` prop, because its modifiers mix roles with states and one site compounds two, so the vocabulary is a design ruling left open rather than folded into a sweep whose acceptance bar is that no frame moves. Broad by reach rather than by count alone: it lands in nearly every studio, browser, inspector and editor tab, and through `Pagination` it reaches the player apps too."
     },
@@ -311,7 +311,7 @@
     {
       "path": "src/ui/svelte/components/StatusToggle.svelte",
       "library": "<Toggle>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (25 callers, issue 1040). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here."
     },

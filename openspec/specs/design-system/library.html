@@ -578,8 +578,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The value is always editable.</b> A click-only stepper is a documented keyboard regression, which is why the shipped component states the rule in its own docblock. The API above is the shipped prop set. <code>allowUnset</code> carries the semantics that clearing commits <code>null</code> and that adjuncts step from <code>min ?? 0</code>, and the three aria names are derived by a shared helper because 23 call sites drifted when they were not. Its filled variant sets a 36px height, which is a value this ladder retires — a conflict recorded in the migrations rather than papered over.<span class="cite"><b>Stepper.svelte:3-6, 151-157</b> · <b>stepperLabels.js</b></span></div>
   </div>
 
-  <div class="spec" data-status="target" data-status-Button="target" data-status-IconButton="shipped">
-    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><span class="st st-target">Button &middot; target</span><span class="st st-shipped">IconButton &middot; shipped</span><p class="why">One component, six roles, two sizes. Each role names a VERB, not a colour: <b>neutral</b> is the secondary verb and the default, <b>primary</b> the create-or-commit verb (at most one per cluster), <b>ghost</b> the quiet navigational verb, <b>dashed</b> the append verb at the foot of the list it adds to, <b>danger</b> the destructive verb, and <b>warning</b> the override verb that proceeds against a flagged rule and destroys nothing.</p></div>
+  <div class="spec" data-status="target" data-status-Button="target" data-status-IconButton="target">
+    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><span class="st st-target">Button &middot; target</span><span class="st st-target">IconButton &middot; target</span><p class="why">One component, six roles, two sizes. Each role names a VERB, not a colour: <b>neutral</b> is the secondary verb and the default, <b>primary</b> the create-or-commit verb (at most one per cluster), <b>ghost</b> the quiet navigational verb, <b>dashed</b> the append verb at the foot of the list it adds to, <b>danger</b> the destructive verb, and <b>warning</b> the override verb that proceeds against a flagged rule and destroys nothing.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">page 38 · the header pair only</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="k-btn page primary">Save recipe</button><button class="k-btn page primary">New template</button><button class="k-btn page"><svg class="i"><use href="#i-cl"/></svg>Back</button><button class="k-btn page ghost">Cancel</button><button class="k-btn page danger"><svg class="i"><use href="#i-trash"/></svg>Delete</button></div></div>
     </div>
@@ -606,8 +606,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The icon-only half now ships, as its own component, and diverges from this specimen twice.</b> It was extracted from 82 hand-rolled <code>manager-icon-button</code> sites across 37 components; a census walking each component&rsquo;s Svelte AST found ONE element host, so it takes no polymorphism prop. <b>Geometry:</b> the shipped control is <b>34&times;34</b>, and 28 only inside <code>.manager-pagination</code> &mdash; so the <b>icon 28</b> above is the ladder value and 34 is the shipped pixel. That conflict is recorded rather than resolved, because repainting 82 sites is a restyle and this extraction&rsquo;s acceptance bar was that no frame moves. <b>Roles:</b> it takes NO role prop. Its modifiers mix roles (<code>is-danger</code>, <code>is-ghost</code>, <code>is-primary</code>) with states (<code>is-locked</code>, <code>is-roll-needed</code>) and one site compounds two of them as a treatment the sheet declares by name, so the vocabulary is a design ruling left open; every modifier travels as a pass-through <code>class</code>. What it DOES enforce is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 36 callers &middot; <b>ui-integration/spec.md</b></span></div>
   </div>
 
-  <div class="spec" data-status="shipped" data-status-Toggle="shipped">
-    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><span class="st st-shipped">shipped</span><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
+  <div class="spec" data-status="target" data-status-Toggle="target">
+    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><span class="st st-target">target</span><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">on · accent</span><div class="k-tog on"><i></i></div></div>
       <div class="unit"><span class="cap">off</span><div class="k-tog off"><i></i></div></div>
@@ -926,8 +926,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">09</span><h2>Surfaces</h2></div>
   <p class="lede">Four ways of telling the reader something, and the rule that separates them.</p>
 
-  <div class="spec" data-status="target" data-status-Callout="shipped" data-status-Notice="target" data-status-InfoStrip="target" data-status-Empty="shipped">
-    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4><span class="st st-shipped">Callout &middot; shipped</span><span class="st st-target">Notice &middot; target</span><span class="st st-target">InfoStrip &middot; target</span><span class="st st-shipped">Empty &middot; shipped</span></div>
+  <div class="spec" data-status="target" data-status-Callout="target" data-status-Notice="target" data-status-InfoStrip="target" data-status-Empty="shipped">
+    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4><span class="st st-target">Callout &middot; target</span><span class="st st-target">Notice &middot; target</span><span class="st st-target">InfoStrip &middot; target</span><span class="st st-shipped">Empty &middot; shipped</span></div>
     <div class="stage col">
       <div class="unit"><span class="cap">callout &mdash; explains a rule that is always true, and stays put</span>
         <div class="k-callout"><svg class="i"><use href="#i-info"/></svg><div>Time only &mdash; nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state.</div></div></div>
@@ -1132,8 +1132,8 @@ a{color:var(--fab-accent)}
     <div class="delta">The shipped component covers BOTH names in one surface: the verdict card and the grouped row list are one tab, not two, so neither name has an implementation of its own to point at and the manifest records the correspondence as unestablished rather than guessing which one the file is.<span class="cite">7 renderers · <b>EditorValidationSurface.svelte</b></span></div>
   </div>
 
-  <div class="spec" data-status="shipped" data-status-Modal="shipped">
-    <div class="spec-head"><h4>&lt;Modal&gt;</h4><span class="st st-shipped">shipped</span><p class="why">The manager's one modal chrome. It exists for a flow that must finish before anything else continues &mdash; today the two steps of an import: mapping folders, then reading the reference report.</p></div>
+  <div class="spec" data-status="target" data-status-Modal="target">
+    <div class="spec-head"><h4>&lt;Modal&gt;</h4><span class="st st-target">target</span><p class="why">The manager's one modal chrome. It exists for a flow that must finish before anything else continues &mdash; today the two steps of an import: mapping folders, then reading the reference report.</p></div>
     <div class="stage b0">
       <div style="width:100%;max-width:460px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--fab-border)">

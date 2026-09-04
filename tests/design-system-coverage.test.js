@@ -321,8 +321,9 @@ const ISSUE_REFERENCE = /\bissue \d+\b/u;
  * `divergent` beats `target` beats `shipped`, so a block reads as met only when everything it
  * specifies is met. DERIVED rather than hand-typed: a multi-name block is the one place where a
  * block-level value could be written to disagree with the names under it, and the entry that
- * exercises the rule is live — the button block declares `target` for the button and `shipped`
- * for the icon button, so the roll-up is proved by the corpus and not only by this comment.
+ * exercises the rule is live — the field block declares `shipped` for the field shell and
+ * `target` for the select and the search, so the roll-up is proved by the corpus and not only
+ * by this comment.
  *
  * @param {string[]} statuses every per-name status in one block
  * @returns {string} the block's value

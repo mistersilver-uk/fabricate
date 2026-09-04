@@ -84,7 +84,8 @@ The status is declared on the block rather than inside the heading, because the 
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
-A single inline disagreement between a shipped component and its specimen is recorded as a row in the library's planned-migrations table rather than by moving the whole entry to `divergent`, which is reserved for a decision that the component STAYS different.
+A single inline disagreement between a shipped component and its specimen puts that entry at `target`, and the library's planned-migrations table carries the row that says what the disagreement is and what it moves to.
+That row is not a licence to leave the entry at `shipped`, and it is not `divergent` either, which is reserved for a decision that the component STAYS different.
 
 A shipped-member row that names no library entry carries `target` by construction rather than by judgement: there is no specimen to measure it against, so the specimen it is owed is the target.
 `tests/design-system-coverage.test.js` is the gate, and it fails on a missing status, on a value outside the vocabulary, on a name in a heading that carries no status of its own, on a manifest row whose status contradicts its specimen, and on a `divergent` entry that names no issue.
