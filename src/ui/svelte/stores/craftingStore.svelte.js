@@ -152,6 +152,26 @@ export function createCraftingStore({ services } = {}) {
     return services?.getSelectedCraftingActorId?.() || null;
   }
 
+  /**
+   * The crafting actor, picked OUT of the source-actor list the same derive already has.
+   *
+   * Matched by ID, never by position (issue 1493). `getCraftingSourceActors` unshifts the
+   * crafting actor only when it is not already among the persisted component sources, so
+   * index 0 is the crafting actor exactly when the player has NOT also lent that actor's
+   * inventory — the commonest configuration being the one where it is not.
+   *
+   * Reuses `currentActorId`, which is the store's one answer to "who is crafting"; a
+   * second read of the same setting here could drift from the one the listing loaded with.
+   *
+   * @param {object[]} sourceActors
+   * @returns {object|null}
+   */
+  function resolveCraftingActorFrom(sourceActors) {
+    const actorId = currentActorId();
+    if (!actorId || !Array.isArray(sourceActors)) return null;
+    return sourceActors.find((actor) => actor?.id === actorId) ?? null;
+  }
+
   const visibleRecipes = $derived.by(() => {
     const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     const query = search.trim().toLowerCase();
@@ -433,7 +453,9 @@ export function createCraftingStore({ services } = {}) {
       return aggregateShoppingList([], recipeManager, []);
     }
     const sourceActors = services?.getCraftingSourceActors?.() ?? [];
-    return aggregateShoppingList(shoppingEntries, recipeManager, sourceActors);
+    return aggregateShoppingList(shoppingEntries, recipeManager, sourceActors, {
+      craftingActor: resolveCraftingActorFrom(sourceActors),
+    });
   });
 
   /**

@@ -12,6 +12,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { CurrencyConfigStore } from '../../src/systems/CurrencyConfigStore.js';
@@ -301,4 +302,107 @@ describe('adminStore world currency actions', () => {
     assert.deepEqual(silver.contains, []);
   });
 
+});
+
+/**
+ * The derived world-currency validation report (issue 1493).
+ *
+ * `validateCurrencyProfile` shipped with ZERO callers in the manager UI, so a world whose ladder
+ * could not be spent against said nothing at all in the place the ladder is authored — the GM only
+ * found out at craft time, through a player being told they were poor.
+ *
+ * These drive the REAL store over a REAL `CurrencyConfigStore`, and read the published viewstate
+ * rather than calling the validator directly: a test that calls `validateCurrencyProfile` itself
+ * would pass on the broken tree, because the validator was never the defect.
+ */
+describe('adminStore world currency validation', () => {
+  it('publishes the report as a TOP-LEVEL sibling, leaving worldCurrency a four-key CurrencyConfig', async () => {
+    const { store } = await setupCurrencyStore();
+    await store.addCurrencyUnit({ id: 'gp', label: 'Gold', actorPath: 'system.currency.gp' });
+
+    const state = get(store.viewState);
+    assert.ok(state.worldCurrencyValidation, 'the report is published at viewstate top level');
+    // The report must NOT be nested: `CurrencyConfig` is exactly these four keys, and the
+    // normalizer that round-trips the setting has to be able to emit all of them and only them.
+    assert.deepEqual(Object.keys(state.worldCurrency).sort(), [
+      'macros',
+      'providerId',
+      'spendStrategy',
+      'units',
+    ]);
+  });
+
+  it('carries only valid and errors — never the validator units or its metadata Map', async () => {
+    // `validateCurrencyProfile` also returns normalized units and a `metadata` Map. A Map in
+    // viewstate is neither plain nor structurally comparable, and no surface reads either.
+    const { store } = await setupCurrencyStore();
+    await store.addCurrencyUnit({ id: 'gp', label: 'Gold', actorPath: 'system.currency.gp' });
+
+    assert.deepEqual(Object.keys(get(store.viewState).worldCurrencyValidation).sort(), [
+      'errors',
+      'valid',
+    ]);
+  });
+
+  it('names the offending unit when a ladder cannot be spent against', async () => {
+    const { store } = await setupCurrencyStore();
+    // A unit with no actor data path under the actorProperty strategy: `resolveCurrencyContext`
+    // cannot read a balance for it, so every craft that costs it dies as an affordability
+    // shortfall the player cannot fix.
+    await store.addCurrencyUnit({ id: 'gp', label: 'Gold', actorPath: '' });
+
+    const report = get(store.viewState).worldCurrencyValidation;
+    assert.equal(report.valid, false);
+    assert.ok(
+      report.errors.some((error) => error.includes('Gold')),
+      `the error names the unit by its label: ${JSON.stringify(report.errors)}`
+    );
+  });
+
+  it('clears the report when the GM repairs the ladder, with no reload', async () => {
+    const { store } = await setupCurrencyStore();
+    await store.addCurrencyUnit({ id: 'gp', label: 'Gold', actorPath: '' });
+    assert.equal(get(store.viewState).worldCurrencyValidation.valid, false);
+
+    await store.updateCurrencyUnit('gp', { actorPath: 'system.currency.gp' });
+
+    const repaired = get(store.viewState).worldCurrencyValidation;
+    assert.equal(repaired.valid, true);
+    assert.deepEqual(repaired.errors, []);
+  });
+
+  it('reports the strategy the ladder is actually on, not the one it was authored for', async () => {
+    // A dnd5e ladder switched to actorInventory: `collectUnitStrategyErrors` requires a pf2e
+    // denomination, so every unit is named. This is the transient state a GM lands in mid-switch,
+    // and reporting it is the point — it is exactly why the craft would refuse.
+    const { store } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
+    await store.addCurrencyUnit({
+      id: 'crowns',
+      label: 'Crowns',
+      actorPath: 'system.currency.gp',
+    });
+    assert.equal(get(store.viewState).worldCurrencyValidation.valid, true);
+
+    await store.setCurrencySpendStrategy('actorInventory');
+
+    const report = get(store.viewState).worldCurrencyValidation;
+    assert.equal(report.valid, false);
+    assert.ok(
+      report.errors.some((error) => error.includes('Crowns')),
+      `the switched-to strategy is what is validated: ${JSON.stringify(report.errors)}`
+    );
+  });
+
+  it('reports, and never refuses: the write still lands while the ladder is invalid', async () => {
+    // Persistence stays UNGATED. The note is a diagnostic, not a gate — a GM part-way through
+    // authoring a ladder must be able to save the half of it that exists.
+    const { store, persisted } = await setupCurrencyStore();
+    const created = await store.addCurrencyUnit({ id: 'gp', label: 'Gold', actorPath: '' });
+
+    assert.ok(created, 'the action still reports success');
+    assert.equal(persisted().units[0].id, 'gp', 'and the unit is on the setting');
+    // Nothing derived reaches the setting.
+    assert.equal('worldCurrencyValidation' in persisted(), false);
+    assert.equal('validation' in persisted(), false);
+  });
 });

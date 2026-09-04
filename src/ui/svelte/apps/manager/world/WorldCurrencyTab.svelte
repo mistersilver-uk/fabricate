@@ -29,6 +29,10 @@
 
   let {
     currencyUnits = [],
+    // The world profile's `validateCurrencyProfile` errors (issue 1493), computed in `adminStore`
+    // and threaded in as plain data. This component does NOT import `currencyProfile.js`: the
+    // heavier systems module stays out of the Svelte layer (see `util/recipeCurrency.js`).
+    currencyValidationErrors = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
     currencyProviderId = '',
@@ -341,6 +345,20 @@
       currencyExpandedUnitId = '';
     }
   });
+
+  // Suppressed while no unit is authored. `validateCurrencyProfile([])` reports "No currency units
+  // are configured.", which is true but is not a mistake: the route already greets a fresh world
+  // with a friendly empty state, and stacking an error on top of it tells a GM they are wrong for
+  // having authored nothing yet.
+  //
+  // Errors that appear the moment the spend strategy changes are CORRECT, not a glitch: a macro
+  // profile with no macros linked yet, or an actorInventory profile whose denominations are not
+  // pf2e coin keys, genuinely cannot be spent against until the GM finishes the switch.
+  const currencyValidationIssues = $derived(
+    currencyUnits.length > 0 && Array.isArray(currencyValidationErrors)
+      ? currencyValidationErrors.filter((issue) => String(issue || '').trim() !== '')
+      : []
+  );
 </script>
 
 <div class="manager-world-currency" data-world-currency-page>
@@ -548,6 +566,72 @@
                 <small>{text(field.hintKey, field.hintFallback)}</small>
               </Field>
             {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!--
+        The report is a live region that is ALWAYS in the DOM, with the `{#if}` inside it. A
+        region inserted in the same tick as its content is not announced, so conditionally
+        rendering the element that carries `aria-live` would announce nothing at the only moment
+        that matters — when a strategy change makes the units unspendable.
+
+        While it has nothing to say it wears the repository's shipped `.visually-hidden` utility
+        (`styles/fabricate.css`, declared under `.fabricate-manager`), the same one the reorder
+        announcer at the top of this file uses. That is a real hidden element — clipped and out
+        of flow, so it leaves no phantom row in the section's gapped flex column — while staying
+        in the accessibility tree, which `display: none`, `visibility: hidden` and the `hidden`
+        attribute would not. A shared global utility rather than a local scoped rule on purpose:
+        a scoped single-compound rule can be emitted carrying a scope hash that matches nothing,
+        and when it is, it fails silently.
+
+        `manager-currency-subunit-warning` ALONE. Composing it with
+        `manager-environment-comp-callout`, as the sibling callouts do, overrides the amber
+        warning tone with a neutral accent, because that rule is later in the sheet at equal
+        specificity — and this one is a warning.
+      -->
+      <div
+        class:visually-hidden={currencyValidationIssues.length === 0}
+        role="status"
+        aria-live="polite"
+        data-world-currency-validation
+      >
+        {#if currencyValidationIssues.length > 0}
+          <div
+            class="manager-currency-subunit-warning"
+            role="note"
+            data-world-currency-validation-note
+          >
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <div class="currency-validation-copy">
+              <strong
+                >{text(
+                  'FABRICATE.Admin.Manager.CurrencyUnits.ValidationTitle',
+                  "Currency can't be spent yet"
+                )}</strong
+              >
+              <!--
+                Keyed on the INDEX, never on the message. Svelte 5 throws `each_key_duplicate` on
+                a repeated key in its production branch as well as its dev one, and these rows are
+                plain validator strings, so keying on the string itself would turn a duplicated
+                message into a crash of the whole route. They are distinct today only because
+                `validateCurrencyProfile` happens to return `[...new Set(errors)]` — an unpinned
+                detail of a file this surface does not own. No row carries state, a transition or
+                an identity worth preserving across a re-render, so the position IS the identity
+                here; a key is present only because `svelte/require-each-key` requires one.
+              -->
+              <ul class="currency-validation-list">
+                {#each currencyValidationIssues as issue, index (index)}
+                  <li data-world-currency-validation-error>{issue}</li>
+                {/each}
+              </ul>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.CurrencyUnits.ValidationHint',
+                  "Crafting can't price or spend currency until you fix the problems listed above. Each spend strategy needs different things from your setup, so switching it can raise new ones. Saving still works."
+                )}</span
+              >
+            </div>
           </div>
         {/if}
       </div>
@@ -921,3 +1005,19 @@
     </div>
   </section>
 </div>
+
+<style>
+  /* Issue 1493. The region's silent state is NOT styled here. It takes the shipped
+     `.visually-hidden` utility from `styles/fabricate.css`, so there is no local rule to keep in
+     step with it and nothing that can be emitted with a scope hash matching nothing. */
+  .currency-validation-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+  }
+
+  .currency-validation-list {
+    margin: 0;
+    padding-inline-start: var(--fab-space-4);
+  }
+</style>

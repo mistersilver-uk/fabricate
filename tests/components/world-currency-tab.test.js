@@ -1,8 +1,10 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -166,5 +168,245 @@ describe('World > Currency tab (mounted)', () => {
     assert.equal(root.querySelector('[data-move-currency-down="sp"]').disabled, true);
     assert.equal(root.querySelector('[data-move-currency-down="gp"]').disabled, false);
     assert.equal(root.querySelector('[data-move-currency-up="sp"]').disabled, false);
+  });
+
+  /**
+   * The world profile's validation report (issue 1493).
+   *
+   * `validateCurrencyProfile` had no caller in the manager at all, so a ladder that could not be
+   * spent against looked perfectly healthy on the page that authors it. The errors arrive as plain
+   * strings from `adminStore`; this component deliberately does not import `currencyProfile.js`.
+   */
+  it('renders the validation errors, each one, where the ladder is authored', async () => {
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: [
+        'Currency unit "Gold" is missing an actor data path.',
+        'Currency unit "Silver" is missing an actor data path.'
+      ]
+    });
+
+    const note = root.querySelector('[data-world-currency-validation-note]');
+    assert.ok(note, 'the report renders');
+    const errors = [...root.querySelectorAll('[data-world-currency-validation-error]')].map(
+      (item) => item.textContent.trim()
+    );
+    assert.deepEqual(errors, [
+      'Currency unit "Gold" is missing an actor data path.',
+      'Currency unit "Silver" is missing an actor data path.'
+    ]);
+  });
+
+  it('renders a repeated validator message rather than throwing on it', async () => {
+    // The list is keyed on the INDEX, never on the message. Svelte 5 throws `each_key_duplicate`
+    // on a repeated key in BOTH its dev and production branches, and these rows are plain
+    // validator strings, so keying on the string itself would turn a duplicated message into a
+    // crash of the whole route. They are distinct today only because `validateCurrencyProfile`
+    // happens to return `[...new Set(errors)]`, an unpinned detail of a file this surface does
+    // not own. (Unkeyed is not on the table: `svelte/require-each-key` fails `lint:svelte`.)
+    const repeated = 'Currency unit "Gold" is missing an actor data path.';
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: [repeated, repeated]
+    });
+
+    const errors = [...root.querySelectorAll('[data-world-currency-validation-error]')].map(
+      (item) => item.textContent.trim()
+    );
+    assert.deepEqual(errors, [repeated, repeated], 'both rows render, and neither one throws');
+  });
+
+  it('keeps the live region in the DOM while it has nothing to say', async () => {
+    // The whole point of the wrapper. A live region inserted in the same tick as its content is
+    // not announced, so rendering the element that carries `aria-live` conditionally would
+    // announce nothing at the one moment that matters — the strategy switch that breaks the
+    // currency profile. The region outlives its content; only the note inside it comes and goes.
+    const healthy = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
+
+    const region = healthy.querySelector('[data-world-currency-validation]');
+    assert.ok(region, 'the region is present with no errors to report');
+    assert.equal(region.getAttribute('role'), 'status');
+    assert.equal(region.getAttribute('aria-live'), 'polite');
+    assertNoElement(
+      healthy,
+      '[data-world-currency-validation-note]',
+      'but it says nothing while the currency profile is sound'
+    );
+
+    harness.remount();
+    const broken = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+    const spoken = broken.querySelector('[data-world-currency-validation]');
+    assert.ok(
+      spoken.querySelector('[data-world-currency-validation-note]'),
+      'and the note appears INSIDE the region rather than beside it'
+    );
+  });
+
+  it('hides the silent region with the shipped visually-hidden utility, not a margin hack', async () => {
+    // A permanently mounted live region has to be a REAL hidden element while it is silent, or it
+    // leaves a phantom row in the section's gapped flex column. `.visually-hidden`
+    // (`styles/fabricate.css`, under `.fabricate-manager`) is the shipped utility for exactly
+    // that, and it is the one the reorder announcer at the top of this same component already
+    // uses; it clips the element out of flow while leaving it in the accessibility tree.
+    //
+    // This asserts the CLASS, never a computed style: happy-dom cannot compute the cascade, so a
+    // `getComputedStyle` assertion here would pass against a stylesheet that was never loaded.
+    const silent = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
+    const hidden = silent.querySelector('[data-world-currency-validation]');
+    assert.equal(
+      hidden.classList.contains('visually-hidden'),
+      true,
+      'the silent region is hidden, not collapsed by a negative margin'
+    );
+
+    harness.remount();
+    const speaking = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+    const shown = speaking.querySelector('[data-world-currency-validation]');
+    assert.equal(
+      shown.classList.contains('visually-hidden'),
+      false,
+      'and it becomes visible the moment it has something to report'
+    );
+  });
+
+  it('says nothing at all to a GM who has authored no coins yet', async () => {
+    // `validateCurrencyProfile([])` reports "No currency units are configured." — true, but not a
+    // mistake. The route already greets a fresh world with a friendly empty state, and stacking an
+    // error on top of it tells a new GM they are wrong for having done nothing yet.
+    const root = await harness.mount({
+      currencyUnits: [],
+      currencyValidationErrors: ['No currency units are configured.']
+    });
+
+    assert.ok(
+      root.querySelector('[data-world-currency-validation]'),
+      'the region is still present, so a later report is still announceable'
+    );
+    assertNoElement(
+      root,
+      '[data-world-currency-validation-note]',
+      'an empty currency profile is not an error the GM has made'
+    );
+  });
+
+  it('wears the warning tone alone, never composed with the neutral callout class', async () => {
+    // `manager-environment-comp-callout` is later in the sheet at equal specificity and overrides
+    // the amber warning tone with a neutral accent. The sibling callouts on this page compose the
+    // two deliberately; this one must not, because it is the only one that reports a fault.
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+
+    const note = root.querySelector('[data-world-currency-validation-note]');
+    assert.equal(note.classList.contains('manager-currency-subunit-warning'), true);
+    assert.equal(
+      note.classList.contains('manager-environment-comp-callout'),
+      false,
+      'composing the neutral callout class would repaint the warning as an accent'
+    );
+    assert.equal(note.getAttribute('role'), 'note');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3) — the note has to be true of the screen it appears on.
+//
+// The published `currency-macro` frame shows this note above FIVE perfectly healthy units,
+// reporting two errors that are not about any unit at all: a missing "can afford" macro and
+// a missing "decrement" one. `validateCurrencyProfile` raises at least four non-unit-scoped
+// errors, so "these currency units can't be spent yet" and "fix the units below" named the
+// wrong thing and pointed the wrong way — the problems are listed ABOVE the sentence.
+//
+// `game.i18n` is backed by the real `lang/en.json` here, so these are assertions on the
+// shipped copy rather than on the component's inline fallbacks.
+// ---------------------------------------------------------------------------
+
+describe('WorldCurrencyTab validation copy (issue 1493)', () => {
+  let restoreI18n = () => {};
+
+  before(async () => {
+    await harness.setup();
+    restoreI18n = installLangBackedI18n(repoRoot);
+  });
+  after(() => {
+    restoreI18n();
+    harness.teardown();
+  });
+  afterEach(harness.remount);
+
+  const MACRO_ERRORS = [
+    'A "can afford" currency macro is required for macro spending.',
+    'A "decrement" currency macro is required for macro spending.'
+  ];
+
+  async function mountWithMacroErrors() {
+    return harness.mount({ currencyUnits: UNITS, currencyValidationErrors: MACRO_ERRORS });
+  }
+
+  it('blames the currency, not the units, when no unit is at fault', async () => {
+    const root = await mountWithMacroErrors();
+    const copy = root.querySelector('.currency-validation-copy');
+
+    assert.equal(copy.querySelector('strong').textContent.trim(), "Currency can't be spent yet");
+    assert.ok(
+      !/units/i.test(copy.querySelector('strong').textContent),
+      'the five units on this page are healthy; the missing macros are the fault'
+    );
+  });
+
+  it('points at the problems it actually sits below', async () => {
+    const root = await mountWithMacroErrors();
+    const copy = root.querySelector('.currency-validation-copy');
+
+    assert.deepEqual(
+      [...copy.children].map((child) => child.tagName),
+      ['STRONG', 'UL', 'SPAN'],
+      'the list is between the title and the hint, so "listed above" is literally true'
+    );
+    assert.equal(
+      copy.querySelector('span').textContent.trim(),
+      "Crafting can't price or spend currency until you fix the problems listed above." +
+        ' Each spend strategy needs different things from your setup, so switching it can' +
+        ' raise new ones. Saving still works.'
+    );
+    assert.ok(
+      !/below/i.test(copy.querySelector('span').textContent),
+      'nothing to fix sits below this sentence'
+    );
+  });
+
+  // The one lang<->fallback mirror this change keeps: `WorldCurrencyTab` predates the
+  // decision to drop these shims and uses `text(key, fallback)` throughout, so unwinding it
+  // here would leave the file half-converted. Guarded instead, because a fallback that
+  // drifts from the shipped copy silently changes the wording rather than degrading to it —
+  // which is exactly what this revision found: both fallbacks still held the OLD sentences.
+  it('keeps its validation fallbacks byte-identical to the shipped copy', () => {
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'),
+      'utf8'
+    );
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const shipped = lang.FABRICATE.Admin.Manager.CurrencyUnits;
+
+    for (const leaf of ['ValidationTitle', 'ValidationHint']) {
+      const key = `FABRICATE.Admin.Manager.CurrencyUnits.${leaf}`;
+      const pattern = new RegExp(
+        `text\\(\\s*'${key.replace(/\./g, '\\.')}',\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\)`
+      );
+      const found = source.match(pattern);
+      assert.ok(found, `${leaf} must be read through its key with a string fallback`);
+      assert.equal(
+        JSON.parse(found[1]),
+        shipped[leaf],
+        `the ${leaf} fallback must read exactly what lang/en.json ships`
+      );
+    }
   });
 });

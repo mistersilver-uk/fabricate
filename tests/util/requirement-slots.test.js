@@ -58,6 +58,22 @@ function essenceState(overrides = {}) {
   };
 }
 
+function currencyState(overrides = {}) {
+  return {
+    groupId: 'g-coin',
+    name: '100 gp',
+    description: '100 gp',
+    img: 'icons/svg/coins.svg',
+    need: 100,
+    have: 0,
+    satisfied: true,
+    isCurrency: true,
+    affordable: true,
+    issue: '',
+    ...overrides,
+  };
+}
+
 describe('buildRequirementSlots', () => {
   it('keys every slot to its group and marks only choice/essence slots interactive', () => {
     const slots = buildRequirementSlots({
@@ -144,6 +160,48 @@ describe('buildRequirementSlots', () => {
 
   it('returns an empty list for a null craftability', () => {
     assert.deepEqual(buildRequirementSlots(null), []);
+  });
+
+  // Issue 1493. The projection is a closed allowlist, so a field it does not name is
+  // dropped — and `isCurrency` is what tells the rail to omit the pip and to announce
+  // the slot without a have/need ratio.
+  it('projects a currency requirement as such, and every other slot as not currency', () => {
+    const slots = buildRequirementSlots({
+      ingredientStates: [fixedState(), currencyState(), essenceState()],
+    });
+    assert.deepEqual(
+      slots.map((slot) => slot.isCurrency),
+      [false, true, false]
+    );
+  });
+
+  it('projects the world currency configuration reason, defaulting to an empty string', () => {
+    const [withIssue, without] = buildRequirementSlots({
+      ingredientStates: [
+        currencyState({ issue: 'Currency configuration is invalid: no ladder.', satisfied: false }),
+        fixedState(),
+      ],
+    });
+    assert.equal(withIssue.issue, 'Currency configuration is invalid: no ladder.');
+    assert.equal(without.issue, '', 'a slot with no reason carries the empty string, never undefined');
+  });
+
+  // A currency slot is binary by construction — `satisfied` IS the affordability verdict
+  // — so the fixed branch's `satisfied ? met : short` is already the right answer and the
+  // numbers are never consulted. Asserted because the omitted pip means nothing else on
+  // the surface would notice if the state stopped tracking affordability.
+  it('states a currency slot from its affordability verdict, not from its numbers', () => {
+    assert.equal(
+      buildRequirementSlots({ ingredientStates: [currencyState()] })[0].state,
+      SLOT_STATE.MET,
+      'affordable is met even though have (0) is below need (100)'
+    );
+    assert.equal(
+      buildRequirementSlots({
+        ingredientStates: [currencyState({ satisfied: false, affordable: false })],
+      })[0].state,
+      SLOT_STATE.SHORT
+    );
   });
 });
 
@@ -390,5 +448,56 @@ describe('suggestChoiceOverrides', () => {
   it('suggests nothing for a craftability offering no choices', () => {
     assert.deepEqual(suggestChoiceOverrides({ ingredientChoices: [] }), {});
     assert.deepEqual(suggestChoiceOverrides(null), {});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2) — a currency PLAN ROW carries the discriminator the panel
+// branches on. The row keeps its place (a currency cost IS spent by the craft) but its
+// `quantity` is the price and its `owned` is the evaluation's placeholder, so the panel
+// rendered "100 gp … You own 0 … ×100" — a balance nobody measured beside a restatement
+// of the price the name already spells out.
+// ---------------------------------------------------------------------------
+
+describe('buildConsumptionPlan currency rows (issue 1493)', () => {
+  // The module-level `currencyState()` factory, NOT a second literal shadowing it: a
+  // block-scoped copy of the same fixture drifts silently from the one every other test in
+  // this file asserts against, and a reader has no way to tell which one a failure came
+  // from.
+  it('keeps the currency row in the plan and marks it as currency', () => {
+    const { rows } = buildConsumptionPlan({
+      ingredientStates: [fixedState(), currencyState({ img: 'icons/coin.webp' })],
+    });
+
+    assert.deepEqual(
+      rows.map((row) => [row.name, row.isCurrency]),
+      [
+        ['Spring Water', false],
+        ['100 gp', true],
+      ],
+      'the currency cost is spent, so it stays — flagged, not filtered'
+    );
+  });
+
+  it('marks an essence carrier row as not-currency', () => {
+    const { rows } = buildConsumptionPlan({
+      ingredientStates: [],
+      essencePool: {
+        requirements: [{ essenceId: 'fire', name: 'Fire', icon: null, colorToken: null }],
+        carriers: [
+          {
+            itemKey: 'ember',
+            name: 'Ember',
+            img: null,
+            allocatedUnits: 2,
+            ownedUnits: 3,
+            perUnit: { fire: 1 },
+          },
+        ],
+      },
+    });
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].isCurrency, false, 'a pool carrier is an item, never a coin');
   });
 });
