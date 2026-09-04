@@ -270,19 +270,25 @@ describe('the delete note refuses while any system holds rules', () => {
   });
 });
 
-describe('the catalogue row states its two reach counts and its one flag', () => {
-  // AC-6's pure half: the flag is answered by the MEMBERSHIP COUNT, so an implementation that
-  // inverted it would state `Unused` on every adopted component.
-  it('flags a component no system holds', () => {
+describe('the catalogue row states its two reach counts as a value over a label', () => {
+  // AC-6's pure half. The `Unused` FLAG this block used to assert is gone with r8's row rebuild
+  // (gap-list rows 14 and 16): the reference's row has one flag slot and puts `Broken link` in
+  // it, and `Unused` restated the `0/3` the systems column now prints two centimetres away. The
+  // membership arithmetic it was the only cover for is asserted here instead, in the column that
+  // carries it — an inverted implementation still reds.
+  it('states the membership fraction for a component no system holds', () => {
     const row = componentRowStats({ membershipCount: 0, recipeCount: 0 }, 3, phrase);
-    assert.equal(row.flag, 'Unused');
-    assert.equal(row.stats.find((stat) => stat.id === 'systems').text, '0/3 systems');
+    const systems = row.stats.find((stat) => stat.id === 'systems');
+    assert.equal(systems.value, '0/3');
+    assert.equal(systems.label, 'Systems');
   });
 
-  it('and states no flag for one two systems hold', () => {
+  it('and counts both reaches for one two systems hold', () => {
     const row = componentRowStats({ membershipCount: 2, recipeCount: 4 }, 3, phrase);
-    assert.equal(row.flag, '');
-    assert.equal(row.stats.find((stat) => stat.id === 'recipes').text, '4 recipes');
+    assert.equal(row.stats.find((stat) => stat.id === 'systems').value, '2/3');
+    const recipes = row.stats.find((stat) => stat.id === 'recipes');
+    assert.equal(recipes.value, '4');
+    assert.equal(recipes.label, 'Recipes');
   });
 });
 

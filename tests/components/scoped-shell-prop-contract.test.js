@@ -114,6 +114,17 @@ const CATALOGUE_PROPS = [
   'onOpenSystemRules',
   'onSelect',
   'openEntryLabel',
+  // ── THE FOUR ISSUE 1371 r8-cat PARITY SWITCHES ─────────────────────────────────────────────
+  // Every one is OPT-IN and defaults to what the essence and tool catalogues already render.
+  // `openEntryLabelled` splits "what is this action called" from "is it drawn with its name on
+  // it", which shipped as one question — so a lane could not title a 28px pen `Open catalogue
+  // entry` without also getting a 104px labelled control. `rowNameTrailing` puts a lane's inert
+  // pills on the NAME LINE, where the reference's row draws its source pill and its exception
+  // flag. `rowSourceBadge` withholds the frame's own presence badge for a lane that draws a
+  // richer source answer itself, so one row never carries two answers to one question.
+  // `splitToolbar` draws the reference's TWO toolbar rows, leaving the filter row — the row the
+  // selection band joins — where it is.
+  'openEntryLabelled',
   'restingHint',
   'restingTitle',
   // The zero-member roster's sentence (issue 1371). Threaded through to `SystemRulesRoster` and
@@ -121,7 +132,9 @@ const CATALOGUE_PROPS = [
   // a lane whose rows can legitimately belong to no system at all names one.
   'rosterEmptyNote',
   'rowMeta',
+  'rowNameTrailing',
   'rowSecondLine',
+  'rowSourceBadge',
   'rowTrailing',
   'scope',
   'searchOf',
@@ -133,6 +146,7 @@ const CATALOGUE_PROPS = [
   'showWorldDefaults',
   'selectedId',
   'sorts',
+  'splitToolbar',
   'subtitle',
   'systemRowAction',
   'systems',
@@ -226,19 +240,26 @@ describe('the shells declare the pinned prop sets', () => {
       'onOpenEntry',
       'onOpenSystemRules',
       'openEntryLabel',
+      // AND THE FOUR issue 1371 r8-cat SWITCHES, catalogue-only for the reason the rest are: three
+      // describe a ROW the rules-list shell draws differently, and `splitToolbar` splits a toolbar
+      // whose second row is the world catalogue's membership filter.
+      'openEntryLabelled',
       'restingHint',
       'restingTitle',
       // AND THE ZERO-MEMBER ROSTER SENTENCE (issue 1371), catalogue-only for the same reason as
       // `systemRowAction` above: it is the INSPECTOR's roster that would otherwise draw one dead
       // link per system in the world, and the rules-list shell has no inspector to draw it in.
       'rosterEmptyNote',
+      'rowNameTrailing',
       'rowSecondLine',
+      'rowSourceBadge',
       'rowTrailing',
       'searchPlaceholder',
       'sectionIcons',
       'sectionTitles',
       'selectAllLabel',
       'showWorldDefaults',
+      'splitToolbar',
       'systemRowAction',
     ]);
   });

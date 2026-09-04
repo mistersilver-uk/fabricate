@@ -30,6 +30,8 @@
  * `shared with -1 other systems`. Both sentences here clamp at zero and both pluralise.
  */
 
+import { paginateRows } from '../../../../../utils/browserPagination.js';
+
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
 
 /**
@@ -123,11 +125,18 @@ export function componentAliasNote(entry, phrase) {
 }
 
 /**
- * The `Global tags` card's closing note: how far this world record reaches.
+ * The `Global tags` card's closing note: where the value LIVES, and how many rule sets exist.
  *
- * `{n}` is the RULE-SET count — the number of systems that have rules for the component — because
- * that is the set the world values are inherited by. A count over every system in the world would
- * be a bigger number that is true of nothing.
+ * IT NO LONGER SAYS `Inherited by all {n} rule sets` (issue 1371, r8 reviewer 5 item 4). The tag
+ * merge is not consumed: the read union re-derives identity from the in-system record and `tags`
+ * is not a section, so a world tag reaches no system's resolved answer today. A note asserting
+ * inheritance was therefore the false half of the merge, which `ui-integration/spec.md`'s
+ * `### GM World Component Screens` forbids any surface from stating while it is unconsumed.
+ *
+ * Both halves of what is left are checkable on the screen the note is on: the tags are set on the
+ * WORLD record — this card is that record — and `{n}` is the RULE-SET count, the number of systems
+ * that have rules for the component. A count over every system in the world would be a bigger
+ * number that is true of nothing.
  *
  * @param {object|null} entry
  * @param {(key: string, fallback: string, data?: object) => string} phrase
@@ -139,7 +148,9 @@ export function componentGlobalTagNote(entry, phrase) {
     members === 1
       ? 'FABRICATE.Admin.Manager.Scoped.Component.GlobalTagNoteOne'
       : 'FABRICATE.Admin.Manager.Scoped.Component.GlobalTagNote',
-    members === 1 ? 'Inherited by {count} rule set' : 'Inherited by all {count} rule sets',
+    members === 1
+      ? 'Set on the world record. {count} rule set holds this component.'
+      : 'Set on the world record. {count} rule sets hold this component.',
     { count: members }
   );
 }
@@ -159,6 +170,10 @@ export function componentSourceFilters(phrase) {
     {
       id: 'source-type',
       label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterSource', 'Source item'),
+      // BESIDE THE SEARCH FIELD (`proto:578`), which is the frame's default row anyway; it is
+      // stated because the membership descriptor below states the other one, and a pair of
+      // descriptors where only one answers the question reads as an oversight.
+      toolbarRow: 'lead',
       options: [
         {
           value: 'all',
@@ -197,43 +212,59 @@ function nameOf(entry) {
 /**
  * The catalogue's ONE lane sort: linked records before unlinked ones.
  *
- * ONE descriptor, with no `-desc` twin, and that is a decision rather than an omission. The
- * shell's direction control is a TOGGLE that inerts against any lane sort id, so a `-desc` twin
- * would be a second select standing beside a greyed toggle. Name, and the system-count sort, are
- * the frame's own and are not restated here.
+ * A REVERSIBLE PAIR SHARING ONE OPTION (issue 1371, gap-list row 11). It shipped as one
+ * descriptor and therefore as one whole order, which left the frame's direction toggle greyed
+ * whenever this sort was chosen — the reference pairs all three of its sort keys with a live
+ * direction control (`proto:581`-`584`). The frame composes `${key}-${direction}` for any key it
+ * does not hold a descriptor for, so declaring the two ids and naming the shared `optionId` is
+ * the whole of it: the select offers one `Source item` entry and the toggle resolves to a real
+ * descriptor in both positions. Name, and the system-count sort, are the frame's own and are not
+ * restated here.
  *
  * @param {(key: string, fallback: string, data?: object) => string} phrase
  * @returns {Array<{id: string, label: string, compare: (left: object, right: object) => number}>}
  */
 export function componentSorts(phrase) {
+  const label = phrase('FABRICATE.Admin.Manager.Scoped.Component.SortSource', 'Source item');
+  /**
+   * Linked before unlinked, or the reverse, with the NAME tie-break running in the same
+   * direction either way — so reversing the sort key does not also shuffle equal rows.
+   *
+   * @param {number} direction `1` for linked-first, `-1` for unlinked-first.
+   * @returns {(left: object, right: object) => number}
+   */
+  const bySource = (direction) => (left, right) => {
+    const order =
+      (Number(right?.hasSourceLink === true) - Number(left?.hasSourceLink === true)) * direction;
+    if (order !== 0) return order;
+    return nameOf(left).localeCompare(nameOf(right));
+  };
   return [
-    {
-      id: 'source-type',
-      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.SortSource', 'Source item'),
-      compare: (left, right) => {
-        const order = Number(right?.hasSourceLink === true) - Number(left?.hasSourceLink === true);
-        if (order !== 0) return order;
-        return nameOf(left).localeCompare(nameOf(right));
-      },
-    },
+    { id: 'source-type-asc', optionId: 'source-type', label, compare: bySource(1) },
+    { id: 'source-type-desc', optionId: 'source-type', label, compare: bySource(-1) },
   ];
 }
 
 /**
- * The row's two reach stats and its one flag.
+ * The row's two reach stats, as a VALUE over a LABEL rather than as a sentence.
  *
- * BOTH STATS ARE MUTED TEXT rather than chips, and that follows the shipped tool row's stated
- * rule: a chip on that row says what the entity DOES, and both of these say how far it REACHES,
- * which is a different kind of fact. The component row has nothing in the first category at all —
- * no category chip and no tag run — so it draws no chip.
+ * TWO COLUMNS, WHICH IS A DIFFERENT CLAIM FROM TWO PHRASES (issue 1371, gap-list row 16). The row
+ * read `8 recipes 2/6 systems` as muted body text inside the identity button; the reference draws
+ * two right-aligned columns, each a mono numeral over an 8px uppercase micro-label
+ * (`proto:606`-`608`). A column of numerals is scannable down the list and a run of sentences is
+ * not, which is the whole reason the reference spends the row width on it.
  *
- * The `Systems` phrase is the shipped shared one, so two world catalogues cannot word one reach
- * two ways; only the `Recipes` count is this lane's.
+ * Both are still REACH facts rather than behaviour facts, so neither is a chip: a chip beside a
+ * name reads as something the entity DOES, and a component's behaviour is a membership fact that
+ * belongs to no world row at all.
+ *
+ * The `Systems` VALUE is the shipped shared fraction phrase, so two world catalogues cannot word
+ * one reach two ways; the labels are this lane's.
  *
  * @param {object|null} entry
  * @param {number} systemCount the world's crafting-system roster size.
  * @param {(key: string, fallback: string, data?: object) => string} phrase
- * @returns {{stats: Array<{id: string, text: string}>, flag: string}}
+ * @returns {{stats: Array<{id: string, value: string, label: string}>}}
  */
 export function componentRowStats(entry, systemCount, phrase) {
   const members = componentMemberCount(entry);
@@ -242,30 +273,161 @@ export function componentRowStats(entry, systemCount, phrase) {
     stats: [
       {
         id: 'recipes',
-        text: phrase(
-          recipes === 1
-            ? 'FABRICATE.Admin.Manager.Scoped.Component.RecipeCountOne'
-            : 'FABRICATE.Admin.Manager.Scoped.Component.RecipeCount',
-          recipes === 1 ? '{count} recipe' : '{count} recipes',
-          { count: recipes }
-        ),
+        value: String(recipes),
+        label: phrase('FABRICATE.Admin.Manager.Scoped.Component.RecipeStatLabel', 'Recipes'),
       },
       {
         id: 'systems',
-        text: phrase(
-          'FABRICATE.Admin.Manager.Scoped.Component.MemberFraction',
-          '{members}/{systems} systems',
-          { members, systems: Number(systemCount) || 0 }
-        ),
+        value: phrase('FABRICATE.Admin.Manager.Scoped.Component.MemberRatio', '{members}/{systems}', {
+          members,
+          systems: Number(systemCount) || 0,
+        }),
+        label: phrase('FABRICATE.Admin.Manager.Scoped.Component.SystemStatLabel', 'Systems'),
       },
     ],
-    // NOT `Broken link`. That flag would need a resolution answer, which the projection does not
-    // hold; `Unused` is answered exactly by the membership count.
-    flag:
-      members === 0
-        ? phrase('FABRICATE.Admin.Manager.Scoped.Component.FlagUnused', 'Unused')
-        : '',
   };
+}
+
+/**
+ * WHAT KIND OF SOURCE the row's pill names, in the two words the reference puts on it.
+ *
+ * `componentSourceLine` answers the INSPECTOR's sentence — `Linked Foundry item` — and this
+ * answers the ROW's pill, which sits after the name inside a 999px chip and has room for two
+ * words (`proto:601`). Same three states, read off the same uuid shape, so the two can only
+ * disagree about wording and never about the record.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+export function componentSourceType(entry, text) {
+  const uuid = String(
+    entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || ''
+  ).trim();
+  if (!uuid || entry?.hasSourceLink !== true) {
+    return text('FABRICATE.Admin.Manager.Scoped.Component.SourceNone', 'No source item');
+  }
+  if (uuid.startsWith('Compendium.')) {
+    return text('FABRICATE.Admin.Manager.Scoped.Component.SourceTypePack', 'Compendium');
+  }
+  return text('FABRICATE.Admin.Manager.Scoped.Component.SourceTypeWorld', 'Foundry item');
+}
+
+/**
+ * Does this record's source link DANGLE — a world address naming an Item the world no longer has?
+ *
+ * ── WHY THIS IS ANSWERABLE HERE AND NOT IN THE PROJECTION ─────────────────────────────────────
+ * `hasSourceLink` answers PRESENCE and deliberately never resolution: the projection holds no
+ * document roster and must not reach for one. The catalogue PAGE does hold one — `worldItems`,
+ * the game-world Item roster it already carries for the create zone and for a row whose world
+ * record has no description of its own — so resolution is answerable exactly where the roster is.
+ *
+ * ── AND WHY A COMPENDIUM ADDRESS IS NEVER REPORTED BROKEN ─────────────────────────────────────
+ * `worldItems` is the WORLD's items. A `Compendium.<scope>.<pack>.Item.<id>` address is not in it
+ * and never will be, so testing one against the roster would flag every pack-linked component as
+ * dangling — a false alarm on the majority of a module-shipped corpus. Only a world address is
+ * checkable from here, so only a world address is checked; a pack address answers `false`, which
+ * is "not known to be broken" rather than "known to be sound", and the row says nothing about it.
+ *
+ * @param {object|null} entry
+ * @param {Array<{uuid?: string}>} worldItems the game-world Item roster.
+ * @returns {boolean}
+ */
+export function componentSourceBroken(entry, worldItems) {
+  const roster = Array.isArray(worldItems) ? worldItems : [];
+  // AN EMPTY ROSTER IS "NOT KNOWN", NEVER "ALL BROKEN". A call site whose Item roster has not
+  // been extended to this route hands over `[]` — the defect the page's own `worldItems` note
+  // records against the tool screens — and testing every address against an empty list would
+  // flag EVERY linked component on the screen at once. The loudest possible false alarm is
+  // exactly the failure a resolution answer must not have, so no roster means no claim.
+  if (roster.length === 0) return false;
+  if (entry?.hasSourceLink !== true) return false;
+  const uuid = String(
+    entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || ''
+  ).trim();
+  if (!uuid || uuid.startsWith('Compendium.')) return false;
+  return !roster.some((item) => item?.uuid === uuid);
+}
+
+/**
+ * The catalogue's SYSTEM-RELATIVE membership filter, as a lane descriptor.
+ *
+ * ── FOUR OPTIONS, AND WHY THEY ARE THE LANE'S RATHER THAN THE FRAME'S ─────────────────────────
+ * `proto:578`-`586` draws `Any system` / `Has rules in {system}` / `No rules in {system}` /
+ * `In no system at all`. The frame's own membership vocabulary is one of two closed sets — a
+ * world catalogue's `all|member|unused` or a system list's `all|in|out` — and this is neither: it
+ * is the union, asked on a world catalogue that nonetheless has a system in scope, because the
+ * rail shows one selected at all times. Adding a third vocabulary to the shared model would make
+ * every scoped list carry a case it can never reach, so the four options are a lane FILTER, which
+ * is the seam the frame already publishes for exactly this.
+ *
+ * ── THE SYSTEM-RELATIVE PAIR IS WITHHELD WHEN NO SYSTEM IS IN SCOPE ───────────────────────────
+ * `Has rules in ` with nothing after it is worse than an absent option, and a predicate keyed on
+ * an empty id would match nothing and read as a corpus of zero.
+ *
+ * @param {{systemId: string, systemName: string}} addressed the rail's selected system.
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {Array<object>}
+ */
+export function componentMembershipScopeFilter({ systemId, systemName }, phrase) {
+  const addressed = String(systemId ?? '').trim();
+  const named = String(systemName ?? '').trim() || addressed;
+  const memberOf = (entry) =>
+    (Array.isArray(entry?.systems) ? entry.systems : []).some(
+      (row) => String(row?.systemId ?? '') === addressed && row?.member === true
+    );
+  const options = [
+    {
+      value: 'all',
+      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.MembershipAny', 'Any system'),
+    },
+    ...(addressed
+      ? [
+          {
+            value: 'in',
+            label: phrase(
+              'FABRICATE.Admin.Manager.Scoped.Component.MembershipIn',
+              'Has rules in {system}',
+              { system: named }
+            ),
+          },
+          {
+            value: 'out',
+            label: phrase(
+              'FABRICATE.Admin.Manager.Scoped.Component.MembershipOut',
+              'No rules in {system}',
+              { system: named }
+            ),
+          },
+        ]
+      : []),
+    {
+      value: 'orphan',
+      label: phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.MembershipOrphan',
+        'In no system at all'
+      ),
+    },
+  ];
+  const label = phrase('FABRICATE.Admin.Manager.Scoped.Component.MembershipLabel', 'Membership');
+  return [
+    {
+      id: 'membership',
+      label,
+      // THE REFERENCE LABELS THIS ONE VISIBLY (`proto:579`) and the source select not at all, so
+      // the micro-label is a per-descriptor answer rather than a rule about lane filters.
+      microLabel: label,
+      toolbarRow: 'filters',
+      options,
+      matches: (entry, value) => {
+        if (value === 'orphan') return componentMemberCount(entry) === 0;
+        if (!addressed) return true;
+        if (value === 'in') return memberOf(entry);
+        if (value === 'out') return !memberOf(entry);
+        return true;
+      },
+    },
+  ];
 }
 
 /**
@@ -789,6 +951,11 @@ export function componentBulkMembershipModes(phrase) {
     {
       id: 'add',
       action: 'addToSystem',
+      // THE DIRECTIONAL GLYPHS ARE THE MODEL'S (issue 1371, gap-list row 42). `proto:622`-`623`
+      // leads each segment with an arrow INTO or OUT OF a bracket, and the direction is the one
+      // thing about this control that must survive a monochrome render: `Add to` and `Remove
+      // from` are one click apart and destructive in one of them.
+      icon: 'fas fa-arrow-right-to-bracket',
       label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkAddTo', 'Add to'),
       note: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkAddNote',
@@ -798,6 +965,7 @@ export function componentBulkMembershipModes(phrase) {
     {
       id: 'remove',
       action: 'removeFromSystem',
+      icon: 'fas fa-arrow-right-from-bracket',
       label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveFrom', 'Remove from'),
       note: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveNote',
@@ -825,6 +993,123 @@ export function componentBulkWriteCount({ selected, systems, category, tags }) {
   const rows = Number(selected) || 0;
   const systemCount = Number(systems) || 0;
   return rows * systemCount + (category ? rows : 0) + (tags ? rows : 0);
+}
+
+/**
+ * The bulk dock's primary label, which NAMES THE WRITE rather than counting edits.
+ *
+ * `design-system/spec.md:415` requires a bulk commit action to name the number of records it
+ * writes to, and `Apply 2 changes` names neither the records nor the verb — two GMs reading it
+ * cannot tell "add these to two systems" from "set a category and a tag". The reference words the
+ * unstaged state as an instruction (`Pick systems to add 1 component to`, `proto:685`) and the
+ * staged one as the write itself, which is what this returns.
+ *
+ * FLAT, WITH EARLY RETURNS, on purpose: one branch per staged shape and no nesting, so the
+ * function stays inside the cognitive-complexity budget while every shape is a readable line.
+ *
+ * @param {{count: number, mode: string, systems: number, category: boolean, tags: boolean,
+ *   writes: number}} staged
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentBulkApplyLabel(
+  { count, mode, systems, category, tags, writes },
+  phrase
+) {
+  const selected = Number(count) || 0;
+  const systemCount = Number(systems) || 0;
+  const membership = systemCount > 0 && (mode === 'add' || mode === 'remove');
+  if (!membership && !category && !tags) {
+    if (mode === 'add' || mode === 'remove') {
+      return phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyPickSystems',
+        'Pick systems to {verb} {count} components',
+        {
+          count: selected,
+          verb: phrase(
+            mode === 'add'
+              ? 'FABRICATE.Admin.Manager.Scoped.Component.BulkVerbAdd'
+              : 'FABRICATE.Admin.Manager.Scoped.Component.BulkVerbRemove',
+            mode === 'add' ? 'add' : 'remove'
+          ),
+        }
+      );
+    }
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyIdle',
+      'Stage a change to write it to {count} components',
+      { count: selected }
+    );
+  }
+  if (membership && !category && !tags) {
+    return phrase(
+      mode === 'add'
+        ? 'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyAdd'
+        : 'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyRemove',
+      mode === 'add'
+        ? 'Add {count} components to {systems} systems'
+        : 'Remove {count} components from {systems} systems',
+      { count: selected, systems: systemCount }
+    );
+  }
+  if (!membership && category && !tags) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyCategory',
+      'Set the world category on {count} components',
+      { count: selected }
+    );
+  }
+  if (!membership && !category && tags) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyTags',
+      'Update world tags on {count} components',
+      { count: selected }
+    );
+  }
+  return phrase(
+    'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyMixed',
+    'Write {writes} records across {count} components',
+    { writes: Number(writes) || 0, count: selected }
+  );
+}
+
+/**
+ * One staging inset's visible page: the rows that survive its search, windowed.
+ *
+ * SHARED BY ALL THREE INSETS (`proto:628`-`697` draws the same object three times), so the
+ * search predicate, the window size and the range sentence cannot drift between systems,
+ * categories and tags. `paginateRows` owns the arithmetic and the clamp; this owns only the
+ * search and the words.
+ *
+ * @param {Array<{id: string, name: string}>} items
+ * @param {{query: string, pageIndex: number, pageSize?: number}} view
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
+ *   range: string, pageLabel: string}}
+ */
+export function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }, phrase) {
+  const needle = String(query ?? '')
+    .trim()
+    .toLowerCase();
+  const matched = (Array.isArray(items) ? items : []).filter(
+    (item) => !needle || String(item?.name ?? '').toLowerCase().includes(needle)
+  );
+  const page = paginateRows(matched, { pageIndex, pageSize }, pageSize);
+  return {
+    rows: page.rows,
+    pageIndex: page.pageIndex,
+    pageCount: page.pageCount,
+    total: matched.length,
+    range: phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerRange',
+      'Showing {start}-{end} of {total}',
+      { start: page.rangeStart, end: page.rangeEnd, total: matched.length }
+    ),
+    pageLabel: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkPickerPage', 'Page {page}/{of}', {
+      page: page.pageIndex + 1,
+      of: page.pageCount,
+    }),
+  };
 }
 
 // ── THE WORLD CATALOGUE ENTRY'S OWN MODEL (issue 1371, maintainer parity round 4) ─────────────

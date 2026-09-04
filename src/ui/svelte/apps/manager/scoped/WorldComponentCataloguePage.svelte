@@ -36,17 +36,22 @@
   import Chip from '../Chip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
+  import StatusPill from '../../../components/StatusPill.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
     authoredWorldComponentCategories,
     componentAliasNote,
     componentGlobalTagNote,
+    componentMembershipScopeFilter,
     componentRowStats,
     componentSearchText,
     componentSorts,
+    componentSourceBroken,
     componentSourceFilters,
     componentSourceLine,
+    componentSourceType,
     componentWorldCategoryNote,
   } from './componentScoped.js';
 
@@ -54,6 +59,13 @@
     scope = null,
     actions = null,
     systems = [],
+    // ── THE SYSTEM THE RAIL HAS SELECTED (issue 1371 r8-cat) ────────────────────────────────
+    // A world catalogue DOES have a system in scope: the rail shows one selected at all times,
+    // and the root already threads it to this page inside `componentScopeProps`. It is what the
+    // membership filter's four options interpolate — `Has rules in Karrun Forgecraft` is a
+    // sentence about a system, and the option is meaningless without one. `''` withholds the two
+    // system-relative options rather than printing a half sentence; see the descriptor's note.
+    systemId = '',
     // THE GAME-WORLD ITEM ROSTER, for the create zone's resolution and for a row whose world
     // record carries no description of its own. Passed by the call site, which also extends the
     // roster's own gate to this route — a `worldItems` handed over without that extension is an
@@ -85,6 +97,11 @@
   // a snapshot taken before the other's writes.
   let bulkApplying = $state(false);
 
+  // AN IN-FLIGHT BULK DELETE, held apart from `bulkApplying` because the two put DIFFERENT
+  // controls into a busy state: an Apply in flight must not spin the danger button, and a delete
+  // in flight must not read as a staged write landing.
+  let bulkDeleting = $state(false);
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -110,8 +127,43 @@
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
   const selectedEntry = $derived(entries.find((entry) => entry.id === selectedId) ?? null);
   const systemCount = $derived(Array.isArray(systems) ? systems.length : 0);
-  const filters = $derived(componentSourceFilters(phrase));
+  const addressedSystemName = $derived(
+    String(
+      (Array.isArray(systems) ? systems : []).find(
+        (system) => String(system?.id ?? '') === String(systemId ?? '')
+      )?.name ?? ''
+    )
+  );
+  const filters = $derived([
+    ...componentSourceFilters(phrase),
+    ...componentMembershipScopeFilter({ systemId, systemName: addressedSystemName }, phrase),
+  ]);
   const sorts = $derived(componentSorts(phrase));
+
+  // ── THE ITEMS THIS WORLD HOLDS THAT ARE NOT YET COMPONENTS ───────────────────────────────
+  // The `Register item` action's option list. It is the roster MINUS what the catalogue already
+  // holds, because offering an Item that is already a component leads only to the "already a
+  // component, so this opened it instead" notice — an action whose whole outcome is an
+  // explanation of why it did nothing.
+  const registeredSourceUuids = $derived(
+    new Set(
+      entries
+        .map((entry) =>
+          String(entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || '').trim()
+        )
+        .filter(Boolean)
+    )
+  );
+  const registerableItems = $derived(
+    (Array.isArray(worldItems) ? worldItems : [])
+      .filter((item) => item?.uuid && !registeredSourceUuids.has(String(item.uuid)))
+      .map((item) => ({
+        id: String(item.uuid),
+        dataId: String(item.uuid),
+        label: String(item.name ?? item.uuid),
+        icon: 'fas fa-cube',
+      }))
+  );
   const categoryOptions = $derived(authoredWorldComponentCategories(scope));
   // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. There is no world tag
   // roster to read: the World Vocabulary store that will publish one is PR 7's. The union of what
@@ -233,6 +285,35 @@
     }
     clearSelection();
   }
+
+  /**
+   * Delete every ticked component, then drop the selection.
+   *
+   * SEQUENTIAL FOR THE REASON `applyBulk` RECORDS, and more sharply: `deleteEntity` is a
+   * read-modify-write of the whole world component payload that also sweeps every membership
+   * record naming the entity, so two overlapping deletes would each write a snapshot taken before
+   * the other's sweep and one of the two entities would come back.
+   *
+   * The selection is cleared on the way out because the rows it names no longer exist; the frame
+   * prunes ids that leave the filtered set, and this makes that pruning immediate rather than a
+   * consequence the GM watches happen.
+   *
+   * @param {string[]} entityIds the ticked rows, in list order.
+   * @param {() => void} clearSelection the frame's own selection reset.
+   * @returns {Promise<void>}
+   */
+  async function deleteBulk(entityIds, clearSelection) {
+    if (bulkDeleting || bulkApplying) return;
+    bulkDeleting = true;
+    try {
+      for (const entityId of entityIds) {
+        await actions?.deleteEntity?.(entityId);
+      }
+    } finally {
+      bulkDeleting = false;
+    }
+    clearSelection();
+  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-components" aria-label={catalogueTitle}>
@@ -244,7 +325,7 @@
     title={catalogueTitle}
     subtitle={text(
       'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle',
-      'One record per component, shared by every system that has rules for it.'
+      "One component per source item — identity only. Crafting behaviour lives in each system's own component rules."
     )}
     icon={PAGE_ICON}
     emptyTitle={text('FABRICATE.Admin.Manager.Scoped.Component.EmptyTitle', 'No components yet')}
@@ -268,7 +349,7 @@
     selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Component.SelectAllShort', 'All')}
     searchPlaceholder={text(
       'FABRICATE.Admin.Manager.Scoped.Component.SearchPlaceholder',
-      'Search components…'
+      'Search catalogue by name or source item…'
     )}
     inspectorBody={componentInspectorBody}
     inspectorFoot={componentInspectorFoot}
@@ -285,8 +366,14 @@
       'FABRICATE.Admin.Manager.Scoped.Component.SelectHint',
       'Choose a component to inspect where it is used.'
     )}
-    openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Component.RowOpenEntry', 'Edit component')}
-    rowSecondLine="meta"
+    openEntryLabel={text(
+      'FABRICATE.Admin.Manager.Scoped.Component.RowOpenEntry',
+      'Open catalogue entry'
+    )}
+    openEntryLabelled={false}
+    rowSecondLine="description"
+    rowSourceBadge={false}
+    splitToolbar
     systemRowAction="navigate"
     rosterEmptyNote={text(
       'FABRICATE.Admin.Manager.Scoped.Component.RosterEmpty',
@@ -298,7 +385,8 @@
     onSelect={(entityId) => (selectedId = entityId)}
     {onOpenEntry}
     {onOpenSystemRules}
-    {rowMeta}
+    rowNameTrailing={componentRowNameTrailing}
+    rowTrailing={componentRowStatColumns}
   />
 </main>
 
@@ -311,18 +399,66 @@
   second zone at the scope that creates the record, not a move.
 -->
 {#snippet componentCreateZone()}
-  <ItemDropZone
-    kind="component-create"
-    title={text(
-      'FABRICATE.Admin.Manager.Scoped.Component.CreateDropTitle',
-      'Drag an Item here to make it a component'
-    )}
-    hint={text(
-      'FABRICATE.Admin.Manager.Scoped.Component.CreateDropHint',
-      'Drop an Item from the Items directory or a compendium.'
-    )}
-    onDrop={onCreateFromItemDrop}
-  />
+  <div class="manager-world-component-register">
+    <ItemDropZone
+      kind="component-create"
+      title={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.CreateDropTitle',
+        'Drag an Item here to make it a component'
+      )}
+      hint={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.CreateDropHint',
+        'Drop an Item from the Items directory or a compendium.'
+      )}
+      onDrop={onCreateFromItemDrop}
+    />
+    <!--
+      THE HEADER ACTION, BUILT BESIDE THE DROP ZONE (M10).
+
+      `proto:570` pins `+ Register item` to the header band's trailing edge; M10 rules it is built
+      beside the world-scope drop zone M2 added, which is the surface that already creates a
+      component. Both make the same record, so they stand together rather than one of them being
+      an alias for the other a screen apart.
+
+      IT IS A PICKER, NOT A BARE BUTTON, and the prototype's own handler is why: `d.onStub` does
+      nothing at all, so there is no reference behaviour to copy and a button that opens nothing
+      would be the dead affordance this file already refuses for the vocabulary exit. The roster
+      it picks from is `worldItems`, which this page holds for the drop zone's resolution, minus
+      what the catalogue already registers; choosing one composes the SAME payload a sidebar drag
+      emits and hands it to the SAME resolver, so a registration cannot take a second path with a
+      second set of refusals. `SearchablePopover` is the shipped chooser — the bulk panel's own
+      pickers are it — so no second one is built here.
+    -->
+    <SearchablePopover
+      options={registerableItems}
+      pickerClass="fab-world-component-register-picker"
+      triggerClass="manager-button manager-world-component-register-action"
+      triggerIcon="fas fa-plus"
+      triggerLabel={text('FABRICATE.Admin.Manager.Scoped.Component.RegisterItem', 'Register item')}
+      triggerAriaLabel={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.RegisterItem',
+        'Register item'
+      )}
+      triggerData={{ 'data-scoped-list-register-item': '' }}
+      dialogAriaLabel={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.RegisterItem',
+        'Register item'
+      )}
+      searchPlaceholder={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.RegisterSearch',
+        'Search world items…'
+      )}
+      searchAriaLabel={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.RegisterSearch',
+        'Search world items…'
+      )}
+      emptyHint={text(
+        'FABRICATE.Admin.Manager.Scoped.Component.RegisterEmpty',
+        'Every Item in this world is already a component. Drop one from a compendium to add another.'
+      )}
+      onChoose={(uuid) => onCreateFromItemDrop({ type: 'Item', uuid })}
+    />
+  </div>
 {/snippet}
 
 {#snippet componentBulkEdit(selectedIds, ctx)}
@@ -332,8 +468,12 @@
     {categoryOptions}
     {tagOptions}
     applying={bulkApplying}
+    deleting={bulkDeleting}
     onClearSelection={() => ctx?.clearSelection?.()}
     onApply={(staged) => applyBulk(selectedIds, staged, () => ctx?.clearSelection?.())}
+    onDelete={actions?.deleteEntity
+      ? () => deleteBulk(selectedIds, () => ctx?.clearSelection?.())
+      : null}
   />
 {/snippet}
 
@@ -460,29 +600,71 @@
 {/snippet}
 
 <!--
-  THE ROW'S SECOND LINE. Both stats are MUTED TEXT with the numeral in the mono face and
-  `tabular-nums`, never chips: see the header for why a reach count is not a chip, and
-  `ui-integration/spec.md` for why every manager numeral is tabular.
+  THE NAME LINE'S TWO PILLS (issue 1371, gap-list rows 13 and 14).
 
-  It renders INSIDE the identity `<button>` (`rowSecondLine="meta"`), so nothing here may be
-  interactive — a `<button>` inside a `<button>` is invalid DOM the browser silently reparents.
+  `proto:601` draws `[name] [🔗 {source}] [flag]` on ONE line. Both pills were elsewhere: the
+  source was the frame's own presence badge in the trailing column, and the exception flag was on
+  the row's second line inside the meta run. Neither placement is the reference's, and the source
+  pill in particular said something different — the frame's badge answers "does this record name
+  an Item at all", where the reference's pill names WHICH KIND of address it is.
+
+  It renders INSIDE the identity `<button>`, so nothing here may be interactive: `StatusPill` is
+  a `<span>`, which is why it is the primitive used rather than a chip button.
 -->
-{#snippet rowMeta(entry)}
+{#snippet componentRowNameTrailing(entry)}
+  {@const linked = entry?.hasSourceLink === true}
+  {@const broken = componentSourceBroken(entry, worldItems)}
+  <span class="manager-world-component-row-source" data-world-component-row-source-pill={entry.id}>
+    <StatusPill
+      tone={linked ? 'subtle' : 'warning'}
+      icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}
+      label={componentSourceType(entry, text)}
+    />
+  </span>
+  {#if broken}
+    <!--
+      THE ONE EXCEPTION FLAG THE REFERENCE PUTS IN THIS SLOT. It replaces the `Unused` flag that
+      used to sit on the second line: `Unused` restated the `0/{n}` the systems column now prints
+      a few centimetres to the right, and a dangling link is the fact NOTHING else on the row can
+      state. `componentSourceBroken`'s own note records why only a world address is checkable.
+    -->
+    <span class="manager-world-component-row-flag" data-world-component-row-flag={entry.id}>
+      <StatusPill
+        tone="warning"
+        icon="fas fa-link-slash"
+        label={text('FABRICATE.Admin.Manager.Scoped.Component.FlagBrokenLink', 'Broken link')}
+      />
+    </span>
+  {/if}
+{/snippet}
+
+<!--
+  THE TRAILING STAT CLUSTER (issue 1371, gap-list row 16).
+
+  `proto:606`-`608`: two right-aligned 60px-minimum columns, each a mono numeral over an 8px
+  uppercase micro-label. It shipped as `8 recipes 2/6 systems` in muted body text INSIDE the
+  identity button, which is a sentence rather than a column — unscannable down a list, and it
+  spent the identity cell's width on facts that belong at the row's trailing edge.
+
+  It renders through `rowTrailing` rather than `rowMeta` because the row's second line is now the
+  DESCRIPTION, which is what the reference draws there; `rowMeta` would put these back under the
+  name. Nothing in it is interactive, so it sits happily in the trailing column beside the pen.
+-->
+{#snippet componentRowStatColumns(entry)}
   {@const row = componentRowStats(entry, systemCount, phrase)}
-  <span class="manager-world-component-row-meta" data-world-component-row-meta={entry.id}>
+  <span class="manager-world-component-row-stats" data-world-component-row-meta={entry.id}>
     {#each row.stats as stat (stat.id)}
-      <span class="manager-world-component-row-stat" data-world-component-row-stat={stat.id}
-        >{stat.text}</span
-      >
+      <span class="manager-world-component-row-stat" data-world-component-row-stat={stat.id}>
+        <span
+          class="manager-world-component-row-stat-value"
+          data-world-component-row-stat-value={stat.id}>{stat.value}</span
+        >
+        <span
+          class="manager-world-component-row-stat-label"
+          data-world-component-row-stat-label={stat.id}>{stat.label}</span
+        >
+      </span>
     {/each}
-    {#if row.flag}
-      <!-- A PILL, NOT BARE TEXT (issue 1371, round 2). The reference draws this as a chip on the
-           recessive surface, and painted as unbordered uppercase in the disabled ink it was the
-           least legible thing on the row — the one exception flag reading as noise. The DISABLED
-           INK was right and is what `neutral` keeps; only the missing pill is added, through the
-           manager's one chip rather than a second pill shape. -->
-      <Chip tone="neutral" data-world-component-row-flag={entry.id}>{row.flag}</Chip>
-    {/if}
   </span>
 {/snippet}
 
@@ -493,23 +675,68 @@
      rows are written by the frame, so a page-scoped rule carries this page's hash and never
      matches them. That block is appended to the host sheet, as both sibling lanes did. */
 
-  .manager-world-component-row-meta {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
+  /* ── THE LIST'S FIRST ELEMENT AND THE ACTION BESIDE IT (M10) ─────────────────────────────
+     The drop zone takes the slack and the action keeps its intrinsic width, so a narrow column
+     shrinks the prompt rather than ellipsising the verb. `align-items: center` puts a 38px
+     control on the zone's own centre line rather than on its first text baseline. */
+  .manager-world-component-register {
+    display: flex;
     gap: var(--fab-space-2);
+    align-items: center;
     min-width: 0;
   }
 
-  /* A muted count rather than a chip: nothing on this row says what the component DOES, so a pill
-     here would read as a property of the component instead of its reach. The numerals are mono
-     and tabular, which is what stops a column of counts jittering as the list re-sorts. */
+  .manager-world-component-register > :global(.manager-item-drop-zone) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* ── THE ROW'S TWO STAT COLUMNS (`proto:606`-`608`) ──────────────────────────────────────
+     Right-aligned and 60px at minimum, so the numerals line up down the list whatever their
+     width — which is the whole reason the reference spends row width on a column rather than on
+     a sentence. `tabular-nums` is what stops them jittering as the list re-sorts. */
+  .manager-world-component-row-stats {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    min-width: 0;
+  }
+
   .manager-world-component-row-stat {
-    color: var(--fab-text-muted);
+    display: flex;
+    flex-direction: column;
+    min-width: 60px;
+    text-align: right;
+  }
+
+  .manager-world-component-row-stat-value {
+    color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
-    font-size: 0.6rem;
+    /* 500, WHICH IS THE ONLY WEIGHT THE FACE SHIPS. `design-system/spec.md:230-231` publishes
+       the mono family at 400 and 500 only, so the reference's `font:700 12px var(--mono)` snaps
+       here exactly as the control-height ladder snaps 32 and 36 to 34. */
+    font-weight: 500;
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
+    line-height: 1.2;
     white-space: nowrap;
+  }
+
+  .manager-world-component-row-stat-label {
+    color: var(--fab-text-subtle);
+    font-size: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* The name line's two pills keep their intrinsic width; the NAME is what ellipsises. */
+  .manager-world-component-row-source,
+  .manager-world-component-row-flag {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
   }
 
   .manager-world-component-inspector {
@@ -553,7 +780,7 @@
      inside a word because a uuid has no spaces and a 300px column has no room for one. */
   .manager-world-component-inspector-uuid {
     margin: 0;
-    color: var(--fab-text-2);
+    color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-weight: 500;
     font-size: 0.63rem;

@@ -26002,3 +26002,184 @@
   > .manager-editor-tabs {
   margin-bottom: var(--fab-space-1);
 }
+
+/* ── issue 1371 r8-cat: THE WORLD COMPONENT CATALOGUE'S REBUILT LIST AND INSPECTOR ────────────
+   An APPENDED BLOCK. No rule above is edited: every selector below either names markup this
+   revision introduced or re-states a route-scoped value LATER in this file than the rule it
+   supersedes, at equal or greater specificity, which is the arbitration the two sibling world
+   catalogues' own blocks already use.
+
+   IT IS IN THIS SHEET RATHER THAN IN A PAGE'S `<style>` for the reason the route block above
+   records: the rows, the inspector identity block and the toolbar are written by
+   `EntityListInspectorFrame` and by primitives it composes, so a page-scoped rule carries the
+   PAGE's `svelte-<hash>` and never matches them. */
+
+/* ── THE ROW IS A FILLED CARD (gap-list rows 18-20) ──────────────────────────────────────────
+   `proto:598` fills every row `--bg1` on a 9px corner with an 11px column gap. The route block
+   above FLATTENED the row to transparent, which was this screen's own earlier reading of the
+   reference and is the value the r4 audit measures as drift; the fill is restored here.
+
+   RADIUS 9 rather than the shared 8: `design-system/spec.md:218` puts rows and wells on 9 and 8
+   is on no rung at all, so this is a ladder correction as well as a parity one.
+
+   THE GAP SNAPS. The reference draws 11px and the published 4px scale has no such step, so it
+   lands on `--fab-space-3` (12px) — the same class of recorded deviation as the control-height
+   ladder snapping 32 and 36 to 34. The row's PADDING is left where it is: the r4 audit's own
+   classification puts `cat-row.padding` 11 against 10 in the 4px-scale band. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row {
+  gap: var(--fab-space-3);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* HOVER AND THE INSPECTED STATE, RESTATED ONE RUNG UP. With the row's resting fill restored,
+   the route block's hover and selection values above are now the SAME colour as rest, so a
+   hovered row and a chosen row would be indistinguishable from an idle one. Each is stated on
+   its own line so the joined-selector guard in `manager-layout.test.js` reads the route
+   attribute as travelling with it.
+
+   BOTH ARE QUALIFIED BY THE SCROLLER, `.manager-scoped-list-rows`, and that is mechanical
+   rather than decorative: stylelint's `no-duplicate-selectors` refuses a second block under a
+   selector this file already writes, and the route block above writes both of these. The
+   scroller is the row list's own parent in every state the frame renders, so the reach is
+   identical and the arbitration is the added class plus source order. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row.is-selected {
+  background: var(--fab-surface-soft);
+}
+
+/* ── THE TOOLBAR AND THE ROWS SHARE THEIR INLINE EDGES (r8 GATES alignment
+   `catalogue-list-rows`) ─────────────────────────────────────────────────────────────────────
+   `proto:576` pads the toolbar `14px 20px 0` and `proto:597` pads the row scroller
+   `2px 20px 18px`, so the filter line and every row beneath it start and end together. The
+   subject padded only the TOOLBAR — `.manager-toolbar` carries `--fab-space-3` — and left the
+   scroller flush, so the filter row sat 12px inside the rows on the left and the rows ran 12px
+   past it on the right.
+
+   NOTHING ANY ROW MEASURES MOVES, which is exactly why the alignment pass exists and the
+   region pass could not see it: every row's own box, type and fill were already right, and the
+   whole column was drawn 12px out of line with the bar above it.
+
+   THE ROWS TAKE THE TOOLBAR'S INSET rather than the toolbar losing its own: the toolbar's
+   padding is `ManagerToolbar`'s, shared with every manager browse screen, and this is a scroller
+   with no declared padding at all — `EntityListInspectorFrame`'s scoped block sets its flex,
+   overflow and scroll behaviour and no box. A layered rule here therefore wins uncontested,
+   which is not true the other way round.
+
+   INLINE ONLY. The block padding is the list's own rhythm and the alignment group states
+   nothing about it. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows {
+  padding-inline: var(--fab-space-3);
+}
+
+/* ── THE ROW'S OPEN CONTROL IS A 28px PEN (gap-list row 17) ──────────────────────────────────
+   `proto:609` draws a 28x28 square on a 7px corner, titled `Open catalogue entry`. The shared
+   `.manager-icon-button` is 34px on a 6px corner; 28 is a rung and 7 is the radius the ladder
+   gives a 26-32px control, so both values are on the published scale. The pager's own icon
+   buttons already take exactly this treatment one block up, which is the precedent. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row .manager-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: 0 0 28px;
+}
+
+/* ── THE TOOLBAR COUNT AND THE MEMBERSHIP LABEL (gap-list rows 5 and 9) ──────────────────────
+   `proto:586` writes the count at 11px/500 and `proto:579` writes the micro-label at 8.5px on
+   0.09em of tracking. Only the count's WEIGHT is stated here, and the omission is deliberate:
+   `EntityListInspectorFrame`'s scoped block declares `.manager-scoped-list-count`'s font-size and
+   is injected UNLAYERED, so a size stated in this layered sheet would match, be overridden and
+   never be used — the silent loss the selection band's note above records at length. The
+   residual is 10.88px against 11px, which is a tenth of a pixel. The label carries no such
+   competitor: `.manager-micro-label` is authored in this same sheet. */
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-count] {
+  font-weight: 500;
+}
+
+.fabricate-manager[data-manager-view='world-components']
+  [data-scoped-list-filter-label='membership'] {
+  font-size: 0.531rem;
+  letter-spacing: 0.09em;
+}
+
+/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ───────────────────────────────────────
+   `proto:578` and `proto:583` ink every toolbar select `--text2` at weight 500, where the shared
+   scoped-list rule inks them `--fab-text` at the inherited 400 — so the two filters and the sort
+   key read at the same weight as the row names below them. The FILL stays as it is: an opaque
+   select is library-forced and pinned by `manager-layout.test.js`. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-toolbar select {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* ── THE INSPECTOR'S IDENTITY TYPE (UX F4, gap-list rows 25-26) ──────────────────────────────
+   `proto:641`-`642`: a 9.5px kicker over a 16px/600 serif name. The shipped values are 8.5px and
+   21.6px/700, so the name is drawn a third larger than the reference's and the kicker a step
+   smaller — the pair the r4 log has reported unchanged since round 4. No rung governs type size,
+   so these are the reference's own numbers.
+
+   SCOPED TO THIS ROUTE, because `.manager-kicker` and `.manager-inspector-name` are shared
+   classes that every manager inspector wears; the essence and tool catalogues keep theirs. */
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-inspector-kicker] {
+  font-size: 0.594rem;
+
+  /* `proto:641` tracks it 0.1em; the shared kicker tracks 0.11em, which at 9.5px is a fifth of a
+     pixel wider per letter and is the only remaining line on this region. */
+  letter-spacing: 0.1em;
+}
+
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-inspector-name] {
+  font-family: var(--fab-font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ── THE `Register item` ACTION (gap-list row 1, M10) ────────────────────────────────────────
+   `proto:570` draws it 38px tall on a 9px corner in the success family with `--on-accent` ink.
+   38 IS A RUNG (`design-system/spec.md:215-216`) and 9 is the radius the ladder gives 34-38, so
+   both values are the published ones rather than the reference's own being copied past the
+   ladder.
+
+   IT IS AUTHORED HERE because `SearchablePopover` renders the trigger in its OWN template, so
+   the page's scoped block carries a hash this element never wears — the same mechanism the
+   selection band's note records one block up. */
+.fabricate-manager .manager-button.manager-world-component-register-action {
+  flex: 0 0 auto;
+  height: 38px;
+  min-height: 38px;
+
+  /* `proto:570` writes the label at 12.5px/700; the shared manager button inherits the
+     application's 14px, which is a step larger than every other control on the band. */
+  font-size: 0.78rem;
+
+  /* AND THE VERB HOLDS ONE LINE. It stands beside a drop zone that takes the column's slack, so
+     without this the two words wrap and the 38px control grows to 54px — measured in the lab. */
+  white-space: nowrap;
+  border-radius: 9px;
+  border-color: var(--fab-success-border);
+  background: var(--fab-success);
+  color: var(--fab-on-success);
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-button.manager-world-component-register-action:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-strong);
+  color: var(--fab-on-success);
+}
+
+/* ── THE BULK PANEL'S STAGED COUNT IS A NUMERAL (gap-list row 46) ────────────────────────────
+   `proto:629` writes each group's staged count in the MONO face beside its label, which is what
+   distinguishes it from the sentence-shaped hints the same slot carries elsewhere in the manager.
+   `BulkEditSection` owns that element, so the rule is authored here and scoped to this panel;
+   the Component, Recipe and Essence Studios' own sections are untouched.
+
+   The face ships 400 and 500 only (`design-system/spec.md:230-231`), so the reference's 600
+   lands on 500. */
+.fabricate-manager [data-world-component-bulk-panel] .fab-bulk-edit-hint {
+  font-family: var(--fab-font-mono);
+  font-weight: 500;
+}

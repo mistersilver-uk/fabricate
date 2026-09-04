@@ -75,14 +75,32 @@ describe('world Component Catalogue (issue 1371)', () => {
     harness.teardown();
   });
 
-  describe('the row states its source link and its reach', () => {
-    // AC-6.
-    it('flags the record with NO source Item and says nothing about the ones that have one', async () => {
-      const target = await harness.mount({
+  // THE GAME-WORLD ITEM ROSTER, which is what makes a DANGLING link answerable at all. It holds
+  // `ingot`'s address and not `coal`'s or `resin`'s, so the corpus carries both halves of the
+  // question: one record whose world address resolves and two whose do not.
+  const WORLD_ITEMS = Object.freeze([
+    Object.freeze({
+      uuid: 'Item.ingot-source',
+      name: 'Iron Ingot',
+      description: 'A bar of worked iron, straight from the Item.',
+    }),
+    Object.freeze({ uuid: 'Item.spare-source', name: 'Spare Bar', description: 'Unregistered.' }),
+  ]);
+
+  describe('the row is the reference row: pills on the name line, columns at the edge', () => {
+    async function mountRows(props = {}) {
+      return harness.mount({
         scope: scopeFor(),
         systems: COMPONENT_SYSTEMS,
         actions: {},
+        worldItems: WORLD_ITEMS,
+        ...props,
       });
+    }
+
+    // AC-6 / gap-list row 13.
+    it('names the KIND of source on every row, where the frame drew only a presence badge', async () => {
+      const target = await mountRows();
 
       // THE ROW COUNT FIRST, so no answer below is an empty match dressed as a pass.
       assert.equal(
@@ -91,54 +109,285 @@ describe('world Component Catalogue (issue 1371)', () => {
         'every record in the corpus renders a row'
       );
 
-      const orphan = target.querySelector(
-        '[data-scoped-list-row="orphan"] [data-scoped-list-source]'
+      assert.equal(
+        target
+          .querySelector('[data-scoped-list-row="ingot"] [data-world-component-row-source-pill]')
+          .textContent.trim(),
+        'Foundry item',
+        'a world address names the kind of address it is, not merely that there is one'
       );
-      assert.ok(Boolean(orphan), 'the record naming no Item IS flagged');
-      assert.equal(orphan.getAttribute('data-scoped-list-source'), 'unlinked');
+      assert.equal(
+        target
+          .querySelector('[data-scoped-list-row="orphan"] [data-world-component-row-source-pill]')
+          .textContent.trim(),
+        'No source item',
+        'and the record naming nothing says so in the same slot'
+      );
       assert.ok(
-        !target.querySelector('[data-scoped-list-row="ingot"] [data-scoped-list-source]'),
-        'and a linked row states no badge: being linked is what a component here is'
+        !target.querySelector('[data-scoped-list-source]'),
+        "the frame's own trailing Linked/No source badge is withheld: one row may not carry two " +
+          'answers to one question'
       );
     });
 
-    it('flags the component NO system has, and not the one two systems hold', async () => {
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: {},
-      });
-
+    // Gap-list row 14.
+    it('flags the DANGLING link, and only where the roster proves it dangles', async () => {
+      const target = await mountRows();
       assert.ok(
-        Boolean(target.querySelector('[data-world-component-row-flag="resin"]')),
-        'a component with zero membership records is Unused'
+        Boolean(target.querySelector('[data-world-component-row-flag="coal"]')),
+        'a world address the Item roster does not hold is flagged'
       );
       assert.ok(
         !target.querySelector('[data-world-component-row-flag="ingot"]'),
-        'and one two systems hold is not — an inverted flag passes any presence-only check'
+        'and one it does hold is not — an inverted answer passes any presence-only check'
+      );
+      assert.match(
+        target.querySelector('[data-world-component-row-flag="coal"]').textContent,
+        /Broken link/
+      );
+      assert.ok(
+        Boolean(
+          target
+            .querySelector('[data-scoped-list-row="coal"] [data-scoped-list-inspect]')
+            .contains(target.querySelector('[data-world-component-row-flag="coal"]'))
+        ),
+        'and it sits on the NAME LINE, inside the identity cell, not on a second row below it'
       );
     });
 
-    it('states BOTH reach counts as text, never as a chip', async () => {
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: {},
-      });
-      const meta = target.querySelector('[data-world-component-row-meta="ingot"]');
-      assert.ok(Boolean(meta), 'the row renders its meta run');
+    it('claims nothing at all when the Item roster was never handed over', async () => {
+      // THE LOUDEST POSSIBLE FALSE ALARM. A call site that does not extend its roster to this
+      // route passes `[]`, and testing every address against an empty list would flag EVERY
+      // linked component on the screen at once.
+      const target = await mountRows({ worldItems: [] });
       assert.equal(
-        meta.querySelector('[data-world-component-row-stat="systems"]').textContent.trim(),
-        '2/2 systems'
+        target.querySelectorAll('[data-world-component-row-flag]').length,
+        0,
+        'no roster means no claim, in either direction'
+      );
+    });
+
+    // Gap-list row 16.
+    it('states both reach counts as a VALUE over a LABEL, in two columns', async () => {
+      const target = await mountRows();
+      const meta = target.querySelector('[data-world-component-row-meta="ingot"]');
+      assert.ok(Boolean(meta), 'the row renders its stat cluster');
+      assert.equal(
+        meta.querySelector('[data-world-component-row-stat-value="systems"]').textContent.trim(),
+        '2/2'
+      );
+      assert.equal(
+        meta.querySelector('[data-world-component-row-stat-label="systems"]').textContent.trim(),
+        'Systems'
+      );
+      assert.equal(
+        meta.querySelector('[data-world-component-row-stat-value="recipes"]').textContent.trim(),
+        '0'
       );
       assert.ok(
         !meta.querySelector('.manager-chip'),
         'a reach count set as a chip reads as a third property of the component'
       );
+      assert.ok(
+        !target
+          .querySelector('[data-scoped-list-row="ingot"] [data-scoped-list-inspect]')
+          .contains(meta),
+        'and the cluster is at the row TRAILING EDGE, not inside the identity cell'
+      );
+    });
+
+    // Gap-list row 15.
+    it('gives the second line to the DESCRIPTION, resolving it from the linked Item', async () => {
+      const target = await mountRows();
+      assert.match(
+        target.querySelector('[data-scoped-list-row="ingot"] .manager-system-description')
+          .textContent,
+        /A bar of worked iron/
+      );
+    });
+
+    // Gap-list row 17.
+    it('opens the entry from a 28px pen that NAMES the screen it opens', async () => {
+      const opened = [];
+      const target = await mountRows({ onOpenEntry: (id) => opened.push(id) });
+      const pen = target.querySelector(
+        '[data-scoped-list-row="ingot"] [data-scoped-list-action="open-entry"]'
+      );
+      assert.ok(Boolean(pen), 'the row carries the action at all');
+      assert.equal(pen.getAttribute('title'), 'Open catalogue entry');
+      assert.ok(
+        Boolean(pen.querySelector('i.fa-pen')),
+        'and it is the icon control, not the 104px labelled button that shipped'
+      );
+      assert.equal(
+        pen.textContent.trim(),
+        '',
+        'a labelled button would print its verb; the reference draws a bare pen with a title'
+      );
+      pen.click();
+      await drain();
+      assert.deepEqual(opened, ['ingot']);
     });
   });
 
-  describe('the Unused flag is a PILL, and the zero-member inspector offers no dead links', () => {
+  describe('the toolbar is two rows, and the second one filters by MEMBERSHIP', () => {
+    async function mountToolbar(props = {}) {
+      return harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        systemId: 'sys-forge',
+        ...props,
+      });
+    }
+
+    // Gap-list rows 5 and 6.
+    it('offers the four system-relative options, naming the system the rail has selected', async () => {
+      const target = await mountToolbar();
+      assert.equal(
+        target.querySelector('[data-scoped-list-filter-label="membership"]').textContent.trim(),
+        'Membership',
+        'the label is VISIBLE, not an invisible accessible name'
+      );
+      const select = target.querySelector('[data-scoped-list-filter="membership"]');
+      assert.deepEqual(
+        [...select.options].map((option) => option.textContent.trim()),
+        ['Any system', 'Has rules in Forge', 'No rules in Forge', 'In no system at all'],
+        'and the two system-relative options interpolate the selected system'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-list-search]').getAttribute('placeholder'),
+        'Search catalogue by name or source item…'
+      );
+    });
+
+    it('withholds the system-relative pair when no system is in scope', async () => {
+      // `Has rules in ` with nothing after it is worse than an absent option, and a predicate
+      // keyed on an empty id would match nothing and read as a corpus of zero.
+      const target = await mountToolbar({ systemId: '' });
+      assert.deepEqual(
+        [...target.querySelector('[data-scoped-list-filter="membership"]').options].map((option) =>
+          option.value
+        ),
+        ['all', 'orphan']
+      );
+    });
+
+    it('actually narrows the list, in both directions', async () => {
+      const target = await mountToolbar();
+      const select = target.querySelector('[data-scoped-list-filter="membership"]');
+      const rows = () =>
+        [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+          row.getAttribute('data-scoped-list-row')
+        );
+      assert.equal(rows().length, 4, 'unfiltered first, so the narrowing below is a real change');
+
+      select.value = 'in';
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      assert.deepEqual(rows().sort(), ['coal', 'ingot', 'orphan'], 'the three Forge holds');
+
+      select.value = 'orphan';
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      assert.deepEqual(rows(), ['resin'], 'and the one no system holds at all');
+    });
+
+    it('puts the search field in its own row above the filter row', async () => {
+      // `proto:576`-`586` is TWO rows: search and the source select above, membership, the sort
+      // pair and the count below. A single row is what the frame draws for every other caller.
+      const target = await mountToolbar();
+      const lead = target.querySelector('[data-scoped-list-search-row]');
+      assert.ok(Boolean(lead), 'the lead row exists');
+      assert.ok(
+        Boolean(lead.querySelector('[data-scoped-list-search]')),
+        'and holds the search field'
+      );
+      assert.ok(
+        Boolean(lead.querySelector('[data-scoped-list-filter="source-type"]')),
+        'and the source select beside it'
+      );
+      assert.ok(
+        !lead.querySelector('[data-scoped-list-filter="membership"]'),
+        'while membership stays on the filter row with the sort pair'
+      );
+    });
+
+    it('leaves the sort DIRECTION live against the source-item sort', async () => {
+      // Gap-list row 11. A lane sort shipped as one descriptor and therefore as one whole order,
+      // which inerted the toggle: `source-type-asc` did not exist and nothing said so.
+      const target = await mountToolbar();
+      const sort = target.querySelector('[data-scoped-list-sort]');
+      sort.value = 'source-type';
+      sort.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      const direction = target.querySelector('[data-scoped-list-direction]');
+      assert.equal(direction.disabled, false, 'the toggle is live');
+
+      const names = () =>
+        [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+          row.getAttribute('data-scoped-list-row')
+        );
+      const ascending = names();
+      assert.equal(ascending[0] !== 'orphan', true, 'linked records lead the ascending order');
+      direction.click();
+      await drain();
+      assert.equal(names()[0], 'orphan', 'and the unlinked one leads once reversed');
+    });
+  });
+
+  describe('the list opens with the surface that MAKES a component', () => {
+    async function mountLead(props = {}) {
+      return harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        ...props,
+      });
+    }
+
+    // Gap-list row 1 / M10.
+    it('draws `Register item` beside the drop zone, offering only unregistered Items', async () => {
+      const target = await mountLead();
+      const action = target.querySelector('[data-scoped-list-register-item]');
+      assert.ok(Boolean(action), 'the header action is built');
+      assert.match(action.textContent, /Register item/);
+      assert.ok(
+        Boolean(target.querySelector('[data-item-drop-zone="component-create"]')),
+        'and M2\'s drop zone stands beside it rather than being replaced by it'
+      );
+
+      action.click();
+      await drain();
+      const options = [...target.querySelectorAll('[data-popover-option]')].map((option) =>
+        option.getAttribute('data-popover-option')
+      );
+      assert.deepEqual(
+        options,
+        ['Item.spare-source'],
+        'the Item already registered as `ingot` is not offered: choosing it could only report ' +
+          'that it did nothing'
+      );
+    });
+
+    it('hands the chosen Item to the SAME resolver a sidebar drag reaches', async () => {
+      const drops = [];
+      const target = await mountLead({ onCreateFromItemDrop: (data) => drops.push(data) });
+      target.querySelector('[data-scoped-list-register-item]').click();
+      await drain();
+      target.querySelector('[data-popover-option="Item.spare-source"]').click();
+      await drain();
+      assert.deepEqual(
+        drops,
+        [{ type: 'Item', uuid: 'Item.spare-source' }],
+        'a registration cannot take a second path with a second set of refusals'
+      );
+    });
+  });
+
+  describe('the zero-member inspector offers no dead links', () => {
     async function mount() {
       return harness.mount({ scope: scopeFor(), systems: COMPONENT_SYSTEMS, actions: {} });
     }
@@ -148,19 +397,6 @@ describe('world Component Catalogue (issue 1371)', () => {
       target.querySelector(`[data-scoped-list-inspect="${entityId}"]`).click();
       await drain();
     }
-
-    it('renders the flag as a chip rather than as bare uppercase text', async () => {
-      // G.2 / UX F11. The reference draws this as a pill on the recessive surface. Painted as
-      // unbordered uppercase in the disabled ink it was the least legible thing on the row — the
-      // one EXCEPTION on it reading as the least important thing on it.
-      const target = await mount();
-      const flag = target.querySelector('[data-world-component-row-flag="resin"]');
-      assert.ok(Boolean(flag), 'the unused row is still flagged');
-      assert.ok(
-        flag.classList.contains('manager-chip'),
-        `the flag is the manager's one chip; it rendered as "${flag.className}"`
-      );
-    });
 
     it('replaces a zero-member roster with a sentence, not six dead links', async () => {
       // G.1 / UX F10. Under `systemRowAction="navigate"` every roster row is a live `Rules ↗`,
@@ -319,10 +555,17 @@ describe('world Component Catalogue (issue 1371)', () => {
         chip.getAttribute('data-world-component-global-tag')
       );
       assert.deepEqual(chips, ['fuel', 'bulk']);
-      assert.match(
-        card.querySelector('[data-world-component-tag-note="coal"]').textContent,
-        /Inherited by 1 rule set/,
-        'and the note counts RULE SETS, not systems in the world'
+      // R8 REVIEWER 5 ITEM 4. It read `Inherited by 1 rule set`, which asserts the FALSE half of
+      // the tag merge: the read union re-derives identity from the in-system record and `tags` is
+      // not a section, so a world tag reaches no system's resolved answer today. What is left is
+      // checkable on the card itself.
+      const note = card.querySelector('[data-world-component-tag-note="coal"]').textContent;
+      assert.match(note, /Set on the world record/);
+      assert.match(note, /1 rule set/, 'and it still counts RULE SETS, not systems in the world');
+      assert.doesNotMatch(
+        note,
+        /inherit|merge/i,
+        'no surface may assert the unconsumed half of the tag merge'
       );
     });
 
@@ -438,14 +681,56 @@ describe('world Component Catalogue (issue 1371)', () => {
      * @returns {Promise<void>}
      */
     async function applyMembership(target, mode, systemId) {
-      target.querySelector(`[data-world-component-bulk-mode-option="${mode}"]`).click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-system-trigger]').click();
-      await drain();
-      target.querySelector(`[data-popover-option="${systemId}"]`).click();
-      await drain();
+      await stageMembership(target, mode, systemId);
       target.querySelector('[data-world-component-bulk-apply]').click();
       await drain();
+    }
+
+    /**
+     * Stage one membership instruction without applying it: pick the mode, tick the system.
+     *
+     * The staging is separate from the Apply because half the assertions below are about the
+     * STAGED state — the dock's label, the inert picker, the cleared instruction — and reading
+     * them after a write has landed reads a panel that has already reset itself.
+     *
+     * @param {HTMLElement} target
+     * @param {string} mode `add` or `remove`.
+     * @param {string} systemId the crafting system to stage against.
+     * @returns {Promise<void>}
+     */
+    async function stageMembership(target, mode, systemId) {
+      target.querySelector(`[data-world-component-bulk-mode-option="${mode}"]`).click();
+      await drain();
+      target
+        .querySelector(
+          `[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="${systemId}"]`
+        )
+        .click();
+      await drain();
+    }
+
+    /**
+     * Cycle one tag's staged direction from the tag inset's own row.
+     *
+     * @param {HTMLElement} target
+     * @param {string} tag
+     * @returns {void}
+     */
+    function stageTag(target, tag) {
+      target
+        .querySelector(
+          `[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="${tag}"]`
+        )
+        .click();
+    }
+
+    /** One inset's rows, by option id, in rendered order. */
+    function insetRows(target, inset) {
+      return [
+        ...target.querySelectorAll(
+          `[data-world-component-bulk-inset="${inset}"] [data-world-component-bulk-option]`
+        ),
+      ].map((row) => row.getAttribute('data-world-component-bulk-option'));
     }
 
     it('swaps the inspector for the panel the moment a row is ticked', async () => {
@@ -495,7 +780,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       // would silently delete every tag the GM had not ticked — and `coal` carries two.
       const { target, calls } = await selectedCatalogue();
 
-      target.querySelector('[data-world-component-bulk-tag="fuel"]').click();
+      stageTag(target, 'fuel');
       await drain();
       target.querySelector('[data-world-component-bulk-apply]').click();
       await drain();
@@ -525,13 +810,8 @@ describe('world Component Catalogue (issue 1371)', () => {
       });
       await selectTwo(target);
 
-      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-system-trigger]').click();
-      await drain();
-      target.querySelector('[data-popover-option="sys-forge"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-tag="fuel"]').click();
+      await stageMembership(target, 'add', 'sys-forge');
+      stageTag(target, 'fuel');
       await drain();
 
       target.querySelector('[data-world-component-bulk-apply]').click();
@@ -556,22 +836,30 @@ describe('world Component Catalogue (issue 1371)', () => {
       // remove. `muted` and `neutral` differ only in their ink token — same border, no fill on
       // either — so "about to be taken off every selected component" and "leave alone" were the
       // same chip, on the one panel whose header says the two directions are one click apart.
+      //
+      // THE CYCLE MOVED TO THE INSET ROW in r8 and the painted state stayed on the CHIP, which is
+      // the reference's own split (`proto:706`): the staged run is where a direction is read at a
+      // glance, and the inset is where it is set.
       const { target } = await selectedCatalogue();
 
-      const chip = () => target.querySelector('[data-world-component-bulk-tag="fuel"]');
-      const unstaged = chip().className;
-      assert.equal(chip().getAttribute('data-world-component-bulk-tag-state'), 'unchanged');
-      assert.equal(chip().getAttribute('aria-pressed'), 'false');
+      const row = () =>
+        target.querySelector(
+          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
+        );
+      const chip = () => target.querySelector('[data-world-component-bulk-tag-chip="fuel"]');
+      assert.equal(row().getAttribute('data-world-component-bulk-option-state'), 'off');
+      assert.ok(!chip(), 'an unstaged tag has no chip in the staged run at all');
 
-      chip().click();
+      row().click();
       await drain();
-      assert.equal(chip().getAttribute('data-world-component-bulk-tag-state'), 'add');
+      assert.equal(row().getAttribute('data-world-component-bulk-option-state'), 'add');
       const added = chip().className;
       const addLabel = chip().getAttribute('aria-label');
+      assert.ok(chip().classList.contains('is-info'));
 
-      chip().click();
+      row().click();
       await drain();
-      assert.equal(chip().getAttribute('data-world-component-bulk-tag-state'), 'remove');
+      assert.equal(row().getAttribute('data-world-component-bulk-option-state'), 'remove');
       const removed = chip().className;
 
       // THE FAMILY, NOT MERELY A DIFFERENT CLASS STRING. `is-muted` and `is-neutral` are two
@@ -584,8 +872,7 @@ describe('world Component Catalogue (issue 1371)', () => {
           `"${removed}"`
       );
       assert.ok(chip().classList.contains('manager-chip'));
-      assert.notEqual(removed, unstaged, 'and it is not the unstaged face');
-      assert.notEqual(removed, added, 'nor the add face');
+      assert.notEqual(removed, added, 'and it is not the add face');
       assert.ok(
         Boolean(chip().querySelector('i.fa-minus')),
         'and it carries the subtractive glyph, so the state survives a monochrome render'
@@ -602,6 +889,15 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.match(chip().getAttribute('aria-label'), /remove/i);
       assert.match(addLabel, /add/i);
+
+      row().click();
+      await drain();
+      assert.equal(
+        row().getAttribute('data-world-component-bulk-option-state'),
+        'off',
+        'and the third click returns to "leave this tag alone", which is the state that must ' +
+          'stay reachable on a panel whose whole point is a partial instruction'
+      );
     });
 
     it('builds its mode segments and notes from the model rather than beside it', async () => {
@@ -631,6 +927,165 @@ describe('world Component Catalogue (issue 1371)', () => {
           `and the ${mode.id} note is the model's, so the two cannot drift`
         );
       }
+    });
+
+    it('draws each axis as an INLINE inset, not as a popover trigger', async () => {
+      // Gap-list rows 43-45. A popover hides the corpus behind a click, so a GM cannot see that a
+      // search matched nothing, cannot see how many systems there are, and cannot read a staged
+      // row beside an unstaged one. `proto:628`-`697` draws the set instead.
+      const { target } = await selectedCatalogue();
+      for (const inset of ['systems', 'category', 'tags']) {
+        const card = target.querySelector(`[data-world-component-bulk-inset="${inset}"]`);
+        assert.ok(Boolean(card), `${inset} is drawn inline`);
+        assert.ok(
+          Boolean(card.querySelector(`[data-world-component-bulk-search="${inset}"]`)),
+          `${inset} carries its own search well`
+        );
+        assert.ok(
+          Boolean(card.querySelector(`[data-world-component-bulk-range="${inset}"]`)),
+          `${inset} states the range it is showing`
+        );
+      }
+      assert.ok(
+        !target.querySelector('[data-world-component-bulk-system-trigger]'),
+        'and no `Pick a … ▾` trigger survives'
+      );
+      assert.deepEqual(insetRows(target, 'systems'), ['sys-forge', 'sys-alchemy']);
+    });
+
+    it('searches inside an inset without touching the row selection', async () => {
+      const { target } = await selectedCatalogue();
+      const search = target.querySelector('[data-world-component-bulk-search="systems"]');
+      search.value = 'alch';
+      search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      assert.deepEqual(insetRows(target, 'systems'), ['sys-alchemy']);
+      assert.match(
+        target.querySelector('[data-world-component-bulk-range="systems"]').textContent,
+        /1-1 of 1/
+      );
+      assert.equal(
+        target.querySelector('[data-world-component-bulk-count]').textContent.trim(),
+        '2 components selected',
+        'searching a staging inset says nothing about which ROWS are ticked'
+      );
+
+      search.value = 'zzz';
+      search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      assert.ok(Boolean(target.querySelector('[data-world-component-bulk-empty="systems"]')));
+    });
+
+    it('gates the system inset on a chosen DIRECTION', async () => {
+      // Staging systems under no direction would compose an instruction with a target and no verb.
+      const { target } = await selectedCatalogue();
+      const row = () =>
+        target.querySelector(
+          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+        );
+      assert.equal(row().disabled, true, 'closed before a direction is chosen');
+      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
+      await drain();
+      assert.equal(row().disabled, false, 'and open once one is');
+    });
+
+    it('leads each direction with its glyph and writes the note BELOW the track', async () => {
+      // Gap-list rows 41 and 42. The direction is the one thing about this control that must
+      // survive a monochrome render, and the note describes what the chosen direction will DO —
+      // so it reads as a consequence of the track above rather than as an instruction about a
+      // control the GM has not reached yet.
+      const { target } = await selectedCatalogue();
+      const add = target.querySelector('[data-world-component-bulk-mode-option="add"]');
+      assert.ok(Boolean(add.querySelector('i.fa-arrow-right-to-bracket')));
+      assert.ok(
+        Boolean(
+          target
+            .querySelector('[data-world-component-bulk-mode-option="remove"]')
+            .querySelector('i.fa-arrow-right-from-bracket')
+        )
+      );
+      const track = target.querySelector('[data-world-component-bulk-mode]');
+      const note = target.querySelector('[data-world-component-bulk-mode-state]');
+      assert.equal(
+        track.compareDocumentPosition(note) & 4,
+        4,
+        'the note FOLLOWS the track in document order'
+      );
+    });
+
+    it('puts the standing explanation SECOND, under the register rather than above Apply', async () => {
+      // Gap-list row 40. It says what CANNOT be bulk-edited, so it belongs before the groups a GM
+      // is about to read rather than after the decision they have already made.
+      const { target } = await selectedCatalogue();
+      const note = target.querySelector('[data-world-component-bulk-per-component-note]');
+      const firstSection = target.querySelector('[data-world-component-bulk-mode]');
+      assert.ok(Boolean(note));
+      assert.equal(
+        note.compareDocumentPosition(firstSection) & 4,
+        4,
+        'the note stands BEFORE the first staging group'
+      );
+    });
+
+    it('names the WRITE on the dock rather than counting edits', async () => {
+      // Gap-list row 48. `design-system/spec.md:415` requires a bulk commit action to name the
+      // records it writes to; `Apply 2 changes` names neither the records nor the verb.
+      const { target } = await selectedCatalogue();
+      const apply = () => target.querySelector('[data-world-component-bulk-apply]');
+      assert.match(apply().textContent, /Stage a change to write it to 2 components/);
+
+      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
+      await drain();
+      assert.match(
+        apply().textContent,
+        /Pick systems to add 2 components/,
+        'a direction with no systems is an instruction, which is what the reference writes'
+      );
+
+      await stageMembership(target, 'add', 'sys-forge');
+      assert.match(apply().textContent, /Add 2 components to 1 systems/);
+
+      target.querySelector('[data-world-component-bulk-mode-option="remove"]').click();
+      await drain();
+      assert.match(
+        apply().textContent,
+        /Remove 2 components from 1 systems/,
+        'and the verb follows the direction: the two are one keystroke apart'
+      );
+    });
+
+    it('offers the armed bulk delete, and writes only from its confirmed state', async () => {
+      // Gap-list row 47. The most destructive verb in the product, behind the manager's one
+      // two-step idiom: arming states the count, and only the confirmed press writes.
+      const { target, calls } = await selectedCatalogue();
+      const danger = () =>
+        target.querySelector('[data-world-component-bulk-danger] .manager-button, ' +
+          '[data-world-component-bulk-danger] button');
+      assert.ok(Boolean(danger()), 'the danger leg is drawn');
+      assert.match(danger().textContent, /Delete 2 components/);
+
+      danger().click();
+      await drain();
+      assert.equal(calls.length, 0, 'arming writes nothing');
+      assert.match(danger().textContent, /Confirm/);
+
+      danger().click();
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => `${call.verb}:${call.args[0]}`),
+        ['deleteEntity:ingot', 'deleteEntity:coal'],
+        'and the confirmed press deletes each selected record in turn, never concurrently'
+      );
+    });
+
+    it('withholds the delete entirely when the call site has no delete leg', async () => {
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { addToSystem: async () => true },
+      });
+      await selectTwo(target);
+      assert.ok(!target.querySelector('[data-world-component-bulk-danger]'));
     });
 
     it('hands its staged instruction over and CLEARS it, so no second Apply exists', async () => {
@@ -667,12 +1122,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         actions,
       });
       await selectTwo(target);
-      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-system-trigger]').click();
-      await drain();
-      target.querySelector('[data-popover-option="sys-forge"]').click();
-      await drain();
+      await stageMembership(target, 'add', 'sys-forge');
 
       target.querySelector('[data-world-component-bulk-apply]').click();
       await drain();
@@ -689,7 +1139,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         'the staged instruction was handed over and cleared, so there is nothing to re-apply'
       );
       assert.equal(
-        target.querySelector('[data-world-component-bulk-system-trigger]').disabled,
+        target.querySelector(
+          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+        ).disabled,
         true,
         'and the staging control that would compose a new one is closed'
       );

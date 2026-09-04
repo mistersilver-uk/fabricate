@@ -1524,6 +1524,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      // issue 1371 r8-cat: THE FRAME IS THIS SCREEN TOO. The comment above already named "the
+      // list frame behind it" and the list omitted it, so a change to the row, the toolbar or
+      // the inspector identity block — every one of which this frame writes — published the
+      // essence and tool catalogues' frames and not this one. It is on the sibling catalogues'
+      // cases already; this is the entry that was missing.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
     ],
   }),
@@ -1553,14 +1559,28 @@ export const VIEW_LAB_CASES = Object.freeze([
     // A REMOVAL IS STAGED, because an unstaged panel is a panel at rest and this case's whole
     // subject is the staging model. `Remove from` is the destructive direction — the one whose
     // note and chip tone round 2 made legible — and one tag staged for addition puts a second
-    // axis and the write count (`Apply 2 changes`) in the same frame.
+    // axis and the dock's write-naming label in the same frame.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'salt' },
       { selector: '[data-scoped-list-select="tw-brine-salt"]' },
       { selector: '[data-scoped-list-select="al-saltpetre"]' },
+      // issue 1371 r8-cat: THE TAG IS STAGED FROM THE INSET ROW. The three staging groups were
+      // `Pick a … ▾` popover triggers and are now the reference's inline search + rows + pager
+      // insets, so the chip this step used to click no longer exists; the row is the stager and
+      // the chip is what a staged direction PUTS on screen.
+      {
+        selector:
+          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]',
+      },
+      // AND THE DIRECTION IS STAGED LAST, WHICH IS ALSO WHAT SCROLLS THE PANEL BACK TO ITS HEAD.
+      // The three insets make this panel taller than the column, so the LAST click decides what
+      // the frame shows: staging the tag last left the shot on the panel's foot, with none of the
+      // register, the standing explanation or the membership track in it — the three things this
+      // case's own `expectContained` list is about. `scroll` cannot fix that (`scrollIntoViewIfNeeded`
+      // is a no-op on an element already partly in view), and the ordering is free: the two axes
+      // are independent, so staging them in either order composes the same instruction.
       { selector: '[data-world-component-bulk-mode-option="remove"]' },
-      { selector: '[data-world-component-bulk-tag="fuel"]' },
     ],
     expectView: 'world-components',
     expectSelector: '[data-world-component-bulk-panel]',
@@ -1583,7 +1603,24 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       {
         container: '[data-world-component-bulk-panel]',
-        target: '[data-world-component-bulk-tag="fuel"]',
+        target: '[data-world-component-bulk-tag-chip="fuel"]',
+      },
+      // AND THE THREE INSETS THEMSELVES (issue 1371 r8-cat, gap-list rows 43-45). A panel that
+      // fell back to the popover triggers still renders the mode track, the Apply dock and a
+      // staged chip, so none of the four assertions above can tell the two forms apart.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-inset="systems"]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-inset="tags"]',
+      },
+      // AND THE DANGER LEG (gap-list row 47), which is the one control on this panel that had no
+      // counterpart at all before this revision.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-danger]',
       },
     ],
     position: { width: 1280, height: 900 },

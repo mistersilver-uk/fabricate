@@ -115,6 +115,9 @@
     inspectorFoot = undefined,
     countUnit = '',
     membershipFilter = true,
+    // Threaded straight to the frame; see its own prop note. OPT-IN, defaulting to the single
+    // toolbar row every catalogue renders today.
+    splitToolbar = false,
     selectAllLabel = '',
     onOpenSystemRules = null,
     // The list's lifted view-state (issue 1438), passed straight through to the frame. It is
@@ -129,6 +132,11 @@
     // exactly what the component and essence catalogues render today.
     rowTrailing = undefined,
     rowSecondLine = 'description',
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN: a lane that draws
+    // its own source pill on the NAME LINE turns the frame's trailing badge off, so one row never
+    // carries two answers to "does this record name a source Item".
+    rowNameTrailing = undefined,
+    rowSourceBadge = true,
     describeEntry = undefined,
     // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
     // exactly what the component and essence catalogues render today.
@@ -148,6 +156,12 @@
     // lane that NAMES the verb gets the design's bordered `Edit <noun>` button instead, which is
     // also what our own system rules list already draws.
     openEntryLabel = '',
+    // WHETHER THAT NAMED VERB IS DRAWN AS A LABELLED BUTTON. It shipped derived from
+    // `openEntryLabel` alone, which made the two questions one: a lane could not name the action
+    // for its `title` and its accessible name — which the reference DOES, `Open catalogue entry`
+    // on a 28px pen (`proto:609`) — without also getting a 104px labelled control. `null` keeps
+    // the derivation, so the world Tool catalogue and both rules lists are unchanged.
+    openEntryLabelled = null,
     // WHAT AN INSPECTOR SYSTEM ROW OFFERS. `manage` is the shipped pair - a `Rules` link for a
     // member and the membership cluster for a non-member. `navigate` is the design's tool
     // catalogue: EVERY row is a link, and the verb that creates a system's record lives on the
@@ -206,7 +220,7 @@
       // A LANE THAT NAMES THE VERB GETS THE LABELLED BUTTON. The design's row action reads
       // `Edit tool`, and a bare pen states neither the verb nor the noun; the shipped `Open`
       // icon button stays the default so no other catalogue's row moves.
-      labelled: Boolean(openEntryLabel),
+      labelled: openEntryLabelled === null ? Boolean(openEntryLabel) : openEntryLabelled === true,
       label: openEntryLabel || text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
       run: (entry) => onOpenEntry(entry.id),
     },
@@ -254,6 +268,8 @@
     {rowMeta}
     {rowTrailing}
     {rowSecondLine}
+    {rowNameTrailing}
+    {rowSourceBadge}
     {describeEntry}
     {nameEntry}
     {listLead}
@@ -266,6 +282,7 @@
     {inspectorFoot}
     {countUnit}
     {membershipFilter}
+    {splitToolbar}
     {selectAllLabel}
     bind:browserState
     bind:selectedId
