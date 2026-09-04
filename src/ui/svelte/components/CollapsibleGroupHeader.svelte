@@ -95,12 +95,28 @@
   }
 
   /* The non-collapsible band. It is not a control, so it takes neither the pointer cursor nor
-     the hover repaint; `padding` is the reference's own `7px 11px` (`proto:1071`) and the
-     radius snaps 8 to the 7 rung (`design-system/spec.md:218`) on a 32px band. */
+     the hover repaint, and the radius snaps 8 to the 7 rung (`design-system/spec.md:218`) on a
+     32px band.
+
+     PADDING IS THE SCALE, NOT THE REFERENCE'S OWN `7px 11px` (`proto:1071`). Padding, margin and
+     gap must derive from the published spacing scale, whose neighbouring steps here are 6/8 and
+     12; the raw pair was new debt the ratchet reds on. 6 and 12 are each one pixel from the
+     drawn value, which is inside this band's slack — nothing is pinned to its height.
+
+     TYPE IS THE REFERENCE'S, in px, because font sizes are NOT scale members and are written as
+     literals (`design-system/spec.md:216-220`). The collapsible form's 0.72rem/0.66rem resolve
+     to 11.52px and 10.56px against the 16px root, and the reference draws 11px and 10.5px; both
+     are stated on `.is-static` alone so the RecipesBrowserView's collapsible header is
+     untouched. */
   .fab-group-header.is-static {
-    padding: 7px 11px;
+    padding: var(--fab-space-chip) var(--fab-space-3);
     border-radius: 7px;
+    font-size: 11px;
     cursor: default;
+  }
+
+  .fab-group-header.is-static .fab-group-count {
+    font-size: 10.5px;
   }
 
   .fab-group-header.is-static:hover {

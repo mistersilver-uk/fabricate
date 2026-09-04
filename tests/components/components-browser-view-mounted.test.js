@@ -19,6 +19,9 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_SCOPE_LEAF_MODULES,
   SCOPED_SHARED_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  componentScopeFor,
+  createComponentScopeHarness,
 } from '../helpers/componentScopeMountModules.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
@@ -676,6 +679,61 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     );
   });
 
+  it("a ghost's identity opens the world catalogue entry, not an in-system selection", async () => {
+    // `onSelectComponent` writes `selectedComponentId`, which the inspector resolves against THIS
+    // SYSTEM's row set — and a ghost has no row there by definition. Wiring the ghost's identity
+    // to it EMPTIED the inspector: whatever was selected vanished and nothing replaced it, so the
+    // click read as a control that visibly does nothing. The world catalogue entry is where that
+    // record's name, art and description are authored, so it is the destination the click implied.
+    //
+    // BOTH props are passed, and both are asserted, because the defect is not "nothing happens" —
+    // it is "the WRONG one fires". A test that only watched the navigation would stay green if the
+    // selection fired alongside it and emptied the panel anyway.
+    const opened = [];
+    const selected = [];
+    const root = await browser.mount({
+      itemCards: [],
+      scope: ghostScope(),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+      onOpenWorldEntry: (...args) => opened.push(args),
+      onSelectComponent: (...args) => selected.push(args),
+    });
+    widen(root);
+
+    root.querySelector('[data-component-id="w-2"] .manager-component-identity').click();
+    flushSync();
+
+    assert.deepEqual(
+      opened,
+      [['world-component-entry', 'w-2']],
+      'the ROUTE TOKEN travels with the id: the token is the half that decides whether the ' +
+        'navigation resolves, and a page cannot route'
+    );
+    assert.deepEqual(selected, [], 'and the in-system selection is NOT also written');
+  });
+
+  it("a MEMBER's identity still selects it in this system", async () => {
+    // The positive control for the test above. Without it, deleting the member branch's
+    // `onSelect: onSelectComponent` — or wiring every row to the navigation — passes.
+    const opened = [];
+    const selected = [];
+    const root = await browser.mount({
+      itemCards: [makeComponent({ id: 'own', name: 'Bloom Ash' })],
+      scope: ghostScope(),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+      onOpenWorldEntry: (...args) => opened.push(args),
+      onSelectComponent: (...args) => selected.push(args),
+    });
+
+    root.querySelector('[data-component-id="own"] .manager-component-identity').click();
+    flushSync();
+
+    assert.deepEqual(selected, [['own']], 'a member row selects, because it HAS a row to select');
+    assert.deepEqual(opened, [], 'and does not navigate away from the list to do it');
+  });
+
   it('adoption forwards addToSystem, which is the COMPOSED verb under that key', async () => {
     // The published component family replaces the generic membership-only verb under this key,
     // so this one call writes the membership record AND the in-system record the read union's row
@@ -786,5 +844,204 @@ describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
     // widened into it by a later sweep.
     const root = await browser.mount({ itemCards: CARDS, dropEnabled: true });
     assert.ok(Boolean(root.querySelector('.manager-component-drop-zone')));
+  });
+});
+
+// ── C7. THE SYSTEM RULES LIST'S INSPECTOR (issue 1371, parity round 4) ────────────────────────
+//
+// `proto:1247-1275`, gap-list rows 117-123. The panel that shipped was a name, two stat tiles, a
+// source register and a FOUR-BUTTON stack; the reference draws a kicker, one identity line whose
+// subline states both numbers, four named blocks and a PINNED foot carrying one primary, with the
+// remaining commands behind a kebab. Every claim below is a part that anatomy either gained or
+// lost, and the panel had no mounted coverage at all before this suite.
+//
+// A SECOND HARNESS in this file rather than a second file: the inspector is this browser's
+// inspector — it is mounted by the shell into the same route — and `createComponentScopeHarness`
+// is the shared factory precisely so a second suite does not restate the manifest.
+const inspector = createComponentScopeHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-component-inspector-',
+  componentPath: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
+  // The overlay closure the kebab binds, and the category vocabulary the `Category` block reads.
+  // An omission here HANGS the suite (`# cancelled`) rather than failing it.
+  rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
+  compiledExtras: [
+    'src/ui/svelte/components/ActionMenu.svelte',
+    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
+  ],
+});
+
+describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parity round 4)', () => {
+  before(async () => {
+    await inspector.setup();
+  });
+  after(() => {
+    inspector.teardown();
+  });
+  afterEach(() => {
+    inspector.remount();
+  });
+
+  const SCOPE = componentScopeFor();
+
+  function entry(id) {
+    return SCOPE.entries.find((candidate) => candidate.id === id) ?? null;
+  }
+
+  function systemRow(id, systemId) {
+    return (entry(id)?.systems ?? []).find((row) => row?.systemId === systemId) ?? null;
+  }
+
+  /** The selected row as the read union hands it over: identity plus this system's own answers. */
+  function selectedCoal(overrides = {}) {
+    return {
+      id: 'coal',
+      name: 'Coal',
+      img: 'icons/commodities/materials/coal.webp',
+      category: 'Raw',
+      tags: ['sooty'],
+      essences: [{ id: 'fire', name: 'Fire', quantity: 2 }],
+      hasRegisteredItemUuid: true,
+      registeredItemUuidDisplay: 'Item.coal-source',
+      salvageSummary: { resultCount: 2 },
+      difficulty: 17,
+      ...overrides,
+    };
+  }
+
+  async function mountCoal(props = {}) {
+    return inspector.mount({
+      selectedComponent: selectedCoal(),
+      showTags: true,
+      worldEntry: entry('coal'),
+      worldSystemRow: systemRow('coal', 'sys-forge'),
+      systemName: 'Forge',
+      salvageFeatureEnabled: true,
+      salvageModeLabel: 'Progressive',
+      ...props,
+    });
+  }
+
+  it('opens on the kicker and ONE identity line, not on a pair of stat tiles', async () => {
+    // Gap-list rows 117 and 118. There was no kicker, the name read at 21.6px/700, and the two
+    // numbers the subline states were also drawn as `1 Tags` / `1 Essences` tiles beside it — the
+    // same fact three times, over a panel that is about to list both.
+    const root = await mountCoal();
+
+    assert.equal(
+      root.querySelector('[data-component-inspector-kicker]').textContent.trim(),
+      'Selected component'
+    );
+    assert.equal(root.querySelector('.manager-component-inspector-name').textContent.trim(), 'Coal');
+    assert.equal(
+      root.querySelector('[data-component-inspector-subline]').textContent.trim(),
+      // `fuel` (world, unmuted) and `sooty` (this system's own); `bulk` is muted here and is not
+      // in effect, which is the same arithmetic the split counter states below.
+      '2 tags · 1 essence',
+      'the subline states BOTH counts, which is what retires the tiles'
+    );
+    assert.equal(
+      root.querySelectorAll('.manager-stat-tile').length,
+      0,
+      'and no stat tile survives to say either of them a second time'
+    );
+  });
+
+  it('carries the Shared identity card the LIST pane used to head with', async () => {
+    // Gap-list rows 101 and 119. The reference draws this callout on the rules editor and puts its
+    // content HERE; the list pane's own copy is asserted gone by the `list head` suite above, so
+    // this is the other half of that move and neither is a claim about an empty tree on its own.
+    const root = await mountCoal();
+    const card = root.querySelector('[data-component-shared-identity]');
+
+    assert.ok(Boolean(card), 'the card renders');
+    assert.equal(
+      card.querySelector('[data-component-shared-identity-label]').textContent.trim(),
+      'Shared identity'
+    );
+    assert.ok(
+      Boolean(card.querySelector('[data-component-open-catalogue]')),
+      'and it EXITS to the catalogue entry, which is where that identity is authored'
+    );
+  });
+
+  it('withholds that card for a component the world corpus does not hold', async () => {
+    // The negative control for the assertion above: without it, a card that never rendered at all
+    // would satisfy nothing and a card that ALWAYS rendered would claim a shared identity for a
+    // record that has none.
+    const root = await mountCoal({ worldEntry: null });
+    assert.ok(!root.querySelector('[data-component-shared-identity]'));
+    assert.ok(
+      Boolean(root.querySelector('.manager-component-inspector-name')),
+      'while the panel itself still draws, so this is a branch rather than an empty mount'
+    );
+  });
+
+  it('states tags in effect as a SPLIT, and drops a tag this system mutes', async () => {
+    // Gap-list row 120. `bulk` is a world tag `sys-forge` mutes, so it is not in effect here and
+    // is neither listed nor counted; `fuel` is, and `sooty` is the system's own. A block titled
+    // "Tags in effect" that listed the union would be naming something else.
+    const root = await mountCoal();
+
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-component-tag]')].map((chip) => [
+        chip.getAttribute('data-component-tag'),
+        chip.getAttribute('data-component-tag-source'),
+      ]),
+      [
+        ['fuel', 'world'],
+        ['sooty', 'system'],
+      ],
+      'the muted world tag is absent, and each chip names where it came from'
+    );
+    assert.equal(
+      root.querySelector('[data-component-tag-split]').textContent.trim(),
+      '1 world · 1 system'
+    );
+  });
+
+  it('names the CATEGORY source, so inherited and set-here are distinguishable', async () => {
+    // Gap-list row 121, and the home of the list head's deleted `N inherit · M override` line.
+    const root = await mountCoal();
+    assert.equal(
+      root.querySelector('[data-component-category-source]').textContent.trim(),
+      'set in this system'
+    );
+
+    const inherited = await inspector.mount({
+      selectedComponent: selectedCoal({ id: 'ingot', name: 'Iron Ingot', category: 'Refined' }),
+      showTags: true,
+      worldEntry: entry('ingot'),
+      worldSystemRow: systemRow('ingot', 'sys-forge'),
+      systemName: 'Forge',
+    });
+    assert.equal(
+      inherited.querySelector('[data-component-category-source]').textContent.trim(),
+      'inherited from world',
+      'the other branch reads differently, so the line is derived rather than a constant'
+    );
+  });
+
+  it('pins ONE primary in the foot and moves the rest behind a kebab', async () => {
+    // Gap-list row 123. Four buttons — Edit component, Copy source UUID, Unlink, Delete — scrolled
+    // inline with the body and gave four commands equal weight where the reference pins one.
+    const opened = [];
+    const root = await mountCoal({ onEditSystemRules: (...args) => opened.push(args) });
+    const foot = root.querySelector('[data-component-inspector-foot]');
+
+    assert.ok(Boolean(foot), 'the foot renders');
+    assert.equal(
+      foot.querySelectorAll('button').length,
+      1,
+      'and holds exactly ONE action, which is the act this whole screen exists to reach'
+    );
+    foot.querySelector('[data-component-edit-system-rules]').click();
+    flushSync();
+    assert.deepEqual(opened, [['coal']]);
+
+    assert.ok(
+      Boolean(root.querySelector('[data-component-inspector-menu]')),
+      'and the other three commands are behind the shared overflow trigger, not lost'
+    );
   });
 });

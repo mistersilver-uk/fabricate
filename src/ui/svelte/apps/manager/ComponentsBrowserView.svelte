@@ -30,6 +30,16 @@
     componentMembershipFilters,
   } from './scoped/componentScoped.js';
 
+  /**
+   * The world entry route a GHOST ROW opens.
+   *
+   * A MODULE CONSTANT rather than an inline literal, because it is the one string that decides
+   * whether the link resolves at all: the issue body named `world-component-edit`, which appears
+   * nowhere in the route table, and a token that does not resolve loses the breadcrumb's middle
+   * crumb and lands the navigation on nothing without erroring.
+   */
+  const WORLD_ENTRY_ROUTE = 'world-component-entry';
+
   let {
     itemCards = [],
     itemSearchTerm = '',
@@ -76,6 +86,10 @@
     // announcement and the focus hop belong to something that outlives both. Optional, so a
     // standalone mount clears exactly as it did.
     onSelectionCleared = null,
+    // THE DEEP LINK OUT OF THIS SCREEN, into the world catalogue entry that AUTHORS a record's
+    // identity. Called with the ROUTE TOKEN and the entity id, because the token is the half
+    // that decides whether the navigation resolves and a page cannot route.
+    onOpenWorldEntry = () => {},
     // The filter / sort / group / paginate view-state (issue 676). The manager root
     // LIFTS this up and binds it here so it survives the editor round-trip.
     browserState = $bindable(null),
@@ -481,7 +495,19 @@
         'Add {name} to this system',
         { name: ghost.name }
       ),
-      onSelect: onSelectComponent,
+      // A GHOST ROW'S IDENTITY OPENS THE WORLD CATALOGUE ENTRY, not the in-system selection.
+      //
+      // `onSelectComponent` writes `selectedComponentId`, and the inspector resolves that id
+      // against THIS SYSTEM's row set — which by definition holds no row for a ghost. Wiring the
+      // ghost's identity to it therefore emptied the inspector: the panel for whatever was
+      // selected disappeared and nothing replaced it, so the click read as a control that
+      // visibly does nothing. (The reference selects a ghost into its own inspector, `proto:4994`;
+      // Fabricate's inspector is built from the in-system record and cannot answer for a record
+      // that has none. Recorded as a deviation.)
+      //
+      // The world catalogue entry is where that record's name, art and description ARE authored,
+      // so it is the destination the click already implied.
+      onSelect: (id) => onOpenWorldEntry(WORLD_ENTRY_ROUTE, id),
       onAdd: (id) => actions?.addToSystem?.(id, systemId),
     };
   }

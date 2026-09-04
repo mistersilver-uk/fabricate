@@ -1402,8 +1402,10 @@
           <!--
             THE NOTE IS DIRECTLY UNDER THE SELECT (gap-list row 143) and carries the model's own
             glyph and tone: `info` while inheriting, `warning` while overriding, subtle where the
-            world authored nothing. The reference inks the inheriting branch a raw `#8FBEF2`,
-            which maps to the info token (LIBRARY-FORCED, recorded as E-4).
+            world authored nothing. The reference inks the inheriting branch with a raw pale-blue
+            literal, which maps to the info token (LIBRARY-FORCED, recorded as E-4). The literal
+            itself is not quoted here: the theme-colour contract scans prose as well as
+            declarations, so writing the hex down would red that gate for a comment.
           -->
           <p
             class={`manager-component-cat-note is-${categoryNote.tone}`}

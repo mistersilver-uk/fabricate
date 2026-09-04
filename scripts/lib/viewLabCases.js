@@ -5092,7 +5092,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-search] input', fill: 'Iron Ingot' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-component-edit]' },
     ],
     expectView: 'component-edit',
     expectSelector: '[data-scoped-inherit-row="category"]',
@@ -5125,7 +5125,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-search] input', fill: 'Coal' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-component-edit]' },
       { selector: '[data-component-edit-section="world-tags"]', scroll: true },
     ],
     expectView: 'component-edit',
@@ -5162,15 +5162,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     steps: [
       { selector: '#manager-nav-component-rules' },
-      { selector: '[data-component-membership-filter]', select: 'all' },
+      // THE COHORT SWITCH IS A `SegmentedControl`, NOT A `<select>` (issue 1371, parity round 4,
+      // rebuild-spec C6): the reference draws two inline segments and the shipped control now
+      // renders one `<label>` per option carrying `data-component-membership-option="<value>"`
+      // (`data-component-membership-filter` is on the TRACK, and stamps `true`, not a value).
+      // `selectOption` on it threw, so this case reached no state at all.
+      { selector: '[data-component-membership-option="all"]' },
       // SCROLL TO THE COHORT, because it sits below every member row: the lab world's smithing
       // system holds a handful of components and the world corpus holds sixty-five, so the ghost
       // list starts well past the fold and an unscrolled frame photographs the member rows this
       // case is not about.
-      { selector: '[data-component-ghost-row]', scroll: true },
+      //
+      // A GHOST ROW IS THE MEMBER ROW, DIMMED AND STATED (rebuild-spec C6), so it is named by the
+      // membership attribute every row carries rather than by a marker only the ghost has: there
+      // is no separate ghost component to hang one on, and inventing an attribute for the test
+      // would be a hook with no product reader.
+      { selector: '.manager-component-row[data-component-member="false"]', scroll: true },
     ],
     expectView: 'components',
-    expectSelector: '[data-component-ghost-row]',
+    expectSelector: '.manager-component-row[data-component-member="false"]',
     expectContained: [
       // A ROW, NOT THE WHOLE `<ul>`. The ghost body is a sixty-row list inside a SCROLLING
       // container, so it legitimately extends past its own scroller and the containment check
@@ -5180,7 +5190,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // spilling out of it.
       {
         container: '.manager-table-scroll',
-        target: '[data-component-ghost-row]',
+        target: '.manager-component-row[data-component-member="false"]',
       },
     ],
     kinds: ['manager', 'components'],
@@ -5389,10 +5399,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-component-edit-normal'],
     reaches: 'exact',
     query: {},
-    steps: [
-      { selector: '#manager-nav-component-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
-    ],
+    steps: [{ selector: '#manager-nav-component-rules' }, { selector: '[data-component-edit]' }],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four `*-complications-*` and
@@ -5421,8 +5428,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="rw-slag"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]',
       },
       { selector: '[data-salvage-routing]', scroll: true },
     ],
@@ -5445,8 +5451,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-chainmail"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-chainmail"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',
@@ -5462,8 +5467,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-longsword"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-longsword"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',
@@ -5501,8 +5505,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="hb-empty-vial"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="hb-empty-vial"] [data-component-edit]',
       },
       { selector: '[data-complications-section]', scroll: true },
     ],
@@ -5530,7 +5533,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
       },
       { selector: '[data-complications-section]', scroll: true },
     ],
@@ -5562,7 +5565,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
       },
       { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
       // The LAST row of the When card, so `scrollIntoViewIfNeeded` — which lands its anchor near
@@ -5597,7 +5600,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-cracked-alembic"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
       },
       { selector: '[data-salvage-stage-complications]', scroll: true },
     ],
@@ -6216,7 +6219,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
-          '.manager-icon-button[aria-label^="Edit"]',
+          '[data-component-edit]',
       },
       { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
     ],
@@ -9324,8 +9327,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-ruby"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-ruby"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',

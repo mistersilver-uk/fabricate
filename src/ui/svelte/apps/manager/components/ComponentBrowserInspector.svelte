@@ -241,7 +241,7 @@
       {#if showTags}
         <div class="manager-component-inspector-block">
           <div class="manager-component-inspector-block-head">
-            <p class="manager-micro-label">
+            <p class="manager-micro-label" data-component-tags-in-effect-label>
               {text('FABRICATE.Admin.Manager.Component.TagsInEffect', 'Tags in effect')}
             </p>
             <span class="manager-component-inspector-split" data-component-tag-split
@@ -279,7 +279,7 @@
       <div class="manager-component-inspector-block">
         <div class="manager-component-inspector-block-head">
           <p class="manager-micro-label">
-            {text('FABRICATE.Admin.Manager.Component.Category', 'Category')}
+            {text('FABRICATE.Admin.Manager.Component.Category.Title', 'Category')}
           </p>
           {#if categorySource}
             <span class="manager-component-inspector-split" data-component-category-source
