@@ -32,7 +32,8 @@ A component no crafting system has adopted yet is marked **Unused**.
 A row with no linked source item also carries a **No source item** warning pill.
 A linked row carries no such pill, and no row shows its description here.
 Filter by whether a component has a linked source item, and sort by name or by source item.
-Sorting by source item groups linked components ahead of unlinked ones in one fixed order, and while it is chosen the ascending and descending toggle has nothing to do, so it has no effect.
+Sorting by source item groups linked components ahead of unlinked ones in one fixed order.
+While it is chosen, the ascending and descending toggle has nothing to order, so it greys out until you sort by name again.
 
 ### Inspecting a component
 
@@ -151,7 +152,8 @@ Adding creates rules in that system that inherit the world category.
 **Add to systems…**, in the card's own header, reveals the systems this component is not yet in so you can add it to any of them from the same list.
 
 Fabricate does not currently offer a way to mute an individual world tag for one crafting system.
-A tag you apply in World classification above is either on or off for every system that has rules for this component.
+The tag is set on the world record as a whole, so there is no per-system exception to author.
+As stated above, no crafting system reads a world tag list yet in any case.
 
 ### Deleting a component
 
@@ -317,8 +319,9 @@ The note beneath the field states which value this system currently resolves and
 
 A **Tags** card sits beside Category.
 
-While the linked world component carries world tags, they are listed at the top of the card, under a caption reading **From the world**.
-Each is shown lit or, if it is muted for this system, struck through and dimmed, but the caption's promise of clicking to mute is not kept: this run is read-only, and Fabricate does not currently offer a way to mute one from any screen.
+While the linked world component carries world tags, they are listed at the top of the card, under a caption reading **From the world · click to mute here**.
+Each is shown lit or, if it is muted for this system, struck through and dimmed.
+The caption's promise is not kept, because this run is read-only, and Fabricate does not currently offer a way to mute one from any screen.
 **Edit world tags** opens the component's world entry, where the world tags themselves are applied or cleared.
 
 Below that, this system's own tags are listed as a click-to-toggle pill run.
@@ -331,7 +334,7 @@ These values are keyed to the essences this system currently uses, so a system t
 
 ### Salvage
 
-A **Salvage** card names this system's salvage resolution mode as a read-only pill, such as **Routed by check**, and carries the **Salvage this component** toggle beside it.
+A **Salvage** card names this system's salvage resolution mode as a read-only pill, such as **Routed by check**, then an **Enabled** label and the switch that turns salvage on for this component.
 What the component actually yields, and how the resolution mode shapes the panel below the toggle, is covered in full in [Component Salvage]({% link components/salvage.md %}#component-salvage).
 
 ### Progressive difficulty
