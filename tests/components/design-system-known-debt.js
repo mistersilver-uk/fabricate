@@ -18,6 +18,22 @@
  * reproduces it. They were RE-MEASURED by the shipped gates on this branch rather than copied from
  * the issue, and the figures differ from the issue's in two independent ways.
  *
+ * THE COMMIT EACH DOCBLOCK NAMES IS `6a2c3b46b`, and it is the base this work was measured on: the
+ * head of the issue-1499 branch as it stood when the lane opened. That branch was then merged into
+ * its parent and the lane restacked, so the figures were re-verified on the INTEGRATED base
+ * `007b6a528` — the issue-1531 head after the maintainer's merge, of which this branch is a
+ * descendant — and every one of them is unchanged. That is not a coincidence to be re-checked on
+ * the next restack: the two commits are byte-identical under `src/` and `styles/`, which are the
+ * only roots any gate here reads, so no figure below COULD have moved between them. The whole
+ * table is reproduced by
+ *
+ *     node --conditions=browser --test tests/components/design-system-debt-ratchets.test.js
+ *
+ * which fails with the observed count beside the pinned one for every row that has drifted, and
+ * the two gates that live elsewhere by running `tests/token-generation-gate.test.js`,
+ * `tests/design-system-required-names.test.js` and `tests/design-system-keyboard-focus.test.js`
+ * the same way.
+ *
  * The first is the base. The lane branches on issue 1499, which stacks on 1498, and between them
  * those two deleted 367 dead rule blocks and 29 unread tokens from `styles/fabricate.css`. That
  * took debt with it — two font weights, three shadows — and the docblocks below say which. It was
