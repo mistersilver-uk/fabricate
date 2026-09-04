@@ -13242,7 +13242,7 @@
                             </label>
                             <button
                               type="button"
-                              class="manager-icon-button"
+                              class="fabricate-icon-button manager-icon-button"
                               aria-label={text(
                                 'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
                                 'Add modifier'
@@ -13319,7 +13319,7 @@
                                   </label>
                                   <button
                                     type="button"
-                                    class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                    class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
                                     aria-label={text(
                                       'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
                                       'Delete modifier'
@@ -13487,7 +13487,7 @@
                                 </label>
                                 <button
                                   type="button"
-                                  class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                  class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
                                   aria-label={text(
                                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
                                     'Delete character modifier reference'
@@ -13675,7 +13675,7 @@
                         </label>
                         <button
                           type="button"
-                          class="manager-icon-button"
+                          class="fabricate-icon-button manager-icon-button"
                           aria-label={text(
                             'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
                             'Add modifier'
@@ -13741,7 +13741,7 @@
                               </label>
                               <button
                                 type="button"
-                                class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
                                 aria-label={text(
                                   'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
                                   'Delete modifier'
@@ -13888,7 +13888,7 @@
                             </label>
                             <button
                               type="button"
-                              class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                              class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
                               aria-label={text(
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
                                 'Delete character modifier reference'

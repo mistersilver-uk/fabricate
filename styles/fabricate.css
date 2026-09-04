@@ -6097,7 +6097,7 @@
   cluster to ~420px, truncating every description to about 28 characters. The border and
   fill arrive on hover, where they are needed.
 */
-.fabricate-manager .manager-icon-button.is-ghost {
+.fabricate-icon-button.manager-icon-button.is-ghost {
   width: 28px;
   height: 28px;
   min-height: 28px;
@@ -6108,18 +6108,18 @@
   font-size: 0.68rem;
 }
 
-.fabricate-manager .manager-icon-button.is-ghost:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-ghost:focus-visible {
+.fabricate-icon-button.manager-icon-button.is-ghost:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button.is-ghost:focus-visible {
   color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
-.fabricate-manager .manager-icon-button.is-ghost.is-danger {
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger {
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-ghost.is-danger:focus-visible {
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:focus-visible {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
@@ -7109,7 +7109,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-icon-button.manager-recipe-step-nav {
+.fabricate-icon-button.manager-icon-button.manager-recipe-step-nav {
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
@@ -13589,7 +13589,7 @@ a.fabricate-button.manager-button {
   background: var(--fab-success);
 }
 
-.fabricate-manager .manager-icon-button.is-primary:not(:disabled) {
+.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
 }
@@ -13668,7 +13668,7 @@ a.fabricate-button.manager-button {
   background: var(--fab-success-strong);
 }
 
-.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover {
+.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
@@ -13687,11 +13687,23 @@ a.fabricate-button.manager-button {
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-icon-button {
+.fabricate-icon-button.manager-icon-button {
   width: 34px;
   height: 34px;
   padding: 0;
   flex: 0 0 34px;
+}
+
+/* The primitive's OWN focus ring (issue 1502). The two area rings — `.fabricate-app
+   button:focus-visible` and `.fabricate-manager button:focus-visible` — are (0,1,1) and stop
+   at their app root, so a control re-rooted at `fabricate-icon-button` would keep its paint
+   and lose its ring the moment it renders outside either area. The declarations are copied
+   verbatim from those two rules; at (0,2,0) this one wins over both wherever they also apply,
+   and the ghost/danger `:focus-visible` pairs above are (0,4,0) colour-and-background only, so
+   nothing here contends with them. */
+.fabricate-icon-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-pagination .manager-icon-button {
