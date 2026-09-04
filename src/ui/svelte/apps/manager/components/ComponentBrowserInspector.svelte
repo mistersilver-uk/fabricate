@@ -224,6 +224,7 @@
           <button
             type="button"
             class="manager-inline-link"
+            data-keyboard-focus="true"
             data-component-open-catalogue
             onclick={() => onOpenWorldEntry(worldEntry.id)}
           >

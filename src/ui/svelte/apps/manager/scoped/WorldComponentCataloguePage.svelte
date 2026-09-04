@@ -400,6 +400,7 @@
           <button
             type="button"
             class="manager-inline-link"
+            data-keyboard-focus="true"
             data-world-component-vocabulary-exit
             onclick={() => onOpenVocabulary()}
           >

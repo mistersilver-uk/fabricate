@@ -694,6 +694,7 @@
                   <button
                     type="button"
                     class="manager-inline-link"
+                    data-keyboard-focus="true"
                     data-scoped-entry-vocabulary-exit
                     onclick={() => onOpenWorldVocabulary()}
                   >
