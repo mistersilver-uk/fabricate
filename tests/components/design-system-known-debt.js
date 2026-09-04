@@ -197,11 +197,22 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * No file carries the `<!-- native select: … -->` marker today. `BulkEditSelect.svelte` and
  * `InventorySystemSelector.svelte` each carry a DOCBLOCK reason, which is not the marker and does
  * not exempt them; they are baselined like the rest.
+ *
+ * ONE ROW WAS ADDED AFTER THAT MEASUREMENT, at issue 1392: the World Vocabulary screen's sort
+ * key, `scoped/WorldVocabularyPage.svelte`. It is banked here rather than exempted, and it is not
+ * the marker's case — that exemption is for a surface which genuinely cannot host a Svelte
+ * component, and this one can. It is the SAME control as two of the 99: the sort trio the page's
+ * own header records it duplicates from `scoped/EntityListInspectorFrame.svelte`, which is the row
+ * above it here. The shared picker the gate's guidance names is `<Select>`, which issue 1504
+ * BUILDS and does not yet exist — `library.html` specifies it and nothing implements it — so the
+ * conversion available today is a bespoke pre-`Select` popover on one screen, diverging from the
+ * sibling that issue 1504 converts and that issue 1510 sweeps the manager's call sites onto. Both
+ * rows leave together with that sweep.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 99;
+export const KNOWN_NATIVE_SELECT_TOTAL = 100;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.

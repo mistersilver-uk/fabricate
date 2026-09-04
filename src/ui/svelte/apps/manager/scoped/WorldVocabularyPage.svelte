@@ -219,10 +219,18 @@
       </select>
       <!-- The direction is a TOGGLE that states its current position, not a second select.
            `aria-pressed` carries the same fact to a screen reader, and the visible word is what
-           makes the state readable without the glyph. -->
+           makes the state readable without the glyph.
+
+           `data-keyboard-focus="true"` is not decoration and is not inherited from the shipped
+           pair: Foundry's `KeyboardManager#hasFocus` returns `!!focused.form` for a BUTTON, so a
+           button with no ancestor `<form>` — and this route renders none — leaves the window
+           reading as unfocused while it holds focus. Every core keybinding then fires on the
+           toggle: Space pauses the game, the arrows pan the canvas behind the manager. The
+           attribute is what tells Foundry the control is holding focus. -->
       <button
         type="button"
         class="wvocab-direction"
+        data-keyboard-focus="true"
         data-wvocab-direction={sortOf(panel).direction}
         aria-pressed={sortOf(panel).direction === 'asc'}
         title={text('FABRICATE.Admin.Manager.Scoped.List.SortDirection', 'Reverse the sort order')}
