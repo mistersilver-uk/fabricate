@@ -25962,3 +25962,43 @@
   height: 38px;
   border-radius: 9px;
 }
+
+
+/* ══ issue 1371 r8-list — THE RULES EDITOR'S COLUMN STARTS WHERE ITS RAIL DOES ═══════════════
+   Lane GATES's alignment groups measured it: `profile-column-and-rail`.top reported the subject
+   insetting `rules-tabstrip` 16.0px below `rules-rail` (258.3 against 242.3) where the reference
+   starts them level.
+
+   THE REFERENCE PUTS THAT 16px BELOW THE TAB STRIP, NOT ABOVE IT. `proto:1301-1306` draws the
+   content column as a flex column whose FIRST child is the strip at `padding: 0 22px` — no top
+   padding at all, so the strip's box top IS the column's top and therefore the rail's — and gives
+   the 16px to the SCROLLING PANEL beneath it (`proto:1307`, `padding: 16px 22px 40px`). The
+   shipped column carried the whole `16px 24px 40px` on the FORM, which is the strip's ancestor,
+   so every child including the strip started 16px down.
+
+   Nothing measured it, and nothing could: the strip's own `box` group is its padding, which is
+   correct in both arrangements, and no region measures the form at all. An alignment group is
+   the only pass that can see an inset that moves a whole column and changes no property on it —
+   which is exactly the case `prototype-parity-measurement.md` names.
+
+   TWO DECLARATIONS, AND THE SECOND IS NOT COSMETIC. Dropping the column's top padding alone
+   would leave the strip-to-first-card distance at the grid's own 12px gap; the reference's is 16
+   (the panel's `padding-top`, immediately under a strip with no margin). `--fab-space-1` on the
+   strip's bottom margin composes with the 12px gap to make exactly that, and a margin is not in
+   the `box` group, so it moves no measured line on the strip either.
+
+   BOTH ARE APPENDED RATHER THAN EDITED IN PLACE, because this sheet is shared by five lanes this
+   revision. Both are chained through `.manager-component-edit-main` — (0,4,0) and (0,5,0) against
+   the base rules' (0,2,0) and (0,3,0) — so each wins on specificity rather than on order, and
+   neither repeats a selector the sheet already carries (`no-duplicate-selectors` refuses that,
+   and a duplicate would also be a second home for one rule). */
+.fabricate-manager .manager-main.manager-component-edit-main .manager-component-edit-view {
+  padding-top: 0;
+}
+
+.fabricate-manager
+  .manager-main.manager-component-edit-main
+  .manager-component-edit-view
+  > .manager-editor-tabs {
+  margin-bottom: var(--fab-space-1);
+}
