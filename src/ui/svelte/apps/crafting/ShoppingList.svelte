@@ -34,48 +34,151 @@
 
   // Missing ingredient components + missing essences, folded into one acquire list.
   // Only shortfalls appear (satisfied entries drop out entirely).
-  const acquireComponents = $derived([
-    ...ingredients
-      .filter((ing) => ing?.satisfied !== true)
-      .map((ing) => ({
-        key: `ing:${ing.componentId ?? ing.description ?? ing.name}`,
-        name: displayName(ing.name, ing.description),
-        img: ing.img ?? null,
-        isEssence: ing.isEssence === true,
-        icon: ing.icon ?? null,
-        have: ing.have ?? 0,
-        need: ing.totalNeed ?? 0,
-      })),
-    ...essences
-      .filter((ess) => ess?.satisfied !== true)
-      .map((ess) => ({
-        key: `ess:${ess.type}`,
-        name: displayName(ess.name, ess.type),
-        icon: ess.icon ?? null,
-        isEssence: true,
-        have: ess.have ?? 0,
-        need: ess.totalNeed ?? 0,
-      })),
-  ]);
+  //
+  // Every row's `key` is the one the AGGREGATOR stamped. It is not re-derived here (issue
+  // 1493): this list re-implemented the identity rule with a coarser one, so two entries
+  // the aggregator deliberately kept apart — a currency cost and a same-description item —
+  // collapsed onto one key, and Svelte answers a repeated `{#each}` key with
+  // `each_key_duplicate`, thrown in the production branch too. With no `<svelte:boundary>`
+  // anywhere under `src/`, that takes down the whole crafting app, not the row.
+  const acquireComponents = $derived(
+    [
+      ...ingredients.filter((ing) => ing?.satisfied !== true).map(ingredientRow),
+      ...essences.filter((ess) => ess?.satisfied !== true).map(essenceRow),
+    ].map(keyed)
+  );
 
+  // The last-resort key for a hand-built aggregate that carries none. Positional, so it is
+  // NOT a second identity rule: it only guarantees uniqueness across the folded list, and
+  // the `row:` namespace cannot collide with any stamped key (`cid:`/`uuid:`/`cur:`/
+  // `desc:`/`ess:`). A wrong key costs DOM identity across a reorder; a duplicate one costs
+  // the app.
+  function keyed(row, index) {
+    return row.key ? row : { ...row, key: `row:${index}` };
+  }
+
+  function ingredientRow(ing) {
+    return {
+      key: ing.key ?? null,
+      name: displayName(ing.name, ing.description),
+      img: ing.img ?? null,
+      isEssence: ing.isEssence === true,
+      icon: ing.icon ?? null,
+      // A CURRENCY cost (issue 1493). `have`/`need` are carried for shape parity with
+      // every other row but MUST NOT be rendered for one: `have` is the evaluation's
+      // placeholder, so the shared ratio chip read "0 / 100 owned" in the danger tone
+      // for a player who simply cannot pay — asserting a coin balance nobody measured.
+      isCurrency: ing.isCurrency === true,
+      have: ing.have ?? 0,
+      need: ing.totalNeed ?? 0,
+      chip: ingredientChip(ing),
+      // Whether this row is a shortfall Fabricate can actually ASSERT — see the summary
+      // count below.
+      assertedShortfall: isAssertedShortfall(ing),
+    };
+  }
+
+  function essenceRow(ess) {
+    return {
+      key: ess.key ?? null,
+      name: displayName(ess.name, ess.type),
+      icon: ess.icon ?? null,
+      isEssence: true,
+      isCurrency: false,
+      have: ess.have ?? 0,
+      need: ess.totalNeed ?? 0,
+      chip: ratioChip(ess.have ?? 0, ess.totalNeed ?? 0),
+      assertedShortfall: true,
+    };
+  }
+
+  // The aggregator's stamped key here too, for the same reason: two nameless tools keyed
+  // `tool:undefined` alike under the rule this list used to re-derive.
   const acquireTools = $derived(
     tools
       .filter((tool) => tool?.available !== true)
       .map((tool) => ({
-        key: `tool:${tool.componentId ?? tool.name}`,
+        key: tool.key ?? null,
         name: tool.name ?? '',
         img: tool.img ?? null,
         needsRepair: tool.needsRepair === true,
       }))
+      .map(keyed)
   );
 
   const plannedRecipes = $derived(queued.length);
-  const missingComponentsCount = $derived(acquireComponents.length);
+  // Counts the rows Fabricate can ASSERT a shortfall for, which is what the card's label
+  // ("Missing components") and its red `is-alert` tone both claim (issue 1493). The two
+  // currency rows that carry no verdict are excluded: a cost blocked by the world's
+  // currency setup is not something the player can go and acquire — nothing they buy
+  // clears it — and a multi-craft aggregate whose affordability was never checked is not
+  // a shortfall anyone measured. Both still RENDER below, tone-warning and tone-neutral
+  // respectively, so the requirement is visible without being counted as the player's
+  // debt. A genuinely unaffordable cost does count: that shortfall is real and measured.
+  const missingComponentsCount = $derived(
+    acquireComponents.filter((row) => row.assertedShortfall).length
+  );
   const unavailableToolsCount = $derived(acquireTools.length);
 
-  function ownedLabel(row) {
-    return localize('FABRICATE.App.Crafting.Shopping.Owned', { have: row.have, need: row.need });
+  function ratioChip(have, need) {
+    return {
+      mode: 'ratio',
+      tone: 'tone-danger',
+      label: localize('FABRICATE.App.Crafting.Shopping.Owned', { have, need }),
+      title: null,
+    };
   }
+
+  // A currency row's NAME is already the whole cost ("100 gp"), so its chip never states a
+  // balance or a price — only which of THREE things is true of it (issue 1493). Decided by
+  // the aggregator's own fields, never re-derived here.
+  //
+  //  1. the world's currency setup cannot resolve the cost at all. That is not the
+  //     player's fault and not an affordability shortfall, so it is a WARNING naming the
+  //     reason on hover — telling a solvent player "Can't afford" is the original defect
+  //     wearing a new voice;
+  //  2. the queue spends this cost more than once. Only a SINGLE craft's affordability was
+  //     ever checked, so the row states how many times the cost recurs and withholds the
+  //     verdict entirely rather than inventing a red or a green;
+  //  3. a checked, genuine shortfall.
+  function currencyChip(ing) {
+    if (ing.issue) {
+      return {
+        mode: 'currency-unavailable',
+        tone: 'tone-warning',
+        label: localize('FABRICATE.App.Crafting.Shopping.CurrencyUnavailable'),
+        title: ing.issue,
+      };
+    }
+    if (ing.affordabilityChecked === false) {
+      const count = ing.costRepeats ?? 1;
+      return {
+        mode: 'currency-unchecked',
+        tone: 'tone-neutral',
+        label: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeats', { count }),
+        title: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeatsHint', { count }),
+      };
+    }
+    return {
+      mode: 'currency',
+      tone: 'tone-danger',
+      label: localize('FABRICATE.App.Crafting.Shopping.CurrencyShort'),
+      title: null,
+    };
+  }
+
+  function ingredientChip(ing) {
+    if (ing.isCurrency !== true) return ratioChip(ing.have ?? 0, ing.totalNeed ?? 0);
+    return currencyChip(ing);
+  }
+
+  // A row Fabricate can state a shortfall for. The two verdict-less currency states are
+  // not shortfalls: one is a GM setup problem, the other is a question nobody answered.
+  function isAssertedShortfall(ing) {
+    if (ing.isCurrency !== true) return true;
+    return !ing.issue && ing.affordabilityChecked !== false;
+  }
+
   function onEntryContext(recipeId, event) {
     event.preventDefault();
     onDecrement?.(recipeId);
@@ -204,7 +307,13 @@
                   <CraftingThumb src={row.img} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
-                <span class="crafting-shopping-chip tone-danger">{ownedLabel(row)}</span>
+                <span
+                  class={`crafting-shopping-chip ${row.chip.tone}`}
+                  data-shopping-chip={row.chip.mode}
+                  title={row.chip.title}
+                >
+                  {row.chip.label}
+                </span>
               </li>
             {/each}
           </ul>
@@ -571,5 +680,14 @@
     color: var(--fab-warning-text);
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
+  }
+
+  /* The row states a fact and no verdict (issue 1493): a currency cost whose affordability
+     was only ever checked for a single craft. Neither red nor amber would be honest, so it
+     borrows the surrounding chrome rather than any status hue. */
+  .crafting-shopping-chip.tone-neutral {
+    color: var(--fab-text-muted);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
   }
 </style>

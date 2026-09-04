@@ -2029,6 +2029,11 @@ A crafting system's Settings tab keeps only the currency participation toggle; i
   A page component cannot perform one, so each page hands the source entry to a callback and does nothing else; the route owns the mapping, the write to the destination library, the route change, the open request and the aria-live confirmation.
   The confirmation MUST be rendered by the destination rather than the source: rendered on the source page it is torn down by the navigation before an assistive technology reaches it.
   The destination opens the new entry and reveals it, because a copy is appended to the end of a library and an entry that is open but off-screen is indistinguishable from one that was never created.
+- The page SHALL render the world profile's validation errors (`validateCurrencyProfile`) as a non-blocking, polite live region, listing each error by the unit label it names.
+  Persistence stays ungated: the note reports, it never refuses a write (`data-models/spec.md` CurrencyConfig requirement 4).
+  This is the surface `data-models/spec.md` CurrencyConfig requirement 5 requires, and without it a PROFILE-invalid ladder — one `validateCurrencyProfile` itself rejects, such as a missing abbreviation, an empty actor data path, or a unit collision — was discoverable only by failing a craft.
+  It does NOT cover a per-actor failure such as a present-but-wrong actor data path, matching `data-models/spec.md` CurrencyConfig requirement 5: `validateCurrencyProfile` cannot detect it (the path is present), so that fault stays discoverable only by failing a craft on the affected actor.
+  The note is suppressed while no currency unit is defined, because the route's empty state already says so and a GM who has authored nothing yet is not in error.
 
 Shipped controls:
 
@@ -3767,6 +3772,12 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   questions under one name.
 - `essencePool` is `null` when the crafting system has essences disabled, matching
   the existing per-set essence-state projection.
+- A currency requirement's projected state SHALL carry its cost and an affordability verdict.
+- No surface SHALL report a have/need ratio for a currency requirement.
+  The occurrence quantity is not the price, and a coin balance is not an item count; reporting "have 0, need 1" for a hundred-gold cost states neither the price nor the shortfall.
+  The state may still carry the sibling `have`/`need` keys for shape consistency with the option-choice projection, but nothing renders them.
+- When currency is enabled for the system but cannot be resolved, the projected state SHALL carry the reason.
+  A currency option refused for a configuration reason MUST NOT present as an affordability shortfall.
 
 ##### Check Descriptor
 
@@ -3849,6 +3860,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   Three disconnected surfaces cannot tell a player which requirement still needs attention, which is the whole job of this area.
 - Every slot carries one of three states — **met**, **partial**, **short** — because a two-state surface renders an untouched choice and a genuinely unaffordable one identically, and marks a half-filled essence as an error.
   A fixed requirement is met at or above its need and short below it; an unchosen choice slot is **partial** (a to-do, never an error); a chosen choice slot is met or short on its own numbers; an essence requirement is short at zero delivered, partial while partly delivered, and met when fully delivered.
+  A fixed CURRENCY requirement is the one exception to the ratio rule: it is binary by construction, so its state comes from its affordability verdict rather than from comparing a have against a need.
+- A currency requirement tile renders its cost in place of a have/need pip.
+- A currency configuration reason renders once per rail, not per tile: the reason belongs to the world's configuration rather than to any one requirement, so repeating it per tile would assert it as a property of each.
 - At most ONE chooser is open at a time; the open slot is the rail's single point of interaction.
 - Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
   The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
@@ -3886,6 +3900,13 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   Render-time canonical normalization uses `DEFAULT_ESSENCE_ICON` when the retained value is missing or unusable, without changing need/have totals.
 - The aggregation shops an essence requirement against the amount **held**, not the amount the plan delivers: `RecipeManager.evaluateShoppingRequirement` deliberately restates an essence state's `owned` as the `have` it aggregates on.
   This is the one place `owned` is reported as `have` (see §Per-Set Craftability), because `delivered` is capped at `need` and a shortage shopped against it would always read satisfied.
+- The aggregation SHALL evaluate against the selected crafting actor, not against the component-source actors alone.
+  The currency affordance probe is actor-bound, so an aggregation that supplies no crafting actor reports every currency requirement as missing regardless of the actor's balance.
+- A currency requirement's affordability verdict is scoped to a **single craft of a single recipe**, because that is the only question the affordance probe answers.
+  The aggregation SHALL NOT report an affirmative verdict for an aggregate that exceeds one craft's cost; such a row stays visible, states how many times the cost recurs, and presents no affordability verdict.
+  A negative verdict is exempt and SHALL stand for any aggregate, because an actor who cannot pay for one craft cannot pay for more.
+- A currency row that presents no affordability verdict — whether because the world's configuration refused it or because the aggregate was never established — SHALL NOT count toward the missing-components total.
+  That total names components the player can go and acquire, and neither row is one.
 
 #### Right Rail (Run Summary or Shopping List)
 

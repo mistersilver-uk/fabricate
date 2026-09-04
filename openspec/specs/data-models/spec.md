@@ -792,7 +792,12 @@ type CurrencyConfig = {
    A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
    The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
 5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
-   Validity is resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
+   The World then Currency route is that surface and MUST render the result once a ladder exists (see `ui-integration/spec.md` _GM World Currency Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
+   Validity is also resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
+   That refusal MUST carry its reason to the caller.
+   A probe or gate that reduces a resolved refusal to a bare `false` reports a shortfall the player does not have, and is a defect.
+   The reason covers both an invalid profile and a resolvable profile with no usable coin spender, and names which of the two it is.
+   It does NOT cover a per-actor failure such as a present-but-wrong actor data path, which profile validation cannot detect.
 6. The one structural refusal the store makes is a sub-unit edit that would self-reference or create a cycle, because that corrupts the graph every reader walks rather than merely leaving the ladder incomplete.
    Deleting a unit additionally strips every `contains[]` entry pointing at it, so a deletion never leaves a dangling edge for a reader to defend against.
 7. **Unit `id`s are stable and are never rewritten**, because recipe currency options (`Ingredient.match.unit`) and salvage currency requirements (`CurrencyRequirement.unit`) store unit ids rather than labels, so a dropped or re-keyed unit orphans every reference to it.

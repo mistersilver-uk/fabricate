@@ -180,3 +180,85 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     assert.ok(qty.classList.contains('is-short'));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 1493 — a currency row states its cost in its NAME and reports nothing else.
+//
+// A render defect, so it is asserted against the mounted DOM: `planRowFor` can carry a
+// perfectly correct `isCurrency` while the markup keeps rendering both spans. Before this
+// branch a 100 gp cost rendered as "100 gp … ConsumptionPlan.Owned:{count:0} … x100" —
+// the evaluation's placeholder presented as a coin balance, and the price restated in
+// coin units beside a name that already spells it out.
+// ---------------------------------------------------------------------------
+
+function currencyPlanCraftability(overrides = {}) {
+  return {
+    ingredientStates: [
+      { groupId: 'g-iron', name: 'Iron', img: null, need: 2, have: 5, satisfied: true },
+      {
+        groupId: 'g-toll',
+        name: '100 gp',
+        description: '100 gp',
+        img: 'icons/coin.webp',
+        need: 100,
+        have: 0,
+        satisfied: true,
+        isCurrency: true,
+        affordable: true,
+        issue: '',
+        ...overrides,
+      },
+    ],
+  };
+}
+
+describe('ConsumptionPlanPanel currency rows (issue 1493)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  it('renders the cost as the whole row, with no owned count and no multiplier', async () => {
+    const target = await harness.mount({
+      plan: buildConsumptionPlan(currencyPlanCraftability()),
+    });
+    const rows = [...target.querySelectorAll('[data-consumption-row]')];
+    assert.equal(rows.length, 2, 'the currency cost keeps its place in the plan');
+
+    const coin = rows[1];
+    assert.equal(coin.querySelector('.consumption-plan-name').textContent.trim(), '100 gp');
+    assert.ok(
+      !coin.querySelector('.consumption-plan-owned'),
+      'the placeholder owned count must not be presented as a coin balance'
+    );
+    assert.ok(
+      !coin.querySelector('.consumption-plan-qty'),
+      'and the price must not be restated in coin units as a multiplier'
+    );
+    assert.equal(
+      coin.textContent.trim(),
+      '100 gp',
+      `a currency row says exactly its cost and nothing else: "${coin.textContent.trim()}"`
+    );
+  });
+
+  it('suppresses both spans for an unaffordable cost too', async () => {
+    const target = await harness.mount({
+      plan: buildConsumptionPlan(
+        currencyPlanCraftability({ satisfied: false, affordable: false })
+      ),
+    });
+    const coin = [...target.querySelectorAll('[data-consumption-row]')][1];
+    assert.equal(coin.textContent.trim(), '100 gp');
+    assert.ok(!coin.querySelector('.consumption-plan-qty'));
+  });
+
+  it('still renders owned and quantity for an ordinary item row', async () => {
+    // The control: the currency branch must not strip the spans from every row.
+    const target = await harness.mount({
+      plan: buildConsumptionPlan(currencyPlanCraftability()),
+    });
+    const iron = [...target.querySelectorAll('[data-consumption-row]')][0];
+    assert.match(iron.querySelector('.consumption-plan-owned').textContent, /"count":5/);
+    assert.equal(iron.querySelector('.consumption-plan-qty').textContent.trim(), '×2');
+  });
+});

@@ -5,6 +5,9 @@
   have/need corner pip moved here from IoTable's legacy grid, a caption, and — for
   a selectable slot — the disclosure line that says what opening it offers.
 
+  A CURRENCY slot is the one exception to the pip (issue 1493): its caption already
+  states the cost, and it has no have/need ratio to report.
+
   Props only: every string arrives already localized and every number already
   derived, so the tile owns presentation and nothing else. Both artwork paths are
   the SHARED thumbs — CraftingThumb for component/tag artwork (plus the item-bag
@@ -47,6 +50,12 @@
   const kind = $derived(String(slot?.kind ?? 'fixed'));
   const state = $derived(String(slot?.state ?? 'short'));
   const isEssence = $derived(slot?.isEssence === true);
+  // A currency slot draws NO pip (issue 1493). Its `need` is a price and its `have` is
+  // always 0, so "0/100" states a shortfall the player may well not have — and the
+  // affordability verdict is already carried by the status border, which for a fixed
+  // slot is exactly `satisfied ? met : short`. A cost chip is not drawn either: it would
+  // be byte-identical to the caption immediately below it, which is already the cost.
+  const isCurrency = $derived(slot?.isCurrency === true);
   const selectable = $derived(slot?.interactive === true && !readOnly);
   const have = $derived(Number(slot?.have ?? 0));
   const need = $derived(Number(slot?.need ?? 0));
@@ -66,7 +75,9 @@
     {:else}
       <CraftingThumb src={slot?.img} alt="" size={44} glyph={fallbackGlyph} />
     {/if}
-    <span class={`requirement-slot-pip is-${state}`} aria-hidden="true">{have}/{need}</span>
+    {#if !isCurrency}
+      <span class={`requirement-slot-pip is-${state}`} aria-hidden="true">{have}/{need}</span>
+    {/if}
   </span>
   <span class="requirement-slot-caption">{caption}</span>
   {#if selectable && disclosure}
