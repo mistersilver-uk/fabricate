@@ -2043,7 +2043,7 @@ test('changed files map to the windows they affect', () => {
 
 test('the broad SearchablePopover signal captures every deliberate picker state, in both apps', () => {
   const selected = mapChangedFilesToCases([
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
 
   // Three overrides, not one, because the primitive has three modes and no frame shows
@@ -2102,17 +2102,67 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-test('the player top bar routes to the frame that opens its picker, not only to the pair', () => {
-  // `src/ui/svelte/components/` is a broad signal, so before issue 1475 this file published the
-  // representative pair and nothing else — and in both of those frames the picker is CLOSED. The
-  // override is what makes a change to the bar publish the state it changed.
+// The ten frames a change to the shared positioning seam must publish (issue 1500).
+//
+// Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
+// the answer from the same array would agree with any wiring, including the one this list exists
+// to correct. The seam shipped selecting SEVEN of these — the `SearchablePopover` frames minus the
+// bulk-edit picker, which reaches its `sourceMatches` through a shared array — and reading
+// `BROAD_SIGNAL_CASE_OVERRIDES` as cover for the `IconPicker` and `ActionMenu` frames was the
+// mistake that let three go missing. That map routes a change to a COMPONENT; this seam is a file
+// those components import, and no override entry can speak for it.
+//
+// Both files are pinned, not just the action. They are a pair by construction — the action is the
+// pass and `overlayBounds.js` holds the boundaries it clamps against — and a wiring that named one
+// of them in a case's `sourceMatches` and dropped the other would publish a full-looking set for
+// half the seam.
+const ANCHORED_POPOVER_FRAMES = [
+  'manager-environment-edit-automatic-force-add',
+  'manager-gathering-task-availability-menu',
+  'manager-recipe-edit-ingredients-or-menu',
+  'manager-recipe-edit-tag-picker',
+  'manager-recipes-bulk-edit-picker',
+  'manager-system-edit-lists',
+  'manager-world-parties-actor-picker',
+  'manager-world-parties-realm-override-picker',
+  'player-actor-picker',
+  'world-tool-entry-on-break-repair-tag-picker-empty',
+];
+
+for (const seamFile of [
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
+]) {
+  test(`${seamFile} publishes every frame that rests on an open panel`, () => {
+    const selected = mapChangedFilesToCases([seamFile]).map((viewCase) => viewCase.id);
+
+    assert.deepEqual(
+      selected.sort((a, b) => a.localeCompare(b)),
+      ANCHORED_POPOVER_FRAMES,
+      `a change confined to ${seamFile} publishes the wrong set of frames. Every id here is a ` +
+        'frame whose own `expectSelector` requires a panel to have been measured, clamped and ' +
+        'portaled, so a regression in that pass is visible in each of them and in no other frame ' +
+        'in the registry. A SHORTER list means a case dropped the seam from its `sourceMatches` ' +
+        'and now shows a panel nothing routes to; a LONGER one means the seam was added to a ' +
+        'frame that draws its trigger closed, which publishes evidence that cannot move.'
+    );
+  });
+}
+
+test('the player top bar routes to the frame that opens its picker, not only to the one that draws it', () => {
+  // Before issue 1475 the bar sat under `src/ui/svelte/components/`, a broad signal, so it
+  // published the representative pair and nothing else — and in both of those frames the picker is
+  // CLOSED. An override added the frame that opens it. Issue 1500 moved the file to `apps/`, where
+  // it is a broad signal no longer: the override went, and the two frames it actually appears in
+  // name it themselves. `manager-components-normal` is deliberately NOT among them — it is the
+  // MANAGER, and it drew this player bar only ever as a side effect of the broad-signal pair.
   const selected = mapChangedFilesToCases([
-    'src/ui/svelte/components/ActorSelectTopBar.svelte',
+    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   ]).map((viewCase) => viewCase.id);
 
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
-    ['fabricate-app-shell', 'manager-components-normal', 'player-actor-picker']
+    ['fabricate-app-shell', 'player-actor-picker']
   );
 });
 

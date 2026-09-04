@@ -375,6 +375,14 @@ Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables wi
 A window that needs a root picks whichever of the two matches what it IS — a GM authoring surface or a play surface — rather than minting one for itself, because each new root is another ancestor a portal resolver must know about and another family a primitive can be accidentally scoped under.
 A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 
+The measurement, the flip, the clamp, the portal and the re-measure on scroll and resize are ONE implementation, the `anchoredPopover` action, and a floating surface MUST position itself through it rather than write the pass again.
+Seven surfaces each carried a hand-written copy before issue 1500 — six shared components and one screen region, the environments browser's biome colour picker, which was found only after the six converted — and they agreed on the invariant and disagreed on everything around it: which clipping boundary, whether a scroll inside the panel counts, whether a missing `addEventListener` is guarded.
+A copy is not a defect until it drifts, and this family had already drifted once in the direction that matters: `overlayHost.js` records the same six components getting the HOST lookup wrong at once.
+The action takes the layout function as a REQUIRED option and imports neither of the two that ship, because a default would put one layout module in the static-import closure of every caller and oblige a mounted test that compiles only a menu to declare the picker's layout.
+A caller's CLIPPING BOUNDARY reaches it only through `bounds` — a selector string for the nearest matching ancestor, or a resolver — and the action MUST NOT name an application's own scroller.
+Nor may a component under `src/ui/svelte/components/`: that directory's premise is that a component in it works wherever it is mounted, and `.manager-main` inside one of them is the same coupling as a hard-coded portal host in a quieter spelling.
+The shipped boundaries are values in `src/ui/svelte/util/overlayBounds.js`, which a shared component takes as its `bounds` default and a caller in another application overrides.
+
 A primitive MUST set its own `height` and `min-height` on any button and its own width on any input, because Foundry's element rules otherwise crop or stretch it.
 A radio or checkbox MUST remove core's pseudo-element rendering in addition to setting `appearance: none`.
 A serif heading MUST name the element it renders on, because bare headings take core's colour and margins.
@@ -511,6 +519,8 @@ It toggles membership, stays open across choices and marks several options selec
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
 It has been adopted: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which is the shipped surface the unscoping and the portal-host resolver are now proved by rather than merely permitted for.
+A primitive that has cleared this bar BELONGS in the shared directory, and the picker was moved into `src/ui/svelte/components/` at issue 1500 to say so; a shared primitive left under one application's directory tells every reader, and the View Lab's broad-signal routing, that it is that application's component.
+The bar runs the other way too, and moved out of the same directory in the same change: a 506-line screen region with one caller is not a shared component, whichever primitives it reuses.
 
 #### Scenario: A converted menu renders no query field
 

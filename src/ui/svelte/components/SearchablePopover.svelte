@@ -208,13 +208,15 @@
 -->
 <script>
   import { tick } from 'svelte';
-  import Chip from './Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import { localize } from '../../util/foundryBridge.js';
-  import { portal } from '../../actions/portal.js';
-  import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
-  import { overlayHostRect, resolveOverlayHost } from '../../util/overlayHost.js';
+  import Chip from '../apps/manager/Chip.svelte';
+  import EmptyState from '../apps/manager/EmptyState.svelte';
+  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
+  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { localize } from '../util/foundryBridge.js';
+  import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { pickerScrollerBounds } from '../util/overlayBounds.js';
+
+  const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   /**
    * The primitive's OWN localization, which none of its other strings need.
@@ -272,6 +274,12 @@
     pickerClass = '',
     minWidth = 240,
     maxWidth = 340,
+    // The clipping boundary the popover is clamped inside: a selector string for the nearest
+    // matching ancestor, or a resolver. The default is the shipped WALK over the manager and
+    // admin scrollers, which skips a zero-sized or `display: contents` candidate and falls back
+    // to the host's own inset edges — a shared component must not name an application's scroller
+    // itself, so the selector is a value from `util/overlayBounds.js`.
+    bounds = pickerScrollerBounds,
     // OPTIONAL two-way handle on the open state (default false, so every consumer that
     // does not `bind:` it behaves exactly as before). The World > Parties travel-actor
     // panel needs it in both directions: its TILE opens the picker without being the
@@ -286,7 +294,6 @@
   let popoverRoot = $state(null);
   let triggerButton = $state(null);
   let searchInput = $state(null);
-  let popoverStyle = $state('');
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
   const filteredOptions = $derived(
@@ -404,85 +411,6 @@
     event.stopPropagation();
   }
 
-  function getPopoverHost() {
-    return resolveOverlayHost(pickerRoot, { component: 'SearchablePopover' });
-  }
-
-  function getHorizontalBounds(hostRect) {
-    if (!pickerRoot) return {};
-    // `.manager-travel-parties` is the World > Parties pane's OWN scroller (issue 1182):
-    // that pane scrolls itself rather than sitting inside `.manager-table-scroll`, so
-    // without it here a card's travel-actor picker is bounded by the manager shell and
-    // can be laid out past the pane's right edge.
-    const selector =
-      '.admin-main, .manager-main, .manager-table-scroll, .manager-travel-parties-content, .manager-travel-parties';
-    let candidate = pickerRoot.parentElement;
-    while (candidate) {
-      if (candidate.matches?.(selector)) {
-        const rect = candidate.getBoundingClientRect?.();
-        const display = globalThis.getComputedStyle?.(candidate)?.display;
-        if (rect && rect.width > 0 && rect.height > 0 && display !== 'contents') {
-          return {
-            minLeft: rect.left - hostRect.left + 16,
-            maxRight: rect.right - hostRect.left - 16,
-          };
-        }
-      }
-      candidate = candidate.parentElement;
-    }
-    return {
-      minLeft: 16,
-      maxRight: Math.max(16, hostRect.width - 16),
-    };
-  }
-
-  function updatePosition() {
-    // In `inlineSearchTrigger` mode the trigger button is UNMOUNTED while open (the
-    // search field takes its place), so the anchor falls back to the picker root —
-    // which is the element the inline field occupies. Without the fallback the panel
-    // would keep its last style and drift on scroll.
-    const anchor = triggerButton ?? pickerRoot;
-    if (!open || !anchor || typeof window === 'undefined') return;
-    const host = getPopoverHost();
-    const hostRect = overlayHostRect(host);
-    const triggerRect = anchor.getBoundingClientRect();
-    const bounds = getHorizontalBounds(hostRect);
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: 'left',
-        minWidth,
-        maxWidth,
-        minLeft: bounds.minLeft,
-        maxRight: bounds.maxRight,
-      }
-    );
-    if (!layout) {
-      popoverStyle = '';
-      return;
-    }
-    const vertical =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-    const cappedHeight = maxHeight > 0 ? Math.min(layout.maxHeight, maxHeight) : layout.maxHeight;
-    popoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${cappedHeight}px;`,
-      vertical,
-    ].join(' ');
-  }
-
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
   // duplication gate counts and a place for the two shapes to drift apart.
   const triggerAttributes = $derived({
@@ -502,22 +430,6 @@
   $effect(() => {
     if (!open || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
-  });
-
-  $effect(() => {
-    if (!open || typeof window === 'undefined' || typeof document === 'undefined') {
-      popoverStyle = '';
-      return;
-    }
-    updatePosition();
-    if (typeof window.addEventListener !== 'function') return;
-    const handleViewportChange = () => updatePosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
   });
 </script>
 
@@ -587,17 +499,31 @@
 
   {#if open}
     <!-- `fabricate-picker-popover` is the panel's own half of the primitive's namespace root. It
-         is a SECOND class rather than the one on the picker root because `use:portal` moves this
-         node out of that root, taking its classes and losing its ancestors. -->
+         is a SECOND class rather than the one on the picker root because `use:anchoredPopover`
+         below moves this node out of that root, taking its classes and losing its ancestors. -->
     <div
       bind:this={popoverRoot}
       class={`fabricate-picker-popover manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
-      style={popoverStyle}
       role="dialog"
       tabindex="-1"
       data-keyboard-focus="true"
       aria-label={dialogAriaLabel || undefined}
-      use:portal={() => getPopoverHost()}
+      use:anchoredPopover={{
+        component: 'SearchablePopover',
+        // In `inlineSearchTrigger` mode the trigger button is UNMOUNTED while open (the search
+        // field takes its place), so the anchor falls back to the picker root — which is the
+        // element the inline field occupies. Without the fallback the panel would keep its last
+        // style and drift on scroll. Both are read EAGERLY, so the swap re-runs the measure.
+        trigger: triggerButton ?? pickerRoot,
+        layout: popoverLayout,
+        // `minWidth`/`maxWidth` are read INSIDE this closure, so they are not dependencies of the
+        // action's `update`: the action re-runs the closure on its next measure rather than when
+        // either prop changes. Both are fixed for the life of one open here, so nothing is owed;
+        // a caller that needed to change a width band mid-open would have to re-measure it.
+        layoutOptions: () => ({ horizontalAlign: 'left', minWidth, maxWidth }),
+        maxHeightCap: maxHeight,
+        bounds,
+      }}
       onclick={stop}
       onkeydown={(event) => {
         if (event.key === 'Escape') {

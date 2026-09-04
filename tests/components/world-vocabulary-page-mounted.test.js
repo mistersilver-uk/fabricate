@@ -77,6 +77,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    // IconPicker positions its panel through the shared action (issue 1500), which resolves the
+    // manager's clipping boundary from `overlayBounds.js`; both are static imports of the picker,
+    // so the closure validator names them the moment the two trees meet.
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/utils/managerBrowserViewState.js',
     // The page's own pure leaf and the World Vocabulary core it imports. Omitting either does
     // not fail a test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, which

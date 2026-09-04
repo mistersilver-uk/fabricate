@@ -53,7 +53,7 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The shared bulk-edit chrome: this panel renders its header, hero, section headings,
     // staged selects and Apply through these three, exactly as the Component Studio's does.

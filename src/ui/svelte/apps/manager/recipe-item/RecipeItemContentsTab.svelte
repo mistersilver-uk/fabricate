@@ -14,7 +14,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';

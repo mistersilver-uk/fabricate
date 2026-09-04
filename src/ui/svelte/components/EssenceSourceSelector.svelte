@@ -1,16 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { dragDrop } from '../actions/dragDrop.js';
-  import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
+  import { MANAGER_SCROLLER_SELECTOR } from '../util/overlayBounds.js';
+
+  const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   let {
     value = null,
     items = [],
     disabled = false,
+    // The clipping boundary the popover is clamped inside — see `IconPicker`, which takes the
+    // same prop for the same reason: the selector is a value, not a shared component's business.
+    bounds = MANAGER_SCROLLER_SELECTOR,
     onDrop = () => {},
     onSelect = () => {},
     onClear = () => {},
@@ -22,7 +27,6 @@
   let triggerButton = $state(null);
   let popoverRoot = $state(null);
   let searchInput = $state(null);
-  let popoverStyle = $state('');
 
   const filteredItems = $derived.by(() => {
     const query = String(searchTerm || '')
@@ -68,90 +72,9 @@
     onClear?.();
   }
 
-  function getPopoverHost() {
-    return resolveOverlayHost(selectorRoot, { component: 'EssenceSourceSelector' });
-  }
-
-  function getPopoverHorizontalBounds(hostRect) {
-    if (!selectorRoot) return {};
-
-    const mainPanel = selectorRoot.closest('.admin-main, .manager-main, .manager-table-scroll');
-    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
-    if (!mainPanelRect) return {};
-
-    return {
-      minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16,
-    };
-  }
-
-  function updatePopoverPosition() {
-    if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
-
-    const popoverHost = getPopoverHost();
-    const hostRect = overlayHostRect(popoverHost);
-    const triggerRect = triggerButton.getBoundingClientRect();
-    const horizontalBounds = getPopoverHorizontalBounds(hostRect);
-
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: 'left',
-        minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight,
-        minWidth: 280,
-        maxWidth: 420,
-      }
-    );
-
-    if (!layout) {
-      popoverStyle = '';
-      return;
-    }
-
-    const verticalPosition =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-
-    popoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
-      verticalPosition,
-    ].join(' ');
-  }
-
   $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
-  });
-
-  $effect(() => {
-    if (!pickerOpen || typeof window === 'undefined' || typeof document === 'undefined') {
-      popoverStyle = '';
-      return;
-    }
-
-    updatePopoverPosition();
-
-    const handleViewportChange = () => updatePopoverPosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
   });
 </script>
 
@@ -218,10 +141,15 @@
     <div
       bind:this={popoverRoot}
       class="fabricate-source-picker-popover essence-source-picker-popover"
-      style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.SourcePickerLabel')}
-      use:portal={() => getPopoverHost()}
+      use:anchoredPopover={{
+        component: 'EssenceSourceSelector',
+        trigger: triggerButton,
+        layout: popoverLayout,
+        layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 280, maxWidth: 420 }),
+        bounds,
+      }}
     >
       <div class="essence-source-picker-search">
         <input

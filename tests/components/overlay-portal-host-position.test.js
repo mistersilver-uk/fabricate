@@ -201,6 +201,13 @@ const SELECTORS = Object.freeze({
     trigger: '.manager-color-picker-trigger',
     panel: '.fabricate-color-picker-popover',
   }),
+  // `RecipeDurationEditor` (issue 1500). Manager-only: its panel takes `position: absolute` from
+  // `.fabricate-manager .manager-recipe-duration-popover`, so it is a manager surface rather than
+  // a shared primitive and there is no player-app reading to take.
+  duration: Object.freeze({
+    trigger: '[data-recipe-duration-trigger]',
+    panel: '.manager-recipe-duration-popover',
+  }),
 });
 
 /**
@@ -495,6 +502,34 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
         `\`${panelHit?.className ?? 'nothing'}\` rather than to the panel, so the panel is drawn ` +
         'but not reachable — clipped or painted over by something in the window'
     );
+  });
+
+  // ── THE SIXTH COPY (issue 1500) ────────────────────────────────────────────────────────────
+  // `RecipeDurationEditor` carried the same hand-written positioning pass as the five above and
+  // was the one of the six with no row here, so the consolidation onto `anchoredPopover` had no
+  // browser reading of it at all.
+  //
+  // It is also the caller whose options differ most — its panel is `width: max-content`, so it
+  // passes `applyWidth: false` and the action writes no width at all. THIS ROW DOES NOT ASSERT
+  // THAT, and the comment used to read as though it did. What this suite measures is the same
+  // pair every row above measures: the panel is adjacent to its trigger, and its parent is the
+  // resolved host. The width branch is a pure function of the layout's output and is pinned by
+  // `tests/actions/anchored-popover.test.js` ('omits the width for a panel that sizes to its
+  // content'), which is where a claim about a style string belongs.
+  //
+  // Manager host only, and that is a measurement rather than an omission: the panel's
+  // `position: absolute` comes from `.fabricate-manager .manager-recipe-duration-popover` in
+  // `styles/fabricate.css`, so a player-app row would red at the `position` clause on the shipped
+  // tree and would be asserting that a manager surface is a shared primitive.
+  it('the duration editor lands at its trigger inside the manager', async () => {
+    const measured = await openOverlayIn({ host: 'manager', component: 'duration' });
+    assertPanelIsAtItsTrigger(measured, 'manager (RecipeDurationEditor)');
+    assert.ok(
+      measured.panelParentClass.includes('fabricate-manager'),
+      `the duration editor's panel parent is \`${measured.panelParentClass}\`, not the manager ` +
+        'root, so the portal did not land'
+    );
+    assert.deepEqual(measured.consoleErrors, [], 'the duration editor reported a missing host');
   });
 
   // ── THE OVERFLOW ACTION MENU (issue 1477) ──────────────────────────────────────────────────

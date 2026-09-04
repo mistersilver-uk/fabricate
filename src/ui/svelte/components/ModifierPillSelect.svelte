@@ -13,7 +13,7 @@
 -->
 <script>
   import Field from './Field.svelte';
-  import SearchablePopover from '../apps/manager/SearchablePopover.svelte';
+  import SearchablePopover from './SearchablePopover.svelte';
   import { formatList, localize } from '../util/foundryBridge.js';
 
   let {

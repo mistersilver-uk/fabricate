@@ -10,9 +10,13 @@
  *
  * The argument is safely ignorable, so targets that do not need it are unaffected.
  *
+ * A SELECTOR STRING IS NOT A TARGET. The string branch was a document-wide `querySelector`,
+ * which is the cross-window defect above rather than a convenience, and issue 1500 deleted it —
+ * so an element, a resolver, or nothing.
+ *
  * @param {HTMLElement} node
- * @param {HTMLElement | string | ((node: HTMLElement) => HTMLElement | null) | null} target
- * @returns {{ update(nextTarget: HTMLElement | string | ((node: HTMLElement) => HTMLElement | null) | null): void, destroy(): void }}
+ * @param {HTMLElement | ((node: HTMLElement) => HTMLElement | null) | null} target
+ * @returns {{ update(nextTarget: HTMLElement | ((node: HTMLElement) => HTMLElement | null) | null): void, destroy(): void }}
  */
 export function portal(node, target) {
   if (typeof document === 'undefined') {
@@ -23,16 +27,13 @@ export function portal(node, target) {
   }
 
   /**
-   * @param {HTMLElement | string | ((node: HTMLElement) => HTMLElement | null) | null} value
+   * @param {HTMLElement | ((node: HTMLElement) => HTMLElement | null) | null} value
    * @returns {HTMLElement | null}
    */
   function resolveTarget(value) {
     const resolved = typeof value === 'function' ? value(node) : value;
 
     if (!resolved) return null;
-    if (typeof resolved === 'string') {
-      return document.querySelector(resolved);
-    }
 
     return resolved instanceof HTMLElement ? resolved : null;
   }

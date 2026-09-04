@@ -5,8 +5,9 @@
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
-  import { overlayHostRect, resolveOverlayHost } from '../../util/overlayHost.js';
+  import { MANAGER_MAIN_SELECTOR } from '../../util/overlayBounds.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
@@ -153,15 +154,16 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
-  // The portaled popover root, registered via registerBiomeColorPopoverNode. It is fed as
-  // an `additionalNodes` entry to the dismissOnOutsideClick wrapping the trigger below, the
-  // same pattern ManagerColorPicker uses for its own portaled popover. ManagerColorPopover's
-  // own internal dismissal is disabled here (`manageDismiss={false}`) so this is the single
-  // outside-click authority; without it, a mousedown on the trigger itself would count as
-  // "outside" (the trigger is not inside the portaled popover), dismiss on mousedown, then
-  // the trigger's own contextmenu handler would reopen it in the same gesture.
+  // The popover root, registered via registerBiomeColorPopoverNode. It is what `anchoredPopover`
+  // portals and positions below, and it is ALSO fed as an `additionalNodes` entry to the
+  // dismissOnOutsideClick wrapping the trigger, the same pattern ManagerColorPicker uses for its
+  // own popover. ManagerColorPopover's own internal dismissal is disabled here
+  // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
+  // mousedown on the trigger itself would count as "outside" (the trigger is not inside the
+  // portaled popover), dismiss on mousedown, then the trigger's own contextmenu handler would
+  // reopen it in the same gesture.
   let biomeColorPopoverRoot = $state(null);
-  let biomeColorPopoverStyle = $state('');
+  const biomeColorPopoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   const gatheringTabs = [
     {
@@ -556,9 +558,6 @@
     const shouldOpen = openBiomeColorPickerId !== id;
     openBiomeColorPickerId = shouldOpen ? id : '';
     biomeColorTriggerButton = shouldOpen ? (event?.currentTarget ?? null) : null;
-    if (shouldOpen) {
-      updateBiomeColorPopoverPosition();
-    }
   }
 
   function handleBiomeIconKeydown(event, id) {
@@ -571,96 +570,33 @@
     biomeColorTriggerButton = null;
   }
 
-  function getBiomeColorPopoverHost() {
-    return resolveOverlayHost(biomeColorTriggerButton, {
-      component: 'EnvironmentsBrowserView biome colour picker',
-    });
-  }
-
-  function getBiomeColorPopoverHorizontalBounds(hostRect) {
-    if (!biomeColorTriggerButton) return {};
-
-    const mainPanel = biomeColorTriggerButton.closest('.manager-main');
-    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
-    if (!mainPanelRect) return {};
-
-    return {
-      minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16,
-    };
-  }
-
-  function updateBiomeColorPopoverPosition() {
-    if (!openBiomeColorPickerId || !biomeColorTriggerButton || typeof window === 'undefined')
-      return;
-
-    const popoverHost = getBiomeColorPopoverHost();
-    const hostRect = overlayHostRect(popoverHost);
-    const triggerRect = biomeColorTriggerButton.getBoundingClientRect();
-    const horizontalBounds = getBiomeColorPopoverHorizontalBounds(hostRect);
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: 'left',
-        minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight,
-        minWidth: 220,
-        maxWidth: 220,
-      }
-    );
-
-    if (!layout) {
-      biomeColorPopoverStyle = '';
-      return;
-    }
-
-    const verticalPosition =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-
-    biomeColorPopoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
-      verticalPosition,
-    ].join(' ');
-  }
-
   function registerBiomeColorPopoverNode(node) {
     biomeColorPopoverRoot = node;
   }
 
+  // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
+  // `ManagerColorPicker` records against its own copy of this shape: the panel is
+  // `ManagerColorPopover`, a shared component this view does not own the markup of and whose
+  // other call sites render it inline. An action is a plain function, so this view applies it to
+  // the node the popover registers — same contract, same teardown, no new prop on that component.
+  //
+  // The options reproduce the measure/flip/clamp pass this view used to hand-write: the picker
+  // layout in host-relative coordinates, left-aligned at a fixed 220px, clipped inside the
+  // manager's main column. The effect tracks the popover ROOT alone; the trigger is re-read
+  // through the `trigger` function on every measure, and closing unmounts the popover, which
+  // unregisters the node and tears the handle down.
   $effect(() => {
-    if (
-      !openBiomeColorPickerId ||
-      typeof window === 'undefined' ||
-      typeof document === 'undefined'
-    ) {
-      biomeColorPopoverStyle = '';
-      biomeColorPopoverRoot = null;
-      return;
-    }
+    if (!biomeColorPopoverRoot) return;
 
-    updateBiomeColorPopoverPosition();
+    const handle = anchoredPopover(biomeColorPopoverRoot, {
+      component: 'EnvironmentsBrowserView biome colour picker',
+      trigger: () => biomeColorTriggerButton,
+      layout: biomeColorPopoverLayout,
+      layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 220, maxWidth: 220 }),
+      bounds: MANAGER_MAIN_SELECTOR,
+    });
 
-    const handleViewportChange = () => updateBiomeColorPopoverPosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
+    return () => handle.destroy();
   });
 
   function updateCurrentCondition(kind, value) {
@@ -1461,8 +1397,6 @@
                             selectedSystemId
                           )}
                         onDismiss={closeBiomeColorPicker}
-                        popoverStyle={biomeColorPopoverStyle}
-                        portalTarget={() => getBiomeColorPopoverHost()}
                         registerPopoverNode={registerBiomeColorPopoverNode}
                         manageDismiss={false}
                       />

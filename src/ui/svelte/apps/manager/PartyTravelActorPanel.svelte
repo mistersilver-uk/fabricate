@@ -42,7 +42,7 @@
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
-  import SearchablePopover from './SearchablePopover.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';

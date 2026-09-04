@@ -42,8 +42,8 @@
     getTimeOfDayLabelKey,
     getWeatherLabelKey,
   } from '../util/gatheringConditionIcons.js';
-  import ComponentSourcesBar from '../apps/crafting/ComponentSourcesBar.svelte';
-  import SearchablePopover from '../apps/manager/SearchablePopover.svelte';
+  import ComponentSourcesBar from './crafting/ComponentSourcesBar.svelte';
+  import SearchablePopover from '../components/SearchablePopover.svelte';
 
   let {
     store = null,

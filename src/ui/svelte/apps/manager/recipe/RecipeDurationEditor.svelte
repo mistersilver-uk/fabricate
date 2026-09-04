@@ -8,9 +8,9 @@
   the duration).
 
   The popover is portaled to the nearest Fabricate application root so it escapes the
-  manager panel's `overflow: hidden`, positioned with the shared icon-picker
-  layout helper, and dismissed on outside click / Escape (mirroring
-  SearchablePopover).
+  manager panel's `overflow: hidden` and positioned with the shared
+  `anchoredPopover` action over the icon-picker layout, and dismissed on outside
+  click / Escape (mirroring SearchablePopover).
 
   Props:
     timeRequirement — `{ minutes, hours, days, months, years }` or null
@@ -20,16 +20,17 @@
 <script>
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { anchoredPopover, hostRelativePopoverLayout } from '../../../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
-  import { portal } from '../../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../../util/iconPickerPopover.js';
-  import { overlayHostRect, resolveOverlayHost } from '../../../util/overlayHost.js';
   import {
     TIME_UNITS,
     formatTimeRequirement,
     durationUnitLabelSingular,
   } from '../../../util/recipeDuration.js';
   import Stepper from '../../../components/Stepper.svelte';
+
+  const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   let { timeRequirement = null, disabled = false, onChange = () => {} } = $props();
 
@@ -42,7 +43,6 @@
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let triggerButton = $state(null);
-  let popoverStyle = $state('');
 
   function unitValue(unit) {
     return Math.max(0, Number(timeRequirement?.[unit] || 0) || 0);
@@ -94,67 +94,6 @@
   function stop(event) {
     event.stopPropagation();
   }
-
-  function getPopoverHost() {
-    return resolveOverlayHost(pickerRoot, { component: 'RecipeDurationEditor' });
-  }
-
-  function updatePosition() {
-    if (!open || !triggerButton || typeof window === 'undefined') return;
-    const host = getPopoverHost();
-    const hostRect = overlayHostRect(host);
-    const triggerRect = triggerButton.getBoundingClientRect();
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      {
-        width: hostRect.width || window.innerWidth,
-        height: hostRect.height || window.innerHeight,
-      },
-      // The popover itself sizes to its content (CSS `width: max-content`); this
-      // width only reserves horizontal room so the left-aligned popover stays
-      // clamped inside the host when the trigger sits near the right edge.
-      { horizontalAlign: 'left', minWidth: 340, maxWidth: 380 }
-    );
-    if (!layout) {
-      popoverStyle = '';
-      return;
-    }
-    const vertical =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-    // No explicit width — CSS `width: max-content` makes the popover exactly as
-    // wide as its single-line contents, so it never needs horizontal scroll.
-    popoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `max-height: ${layout.maxHeight}px;`,
-      vertical,
-    ].join(' ');
-  }
-
-  $effect(() => {
-    if (!open || typeof window === 'undefined' || typeof document === 'undefined') {
-      popoverStyle = '';
-      return;
-    }
-    updatePosition();
-    if (typeof window.addEventListener !== 'function') return;
-    const handleViewportChange = () => updatePosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
-  });
 </script>
 
 <div
@@ -190,12 +129,20 @@
     <div
       bind:this={popoverRoot}
       class="manager-recipe-duration-popover"
-      style={popoverStyle}
       role="dialog"
       tabindex="-1"
       data-keyboard-focus="true"
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EditDuration', 'Edit duration')}
-      use:portal={() => getPopoverHost()}
+      use:anchoredPopover={{
+        component: 'RecipeDurationEditor',
+        trigger: triggerButton,
+        layout: popoverLayout,
+        // The popover sizes to its content (CSS `width: max-content`); this width band only
+        // reserves horizontal room so the left-aligned popover stays clamped inside the host when
+        // the trigger sits near the right edge, and `applyWidth: false` keeps the box itself free.
+        layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 340, maxWidth: 380 }),
+        applyWidth: false,
+      }}
       onclick={stop}
       onkeydown={(event) => {
         if (event.key === 'Escape') {

@@ -11,7 +11,7 @@
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
   import IconButton from '../../components/IconButton.svelte';
-  import SearchablePopover from './SearchablePopover.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
 
   let {
     event = null,

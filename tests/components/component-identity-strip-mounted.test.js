@@ -40,6 +40,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/actionMenuLayout.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   compiledModules: [

@@ -69,6 +69,8 @@ const harness = createMountedComponentHarness({
     // suite's `before()` by name rather than hanging it, which is what the shared harness
     // buys over the allowlist it replaced.
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',
@@ -152,7 +154,7 @@ const harness = createMountedComponentHarness({
     // panel it renders over a filtered-to-nothing list. `Chip` directly above is shared with
     // the complication band and is already listed.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
@@ -217,7 +219,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
-    'src/ui/svelte/components/ActorSelectTopBar.svelte',
+    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',

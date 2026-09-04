@@ -81,7 +81,7 @@ const harness = createMountedComponentHarness({
     // the conversion, so it is in this tree's static graph; the harness's closure validator
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     // The shipped segmented primitive (issue 975): `RecipeIngredientOption` below
     // renders it for the tag-match Any/All control, so it is in this tree's static
     // import graph and the closure validator throws without it.

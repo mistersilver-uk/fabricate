@@ -21,7 +21,7 @@
 <script>
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
 
   let {
     options = [],

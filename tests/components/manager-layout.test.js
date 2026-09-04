@@ -6268,7 +6268,7 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
   // layered sheet and its hash stamped onto the fixture, so a compact-mode rule that grew past
   // its `.is-compact-option-rows` qualifier would be caught here rather than shipping.
   const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/SearchablePopover.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
   );
   const stamp = (markup) =>
     [
@@ -11053,7 +11053,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
   // So the fixture renders the four reference marks a ROW draws beside the panel and compares
   // colour for colour, rather than pinning four token names a rename would walk away from.
   const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/SearchablePopover.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
   );
   const stamp = (markup) =>
     [

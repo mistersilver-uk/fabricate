@@ -35,6 +35,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
@@ -59,7 +61,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     // The three card components the parties rebuild added (issue 1182), each imported
@@ -118,19 +120,40 @@ async function mountSettingsTab() {
 }
 
 // Stubs the trigger's rect (the popover-positioning math reads it) and marks the
-// mounted root as the manager shell so `getBiomeColorPopoverHost`'s
-// `.closest('.fabricate-manager')` lookup resolves. WITHOUT this the portal action
-// no-ops (see src/ui/svelte/actions/portal.js) and the popover never leaves the
-// trigger's own DOM subtree — which would silently defeat the regression this suite
+// mounted root as the manager shell so `resolveOverlayHost` — which `anchoredPopover`
+// calls on the view's behalf since issue 1500 converted this seventh hand-written copy
+// — walks up to a host. WITHOUT this the portal no-ops and the popover never leaves the
+// trigger's own DOM subtree, which would silently defeat the regression this suite
 // exists to catch, since the real bug only exists once the popover is portaled away
 // from the trigger.
-function stageManagerShell(target) {
+//
+// THE `.manager-main` RECT IS THE SECOND STUB, and it is what makes the panel take a
+// position at all rather than merely a parent. `bounds` here is the SELECTOR STRING
+// `MANAGER_MAIN_SELECTOR`, which the action resolves with `anchor.closest('.manager-main')`
+// (`anchoredPopover.js:185-190`) — not with `ancestorScrollerBounds`, whose skip-the-zero-
+// sized-candidate walk belongs to the callers that pass a resolver (`overlayBounds.js:65-72`).
+// happy-dom gives every element a zero rect and the string branch KEEPS it: minLeft becomes 16
+// and maxRight −16, a zero-width band that `computeIconPickerPopoverLayout` answers `null` for
+// (`iconPickerPopover.js:77-78`), and the action then CLEARS the style, so the panel renders
+// with `style=""` and a positioning regression is invisible. These numbers are a manager
+// column inset 60px from the left of a 1280px window: they are arbitrary, but they must
+// be non-degenerate for the arithmetic below to have an answer.
+function stageManagerShell(target, triggerLeft = 140) {
   target.classList.add('fabricate-manager');
+  const managerMain = target.querySelector('.manager-main');
+  managerMain.getBoundingClientRect = () => ({
+    left: 60,
+    top: 40,
+    right: 1220,
+    bottom: 760,
+    width: 1160,
+    height: 720,
+  });
   const trigger = biomeTrigger(target);
   trigger.getBoundingClientRect = () => ({
-    left: 140,
+    left: triggerLeft,
     top: 100,
-    right: 170,
+    right: triggerLeft + 30,
     bottom: 130,
     width: 30,
     height: 30,
@@ -138,10 +161,10 @@ function stageManagerShell(target) {
   return trigger;
 }
 
-// Opening the popover also runs the position-tracking effect, which registers
-// `window` resize/scroll listeners (unrelated to the dismissal bug this suite
-// covers). That effect pass is scheduled a tick after the state change, so a
-// single synchronous `flushSync()` is not enough to settle it.
+// Opening the popover also runs the effect that applies `anchoredPopover`, which portals
+// the panel and registers `window` resize / capture-`scroll` listeners (unrelated to the
+// dismissal bug this suite covers). That effect pass is scheduled a tick after the state
+// change, so a single synchronous `flushSync()` is not enough to settle it.
 async function openBiomePopover(trigger) {
   trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   flushSync();
@@ -160,6 +183,13 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     // out-of-scope effect does not crash this suite.
     window.addEventListener ??= () => {};
     window.removeEventListener ??= () => {};
+    // `defineProperty` and not `window.innerWidth = 1280`: happy-dom declares both as
+    // accessors with no setter, so a plain assignment is silently dropped in sloppy mode
+    // and they stay `undefined`. The positioning pass falls back to the window box when
+    // the host reports no size, so without a real viewport the layout has no answer and
+    // the panel is left unpositioned — see `stageManagerShell` for the other half.
+    Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
   });
   after(harness.teardown);
   afterEach(harness.remount);
@@ -171,9 +201,12 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     await openBiomePopover(trigger);
     const opened = colorPopover(target);
     assert.ok(opened, 'first right-click opens the popover');
-    assert.equal(
-      opened.parentElement,
-      target,
+    // `assert.ok(a === b)` and not `assert.equal(a, b)`: on failure node:assert serialises both
+    // operands to build its diff, and a happy-dom element's own enumerable state reaches its
+    // parents, its children and its owner document — so the failure allocates until the heap
+    // dies and the suite reports `# cancelled` with no message. The boolean fails in words.
+    assert.ok(
+      opened.parentElement === target,
       'the popover is portaled out of the trigger row into the manager shell'
     );
 
@@ -188,9 +221,8 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     await tick();
     flushSync();
 
-    assert.equal(
-      colorPopover(target),
-      null,
+    assert.ok(
+      !colorPopover(target),
       'a second right-click on the trigger closes the popover instead of reopening it'
     );
   });
@@ -205,7 +237,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     flushSync();
 
-    assert.equal(colorPopover(target), null, 'an outside mousedown still dismisses the popover');
+    assert.ok(!colorPopover(target), 'an outside mousedown still dismisses the popover');
   });
 
   it('still dismisses the popover on Escape while open', async () => {
@@ -218,7 +250,71 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     flushSync();
 
-    assert.equal(colorPopover(target), null, 'Escape still dismisses the popover');
+    assert.ok(!colorPopover(target), 'Escape still dismisses the popover');
+  });
+
+  // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL, and each of them is
+  // satisfied by a popover that opens, portals and is then laid out nowhere at all: the conversion
+  // deleted a hand-written measure/clamp/place block from this view and handed the job to
+  // `anchoredPopover` + `bounds: MANAGER_MAIN_SELECTOR`, and a conversion that portals correctly
+  // while measuring against the wrong box is exactly the regression a dismissal assertion cannot
+  // see.
+  //
+  // The string is not a golden value copied out of a run. It is the arithmetic of the deleted
+  // block over the two stubs, and every term is checkable by hand against
+  // `computeIconPickerPopoverLayout`:
+  //
+  //   bounds  `.manager-main` at left 60 / right 1220, inset 16 → minLeft 76, maxRight 1204
+  //   width   `minWidth: maxWidth: 220` from the view's own `layoutOptions` → 220
+  //   left    horizontalAlign 'left' → the trigger's own 140, inside [76, 1204 − 220]
+  //   height  preferred 380, and the space below the trigger (800 − 130 − 6 − 16 = 648) exceeds it
+  //   top     the trigger's bottom 130 plus the 6px gap → 136, so the placement is 'bottom'
+  //
+  // A width option dropped, a flip to `top`, or a layout that stopped being applied at all
+  // therefore reds here with the offending term visible in the diff, rather than passing as "the
+  // popover opened". The CLAMP is not one of the terms this case can see — at a trigger 140px
+  // from the left of a 1160px column, the column's boundary and the window's agree on the answer
+  // — which is what the case below it exists for.
+  it('positions the portaled panel where the deleted block would have', async () => {
+    const target = await mountSettingsTab();
+    const trigger = stageManagerShell(target);
+
+    await openBiomePopover(trigger);
+    const opened = colorPopover(target);
+    assert.ok(opened, 'popover opens on right-click');
+
+    assert.equal(
+      opened.getAttribute('style'),
+      'left: 140px; right: auto; width: 220px; max-height: 380px; top: 136px; bottom: auto;'
+    );
+  });
+
+  // THE CLAMP, on the one geometry that can see it. The case above measures a panel with room on
+  // both sides, where `bounds: MANAGER_MAIN_SELECTOR` and the action's default window margin
+  // return the same number — so deleting the `bounds` option entirely leaves it green, and the
+  // boundary the conversion had to carry over from the deleted block would be unguarded.
+  //
+  // A trigger 1020px in has 260px of window to its right and only 200px of COLUMN, so the two
+  // boundaries now disagree and the panel is placed by whichever one the action was given:
+  //
+  //   with `bounds`      maxRight 1204 → maxLeft 1204 − 220 = 984, and 1020 clamps back to 984
+  //   without it         maxRight 1264 → maxLeft 1044, and 1020 is left where it asked to be
+  //
+  // 984 is therefore a value only the column can produce. The manager column is the box the biome
+  // panel must not overhang — it scrolls, and a panel laid out past its right edge is the defect
+  // `MANAGER_MAIN_SELECTOR` names.
+  it('clamps the panel to the manager column and not to the window', async () => {
+    const target = await mountSettingsTab();
+    const trigger = stageManagerShell(target, 1020);
+
+    await openBiomePopover(trigger);
+    const opened = colorPopover(target);
+    assert.ok(opened, 'popover opens on right-click');
+
+    assert.equal(
+      opened.getAttribute('style'),
+      'left: 984px; right: auto; width: 220px; max-height: 380px; top: 136px; bottom: auto;'
+    );
   });
 
   it('a click inside the popover does not dismiss it', async () => {

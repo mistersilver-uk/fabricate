@@ -14,7 +14,7 @@
 <script>
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
 
   let {
     toolIds = [],

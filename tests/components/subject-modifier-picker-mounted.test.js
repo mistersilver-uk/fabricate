@@ -42,6 +42,8 @@ const harness = createMountedComponentHarness({
     // a `SearchablePopover` (issue 1458) it also portals its panel and lays it out.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
@@ -52,7 +54,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
     // the shared picker now, so this tree reaches all three; an omission does not fail this
     // suite, it cancels every test in it.
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     PICKER_PATH,

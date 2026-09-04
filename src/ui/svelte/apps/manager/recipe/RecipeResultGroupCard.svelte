@@ -16,7 +16,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultItemRow from './RecipeResultItemRow.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
 
   let {

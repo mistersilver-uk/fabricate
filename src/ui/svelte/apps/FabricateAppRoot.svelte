@@ -29,7 +29,7 @@
   import AlchemyView from './alchemy/AlchemyView.svelte';
   import JournalView from './journal/JournalView.svelte';
   import InventoryView from './inventory/InventoryView.svelte';
-  import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
+  import ActorSelectTopBar from './ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
   import { buildPlayerNavTabs, parseRouteKey } from '../../playerNavModel.js';
   import {

@@ -186,7 +186,7 @@ const SHARED_PRIMITIVES = [
   // Overview tab and the Checks card render it — so a suite that mounts either pulls this
   // picker in without naming a popover anywhere, which is exactly the shape this list exists
   // to turn into a named failure rather than a cancelled run.
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   // THE shared overflow action menu (issue 1477). It is a LEAF TWO RUNGS DOWN, which is the shape
   // this list exists for: the environment editor's Tasks and Events tabs render it through
   // `environment/CompositionList`, and the component editor renders it through

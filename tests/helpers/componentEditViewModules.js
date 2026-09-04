@@ -50,6 +50,8 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // The identity strip's drop target + its portaled overflow menu (issue 676).
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   // `ActionMenu`'s own placement helper (issue 1477). Separate from `iconPickerPopover.js`
   // because a picker's layout DECIDES the panel width while an overflow menu's width is its
@@ -89,7 +91,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // Rendered by the salvage block.
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   // The salvage result quantity + the progressive DC are the shared Stepper (issue 676).
   // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite
   // hangs.

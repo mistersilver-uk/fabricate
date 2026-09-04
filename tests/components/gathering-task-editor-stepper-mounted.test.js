@@ -51,6 +51,8 @@ const harness = createMountedComponentHarness({
     // The availability menus and `ModifierPillSelect`'s add menu are `SearchablePopover`
     // now (issue 1458), which portals its panel and lays it out against the trigger.
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
@@ -75,7 +77,7 @@ const harness = createMountedComponentHarness({
     // The three availability add menus, and `ModifierPillSelect`'s, are this primitive
     // (issue 1458). `Chip` and `EmptyState` are already above; an omission of this one
     // cancels every test in the suite rather than failing one.
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     EDITOR_PATH,

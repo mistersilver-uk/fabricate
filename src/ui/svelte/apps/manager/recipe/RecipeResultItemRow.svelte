@@ -54,7 +54,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE complication summary row (issue 1286), in its `readonly-gm` variant — shared
   // with the Component Studio's salvage strip rather than copied, because SonarCloud's
