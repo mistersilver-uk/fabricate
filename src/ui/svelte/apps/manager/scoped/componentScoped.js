@@ -28,9 +28,23 @@
  * is the member count minus one. A component with NO membership record — every component on a
  * world that has not adopted it anywhere, and every ghost row — would otherwise render
  * `shared with -1 other systems`. Both sentences here clamp at zero and both pluralise.
+ *
+ * ## Why this module imports ONE leaf and must keep doing so
+ *
+ * `ComponentEditView.svelte` imports this file, and every mounted suite that renders that view
+ * copies the manager's compiled module graph into a hand-rolled tree file by file
+ * (`tests/helpers/componentEditViewModules.js`). A module this one imports is a module EVERY
+ * such manifest has to carry, and an omission there is reported as `# cancelled`, never as
+ * `# fail` — so a new import here breaks five suites in a way that reads as a hang rather than
+ * as a failure.
+ *
+ * That is not hypothetical. This module briefly imported `utils/browserPagination.js` for one
+ * bulk-panel helper and took 105 tests down with it across four suites. The helper now lives in
+ * `ComponentCatalogueBulkPanel.svelte`, which is mounted only by the catalogue suites, whose
+ * manifest already carries the pagination leaf for the list frame.
+ * `tests/components/scoped-shell-prop-contract.test.js` pins this file's import list, so the
+ * next one fails loudly and HERE rather than quietly and four suites away.
  */
-
-import { paginateRows } from '../../../../../utils/browserPagination.js';
 
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
 
@@ -1071,45 +1085,6 @@ export function componentBulkApplyLabel(
     'Write {writes} records across {count} components',
     { writes: Number(writes) || 0, count: selected }
   );
-}
-
-/**
- * One staging inset's visible page: the rows that survive its search, windowed.
- *
- * SHARED BY ALL THREE INSETS (`proto:628`-`697` draws the same object three times), so the
- * search predicate, the window size and the range sentence cannot drift between systems,
- * categories and tags. `paginateRows` owns the arithmetic and the clamp; this owns only the
- * search and the words.
- *
- * @param {Array<{id: string, name: string}>} items
- * @param {{query: string, pageIndex: number, pageSize?: number}} view
- * @param {(key: string, fallback: string, data?: object) => string} phrase
- * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
- *   range: string, pageLabel: string}}
- */
-export function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }, phrase) {
-  const needle = String(query ?? '')
-    .trim()
-    .toLowerCase();
-  const matched = (Array.isArray(items) ? items : []).filter(
-    (item) => !needle || String(item?.name ?? '').toLowerCase().includes(needle)
-  );
-  const page = paginateRows(matched, { pageIndex, pageSize }, pageSize);
-  return {
-    rows: page.rows,
-    pageIndex: page.pageIndex,
-    pageCount: page.pageCount,
-    total: matched.length,
-    range: phrase(
-      'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerRange',
-      'Showing {start}-{end} of {total}',
-      { start: page.rangeStart, end: page.rangeEnd, total: matched.length }
-    ),
-    pageLabel: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkPickerPage', 'Page {page}/{of}', {
-      page: page.pageIndex + 1,
-      of: page.pageCount,
-    }),
-  };
 }
 
 // ── THE WORLD CATALOGUE ENTRY'S OWN MODEL (issue 1371, maintainer parity round 4) ─────────────

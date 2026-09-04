@@ -118,6 +118,13 @@
     // Threaded straight to the frame; see its own prop note. OPT-IN, defaulting to the single
     // toolbar row every catalogue renders today.
     splitToolbar = false,
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
+    // exactly what the essence and tool catalogues render today: `toolbarLeadSize` is the control
+    // rung the LEAD toolbar row takes (`''` = the shipped 34px, `'38'` = the ladder's next rung,
+    // which is what `proto:577`-`578` draws), and `rowMedallion` is the `{variant, size, glyph}`
+    // descriptor for the tile at the head of a row (`null` = the shipped 40px artwork tile).
+    toolbarLeadSize = '',
+    rowMedallion = null,
     selectAllLabel = '',
     onOpenSystemRules = null,
     // The list's lifted view-state (issue 1438), passed straight through to the frame. It is
@@ -186,6 +193,18 @@
     // than derived. Empty by default, so the essence and tool catalogues render the roster they
     // always did, and only a lane that names a sentence gets one.
     rosterEmptyNote = '',
+    // THE ROSTER'S TWO SURFACE DECISIONS (issue 1371 r9-cat, reviewer finding 7). Threaded
+    // straight to `SystemRulesRoster`, which states both as opt-in props for exactly this:
+    // `rosterRecessed` drops the card one ramp rung to `--fab-bg-0`, and `rosterSearchWell` lifts
+    // its search field back up to a `--fab-bg-1` box with a hairline and the rows' 7px corner, so
+    // a recessed card reads as a container holding two kinds of thing rather than as a flat pane.
+    //
+    // The shell has to carry them because a page composes THIS component and never the roster:
+    // the panel is rendered inside `catalogueInspector`, which is this file's snippet. Both
+    // default to OFF, so the essence and tool catalogues render the card they always did — the
+    // reference for this pair is the world Component catalogue's inspector and no other.
+    rosterRecessed = false,
+    rosterSearchWell = false,
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -283,6 +302,8 @@
     {countUnit}
     {membershipFilter}
     {splitToolbar}
+    {toolbarLeadSize}
+    {rowMedallion}
     {selectAllLabel}
     bind:browserState
     bind:selectedId
@@ -387,6 +408,8 @@
     {onOpenSystemRules}
     {systemRowAction}
     {rosterEmptyNote}
+    recessed={rosterRecessed}
+    searchWell={rosterSearchWell}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}

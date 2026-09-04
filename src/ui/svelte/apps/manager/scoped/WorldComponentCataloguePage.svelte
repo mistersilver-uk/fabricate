@@ -123,6 +123,31 @@
   const TITLE_KEY = 'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle';
   const TITLE_FALLBACK = 'Component catalogue';
 
+  /**
+   * THE ROW'S LEADING TILE, as the reference draws it (`proto:600`, UX finding F12).
+   *
+   * `width:38px;height:38px;border-radius:9px;font-size:15px` with a slate fill and no border at
+   * all. `glyph-chip` is the two halves of that a caller cannot state — the absent edge, and the
+   * fact that a tinted glyph on this chip does not bring a tinted SURFACE with it — and 38 and 15
+   * are the primitive's own `size` and `glyph`, which is why they are written here beside it.
+   *
+   * A MODULE CONSTANT rather than an inline object literal, because a fresh object every render
+   * is a fresh prop value every render: the frame merges it into a `$derived`, and an inline
+   * literal would re-run that merge and re-diff every medallion in the list on every keystroke in
+   * the search field. Nothing here depends on state, so it is built once.
+   *
+   * The reference tints the glyph per CATEGORY and this passes no `tint`. That is not an omission
+   * being deferred: a world category is a bare string in this corpus — `authoredWorldComponentCategories`
+   * reads `entry.defaults.category` and nothing carries a colour token for one — so there is no
+   * per-category colour to pass until the world vocabulary publishes one. The frame's own
+   * `thumbnailOf` still supplies the entity's colour token where a scope HAS one.
+   */
+  const COMPONENT_ROW_MEDALLION = Object.freeze({
+    variant: 'glyph-chip',
+    size: 38,
+    glyph: 15,
+  });
+
   const catalogueTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
   const selectedEntry = $derived(entries.find((entry) => entry.id === selectedId) ?? null);
@@ -317,18 +342,24 @@
 </script>
 
 <!--
-  r8-prim: THREE PRIMITIVE SEAMS THIS SCREEN CONSUMES ONCE LANE PRIM SHIPS THEM.
+  THE THREE PRIMITIVE SEAMS THIS SCREEN CONSUMES, NOW THAT THEY EXIST (issue 1371 r9-cat).
 
-   - wire the 38px size on `ManagerSearchField` and the toolbar selects (M12(b) / UX F5).
-     `proto:577`-`578` draws the search field and the source select at 38px, which IS a rung, and
-     the membership and sort selects and the direction toggle are the same statement one row down;
-     every one of them renders at the frame's shared 34 until the primitives take a size.
-   - wire the unbordered tinted 38px `Medallion` variant (UX F12). `proto:600` draws the row chip
-     as a tinted glyph tile with no edge at 38px; the shipped medallion is a 40px bordered
-     artwork tile on `--fab-bg-3`, which is six compare lines from one primitive decision.
-   - wire `SystemRulesRoster`'s opt-in recess and lifted search well (reviewer 7). Both were
-     restyled IN PLACE for all three catalogues and PRIM turns them into props; this screen is
-     the one that wants them on.
+  Each was a marker here for one revision while the primitive that owns it was built, and each is
+  wired below rather than restyled in place — the whole point of putting them on the primitives is
+  that the essence and tool catalogues, which share every one of these components, do not move.
+
+   - `toolbarLeadSize="38"` (M12(b) / UX F5): `proto:577`-`578` draws the search field and the
+     source select at 38px, which IS a rung of the published ladder. It is the LEAD ROW's size and
+     not the toolbar's: `proto:582`-`585` draws the membership select, the sort select and the
+     direction toggle one row below at 32, a RETIRED rung, so those three stay at the ladder's 34
+     under D-C and this prop deliberately does not reach them.
+   - `rowMedallion` (UX F12): `proto:600` draws the row's leading tile as a borderless slate
+     square at 38px carrying a 15px tinted glyph, against the shipped 40px bordered artwork tile.
+     The variant owns only the absent edge and the cancelled surface wash; the size and the glyph
+     are the primitive's own arguments, which is why the descriptor states all three together.
+   - `rosterRecessed` / `rosterSearchWell` (reviewer 7): the reference's system-roster card is a
+     recess with its search field LIFTED out of it. Both were restyled in place for all three
+     catalogues before lane PRIM turned them into props; this screen is the one that wants them.
 -->
 <main class="manager-main" data-scoped-page="world-components" aria-label={catalogueTitle}>
   <EntityCatalogueShell
@@ -388,6 +419,10 @@
     rowSecondLine="description"
     rowSourceBadge={false}
     splitToolbar
+    toolbarLeadSize="38"
+    rowMedallion={COMPONENT_ROW_MEDALLION}
+    rosterRecessed
+    rosterSearchWell
     systemRowAction="navigate"
     rosterEmptyNote={text(
       'FABRICATE.Admin.Manager.Scoped.Component.RosterEmpty',
@@ -443,6 +478,14 @@
       second set of refusals. `SearchablePopover` is the shipped chooser — the bulk panel's own
       pickers are it — so no second one is built here.
     -->
+    <!-- r9-prim2: the trigger's 38px RUNG IS A ONE-SITE OVERRIDE AND SHOULD NOT STAY ONE.
+         `proto:570` draws this action at 38px, and it MEASURES 38 — `compare` reports no height
+         line on `cat-header-action` — but only because `styles/fabricate.css` gives
+         `.manager-world-component-register-action` its own `height`, `min-height` and
+         `border-radius` beside the shared button class. That is this screen re-deriving a rung
+         the ladder publishes, which is the shape `is-size-38` exists to end one control over.
+         When `ManagerButton` takes an opt-in 38px size, this trigger names it in `triggerClass`
+         and those three declarations are deleted from the sheet in the same change. -->
     <SearchablePopover
       options={registerableItems}
       pickerClass="fab-world-component-register-picker"
@@ -583,13 +626,32 @@
         class="manager-world-component-inspector-tags"
         data-world-component-global-tags={entry.id}
       >
-        <!-- r8-prim: wire the purple `emphasis` variant lane PRIM adds to `Chip` (UX F10). The
-             reference draws a world tag as a 999px pill with a purple 12% fill, a purple 35%
-             edge and PURPLE ink (`proto:757`); the shipped `tone="tag"` measures a grey-blue
-             fill, a 10px corner and cream ink, which is ten compare lines from one primitive
-             decision. It is not re-inked in place here: `tone="tag"` ships to other screens. -->
+        <!--
+          THE WORLD TAG IS A LIT MICRO PILL, AND IT TAKES BOTH OF `Chip`'S AXES TO SAY SO
+          (issue 1371 r9-cat, UX finding F10).
+
+          `proto:757` draws it as `padding: 2px 9px; border-radius: 999px; font: 600 9.5px` with a
+          purple 12% fill, a purple 35% edge and PURPLE ink. `tone="tag"` alone measured a
+          grey-blue fill, a 10px corner and cream ink — three of those four wrong.
+
+          `emphasis="lit"` is the PAINT: it inks the label in the family's own colour over a wash
+          of it, which is the half `tone="tag"` got wrong (that tone mixes its wash into the
+          OPAQUE `--fab-bg-3`, so the fill measured a grey-blue, and it inked `--fab-text`). The
+          edge was always right. `density="list"` is the SCALE, and it is the shipped one rather
+          than a new value: the primitive's own note records that the reference's micro pill —
+          `padding: 2px 8px; border-radius: 999px; font: 600 9px` — IS `list`, to within a pixel
+          of vertical padding, and warns in as many words that adding a scale a pixel from a
+          shipped one is how this component drifts back into two of everything.
+
+          NOT `density="tag-run"`, which the world Component ENTRY uses for the same vocabulary:
+          that run is a CONTROL a GM clicks and the reference draws it at `5px 12px / 11px`
+          (`proto:5401`). This one is a badge that is read. One tag, two sites, two scales — and
+          the paint axis is shared, which is exactly the split `emphasis` exists to make.
+        -->
         {#each entry?.defaults?.tags ?? [] as tag (tag)}
-          <Chip tone="tag" data-world-component-global-tag={tag}>{tag}</Chip>
+          <Chip tone="tag" emphasis="lit" density="list" data-world-component-global-tag={tag}
+            >{tag}</Chip
+          >
         {:else}
           <span class="manager-world-component-inspector-empty"
             >{text('FABRICATE.Admin.Manager.Scoped.Component.NoGlobalTags', 'No global tags')}</span
@@ -634,6 +696,17 @@
   {@const linked = entry?.hasSourceLink === true}
   {@const broken = componentSourceBroken(entry, worldItems)}
   <span class="manager-world-component-row-source" data-world-component-row-source-pill={entry.id}>
+    <!-- r9-prim2: the pill's FACE is the one thing left open here, and it is `StatusPill`'s.
+         `proto:601` draws it as an UNBORDERED 999px stadium — `padding: 1px 7px; font: 600 9px`
+         on `var(--surface-raised)`, with no `border` declared at all. Measured against it the
+         shipped pill reports six lines: `borderTopWidth 1 ≠ 0`, `borderTopStyle solid ≠ none`,
+         `borderTopColor` (ours transparent, the reference's the inherited subtle ink on a
+         zero-width edge), `fontSize 9.92 ≠ 9` and both horizontal insets `4 ≠ 7`. Every one of
+         them is declared inside the primitive's own scoped block, and a component's scoped block
+         is UNLAYERED while `styles/fabricate.css` imports at `layer(modules)` — so no
+         page-authored or sheet-authored rule can win against it however specific it is written.
+         It needs an opt-in row face on `StatusPill`, in that primitive's own vocabulary, rather
+         than a second implementation of the pill here. Wire it where this tag stands. -->
     <StatusPill
       tone={linked ? 'subtle' : 'warning'}
       icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}

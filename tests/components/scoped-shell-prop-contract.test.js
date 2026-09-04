@@ -21,8 +21,8 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 
 import { listSvelteComponents } from '../../scripts/lib/svelteComponentFiles.js';
 import {
@@ -131,6 +131,16 @@ const CATALOGUE_PROPS = [
   // EMPTY by default, so the essence and tool catalogues render the roster they always did; only
   // a lane whose rows can legitimately belong to no system at all names one.
   'rosterEmptyNote',
+  // ── THE FOUR ISSUE 1371 r9-cat PRIMITIVE SEAMS ─────────────────────────────────────────────
+  // Every one is OPT-IN and defaults to what the essence and tool catalogues already render, and
+  // every one exists because a page composes THIS shell and never the component underneath it.
+  // `rosterRecessed` and `rosterSearchWell` are `SystemRulesRoster`'s two surface props, reached
+  // through the inspector snippet this file owns; `rowMedallion` is the `{variant, size, glyph}`
+  // descriptor for the row's leading tile; `toolbarLeadSize` is the control rung the LEAD toolbar
+  // row takes, which is the reference's 38 against the filter row's retired 32.
+  'rosterRecessed',
+  'rosterSearchWell',
+  'rowMedallion',
   'rowMeta',
   'rowNameTrailing',
   'rowSecondLine',
@@ -151,6 +161,7 @@ const CATALOGUE_PROPS = [
   'systemRowAction',
   'systems',
   'title',
+  'toolbarLeadSize',
 ];
 
 const RULES_PROPS = [
@@ -250,6 +261,14 @@ describe('the shells declare the pinned prop sets', () => {
       // `systemRowAction` above: it is the INSPECTOR's roster that would otherwise draw one dead
       // link per system in the world, and the rules-list shell has no inspector to draw it in.
       'rosterEmptyNote',
+      // AND THE FOUR issue 1371 r9-cat PRIMITIVE SEAMS, catalogue-only for the reason the rest
+      // are: `rosterRecessed` and `rosterSearchWell` paint the INSPECTOR's roster card, which the
+      // rules-list shell has no inspector to draw; `rowMedallion` describes a ROW that shell
+      // draws differently; and `toolbarLeadSize` sizes the LEAD row of the two-row toolbar only
+      // the world catalogue splits.
+      'rosterRecessed',
+      'rosterSearchWell',
+      'rowMedallion',
       'rowNameTrailing',
       'rowSecondLine',
       'rowSourceBadge',
@@ -261,6 +280,7 @@ describe('the shells declare the pinned prop sets', () => {
       'showWorldDefaults',
       'splitToolbar',
       'systemRowAction',
+      'toolbarLeadSize',
     ]);
   });
 });
@@ -939,5 +959,177 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
         `a rule on the shared class states a surface, which reaches all six screens: ${body.trim()}`
       );
     }
+  });
+});
+
+/**
+ * THE SEAM BETWEEN THE SHELL AND THE PRIMITIVES BELOW IT (issue 1371 r9-cat).
+ *
+ * Three opt-ins the world Component catalogue turns on live on components a PAGE never composes:
+ * `SystemRulesRoster`'s two surface props are reached only through the shell's own inspector
+ * snippet, and the frame's row medallion and lead-row rung are reached only through the shell's
+ * own frame tag. So the shell declaring the prop and the shell FORWARDING it are two different
+ * facts, and a declared-but-unforwarded prop is the exact failure that reads as green: the page
+ * passes it, nothing throws, and the screen renders the default it always did.
+ *
+ * `declaredProps` above pins the first fact. This pins the second, and it pins the DEFAULTS with
+ * it — a `recessed`/`searchWell` pair defaulting to `true` would forward correctly and repaint
+ * five other screens.
+ */
+describe('the catalogue shell FORWARDS what it declares', () => {
+  const shell = () => sourceOf(CATALOGUE);
+
+  it('hands the roster its two surface props, renamed at the boundary', () => {
+    const source = shell();
+    // Renamed on the way in — `rosterRecessed` / `rosterSearchWell` — because a shell prop named
+    // `recessed` says nothing about WHAT is recessed on a component that also owns a list, a
+    // toolbar and an inspector. The roster's own names stay its own.
+    assert.match(source, /\n\s*rosterRecessed = false,/, 'declared, and OFF by default');
+    assert.match(source, /\n\s*rosterSearchWell = false,/, 'declared, and OFF by default');
+    assert.match(
+      source,
+      /recessed=\{rosterRecessed\}/,
+      'and the roster tag is handed the value rather than a literal'
+    );
+    assert.match(source, /searchWell=\{rosterSearchWell\}/, 'likewise for the search well');
+  });
+
+  it('hands the frame the row medallion and the lead-row rung', () => {
+    const source = shell();
+    assert.match(source, /\n\s*toolbarLeadSize = '',/, 'declared, and the shipped rung by default');
+    assert.match(source, /\n\s*rowMedallion = null,/, 'declared, and the shipped tile by default');
+    // Shorthand `{name}`, which is how every other pass-through on this tag is written.
+    assert.match(source, /\{toolbarLeadSize\}/, 'and forwarded to the frame');
+    assert.match(source, /\{rowMedallion\}/, 'and forwarded to the frame');
+  });
+
+  it('and the FRAME spends them on the two elements they name', () => {
+    const source = sourceOf(FRAME);
+    assert.match(
+      source,
+      /<ManagerSearchField\b[\s\S]{0,200}?size=\{toolbarLeadSize\}/,
+      'the search field takes the rung as its own `size` prop'
+    );
+    assert.match(
+      source,
+      /class=\{leadSelectSizeClass\(filter\)\}/,
+      'a lane-filter select takes the rung as a class, because the manager has no select component'
+    );
+    assert.match(
+      source,
+      /variant=\{rowMedallionSpec\.variant\}[\s\S]{0,120}?size=\{rowMedallionSpec\.size\}[\s\S]{0,120}?glyph=\{rowMedallionSpec\.glyph\}/,
+      'and the ROW medallion takes all three of the descriptor’s arguments'
+    );
+  });
+
+  it('the select rung is UNDEFINED when unset, never an empty class attribute', () => {
+    const source = sourceOf(FRAME);
+    // The whole reason `leadSelectSizeClass` is a function and not a `class:` directive. A
+    // directive writes the attribute whatever the value is, so every other catalogue's three
+    // selects would go from no `class` at all to `class=""` — a real DOM change on five screens
+    // shipped as an opt-in that "defaults to off".
+    assert.match(
+      source,
+      /return toolbarLeadSize === '38' && onLeadRow \? 'is-size-38' : undefined;/,
+      'the unset branch answers undefined, which Svelte drops'
+    );
+    assert.ok(
+      !/class:is-size-38=/.test(source),
+      'and no `class:` directive writes the token, which would emit class="" when off'
+    );
+  });
+
+  it('the rung reaches the LEAD row only, so the retired 32px row keeps the ladder’s 34', () => {
+    const source = sourceOf(FRAME);
+    // `proto:582`-`585` draws the membership select, the sort select and the direction toggle at
+    // 32 — a RETIRED rung — so D-C puts them on 34 and this prop must not reach them. The guard
+    // is the row test inside the helper: without it, one prop would take all five controls.
+    assert.match(
+      source,
+      /const onLeadRow = \(filter\?\.toolbarRow \?\? 'lead'\) === 'lead';/,
+      'the helper decides on the descriptor’s ROW'
+    );
+    // The sort select is written by the frame itself, outside the lane-filter snippet, and it
+    // must not acquire the token: `proto:583` draws it on the filter row. Sliced from the tag
+    // that OPENS it — searching backwards from its own hook — so the assertion reads the element
+    // and not the whole file.
+    const hook = source.indexOf('data-scoped-list-sort\n');
+    assert.ok(hook > 0, 'NON-VACUITY: the sort select is still written by this frame');
+    const sortSelect = source.slice(source.lastIndexOf('<select', hook), hook);
+    assert.match(sortSelect, /value=\{sortKey\}/, 'and the slice is that element');
+    assert.ok(!/is-size-38/.test(sortSelect), 'and it carries no 38px token');
+  });
+});
+
+/**
+ * THE IMPORT-FREE LEAF, PINNED (issue 1371 r9-cat).
+ *
+ * `componentScoped.js` is imported by `ComponentEditView.svelte`, and every mounted suite that
+ * renders that view copies the manager's compiled module graph into a hand-rolled tree file by
+ * file. A module this leaf imports is a module EVERY such manifest must carry, and an omission
+ * there is reported as `# cancelled`, never as `# fail` — a hang with no message, four suites
+ * away from the edit that caused it.
+ *
+ * That is not a hypothesis. This module briefly imported `utils/browserPagination.js` for one
+ * bulk-panel helper and cancelled 105 tests across four suites. The allowlist below is therefore
+ * a hand-maintained mirror of a closure no single suite can see, and this test is what stops it
+ * rotting: every entry must resolve to a real tracked file, and nothing outside it may be
+ * imported.
+ */
+describe('componentScoped.js stays the import-free leaf its consumers assume', () => {
+  const LEAF = `${SCOPED_DIR}/componentScoped.js`;
+  // The ONE import this leaf may hold. It is itself import-free, and it is already in every
+  // manifest that carries this file.
+  const ALLOWED = ['src/utils/componentCategories.js'];
+
+  function importedPaths() {
+    const source = sourceOf(LEAF);
+    const dir = resolve(repoRoot, SCOPED_DIR);
+    return [...source.matchAll(/^import\s[^'"]*from\s*'([^']+)';/gm)].map(([, specifier]) =>
+      relative(repoRoot, resolve(dir, specifier)).split(sep).join('/')
+    );
+  }
+
+  it('resolves every allowlisted entry to a real file, so the list cannot rot into prose', () => {
+    for (const path of ALLOWED) {
+      assert.ok(
+        existsSync(resolve(repoRoot, path)),
+        `the allowlist names a file that exists: ${path}`
+      );
+    }
+  });
+
+  it('imports NOTHING outside the allowlist', () => {
+    const imported = importedPaths();
+    assert.ok(imported.length > 0, 'NON-VACUITY: the reader finds this file’s imports at all');
+    const strays = imported.filter((path) => !ALLOWED.includes(path));
+    assert.deepEqual(
+      strays,
+      [],
+      'a new import here has to be added to every mounted manifest that renders ComponentEditView, ' +
+        'and an omission is reported as `# cancelled` rather than `# fail`. Put the dependency ' +
+        'beside its caller instead — `componentBulkPickerPage` lives in ' +
+        'ComponentCatalogueBulkPanel.svelte for exactly this reason.'
+    );
+  });
+
+  it('and the paginated bulk helper is where the move put it', () => {
+    // Read off the IMPORT LIST rather than off the raw text: the leaf's own header records the
+    // regression by name, and a substring scan would read that explanation as the defect.
+    assert.ok(
+      !importedPaths().some((path) => path.endsWith('browserPagination.js')),
+      'the leaf imports no pagination module — the regression this pin exists for'
+    );
+    const panel = sourceOf(`${SCOPED_DIR}/ComponentCatalogueBulkPanel.svelte`);
+    assert.match(
+      panel,
+      /import \{ paginateRows \} from '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils\/browserPagination\.js';/,
+      'the catalogue bulk panel holds it instead, inside the catalogue harness’s own closure'
+    );
+    assert.match(
+      panel,
+      /function componentBulkPickerPage\(/,
+      'and the helper moved with the import rather than the import being duplicated'
+    );
   });
 });

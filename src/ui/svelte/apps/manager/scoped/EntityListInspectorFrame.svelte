@@ -263,6 +263,37 @@
     // FILTER ROW keeps its class and its identity either way — it is the row the selection band
     // joins — so only what stands ABOVE it moves.
     splitToolbar = false,
+    // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
+    // The control HEIGHT the search field and the lead row's lane-filter selects take, named
+    // after the rung rather than after an adjective, exactly as `ManagerSearchField`'s own
+    // `size` is: `''` is the shipped 34px control and `'38'` is the ladder's next rung up
+    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
+    //
+    // IT GOVERNS THE LEAD ROW AND NOT THE FILTER ROW, because that is what the reference draws:
+    // `proto:577`-`578` puts the search field and the source-type select at 38px, and
+    // `proto:582`-`585` puts the membership select, the sort select and the direction toggle one
+    // row below at 32 — a RETIRED rung, so those three stay on the ladder's 34 under D-C and are
+    // deliberately NOT moved by this prop. A single "toolbar size" would have taken all five.
+    //
+    // Anything outside the closed set renders the shipped 34px control: the field's own prop
+    // drops an unrecognised value, and the select's class is emitted only for a literal match, so
+    // a typo is the default rather than an unstyled `is-size-<whatever the caller composed>`.
+    toolbarLeadSize = '',
+    // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ───────────────────────────
+    // A `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for
+    // the tile at the head of every list row. `null` is the shipped 40px bordered artwork tile,
+    // so the essence and tool catalogues are byte-identical.
+    //
+    // It is a descriptor rather than three props because the three are ONE statement about one
+    // element and are never set apart: the reference's row chip is a 38px borderless slate square
+    // carrying a 15px tinted glyph (`proto:600`), and a caller that set the variant without the
+    // size would get the shipped tile's geometry wearing the reference's edge. The primitive's
+    // own note explains why the size and the glyph stayed its arguments rather than folding into
+    // the variant; this prop keeps them together at the one place a caller states them.
+    //
+    // The INSPECTOR's medallion is deliberately not covered. It is a different site at a
+    // different size on every catalogue, and no reference or region asks it to move.
+    rowMedallion = null,
     // The VISIBLE caption on the select-all box. The prototype's reads `All` where the shipped
     // primitive says `Select all`. Only the caption moves: the primitive's `ariaLabel` is
     // untouched, because `All` is not an accessible name a screen-reader user can act on.
@@ -388,6 +419,45 @@
 
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
+
+  /**
+   * The class a LEAD-ROW select carries when the caller asked for the 38px rung, and `undefined`
+   * otherwise.
+   *
+   * `undefined` rather than `''`, and that is the whole reason this is a function rather than a
+   * `class:is-size-38` directive: a `class:` directive writes the attribute whatever the value
+   * is, so an unset opt-in would take every other catalogue's `<select>` from no `class`
+   * attribute at all to `class=""`. Svelte drops an `undefined` attribute, so a caller that does
+   * not ask for the rung renders the exact markup it always did — which the default-output proof
+   * compares byte for byte.
+   *
+   * The token is written as a LITERAL, never composed from `toolbarLeadSize`.
+   * `scripts/lib/stylesheetLiveClasses.js` cannot see a customer for a class a component builds
+   * by template, so `is-size-${size}` would report the sheet's rule as dead; the same reason
+   * `ManagerSearchField` maps its rung to a literal instead of interpolating one.
+   *
+   * @param {object} filter a lane filter descriptor.
+   * @returns {string|undefined}
+   */
+  function leadSelectSizeClass(filter) {
+    const onLeadRow = (filter?.toolbarRow ?? 'lead') === 'lead';
+    return toolbarLeadSize === '38' && onLeadRow ? 'is-size-38' : undefined;
+  }
+
+  /**
+   * The row medallion's three arguments, merged over the shipped tile.
+   *
+   * The defaults restate `Medallion`'s own — `variant: ''`, `size: 40`, `glyph: 0` — rather than
+   * omitting the attributes under an `{#if}`, because a single always-present element is what
+   * keeps the unset case byte-identical: two branches of the same tag is how a keyed list starts
+   * re-creating the node it used to update.
+   */
+  const rowMedallionSpec = $derived({
+    variant: '',
+    size: 40,
+    glyph: 0,
+    ...(rowMedallion && typeof rowMedallion === 'object' ? rowMedallion : {}),
+  });
 
   // A LANE SORT IS ITS OWN WHOLE ORDER, so it is passed through verbatim and the direction
   // toggle goes inert against it. A descriptor supplies one `compare`, not a pair, so composing
@@ -958,6 +1028,11 @@
             on a row that no longer holds the selection register.
           -->
           {#if selection.count > 0}
+            <!-- r9-prim2: gap-list row 37 is this primitive's, not this frame's. `proto:592`
+                 draws NO tri-state master box in the band at all — it reads `{n} selected` and
+                 offers `Select all {n} shown` as a text action — and `BulkSelectionToolbar`
+                 renders that box unconditionally with no prop to suppress it. The note below
+                 records the trade the frame took instead. Wire the opt-in here when it exists. -->
             <BulkSelectionToolbar
               rowClass={TOOLBAR_ROW_CLASS}
               toolbarAttr={TOOLBAR_ATTR}
@@ -1080,7 +1155,9 @@
                       src={thumbnail.src}
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
-                      size={40}
+                      variant={rowMedallionSpec.variant}
+                      size={rowMedallionSpec.size}
+                      glyph={rowMedallionSpec.glyph}
                     />
                     <span class="manager-system-copy">
                       <!--
@@ -1384,6 +1461,7 @@
 {#snippet searchField()}
   <ManagerSearchField
     value={query}
+    size={toolbarLeadSize}
     onInput={(next) => changeQuery(next)}
     placeholder={searchPlaceholder ||
       text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
@@ -1401,6 +1479,18 @@
   `microLabel` is the second opt-in: the reference labels its membership control with a visible
   8px micro-label rather than an invisible accessible name (`proto:579`). A descriptor that names
   none renders the bare `aria-label`led select it always did.
+
+  THE 38px RUNG IS THE ROW'S, NOT THE DESCRIPTOR'S (issue 1371 r9-cat). `proto:577`-`578` draws
+  BOTH controls on the lead row at 38 and `proto:582`-`585` draws all three on the filter row at
+  32, so the height is a fact about which row a control stands in and not about which filter it
+  is. `toolbarLeadSize` therefore says it once for the row, and `leadSelectSizeClass` reads the
+  descriptor only to find out which row it landed in.
+
+  The class rather than a prop is `ManagerToolbar`'s own contract: the manager has no select
+  COMPONENT, because the control beside the field is three different things across eleven bars and
+  the bar takes a slot instead of choosing between them. `styles/fabricate.css`'s `r8-prim` block
+  carries the rule at `.manager-scoped-list-toolbar select.is-size-38` — (0,3,1), which beats the
+  shipped 34px `(0,2,1)` on specificity rather than on source order.
 -->
 {#snippet laneFilterSelects(row)}
   {#each laneFilters as filter (filter.id)}
@@ -1415,6 +1505,7 @@
         </span>
       {/if}
       <select
+        class={leadSelectSizeClass(filter)}
         value={filterValues[filter.id] ?? 'all'}
         data-scoped-list-filter={filter.id}
         aria-label={filter.microLabel ? undefined : filter.label}

@@ -77,12 +77,64 @@
   import Chip from '../Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { paginateRows } from '../../../../../utils/browserPagination.js';
   import {
     componentBulkApplyLabel,
     componentBulkMembershipModes,
-    componentBulkPickerPage,
     componentBulkWriteCount,
   } from './componentScoped.js';
+
+  /**
+   * One staging inset's visible page: the rows that survive its search, windowed.
+   *
+   * SHARED BY ALL THREE INSETS (`proto:628`-`697` draws the same object three times), so the
+   * search predicate, the window size and the range sentence cannot drift between systems,
+   * categories and tags. `paginateRows` owns the arithmetic and the clamp; this owns only the
+   * search and the words.
+   *
+   * IT LIVES HERE RATHER THAN IN `componentScoped.js`, AND THE ADDRESS IS THE POINT. That module
+   * is the import-free leaf `ComponentEditView.svelte` pulls in, so every module it imports has
+   * to appear in every mounted manifest that renders the component editor — and a missing
+   * manifest entry is reported as `# cancelled`, not `# fail`. Holding the one paginated helper
+   * beside its only caller keeps the pagination leaf inside the CATALOGUE's own closure, where
+   * `SCOPED_LIST_RAW_MODULES` already carries it for the list frame. It is still a pure function
+   * of its arguments, so nothing about it changed except which graph it is in.
+   *
+   * @param {Array<{id: string, name: string}>} items
+   * @param {{query: string, pageIndex: number, pageSize?: number}} view
+   * @param {(key: string, fallback: string, data?: object) => string} say
+   * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
+   *   range: string, pageLabel: string}}
+   */
+  function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }, say) {
+    const needle = String(query ?? '')
+      .trim()
+      .toLowerCase();
+    const matched = (Array.isArray(items) ? items : []).filter(
+      (item) =>
+        !needle ||
+        String(item?.name ?? '')
+          .toLowerCase()
+          .includes(needle)
+    );
+    const page = paginateRows(matched, { pageIndex, pageSize }, pageSize);
+    return {
+      rows: page.rows,
+      pageIndex: page.pageIndex,
+      pageCount: page.pageCount,
+      total: matched.length,
+      range: say(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerRange',
+        'Showing {start}-{end} of {total}',
+        { start: page.rangeStart, end: page.rangeEnd, total: matched.length }
+      ),
+      pageLabel: say(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerPage',
+        'Page {page}/{of}',
+        { page: page.pageIndex + 1, of: page.pageCount }
+      ),
+    };
+  }
 
   let {
     count = 0,
@@ -434,6 +486,21 @@
   }
 </script>
 
+<!--
+  r9-prim2: THREE OF THIS PANEL'S GAP-LIST ROWS ARE `BulkEditPanelShell`'S TO GIVE, NOT THIS
+  FILE'S TO TAKE.
+
+   - row 38: the shell's clear action reads `Clear selection` where `proto:596` reads `Clear`. It
+     is hard-coded in the shell's own template, so it needs a `clearLabel` prop defaulting to the
+     shipped string.
+   - row 39: the count hero's copy is the shell's too, and the reference states a different
+     sentence there. Same shape: an override that defaults to what ships.
+   - row 47: see the danger leg below. `proto:686`-`688` pins that control INSIDE the dock, under
+     the primary action, and the shell exposes no dock slot — so the panel renders it as its last
+     content instead, which is the right reading order and the wrong box.
+
+  All three default to what ships, so no other bulk panel in the manager moves. Wire them here.
+-->
 <BulkEditPanelShell
   heading={headingLabel}
   {applyLabel}
@@ -600,10 +667,25 @@
   {/if}
 </BulkEditPanelShell>
 
+<!--
+  EVERY `<button>` BELOW DECLARES `data-keyboard-focus="true"`, AND IT IS NOT DECORATION.
+
+  Foundry's `KeyboardManager#hasFocus` recognises a BUTTON only when it has an ancestor `<form>`
+  — it literally returns `!!focused.form` — and this route renders no form at all. So while one
+  of these six held focus the window read as UNFOCUSED and every core keybinding stayed live:
+  Space pauses the game, the arrows pan the canvas behind the manager. A bulk panel is worked from
+  the keyboard the moment a GM tabs into a picker's rows and its pager, which is exactly the shape
+  most likely to be holding focus when a key is pressed.
+
+  `tests/design-system-keyboard-focus.test.js` is the gate, and the answer is the declaration
+  rather than a baseline row: all six arrived with this panel, so they are new debt and not
+  inherited debt. `WorldComponentCataloguePage.svelte`'s vocabulary exit already does the same.
+-->
 {#snippet clearSystems()}
   <button
     type="button"
     class="fab-bulk-component-clear"
+    data-keyboard-focus="true"
     data-world-component-bulk-clear-systems
     disabled={inert}
     onclick={() => (stagedSystemIds = [])}
@@ -616,6 +698,7 @@
   <button
     type="button"
     class="fab-bulk-component-clear"
+    data-keyboard-focus="true"
     data-world-component-bulk-clear-category
     disabled={inert}
     onclick={() => (stagedCategory = UNCHANGED)}
@@ -628,6 +711,7 @@
   <button
     type="button"
     class="fab-bulk-component-clear"
+    data-keyboard-focus="true"
     data-world-component-bulk-clear-tags
     disabled={inert}
     onclick={() => (stagedTags = {})}
@@ -667,6 +751,7 @@
           type="button"
           class="fab-bulk-component-inset-row"
           class:is-staged={row.state !== 'off'}
+          data-keyboard-focus="true"
           data-world-component-bulk-option={row.id}
           data-world-component-bulk-option-state={row.state}
           aria-pressed={row.state !== 'off'}
@@ -693,6 +778,7 @@
         <button
           type="button"
           class="fab-bulk-component-inset-page"
+          data-keyboard-focus="true"
           data-world-component-bulk-prev={inset.id}
           disabled={inert || inset.page.pageIndex === 0}
           aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
@@ -704,6 +790,7 @@
         <button
           type="button"
           class="fab-bulk-component-inset-page"
+          data-keyboard-focus="true"
           data-world-component-bulk-next={inset.id}
           disabled={inert || inset.page.pageIndex >= inset.page.pageCount - 1}
           aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}

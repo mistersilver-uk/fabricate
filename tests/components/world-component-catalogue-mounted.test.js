@@ -1156,4 +1156,128 @@ describe('world Component Catalogue (issue 1371)', () => {
       await drain();
     });
   });
+
+  /**
+   * THE FOUR SHARED PRIMITIVES THIS SCREEN NOW ASKS FOR A DIFFERENT FACE FROM (issue 1371 r9-cat).
+   *
+   * Every one of them is rendered by a component this page composes rather than writes —
+   * `ManagerSearchField` and the `<select>`s and the `Medallion` by the frame, the roster card by
+   * the shell, the tag pill by `Chip` — so the only thing this page can be held to is that it
+   * PASSES the opt-in. That is exactly what these assertions read: the class or the attribute the
+   * primitive emits for the value passed, on the element the reference measures.
+   *
+   * They are class assertions and not computed-style ones deliberately. The rules live in
+   * `styles/fabricate.css` and in each primitive's own scoped block, neither of which a mounted
+   * happy-dom tree loads; the parity harness measures the paint in a real browser, and this suite
+   * measures that the paint was ASKED FOR. Between them nothing is taken on trust.
+   */
+  describe('the screen consumes the shared primitives’ opt-in faces', () => {
+    async function mounted() {
+      return harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        systemId: 'sys-forge',
+        onOpenVocabulary: () => {},
+      });
+    }
+
+    it('takes the 38px rung on the LEAD row’s two controls and nowhere else', async () => {
+      // `proto:577`-`578` draws the search field and the source select at 38, which IS a rung of
+      // the published ladder; `proto:582`-`585` draws the membership select, the sort select and
+      // the direction toggle one row down at 32, which is RETIRED, so those three stay on the
+      // ladder's 34. One "toolbar size" would have taken all five, which is why the prop names
+      // the ROW.
+      const target = await mounted();
+      const field = target.querySelector('[data-scoped-list-search]').closest('.manager-search');
+      assert.ok(Boolean(field), 'the search field is the shared primitive');
+      assert.ok(
+        field.classList.contains('is-size-38'),
+        'and it carries the rung `ManagerSearchField` emits for size="38"'
+      );
+
+      const source = target.querySelector('[data-scoped-list-filter="source-type"]');
+      assert.ok(
+        source.classList.contains('is-size-38'),
+        'the lead row’s select carries the same rung'
+      );
+
+      for (const [what, selector] of [
+        ['membership', '[data-scoped-list-filter="membership"]'],
+        ['sort', '[data-scoped-list-sort]'],
+      ]) {
+        const control = target.querySelector(selector);
+        assert.ok(Boolean(control), `NON-VACUITY: the ${what} control is rendered`);
+        assert.ok(
+          !control.classList.contains('is-size-38'),
+          `and the filter row’s ${what} control keeps the ladder’s 34, because 32 is retired`
+        );
+      }
+    });
+
+    it('draws the row’s tile as the reference’s borderless 38px glyph chip', async () => {
+      // UX finding F12. `proto:600`: `width:38px;height:38px;border-radius:9px;font-size:15px`
+      // with a slate fill and no edge, against the shipped 40px bordered artwork tile. The
+      // variant owns the absent border and the cancelled wash; 38 and 15 are the primitive's own
+      // `size` and `glyph`, which is why all three are asserted here.
+      const target = await mounted();
+      const chip = target.querySelector('[data-scoped-list-row] .fab-medallion');
+      assert.ok(Boolean(chip), 'a row leads with the shared medallion');
+      assert.ok(
+        chip.classList.contains('is-glyph-chip'),
+        'and it carries the variant’s class, which is what cancels the border and the wash'
+      );
+      // The DOM normalises the declaration list it was handed (`width:38px` comes back as
+      // `width: 38px`), so each is matched with the separator optional rather than pinned to the
+      // component's own spelling of it.
+      const style = chip.getAttribute('style') || '';
+      assert.match(style, /width:\s*38px/, 'at the reference’s 38px');
+      assert.match(style, /height:\s*38px/, 'square');
+      assert.match(
+        style,
+        /--fab-medallion-glyph:\s*15px/,
+        'carrying the reference’s 15px glyph rather than the 0.9rem speck a 38px tile would hold'
+      );
+    });
+
+    it('turns the inspector roster into a recess with its search field lifted out of it', async () => {
+      // Reviewer finding 7. Both were restyled IN PLACE for all three catalogues before the props
+      // existed; this screen is the one whose reference draws them.
+      const target = await mounted();
+      target.querySelector('[data-scoped-list-inspect="ingot"]').click();
+      await drain();
+      const card = target.querySelector('.manager-scoped-roster-card');
+      assert.ok(Boolean(card), 'the inspector composes the shared roster');
+      assert.ok(card.classList.contains('is-recessed'), 'and the card takes the recess');
+      const search = target.querySelector('.manager-scoped-roster-search');
+      assert.ok(Boolean(search), 'the roster still draws its search field');
+      assert.ok(
+        search.classList.contains('manager-scoped-roster-search-well'),
+        'and the field is lifted into its own well rather than sitting flush in the recess'
+      );
+    });
+
+    it('draws a world tag as the reference’s LIT micro pill, on both of Chip’s axes', async () => {
+      // UX finding F10. `proto:757`: `padding: 2px 9px; border-radius: 999px; font: 600 9.5px`,
+      // purple ink over a purple wash behind a purple edge. `tone="tag"` alone measured a
+      // grey-blue fill, a 10px corner and cream ink — `emphasis` is the paint and `density` the
+      // scale, and it takes both to state the pill.
+      const target = await mounted();
+      target.querySelector('[data-scoped-list-inspect="coal"]').click();
+      await drain();
+      const chip = target.querySelector('[data-world-component-global-tags] .manager-chip');
+      assert.ok(Boolean(chip), 'the card draws its tags as the shared chip');
+      for (const token of ['is-tag', 'is-lit', 'is-list']) {
+        assert.ok(
+          chip.classList.contains(token),
+          `and it carries \`${token}\`; \`is-lit\` paints nothing without \`is-tag\`’s colour`
+        );
+      }
+      assert.ok(
+        !chip.classList.contains('is-tag-run'),
+        'and NOT the entry’s control scale, which the reference draws at 11px for a chip a GM clicks'
+      );
+    });
+  });
 });
