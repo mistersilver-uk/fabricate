@@ -94,6 +94,15 @@
     // `density`: the design draws this control at one size only, and a caller free to combine
     // the two would be choosing between two sets of the same four properties at equal
     // specificity, decided by source order.
+    //
+    // 'accent' (issue 1371, maintainer parity round 4) is the COHORT filter's family: the
+    // reference's system rules list draws its `In this system` / `All world components` switch
+    // with the chosen segment FILLED `--fab-accent` on `--fab-on-accent` and the idle one
+    // unfilled, unbordered and in `--fab-text-muted` (`proto:1558`). Unlike `tag` it carries no
+    // scale of its own — it is colour only — so it composes with `density="compact"`, which is
+    // the rung the reference's `padding: 5px 11px` / radius-6 / 10.5px-600 segment lands on.
+    // That is deliberate and is why it is spelled as a `tone` rather than a fourth `density`:
+    // the geometry is already a shipped rung and only the paint is new.
     tone = '',
   } = $props();
 
@@ -118,7 +127,7 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -360,6 +369,35 @@
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
+  }
+
+  /* ACCENT TONE (issue 1371): colour only. It states the chosen segment's fill and ink and the
+     idle segment's ink, and nothing about size — see the `tone` note. Written after the
+     `is-compact` block it composes with, so the fill wins over that block's active paint at
+     equal specificity, and after nothing else, because nothing else declares these two. */
+  .manager-segmented.is-accent .manager-segment.is-active {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+  }
+
+  .manager-segmented.is-accent .manager-segment:not(.is-active) {
+    border-color: transparent;
+    background: none;
+    color: var(--fab-text-muted);
+  }
+
+  /* The numeral rides the segment's own ink in both states, so the chosen segment's count is
+     legible on the accent fill rather than staying in the muted grey the base rule gives it.
+     BOTH selectors carry `.is-active` / `:not(.is-active)` to reach (0,4,0): the shipped
+     `.manager-segment.is-active .manager-segment-count` below is (0,3,0) and is written LATER
+     in this block, so a (0,3,0) rule here would lose the chosen segment's numeral to it. */
+  .manager-segmented.is-accent .manager-segment.is-active .manager-segment-count {
+    color: inherit;
+  }
+
+  .manager-segmented.is-accent .manager-segment:not(.is-active) .manager-segment-count {
+    color: inherit;
   }
 
   .manager-segment {

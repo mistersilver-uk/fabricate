@@ -603,38 +603,75 @@ export function componentDeleteNote(systemNames, phrase) {
 }
 
 /**
- * The system rules list's three membership filters, each carrying its count.
+ * The system rules list's cohort filter, as `SegmentedControl` options.
  *
- * `Overriding` carries no count: it is a predicate over the member cohort rather than a cohort of
- * its own, and a count beside it would have to be recomputed per row state.
+ * -- TWO SEGMENTS, NOT THREE OPTIONS ON A `<select>` ----------------------------------------
+ * The reference draws this as an inline two-segment switch -- `In this system ({n})` then
+ * `All world components ({m})` -- and never as a dropdown (`proto:1558`, gap-list row 145). The
+ * third shipped option, `Overriding`, has no counterpart anywhere in the reference: it is a
+ * PREDICATE over the member cohort rather than a cohort of its own, which is why it alone could
+ * carry no count, and it is dropped here rather than kept as a subject-only axis.
+ *
+ * The COUNT IS THE SEGMENT'S OWN `badge`, not part of its label, because the primitive draws it
+ * in the mono face the reference sets it in and a label carrying `({n})` would render the number
+ * twice on any caller that also passed a count.
  *
  * @param {{members: number, world: number}} counts
- * @param {(key: string, fallback: string, data?: object) => string} phrase
- * @returns {Array<{id: string, label: string}>}
+ * @returns {Array<{value: string, labelKey: string, fallback: string, badge: number}>}
  */
-export function componentMembershipFilters({ members, world }, phrase) {
+export function componentMembershipFilters({ members, world }) {
   return [
     {
-      id: 'in',
-      label: phrase(
-        'FABRICATE.Admin.Manager.Component.FilterInSystem',
-        'In this system ({count})',
-        { count: Number(members) || 0 }
-      ),
+      value: 'in',
+      labelKey: 'FABRICATE.Admin.Manager.Component.FilterInSystem',
+      fallback: 'In this system',
+      badge: Number(members) || 0,
     },
     {
-      id: 'all',
-      label: phrase(
-        'FABRICATE.Admin.Manager.Component.FilterAllWorld',
-        'All world components ({count})',
-        { count: Number(world) || 0 }
-      ),
-    },
-    {
-      id: 'over',
-      label: phrase('FABRICATE.Admin.Manager.Component.FilterOverriding', 'Overriding'),
+      value: 'all',
+      labelKey: 'FABRICATE.Admin.Manager.Component.FilterAllWorld',
+      fallback: 'All world components',
+      badge: Number(world) || 0,
     },
   ];
+}
+
+/**
+ * The system rules list's count line, in the ONE sentence the reference writes for the cohort
+ * being shown.
+ *
+ * TWO SENTENCES, BECAUSE THE REFERENCE WRITES TWO. Showing only this system's components it
+ * reads `{shown} of {total} catalogue entries` (`proto:1069`, and the reference frame reads
+ * `8 of 14 catalogue entries`). Widened to the whole world corpus the shown count no longer
+ * means the same thing, so the reference states membership instead -- `{shown} shown · {mine} of
+ * {all} in this system` (`proto:1556`). A single sentence covering both would be true of neither.
+ *
+ * IT IS COMPUTED OVER THE RENDERED COHORT IN BOTH BRANCHES. The shipped line counted the member
+ * PAGE alone, so under `All world components` on a system with no components the toolbar read
+ * `0-0 of 0` above a body drawing sixty-six rows.
+ *
+ * @param {object} counts
+ * @param {boolean} counts.allWorld which cohort is on screen.
+ * @param {number} counts.shown rows the body is drawing.
+ * @param {number} counts.total this system's whole component library.
+ * @param {number} counts.mine how many world components this system has rules for.
+ * @param {number} counts.all how many components the world corpus holds.
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentCohortCountText({ allWorld, shown, total, mine, all }, phrase) {
+  if (!allWorld) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Component.CountCatalogueEntries',
+      '{shown} of {total} catalogue entries',
+      { shown: Number(shown) || 0, total: Number(total) || 0 }
+    );
+  }
+  return phrase(
+    'FABRICATE.Admin.Manager.Component.CountCohort',
+    '{shown} shown · {mine} of {all} in this system',
+    { shown: Number(shown) || 0, mine: Number(mine) || 0, all: Number(all) || 0 }
+  );
 }
 
 /**
@@ -1134,4 +1171,160 @@ function componentSourceAddresses(entity) {
     if (uuid) addresses.add(uuid);
   }
   return addresses;
+}
+
+/**
+ * The system rules list inspector's identity subline -- `{n} tags · {m} essences`.
+ *
+ * BOTH CLAUSES PLURALISE INDEPENDENTLY, and the reference's own frame is why: it reads
+ * `1 tag · 1 essence`, so a shared plural key would render `1 tags · 1 essences` on the very
+ * first component a GM opens. Four keys rather than a composed one, because a translator cannot
+ * reorder a sentence this module joined by hand.
+ *
+ * @param {{tags: number, essences: number}} counts
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentInspectorSubline({ tags, essences }, phrase) {
+  const tagCount = Number(tags) || 0;
+  const essenceCount = Number(essences) || 0;
+  const left = phrase(
+    tagCount === 1
+      ? 'FABRICATE.Admin.Manager.Component.InspectorTagsOne'
+      : 'FABRICATE.Admin.Manager.Component.InspectorTags',
+    tagCount === 1 ? '{count} tag' : '{count} tags',
+    { count: tagCount }
+  );
+  const right = phrase(
+    essenceCount === 1
+      ? 'FABRICATE.Admin.Manager.Component.InspectorEssencesOne'
+      : 'FABRICATE.Admin.Manager.Component.InspectorEssences',
+    essenceCount === 1 ? '{count} essence' : '{count} essences',
+    { count: essenceCount }
+  );
+  return left + ' · ' + right;
+}
+
+/**
+ * The inspector's `Tags in effect` split counter -- `{w} world · {s} system`.
+ *
+ * It is a SPLIT and not a total, because the two halves are authored in different places and the
+ * whole point of the block is to say which of the chips beside it the GM can change from here.
+ *
+ * @param {{world: number, system: number}} counts
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentTagSplitText({ world, system }, phrase) {
+  return phrase(
+    'FABRICATE.Admin.Manager.Component.InspectorTagSplit',
+    '{world} world · {system} system',
+    { world: Number(world) || 0, system: Number(system) || 0 }
+  );
+}
+
+/**
+ * The inspector's `Category` source line -- where the value on screen was resolved from.
+ *
+ * `''` for a component the world corpus holds no record of: there is nothing to inherit FROM, so
+ * neither `inherited from world` nor `set in this system` is a true statement about it, and the
+ * reference draws the line only where a source exists.
+ *
+ * @param {object|null} systemRow the world projection's row for this `(component, system)` pair.
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentCategorySourceText(systemRow, phrase) {
+  if (!systemRow || systemRow.member !== true) return '';
+  return systemRow.inherited?.category === false
+    ? phrase('FABRICATE.Admin.Manager.Component.InspectorCategorySet', 'set in this system')
+    : phrase(
+        'FABRICATE.Admin.Manager.Component.InspectorCategoryInherited',
+        'inherited from world'
+      );
+}
+
+/**
+ * The inspector's `Salvage in {system}` note -- the one sentence that says what this component's
+ * salvage rules ARE here, without opening the editor.
+ *
+ * THREE BRANCHES, because the reference's sentence only makes sense in one of them: a system with
+ * salvage switched off stores no salvage at all, a component with salvage off yields nothing, and
+ * only the third has a mode, a DC and an ordered result count to state.
+ *
+ * @param {object} options
+ * @param {boolean} options.featureEnabled whether the SYSTEM has the salvage feature on.
+ * @param {boolean} options.componentEnabled whether THIS component salvages.
+ * @param {string} options.modeLabel the system's resolution-mode label, already localized.
+ * @param {number|null} options.dc the component's progressive DC, or `null`.
+ * @param {number} options.resultCount how many results the rules award.
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentSalvageSummary(
+  { featureEnabled, componentEnabled, modeLabel, dc, resultCount },
+  phrase
+) {
+  if (!featureEnabled) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Component.InspectorSalvageFeatureOff',
+      'Salvage is switched off for this system, so these rules store none.'
+    );
+  }
+  if (!componentEnabled) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Component.InspectorSalvageOff',
+      'Salvage is disabled for this component.'
+    );
+  }
+  const count = Number(resultCount) || 0;
+  const results = phrase(
+    count === 1
+      ? 'FABRICATE.Admin.Manager.Component.InspectorSalvageResultsOne'
+      : 'FABRICATE.Admin.Manager.Component.InspectorSalvageResults',
+    count === 1 ? '{count} ordered result' : '{count} ordered results',
+    { count }
+  );
+  const numericDc = Number(dc);
+  if (Number.isFinite(numericDc) && numericDc >= 1) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Component.InspectorSalvageWithDc',
+      '{mode} · these rules’ DC is {dc} · {results}.',
+      { mode: modeLabel, dc: numericDc, results }
+    );
+  }
+  return phrase('FABRICATE.Admin.Manager.Component.InspectorSalvageNoDc', '{mode} · {results}.', {
+    mode: modeLabel,
+    results,
+  });
+}
+
+/**
+ * The system rules LIST header's subtitle -- this system's own posture, not a generic sentence.
+ *
+ * @param {{systemName: string, salvageModeLabel: string}} options
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentListSubtitle({ systemName, salvageModeLabel }, phrase) {
+  return phrase(
+    'FABRICATE.Admin.Manager.Component.ListSubtitle',
+    'Component rules in {system} · {mode} salvage · world category and tags merge in; essences, salvage and overrides are this system’s own.',
+    { system: systemName, mode: salvageModeLabel }
+  );
+}
+
+/**
+ * The rules EDITOR header's subtitle -- `{system} rules · {category} · {mode}`.
+ *
+ * @param {{systemName: string, category: string, salvageModeLabel: string}} options
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentRulesSubtitle({ systemName, category, salvageModeLabel }, phrase) {
+  return phrase(
+    'FABRICATE.Admin.Manager.Component.RulesSubtitle',
+    '{system} rules · {category} · {mode}',
+    { system: systemName, category, mode: salvageModeLabel }
+  );
 }

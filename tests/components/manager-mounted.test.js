@@ -992,6 +992,10 @@ function compileManagerRoot() {
     // stack, and every blocked test is reported as `# cancelled` rather than failing.
     'src/ui/svelte/apps/manager/scoped/componentScoped.js',
     'src/utils/componentScopeValidation.js',
+    // The system rules EDITOR's own Validation tab model (issue 1371, parity round 4). It is a
+    // separate module from the world entry's above because it validates a different subject —
+    // one system's rules rather than the world record — and both are in this root's static graph.
+    'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
     'src/utils/scopedEntityListModel.js',
     // Issue 1392 (epic 1357, PR 7a): the world Tags & Categories screen is a real body now, so
     // its pure leaf is in this root's static graph — and so is the World Vocabulary's own core,
@@ -8877,8 +8881,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
-    assert.ok(target.textContent.includes('Compendium'));
-    assert.ok(target.textContent.includes('Unknown'));
+    // THE SOURCE-ORIGIN PILL IS GONE FROM THE ROW (issue 1371, parity round 4; gap-list row 114).
+    // The reference's system row carries ONE state pill — `Salvage` — because the source belongs
+    // to the world catalogue and the category is the group band's job.
+    assert.ok(
+      !target.querySelector('[data-component-id="c1"] [data-status-pill="accent"]'),
+      'no `Compendium` / `Items Directory` pill on a system rules row'
+    );
+    assert.ok(
+      target.textContent.includes('Recipes'),
+      'and the trailing cluster states the stat the reference draws in its place'
+    );
     const compactEssenceChip = target.querySelector(
       '[data-component-id="c1"] .manager-essence-compact-chip'
     );
@@ -8935,12 +8948,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Iron Ore'), 'the category filter narrows the list');
 
-    // `general` is suppressed as a BADGE (no redundant "General" chip on every row) but
-    // stays a selectable FILTER option, pinned last as the catch-all — the Recipe
-    // Studio's badge-vs-filter asymmetry.
+    // NO CATEGORY BADGE ON THE ROW since issue 1371's parity round 4 (gap-list row 114). The
+    // reference's system row carries one state pill — `Salvage` — because CATEGORY is the group
+    // band's whole subject, and a chip repeating it on every row inside that band is the noise
+    // the band exists to remove. It stays a selectable FILTER option, which is the half of the
+    // Recipe Studio's badge-vs-filter asymmetry that survives.
     assert.ok(
-      target.querySelector('[data-component-id="c1"] [data-component-category="Reagent"]'),
-      'a custom category renders as a row badge'
+      !target.querySelector('[data-component-id="c1"] [data-component-category]'),
+      'the row states no category: the band it sits under already does'
+    );
+    assert.equal(
+      target.querySelector('[data-component-group="Reagent"] .fab-group-name').textContent.trim(),
+      'Reagent',
+      'and THAT is where the category is stated'
     );
     categoryFilter.value = 'general';
     categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
@@ -8951,34 +8971,27 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.textContent.includes('Glass Vial'),
       'the uncategorized component falls into general'
     );
-    assert.equal(
-      target.querySelector('[data-component-id="c2"] [data-component-category]'),
-      null,
-      'the general bucket renders no redundant badge'
+    // ── THE ACTIVE-FILTER CHIP ROW IS GONE (gap-list row 103) ────────────────────────────
+    // The reference's toolbar is TWO rows — [search, category, essence] then [Select all, Group
+    // by category, Sort by, count] — and this one was four. The chip run was the third of them,
+    // and each of the three filters already shows its own state in the control that set it.
+    assert.ok(
+      !target.querySelector('[data-component-filter-chip]'),
+      'no third toolbar row restating what the three controls above already show'
     );
 
-    // Filters clear through the dismissible CHIP run (issue 676), adopted from the Recipe
-    // Studio: the lone "Clear filters" button said that filters were on but never which
-    // ones. `data-clear-filters="components"` survives only on the filtered-to-nothing
-    // panel, which is not this state.
-    const categoryChip = target.querySelector('[data-component-filter-chip="category"]');
-    assert.ok(categoryChip, 'an active category filter announces itself as a chip');
-    assert.ok(
-      categoryChip.textContent.includes('General'),
-      'the chip names the LOCALIZED category, not the raw `general` token'
-    );
-    categoryChip.querySelector('button').click();
+    // The filter is cleared through the control that set it, and the list widens again.
+    categoryFilter.value = 'all';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
+    // The count is the sentence the reference writes for the in-system cohort (`proto:1069`),
+    // computed over the rows the body is drawing.
     assert.equal(
-      target.querySelector('[data-component-filter-chip="category"]'),
-      null,
-      'clearing the chip clears the filter it names'
+      target.querySelector('[data-component-count]').textContent.trim(),
+      '2 of 2 catalogue entries'
     );
-    // The count reports the page WINDOW, not "2 of 2" — `paginateComponents` has computed
-    // the range since it was written and the view never read it.
-    assert.equal(target.querySelector('[data-component-count]').textContent.trim(), '1–2 of 2');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -8990,26 +9003,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'raw source UUID should not render as inspector text'
     );
 
-    const copySourceAction = target.querySelector('[data-component-action="copy-source"]');
-    assert.ok(copySourceAction, 'component inspector should expose a copy source action');
-    assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
-    copySourceAction.click();
+    // Copy, Unlink and Delete are HOSTED here (issue 676) — they were rehomed off the row,
+    // whose three ghost icons had turned it into a toolbar. Since issue 1371's parity round 4
+    // they sit behind the inspector's kebab rather than in a four-button stack (gap-list row
+    // 123), so the inspector is still the reason the row can carry one action.
+    target.querySelector('[data-component-inspector-menu]').click();
     flushSync();
-    // Copy and Delete are HOSTED here (issue 676) — they were rehomed off the row, whose
-    // three ghost icons had turned it into a toolbar. The inspector is the reason the row
-    // can carry one action, so these must exist rather than be absent.
-    assert.ok(
-      target.querySelector('[data-component-action="edit"]'),
-      'component inspector offers Edit'
+    const menuLabels = [...target.querySelectorAll('[role="menuitem"]')].map((item) =>
+      item.textContent.trim()
     );
-    assert.ok(
-      target.querySelector('[data-component-action="delete"]'),
-      'component inspector hosts the Delete rehomed off the row'
-    );
-    assert.ok(
-      target.querySelector('[data-component-action="unlink"]'),
-      'component inspector offers Unlink for a linked component'
-    );
+    assert.deepEqual(menuLabels, [
+      'Copy source UUID',
+      'Unlink component',
+      'Delete component',
+    ]);
+    [...target.querySelectorAll('[role="menuitem"]')][0].click();
+    flushSync();
     assert.equal(
       target.querySelector('[data-component-source-missing]'),
       null,
@@ -9018,13 +9027,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     const componentInspector = target.querySelector('[data-component-inspector]');
     assert.ok(componentInspector, 'the components route renders the browser inspector');
     assert.ok(
-      componentInspector.querySelector('.manager-component-browser-inspector-hero .fab-medallion'),
-      'the inspector hero renders the shared Medallion, not a bespoke preview img'
+      componentInspector.querySelector('.manager-component-inspector-identity .fab-medallion'),
+      'the inspector identity renders the shared Medallion, not a bespoke preview img'
     );
+    // THE TWO STAT TILES ARE GONE (gap-list row 118): the subline states both numbers, and a
+    // tile per number over a panel about to list them is the same fact three times.
+    assert.equal(componentInspector.querySelectorAll('[data-component-fact]').length, 0);
     assert.equal(
-      componentInspector.querySelectorAll('[data-component-fact]').length,
-      2,
-      'the inspector reports the two stat tiles (tags / essences)'
+      componentInspector.querySelector('[data-component-inspector-subline]').textContent.trim(),
+      '2 tags · 1 essence',
+      'the subline states both numbers, which is what the two tiles were for'
     );
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
@@ -9069,7 +9081,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
-    target.querySelector('[data-component-action="delete"]').click();
+    target.querySelector('[data-component-inspector-menu]').click();
+    flushSync();
+    [...target.querySelectorAll('[role="menuitem"]')]
+      .find((item) => item.textContent.trim() === 'Delete component')
+      .click();
     flushSync();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
@@ -9115,7 +9131,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'the words belong in the tooltip only: repeating them on every row crowded the description'
     );
-    assert.ok(target.textContent.includes('Missing'));
+    // THE DANGLING LINK IS STATED IN THE INSPECTOR, NOT ON THE ROW (issue 1371, parity round 4).
+    // The row's source-origin pill went with the rest of the source register (gap-list row 114);
+    // the remediation paragraph stays, because a component claiming a document that no longer
+    // exists is the one thing on this screen a GM has to act on.
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector] [data-component-source-missing]')),
+      'a missing source still reaches the GM, one pane over'
+    );
 
     // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
     // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
@@ -9245,37 +9268,51 @@ describe('CraftingSystemManager mounted behavior', () => {
   // column has FOUR controls, and Unlink is the one that makes the sibling check worth
   // running. Unlink breaks the item linkage and keeps the component — it destroys nothing —
   // so it is precisely the neighbour a `danger` role picked by feel would land on.
-  it('paints the component inspector Delete as danger, and not Unlink beside it', async () => {
+  // REWRITTEN FOR ISSUE 1371's PARITY ROUND 4 (gap-list row 123). The four-button stack this
+  // case was written against — Edit, Copy source UUID, Unlink, Delete, all full-width and all
+  // inline in the scroll area — is what the reference replaces with ONE pinned primary and an
+  // overflow. Four commands at equal weight where the design pins one is a hierarchy change, not
+  // a variant, so the case moves with it: what survives is the claim it was really making, that
+  // Delete is marked destructive and its three neighbours are not.
+  it('pins ONE primary and puts the other three behind the kebab, Delete alone marked destructive', async () => {
     await openComponentsBrowser();
 
     const inspector = target.querySelector('[data-component-inspector]');
     assert.ok(Boolean(inspector), 'the components route opens on the single-component inspector');
 
-    const remove = inspector.querySelector('[data-component-action="delete"]');
-    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    const foot = inspector.querySelector('[data-component-inspector-foot]');
+    assert.ok(Boolean(foot), 'the inspector pins a foot rather than scrolling its actions');
+    const actions = foot.querySelectorAll('button');
+    assert.equal(actions.length, 1, 'and the foot carries exactly ONE action');
+    assert.equal(actions[0].textContent.trim(), 'Edit system rules');
     assert.ok(
-      remove.classList.contains('fab-manager-button'),
-      'Delete renders through the ManagerButton primitive, not a hand-written class'
-    );
-    assert.ok(
-      remove.classList.contains('is-danger'),
-      'Delete carries the danger role — the verb removes the component from the system'
-    );
-    assert.ok(
-      remove.classList.contains('manager-component-browser-inspector-delete'),
-      'and keeps the bespoke class the panel geometry is keyed on'
+      Boolean(foot.querySelector('[data-component-edit-system-rules]')),
+      'which is the act this whole screen exists to reach'
     );
 
-    for (const action of ['edit', 'copy-source', 'unlink']) {
-      const sibling = inspector.querySelector(`[data-component-action="${action}"]`);
-      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+    // The other three are BEHIND the kebab and therefore absent until it is opened — which is
+    // itself the assertion the old stack could not make.
+    assert.ok(
+      !target.querySelector('[role="menuitem"]'),
+      'pre-condition: the overflow is closed, so none of its commands is on screen'
+    );
+    inspector.querySelector('[data-component-inspector-menu]').click();
+    flushSync();
+
+    const items = [...target.querySelectorAll('[role="menuitem"]')];
+    assert.deepEqual(
+      items.map((item) => item.textContent.trim()),
+      ['Copy source UUID', 'Unlink component', 'Delete component'],
+      'nothing is lost: the three commands the foot no longer carries are all here'
+    );
+    assert.ok(
+      items[2].classList.contains('is-danger'),
+      'Delete carries the danger marking — the verb removes the component from the system'
+    );
+    for (const item of items.slice(0, 2)) {
       assert.ok(
-        sibling.classList.contains('fab-manager-button'),
-        `${action} renders through the primitive too`
-      );
-      assert.ok(
-        !sibling.classList.contains('is-danger'),
-        `${action} destroys no record, so the danger role must not have landed on it`
+        !item.classList.contains('is-danger'),
+        `${item.textContent.trim()} destroys no record, so the marking must not have landed on it`
       );
     }
   });
@@ -9287,17 +9324,19 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
     await openComponentsBrowser();
 
-    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance.
+    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance. The
+    // single-component delete is behind the inspector's kebab since issue 1371's parity round 4
+    // (gap-list row 123), so the pre-condition is asserted on the trigger that reaches it.
     assert.ok(
-      Boolean(target.querySelector('[data-component-action="delete"]')),
-      'the single-component inspector offers Delete'
+      Boolean(target.querySelector('[data-component-inspector-menu]')),
+      'the single-component inspector offers its overflow, and Delete is in it'
     );
 
     tickComponentRow('c1');
 
     assert.ok(
-      !target.querySelector('[data-component-action="delete"]'),
-      'the inspector — and its Delete — is replaced'
+      !target.querySelector('[data-component-inspector-menu]'),
+      'the inspector — and the overflow carrying its Delete — is replaced'
     );
     assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
     assert.match(
@@ -10317,10 +10356,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       editHeading.querySelector('.fab-medallion'),
       'the heading leads with the shared Medallion, as the recipe editor does'
     );
+    // `{system} rules · {effective category} · {mode}` since issue 1371's parity round 4
+    // (`proto:5719`, gap-list row 125). The subline used to end in a SOURCE segment naming where
+    // the linked Item lives, which under epic 1357 is world data stated on the world entry — so
+    // the one line this screen has for context spent half of it on a fact that is not this
+    // screen's. The reference spends it on the three facts that decide what the editor below can
+    // author: whose rules these are, what they classify the component as, and how salvage
+    // resolves here.
     assert.equal(
       editHeading.querySelector('[data-component-edit-subline]').textContent.trim(),
-      'Reagent · Linked Compendium',
-      'the subline reads "<category> · Linked <source>"'
+      'Alchemy rules · Reagent · Simple',
+      'the subline reads "{system} rules · {category} · {mode}"'
     );
     // The breadcrumb names the component too — not the generic string the recipe
     // breadcrumb's own comment rejects.
@@ -10348,58 +10394,50 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the component editor renders no right-rail inspector card'
     );
 
-    // AC3: open-sheet stays ON THE SOURCE NAME — the common action keeps its
-    // affordance rather than being buried in the kebab.
-    target.querySelector('[data-component-edit-action="open-source"]').click();
-    flushSync();
-    assert.deepEqual(
-      opened,
-      ['Compendium.fabricate.items.iron-ore'],
-      'Open Source Item should call onOpenSource with the stored UUID'
-    );
-
-    // AC3: unlink lives in the OVERFLOW (rare + destructive — what a kebab is for), so
-    // it must be opened first. The menu is portaled to the `.fabricate-manager` host to
-    // escape the scrolling column's `overflow: hidden`, so query from the root, not the
-    // strip. Rows are addressed by their label: `ActionMenu` is a shared component and
-    // gives items no per-caller data hook unless the caller asks for one.
-    //
-    // `role="menuitem"`, not `.manager-travel-option` (issue 1477). These are COMMANDS, and the
-    // picker they used to be announced them as selectable options in a listbox.
-    const overflowItem = (label) =>
-      Array.from(root.querySelectorAll('[role="menuitem"]')).find((button) =>
-        button.textContent.includes(label)
-      );
-
-    target.querySelector('.manager-component-overflow-trigger').click();
-    await tick();
-    flushSync();
-    assert.ok(overflowItem('Copy source UUID'), 'the overflow carries Copy source UUID');
+    // ── THE SOURCE REGISTER IS GONE FROM THIS SCREEN (issue 1371, parity round 4) ──────────
+    // Open-sheet on the name, the overflow's Copy source UUID and Unlink Source Item, and the
+    // drop-to-replace target were all asserted here. `rebuild-spec.md` D3 removes every one of
+    // them: under epic 1357 the record naming the source Item is world catalogue data, so it is
+    // authored on the world Component entry and this screen carries the ONE exit that goes
+    // there. The removal is asserted rather than deleted, and the three unused recorders below
+    // are the proof that no path still reaches them.
     assert.ok(
-      !root.querySelector('.manager-component-identity-strip [role="listbox"]'),
-      'and it is no longer a listbox anywhere in the strip'
+      !target.querySelector('[data-component-edit-action="open-source"]'),
+      'the name no longer opens the linked Item sheet from a system rules screen'
     );
-    overflowItem('Unlink Source Item').click();
-    flushSync();
+    assert.ok(
+      !target.querySelector('.manager-component-overflow-trigger'),
+      'and there is no source overflow to bury Unlink and Copy source UUID in'
+    );
+    assert.ok(
+      !target.querySelector('[data-component-edit-action="replace-source"]'),
+      'and no drop target: a rules editor must not restamp the durable roles map'
+    );
     assert.deepEqual(
-      unlinked,
-      ['c1'],
-      'Unlink Source Item should call onUnlinkSource with the component id'
+      [opened, unlinked, replaced],
+      [[], [], []],
+      'nothing reached the three source services, which is what "removed" has to mean'
     );
 
-    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(dropEvent, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.replacement' }) },
-    });
-    target.querySelector('[data-component-edit-action="replace-source"]').dispatchEvent(dropEvent);
-    flushSync();
-    assert.deepEqual(
-      replaced,
-      [{ itemId: 'c1', data: { type: 'Item', uuid: 'Item.replacement' } }],
-      'drop should route through onReplaceSource for the active component'
+    // What stands in their place is ONE callout. THIS fixture's world corpus holds no record of
+    // `c1`, which is the branch that withholds the pill, the attribution note and the exit — so
+    // the card states whose the identity is instead of claiming a catalogue entry that is not
+    // there. Both branches are driven; the other is
+    // `tests/components/component-identity-strip-mounted.test.js`.
+    const callout = target.querySelector('[data-component-edit-section="identity"]');
+    assert.ok(Boolean(callout), 'the editor opens on the identity callout');
+    assert.equal(
+      callout.querySelector('[data-component-edit-field="name"]').textContent.trim(),
+      'Iron Ore'
+    );
+    assert.ok(!callout.querySelector('[data-component-world-pill]'));
+    assert.match(
+      callout.querySelector('[data-component-identity-unlinked-hint]').textContent,
+      /no world catalogue entry/
     );
 
-    // Tags and essences are stacked cards in the editor (no tabs), so they render immediately.
+    // Tags and essences are cards on the `Component rules` tab, which is the tab a fresh editor
+    // opens on, so they render immediately.
     assert.ok(
       target.querySelector('[data-component-edit-section="tags"]'),
       'Tags section should render'
@@ -26767,12 +26805,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       return { fill };
     }
 
-    const inspectorDescription = () =>
-      target
-        .querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
-        .textContent.trim();
-    const inspectorPillTone = () =>
-      target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
+    // THE INSPECTOR'S HYDRATED SURFACE IS ITS REMEDIATION PARAGRAPH (issue 1371, parity round 4).
+    // It used to be the description paragraph and the source-origin pill, and `rebuild-spec.md`
+    // C7 removes both: the reference's inspector states shared identity, tags, category and
+    // salvage, and the source register belongs to the world catalogue. What a dangling link
+    // still has to reach is the sentence telling the GM to act, and THAT is what hydration must
+    // deliver — a fill the GM never sees is the whole defect this suite exists for.
+    const inspectorRemediation = () =>
+      target.querySelector('[data-component-inspector] [data-component-source-missing]');
     const rowDescription = () =>
       target
         .querySelector('[data-component-id="linked-1"] .manager-system-description')
@@ -26781,40 +26821,29 @@ describe('CraftingSystemManager mounted behavior', () => {
     it('replaces the inspector prose and flips the source pill from Linked to Missing', async () => {
       const { fill } = await openComponentStudioWithLinkedCard();
 
-      // CONTROL, same fixture: the pre-hydration reading. This is the regression issue 676
-      // filed and issue 800 preserved, and an accent pill telling the GM a dangling link is
-      // healthy — so these three strings are what a broken republish leaves on screen.
-      assert.equal(
-        inspectorDescription(),
-        'No description has been added.',
-        'pre-condition: the un-hydrated card has no prose to show'
-      );
-      assert.equal(inspectorPillTone(), 'accent', 'pre-condition: it reads as a healthy link');
+      // CONTROL, same fixture: the pre-hydration reading. The un-hydrated card still reads as a
+      // healthy link, so the panel offers nothing to act on — which is what a broken republish
+      // would leave on screen forever.
       assert.ok(
-        !target.querySelector('[data-component-source-missing]'),
-        'pre-condition: and offers no remediation paragraph'
+        Boolean(target.querySelector('[data-component-inspector]')),
+        'pre-condition: the inspector is open on the linked card'
       );
+      assert.ok(!inspectorRemediation(), 'pre-condition: and offers no remediation paragraph');
 
       fill();
       await tick();
       await tick();
       flushSync();
 
-      assert.equal(
-        inspectorDescription(),
-        RESOLVED.description,
-        'the resolved prose REACHES the inspector — a fill the GM never sees is the whole ' +
+      assert.ok(
+        Boolean(inspectorRemediation()),
+        'the resolved verdict REACHES the inspector — a fill the GM never sees is the whole ' +
           'defect, and every spy in this repo stays green through it'
       );
-      assert.equal(
-        inspectorPillTone(),
-        'warning',
-        'and the pill flips to the amber Missing tone, so a deleted source document is not ' +
-          'reported as a healthy link'
-      );
-      assert.ok(
-        Boolean(target.querySelector('[data-component-source-missing]')),
-        'and the remediation paragraph renders'
+      assert.match(
+        inspectorRemediation().textContent,
+        /no longer resolves/,
+        'and it is the sentence that tells the GM what to do about it'
       );
     });
 

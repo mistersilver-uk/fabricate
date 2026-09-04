@@ -111,6 +111,10 @@
   // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
   // globs for the component EDITOR's frames.
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
+  // The three component-scope sentences this shell owns (issue 1371, parity round 4): the two
+  // header subtitles it renders, and the salvage-mode label all three of them name.
+  import { componentListSubtitle, componentRulesSubtitle } from './scoped/componentScoped.js';
+  import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
   import ComponentBulkEditPanel from './components/ComponentBulkEditPanel.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
   import KnowledgeView from './KnowledgeView.svelte';
@@ -1150,6 +1154,36 @@
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
+
+  // ── THE SYSTEM'S SALVAGE MODE, AS A LABEL, FOR THE THREE COMPONENT SURFACES THAT STATE IT ──
+  // The list's header subtitle, the rules editor's header subtitle and the list inspector's
+  // `Salvage in {system}` note all name it, and the persisted token is never displayed.
+  // `salvageResolutionModeOptions` is the list whose own comment records that `routed` reads as
+  // "Routed by check"; deriving the label three times would be three chances to disagree.
+  const componentSalvageModeLabel = $derived(
+    (() => {
+      const option = salvageResolutionModeOptions.find(
+        (candidate) => candidate.value === (selectedSystem?.salvageResolutionMode || 'simple')
+      );
+      return option ? text(option.labelKey, option.fallback) : '';
+    })()
+  );
+
+  // The world projection's entry for the SELECTED row, and that entry's row for THIS system.
+  // Resolved here rather than inside the inspector so the panel takes two plain objects instead
+  // of the whole world-scope bundle.
+  const componentInspectorWorldEntry = $derived(
+    (Array.isArray(worldScopeState.component?.entries)
+      ? worldScopeState.component.entries
+      : []
+    ).find((entry) => String(entry?.id ?? '') === String(selectedComponent?.id ?? '')) ?? null
+  );
+  const componentInspectorWorldSystemRow = $derived(
+    (Array.isArray(componentInspectorWorldEntry?.systems)
+      ? componentInspectorWorldEntry.systems
+      : []
+    ).find((row) => row?.systemId === selectedSystemId) ?? null
+  );
   // Routed-salvage outcome tier NAMES (active type), used by the per-component
   // outcome-routing selects. Names map to result-group ids in component.salvage.
   // Policy-conditional on the same terms (issue 1098). Unfiltered until that issue, so it
@@ -2374,11 +2408,6 @@
   );
   const showComponentTags = $derived(
     itemCards.some((item) => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0))
-  );
-  const showComponentEssences = $derived(
-    itemCards.some(
-      (item) => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)
-    )
   );
   const selectedComponent = $derived(
     itemCards.find((item) => item.id === selectedComponentId) || itemCards[0] || null
@@ -4969,30 +4998,23 @@
   // decision 4). The SOURCE segment names where the linked item lives — the same origin
   // the browser row's status pill reports — because the editor's whole premise is that
   // name, image and description follow that item. An unlinked component says so.
+  // ISSUE 1371, PARITY ROUND 4 (gap-list row 125). The reference reads
+  // `{system} rules · {effective category} · {mode}` (`proto:5719`). What shipped was
+  // `{category} · Linked Items Directory` — a source segment that names where the linked Item
+  // lives, which under epic 1357 is world data and is stated on the world entry, not here.
   function componentEditSubtitle() {
     const category = getComponentCategoryLabel(
       normalizeComponentCategory(componentForEdit?.category),
       localize
     );
-    return `${category} · ${componentEditSourceSegment()}`;
-  }
-
-  function componentEditSourceSegment() {
-    if (!componentForEdit?.hasRegisteredItemUuid) {
-      return text('FABRICATE.Admin.Manager.Component.UnlinkedBadge', 'Not linked');
-    }
-    if (componentForEdit?.sourceMissing) {
-      return text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing');
-    }
-    const origin = componentForEdit?.sourceOrigin || '';
-    const sourceLabel =
-      componentForEdit?.sourceOriginLabel ||
-      (origin === 'compendium'
-        ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
-        : origin === 'world'
-          ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
-          : text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'));
-    return `${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceLabel}`;
+    return componentRulesSubtitle(
+      {
+        systemName: selectedSystem?.name || '',
+        category,
+        salvageModeLabel: componentSalvageModeLabel,
+      },
+      format
+    );
   }
 
   function resolutionModeLabel(mode) {
@@ -5378,10 +5400,16 @@
         'FABRICATE.Admin.Manager.RecipeItem.EditSubtitle',
         'Link a world item and recipes, then set its use and learn caps.'
       );
+    // ISSUE 1371, PARITY ROUND 4 (gap-list row 98). The generic sentence said nothing a GM
+    // could act on; the reference writes THIS system's own posture — its salvage mode, and which
+    // half of a component's rules is world data and which is the system's.
     if (currentView === 'components')
-      return text(
-        'FABRICATE.Admin.Manager.Component.Subtitle',
-        'Manage item-backed components for the selected crafting system.'
+      return componentListSubtitle(
+        {
+          systemName: selectedSystem?.name || '',
+          salvageModeLabel: componentSalvageModeLabel,
+        },
+        format
       );
     if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
     if (currentView === 'component-edit')
@@ -6977,7 +7005,9 @@
 
   function componentEditSaveLabel() {
     if (componentEditSaving) return text('FABRICATE.Admin.Manager.Component.Saving', 'Saving...');
-    return text('FABRICATE.Admin.Manager.Component.SaveComponent', 'Save Component');
+    // `Save rules`, per the reference (gap-list row 126): this editor saves ONE SYSTEM'S rules
+    // for a component whose identity is saved somewhere else entirely.
+    return text('FABRICATE.Admin.Manager.Component.SaveRules', 'Save rules');
   }
 
   function deleteComponent(itemId = selectedComponent?.id) {
@@ -10976,7 +11006,24 @@
               </p>
             {/if}
           {:else if currentView === 'components'}
-            <!-- no header actions for the components list -->
+            <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The header had no action
+                 at all, so the only route to adopt a world component into this system was the
+                 list's own `All world components` cohort. This lands on the same cohort with the
+                 filter already widened, which is what the reference's action does. -->
+            <ManagerButton
+              role="primary"
+              data-component-add-from-catalogue
+              onclick={() => openWorldScopedEntry('world-component-catalogue', '')}
+              disabled={!selectedSystemId}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Component.AddFromCatalogue',
+                  'Add from catalogue'
+                )}</span
+              >
+            </ManagerButton>
           {:else if currentView === 'knowledge'}
             <!-- The Knowledge surface's only actions are per-character: they live in the
              detail-pane header, next to the character they act on. -->
@@ -15749,11 +15796,27 @@
               onDelete={(ids) => deleteSelectedComponents(ids)}
             />
           {:else if selectedComponent}
+            <!--
+              THE WORLD FACTS THE IN-SYSTEM CARD CANNOT ANSWER (issue 1371, parity round 4). Three
+              of this inspector's blocks are about the relationship between the two scopes — how
+              many other systems share the identity, which tags came from the world and are not
+              muted here, and whether the category was inherited or set — and the read union
+              re-derives identity from the in-system record on every row, so none of them is
+              answerable from `selectedComponent`. They are resolved HERE, off the world
+              projection this route already holds, rather than handed the whole `scope` bundle:
+              a spread would subscribe the panel to an object that is new on every world edit.
+            -->
             <ComponentBrowserInspector
               {selectedComponent}
               showTags={showComponentTags}
-              showEssences={showComponentEssences}
-              onEdit={() => editComponent(selectedComponent?.id)}
+              worldEntry={componentInspectorWorldEntry}
+              worldSystemRow={componentInspectorWorldSystemRow}
+              systemName={selectedSystem?.name || ''}
+              salvageFeatureEnabled={componentSalvageEnabled}
+              salvageModeLabel={componentSalvageModeLabel}
+              onEditSystemRules={() => editComponent(selectedComponent?.id)}
+              onOpenWorldEntry={(entityId) =>
+                openWorldScopedEntry('world-component-entry', entityId)}
               onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
               onUnlink={(id) => unlinkComponentSource(id)}
               onDelete={(id) => deleteComponent(id)}

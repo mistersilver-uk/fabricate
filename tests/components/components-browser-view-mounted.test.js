@@ -62,6 +62,9 @@ const browser = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+    // The cohort filter is the shared segmented track since issue 1371's parity round 4; the
+    // `<select>` it replaced needed no entry, and an omission here HANGS this suite.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The manager's ONE multi-select row (issue 772; extracted to a shared primitive under
     // `apps/manager/` for issue 1010, so this path moved out of the browser's own directory).
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
@@ -138,26 +141,34 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
     const root = await browser.mount({ itemCards: manyGeneral(30) });
 
     assert.equal(root.querySelectorAll('.manager-component-row').length, 25, 'the default page holds 25');
+    // A BARE NUMERAL since issue 1371's parity round 4 (`proto:1073`, gap-list row 107): the
+    // reference draws the folder glyph, the category name and a mono count, and the noun is the
+    // band's whole subject. The `of` form survives for the one case that needs it — a category
+    // spanning a page boundary would otherwise report the slice as the whole bucket.
     assert.deepEqual(
       countTexts(root),
-      ['25 of 30 components'],
+      ['25 of 30'],
       'the header must not say the General bucket holds 25'
     );
-    // The pager and the header now agree about the same library.
+    // The pager and the header now agree about the same library, in the sentence the reference
+    // writes for the in-system cohort (`proto:1069`).
     assert.equal(
       root.querySelector('[data-component-count]').textContent.trim(),
-      '1–25 of 30'
+      '25 of 30 catalogue entries'
     );
   });
 
   it('says it once when the group is shown WHOLE', async () => {
     const root = await browser.mount({ itemCards: manyGeneral(3) });
-    assert.deepEqual(countTexts(root), ['3 components'], 'not "3 of 3"');
+    assert.deepEqual(countTexts(root), ['3'], 'not "3 of 3", and not "3 components"');
   });
 
-  it('handles the singular — "1 component" whole, "1 of N" paged', async () => {
+  it('handles the singular — a bare "1" whole, "1 of N" paged', async () => {
+    // The plural agreement this case was written for is GONE with the noun: a bare numeral has
+    // no singular branch to get wrong. What survives is the distinction the case really pins —
+    // a group shown whole says one number, a group spanning a boundary says two.
     const root = await browser.mount({ itemCards: manyGeneral(1) });
-    assert.deepEqual(countTexts(root), ['1 component'], 'never "1 components"');
+    assert.deepEqual(countTexts(root), ['1'], 'a whole group says its size and nothing else');
 
     browser.remount();
     const paged = await browser.mount({ itemCards: manyGeneral(26) });
@@ -169,7 +180,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
     flushSync();
 
     assert.equal(paged.querySelectorAll('.manager-component-row').length, 1, 'page 2 holds one row');
-    assert.deepEqual(countTexts(paged), ['1 of 26 components'], 'never "1 components", never a bare "1"');
+    assert.deepEqual(countTexts(paged), ['1 of 26'], 'a continuation page still says both numbers');
   });
 
   it('counts the total over the FILTERED rows, so an active filter is respected', async () => {
@@ -179,7 +190,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
       makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' })
     ];
     const root = await browser.mount({ itemCards: rows, categoryVocabulary: ['Metal'] });
-    assert.deepEqual(countTexts(root), ['2 components', '2 components'], 'Metal then general');
+    assert.deepEqual(countTexts(root), ['2', '2'], 'Metal then general');
 
     const categoryFilter = root.querySelector('[data-component-category-filter]');
     categoryFilter.value = 'Metal';
@@ -188,7 +199,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
 
     assert.deepEqual(
       countTexts(root),
-      ['2 components'],
+      ['2'],
       'a total that counted the unfiltered roster would report the whole library here'
     );
   });
@@ -233,7 +244,6 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     shared.essenceFilter = 'Fire';
     shared.pageSize = 10;
     shared.pageIndex = 1;
-    shared.collapsedCategories = new Set(['Metal']);
     shared.sortKey = 'salvage';
 
     browser.remount();
@@ -242,7 +252,6 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     assert.equal(shared.categoryFilter, 'Metal', 'the category filter survives the round-trip');
     assert.equal(shared.essenceFilter, 'Fire', 'the essence filter survives the round-trip');
     assert.equal(shared.pageIndex, 1, 'the page survives the round-trip');
-    assert.equal(shared.collapsedCategories.has('Metal'), true, 'the collapsed group survives the round-trip');
     assert.equal(shared.sortKey, 'salvage', 'the sort key is a preference and is untouched');
   });
 
@@ -270,7 +279,17 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     assert.equal(shared.categoryFilter, 'all', 'a switch clears the vocabulary-scoped category filter');
     assert.equal(shared.essenceFilter, 'all', 'a switch clears the essence filter too');
     assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
-    assert.equal(shared.collapsedCategories.size, 0, 'a switch re-expands every group');
+    // THE COLLAPSE SET IS NO LONGER THIS SCREEN'S (issue 1371, parity round 4; gap-list row 107).
+    // The reference's group band draws no chevron and is not a button, so `collapsible={false}`
+    // means nothing on this list collapses and nothing here writes that field. It is left on the
+    // lifted state untouched — `createComponentBrowserState` still mints it and the Recipe Studio
+    // still uses its own — rather than cleared, which would be this screen reaching into a field
+    // it no longer owns.
+    assert.equal(
+      shared.collapsedCategories.has('Metal'),
+      true,
+      'a screen that no longer collapses must not write the collapse set either'
+    );
     assert.equal(shared.systemId, 'sys-2', 'the persisted sentinel advances to the new system');
     assert.equal(shared.sortKey, 'salvage', 'sort key is a cross-system preference and is kept');
     assert.equal(shared.groupByCategory, false, 'group-by-category is a cross-system preference and is kept');
@@ -304,8 +323,8 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     // Herb/Metal/general alphabetical slice, which is what the pre-801 order produced.
     assert.equal(root.querySelectorAll('.manager-component-row').length, 10, 'page 1 holds ten');
     assert.deepEqual(groupsOnPage(root), [
-      ['Herb', '6 components'],
-      ['Metal', '4 of 12 components'],
+      ['Herb', '6'],
+      ['Metal', '4 of 12'],
     ]);
 
     // Page 2: Metal CONTINUES contiguously (its remaining 8), then general begins. Metal's
@@ -314,14 +333,14 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     root.querySelector('[data-pagination-next]').click();
     flushSync();
     assert.deepEqual(groupsOnPage(root), [
-      ['Metal', '8 of 12 components'],
-      ['general', '2 of 4 components'],
+      ['Metal', '8 of 12'],
+      ['general', '2 of 4'],
     ]);
 
     // Page 3: general finishes; Metal never reappears (contiguity across the boundary).
     root.querySelector('[data-pagination-next]').click();
     flushSync();
-    assert.deepEqual(groupsOnPage(root), [['general', '2 of 4 components']]);
+    assert.deepEqual(groupsOnPage(root), [['general', '2 of 4']]);
   });
 });
 
@@ -358,17 +377,15 @@ describeBrowserBulkSelection({
   // is what makes `flatId(1)` reliably the first row of page 1.
   makeFlatRows: (count) => manyGeneral(count),
   flatId: (index) => `g${index}`,
-  makeGroupedRows: () => [
-    makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
-    makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
-    makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
-    makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
-  ],
-  grouped: {
-    collapseHeader: 'Metal',
-    hiddenIds: ['m1', 'm2'],
-    visibleIds: ['h1', 'h2']
-  },
+  // NO `makeGroupedRows` / `grouped` SINCE ISSUE 1371's PARITY ROUND 4. The shared collapsed-group
+  // case drives a category's REAL header button, and this screen's band is no longer a button:
+  // the reference draws no chevron on it (gap-list row 107), so `collapsible={false}` leaves
+  // nothing on this list to collapse. The helper's own contract covers this — a studio with no
+  // grouping axis takes the flat branch, where the page box must still reach exactly the rendered
+  // rows and no more — and the Recipe Studio still exercises the collapsed branch.
+  //
+  // The grouped `pageIds` branch is NOT lost with it: `reaches every rendered row with grouping
+  // on` below drives it directly.
   props: (itemCards, extra = {}) => ({
     itemCards,
     // Derived from the rows rather than hard-coded, because the same `props` builds both the
@@ -381,8 +398,41 @@ describeBrowserBulkSelection({
   rowControls: {
     scope: '.manager-action-group',
     count: 1,
-    why: 'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
+    why: 'the row still carries exactly ONE action — a labelled `Edit rules ↗` since parity round 4'
   }
+});
+
+// The grouped `pageIds` branch, which the shared cases stopped reaching when this screen's group
+// band stopped being a control. It is the branch that decides which rows the tri-state page box
+// acts on, so it needs a driver of its own rather than a comment saying grouping is on by default.
+describe('ComponentsBrowserView grouped page selection (issue 1371)', () => {
+  it('reaches every rendered row with grouping on, across both categories', async () => {
+    const root = await browser.mount({
+      itemCards: [
+        makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
+        makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
+        makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
+      ],
+      categoryVocabulary: ['Metal', 'Herb'],
+    });
+
+    assert.equal(
+      root.querySelectorAll('[data-component-group]').length,
+      2,
+      'grouping is on, so `pageIds` takes its grouped branch rather than the flat page list'
+    );
+
+    root.querySelector('[data-component-select-all-page]').click();
+    flushSync();
+
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-component-row.is-bulk-selected')]
+        .map((row) => row.dataset.componentId)
+        .sort(),
+      ['h1', 'm1', 'm2'],
+      'every rendered row across every group, which is what the grouped branch flattens'
+    );
+  });
 });
 
 // Issue 772, acceptance 13 (row half). The badge used to gate on the CRAFTING resolution
@@ -520,7 +570,17 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     });
   }
 
-  it('counts the widened cohort in the filter label', async () => {
+  /** How the cohort switch is thrown, now that it is a segmented track rather than a select. */
+  function widen(root) {
+    root.querySelector('[data-component-membership-option="all"] input').click();
+    flushSync();
+  }
+
+  it('counts each cohort on its own segment, in the mono badge', async () => {
+    // THE CONTROL IS A TWO-SEGMENT TRACK since issue 1371's parity round 4 (gap-list row 145).
+    // The `<select>` it replaced carried a third option, `Overriding`, that the reference draws
+    // nowhere: it was a PREDICATE over the member cohort rather than a cohort of its own, which
+    // is why it alone could carry no count.
     const root = await browser.mount({
       itemCards: [],
       scope: ghostScope(),
@@ -529,9 +589,19 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     });
     const options = [...root.querySelectorAll('[data-component-membership-option]')];
     assert.deepEqual(
-      options.map((option) => option.textContent.trim()),
-      ['In this system (0)', 'All world components (3)', 'Overriding'],
-      'each option carries its own count, so the widened set is legible before it is chosen'
+      options.map((option) => option.getAttribute('data-component-membership-option')),
+      ['in', 'all'],
+      'two segments and no third: `Overriding` has no counterpart in the reference'
+    );
+    assert.deepEqual(
+      options.map((option) => option.querySelector('.manager-segment-label').textContent.trim()),
+      ['In this system', 'All world components'],
+      'the count is the segment badge, not part of its label'
+    );
+    assert.deepEqual(
+      options.map((option) => option.querySelector('[data-segment-badge]').textContent.trim()),
+      ['0', '3'],
+      'each segment carries its own count, so the widened set is legible before it is chosen'
     );
   });
 
@@ -544,15 +614,12 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     });
     // THE ZERO STATE FIRST, so the assertion below is a change rather than a state that was
     // always true.
-    assert.equal(root.querySelectorAll('[data-component-ghost-row]').length, 0);
+    assert.equal(root.querySelectorAll('[data-component-member="false"]').length, 0);
 
-    const filter = root.querySelector('[data-component-membership-filter]');
-    filter.value = 'all';
-    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    widen(root);
 
     assert.equal(
-      root.querySelectorAll('[data-component-ghost-row]').length,
+      root.querySelectorAll('[data-component-member="false"]').length,
       3,
       'the widened cohort renders, rather than being derived, counted and then discarded by one ' +
         'boolean read off the raw prop'
@@ -564,26 +631,49 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     );
   });
 
-  it('and a ghost row states NO behaviour, only the verb it exists for', async () => {
+  it('draws a ghost as the SAME row, dimmed and stated', async () => {
+    // Gap-list row 146. The ghost used to be a two-line stub — name, "No rules in this system
+    // yet", and a filled green `+ Add`. The reference keeps every part of the member row and
+    // states the difference, so each of these five is a part the stub had dropped.
     const root = await browser.mount({
       itemCards: [],
       scope: ghostScope(),
       systemId: 'sys-1',
       selectedSystemId: 'sys-1',
     });
-    const filter = root.querySelector('[data-component-membership-filter]');
-    filter.value = 'all';
-    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    widen(root);
 
-    const row = root.querySelector('[data-component-ghost-row="w-1"]');
+    const row = root.querySelector('[data-component-id="w-1"]');
     assert.ok(Boolean(row), 'the ghost row renders');
-    assert.ok(
-      !row.querySelector('.manager-chip'),
-      'everything a row says about behaviour is a MEMBERSHIP fact, and inventing one from the ' +
-        'world default would claim rules that do not exist here'
+    assert.equal(row.dataset.componentMember, 'false');
+    assert.ok(row.classList.contains('is-ghost'), 'and reads as the dimmed cohort');
+    assert.ok(Boolean(row.querySelector('.fab-medallion')), 'the medallion stays');
+    assert.equal(
+      row.querySelector('[data-status-pill]').textContent.trim(),
+      'Not in this system',
+      'the name line states the membership fact rather than a salvage state it cannot have'
     );
-    assert.ok(Boolean(row.querySelector('[data-component-ghost-add="w-1"]')), 'and its Add does');
+    assert.equal(
+      row.querySelector('[data-component-recipes]').getAttribute('data-component-recipes'),
+      '\u2014',
+      'the Recipes column stays and answers with an em dash rather than being dropped'
+    );
+    assert.ok(
+      !row.querySelector('.manager-component-essence-dots'),
+      'and it states NO behaviour: this system has authored no essence contribution for it'
+    );
+
+    const add = row.querySelector('[data-component-ghost-add="w-1"]');
+    assert.ok(Boolean(add), 'its one control is the adoption verb');
+    assert.ok(
+      add.classList.contains('is-dashed'),
+      'DASHED, not the filled green primary that shipped: adopting is an offer, not the row primary'
+    );
+    assert.ok(
+      !row.querySelector('[data-component-select]'),
+      'and it carries no bulk box: the prune effect drops every id this system has no component ' +
+        'for, so a box here would be untickable in practice'
+    );
   });
 
   it('adoption forwards addToSystem, which is the COMPOSED verb under that key', async () => {
@@ -598,44 +688,54 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
       actions: { addToSystem: (...args) => calls.push(args) },
     });
-    const filter = root.querySelector('[data-component-membership-filter]');
-    filter.value = 'all';
-    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    widen(root);
 
     root.querySelector('[data-component-ghost-add="w-2"]').click();
     flushSync();
 
     assert.deepEqual(calls, [['w-2', 'sys-1']]);
   });
+
+  it('states the cohort each sentence is true of, and never the other', async () => {
+    // Gap-list rows 106 and 145. The count read `1-23 of 23 · 44 not in this system` — one range
+    // over the MEMBER page beside a second number about a different cohort. The reference writes
+    // one sentence per cohort: `{shown} of {total} catalogue entries` in this system, and
+    // `{shown} shown · {mine} of {all} in this system` once the corpus is widened.
+    const root = await browser.mount({
+      itemCards: [makeComponent({ id: 'own', name: 'Bloom Ash' })],
+      scope: ghostScope(),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+    });
+    const count = () => root.querySelector('[data-component-count]').textContent.trim();
+
+    assert.equal(count(), '1 of 1 catalogue entries', 'in-system: the library and nothing else');
+
+    widen(root);
+    assert.equal(
+      count(),
+      '4 shown · 1 of 4 in this system',
+      'widened: the rows on screen, then how many of the corpus this system actually holds'
+    );
+  });
 });
 
-// ── THE ATTRIBUTION BANNER AND THE INHERIT SUMMARY, ON THIS SCREEN (issue 1371, round 2) ─────
+// ── WHAT THE LIST HEAD NO LONGER DRAWS (issue 1371, parity round 4) ──────────────────────────
 //
-// AC-13 says "Mounted on `ComponentsBrowserView` AND `ComponentEditView`", and AC-16's mounted
-// half names both system screens. Round 1 realised neither on this one, so deleting the banner and
-// the summary outright left the whole tree green — and that gap is what let the layout collapse
-// ship: the banner had no mounted reader at all.
+// Gap-list rows 101 and 105. This pane opened with a `SharedDefinitionCallout` — the component's
+// name, a `World definition` pill and an `Edit shared definition` exit — and a centred
+// `N inherit the world category · M override it` line. The reference draws that callout on the
+// rules EDITOR only, and puts its content on THIS screen in the inspector's `Shared identity`
+// card; the summary line has no counterpart anywhere. A card in the wrong screen is the exact
+// class the parity inventory exists to name, so its ABSENCE here is the assertion.
 //
-// It is also the fixture that reaches the `format` two-argument path. Every direct `format(...)`
-// call in the view passes a data object; the only two-argument caller is `componentInheritState`,
-// which returns `null` BEFORE calling its localizer unless the row is a MEMBER. So a scope with no
-// membership — which is every fixture round 1 had — never executes the line that silently killed
-// the route.
-describe('ComponentsBrowserView world banner and inherit summary (issue 1371)', () => {
+// This is a removal, so it needs a positive control beside it or it passes on an empty tree: the
+// fixture below is the one the round-2 suite used to prove the banner PRESENT — a real member
+// scope with a selected component — and the rows it produces are asserted to render.
+describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
   const SYSTEMS = [{ id: 'sys-1', name: 'Forge' }];
 
-  /**
-   * A scope where THIS system holds both rows: one inheriting its category, one overriding.
-   *
-   * @param {number} members how many systems hold `c-inherit`, for the banner's clamped count.
-   * @returns {object}
-   */
-  function memberScope(members = 1) {
-    const roster = Array.from({ length: Math.max(members, 1) }, (_, index) => ({
-      id: index === 0 ? 'sys-1' : `sys-${index + 1}`,
-      name: index === 0 ? 'Forge' : `System ${index + 1}`,
-    }));
+  function memberScope() {
     return projectComponentScope({
       entityType: 'component',
       corpus: {
@@ -645,15 +745,11 @@ describe('ComponentsBrowserView world banner and inherit summary (issue 1371)', 
         ],
         defaults: [{ id: 'c-inherit', category: 'Refined' }],
         membership: [
-          ...roster.map((system) => ({
-            entityId: 'c-inherit',
-            systemId: system.id,
-            inherit: { category: true },
-          })),
+          { entityId: 'c-inherit', systemId: 'sys-1', inherit: { category: true } },
           { entityId: 'c-override', systemId: 'sys-1', inherit: { category: false } },
         ],
       },
-      systems: roster,
+      systems: SYSTEMS,
     });
   }
 
@@ -662,93 +758,33 @@ describe('ComponentsBrowserView world banner and inherit summary (issue 1371)', 
     makeComponent({ id: 'c-override', name: 'Coal', category: 'Raw' }),
   ];
 
-  async function open({ members = 1, selectedComponentId = 'c-inherit', opened = [] } = {}) {
+  it('draws neither the shared-definition callout nor the inherit summary', async () => {
     const root = await browser.mount({
       itemCards: CARDS,
-      scope: memberScope(members),
+      scope: memberScope(),
       systemId: 'sys-1',
       selectedSystemId: 'sys-1',
-      selectedComponentId,
-      onOpenWorldEntry: (route, entityId) => opened.push([route, entityId]),
+      selectedComponentId: 'c-inherit',
     });
-    return root;
-  }
 
-  it('names the SELECTED component, and says nothing at rest', async () => {
-    // The banner used to fall back to whichever row sorted first, so at rest it stated a count and
-    // an exit about a component nobody had chosen.
-    const resting = await open({ selectedComponentId: '' });
+    // THE POSITIVE CONTROL: the same fixture that used to render the banner still renders rows,
+    // so the two absences below are a change rather than an empty tree.
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 2, 'the rows still draw');
+
     assert.ok(
-      !resting.querySelector('[data-scoped-shared-definition]'),
-      'no selection, no subject, no banner'
+      !root.querySelector('[data-scoped-shared-definition]'),
+      'the callout belongs to the rules editor and to this screen INSPECTOR, not to the list pane'
     );
-
-    const selected = await open({ selectedComponentId: 'c-override' });
-    const note = selected.querySelector('[data-scoped-shared-definition-note]');
-    assert.ok(Boolean(note), 'a selected component brings the banner with it');
-    assert.match(
-      selected.querySelector('.manager-scoped-entity-title').textContent,
-      /Coal/,
-      'and the banner names the component the GM chose'
+    assert.ok(
+      !root.querySelector('[data-component-inherit-summary]'),
+      'and the inherit summary has no counterpart in the reference at all'
     );
   });
 
-  it('clamps the shared-system count at zero on THIS screen', async () => {
-    // AC-13's `ComponentsBrowserView` half. `c-override` is held by one system, so "0 other" —
-    // and the prototype's own unclamped string would render "-1 other systems" here.
-    const root = await open({ selectedComponentId: 'c-override' });
-    const note = root.querySelector('[data-scoped-shared-definition-note]').textContent;
-    assert.match(note, /0 other systems/);
-    assert.ok(!note.includes('-1'), 'and never a negative count');
-  });
-
-  it('and states two other systems when three hold it', async () => {
-    const root = await open({ members: 3, selectedComponentId: 'c-inherit' });
-    assert.match(
-      root.querySelector('[data-scoped-shared-definition-note]').textContent,
-      /2 other systems/
-    );
-  });
-
-  it('its exit invokes the navigation prop with the ROUTE TOKEN and the entity', async () => {
-    // AC-16's mounted half on this screen. The prop defaults to a no-op at the call site, so an
-    // unwired exit is silently inert rather than an error — a source assertion alone cannot say
-    // the click reaches it.
-    const opened = [];
-    const root = await open({ selectedComponentId: 'c-override', opened });
-    root.querySelector('[data-scoped-shared-definition-open]').click();
-    flushSync();
-    assert.deepEqual(opened, [['world-component-entry', 'c-override']]);
-  });
-
-  it('states the inherit summary, which is what replaced the per-row line', async () => {
-    // D-20's substitute surface. It renders only when the world corpus knows at least one of this
-    // system's components, and round 1 had no fixture that reached it — so both the summary and
-    // the `format` two-argument path were unexecuted.
-    const root = await open();
-    const summary = root.querySelector('[data-component-inherit-summary]');
-    assert.ok(Boolean(summary), 'the summary renders once the world layer knows these rows');
-    assert.equal(
-      summary.textContent.trim(),
-      '1 inherit the world category · 1 override it',
-      'one of each, counted off the projection join rather than off the in-system record'
-    );
-  });
-
-  it('and the Overriding filter narrows to the overriding row', async () => {
-    // The third membership option, and the only one round 1 never selected. It is also the branch
-    // that calls `componentInheritState` per row, which is the two-argument `format` path.
-    const root = await open();
-    assert.equal(root.querySelectorAll('.manager-component-row').length, 2);
-
-    const filter = root.querySelector('[data-component-membership-filter]');
-    filter.value = 'over';
-    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
-
-    const rows = [...root.querySelectorAll('.manager-component-row')].map((row) =>
-      row.getAttribute('data-component-id')
-    );
-    assert.deepEqual(rows, ['c-override'], 'only the row whose switch is off survives');
+  it('keeps the drop zone, which is the one licensed subject-only card here', async () => {
+    // Maintainer ruling M2, "KEEP the system-scope one". Stated so the removals above cannot be
+    // widened into it by a later sweep.
+    const root = await browser.mount({ itemCards: CARDS, dropEnabled: true });
+    assert.ok(Boolean(root.querySelector('.manager-component-drop-zone')));
   });
 });

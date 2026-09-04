@@ -76,6 +76,11 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // `ItemDropZone`'s payload resolver — it covers BOTH shipped drag shapes, so the macro
   // drop and the identity strip's item drop read one implementation.
   'src/ui/svelte/util/dropUtils.js',
+  // The rules editor's own Validation tab model (issue 1371, parity round 4). It validates ONE
+  // SYSTEM'S rules — the essence contribution, the salvage results, the routing and the
+  // progressive DC — where `componentScopeValidation.js` validates the WORLD record, so the two
+  // are separate modules and both are in this tree's static graph.
+  'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
 ]);
 
 /**
@@ -144,5 +149,18 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
+  // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4). The editor grew a two-tab
+  // strip, the Validation tab's shared surface, the roll-budget `Callout` and the
+  // `How players see it` rail — and the rail brings two leaves of its own. Every one is a STATIC
+  // import of `ComponentEditView`, so an omission here HANGS every suite built on this list and
+  // is reported as `# cancelled` rather than `# fail`.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+  // `ExplainerCard`'s own card shell, two rungs down from this tree's root.
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

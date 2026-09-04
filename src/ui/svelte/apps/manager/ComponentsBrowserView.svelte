@@ -1,12 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
@@ -24,26 +24,11 @@
     componentCategoryOptions,
     createComponentBrowserState,
   } from '../../../../utils/componentBrowserModel.js';
+  import { getComponentCategoryLabel } from '../../../../utils/componentCategories.js';
   import {
-    GENERAL_COMPONENT_CATEGORY,
-    getComponentCategoryLabel,
-  } from '../../../../utils/componentCategories.js';
-  import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';
-  import {
-    componentAttributionNote,
-    componentInheritState,
+    componentCohortCountText,
     componentMembershipFilters,
   } from './scoped/componentScoped.js';
-
-  /**
-   * The world entry route this screen deep-links to.
-   *
-   * A MODULE CONSTANT rather than an inline literal, because it is the one string that decides
-   * whether the link resolves at all: the issue body named `world-component-edit`, which appears
-   * nowhere in the route table, and a token that does not resolve loses the breadcrumb's middle
-   * crumb and lands the navigation on nothing without erroring.
-   */
-  const WORLD_ENTRY_ROUTE = 'world-component-entry';
 
   let {
     itemCards = [],
@@ -58,9 +43,10 @@
     // publish. All three of these ARE passed, so none of them does.
     //
     // `systemId` is read rather than inferred: `scope.entries[].systems[]` is the world
-    // projection's own JOIN, and picking this system's row out of it is the only way a row can
-    // state whether it INHERITS the world category or overrides it — the system's own component
-    // record carries the resolved value and cannot tell the two apart.
+    // projection's own JOIN, and it carries the two facts this list draws that the in-system
+    // record cannot answer — the per-system `recipeCount` the `Recipes` column states, and
+    // whether the category was inherited or set here, which the inspector's `Category` block
+    // reads.
     scope = null,
     actions = null,
     systemId = '',
@@ -90,17 +76,8 @@
     // announcement and the focus hop belong to something that outlives both. Optional, so a
     // standalone mount clears exactly as it did.
     onSelectionCleared = null,
-    // THE DEEP LINK OUT OF THIS SCREEN, into the world entry that AUTHORS the identity the
-    // attribution banner names. Called with the ROUTE TOKEN and the entity id, because the token
-    // is the half that decides whether the navigation resolves and a page cannot route.
-    onOpenWorldEntry = () => {},
     // The filter / sort / group / paginate view-state (issue 676). The manager root
-    // LIFTS this up and binds it here so it survives the editor round-trip: opening a
-    // component unmounts this browser, and remounting it with the controls reset to
-    // defaults threw away the page, filters, sort and grouping the GM left — which is
-    // exactly what this view did before, because it kept all of it locally. Mirrors
-    // RecipesBrowserView. When unbound (the isolated mounted tests) the local fallback
-    // below keeps every control reactive in-component.
+    // LIFTS this up and binds it here so it survives the editor round-trip.
     browserState = $bindable(null),
   } = $props();
 
@@ -112,19 +89,11 @@
 
   // Switching system resets the filters — they name a vocabulary the new system does
   // not share. The page/sort/group PREFERENCES are deliberately kept.
-  //
-  // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state — NOT a
-  // component-local `$state`. A local sentinel re-initialised to '' on every mount, so
-  // returning from an editor (a remount with the system unchanged) was misread as a
-  // system switch and wiped the page/filters/collapse this object otherwise preserves
-  // (issue 806). The equality early-return means writing `ui.systemId` back inside the
-  // same effect does not loop — it mirrors the `model.pageIndex` sync effect.
   $effect(() => {
     if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
-    ui.collapsedCategories = new Set();
     // The bulk selection is scoped to the selected system — its ids name components the
     // new system does not have — so a switch clears it, and the root discards the staged
     // draft when the count reaches zero (issue 772).
@@ -148,16 +117,6 @@
   );
   const categoryOptions = $derived(componentCategoryOptions(itemCards || [], categoryVocabulary));
 
-  // Grouping ON ⇒ order category-major BEFORE pagination (issue 801), so each category is
-  // a contiguous run across page boundaries rather than an interleaved slice on every
-  // page. `groups` still groups the current page; the header's "N of M" stays truthful for
-  // a category that spans a boundary. When grouping is OFF the order is unchanged.
-  //
-  // The four steps used to be composed here by hand. They moved into
-  // `buildComponentBrowserModel` for issue 1081: the per-category totals the group headers
-  // pair with their rendered count MUST be counted over the FILTERED COHORT, and once row
-  // projection is page-scoped a pipeline assembled at the call site is exactly where
-  // "count the array in scope" — the page — gets written.
   // ── THE WORLD PROJECTION'S PER-SYSTEM JOIN, indexed by world entity id ──────────────────
   // Read as a Map rather than scanned per row: `scope` republishes a NEW object on every
   // world-scope edit, and a `find` per row would walk the whole corpus once per component on
@@ -173,50 +132,35 @@
     )
   );
 
-  const worldEntriesById = $derived(
-    new Map(
-      (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => [
-        String(entry?.id ?? ''),
-        entry,
-      ])
-    )
-  );
-
-  /**
-   * What one row says about its relationship to the world default, or `null` when the world
-   * corpus has no record of this component and there is therefore nothing to inherit FROM.
-   *
-   * @param {string} componentId
-   * @returns {{state: string, label: string}|null}
-   */
-  function inheritState(componentId) {
-    return componentInheritState(worldRowsByComponentId.get(String(componentId || '')), format);
-  }
-
-  // ── THE THREE MEMBERSHIP FILTERS ────────────────────────────────────────────────────────
-  // `all` is the one that changes what a row IS. Search, category and essence narrow a list of
-  // THIS system's components; `All world components` widens it past them, to world records this
-  // system has no rules for at all — which is the only route on this screen to adopt a component
-  // a GM has not added yet.
+  // ── THE COHORT SWITCH ────────────────────────────────────────────────────────────────────
+  // `all` is the one control that changes what a row IS. Search, category and essence narrow a
+  // list of THIS system's components; `All world components` widens it past them, to world
+  // records this system has no rules for at all — which is the only route on this screen to
+  // adopt a component a GM has not added yet.
+  //
+  // The shipped third option, `Overriding`, is GONE (gap-list row 145): the reference draws two
+  // segments and no third, and that option was a predicate over the member cohort rather than a
+  // cohort of its own, which is why it alone could carry no count.
   //
   // HELD LOCALLY RATHER THAN LIFTED, and that is a scope decision rather than a preference: the
   // lifted browser state is minted by `createComponentBrowserState`, in a file this change does
-  // not open, so a lifted axis would be a key that object does not declare. The consequence is
-  // that this one filter resets on the editor round trip while the other five survive it; the
-  // follow-up is one field on that factory.
+  // not open, so a lifted axis would be a key that object does not declare.
   let membershipFilter = $state('in');
+  const allWorldCohort = $derived(membershipFilter === 'all');
 
   const systemComponentIds = $derived(
     new Set((itemCards || []).map((item) => String(item?.id ?? '')))
   );
 
   /**
-   * The world records this system has NO component for, projected into a row shape of their own.
+   * The world records this system has NO component for, projected into the SAME row shape the
+   * member rows use.
    *
-   * They are `member: false` and carry NO category, essence, difficulty or salvage answer,
+   * They are `member: false` and carry no category, essence, difficulty or salvage answer,
    * because this system has authored none: everything a row states about behaviour is a
    * MEMBERSHIP fact, and inventing one from the world default would claim rules that do not
-   * exist here.
+   * exist here. What they DO keep is identity — the art, the name and the world description —
+   * because the reference draws the ghost as the dimmed member row and not as a stub.
    */
   const ghostRows = $derived(
     (Array.isArray(scope?.entries) ? scope.entries : [])
@@ -232,29 +176,22 @@
   );
 
   const membershipFilters = $derived(
-    componentMembershipFilters(
-      {
-        members: (itemCards || []).length,
-        world: (itemCards || []).length + ghostRows.length,
-      },
-      format
-    )
+    componentMembershipFilters({
+      members: (itemCards || []).length,
+      world: (itemCards || []).length + ghostRows.length,
+    })
   );
 
   /**
    * THE GHOST HALF OF THE COHORT, after the membership segment and the search term.
    *
-   * A superset of the member rows in every case, so every previously reachable state is reached
-   * identically: `all` widens, `in` and `over` show none of these at all.
-   *
    * THE ZERO STATE IS GATED ON THE COHORT AND NOT ON THE RAW PROP, which is the whole point of
    * naming this. The sibling Tool Rules list records what happens otherwise: for a system that
-   * has adopted nothing, the toolbar reads `3 shown` over a body drawing the zero state, because
-   * `itemCards.length === 0` is true and stays true whatever the segment says — and the ONE route
-   * in the product to adopt a component into an empty system becomes unreachable.
+   * has adopted nothing, the toolbar reads `3 shown` over a body drawing the zero state, and the
+   * ONE route in the product to adopt a component into an empty system becomes unreachable.
    */
   const visibleGhostRows = $derived(
-    membershipFilter === 'all'
+    allWorldCohort
       ? ghostRows.filter((row) => {
           const needle = String(itemSearchTerm || '')
             .trim()
@@ -264,60 +201,11 @@
       : []
   );
 
-  /**
-   * The MEMBER half of the cohort, before the model's own filter, sort and page.
-   *
-   * A FUNCTION DECLARATION rather than a `$derived`, because the browser model above is declared
-   * earlier in this file and reads it: a `const` would be in its temporal dead zone at parse
-   * order, while a hoisted function is called only when the model is first evaluated, which is
-   * during render and therefore after every top-level statement has run.
-   *
-   * @returns {object[]}
-   */
-  function cohortCards() {
-    const cards = itemCards || [];
-    if (membershipFilter !== 'over') return cards;
-    return cards.filter((item) => inheritState(item?.id)?.state === 'overridden');
-  }
-
-  const cohortRows = $derived([...cohortCards(), ...visibleGhostRows]);
-
-  /**
-   * How many of THIS system's components inherit the world category, and how many override it.
-   *
-   * `known` is the denominator and is what gates the line: a system whose components the world
-   * corpus holds no record of has nothing to inherit FROM, and a `0 inherit · 0 override` line
-   * over such a library states a relationship that does not exist rather than a missing one.
-   */
-  const inheritSummary = $derived(
-    (itemCards || []).reduce(
-      (totals, item) => {
-        const state = inheritState(item?.id)?.state;
-        if (!state) return totals;
-        return {
-          known: totals.known + 1,
-          inheriting: totals.inheriting + (state === 'inherited' ? 1 : 0),
-          overriding: totals.overriding + (state === 'overridden' ? 1 : 0),
-        };
-      },
-      { known: 0, inheriting: 0, overriding: 0 }
-    )
-  );
-
-  // THE BANNER'S SUBJECT IS THE SELECTED COMPONENT, AND NOTHING ELSE. It used to fall back to
-  // `cohortRows[0]`, so at rest it named whichever component sorted first and offered ITS exit -
-  // a count and a navigation about a record the GM had not chosen. `### GM World Component
-  // Screens` requirement 7 says the banner links to "that component's world entry", and on a list
-  // at rest there is no "that component". The layout is unchanged either way, because the head
-  // wrapper below keeps `.manager-main`'s child count constant.
-  const bannerEntry = $derived(worldEntriesById.get(String(selectedComponentId || '')) ?? null);
-
   const model = $derived(
-    buildComponentBrowserModel(cohortCards(), {
+    buildComponentBrowserModel(itemCards || [], {
       category: ui.categoryFilter,
       essence: ui.essenceFilter,
-      // Not applied as a filter here (the store searches before projecting); it feeds the
-      // active-filter chip run only.
+      // Not applied as a filter here (the store searches before projecting).
       search: itemSearchTerm,
       sortKey: ui.sortKey,
       sortDirection: ui.sortDirection,
@@ -329,25 +217,10 @@
   const filteredComponents = $derived(model.filtered);
   // The expensive half of a component card — its linked source document, the "Missing"
   // badge and the live description fallback — is resolved for the PAGE and nothing else
-  // (issue 1081). The store projects every card cheaply and only this view knows which of
-  // them are on screen, so the request has to originate here.
-  //
-  // `hydrate()` is idempotent and memoized per card, so re-running this effect on every
-  // re-render (including the store's own republish once the cards fill) costs nothing. The
-  // returned promise is deliberately not awaited: the card fills itself in place and the
-  // store republishes, which is what re-renders the rows.
-  //
-  // Called off the card rather than through the projection's `hydrateItemCards` helper on
-  // purpose: importing `stores/adminComponentRowProjection.js` here would pull that module
-  // (and its own imports) into the dependency closure of every mounted-component suite that
-  // renders this tree, where a module missing from the harness allowlist HANGS the suite as
-  // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
-  // fixture — is simply left as it is.
-  //
-  // The rejection is swallowed deliberately rather than left to become an unhandled
-  // rejection on every render: a card that could not resolve keeps its un-hydrated reading,
-  // which renders correctly rather than blankly, and the projection drops its memo on
-  // rejection so the next render retries.
+  // (issue 1081). `hydrate()` is idempotent and memoized per card. Called off the card rather
+  // than through the projection's helper on purpose: importing that store module here would
+  // pull it into the dependency closure of every mounted suite that renders this tree, where a
+  // module missing from the harness allowlist HANGS the suite as `# cancelled`.
   $effect(() => {
     for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
   });
@@ -356,26 +229,21 @@
     pageIndex: model.pageIndex,
     pageCount: model.pageCount,
     totalCount: model.totalCount,
-    // The 1-based inclusive window the pager renders as "1–25 of 30". Dropping these makes
-    // the count read "undefined–undefined of 30" and nothing else fails.
     rangeStart: model.rangeStart,
     rangeEnd: model.rangeEnd,
   });
   const groups = $derived(model.groups);
 
   // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
-  // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
-  // (the default) a COLLAPSED group renders no rows at all, so a naive page list would let
-  // the toolbar's tri-state box select rows the GM cannot see and report a count exceeding
-  // the visible ones. `filteredIds` is the whole filtered set, which the results link
-  // reaches and the page box deliberately cannot.
+  // `pageIds` is the set of RENDERED MEMBER row ids. Ghost rows are not in it and carry no
+  // selection box at all: `pruneComponentSelection` below drops every id the system has no
+  // component for, so a ticked ghost would be removed on the very next render and the box
+  // would be a control that visibly does nothing. See the ghost-row note in the markup.
   const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
   const filteredIds = $derived(filteredComponents.map((item) => item.id));
   const pageIds = $derived(
     ui.groupByCategory
-      ? groups
-          .filter((group) => !isCategoryCollapsed(group.category))
-          .flatMap((group) => group.components.map((item) => item.id))
+      ? groups.flatMap((group) => group.components.map((item) => item.id))
       : page.components.map((item) => item.id)
   );
   const selectionSummary = $derived(
@@ -400,8 +268,7 @@
   });
 
   // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
-  // state propagates back to the manager root — the rule `collapsedCategories` above
-  // already documents.
+  // state propagates back to the manager root.
   function toggleComponentBulkSelected(id) {
     ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
   }
@@ -421,10 +288,6 @@
     onSelectionCleared?.();
   }
 
-  // The active-filter chips, derived by the pure model so the run and the "is anything
-  // on?" question can never disagree.
-  const chips = $derived(model.chips);
-
   const sortOptions = $derived(
     COMPONENT_SORT_KEYS.map((key) => ({
       key,
@@ -438,34 +301,15 @@
   }
 
   // `replacements` TOLERATES ABSENCE (issue 1371). It was a bare `Object.entries(replacements)`,
-  // which THROWS on a two-argument call — and this helper is now handed to the shared
+  // which THROWS on a two-argument call — and this helper is handed to the shared
   // component-scope model as its localizer, where several strings carry no token at all. A throw
-  // inside a render kills the whole route: the manager falls back to the systems library, so the
-  // symptom is a navigation that silently does not happen rather than an error anyone can read.
+  // inside a render kills the whole route.
   function format(key, fallback, replacements) {
     let result = text(key, fallback);
     for (const [token, value] of Object.entries(replacements ?? {})) {
       result = result.replace(`{${token}}`, value);
     }
     return result;
-  }
-
-  const CHIP_LABELS = {
-    category: ['FABRICATE.Admin.Manager.Component.ChipCategory', 'Category: {value}'],
-    essence: ['FABRICATE.Admin.Manager.Component.ChipEssence', 'Essence: {value}'],
-    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}'],
-  };
-
-  function chipLabel(chip) {
-    const [labelKey, fallback] = CHIP_LABELS[chip.id];
-    const value = chip.id === 'category' ? categoryLabel(chip.value) : chip.value;
-    return format(labelKey, fallback, { value });
-  }
-
-  function clearChip(chipId) {
-    if (chipId === 'category') setCategoryFilter('all');
-    if (chipId === 'essence') setEssenceFilter('all');
-    if (chipId === 'search') onSearchChange('');
   }
 
   function sortLabel(key) {
@@ -482,63 +326,10 @@
     return getComponentCategoryLabel(category, localize);
   }
 
-  // Suppressed for `general`: no redundant "General" chip on every uncategorized row.
-  // `general` remains a selectable FILTER option, pinned last as the catch-all — the
-  // same badge-vs-filter asymmetry the Recipe Studio settled on.
-  function categoryBadgeFor(item) {
-    const category = item?.category || GENERAL_COMPONENT_CATEGORY;
-    return category === GENERAL_COMPONENT_CATEGORY ? '' : categoryLabel(category);
-  }
-
   function uniqueSorted(values) {
     return Array.from(
       new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b));
-  }
-
-  // Where the component's linked item lives — a real state, so it reads as a StatusPill
-  // (the shared vehicle the Recipe Studio's row states use) rather than a raw chip.
-  // A resolved link (compendium / world) is ACCENT; an unresolved stored source is the
-  // one WARNING, because a component whose source no longer exists is a thing the GM
-  // must be able to scan a library for.
-  function componentSourceOrigin(item) {
-    if (item?.sourceMissing) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
-        tone: 'warning',
-        icon: 'fas fa-link-slash',
-      };
-    }
-    const origin = item?.sourceOrigin || '';
-    if (origin === 'compendium') {
-      return {
-        id: 'compendium',
-        label:
-          item?.sourceOriginLabel ||
-          text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
-        tone: 'accent',
-        icon: 'fas fa-book-atlas',
-      };
-    }
-    if (origin === 'world') {
-      return {
-        id: 'world',
-        label:
-          item?.sourceOriginLabel ||
-          text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
-        tone: 'accent',
-        icon: 'fas fa-box-archive',
-      };
-    }
-    return {
-      id: 'unknown',
-      label:
-        item?.sourceOriginLabel ||
-        text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
-      tone: 'subtle',
-      icon: 'fas fa-circle-question',
-    };
   }
 
   function isSelectedComponent(item) {
@@ -568,47 +359,25 @@
     ui.groupByCategory = !ui.groupByCategory;
   }
 
-  // Collapse is opt-IN: a category absent from the set is expanded. A new Set is
-  // assigned rather than mutated so the bound state propagates back to the root.
-  function toggleCategoryCollapsed(category) {
-    // Copy-then-reassign, per the contract above: in-place SvelteSet mutation would stop
-    // the bound state propagating back to the manager root.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const next = new Set(ui.collapsedCategories);
-    if (next.has(category)) next.delete(category);
-    else next.add(category);
-    ui.collapsedCategories = next;
-  }
-
-  function isCategoryCollapsed(category) {
-    return ui.collapsedCategories.has(category);
-  }
-
-  // The header says BOTH numbers, because either one alone lies (issue 676). This view
-  // groups the PAGE, so counting `filteredComponents` would put "282 components" above
-  // the 25 rows page 1 renders — but counting only the page put "General · 25 components"
-  // above page 1 of a 282-strong General bucket, which says the bucket holds 25. So a
-  // partially-shown group reads "25 of 282 components"; `group.total` is the category's
-  // size across the FILTERED rows.
+  // ── THE GROUP HEADER'S COUNT IS A BARE NUMERAL ───────────────────────────────────────────
+  // `proto:1073` draws it as a mono count and nothing else — the reference frame reads
+  // `Beast 1` — where this list wrote `1 component` / `7 components`. The noun is the group
+  // band's whole subject, so repeating it on every band is the noise the reference removes.
   //
-  // A group shown WHOLE says it once — "25 components", not "25 of 25". Grouping is on by
-  // default and most libraries fit one page, so the "of" form would otherwise be pure
-  // noise on the common case. The plural agrees with the TOTAL, which is >= 2 whenever
-  // the "of" form is used; "1 components" (the shipped bug) is what the GroupCountOne key
-  // exists to prevent.
+  // The `of` form SURVIVES for the one case that needs it: this view groups the PAGE, so a
+  // category spanning a page boundary would otherwise report the slice as the whole bucket.
+  // `group.total` is the category's size across the FILTERED rows.
   function groupCountText(group) {
     const count = group.components.length;
     const total = group.total ?? count;
     if (total > count) {
       return format(
-        'FABRICATE.Admin.Manager.Component.GroupCountOfTotal',
-        '{count} of {total} components',
+        'FABRICATE.Admin.Manager.Component.GroupCountOfTotalBare',
+        '{count} of {total}',
         { count, total }
       );
     }
-    return count === 1
-      ? text('FABRICATE.Admin.Manager.Component.GroupCountOne', '1 component')
-      : format('FABRICATE.Admin.Manager.Component.GroupCount', '{count} components', { count });
+    return String(count);
   }
 
   function clearFilters() {
@@ -622,18 +391,8 @@
   // issue 772): shown whenever the system is progressive on ANY axis that reads
   // `component.difficulty`, and only where a value is authored. It reads "None" when the
   // axis is on but the component has no difficulty, so a GM can see the gap.
-  //
-  // This used to read `selectedSystemResolutionMode === 'progressive'` — the CRAFTING axis
-  // alone — which was already false against the editor control (three-axis since issue
-  // 676) and would have let the bulk panel write a DC that NO row could display on a
-  // salvage-only or gathering-only progressive system.
   const showProgressiveDifficulty = $derived(difficultyAxisProgressive === true);
 
-  // The badge reads as the VALUE ALONE — `3`, or `None` — and names itself through its
-  // tooltip rather than its text. In a row of badges the words "Progressive difficulty"
-  // repeated on every component crowded out the description they sit beside, and the gauge
-  // glyph plus a bare number is already unambiguous once the tooltip is there to confirm it.
-  // The label is not dropped, only moved: `difficultyBadgeTitle` carries it.
   function difficultyBadgeFor(item) {
     if (!showProgressiveDifficulty) return '';
     const difficulty = Number(item?.difficulty);
@@ -642,27 +401,46 @@
       : text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None');
   }
 
-  // The row carries ONE action — Edit. Copy-source-UUID and Delete moved into the
-  // browser inspector (issue 676): three ghost icons on every row turned it into a
-  // toolbar and truncated the description, exactly as the Recipe Studio found.
+  // THE `Recipes` COLUMN'S VALUE (gap-list row 112). It is the world projection's own
+  // per-system count — `scope.entries[].systems[].recipeCount` — and not a re-derivation:
+  // that number is built once per refresh over every system's recipe cohort, and counting it
+  // again per row would walk the corpus once per rendered component.
+  function recipesValueFor(id) {
+    const row = worldRowsByComponentId.get(String(id || ''));
+    const count = Number(row?.recipeCount);
+    return Number.isFinite(count) ? String(count) : '0';
+  }
+
+  const recipesLabel = $derived(text('FABRICATE.Admin.Manager.Component.RecipesStat', 'Recipes'));
+  const salvageLabel = $derived(text('FABRICATE.Admin.Manager.Component.SalvagePill', 'Salvage'));
+  // The em dash the ghost row draws in the `Recipes` column. A MODULE-LEVEL constant rather
+  // than a literal in the markup: it is the one glyph that says "this system has no rules, so
+  // there is no number", and a hyphen typed in its place would read as a minus sign.
+  const NO_VALUE = '—';
+
+  /**
+   * One MEMBER row's props.
+   *
+   * @param {object} item
+   * @returns {object}
+   */
   function rowProps(item) {
-    const origin = componentSourceOrigin(item);
     return {
       component: item,
+      member: true,
       selected: isSelectedComponent(item),
-      categoryBadge: categoryBadgeFor(item),
       difficultyBadge: difficultyBadgeFor(item),
       difficultyBadgeTitle: text(
         'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
         'Progressive difficulty'
       ),
-      originLabel: origin.label,
-      originTone: origin.tone,
-      originIcon: origin.icon,
-      editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', {
+      salvageLabel: item?.salvageSummary ? salvageLabel : '',
+      recipesValue: recipesValueFor(item?.id),
+      recipesLabel,
+      editLabel: text('FABRICATE.Admin.Manager.Component.EditRules', 'Edit rules'),
+      editNamedLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', {
         name: item.name,
       }),
-      editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
       bulkSelected: bulkSelectedIds.has(item.id),
       selectLabel: format(
@@ -675,14 +453,55 @@
       onToggleSelect: toggleComponentBulkSelected,
     };
   }
+
+  /**
+   * One GHOST row's props — the same row, dimmed and stated.
+   *
+   * ADOPTION IS TWO WRITES AND THIS CALLS ONE KEY. `actions.addToSystem` is the COMPOSED verb:
+   * it writes the membership record AND the in-system record the read union's row set is built
+   * from. A membership record written alone names a component no reader can see.
+   *
+   * @param {object} ghost
+   * @returns {object}
+   */
+  function ghostRowProps(ghost) {
+    return {
+      component: ghost,
+      member: false,
+      notInSystemLabel: text('FABRICATE.Admin.Manager.Component.GhostPill', 'Not in this system'),
+      recipesValue: NO_VALUE,
+      recipesLabel,
+      noDescriptionText: text(
+        'FABRICATE.Admin.Manager.Component.GhostNoDescription',
+        'No description yet.'
+      ),
+      addLabel: text('FABRICATE.Admin.Manager.Component.GhostAdd', 'Add to system'),
+      addNamedLabel: format(
+        'FABRICATE.Admin.Manager.Component.GhostAddNamed',
+        'Add {name} to this system',
+        { name: ghost.name }
+      ),
+      onSelect: onSelectComponent,
+      onAdd: (id) => actions?.addToSystem?.(id, systemId),
+    };
+  }
+
+  const countText = $derived(
+    componentCohortCountText(
+      {
+        allWorld: allWorldCohort,
+        shown: page.components.length + visibleGhostRows.length,
+        total: (itemCards || []).length,
+        mine: (itemCards || []).length,
+        all: (itemCards || []).length + ghostRows.length,
+      },
+      format
+    )
+  );
 </script>
 
 <!--
-  There is ONE page header, and the shell owns it. This view used to render a SECOND
-  one — kicker + "Component directory" + a second subtitle — directly under the shell's
-  breadcrumb / "Components" / subtitle block: ~74px of duplicated chrome saying what the
-  breadcrumb and the titlebar's gold system badge already said. The Recipe Studio
-  deleted exactly this; ruling 1 says it wins.
+  There is ONE page header, and the shell owns it.
 -->
 <main
   class="manager-main"
@@ -690,52 +509,25 @@
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
   <!--
-    ONE HEAD, TWO CONTENTS, AND THE CHILD COUNT IS THE POINT (issue 1371, round 2).
+    ONE HEAD, AND THE CHILD COUNT IS THE POINT (issue 1371).
 
-    `.manager-main` on this route is a FOUR-TRACK grid — `auto auto minmax(0, 1fr) auto` at
-    `styles/fabricate.css:2373-2375` — for four children: this head, the toolbar, the list and the
-    pager. The banner shipped as a FIFTH, direct child, which pushed every child down one track:
-    the toolbar landed in `minmax(0, 1fr)`, whose min is 0, collapsed, and painted its filter row,
-    its inherit summary and its count on top of rows 1 to 3.
+    `.manager-main` on this route is a FOUR-TRACK grid — `auto auto minmax(0, 1fr) auto` — for
+    four children: this head, the toolbar, the list and the pager. Anything drawn as a fifth
+    DIRECT child pushes every child down one track: the toolbar lands in `minmax(0, 1fr)`, whose
+    min is 0, collapses, and paints itself on top of rows 1 to 3. The wrapper holds the count at
+    four whatever it contains.
 
-    A FIVE-TRACK TEMPLATE IS NOT THE FIX. The banner is conditional — a system whose components
-    the world corpus has no record of renders none, and so does a list at rest — so a static fifth
-    track misplaces the list in exactly the states the banner is absent. Wrapping keeps the count
-    at four in BOTH states and needs no sheet edit at all.
+    THE `SharedDefinitionCallout` THAT USED TO HEAD THIS PANE IS GONE (gap-list row 101,
+    `rebuild-spec.md` C2). The reference draws that callout on the rules EDITOR only, and puts
+    its content on THIS screen in the inspector, as the `Shared identity` card — a card in the
+    wrong screen is the exact class the parity inventory exists to name. The subject-only
+    `N inherit the world category · M override it` line went with it (row 105): its information
+    is the inspector's `Category` block.
 
-    The sheet's own comments record this same off-by-one twice already, once for this very route
-    (`:2369-2372`, issue 676) and once for `books-scrolls` (`:2386-2392`). `manager-layout.test.js`
-    now carries a children-vs-tracks guard for this route so it cannot be recorded a fourth time.
+    The drop zone STAYS, under maintainer ruling M2 ("KEEP the system-scope one"). It is the one
+    subject-only card on this screen that is licensed.
   -->
   <div class="manager-component-head">
-    <!--
-      THE CATALOGUE ATTRIBUTION BANNER. Everything a GM reads on this screen names a component
-      whose identity is authored ONE ROUTE AWAY, in the world catalogue, and shared with every
-      other system that has rules for it — so without this the screen offers no signal at all that
-      a name here is not a name this system owns.
-
-      It does NOT claim the displayed name comes from the catalogue, because under the read union
-      it does not: identity is re-derived from the in-system record on every row. It states where
-      identity is AUTHORED, and the count of other systems is CLAMPED at zero — a component with
-      no membership record would otherwise read as shared with negative one.
-    -->
-    {#if bannerEntry}
-      <SharedDefinitionCallout
-        name={bannerEntry.entity?.name || bannerEntry.id}
-        icon="fas fa-cube"
-        pillLabel={text('FABRICATE.Admin.Manager.Scoped.Component.WorldPill', 'World definition')}
-        note={componentAttributionNote(
-          { surface: 'list', memberCount: Number(bannerEntry.membershipCount) || 0 },
-          format
-        )}
-        actionLabel={text(
-          'FABRICATE.Admin.Manager.Component.OpenSharedDefinition',
-          'Edit shared definition'
-        )}
-        onOpen={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, bannerEntry.id)}
-      />
-    {/if}
-
     <section
       class="manager-component-drop-zone"
       use:dragDrop={{
@@ -767,21 +559,18 @@
   </div>
 
   <!--
-    The three-row filter bar, adopted from the Recipe Studio (ruling 1). Row one is
-    every FILTER (search, essence); row two carries the category filter with the two
-    VIEW controls — how the list is grouped, and how it is ordered — split by rules and
-    each titled by an uppercase micro-label that precedes its control and never wraps;
-    row three is the active-filter chips and the count.
+    TWO TOOLBAR ROWS, NOT FOUR (gap-list row 103, `rebuild-spec.md` C3). Row one is the three
+    controls that narrow the list — search, category, essence — plus the cohort switch that
+    widens it. Row two carries the selection register, the two VIEW controls (how the list is
+    grouped and how it is ordered) split by hairline dividers and each titled by an uppercase
+    micro-label, and the count pinned to the trailing edge.
 
-    It replaces a flat run of eight sentence-case `.manager-filter` controls, in which
-    the group toggle and the sort-direction button carried NO CSS at all: the toggle had
-    no visual pressed state, and the direction button sat at the boxy base
-    `.manager-button` scale the Recipe Studio already documented fixing.
+    The active-filter CHIP row is gone with the other two rows: the reference draws none, and
+    each of the three filters already shows its own state in the control that set it.
   -->
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
-       (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
-       keyboard here when an action empties the bulk selection and unmounts the panel that
-       was acted on, addressing it through `data-component-toolbar`. -->
+       (issue 1157). The manager root lands the keyboard here when an action empties the bulk
+       selection and unmounts the panel that was acted on. -->
   <ManagerToolbar
     class="manager-component-toolbar"
     tabindex="-1"
@@ -790,23 +579,40 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">
-      <!-- The capture registry's narrowing hook (issue 1371, round 2). A case that has to reach
-           a specific component types into this field rather than depending on where that
-           component happens to sort; the primitive routes an unknown `data-*` onto its label. -->
+      <!-- The capture registry's narrowing hook: a case that has to reach a specific component
+           types into this field rather than depending on where that component happens to sort. -->
       <ManagerSearchField
         data-component-search=""
         value={itemSearchTerm || ''}
         onInput={(next) => onSearchChange(next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
-          'Search components...'
+          'Search name or tags…'
         )}
         ariaLabel={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
       />
 
+      <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls
+           each announce themselves in sentence case reads as a form. -->
+      <select
+        class="manager-component-category-filter"
+        data-component-category-filter
+        value={ui.categoryFilter}
+        onchange={(event) => setCategoryFilter(event.currentTarget.value)}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
+          'Filter components by category'
+        )}
+      >
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option
+        >
+        {#each categoryOptions as category (category.name)}
+          <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
+        {/each}
+      </select>
+
       {#if showComponentEssences && componentEssenceOptions.length > 0}
-        <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose
-             controls each announce themselves in sentence case reads as a form. -->
         <select
           class="manager-component-essence-filter"
           data-component-essence-filter
@@ -825,51 +631,62 @@
           {/each}
         </select>
       {/if}
+
+      <!--
+        THE COHORT SWITCH, as the two-segment inline filter the reference draws (`proto:1558`,
+        gap-list row 145) rather than the `<select>` that shipped. `tone="accent"` fills the
+        chosen segment; `density="compact"` is the rung its `padding: 5px 11px` / radius-6 /
+        10.5px-600 geometry lands on. The per-segment count rides the primitive's `badge`, which
+        draws it in the mono face the reference sets it in.
+      -->
+      <SegmentedControl
+        options={membershipFilters}
+        value={membershipFilter}
+        density="compact"
+        tone="accent"
+        groupName="component-membership"
+        dataAttr="data-component-membership-filter"
+        optionDataAttr="data-component-membership-option"
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Component.MembershipFilterLabel',
+          'Filter components by world membership'
+        )}
+        onChange={(next) => {
+          membershipFilter = next;
+          ui.pageIndex = 0;
+        }}
+      />
     </div>
 
     <div class="manager-component-filter-row is-secondary">
       <!--
-        THE MEMBERSHIP SEGMENT. `All world components` is the one option that changes what a row
-        IS: it widens the list past this system's own components to world records it has no rules
-        for, which is the only route on this screen to adopt one.
+        THE SELECTION REGISTER, INLINE AND FIRST (gap-list rows 104 and 147). `Select all` is
+        the reference's first item on this row, not a fourth row of its own, and once a row is
+        ticked the SAME register grows the accent count, the standing sentence pointing at the
+        inspector, and the two bare text actions at the trailing edge.
+
+        `rowClass` is a `display: contents` shim, so the primitive's own children become items
+        of THIS row rather than a nested bar with its own metrics. Everything else the reference
+        states about this register — the check-double glyph, the bare actions with no underline
+        and no xmark, the trailing pair — is already a parameter of the shared primitive.
       -->
-      <select
-        class="manager-component-membership-filter"
-        data-component-membership-filter
-        value={membershipFilter}
-        onchange={(event) => {
-          membershipFilter = event.currentTarget.value;
-          ui.pageIndex = 0;
-        }}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Component.MembershipFilterLabel',
-          'Filter components by world membership'
+      <BulkSelectionToolbar
+        rowClass="manager-component-selection-inline"
+        pageSelectionState={selectionSummary.pageSelectionState}
+        count={selectionSummary.count}
+        showSelectAllResults={selectionSummary.showSelectAllResults}
+        selectAllResultsCount={selectionSummary.selectAllResultsCount}
+        countIcon="fas fa-check-double"
+        bareActions
+        trailingActions
+        hint={text(
+          'FABRICATE.Admin.Manager.Component.BulkInInspector',
+          'Bulk actions are in the inspector →'
         )}
-      >
-        {#each membershipFilters as option (option.id)}
-          <option value={option.id} data-component-membership-option={option.id}
-            >{option.label}</option
-          >
-        {/each}
-      </select>
-      <span class="manager-component-filter-divider" aria-hidden="true"></span>
-      <select
-        class="manager-component-category-filter"
-        data-component-category-filter
-        value={ui.categoryFilter}
-        onchange={(event) => setCategoryFilter(event.currentTarget.value)}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
-          'Filter components by category'
-        )}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option
-        >
-        {#each categoryOptions as category (category.name)}
-          <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
-        {/each}
-      </select>
+        onTogglePage={(on) => setPageSelected(on)}
+        onSelectAllResults={selectAllResults}
+        onClear={clearBulkSelection}
+      />
       <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <div class="manager-component-filter-field">
         <span class="manager-component-filter-label" id="manager-component-group-label"
@@ -877,8 +694,7 @@
         >
         <!-- `data-component-group-by-category=""` rather than the bare attribute: on a
              COMPONENT a bare attribute is the boolean `true`, which the rest spread would
-             stamp as `="true"` and change the byte the sheet's own
-             `[data-component-group-by-category]` rule is written beside. -->
+             stamp as `="true"` and change the byte the sheet's own rule is written beside. -->
         <StatusToggle
           on={ui.groupByCategory}
           data-component-group-by-category=""
@@ -923,108 +739,14 @@
           >
         </ManagerButton>
       </div>
+      <!--
+        THE COUNT AND THE BODY AGREE, IN BOTH COHORTS. It reads `{shown} of {total} catalogue
+        entries` over this system's own library and `{shown} shown · {mine} of {all} in this
+        system` once the cohort is widened — the sentence the reference writes for each — and
+        both are computed over the rows the body is actually drawing.
+      -->
+      <span class="manager-component-count" data-component-count>{countText}</span>
     </div>
-
-    <div class="manager-component-filter-row is-chips">
-      {#each chips as chip (chip.id)}
-        <Chip
-          tone="info"
-          class="manager-component-filter-chip"
-          data-component-filter-chip={chip.id}
-        >
-          <span>{chipLabel(chip)}</span>
-          <button
-            type="button"
-            class="manager-component-chip-clear"
-            aria-label={format(
-              'FABRICATE.Admin.Manager.Component.ClearChip',
-              'Clear {filter} filter',
-              { filter: chip.id }
-            )}
-            onclick={() => clearChip(chip.id)}
-          >
-            <i class="fas fa-times" aria-hidden="true"></i>
-          </button>
-        </Chip>
-      {/each}
-      <!--
-        The count is quiet right-aligned metadata, not a control: a bordered chip read as
-        something to press. It reports the page WINDOW ("1–5 of 12") — `paginateComponents`
-        has computed `rangeStart`/`rangeEnd` since it was written and nothing read them —
-        because "6 of 6" never told the GM which page they were looking at.
-      -->
-      <!--
-        WHAT THIS SYSTEM'S ROWS RESOLVE THEIR CATEGORY FROM, summarised. The per-row line the
-        design draws needs a prop on the shared row component, which this change does not open;
-        the summary and the `Overriding` filter beside it are the two surfaces that state the same
-        fact from inside this file. See the lane report's deviations.
-      -->
-      {#if inheritSummary.known > 0}
-        <span class="manager-component-inherit-summary" data-component-inherit-summary>
-          {format(
-            'FABRICATE.Admin.Manager.Component.InheritSummary',
-            '{inheriting} inherit the world category · {overriding} override it',
-            inheritSummary
-          )}
-        </span>
-      {/if}
-      <!--
-        THE COUNT AND THE BODY AGREE (issue 1371, round 2). The ghost cohort is rendered as its own
-        list after the paginated one — it is a different row shape with a different verb, and
-        folding it into the model would put unadoptable rows through a category grouping and a
-        difficulty sort that mean nothing for them. But the count was computed over the MEMBER page
-        alone, so under `All world components` on an empty system the toolbar read `0–0 of 0` above
-        a body drawing sixty-six rows. That is the same count-versus-body disagreement this
-        screen's own cohort note records as the defect to avoid.
-
-        So the ghost total is STATED BESIDE the member range rather than folded into it: two
-        numbers that are true, rather than one that is true of half the screen.
-      -->
-      <span class="manager-component-count" data-component-count>
-        {format('FABRICATE.Admin.Manager.Component.CountRange', '{start}–{end} of {total}', {
-          start: page.rangeStart,
-          end: page.rangeEnd,
-          total: page.totalCount,
-        })}{#if visibleGhostRows.length > 0}<!--
-          ONE KEY, NOT A PLURAL PAIR. Every other count on this screen pluralises, and this one
-          does not have to: the noun is `{count}` itself and the rest of the clause is invariant in
-          English, so a singular branch would be two keys holding the same string — a translator
-          reading them as a distinction that exists, and a reviewer reading a copy-paste.
-        --><span
-            data-component-ghost-count
-            >{format(
-              'FABRICATE.Admin.Manager.Component.GhostCount',
-              ' · {count} not in this system',
-              {
-                count: visibleGhostRows.length,
-              }
-            )}</span
-          >{/if}
-      </span>
-    </div>
-
-    <!--
-      The multi-select row is the LAST row of the toolbar, immediately above the list —
-      the prototype's third-row-then-list order (issue 772). It is a row of THIS toolbar,
-      not a sticky bar of its own over the list, so it inherits the toolbar's own metrics
-      instead of declaring a second register. It does cost the list one row's height at
-      the default manager window size, which is why the PR carries a frame proving
-      `.manager-table-scroll` still shows several rows with it present.
-    -->
-    <!--
-      Rendered on the shared primitive's DEFAULTS (issue 1010): its row class and its five
-      `data-*` hooks default to this studio's strings, so the smoke selectors, the view-lab
-      cases and the mounted assertions that predate the extraction still resolve unchanged.
-    -->
-    <BulkSelectionToolbar
-      pageSelectionState={selectionSummary.pageSelectionState}
-      count={selectionSummary.count}
-      showSelectAllResults={selectionSummary.showSelectAllResults}
-      selectAllResultsCount={selectionSummary.selectAllResultsCount}
-      onTogglePage={(on) => setPageSelected(on)}
-      onSelectAllResults={selectAllResults}
-      onClear={clearBulkSelection}
-    />
   </ManagerToolbar>
 
   <section
@@ -1032,12 +754,11 @@
     aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
   >
     <!--
-      THE ZERO STATE IS GATED ON THE COHORT, NEVER ON THE RAW PROP. See `visibleGhostRows` for
-      the measured defect that gate exists to prevent: an empty system under `All world
-      components` drew the zero state over a toolbar counting three rows, and the only route in
-      the product to adopt a component into an empty system became unreachable.
+      THE ZERO STATE IS GATED ON THE COHORT, NEVER ON THE RAW PROP: an empty system under
+      `All world components` drew the zero state over a toolbar counting three rows, and the
+      only route in the product to adopt a component into an empty system became unreachable.
     -->
-    {#if cohortRows.length === 0}
+    {#if (itemCards || []).length === 0 && visibleGhostRows.length === 0}
       <EmptyState
         icon="fas fa-box-open"
         title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
@@ -1048,13 +769,12 @@
       />
     {:else if filteredComponents.length === 0 && visibleGhostRows.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the full
-           empty-panel apparatus: one dashed panel says it, and Clear filters is the way
-           out (the Recipe Studio's treatment). -->
+           empty-panel apparatus: one dashed panel says it, and Clear filters is the way out. -->
       <EmptyState
         filtered
         hint={text(
           'FABRICATE.Admin.Manager.Component.EmptySearchTitle',
-          'No components match your filters.'
+          'No components match these filters.'
         )}
       >
         <ManagerButton data-clear-filters="components" onclick={clearFilters}
@@ -1062,38 +782,36 @@
         >
       </EmptyState>
     {:else}
-      <!-- A card row has no columns, so this is a LIST, not a grid: a real
-           `<ul role="list">` of `<li>` cards carrying `aria-current`, mirroring the
-           Recipe Studio, rather than nested `<div>`s with no selection semantics at all. -->
+      <!-- A card row has no columns, so this is a LIST, not a grid: a real `<ul role="list">`
+           of `<li>` cards carrying `aria-current`. -->
       <div class="manager-components-list">
         {#if ui.groupByCategory}
           {#each groups as group (group.category)}
             <section class="manager-component-group" data-component-group={group.category}>
+              <!--
+                NO DISCLOSURE CHEVRON, AND NOT A BUTTON (gap-list rows 107 and 108). The
+                reference draws a folder glyph, the category name and a bare mono count on a
+                `surface-soft` band, and nothing on it expands. `collapsible={false}` is the
+                primitive's own answer; collapsing this list is not shipped rather than shipped
+                differently, which is what gap-list row 107 asks for.
+              -->
               <CollapsibleGroupHeader
+                collapsible={false}
                 name={categoryLabel(group.category)}
                 countText={groupCountText(group)}
-                expanded={!isCategoryCollapsed(group.category)}
-                controls={`manager-component-group-${group.category}`}
-                onToggle={() => toggleCategoryCollapsed(group.category)}
               />
-              {#if !isCategoryCollapsed(group.category)}
-                <ul
-                  class="manager-component-group-body"
-                  role="list"
-                  id={`manager-component-group-${group.category}`}
-                >
-                  {#each group.components as item (item.id)}
-                    <ComponentRow {...rowProps(item)} />
-                  {:else}
-                    <li class="manager-muted manager-component-group-empty">
-                      {text(
-                        'FABRICATE.Admin.Manager.Component.EmptyCategory',
-                        'No components in this category.'
-                      )}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
+              <ul class="manager-component-group-body" role="list">
+                {#each group.components as item (item.id)}
+                  <ComponentRow {...rowProps(item)} />
+                {:else}
+                  <li class="manager-muted manager-component-group-empty">
+                    {text(
+                      'FABRICATE.Admin.Manager.Component.EmptyCategory',
+                      'No components in this category.'
+                    )}
+                  </li>
+                {/each}
+              </ul>
             </section>
           {/each}
         {:else}
@@ -1107,16 +825,21 @@
         <!--
           THE GHOST COHORT: world components this system has NO rules record for.
 
-          They state NO behaviour at all — no category, no essences, no difficulty, no salvage —
-          because everything a row says about behaviour is a MEMBERSHIP fact, and inventing one
-          from the world default would claim rules that do not exist here. What they carry is the
-          one verb they exist for.
+          They are THE SAME ROW, dimmed and stated (`rebuild-spec.md` C6, gap-list row 146) —
+          the medallion, the copy column and the `Recipes` column all stay, the pill reads
+          `Not in this system`, the second line is the WORLD description and the trailing
+          control is a dashed `+ Add to system`.
 
-          ADOPTION IS TWO WRITES AND THIS CALLS ONE KEY. `actions.addToSystem` is the COMPOSED
-          verb: the published component family replaces the generic membership-only write under
-          that key, so this button writes the membership record AND the in-system record the read
-          union's row set is built from. A membership record written alone names a component no
-          reader can see.
+          THEY CARRY NO SELECTION BOX, and that is mechanical rather than a preference: the
+          prune effect above drops every selected id the system has no component for, so a box
+          rendered here would be untickable in practice — the id would be removed on the next
+          render, with nothing on screen explaining why. Reported to the driver as the one
+          knowing divergence from C6's row table.
+
+          They are rendered as their own list AFTER the paginated one — a different verb with a
+          different membership answer — rather than folded into the model, which would put
+          unadoptable rows through a category grouping and a difficulty sort that mean nothing
+          for them.
         -->
         {#if visibleGhostRows.length > 0}
           <ul
@@ -1129,30 +852,7 @@
             )}
           >
             {#each visibleGhostRows as ghost (ghost.id)}
-              <li class="manager-component-ghost-row" data-component-ghost-row={ghost.id}>
-                <span class="manager-component-ghost-identity">
-                  <span class="manager-component-ghost-name">{ghost.name}</span>
-                  <span class="manager-muted manager-component-ghost-note"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.GhostNote',
-                      'No rules in this system yet'
-                    )}</span
-                  >
-                </span>
-                <ManagerButton
-                  role="primary"
-                  data-component-ghost-add={ghost.id}
-                  aria-label={format(
-                    'FABRICATE.Admin.Manager.Component.GhostAddNamed',
-                    'Add {name} to this system',
-                    { name: ghost.name }
-                  )}
-                  onclick={() => actions?.addToSystem?.(ghost.id, systemId)}
-                >
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Component.GhostAdd', 'Add')}</span>
-                </ManagerButton>
-              </li>
+              <ComponentRow {...ghostRowProps(ghost)} />
             {/each}
           </ul>
         {/if}
@@ -1175,14 +875,10 @@
 <style>
   /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
      stays at zero. Everything this view drew before issue 1371 keeps its rules in
-     `styles/fabricate.css`; only the two surfaces this change ADDS are declared here, which is
-     where a per-component override belongs — a component's `css: 'injected'` block lands
-     UNLAYERED and therefore beats the host sheet at any specificity, so a rule authored in both
-     places would silently resolve here anyway. */
+     `styles/fabricate.css`; only the surfaces this change ADDS are declared here. */
 
-  /* THE HEAD WRAPPER (issue 1371, round 2). It exists to hold `.manager-main`'s child count at
-     four whether or not the attribution banner renders; the column and the gap are what the two
-     children had as siblings of the grid, so nothing moves in the state that already worked. */
+  /* THE HEAD WRAPPER. It exists to hold `.manager-main`'s child count at four; the column and
+     the gap are what its child had as a sibling of the grid. */
   .manager-component-head {
     display: flex;
     flex-direction: column;
@@ -1190,49 +886,16 @@
     min-width: 0;
   }
 
-  .manager-component-inherit-summary {
-    margin-left: auto;
-    color: var(--fab-text-muted);
-    font-size: 0.62rem;
-    font-weight: 600;
-    white-space: nowrap;
-  }
+  /* THE SELECTION REGISTER'S SHIM. `BulkSelectionToolbar` renders one element carrying the
+     class this prop names; `display: contents` removes that box from the layout so its
+     children — the select-all label, the divider, the count, the standing sentence and the two
+     text actions — become flex items of the toolbar row that hosts it, which is where the
+     reference draws them. It declares nothing else: every metric is the row's.
 
-  /* The ghost cohort reads QUIETER than an adopted row, because it is a record this system does
-     not have: a dashed edge and the recessive surface say "available" where a solid card says
-     "yours". */
-  .manager-component-ghost-body {
-    margin-top: var(--fab-space-2);
-  }
-
-  .manager-component-ghost-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px dashed var(--fab-border);
-    border-radius: 9px;
-    background: none;
-    min-width: 0;
-  }
-
-  .manager-component-ghost-identity {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    min-width: 0;
-  }
-
-  .manager-component-ghost-name {
-    color: var(--fab-text);
-    font-size: 0.78rem;
-    font-weight: 600;
-    overflow-wrap: break-word;
-  }
-
-  .manager-component-ghost-note {
-    font-size: 0.62rem;
+     `:global()` is REQUIRED and is not laziness. The element is rendered by that component,
+     not by this template, so Svelte's scoping hash is never applied to it and a plain selector
+     here would compile to a rule that matches nothing. */
+  :global(.manager-component-selection-inline) {
+    display: contents;
   }
 </style>

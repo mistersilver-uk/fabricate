@@ -45,6 +45,12 @@
     id = '',
     name = '',
     icon = '',
+    // THE ESSENCE'S OWN COLOUR, inked onto the tile's glyph (issue 1371, parity round 4). The
+    // reference tints each tile by the essence it names (`proto:5717`), which is how a GM reads a
+    // four-column grid at a glance. It arrives as an authored CSS colour and is interpolated into
+    // a custom property, so an absent or empty value leaves the `var()` FALLBACK — the accent this
+    // tile has always painted — rather than emitting an invalid declaration.
+    color = '',
     quantity = 0,
     disabled = false,
     ariaLabel = '',
@@ -65,7 +71,11 @@
   data-component-essence-active={active}
 >
   <div class="manager-component-essence-identity">
-    <span class="manager-component-essence-icon" aria-hidden="true">
+    <span
+      class="manager-component-essence-icon"
+      style={color ? `--fab-essence-tile-ink:${color}` : undefined}
+      aria-hidden="true"
+    >
       <i class={icon || 'fas fa-mortar-pestle'}></i>
     </span>
     <strong class="manager-component-essence-name" title={name}>{name}</strong>
@@ -103,9 +113,11 @@
     align-content: start;
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-2);
-    border: 1px solid color-mix(in srgb, var(--fab-accent) 32%, transparent);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--fab-accent) 8%, var(--fab-bg-3));
+    /* `proto:5716`: a contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an
+       accent wash. Radius 10 snaps to the 9 rung (`design-system/spec.md:218`). */
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
   }
 
   /* No essence contributed: this card is a control the GM has not used. It recedes rather
@@ -132,15 +144,20 @@
     height: 22px;
     border-radius: 6px;
     background: var(--fab-overlay-light-06);
-    color: var(--fab-accent);
+    /* The FALLBACK is the accent this tile painted before the tint existed, so an untinted card
+       is byte-identical to what shipped. */
+    color: var(--fab-essence-tile-ink, var(--fab-accent));
     font-size: 0.7rem;
   }
 
+  /* `proto:5717`: 11.5px/600 in the SECONDARY ink, ellipsised. The tile's subject is the
+     numeral below it, so the name recedes a rung rather than competing with it. */
   .manager-component-essence-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-text);
-    font-size: 0.76rem;
+    color: var(--fab-text-secondary);
+    font-weight: 600;
+    font-size: 0.72rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

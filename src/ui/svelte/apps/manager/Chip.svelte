@@ -31,6 +31,18 @@
      size; a tone that resized would reintroduce the drift this component removes.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
+   - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
+     the scope being read (issue 1371, maintainer parity round 4) — a dashed hairline, the
+     `--fab-surface-soft` fill and a struck-through label (`proto:5692-5697`). It composes with
+     `tone`, adding those three declarations and nothing else, so the two call sites pair it
+     with `tone="muted"` and a muted chip that does NOT set it is byte-identical to what
+     shipped. It is a BOOLEAN rather than a repaint of `tone="muted"` because that tone already
+     has five callers with a different meaning — "unavailable", as in the complications
+     section's `Salvage · n/a` — and striking those through would say they had been switched
+     off by a GM. `rebuild-spec.md` D4.2 names this the `muted` variant; the prop is spelled
+     `struck` only because the tone of that name is taken.
+     Callers: the rules editor's world-tag group and the world Component entry's own world-tag
+     run, which the reference paints identically.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
    - swatch: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …) rendering a leading
      COLOUR DOT (issue 1036). The colour pill is a variant of the one chip rather than a
@@ -78,6 +90,7 @@
     tag = 'span',
     tone = '',
     mono = false,
+    struck = false,
     icon = '',
     swatch = '',
     class: extraClass = '',
@@ -142,6 +155,7 @@
       TONES.has(tone) ? `is-${tone}` : '',
       safeSwatch ? 'has-swatch' : '',
       mono ? 'is-mono' : '',
+      struck ? 'is-struck' : '',
       truncate ? 'is-truncated' : '',
       density === 'row' ? 'is-row' : '',
       density === 'list' ? 'is-list' : '',
@@ -368,6 +382,24 @@
     border-color: var(--fab-border);
     color: var(--fab-text-disabled);
     background: none;
+  }
+
+  /* THE MUTED VARIANT (issue 1371): a value switched off in the scope being read. Written
+     AFTER every tone rule so it wins the three properties it states over whichever tone the
+     caller paired it with, and states only those three — the tone still owns the ink, so a
+     muted-toned struck chip keeps `--fab-text-disabled` and an info-toned one would keep the
+     info ink. `border-style` rather than the `border` shorthand, so the tone's own
+     `border-color` survives. */
+  .manager-chip.is-struck {
+    border-style: dashed;
+    background: var(--fab-surface-soft);
+    text-decoration: line-through;
+  }
+
+  /* The strike must not cross the leading glyph: `text-decoration` inherits into the `<i>`,
+     and an eye-slash with a line through it reads as a broken icon rather than a muted tag. */
+  .manager-chip.is-struck > i {
+    text-decoration: none;
   }
 
   /* ROW density (issue 1096): the Checks Studio modifier row's in-line annotation chip

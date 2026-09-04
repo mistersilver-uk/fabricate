@@ -100,12 +100,14 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     editor.teardown();
   });
 
-  describe('the attribution banner is clamped and routes to the world entry', () => {
-    // AC-13 and AC-16's mounted half.
+  describe('the identity callout is clamped and routes to the world entry', () => {
+    // AC-13 and AC-16's mounted half. The banner is the ONE callout since issue 1371's parity
+    // round 4 (gap-list row 129): the `SharedDefinitionCallout` under the identity strip and the
+    // strip itself were two stacked cards making one statement, and the reference draws one.
     it('reads 0 other systems for a component NO system has a record for', async () => {
       const { target } = await openEditor(componentRecord('resin', 'Wildwood Resin', 'general'));
-      const note = target.querySelector('[data-scoped-shared-definition-note]');
-      assert.ok(Boolean(note), 'the editor renders the attribution banner');
+      const note = target.querySelector('[data-component-identity-note]');
+      assert.ok(Boolean(note), 'the editor renders the identity callout');
       assert.match(note.textContent, /0 other systems/);
       assert.ok(
         !note.textContent.includes('-1'),
@@ -118,8 +120,24 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       // zero fixture is the criterion rather than this one.
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
       assert.match(
-        target.querySelector('[data-scoped-shared-definition-note]').textContent,
+        target.querySelector('[data-component-identity-note]').textContent,
         /1 other system\./
+      );
+    });
+
+    it('and it is ONE callout, carrying the World catalogue pill', async () => {
+      // The removal, stated where a reader will look for it. Two cards drawing one fact is the
+      // shape the reference collapses, and an assertion on the survivor alone cannot say the
+      // second one went.
+      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
+      assert.ok(
+        !target.querySelector('[data-scoped-shared-definition]'),
+        'the second card is gone rather than merely re-styled'
+      );
+      assert.equal(
+        target.querySelector('[data-component-world-pill]').textContent.trim(),
+        'World catalogue',
+        'and the pill reads the catalogue rather than a "World definition"'
       );
     });
 
@@ -127,7 +145,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       const { target, opened } = await openEditor(
         componentRecord('ingot', 'Iron Ingot', 'Refined')
       );
-      target.querySelector('[data-scoped-shared-definition-open]').click();
+      target.querySelector('[data-component-edit-action="open-world-entry"]').click();
       await drain();
       assert.deepEqual(
         opened,
@@ -138,62 +156,87 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
   });
 
-  describe('the category inherit switch locks the value and branches on the WORLD value', () => {
-    // AC-14.
-    it('LOCKS the value control while the section is inherited', async () => {
+  describe('the category control is ONE select whose first option is the inherit option', () => {
+    // AC-14, rebuilt to the reference for issue 1371's parity round 4 (gap-list rows 133, 143).
+    // The card used to float a `<select>` into its head, DISABLE it while the section inherited,
+    // and repeat the choice as a second labelled row with a toggle and the note beside it. The
+    // reference draws the head, then one full-width select whose FIRST option is
+    // `Inherit from world · {value}`, then the note directly under it.
+    it('offers the inherit option FIRST and selects it while the section inherits', async () => {
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
       const select = target.querySelector('[data-component-edit-category]');
       assert.ok(Boolean(select), 'the editor renders its category control');
       assert.equal(
+        select.options[0].value,
+        '__inherit',
+        'the inherit option is folded into the control rather than living beside it'
+      );
+      assert.match(select.options[0].textContent, /Inherit from world/);
+      assert.match(
+        select.options[0].textContent,
+        /Refined/,
+        'and it NAMES the world value, which is the whole reason it is an option and not a switch'
+      );
+      assert.equal(select.value, '__inherit', 'an inheriting section selects it');
+      assert.equal(
         select.disabled,
-        true,
-        'an editable control over a value the system does not own offers a change the very next ' +
-          'read discards'
+        false,
+        'the control is no longer disabled: choosing a concrete category IS how you override'
       );
-      assert.ok(
-        Boolean(target.querySelector('[data-scoped-inherit-toggle="category"]')),
-        'and the switch that would unlock it is offered'
-      );
-    });
-
-    it('and flipping the switch forwards setSectionInherited(…, false)', async () => {
-      // Asserted on the FORWARDED ARGUMENT, because the action refuses silently for a non-member.
-      const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      target.querySelector('[data-scoped-inherit-toggle="category"]').click();
-      await drain();
-      assert.deepEqual(
-        calls.filter((call) => call.verb === 'setSectionInherited'),
-        [{ verb: 'setSectionInherited', args: ['ingot', 'sys-forge', 'category', false] }]
-      );
-    });
-
-    it('leaves the value EDITABLE for a system that overrides it', async () => {
-      // The positive control on the lock: without it an implementation that disabled the select
-      // unconditionally passes the assertion above.
-      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
-        systemId: 'sys-alchemy',
-      });
-      assert.equal(target.querySelector('[data-component-edit-category]').disabled, false);
-    });
-
-    it('and WITHHOLDS the inherit affordance when no world category is authored', async () => {
-      // THE FIXTURE IS A MEMBER WITH NO WORLD DEFAULT, and that is the whole point of it.
-      //
-      // It used to be `resin`, which has NO MEMBERSHIP RECORD — and the affordance is withheld for
-      // a non-member first, so the world-value half was never reached and the delta's own
-      // reddening mutation ("render the inherit option unconditionally") survived. `orphan` is a
-      // `sys-forge` member whose world record carries no `category`, which is the only fixture
-      // that isolates the branch this test names.
-      const { target } = await openEditor(componentRecord('orphan', 'Unbound Salt', 'general'));
       assert.ok(
         !target.querySelector('[data-scoped-inherit-toggle="category"]'),
+        'and the separate toggle is gone with the second labelled row it sat in'
+      );
+    });
+
+    it('choosing a concrete category clears the inherit flag AND stages the value', async () => {
+      // TWO WRITES, and the second is the one a lock used to stand in for: the read union
+      // re-applies an inheriting world category AFTER the in-system re-spread, so a value staged
+      // without clearing the flag is discarded on the very next read.
+      const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
+      const select = target.querySelector('[data-component-edit-category]');
+      const concrete = [...select.options].find((option) => option.value !== '__inherit');
+      select.value = concrete.value;
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'setSectionInherited'),
+        [{ verb: 'setSectionInherited', args: ['ingot', 'sys-forge', 'category', false] }],
+        'the membership flag is cleared, or the staged value is discarded on the next read'
+      );
+    });
+
+    it('and choosing the inherit option forwards setSectionInherited(…, true)', async () => {
+      // The other direction, from the system that OVERRIDES. Asserted on the forwarded argument,
+      // because the action refuses silently for a non-member.
+      const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
+        systemId: 'sys-alchemy',
+      });
+      const select = target.querySelector('[data-component-edit-category]');
+      assert.notEqual(select.value, '__inherit', 'the overriding system does not start there');
+      select.value = '__inherit';
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'setSectionInherited'),
+        [{ verb: 'setSectionInherited', args: ['ingot', 'sys-alchemy', 'category', true] }]
+      );
+    });
+
+    it('and WITHHOLDS the inherit option when no world category is authored', async () => {
+      // THE FIXTURE IS A MEMBER WITH NO WORLD DEFAULT, and that is the whole point of it.
+      // `orphan` is a `sys-forge` member whose world record carries no `category`, which is the
+      // only fixture that isolates the branch this test names: the affordance is withheld for a
+      // non-member first, so a non-member fixture never reaches the world-value half.
+      const { target } = await openEditor(componentRecord('orphan', 'Unbound Salt', 'general'));
+      const select = target.querySelector('[data-component-edit-category]');
+      assert.ok(
+        ![...select.options].some((option) => option.value === '__inherit'),
         'the option is ABSENT rather than offered against an unauthored world value'
       );
-      assert.equal(
-        target.querySelector('[data-component-edit-category]').disabled,
-        false,
-        'and the value control is editable, because this system supplies its own'
-      );
+      assert.equal(select.disabled, false, 'and this system supplies its own value');
       const note = target.querySelector('[data-component-edit-category-note]');
       assert.ok(Boolean(note), 'the third branch of the note renders in its place');
       assert.match(note.textContent, /No world category is set/);
@@ -202,15 +245,15 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     it('and the two states PAINT differently, which is what the tone field was for', async () => {
       // THE RENDERED CLASS, NOT THE MODEL FIELD. `componentCategoryNote` has answered
       // `tone: 'info'` / `'warning'` since round 1 and the unit test asserted the string, but the
-      // row dropped the value on the floor: both states painted the one shipped muted ink, so the
-      // whole mapping of the reference's raw hex onto Fabricate's families was a constant with no
-      // pixel behind it. That is the anti-guard shape — an assertion satisfied by a value nothing
+      // note dropped the value on the floor: both states painted one muted ink, so the whole
+      // mapping of the reference's raw hex onto Fabricate's families was a constant with no pixel
+      // behind it. That is the anti-guard shape — an assertion satisfied by a value nothing
       // consumes — and only a class read off the DOM closes it.
       const { target: inheriting } = await openEditor(
         componentRecord('ingot', 'Iron Ingot', 'Refined')
       );
-      const inheritNote = inheriting.querySelector('[data-scoped-inherit-note="category"]');
-      assert.ok(Boolean(inheritNote), 'the inheriting row renders its note');
+      const inheritNote = inheriting.querySelector('[data-component-edit-category-note]');
+      assert.ok(Boolean(inheritNote), 'the inheriting state renders its note');
       assert.ok(
         inheritNote.classList.contains('is-info'),
         `the inheriting note carries the info family; it carried "${inheritNote.className}"`
@@ -224,7 +267,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         componentRecord('ingot', 'Iron Ingot', 'Refined'),
         { systemId: 'sys-alchemy' }
       );
-      const overrideNote = overriding.querySelector('[data-scoped-inherit-note="category"]');
+      const overrideNote = overriding.querySelector('[data-component-edit-category-note]');
       assert.ok(
         overrideNote.classList.contains('is-warning'),
         `the overriding note carries the warning family; it carried "${overrideNote.className}"`
