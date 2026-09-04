@@ -28514,6 +28514,114 @@ describe('CraftingSystemManager mounted behavior', () => {
       });
     });
 
+    // ── THE WORLD COMPONENT ENTRY SAYS THERE ARE UNSAVED CHANGES (issue 1371, round 5) ──
+    //
+    // NESTED HERE for the reason the essence block below records: `mountWithRealStore` is the
+    // only harness in the repository that drives the manager shell over a real world-scope
+    // corpus, and this marker is rendered by the SHELL.
+    //
+    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS. The marker sits in `.manager-header`, a
+    // sibling of `.manager-main`, so `WorldComponentEntryPage`'s own mounted suite cannot see
+    // it — every assertion there is green whether the shell renders the marker, renders it
+    // permanently, or renders nothing at all. Lane A proved the behaviour against the running
+    // app and could not place a guard from its page mount; this is that guard.
+    //
+    // THE PAIR IS ASSERTED TOGETHER, not the marker alone. The marker and the Save's disabled
+    // state read one `worldComponentEntryDirty`, and the failure worth catching is the two
+    // DISAGREEING — a screen offering a Save it will not perform, or refusing one over an edit
+    // it is showing as pending.
+    describe('world component entry unsaved marker (issue 1371)', () => {
+      // A SOURCE-LESS record, and that is load-bearing rather than incidental: the entry renders
+      // the name as a read-only `<span>` when a Foundry item backs it, because the identity then
+      // follows the item. The editable `<input>` this block types into exists only for a record
+      // with no source, which is the state a GM authors a name in.
+      const UNBOUND_SALT = Object.freeze({
+        id: 'lab-unbound-salt',
+        name: 'Unbound Salt',
+        description: 'Catalogued from a merchant\u2019s ledger, with no game-world Item behind it.',
+      });
+
+      async function settleEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const unsavedMarker = () =>
+        target.querySelector('[data-world-component-entry-unsaved]')?.textContent?.trim();
+      const saveDisabled = () =>
+        target.querySelector('[data-world-component-save]')?.disabled === true;
+
+      /** Open the entry the way a GM does: the world rail, then the row's own open action. */
+      async function openSaltEntry() {
+        await mountWithRealStore({ worldComponents: [{ ...UNBOUND_SALT }] });
+        worldNavItem('component-catalogue').click();
+        await settleEntryRoute();
+        const open = target.querySelector(
+          `[data-scoped-list-row="${UNBOUND_SALT.id}"] [data-scoped-list-action="open-entry"]`
+        );
+        assert.ok(
+          Boolean(open),
+          'the component catalogue rendered no open-entry action, so nothing below reaches the ' +
+            'entry this block is about'
+        );
+        open.click();
+        await settleEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-component-entry',
+          'the row action did not commit the entry route'
+        );
+      }
+
+      /**
+       * Type into the buffered name field. An `input` event is the only thing that moves the
+       * draft: it is seeded from the persisted record, so a click cannot dirty it.
+       *
+       * @param {string} value the name to type.
+       */
+      async function typeName(value) {
+        const field = target.querySelector('[data-scoped-entry-name]');
+        assert.ok(Boolean(field), 'the entry rendered no editable name field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleEntryRoute();
+      }
+
+      it('rests with NO marker and a disabled Save', async () => {
+        await openSaltEntry();
+        assert.ok(
+          !target.querySelector('[data-world-component-entry-unsaved]'),
+          'a freshly-opened entry has nothing pending, so announcing unsaved changes would be a ' +
+            'permanent decoration rather than a state'
+        );
+        assert.ok(saveDisabled(), 'and the Save is off, because there is nothing to write');
+      });
+
+      it('announces the pending edit and arms the Save after ONE keystroke', async () => {
+        await openSaltEntry();
+        await typeName('Bound Salt');
+        assert.equal(
+          target.querySelector('[data-scoped-entry-name]').value,
+          'Bound Salt',
+          'the keystroke never reached the draft, so both assertions below are vacuous'
+        );
+        assert.equal(
+          unsavedMarker(),
+          'Unsaved changes',
+          'the GM holds an edit the record does not carry, and the header must say so before ' +
+            'they navigate away from it'
+        );
+        assert.ok(
+          !saveDisabled(),
+          'and the Save is armed: the marker and the Save read one dirty flag, and a screen ' +
+            'showing a pending edit while refusing to write it is the failure here'
+        );
+      });
+    });
+
     // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
     //
     // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
