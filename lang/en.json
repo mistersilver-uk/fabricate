@@ -6375,6 +6375,7 @@
             "BulkCategorySearch": "Search categories",
             "BulkCategoryNoMatch": "No world category matches that search.",
             "BulkTagState": "{added} added · {removed} removed",
+            "BulkStagingHint": "Pick the systems to add them to, stage a category or tags, then commit below.",
             "BulkNoTags": "No world tags are authored yet. Create them in Tags & Categories first.",
             "BulkPerComponentNote": "Names and source links stay per component. What you can change in bulk is which systems these components belong to, and their world category and tags.",
             "Entry": {

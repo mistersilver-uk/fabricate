@@ -29,6 +29,9 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { componentBulkMembershipModes } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
+// The frame's own lifted view-state factory, so the page-size case below states the SHIPPED
+// shape and changes with it rather than hand-rolling a second one.
+import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -1187,6 +1190,113 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    it('puts the danger leg INSIDE the shell’s pinned dock, not above it', async () => {
+      // Gap-list row 47. `proto:686`-`688` pins the destructive verb and its note in the same
+      // bordered foot as the primary action. It shipped as the panel's last CONTENT, a scrolling
+      // sibling of a pinned dock — so a GM who had scrolled the staging groups could have the
+      // Apply in front of them and the delete somewhere above it.
+      const { target } = await mixedSelection();
+      const dock = target.querySelector('.fab-bulk-edit-dock');
+      assert.ok(Boolean(dock), 'the shell draws its dock');
+      assert.ok(
+        Boolean(dock.querySelector('[data-world-component-bulk-danger]')),
+        'and the danger leg is inside it'
+      );
+      assert.ok(
+        dock.classList.contains('has-foot'),
+        'which is what turns the dock into the reference’s two-row column'
+      );
+      // The alternatives clause: the sibling card and the dock foot are not a pair.
+      const panel = target.querySelector('[data-world-component-bulk-panel]');
+      assert.equal(
+        panel.querySelectorAll('[data-world-component-bulk-danger]').length,
+        1,
+        'and the control is drawn ONCE — the sibling card and the dock foot are alternatives'
+      );
+    });
+
+    it('takes the shell’s short Clear and names the staging THIS panel offers', async () => {
+      // Gap-list rows 38 and 39. Both were the shell's own hard-coded strings.
+      const { target } = await mixedSelection();
+      assert.equal(
+        target.querySelector('[data-world-component-bulk-clear]').textContent.trim(),
+        'Clear',
+        'the action sits under a BULK EDIT eyebrow, so "selection" is the only thing it clears'
+      );
+      assert.match(
+        target.querySelector('.fab-bulk-edit-hero-hint').textContent,
+        /Pick the systems to add them to, stage a category or tags, then commit below\./,
+        'and the hero names the three axes rather than saying only that changes are staged'
+      );
+    });
+
+    it('offers ONE select-all over the rows on screen, and no master box', async () => {
+      // Gap-list row 37. `proto:592` draws no tri-state box in the band at all: it reads
+      // `{n} selected` and offers `Select all {n} shown`.
+      const { target } = await mixedSelection();
+      const band = target.querySelector('[data-scoped-list-selection-toolbar]');
+      assert.ok(Boolean(band), 'the band renders under a selection');
+      assert.ok(
+        !band.querySelector('[data-scoped-list-select-all-page]'),
+        'and draws no master checkbox, which the reference has nowhere in this band'
+      );
+      const results = band.querySelector('[data-scoped-list-select-all-results]');
+      assert.ok(Boolean(results), 'the one select-all is a text action');
+      const rendered = target.querySelectorAll('[data-scoped-list-row]').length;
+      assert.ok(rendered > 0, 'NON-VACUITY: rows are rendered');
+      assert.equal(
+        results.textContent.trim(),
+        `Select all ${rendered} shown`,
+        'counting the rows being RENDERED, so the caption names the set a GM can actually see ' +
+          'rather than a filtered corpus that may run past the page'
+      );
+
+      results.click();
+      await drain();
+      assert.equal(
+        target.querySelectorAll('input[data-scoped-list-select]:checked').length,
+        rendered,
+        'and it reaches those same rows'
+      );
+    });
+
+    it('and `shown` means the PAGE, on a corpus the page does not hold all of', async () => {
+      // THE ASSERTION ABOVE CANNOT SEE THIS. The default page is 10 and this corpus is 4, so the
+      // rendered rows and the filtered corpus are the same set and a select-all wired to either
+      // one satisfies it — proved: pointing `onSelectAllResults` at `projected.rows` left that
+      // test green. A two-row page separates the populations, which is the only arrangement in
+      // which the word `shown` is falsifiable.
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: recordingComponentActions().actions,
+        browserState: { ...createScopedListBrowserState(), pageSize: 2 },
+      });
+      target.querySelector('[data-scoped-list-select="ingot"]').click();
+      await drain();
+      const rendered = target.querySelectorAll('[data-scoped-list-row]').length;
+      assert.equal(rendered, 2, 'the page holds two of the four');
+      const results = target.querySelector('[data-scoped-list-select-all-results]');
+      assert.match(results.textContent, /Select all 2 shown/, 'and the caption says two');
+
+      results.click();
+      await drain();
+      // READ OFF THE BAND'S COUNT, not off the checked inputs: the two off-page rows are not in
+      // the DOM at all, so a corpus-wide select-all would tick four and still leave exactly two
+      // checked boxes on screen. The band counts `selectedIds`, which is the set itself.
+      assert.match(
+        target.querySelector('[data-scoped-list-selection-count]').textContent,
+        /\b2 selected\b/,
+        'it selects TWO — a select-all wired to the filtered corpus would have taken four, and ' +
+          'the two it took off-page would have been invisible in the row markup'
+      );
+      assert.equal(
+        target.querySelectorAll('input[data-scoped-list-select]:checked').length,
+        2,
+        'and both of them are the rows on screen'
+      );
+    });
+
     it('and withholds the delete outright when every selected record is held', async () => {
       const { calls, actions } = recordingComponentActions();
       const target = await harness.mount({
@@ -1408,6 +1518,29 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(
         search.classList.contains('manager-scoped-roster-search-well'),
         'and the field is lifted into its own well rather than sitting flush in the recess'
+      );
+    });
+
+    it('takes the BARE pill face on the source badge and leaves the flag its edge', async () => {
+      // `proto:601` draws the source badge edgeless on `--surface-raised`; `proto:3893`'s `pill()`
+      // helper draws the exception flag WITH a real 1px edge. They are two faces, and a flag that
+      // lost its edge would read as the badge beside it — which is why this asserts both halves.
+      const target = await mounted();
+      const badge = target.querySelector(
+        '[data-world-component-row-source-pill] [data-status-pill]'
+      );
+      assert.ok(Boolean(badge), 'the row leads its name line with the shared pill');
+      assert.equal(
+        badge.getAttribute('data-status-pill-emphasis'),
+        'bare',
+        'and the badge takes the edgeless face'
+      );
+
+      const flag = target.querySelector('[data-world-component-row-flag] [data-status-pill]');
+      assert.ok(Boolean(flag), 'NON-VACUITY: a broken-link row is in the corpus');
+      assert.ok(
+        !flag.getAttribute('data-status-pill-emphasis'),
+        'and the exception flag keeps the shipped bordered face'
       );
     });
 

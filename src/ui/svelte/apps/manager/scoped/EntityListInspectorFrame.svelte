@@ -294,6 +294,21 @@
     // The INSPECTOR's medallion is deliberately not covered. It is a different site at a
     // different size on every catalogue, and no reference or region asks it to move.
     rowMedallion = null,
+    // ── THE SELECTION BAND'S SELECT-ALL, AND WHAT IT REACHES (issue 1371 r9-cat, gap-list 37) ──
+    // `'results'` (the shipped band: a tri-state master box for the page, and `Select all {n}
+    // results` for the whole filtered corpus) or `'shown'` — the reference's band, which draws no
+    // master box at all and offers one text action, `Select all {n} shown` (`proto:592`).
+    //
+    // Threaded straight to `BulkSelectionToolbar`, whose own prop it is. It is a SCOPE and not a
+    // boolean because that is what changes: `results` and `shown` are two populations, and the
+    // caller has to hand over the second one's count and its action as well — this frame does,
+    // from `page.rows`, which is literally the rows it is rendering.
+    //
+    // WHAT IT COSTS, STATED: under `'shown'` the primitive renders NOTHING at zero selection, so
+    // the resting toolbar loses the `All` box. That is the reference's own arrangement — a
+    // selection opens from the ROW's checkbox (`proto:603`) and the band completes it — and it is
+    // the trade the band's own note below already describes.
+    selectAllScope = 'results',
     // The VISIBLE caption on the select-all box. The prototype's reads `All` where the shipped
     // primitive says `Select all`. Only the caption moves: the primitive's `ariaLabel` is
     // untouched, because `All` is not an accessible name a screen-reader user can act on.
@@ -416,6 +431,11 @@
   const membershipOptions = $derived(
     systemId ? SYSTEM_MEMBERSHIP_FILTERS : WORLD_MEMBERSHIP_FILTERS
   );
+
+  // The selection band's population, resolved once. A closed comparison rather than a truthiness
+  // test, so an unrecognised scope keeps the shipped band exactly as `BulkSelectionToolbar`'s own
+  // resolver does with the same value.
+  const shownScope = $derived(selectAllScope === 'shown');
 
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
@@ -624,6 +644,24 @@
     selectedIds = setBulkSelection(
       selectedIds,
       projected.rows.map((entry) => entry.id),
+      true
+    );
+    disarm();
+  }
+
+  /**
+   * `Select all {n} shown` — the reference band's ONE select-all, over the rows on screen.
+   *
+   * The rendered page rather than the filtered corpus, because that is what the word says: a GM
+   * reading `Select all 10 shown` beside ten visible rows has been told which ten. `results`
+   * keeps its own action above, over `projected.rows`, and the two are separate functions rather
+   * than one taking a population — a select-all that silently changed which set it reached with
+   * the caption beside it is the defect this scope exists to make impossible to write.
+   */
+  function selectAllShown() {
+    selectedIds = setBulkSelection(
+      selectedIds,
+      page.rows.map((entry) => entry.id),
       true
     );
     disarm();
@@ -1028,11 +1066,6 @@
             on a row that no longer holds the selection register.
           -->
           {#if selection.count > 0}
-            <!-- r9-prim2: gap-list row 37 is this primitive's, not this frame's. `proto:592`
-                 draws NO tri-state master box in the band at all — it reads `{n} selected` and
-                 offers `Select all {n} shown` as a text action — and `BulkSelectionToolbar`
-                 renders that box unconditionally with no prop to suppress it. The note below
-                 records the trade the frame took instead. Wire the opt-in here when it exists. -->
             <BulkSelectionToolbar
               rowClass={TOOLBAR_ROW_CLASS}
               toolbarAttr={TOOLBAR_ATTR}
@@ -1040,17 +1073,22 @@
               countAttr={COUNT_ATTR}
               resultsAttr={RESULTS_ATTR}
               clearAttr={CLEAR_ATTR}
+              {selectAllScope}
               pageSelectionState={selection.pageSelectionState}
               count={selection.count}
-              showSelectAllResults={selection.showSelectAllResults}
-              selectAllResultsCount={selection.selectAllResultsCount}
+              showSelectAllResults={shownScope
+                ? selection.count > 0
+                : selection.showSelectAllResults}
+              selectAllResultsCount={shownScope
+                ? page.rows.length
+                : selection.selectAllResultsCount}
               {selectAllLabel}
               hint={selectionHint}
               trailingActions
               bareActions
               countIcon="fa-solid fa-check-double"
               onTogglePage={togglePage}
-              onSelectAllResults={selectAllResults}
+              onSelectAllResults={shownScope ? selectAllShown : selectAllResults}
               onClear={clearSelection}
             />
           {/if}

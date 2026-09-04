@@ -125,6 +125,9 @@
     // descriptor for the tile at the head of a row (`null` = the shipped 40px artwork tile).
     toolbarLeadSize = '',
     rowMedallion = null,
+    // Threaded straight to the frame and on to `BulkSelectionToolbar`; see the frame's own prop
+    // note. `'results'` is the shipped band, so the essence and tool catalogues are unchanged.
+    selectAllScope = 'results',
     selectAllLabel = '',
     onOpenSystemRules = null,
     // The list's lifted view-state (issue 1438), passed straight through to the frame. It is
@@ -304,6 +307,7 @@
     {splitToolbar}
     {toolbarLeadSize}
     {rowMedallion}
+    {selectAllScope}
     {selectAllLabel}
     bind:browserState
     bind:selectedId

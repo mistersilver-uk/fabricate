@@ -148,10 +148,14 @@ const CATALOGUE_PROPS = [
   'rowTrailing',
   'scope',
   'searchOf',
-  'searchPlaceholder',
   'sectionIcons',
   'sectionNotes',
   'sectionTitles',
+  // THE SELECTION BAND'S POPULATION (issue 1371 r9-cat, gap-list row 37). `'results'` is the
+  // shipped band — a tri-state master box plus `Select all {n} results` — and `'shown'` is the
+  // reference's, which draws no box and offers one text action over the rendered rows.
+  'selectAllScope',
+  'searchPlaceholder',
   'selectAllLabel',
   'showWorldDefaults',
   'selectedId',
@@ -277,6 +281,9 @@ describe('the shells declare the pinned prop sets', () => {
       'sectionIcons',
       'sectionTitles',
       'selectAllLabel',
+      // Catalogue-only for the reason `splitToolbar` is: the rules-list shell's selection band is
+      // the shipped one and no reference asks it to move.
+      'selectAllScope',
       'showWorldDefaults',
       'splitToolbar',
       'systemRowAction',
@@ -1001,6 +1008,17 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     // Shorthand `{name}`, which is how every other pass-through on this tag is written.
     assert.match(source, /\{toolbarLeadSize\}/, 'and forwarded to the frame');
     assert.match(source, /\{rowMedallion\}/, 'and forwarded to the frame');
+  });
+
+  it('and hands the frame the selection band’s population', () => {
+    const source = shell();
+    assert.match(
+      source,
+      /\n\s*selectAllScope = 'results',/,
+      'declared, and the SHIPPED band by default, so the essence and tool catalogues keep their ' +
+        'master box'
+    );
+    assert.match(source, /\{selectAllScope\}/, 'and forwarded to the frame');
   });
 
   it('and the FRAME spends them on the two elements they name', () => {

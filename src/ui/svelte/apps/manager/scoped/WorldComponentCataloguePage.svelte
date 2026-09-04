@@ -430,6 +430,7 @@
     rowSourceBadge={false}
     splitToolbar
     toolbarLeadSize="38"
+    selectAllScope="shown"
     rowMedallion={COMPONENT_ROW_MEDALLION}
     rosterRecessed
     rosterSearchWell
@@ -488,14 +489,24 @@
       second set of refusals. `SearchablePopover` is the shipped chooser — the bulk panel's own
       pickers are it — so no second one is built here.
     -->
-    <!-- r9-prim2: the trigger's 38px RUNG IS A ONE-SITE OVERRIDE AND SHOULD NOT STAY ONE.
-         `proto:570` draws this action at 38px, and it MEASURES 38 — `compare` reports no height
-         line on `cat-header-action` — but only because `styles/fabricate.css` gives
-         `.manager-world-component-register-action` its own `height`, `min-height` and
-         `border-radius` beside the shared button class. That is this screen re-deriving a rung
-         the ladder publishes, which is the shape `is-size-38` exists to end one control over.
-         When `ManagerButton` takes an opt-in 38px size, this trigger names it in `triggerClass`
-         and those three declarations are deleted from the sheet in the same change. -->
+    <!--
+      WHY THIS ONE CONTROL STILL STATES ITS OWN RUNG, now that `ManagerButton` publishes a 38px
+      size (issue 1371 r9-prim2). Re-verified against the tree rather than assumed.
+
+      `ManagerButton`'s rung is `.fabricate-manager .manager-button.fab-manager-button.is-size-38`,
+      and `fab-manager-button` is the class the PRIMITIVE writes. This trigger is not that
+      primitive: `SearchablePopover` renders a bare `<button class={triggerClass}>` and offers a
+      `triggerChip` form but no `ManagerButton` form, so `is-size-38` handed to it in
+      `triggerClass` would match nothing and take the control back to Foundry's own button height
+      and corner. That is population B in `manager-button-cascade-inventory.test.js`, and the two
+      sheet rules behind this class are dispositioned EXCLUDE there for exactly this reason.
+
+      So `styles/fabricate.css` keeps this site's `height`, `min-height` and `border-radius`, and
+      the honest follow-up is a `ManagerButton` trigger form on `SearchablePopover` — which would
+      retire all thirteen population-B overrides at once rather than this one by hand.
+      `cat-header-action` measures 38px and reports no height line today, so nothing is pending
+      on the SCREEN; what is pending is one shared trigger contract.
+    -->
     <SearchablePopover
       options={registerableItems}
       pickerClass="fab-world-component-register-picker"
@@ -707,19 +718,24 @@
   {@const linked = entry?.hasSourceLink === true}
   {@const broken = componentSourceBroken(entry, worldItems)}
   <span class="manager-world-component-row-source" data-world-component-row-source-pill={entry.id}>
-    <!-- r9-prim2: the pill's FACE is the one thing left open here, and it is `StatusPill`'s.
-         `proto:601` draws it as an UNBORDERED 999px stadium — `padding: 1px 7px; font: 600 9px`
-         on `var(--surface-raised)`, with no `border` declared at all. Measured against it the
-         shipped pill reports six lines: `borderTopWidth 1 ≠ 0`, `borderTopStyle solid ≠ none`,
-         `borderTopColor` (ours transparent, the reference's the inherited subtle ink on a
-         zero-width edge), `fontSize 9.92 ≠ 9` and both horizontal insets `4 ≠ 7`. Every one of
-         them is declared inside the primitive's own scoped block, and a component's scoped block
-         is UNLAYERED while `styles/fabricate.css` imports at `layer(modules)` — so no
-         page-authored or sheet-authored rule can win against it however specific it is written.
-         It needs an opt-in row face on `StatusPill`, in that primitive's own vocabulary, rather
-         than a second implementation of the pill here. Wire it where this tag stands. -->
+    <!--
+      THE BARE FACE, WHICH IS THE ONLY THING THAT WAS LEFT OPEN HERE (UX F12's sibling finding).
+
+      `proto:601` draws this badge as an UNBORDERED 999px stadium — `padding: 1px 7px; font: 600
+      9px` on `var(--surface-raised)`, with no `border` declared at all. The shipped pill measured
+      six lines against it: the edge's width, style and colour, 9.92px type, and both horizontal
+      insets. Every one of them is declared inside the primitive's own scoped block, and a
+      component's scoped block is UNLAYERED while `styles/fabricate.css` imports at
+      `layer(modules)` — so no page- or sheet-authored rule could have won against it however
+      specific. `emphasis="bare"` is that face, on the primitive that owns it.
+
+      IT KEEPS THE TONE, which is why it is `bare` and not `outlined`: the fill and the ink are
+      the tone's, and only the edge and the type move. So a linked badge stays `subtle` and an
+      unlinked one stays `warning` and keeps its amber.
+    -->
     <StatusPill
       tone={linked ? 'subtle' : 'warning'}
+      emphasis="bare"
       icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}
       label={componentSourceType(entry, text)}
     />
@@ -730,6 +746,11 @@
       used to sit on the second line: `Unused` restated the `0/{n}` the systems column now prints
       a few centimetres to the right, and a dangling link is the fact NOTHING else on the row can
       state. `componentSourceBroken`'s own note records why only a world address is checkable.
+
+      AND IT DELIBERATELY DOES NOT TAKE `emphasis="bare"`, unlike the source badge one block up.
+      They are two faces, not one: `proto:3893`'s `pill()` helper draws the exception flag at
+      `2px 8px` with a REAL `1px solid` edge at 9.5px, and only `proto:601`'s source badge is
+      edgeless. A flag that lost its edge would read as the badge beside it.
     -->
     <span class="manager-world-component-row-flag" data-world-component-row-flag={entry.id}>
       <StatusPill

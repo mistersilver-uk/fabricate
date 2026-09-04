@@ -553,30 +553,35 @@
 </script>
 
 <!--
-  r9-prim2: THREE OF THIS PANEL'S GAP-LIST ROWS ARE `BulkEditPanelShell`'S TO GIVE, NOT THIS
-  FILE'S TO TAKE.
+  THE THREE PER-SITE PARAMETERS THIS PANEL ASKS `BulkEditPanelShell` FOR (gap-list rows 38, 39,
+  47). Each was a marker here for one revision while the shell grew the seam, and each defaults to
+  what ships, so the Component, Recipe and Essence Studios are untouched.
 
-   - row 38: the shell's clear action reads `Clear selection` where `proto:596` reads `Clear`. It
-     is hard-coded in the shell's own template, so it needs a `clearLabel` prop defaulting to the
-     shipped string.
-   - row 39: the count hero's copy is the shell's too, and the reference states a different
-     sentence there. Same shape: an override that defaults to what ships.
-   - row 47: see the danger leg below. `proto:686`-`688` pins that control INSIDE the dock, under
-     the primary action, and the shell exposes no dock slot — so the panel renders it as its last
-     content instead, which is the right reading order and the wrong box.
-
-  All three default to what ships, so no other bulk panel in the manager moves. Wire them here.
+   - `clearLabel`: `proto:626` reads `Clear` where the shell reads `Clear selection`. The action
+     stands under a `BULK EDIT` eyebrow in a rail showing nothing but the selection, so
+     "selection" is the only thing it could be clearing.
+   - `hint`: `proto:628` names the staging THIS panel offers, where the shell's noun-free default
+     says only that changes are staged.
+   - `dockFoot`: the danger leg, which `proto:686`-`688` pins INSIDE the dock under the primary
+     action. It rendered as the panel's last content instead — the right reading order in the
+     wrong box, a scrolling sibling of a pinned dock.
 -->
 <BulkEditPanelShell
   heading={headingLabel}
   {applyLabel}
   {canApply}
+  clearLabel={text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear')}
+  hint={text(
+    'FABRICATE.Admin.Manager.Scoped.Component.BulkStagingHint',
+    'Pick the systems to add them to, stage a category or tags, then commit below.'
+  )}
   panelAttr="data-world-component-bulk-panel"
   clearAttr="data-world-component-bulk-clear"
   countAttr="data-world-component-bulk-count"
   applyAttr="data-world-component-bulk-apply"
   {onClearSelection}
   onApply={applyStaged}
+  dockFoot={onDelete ? componentBulkDanger : undefined}
 >
   <!--
     THE STANDING EXPLANATION IS SECOND, DIRECTLY UNDER THE REGISTER (gap-list row 40).
@@ -687,51 +692,6 @@
       )}
     </p>
   {/if}
-
-  <!--
-    THE DANGER LEG (gap-list row 47). `proto:686`-`688` pins it inside the dock, under the primary
-    action; `BulkEditPanelShell` owns that dock and takes no slot in it, so this renders as the
-    panel's last content instead — directly above the dock, in the same reading order, with the
-    same consequence note under it. Moving it INTO the dock needs an opt-in on the shell, which no
-    lane owns this revision; it is recorded rather than worked around.
-
-    AND IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7). The world Component entry will not
-    delete a record any system still has rules for, and this panel used to delete exactly those
-    records without asking — the same record undeletable one screen away and deletable in a
-    tick-box, on the path a GM reaches with a page of rows selected. The plan splits the
-    selection: the button counts and writes only the free ones, the note NAMES the held ones and
-    the systems holding them, and the control goes `disabled` with the entry's own `Cannot
-    delete` label when nothing in the selection can go at all.
-  -->
-  {#if onDelete}
-    <div class="fab-bulk-component-danger" data-world-component-bulk-danger>
-      <ArmedDangerButton
-        token="world-component-bulk-delete"
-        armed={deleteArmed}
-        busy={deleting === true}
-        disabled={applying === true}
-        idleLabel={deleteLabel}
-        armedLabel={deleteArmedLabel}
-        busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
-        idleAriaLabel={deleteLabel}
-        armedAriaLabel={`${deleteArmedLabel} — ${deleteNote.text}`}
-        describedBy="world-component-bulk-delete-note"
-        onArm={() => (deleteArmed = true)}
-        onDisarm={() => (deleteArmed = false)}
-        onConfirm={() => {
-          deleteArmed = false;
-          onDelete();
-        }}
-      />
-      <p
-        class="fab-bulk-component-note"
-        id="world-component-bulk-delete-note"
-        data-world-component-bulk-delete-note={deleteNote.refused ? 'refused' : 'proceed'}
-      >
-        {deleteNote.text}
-      </p>
-    </div>
-  {/if}
 </BulkEditPanelShell>
 
 <!--
@@ -748,6 +708,57 @@
   rather than a baseline row: all six arrived with this panel, so they are new debt and not
   inherited debt. `WorldComponentCataloguePage.svelte`'s vocabulary exit already does the same.
 -->
+<!--
+  THE DANGER LEG, IN THE DOCK (gap-list row 47).
+
+  `proto:686`-`688` pins the destructive verb and its consequence note INSIDE the pinned dock,
+  under the primary action, on the dock's own column rhythm. It shipped as the panel's last
+  CONTENT — the right reading order in the wrong box, a scrolling sibling of a pinned dock, so a
+  GM who had scrolled the staging groups could have the Apply in front of them and the delete
+  somewhere above. `dockFoot` is the shell's own slot for it, and the sibling card and the dock
+  foot are alternatives rather than a pair: rendering both would draw the control twice.
+
+  IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7). The world Component entry will not delete a
+  record any system still has rules for, and this panel used to delete exactly those records
+  without asking — the same record undeletable one screen away and deletable in a tick-box, on the
+  path a GM reaches with a page of rows selected. The plan splits the selection: the button counts
+  and writes only the free ones, and the note NAMES the held ones and the systems holding them.
+
+  THE CONTROL STAYS ENABLED EVEN WHEN NOTHING CAN GO, which is `ui-integration/spec.md`
+  requirement 16's own rule — a disabled button satisfies any assertion that the delete did not
+  happen while leaving the GM no explanation at all — so the ARMED label is what states the
+  outcome, in the entry's own words.
+-->
+{#snippet componentBulkDanger()}
+  <div class="fab-bulk-component-danger" data-world-component-bulk-danger>
+    <ArmedDangerButton
+      token="world-component-bulk-delete"
+      armed={deleteArmed}
+      busy={deleting === true}
+      disabled={applying === true}
+      idleLabel={deleteLabel}
+      armedLabel={deleteArmedLabel}
+      busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
+      idleAriaLabel={deleteLabel}
+      armedAriaLabel={`${deleteArmedLabel} — ${deleteNote.text}`}
+      describedBy="world-component-bulk-delete-note"
+      onArm={() => (deleteArmed = true)}
+      onDisarm={() => (deleteArmed = false)}
+      onConfirm={() => {
+        deleteArmed = false;
+        onDelete();
+      }}
+    />
+    <p
+      class="fab-bulk-component-note"
+      id="world-component-bulk-delete-note"
+      data-world-component-bulk-delete-note={deleteNote.refused ? 'refused' : 'proceed'}
+    >
+      {deleteNote.text}
+    </p>
+  </div>
+{/snippet}
+
 {#snippet clearSystems()}
   <button
     type="button"
@@ -1123,6 +1134,13 @@
     white-space: nowrap;
   }
 
+  /* THE DANGER LEG NOW RENDERS INSIDE THE SHELL'S DOCK, and this rule still reaches it: a
+     snippet carries the scope hash of the component that DEFINES it, not of the one that renders
+     it, so `dockFoot` is styled from here exactly as it was when it stood as a sibling.
+
+     It states no spacing above itself. The dock's own `has-foot` column rhythm owns the gap
+     between the Apply and this leg — restating it here would be a second source of truth for one
+     value, and it would compose with the dock's rather than replace it. */
   .fab-bulk-component-danger {
     display: flex;
     flex-direction: column;
