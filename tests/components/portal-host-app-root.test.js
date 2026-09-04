@@ -35,9 +35,9 @@
  *      `classes` arrays and the root element each one's Svelte root component renders — not from
  *      a list here. A list would rot the moment an application is added.
  *   2. The portal population is read out of the corpus: every file that imports the portal action
- *      or the anchored-popover action, hands a portal target to one that does, or owns the
- *      clipping selectors they pass. Read from CODE — the corpus is scanned with its comments
- *      blanked, so prose about a portal never joins a population this gate floors.
+ *      or the anchored-popover action, or owns the clipping selectors they pass. Read from CODE —
+ *      the corpus is scanned with its comments blanked, so prose about a portal never joins a
+ *      population this gate floors.
  *   3. The SELECTOR EXTRACTOR is floored on the calls it finds, not on the offences. After the
  *      fix there are no offending calls at all, so a pattern that quietly stopped matching would
  *      report a clean tree. The floor is on the host lookups those files still legitimately make,
@@ -47,7 +47,11 @@
  *      `util/overlayBounds.js`. A reader that only knew how to find `.closest('…')` would
  *      therefore have gone blind at exactly the moment the selectors moved, and the offence
  *      clause below would have been policing an empty set. So the extractor reads BOTH shapes,
- *      the bounds module is in the population, and the floor names one selector of each kind.
+ *      over EVERY file in the population rather than over the bounds module alone, and the floor
+ *      names one selector of each spelling it has to read: a constant, a plain call, an optional
+ *      call, and an argument carrying the opposite quote. A synthetic case fixes a witness for
+ *      each of those spellings besides, because which of them the shipped tree happens to contain
+ *      is exactly the thing issue 1500 changed once already.
  *   4. The detector is proved to fire on a synthetic offender and not to fire on a shipped
  *      selector, so a predicate rewritten to match everything or nothing reds here rather than
  *      greening the assertion below.
@@ -128,8 +132,7 @@ function applicationRootClasses() {
 }
 
 /**
- * Every `src/ui` file that portals something, hands a portal target to a file that does, or owns
- * the clipping selectors those files pass.
+ * Every `src/ui` file that portals something, or owns the clipping selectors those files pass.
  *
  * Membership is what makes a hard-coded root an OFFENCE rather than a legitimate lookup: the
  * manager's own root component queries `.fabricate-manager` to rescue focus into its live region,
@@ -141,6 +144,17 @@ function applicationRootClasses() {
  * longer has a portal prop — does not join a population whose floor is an anti-vacuity claim
  * about how much real code this gate is reading.
  *
+ * A FOURTH ROUTE WAS REMOVED RATHER THAN LEFT TO LOOK LIKE COVERAGE. `text.includes('portalTarget')`
+ * was how a panel that is HANDED its host — rather than finding one — joined the population, and
+ * `ManagerColorPopover`'s `portalTarget` prop was the only thing it ever matched. Issue 1500
+ * deleted that prop: its caller drives `anchoredPopover` against the panel instead, so the panel
+ * has nothing to be told. The string now survives in exactly one place in `src/ui`, the comment in
+ * that component explaining the removal — and comments are blanked before this runs, so the route
+ * selected NOTHING while reading as though a whole membership rule were still being enforced. A
+ * clause that cannot fire is not a conservative extra; it is the thing this file's floors exist to
+ * catch, in the file that declares them. If a panel is ever handed a host by prop again, the route
+ * comes back with the prop and with a file for its floor to count.
+ *
  * @param {Record<string, string>} sources Working-tree sources with comments blanked.
  * @returns {string[]} Sorted file paths.
  */
@@ -151,8 +165,7 @@ function portalingFiles(sources) {
         file === OVERLAY_BOUNDS ||
         text.includes(PORTAL_ACTION) ||
         text.includes(ANCHORED_POPOVER_ACTION) ||
-        text.includes(OVERLAY_BOUNDS_MODULE) ||
-        text.includes('portalTarget')
+        text.includes(OVERLAY_BOUNDS_MODULE)
     )
     .map(([file]) => file)
     .sort(byName);
@@ -165,33 +178,62 @@ function portalingFiles(sources) {
  * another element by name, and all three have been used as a portal host at some point in this
  * codebase's history.
  *
+ * TWO SPELLINGS THIS MISSED, both of them shipped in the population it reads:
+ *
+ *   - `(?:\?\.)?\(` — an OPTIONAL call. `menuRoot?.querySelector?.('button')` is what a
+ *     component writes when the node may not be mounted yet, and `ActionMenu` and
+ *     `SearchablePopover` both write it. A pattern demanding a bare `(` read
+ *     `null?.querySelector?.('.fabricate-manager')` as no lookup at all.
+ *   - the argument may contain the OPPOSITE quote. A selector is CSS, and CSS attribute values
+ *     are quoted: `querySelectorAll('[role="menuitem"]:not([disabled])')` is one shipped call
+ *     that a `[^'"`]*` body could not reach past its second character. Each alternative below
+ *     therefore excludes only its OWN delimiter, so `closest('[role="x"] .fabricate-manager')`
+ *     — an offence written the way a real selector is written — is read rather than skipped.
+ *
+ * Neither is an edge case invented here: both were found in the shipped tree, and the second is
+ * the shape a hard-coded root is most likely to arrive in, since a bare class selector is the
+ * only kind the old pattern could see.
+ *
+ * The bodies stop at a newline. A selector never spans one, and an unterminated quote would
+ * otherwise swallow the rest of the file and report it as one enormous selector.
+ *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
  */
 function selectorLookups(text) {
   const found = [];
-  const pattern = /\.(closest|querySelectorAll|querySelector)\(\s*(['"`])([^'"`]*)\2/g;
+  const pattern =
+    /\.(closest|querySelectorAll|querySelector)(?:\?\.)?\(\s*(?:'([^'\n]*)'|"([^"\n]*)"|`([^`\n]*)`)/g;
   let match = pattern.exec(text);
   while (match !== null) {
-    found.push({ call: match[1], selector: match[3] });
+    found.push({ call: match[1], selector: match[2] ?? match[3] ?? match[4] });
     match = pattern.exec(text);
   }
   return found;
 }
 
 /**
- * Every selector string the bounds module publishes as a clipping boundary.
+ * Every selector string a file states as a CONSTANT rather than passing to a call.
  *
  * The SECOND shape a host or boundary selector takes since issue 1500. `selectorLookups` reads a
  * call; this reads a VALUE, because the four `closest()` calls it used to find were replaced by
  * constants handed to the action. Both feed the same offence clause, so moving a selector out of
  * a call and into a constant does not move it out of this gate's sight.
  *
+ * DETECTED BY WHAT THE VALUE IS, not by what the constant is CALLED. The first form of this read
+ * `const \w*SELECTOR\w*`, which made the claim above false in the easiest possible way: a
+ * boundary named `HOST`, `MANAGER_ROOT` or `PORTAL_HOME` is the same coupling under a name the
+ * pattern does not recognise, and nothing in the repository requires the word. A CSS selector
+ * begins with `.` or `[` for the two things this gate cares about — a class and an attribute
+ * clause — so that is the test, and it is a property of the string rather than of the author's
+ * naming. `const LABEL = 'Add tag'` and `const KEY = 'biomes'` are excluded by the same rule
+ * without an allowlist to maintain.
+ *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
  */
 function boundsSelectors(text) {
-  return [...text.matchAll(/const\s+\w*SELECTOR\w*\s*=\s*(['"])([^'"]*)\1/g)].map((match) => ({
+  return [...text.matchAll(/const\s+\w+\s*=\s*(['"])([.[][^'"]*)\1/g)].map((match) => ({
     call: 'bounds',
     selector: match[2],
   }));
@@ -200,12 +242,18 @@ function boundsSelectors(text) {
 /**
  * Every selector this file states, in whichever of the two shapes it states it.
  *
- * @param {string} file The file's repo-relative path.
+ * BOTH READERS RUN OVER EVERY FILE. `boundsSelectors` used to be applied to `overlayBounds.js`
+ * alone, which reduced "a selector in a constant is still in sight" to "a selector in a constant
+ * IN ONE FILE is still in sight" — and the offence this gate exists for is a component naming an
+ * application root, so the one file exempted from the constant reader was the only one that could
+ * not commit it. A component that lifts `'.fabricate-manager'` into a module constant is caught
+ * here now, wherever it lives.
+ *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
  */
-function hostLookups(file, text) {
-  return [...selectorLookups(text), ...(file === OVERLAY_BOUNDS ? boundsSelectors(text) : [])];
+function hostLookups(text) {
+  return [...selectorLookups(text), ...boundsSelectors(text)];
 }
 
 /** The class names a selector string mentions. */
@@ -291,14 +339,28 @@ test('the selector extractor still finds the host lookups it reads', () => {
   // at all. What proves the scanner is alive is the lookups these files legitimately still make:
   // the horizontal-bounds walks (`closest('.admin-main, .manager-main, …')`) and friends.
   const files = portalingFiles(stripped);
-  const lookups = files.flatMap((file) => hostLookups(file, stripped[file]));
+  const lookups = files.flatMap((file) => hostLookups(stripped[file]));
 
-  // NAMED, not merely counted. Four selectors survive in this population after issue 1500, so a
-  // bare floor of four would be satisfied by four of any kind — including four the extractor
-  // found by accident. These are one of each SHAPE: `.manager-main` is the biome picker's old
-  // clipping walk in the form it now takes, `MANAGER_MAIN_SELECTOR` in the bounds module, and
-  // `.essence-icon-picker-option` is the icon picker's row measurement, still a live call.
-  for (const anchor of ['.manager-main', '.essence-icon-picker-option']) {
+  // NAMED, not merely counted. Seven selectors survive in this population, so a bare floor of
+  // seven would be satisfied by seven of any kind — including seven the extractor found by
+  // accident. These are one of each SPELLING the extractor has to read, so a narrowing reds with
+  // the spelling it lost named in the message:
+  //
+  //   `.manager-main`                       a boundary CONSTANT, `MANAGER_MAIN_SELECTOR` in the
+  //                                         bounds module — the biome picker's clipping walk in
+  //                                         the form it took when it left the component
+  //   `.essence-icon-picker-option`         a plain call, the icon picker's row measurement
+  //   `button`                              an OPTIONAL call, `?.querySelector?.('button')`, which
+  //                                         two components write and the first pattern could not
+  //                                         see at all
+  //   `[role="menuitem"]:not([disabled])`   an argument carrying the OPPOSITE quote, which is what
+  //                                         any attribute selector carries
+  for (const anchor of [
+    '.manager-main',
+    '.essence-icon-picker-option',
+    'button',
+    '[role="menuitem"]:not([disabled])',
+  ]) {
     assert.ok(
       lookups.some((lookup) => lookup.selector === anchor),
       `the extractor no longer finds the shipped lookup for \`${anchor}\`, so the absence ` +
@@ -308,9 +370,9 @@ test('the selector extractor still finds the host lookups it reads', () => {
   }
 
   assert.ok(
-    lookups.length >= 4,
+    lookups.length >= 7,
     `the extractor found only ${lookups.length} selectors across ${files.length} portaling ` +
-      'files. Four ship; a number this low means the pattern no longer matches the code.'
+      'files. Seven ship; a number this low means the pattern no longer matches the code.'
   );
 
   // BOTH READERS ARE ALIVE. The defect was written as `closest('.fabricate-manager')`, and the
@@ -323,6 +385,71 @@ test('the selector extractor still finds the host lookups it reads', () => {
       `no \`${shape}\` selector was found in any portaling file. Both shapes ship — a DOM lookup ` +
         'in a component and a boundary constant in `util/overlayBounds.js` — so the extractor is ' +
         'not reading what it claims to.'
+    );
+  }
+});
+
+test('the selector extractor reads every spelling a host lookup can take', () => {
+  // SYNTHETIC, because the shipped tree cannot exercise all of them. The clause above is floored on
+  // what the population happens to contain, and the population is a moving target: `closest()` had
+  // four uses here until issue 1500 moved every one of them into a constant, at which point the
+  // `closest` alternative of the pattern was matched by NOTHING and could have been deleted
+  // without reddening a thing. These inputs are fixed, so each alternative keeps a witness whether
+  // or not any component still writes it.
+  //
+  // Every string here is the OFFENCE — `.fabricate-manager`, an application root — in a different
+  // spelling, so this doubles as the proof that the offence clause can see each of them.
+  for (const [label, source, expected] of [
+    ['the plain ancestor walk', `root.closest('.fabricate-manager')`, 'closest'],
+    ['a document-wide query', `document.querySelector(".fabricate-manager")`, 'querySelector'],
+    ['an every-match query', "host.querySelectorAll('.fabricate-manager')", 'querySelectorAll'],
+    ['an optional call', `menuRoot?.querySelector?.('.fabricate-manager')`, 'querySelector'],
+    ['a template literal', 'root.closest(`.fabricate-manager`)', 'closest'],
+  ]) {
+    assert.deepEqual(
+      selectorLookups(source),
+      [{ call: expected, selector: '.fabricate-manager' }],
+      `\`selectorLookups\` no longer reads ${label}, which is one of the five ways this offence ` +
+        `has been or can be written: ${source}`
+    );
+  }
+
+  // The opposite quote, kept separate because the SELECTOR is what differs rather than the call.
+  // An attribute clause is quoted CSS, so a pattern whose body excludes every quote truncates it
+  // — and this exact shape ships in `ActionMenu`.
+  assert.deepEqual(
+    selectorLookups(`row.closest('[role="listitem"] .fabricate-manager')`),
+    [{ call: 'closest', selector: '[role="listitem"] .fabricate-manager' }],
+    'a selector carrying the opposite quote is truncated or dropped, so an offence written with ' +
+      'an attribute clause in front of it passes this gate'
+  );
+
+  // The constant reader, over a name the first form of it required and a name it did not. Both are
+  // the same coupling, and neither is more likely than the other to be what the next author types.
+  for (const source of [
+    `const MANAGER_HOST_SELECTOR = '.fabricate-manager';`,
+    `const PORTAL_HOME = '.fabricate-manager';`,
+  ]) {
+    assert.deepEqual(
+      boundsSelectors(source),
+      [{ call: 'bounds', selector: '.fabricate-manager' }],
+      `\`boundsSelectors\` does not read \`${source}\`, so lifting a root into a constant is a ` +
+        'way out of this gate'
+    );
+  }
+
+  // AND IT IS NOT MATCHING EVERYTHING. A widened predicate that answered "selector" to any string
+  // constant would satisfy every assertion above and turn the offence clause into noise.
+  for (const source of [
+    `const ADD_TAG_LABEL = 'Add tag';`,
+    `const VOCABULARY = 'biomes';`,
+    `const HREF = 'https://example.invalid/.fabricate-manager';`,
+  ]) {
+    assert.deepEqual(
+      boundsSelectors(source),
+      [],
+      `\`boundsSelectors\` reads \`${source}\` as a selector, so it is deciding on the wrong ` +
+        'population and every constant in the corpus is now this gate\'s business'
     );
   }
 });
@@ -355,7 +482,7 @@ test('no component hard-codes an application root as a portal host', () => {
 
   for (const file of portalingFiles(stripped)) {
     if (file === RESOLVER) continue;
-    for (const { call, selector } of hostLookups(file, stripped[file])) {
+    for (const { call, selector } of hostLookups(stripped[file])) {
       const named = applicationRootsNamedBy(selector, roots);
       if (named.length > 0) offenders.push(`${file}: .${call}('${selector}') names ${named.join(', ')}`);
     }
