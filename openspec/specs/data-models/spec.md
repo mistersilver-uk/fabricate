@@ -2069,6 +2069,12 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-integration/spec.md` `### GM World Component Screens` requirement 5).
 > A published leg with no caller is a REACHABLE WRITE PATH with no writer, which is a different state from an unreachable corpus and must not be counted as one.
 >
+> **THE PUBLISH READS THE WHOLE RECIPE LIBRARY EXACTLY ONCE, AND THAT IS A PINNED BUDGET RATHER THAN AN OBSERVATION** (issue 1371).
+> One world-scope snapshot answers a recipe question for three entity types, and each consumer that reaches for the library itself takes a WHOLE-LIBRARY COPY: two consumers were doing so for one publish — the snapshot's own `recipes` key and the essence usage leg — so the library was copied twice per republish and every world-scope write republishes.
+> The read is therefore taken once, bound to a name, and PASSED to the legs that need it, and a `node --test` budget counts both the copy and the per-system cohort reads.
+> The two quantities are counted SEPARATELY because they are not the same cost: a per-system cohort read is answered from the recipe manager's own index, while the unfiltered read is not, so a pin that counted only cohorts left the more expensive quantity unguarded — which is how the second copy arrived with no test moving.
+> The pin is a LITERAL over the three legs and their three arguments, because an argument silently dropped from any of them restores exactly that cost with no rendered symptom at all.
+>
 > **THE STALENESS OF THIS PARAGRAPH IS MECHANICAL RATHER THAN A MERGE CONVENTION.**
 > A `node --test` assertion DERIVES the unreachable set from which world scoped-entity pages under `scoped/` still import the shared placeholder body, and asserts this paragraph names exactly those types.
 > It reds in a lane that replaces a body without amending this text, and it reds the other way in a lane that amends this text while still delegating.
@@ -2398,6 +2404,17 @@ That hazard is independent of which system authored the list, which is why no do
 4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.
    Component membership is binary — present or absent.
    Essence enabling toggles effect transfer and macros and tool enabling evokes a drained leyline or a seasonal workshop; component enabling serves no purpose and is deliberately not implemented, and an `enabled` key in adversarial or hand-edited input is DROPPED by the component normalizer rather than carried.
+5. **REMOVING A COMPONENT FROM A SYSTEM IS TWO DELETIONS, AND THE IN-SYSTEM ONE IS A REFERENCE-REPAIRING CASCADE** (issue 1371).
+   The membership record's deletion is the fact of leaving; the in-system record's deletion is what the system is actually left with, and the two are composed under the family's one `removeFromSystem` key because deleting the membership record alone leaves an in-system record requirement 15's read union pushes through unchanged.
+   The in-system half runs the SANCTIONED DELETE the system's own component list runs — remove the components, repair every reference to them, persist once — so it rewrites every recipe in that system naming the id, disables the ones left without a usable ingredient set or result, clears essence source links pointing at it, cleans up its salvage runs and reconciles alchemy signatures.
+   **"REMOVE FROM THIS SYSTEM" AND "DELETE THIS SYSTEM'S COMPONENT" THEREFORE LEAVE THE SAME SYSTEM BEHIND**, and the WORLD entity is the whole of the difference: it survives one and not the other.
+   **THIS IS NOT IN TENSION WITH REQUIREMENT 3 OF `## Scoped Entity Definitions`, AND THE DISTINCTION IS WORTH STATING BECAUSE THE TWO READ ALIKE.**
+   That requirement's "absence is a REFUSAL at use, never a prune" governs NORMALIZATION — a reference surviving a load must not be silently deleted by it, which is why a **Valid Id Basis** is not membership-filtered.
+   This requirement governs a GM'S DELIBERATE, ARMED WRITE, where a rewrite is the point rather than a side effect; nothing here licenses a normalizer to prune.
+   **A SYSTEM MANAGER THAT CANNOT RUN THE CASCADE REFUSES THE WHOLE REMOVAL RATHER THAN HALF OF IT**, on the tool family's precedent for the mirror verb: the capability is checked BEFORE the membership record is touched, and neither half is written when it is absent.
+   The asymmetry is sharper here than on the add path — deleting the membership record and then failing the in-system one leaves the component RESOLVING in a system the GM has removed it from, with the world layer no longer consulted, which is the exact state the composition exists to prevent.
+   **AND THE ADD PATH ROLLS BACK THE RECORD IT WROTE.** A seed refused for a duplicate source reference removes the membership record THIS CALL wrote and reports `false`; a record authored earlier is left alone, so an unrelated collision cannot delete a GM's own membership.
+   The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
 
 ### Essence scope
 
