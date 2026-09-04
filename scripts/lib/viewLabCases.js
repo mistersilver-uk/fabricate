@@ -3028,17 +3028,29 @@ export const VIEW_LAB_CASES = Object.freeze([
     // rather than a blocked one: the input still renders and is still typeable, and one muted
     // line under it says there is nothing to name yet.
     //
-    // `clearSystem` is the whole mechanism, and it is the same one
-    // `world-tool-entry-bonus-empty-library` uses: both world catalogues are built by LIFTING
-    // each crafting system's own copy, so a world with no crafting systems is the honest way to
-    // reach an empty one. It leaves the world Tool corpus, the entry route and this Tool's own
+    // TWO INPUTS, BECAUSE THE WORLD CATALOGUE HAS TWO SOURCES (issue 1540). `clearSystem` is the
+    // first and it is the same one `world-tool-entry-bonus-empty-library` uses: both world
+    // catalogues are built by LIFTING each crafting system's own copy, so a world with no
+    // crafting systems lifts nothing into either.
+    //
+    // That was the WHOLE mechanism until issue 1392 gave the fixture a world-only component —
+    // `lab-world-component-curio`, which the world Tags & Categories screen needs and which no
+    // `clearSystem` can remove, because nothing lifted it. ONE catalogue row is not an empty
+    // catalogue: the field draws its ordinary search face, `data-recipe-option-empty-catalogue`
+    // is never stamped, and this case failed on the containment assertion that names it — which
+    // is exactly the assertion doing its job, since the frame underneath was a populated field
+    // published under the name of an empty one.
+    //
+    // `noAuthoredWorldComponents` is the second input and it removes that record and only that
+    // record. The two together are the day-one world this frame is named for: nothing lifted and
+    // nothing authored. Both leave the world Tool corpus, the entry route and this Tool's own
     // authored repair seed untouched, so what changes between this frame and
     // `world-tool-entry-on-break-repair` is the catalogue and nothing else.
     //
     // WHICH IS ALSO WHY BOTH FRAMES ARE NEEDED. The populated one photographs a named row
     // reading back on its chip; this one photographs the field a GM meets on day one. A single
     // frame of either would be evidence that the OTHER state renders correctly by assumption.
-    query: { clearSystem: '1' },
+    query: { clearSystem: '1', noAuthoredWorldComponents: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -3128,14 +3140,26 @@ export const VIEW_LAB_CASES = Object.freeze([
     // all 22 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
     // hero panel in a full pane and cannot show the note.
     //
-    // NO `clearSystem`, AND THAT IS THE FINDING. The world tag vocabulary is not lifted from
-    // the crafting systems the way the world component and essence catalogues are: it is the
-    // union of every world component's own `defaults.tags`, which only the explicit
-    // `setWorldTags` action ever writes. Nothing in the lab world calls it and nothing in a
-    // freshly installed world has either, so the world Tool repair route's `+ Tag` picker is
-    // empty on the ORDINARY fixture — which is precisely why this is the panel the maintainer
-    // met and photographed. Its populated twin therefore runs in the recipe editor, where
+    // NO `clearSystem`, AND THAT IS STILL THE FINDING. The tag list this picker offers is not
+    // lifted from the crafting systems the way the world component and essence catalogues are:
+    // it is the union of every world component's own `defaults.tags`, which only the explicit
+    // `setWorldTags` action ever writes, and a freshly installed world has none. Removing the
+    // crafting systems would therefore prove nothing about THIS picker while costing the frame
+    // every other row on the screen. Its populated twin runs in the recipe editor instead, where
     // `itemTags` is the selected system's own vocabulary.
+    //
+    // WHAT THE ORDINARY FIXTURE IS NO LONGER, IS TAGLESS (issue 1540). Issue 1392 authored one
+    // world-only component whose default carries the tag `moss`, so the world Tags & Categories
+    // screen could photograph a tag whose ONLY reference is a world default — the asymmetry that
+    // screen exists to make readable. That one authored tag is also a row in this picker, which
+    // is not the empty list this case is named for, and the case failed on its own note selector
+    // with a populated popover underneath.
+    //
+    // `noAuthoredWorldComponents` drops that record and only that record. The migration still
+    // lifts a world component out of every system's library, so the repair row's own component
+    // catalogue is as populated here as in its sibling frames and this frame still differs from
+    // them in one thing: the picker it opens.
+    query: { noAuthoredWorldComponents: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {

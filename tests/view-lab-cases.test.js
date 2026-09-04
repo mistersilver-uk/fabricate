@@ -1056,6 +1056,58 @@ test('the no-selection World Parties case clears selection through the real Mana
   assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
 });
 
+test("the two day-one repair frames drop the fixture's OWN world component records", () => {
+  // BOTH OF THESE CASES PHOTOGRAPH AN ABSENCE, and issue 1392 authored the record that filled it
+  // (issue 1540). `lab-world-component-curio` is a world-only component the world Tags &
+  // Categories screen needs, and NOTHING LIFTED IT — so `clearSystem`, which empties the world
+  // catalogue by removing the crafting systems the migration lifts FROM, cannot reach it. Its
+  // entity put one row in the "no catalogue" frame's name field and its default's `moss` put one
+  // row in the "no tags" frame's picker, and each case then failed on the assertion naming its
+  // own state rather than publishing a populated frame under an empty frame's name.
+  //
+  // A MIRROR GUARD IN BOTH DIRECTIONS. The flag is plumbed through three files that know nothing
+  // about each other — the case literal here, `mount.js`'s query layer and `labWorld.js`'s
+  // fixture — and a rename in any one of them leaves a query parameter nobody reads. That failure
+  // is silent at the point it happens and only surfaces as a wrong frame. The fixture premise is
+  // pinned with it: if the seeded world component records or their tags ever go away, these cases
+  // no longer need the flag, and this is where that is noticed rather than in a screenshot.
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+  const emptyCatalogue = getCaseById('world-tool-entry-on-break-repair-empty-catalogue');
+  const emptyPicker = getCaseById('world-tool-entry-on-break-repair-tag-picker-empty');
+
+  // The catalogue frame needs BOTH sources gone, because they are independent.
+  assert.equal(emptyCatalogue.query?.clearSystem, '1');
+  assert.equal(emptyCatalogue.query?.noAuthoredWorldComponents, '1');
+  // The picker frame needs only the authored one. Its list is the union of the world components'
+  // own `defaults.tags`, which the migration leaves unauthored, so removing the crafting systems
+  // would prove nothing about this control and would change every other row in the frame.
+  assert.equal(emptyPicker.query?.noAuthoredWorldComponents, '1');
+  assert.ok(!emptyPicker.query?.clearSystem, 'the picker frame keeps its crafting systems');
+
+  assert.match(
+    mountSource,
+    /noAuthoredWorldComponents: params\.get\('noAuthoredWorldComponents'\) === '1'/
+  );
+  assert.match(mountSource, /noAuthoredWorldComponents: params\.noAuthoredWorldComponents/);
+  assert.match(
+    worldSource,
+    /if \(noAuthoredWorldComponents\) stripAuthoredWorldComponents\(content\)/
+  );
+  assert.match(worldSource, /content\.componentScope = \{ entities: \[\], defaults: \{\} \}/);
+
+  // The fixture premise the flag exists for, in the fixture's own terms.
+  assert.ok(
+    (content.componentScope?.entities ?? []).length > 0,
+    'the lab world authors world-only component records the migration would not produce'
+  );
+  assert.ok(
+    Object.values(content.componentScope?.defaults ?? {}).flatMap((entry) => entry?.tags ?? [])
+      .length > 0,
+    "and one of their defaults carries the world's only component tag"
+  );
+});
+
 test('the narrow World Parties case reuses the normal populated state below the stack breakpoint', () => {
   const normal = getCaseById('manager-world-parties-normal');
   const narrow = getCaseById('manager-world-parties-stacked');
@@ -2029,9 +2081,11 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
   // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
   // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
-  // WORLD scope, where the vocabulary is the union of every world component's own
-  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
-  // and in a freshly installed one alike, which is the state the maintainer met.
+  // WORLD scope, where the list is the union of every world component's own `defaults.tags` and
+  // only `setWorldTags` ever writes one — so a freshly installed world reaches it with nothing to
+  // list, which is the state the maintainer met. The lab world itself has authored one such tag
+  // since issue 1392, and that case's `noAuthoredWorldComponents` is what puts the fixture back
+  // in the day-one state rather than leaving the frame to whatever the fixture happens to carry.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
