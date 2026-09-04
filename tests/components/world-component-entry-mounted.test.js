@@ -914,6 +914,34 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
+    it('and the APPLIED chip alone asks for the lit emphasis, which is its ink and its fill', async () => {
+      // `proto:5401`/`proto:5665` draw the applied tag as one colour said three ways — on the
+      // edge, on a wash of itself, and ON THE LABEL. `tone="tag"` states the edge and only the
+      // edge: it mixes its wash into the opaque surface behind the chip and inks the label in the
+      // default text token. The other two declarations are the shared primitive's
+      // `emphasis="lit"`, so a wiring that dropped that prop would still render a toned,
+      // correctly scaled, correctly edged chip and would still pass every other assertion here —
+      // the same silent regression to a shipped face this describe block exists to catch.
+      //
+      // The unlit chip is asserted WITHOUT it, and that is a constraint rather than symmetry:
+      // the emphasis is selected on the two chip classes that declare a colour of their own, so
+      // `is-lit` beside `is-neutral` matches nothing. A wiring that passed the emphasis
+      // unconditionally would read as correct from the lit chip alone and would be dead markup on
+      // every other chip in the run.
+      const { target: applying } = await open('coal');
+      const { target: empty } = await open('ingot');
+      const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
+      const unlit = empty.querySelector('[data-scoped-entry-tag="bulk"]');
+      assert.ok(
+        lit.classList.contains('is-lit'),
+        `the applied chip asks for the lit face, and read "${lit.className}"`
+      );
+      assert.ok(
+        !unlit.classList.contains('is-lit'),
+        `and the unapplied one does not ask for a face it has no colour to wear, but read "${unlit.className}"`
+      );
+    });
+
     it('the systems filter is a PILL run on the SOFT accent track', async () => {
       // `proto:5457`: three unenclosed segments at radius 999, the chosen one on the soft accent
       // and the rest on a `--fab-bg-1` fill behind a hairline, all three at 600.

@@ -834,17 +834,22 @@
                     reference to buy nothing. (No colour literal is written here: the theme
                     colour contract scans comments too, and the tokens say it exactly.)
 
-                    r8-prim: wire — THE LIT CHIP STILL WAITS FOR ITS VARIANT (UX F10). The
-                    reference inks and tints the lit tag in the tag hue (`proto:5401`,
-                    `proto:5665`), and `tone="tag"` does not paint that: the compare run measures
-                    the lit chip's border in the tag hue but its FILL as a grey-blue mix and its
-                    INK as the default warm text token, which is the ONE surviving colour
-                    divergence on this screen. The fix is an opt-in lit variant on the shared
-                    `Chip`, the same shape lane E shipped for `struck` and `density="tag-run"`,
-                    NOT an in-place restyle of `tone="tag"` (six other callers) and not a fourth
-                    chip component. Lane PRIM owns that primitive this revision; wire it here the
-                    moment it lands, and re-run `compare --screen entry` to close the three
-                    `entry-tag-chip` colour lines.
+                    THE LIT CHIP IS `tone="tag" emphasis="lit"`, and the emphasis states the half
+                    the tone does not. The reference says ONE colour three ways: on the edge, on a
+                    wash of itself, and ON THE LABEL (`proto:5401`, `proto:5665`). `tone="tag"`
+                    alone says only the edge — it mixes its wash into the OPAQUE surface behind the
+                    chip rather than into nothing, and inks the label in the default text token, so
+                    a compare run measured the fill and the ink as this screen's last surviving
+                    colour divergence while the edge was right all along. `emphasis="lit"` is the
+                    shared primitive's opt-in second axis for exactly those two declarations, the
+                    same shape lane E shipped for `struck` and `density="tag-run"` — NOT an in-place
+                    restyle of `tone="tag"`, which has six other callers, and not a fourth chip
+                    component.
+
+                    The two props ride the SAME branch, and that is a constraint rather than a
+                    tidiness: the emphasis is selected on the classes that declare a colour of
+                    their own, so `emphasis="lit"` beside `tone="neutral"` would emit a class that
+                    matches nothing. The unlit branch therefore takes neither.
                   -->
                   <div class="manager-component-entry-chips">
                     {#each tagVocabulary as tag (tag)}
@@ -853,6 +858,7 @@
                         type="button"
                         density="tag-run"
                         tone={worldTags.includes(tag) ? 'tag' : 'neutral'}
+                        emphasis={worldTags.includes(tag) ? 'lit' : ''}
                         data-scoped-entry-tag={tag}
                         aria-pressed={worldTags.includes(tag)}
                         aria-label={phrase(
