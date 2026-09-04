@@ -72,7 +72,10 @@
      editor's world-tag and own-tag runs (`proto:5692`, `proto:5707`): `padding: 5px 12px`,
      `border-radius: 999px`, `font: 600 11px`, a pill roughly 25px tall against the default
      chip's 20. Two parity lanes measured that one mismatch as ~34 of the rules editor's 117
-     drift lines and 8 of the entry's — the largest single cause on either screen.
+     drift lines and 10 of the entry's — the largest single cause on either screen. This
+     block closes 5 of that 10 outright (corner, size, weight and both horizontal insets);
+     the two vertical insets stay open by 1px under the spacing-scale deviation below, and
+     the remaining 3 are the caller's `tone`, not this scale's.
 
      `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws — a
      `rgba(201,160,220,.16)` fill on a `rgba(201,160,220,.5)` edge — is the SHIPPED `tone="tag"`,
