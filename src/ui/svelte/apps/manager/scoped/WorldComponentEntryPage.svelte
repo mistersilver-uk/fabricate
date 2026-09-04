@@ -791,7 +791,7 @@
                     options={categoryPickerOptions}
                     value={worldCategory}
                     showSearch={false}
-                    showChevron
+                    showChevron={true}
                     triggerHasPopup="listbox"
                     pickerClass="manager-component-entry-category-picker"
                     triggerClass="manager-component-entry-category-trigger"
