@@ -113,7 +113,7 @@ function modifierRow(label, expression) {
           <span class="manager-modifier-label">${label}</span>
           ${path}
         </button>
-        <button type="button" class="manager-icon-button" aria-label="Delete modifier">
+        <button type="button" class="fabricate-icon-button manager-icon-button" aria-label="Delete modifier">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>

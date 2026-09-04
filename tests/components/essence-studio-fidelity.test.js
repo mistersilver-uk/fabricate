@@ -265,11 +265,18 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'the inspector imports the shared button'
     );
-    assert.equal(
-      /class="manager-button/.test(inspectorSource),
-      false,
-      'and hand-rolls no manager button of its own'
-    );
+    // TOKEN-AWARE, not a prefix (issue 1502). The family is rooted at the class the primitive
+    // emits, so a hand-rolled site now spells `class="fabricate-button manager-button …"` — and
+    // `class="manager-button` no longer matches it. The probe would have gone quietly blind at
+    // exactly the moment the spelling it guards against changed, which is the failure mode this
+    // whole family of guards exists to prevent. Bounded to one `<tag …>` span so that a message
+    // literal or a JS string mentioning the class cannot pose as fixture markup: this file holds
+    // a `'<BulkEditSection'` string whose unterminated attribute run would otherwise swallow the
+    // prose below it.
+    const handRolled = [...inspectorSource.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)]
+      .flatMap((tag) => [...tag[0].matchAll(/class="([^"]*)"/g)].map(([, value]) => value))
+      .filter((value) => value.split(/\s+/).includes('manager-button'));
+    assert.deepEqual(handRolled, [], 'and hand-rolls no manager button of its own');
     const primitive = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/InspectorActionButton.svelte'),
       'utf8'

@@ -172,7 +172,7 @@ async function readRenderedToolGeometry(width, view) {
     const editor =
       view === 'tool-edit'
         ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
-          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button fab-manager-button is-ghost">Back</button><button class="manager-button fab-manager-button is-danger">Delete</button><button class="manager-button fab-manager-button is-primary" data-tool-editor-save>Save Tool</button></div></div></header>
+          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="fabricate-button manager-button fab-manager-button is-ghost">Back</button><button class="fabricate-button manager-button fab-manager-button is-danger">Delete</button><button class="fabricate-button manager-button fab-manager-button is-primary" data-tool-editor-save>Save Tool</button></div></div></header>
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
@@ -2338,9 +2338,9 @@ test('the typographic contract sets names in the serif and numerics in the mono 
 
 test('Tool replacement Component picker resists Foundry button height and image overrides', () => {
   const triggerBlock = blockFor(
-    '.fabricate-manager .manager-button.manager-salvage-component-trigger,\n' +
-      '.fabricate-manager .manager-button.manager-recipe-component-trigger,\n' +
-      '.fabricate-manager .manager-button.manager-tool-replacement-component-trigger'
+    '.fabricate-button.manager-button.manager-salvage-component-trigger,\n' +
+      '.fabricate-button.manager-button.manager-recipe-component-trigger,\n' +
+      '.fabricate-button.manager-button.manager-tool-replacement-component-trigger'
   );
   const portraitBlock = blockFor(
     '.fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,\n' +
@@ -3512,7 +3512,7 @@ test('manager components browser defines drop target and compact responsive list
   // three here is what makes `blockFor` read the whole group: it anchors on `{`, so a selector
   // appended to the list leaves a two-selector lookup matching nothing and failing silently.
   const sortDirectionBlock = blockFor(
-    '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction,\n.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction]'
+    '.fabricate-button.manager-button.manager-recipe-sort-direction,\n.fabricate-button.manager-button.manager-component-sort-direction,\n.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction]'
   );
   assert.ok(
     sortDirectionBlock.includes('border-radius: 9px;'),
@@ -3630,7 +3630,7 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   // Issue 1315 retired the `.manager-icon-button` half of this pair with the manual-mode icon
   // Force add that was its only consumer, so the rule is now the labelled button alone.
-  const warningActionBlock = blockFor('.fabricate-manager .manager-button.is-warning-action');
+  const warningActionBlock = blockFor('.fabricate-button.manager-button.is-warning-action');
   const sourceDropBlock = blockFor(
     '.fabricate-manager .manager-essence-source-drop-zone .essence-source-trigger'
   );
@@ -4339,7 +4339,7 @@ test('manager environment composition overflow menu renders bounded single-line 
           <main class="fabricate-manager">
             <div class="harness">
               <div class="fabricate-action-menu manager-action-menu">
-                <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-label="Open task actions">
+                <button type="button" class="fabricate-icon-button manager-icon-button" aria-haspopup="menu" aria-label="Open task actions">
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                 </button>
                 <div class="fabricate-action-menu-panel manager-action-menu-panel" role="menu" tabindex="-1" data-keyboard-focus="true" aria-label="Open task actions">
@@ -4583,7 +4583,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
 });
 
 test('manager pagination footer uses scoped chrome with stable summary, nav, and per-page controls', () => {
-  const block = blockFor('.fabricate-manager .manager-pagination');
+  const block = blockFor('.fabricate-pagination.manager-pagination');
 
   assert.ok(block.includes('display: flex;'), 'pagination footer should layout horizontally');
   assert.ok(
@@ -4596,11 +4596,11 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
     'pagination footer should anchor to the table with a manager border'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-pagination-page'),
+    css.includes('.fabricate-pagination .manager-pagination-page'),
     'pagination should expose a stable Page-of label for keyboard users'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-pagination-size select'),
+    css.includes('.fabricate-pagination .manager-pagination-size select'),
     'pagination should style the per-page selector inside the manager scope'
   );
 });
@@ -4665,14 +4665,14 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor(
-    '.fabricate-manager .manager-button,\n.fabricate-manager .manager-icon-button'
+    '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button'
   );
-  const primaryIconBlock = blockFor('.fabricate-manager .manager-icon-button.is-primary');
+  const primaryIconBlock = blockFor('.fabricate-icon-button.manager-icon-button.is-primary');
   const primaryIconHoverBlock = blockFor(
-    '.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover'
+    '.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover'
   );
   const iconBlocks = Array.from(
-    css.matchAll(/\.fabricate-manager \.manager-icon-button\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-icon-button\.manager-icon-button\s*\{[\s\S]*?\}/g)
   );
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -4715,11 +4715,11 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
     'primary icon buttons should keep a soft green hover state'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-button:disabled'),
+    css.includes('.fabricate-button.manager-button:disabled'),
     'disabled manager buttons should have explicit disabled styling'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-button:not(:disabled):hover'),
+    css.includes('.fabricate-button.manager-button:not(:disabled):hover'),
     'manager hover styles should not target disabled buttons'
   );
 });
@@ -5616,7 +5616,7 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
-  const armedBlock = blockFor('.fabricate-manager .manager-button.is-danger.is-armed');
+  const armedBlock = blockFor('.fabricate-button.manager-button.is-danger.is-armed');
   const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
   const rosterFocusBlock = blockFor(
     '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
@@ -5661,10 +5661,10 @@ async function readRenderedKnowledgeGeometry(width) {
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
-    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button fab-manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button fab-manager-button is-danger">Reset this system</button><button class="manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -6804,7 +6804,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
-      <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
+      <button type="button" class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
       withChipHash(
@@ -7459,7 +7459,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       <div class="manager-travel-parties-list ${hash}">${cards}</div>
     </div>
     <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
-      <div class="manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
+      <div class="fabricate-pagination manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
     </div>
   </div>`;
 
@@ -7715,12 +7715,12 @@ async function checksRollEdges(page, tiersWrapperClass) {
                 <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
               </div>
             </div>
-            <button type="button" class="manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+            <button type="button" class="fabricate-button manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
               <i class="fas fa-trash"></i>
             </button>
           </div>
         </div>
-        <button type="button" class="manager-button fab-manager-button is-dashed" data-add-tier>
+        <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-add-tier>
           <i class="fas fa-plus"></i><span>Add difficulty tier</span>
         </button>
       </div>
@@ -8787,20 +8787,27 @@ const managerButtonRoleClasses = (() => {
   );
 })();
 
-// The two unconditional classes, likewise read out of the component rather than restated.
+// The three unconditional classes, likewise read out of the component rather than restated.
+// The family ROOT leads them since issue 1502: every re-rooted rule in the sheet is a compound
+// keyed on it, so a probe built without it measures an unstyled control while naming the
+// primitive. Reading the array is what keeps that automatic — the root arrives here with no
+// edit to this harness, exactly as `manager-button` and `fab-manager-button` do.
 const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
-    base.includes('manager-button') && base.includes('fab-manager-button'),
-    `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
+    base.includes('fabricate-button') &&
+      base.includes('manager-button') &&
+      base.includes('fab-manager-button'),
+    'ManagerButton must emit the family root, the convention class and the primitive class, ' +
+      `got ${base.join(' ')}`
   );
   return base;
 })();
 
 function managerButtonClassesFor(role) {
-  // `neutral` is the EMPTY modifier — the primitive emits the two base classes and nothing
+  // `neutral` is the EMPTY modifier — the primitive emits the three base classes and nothing
   // more — so it is the one role that cannot be probed by looking a class name up, and the
   // one role a mutation cannot flip by deleting a prop.
   if (role === 'neutral') return managerButtonBaseClasses.join(' ');
@@ -9303,7 +9310,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
               <button type="button" class="${managerButtonClassesFor('warning')}" data-probe="warning"><span>Force add</span></button>
               <button type="button" class="${neutral} is-warning" data-probe="misspelt"><span>Force add</span></button>
               <button type="button" class="${neutral}" data-probe="neutral"><span>Force add</span></button>
-              <span class="manager-icon-button is-warning-action" data-probe="icon"></span>
+              <span class="fabricate-icon-button manager-icon-button is-warning-action" data-probe="icon"></span>
             </section>
             <span data-token="border" style="color: var(--fab-warning-border)"></span>
             <span data-token="ink" style="color: var(--fab-warning-text)"></span>
@@ -9531,7 +9538,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                       <section class="manager-inspector-card" data-checks-preview-as>
                         <div class="fabricate-picker manager-travel-picker manager-checks-preview-actor">
                           <button type="button" data-probe="preview-actor" data-checks-preview-actor
-                            class="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
+                            class="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
                           </button>
                         </div>
@@ -9547,7 +9554,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                       <section class="manager-inspector-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
-                            class="manager-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            class="fabricate-button manager-button fab-manager-button is-primary manager-checks-simulator-roll">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                           <button type="button" data-probe="roll-unconverted"

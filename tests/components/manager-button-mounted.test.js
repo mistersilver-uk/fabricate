@@ -80,7 +80,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     assert.equal(node.tagName, 'BUTTON');
     assert.equal(node.getAttribute('type'), 'button');
     // A manager button inside a `<form>`-adjacent card must never submit by accident.
-    assert.equal(node.className, 'manager-button fab-manager-button');
+    assert.equal(node.className, 'fabricate-button manager-button fab-manager-button');
   });
 
   it('emits is-warning-action for the warning role, and never is-warning', async () => {
@@ -98,7 +98,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       await harness.mount({ role });
       assert.equal(
         button().className,
-        `manager-button fab-manager-button is-${role}`,
+        `fabricate-button manager-button fab-manager-button is-${role}`,
         `the ${role} role`
       );
       harness.remount();
@@ -108,7 +108,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   it('renders neutral for an unrecognised role rather than an unstyled is-* class', async () => {
     await harness.mount({ role: 'nonsense' });
     // A typo must show up as the default button, never as a class the sheet does not declare.
-    assert.equal(button().className, 'manager-button fab-manager-button');
+    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button');
   });
 
   it('renders neutral for a role that names an inherited member of the mapping', async () => {
@@ -119,14 +119,21 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     // (`Object.hasOwn`) is a line a future tidy-up would read as redundant (issue 1118).
     for (const role of ['toString', 'constructor', 'hasOwnProperty']) {
       await harness.mount({ role });
-      assert.equal(button().className, 'manager-button fab-manager-button', `role="${role}"`);
+      assert.equal(
+        button().className,
+        'fabricate-button manager-button fab-manager-button',
+        `role="${role}"`
+      );
       harness.remount();
     }
   });
 
   it('emits is-full-width only when fullWidth is set, and never as a role', async () => {
     await harness.mount({ role: 'dashed', fullWidth: true });
-    assert.equal(button().className, 'manager-button fab-manager-button is-dashed is-full-width');
+    assert.equal(
+      button().className,
+      'fabricate-button manager-button fab-manager-button is-dashed is-full-width'
+    );
     harness.remount();
     await harness.mount({ role: 'dashed' });
     // `dashed` states the VERB (append to the list above me); the container states the width.
@@ -139,7 +146,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     // silently unstyle the button while every `data-*` selector kept resolving.
     assert.equal(
       button().className,
-      'manager-button fab-manager-button is-ghost is-subtle manager-thing'
+      'fabricate-button manager-button fab-manager-button is-ghost is-subtle manager-thing'
     );
   });
 

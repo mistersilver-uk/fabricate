@@ -4,12 +4,28 @@
  * ── WHY IT IS A MODULE RATHER THAN A CONSTANT (issue 1502) ──────────────────────────────
  * It was module-private in `tests/manager-button-source-contract.test.js`, which was correct while
  * exactly one gate asked the question. Two do now: `searchable-popover-area-scope.test.js`'s
- * fixture clauses must EXEMPT the same entries from the "every fixture element carries the family
- * root" offender list, because an entry here is a control the product deliberately does not render
- * through the primitive and therefore one that must NOT gain `fabricate-button`. Two hand-listed
+ * fixture clauses consult the same entries when they build their offender list. Two hand-listed
  * copies of one census is the drift this repository has already paid for once —
  * `tests/helpers/primitiveSourceContract.js` exists because SonarCloud measured 88 duplicated
  * lines between two source-contract guards — so the census is stated once and imported twice.
+ *
+ * ── THE TWO GATES ASK DIFFERENT QUESTIONS OF THIS LIST, AND FOUR ENTRIES NOW ANSWER THEM
+ *    DIFFERENTLY ─────────────────────────────────────────────────────────────────────────
+ * The question here is about the PRIMITIVE class: does a fixture write `manager-button` without
+ * `fab-manager-button`, i.e. model a control the product renders unconverted? Every entry below
+ * answers yes, permanently, and that is what earns it a place.
+ *
+ * The area-scope gate asks about the family ROOT instead, and for the four population-B entries
+ * the two answers came apart in issue 1502. `SearchablePopover` renders its trigger as a raw
+ * `<button class={triggerClass}>`, so the class list is CALLER-authored; that issue gave all
+ * twelve of those call sites `fabricate-button` as their leading token, because the family is now
+ * rooted at it and a trigger without it matches no rule in the sheet at all. The four fixtures
+ * that model those triggers measure geometry against the real sheet, so they carry the root too —
+ * MEASURED: strip it from `recipe-studio-font-size.test.js` and its flat picker reads Foundry's
+ * 14px app base instead of the shared trigger rule's 13.12px. They remain unconverted, so they
+ * remain listed here; they are simply no longer examples of "a fixture that must not gain the
+ * root". Read this list as the ledger of deliberately UNCONVERTED fixtures, which is what its
+ * entries have always said, and not as a ledger of root-less ones.
  *
  * ── THE SHAPE, AND WHY EACH FIELD IS REQUIRED ───────────────────────────────────────────
  * Keyed on the file and the exact class attribute rather than on a line number, which rots on the
@@ -62,27 +78,40 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
   // fixture outliving the control it models.)
   Object.freeze({
     file: 'tests/components/manager-layout.test.js',
-    classes: 'manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger',
+    classes:
+      'fabricate-button manager-button manager-travel-picker-trigger ' +
+      'manager-checks-preview-actor-trigger',
     count: 1,
-    why: 'Population B, as above: the Checks preview actor picker trigger.',
+    why:
+      'Population B, as above: the Checks preview actor picker trigger. It carries the family ' +
+      'root since issue 1502, as its call site does, and stays listed because it still models an ' +
+      'unconverted control.',
   }),
   Object.freeze({
     file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'manager-button manager-recipe-component-trigger',
+    classes: 'fabricate-button manager-button manager-recipe-component-trigger',
     count: 1,
-    why: 'Population B: the recipe ingredient picker trigger.',
+    why:
+      'Population B: the recipe ingredient picker trigger. Root-carrying since issue 1502, and ' +
+      'the fixture whose measurement proved the root is load-bearing rather than cosmetic.',
   }),
   Object.freeze({
     file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'manager-button manager-recipe-component-trigger manager-recipe-stage-trigger',
+    classes:
+      'fabricate-button manager-button manager-recipe-component-trigger ' +
+      'manager-recipe-stage-trigger',
     count: 1,
-    why: 'Population B: the recipe stage picker trigger.',
+    why:
+      'Population B: the recipe stage picker trigger. Root-carrying since issue 1502, and still ' +
+      'unconverted, so it keeps its place here.',
   }),
   Object.freeze({
     file: 'tests/components/component-studio-font-size.test.js',
-    classes: 'manager-button manager-salvage-component-trigger',
+    classes: 'fabricate-button manager-button manager-salvage-component-trigger',
     count: 1,
-    why: 'Population B: the salvage result component picker trigger.',
+    why:
+      'Population B: the salvage result component picker trigger. Root-carrying since issue ' +
+      '1502, and still unconverted, so it keeps its place here.',
   }),
   Object.freeze({
     file: 'tests/components/theme-rendered-validation.test.js',

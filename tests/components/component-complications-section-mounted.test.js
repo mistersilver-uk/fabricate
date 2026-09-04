@@ -532,15 +532,24 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'the retired class is gone from CSS and markup'
     );
     const globalCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    // Both selectors moved in issue 1502: the family is rooted at the class `ManagerButton`
+    // emits, so the leading `.fabricate-manager` DESCENDANT is now a `.fabricate-button`
+    // COMPOUND on the same element, at the same (0,3,0).
     for (const selector of [
-      '.fabricate-manager .manager-button.fab-manager-button.is-dashed',
-      '.fabricate-manager .manager-button.fab-manager-button.is-full-width',
+      '.fabricate-button.manager-button.fab-manager-button.is-dashed',
+      '.fabricate-button.manager-button.fab-manager-button.is-full-width',
     ]) {
-      assert.doesNotMatch(
-        blockIn(globalCss, selector),
-        /margin/,
-        `${selector} must not add to the panel's grid gap`
+      const block = blockIn(globalCss, selector);
+      // NON-VACUITY, stated at the call site rather than left to `blockIn`. A
+      // `doesNotMatch(…, /margin/)` over an empty or declaration-free string PASSES, so a
+      // selector that stopped existing — which is exactly what a re-root does to the old
+      // spelling — would read as "the rule declares no margin" instead of "there is no rule".
+      assert.ok(
+        /[\w-]+\s*:/.test(block),
+        `${selector} must resolve to a rule with declarations, not an empty slice; got ` +
+          `${JSON.stringify(block)}`
       );
+      assert.doesNotMatch(block, /margin/, `${selector} must not add to the panel's grid gap`);
     }
   });
 

@@ -428,7 +428,6 @@
     "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte | 2",
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | 1",
     "src/ui/svelte/components/EssenceSourceSelector.svelte | 3",
-    "src/ui/svelte/components/IconButton.svelte | 1",
     "src/ui/svelte/components/IconPicker.svelte | 2",
     "src/ui/svelte/components/ImagePathPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
