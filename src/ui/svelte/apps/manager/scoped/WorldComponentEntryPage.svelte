@@ -58,7 +58,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import WorldComponentEntryPreviewRail from './WorldComponentEntryPreviewRail.svelte';
   import WorldComponentEntrySourceCard from './WorldComponentEntrySourceCard.svelte';
   import WorldComponentEntrySystemsCard from './WorldComponentEntrySystemsCard.svelte';

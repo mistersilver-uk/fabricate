@@ -36,7 +36,7 @@
   import Chip from '../Chip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
