@@ -499,8 +499,8 @@
 
   {#if open}
     <!-- `fabricate-picker-popover` is the panel's own half of the primitive's namespace root. It
-         is a SECOND class rather than the one on the picker root because `use:portal` moves this
-         node out of that root, taking its classes and losing its ancestors. -->
+         is a SECOND class rather than the one on the picker root because `use:anchoredPopover`
+         below moves this node out of that root, taking its classes and losing its ancestors. -->
     <div
       bind:this={popoverRoot}
       class={`fabricate-picker-popover manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
