@@ -425,7 +425,7 @@
        label. It has always been a content-width flex item at the inherited weight; the
        sheet's `text-align: center` is adopted and is inert on a content-width box. */
     min-width: auto;
-    font-weight: inherit;
+    font-weight: 400;
   }
 
   .gathering-detail-pagination :global(.manager-pagination-size) {
