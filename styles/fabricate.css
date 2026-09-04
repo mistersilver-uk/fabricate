@@ -9771,16 +9771,6 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .environment-stale-warning,
-.fabricate-manager .environment-field-error {
-  font-size: 0.74rem;
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .environment-stale-warning {
-  color: var(--fab-danger-text);
-}
-
 .fabricate-manager .manager-edit-card {
   display: flex;
   flex-direction: column;
@@ -25301,11 +25291,15 @@
    paragraph at all (`proto:1247-1266` enumerates the inspector's five blocks and this is not one
    of them), and it is recorded as a retained subject-only element beside the markup that emits
    it. This rule exists because C7 RENAMED the class and never wrote the replacement: on `main`
-   the paragraph carried `environment-stale-warning` and borrowed that block's pair
-   (`:10663-10667`), so after the rename it rendered as unstyled body text — the one thing on
-   this panel a GM has to act on, drawn as though it were prose. The pair is carried across
-   verbatim rather than re-derived, because nothing about the warning changed except where its
-   markup lives. */
+   the paragraph carried `environment-stale-warning` and borrowed that block's pair, so after the
+   rename it rendered as unstyled body text — the one thing on this panel a GM has to act on,
+   drawn as though it were prose. The pair is carried across verbatim rather than re-derived,
+   because nothing about the warning changed except where its markup lives.
+
+   THE DONOR BLOCK IS GONE and is deliberately not cited by line any more. This rule was its last
+   reader, so once it landed the `.environment-stale-warning` / `.environment-field-error` pair
+   matched no element under `src/` and `tests/styles-dead-classes.test.js` named both blocks; they
+   were deleted rather than kept alive by a comment pointing at them. */
 .fabricate-manager .manager-component-inspector-warning {
   margin: 0;
   color: var(--fab-danger-text);
