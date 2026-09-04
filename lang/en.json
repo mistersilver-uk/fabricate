@@ -6474,6 +6474,7 @@
             "BulkApplyMixed": "Write {writes} records across {count} components",
             "BulkDelete": "Delete {count} components…",
             "BulkDeleteOne": "Delete 1 component…",
+            "BulkDeleteNone": "Delete from the world…",
             "BulkDeleteArmed": "Confirm — delete {count} from the world",
             "BulkDeleteBusy": "Deleting…",
             "BulkDeleteNote": "This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving.",

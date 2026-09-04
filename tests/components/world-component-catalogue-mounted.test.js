@@ -1204,17 +1204,31 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.match(note.textContent, /none of them can be deleted/);
       assert.match(note.textContent, /Remove them from those systems first/);
-      const danger = dangerControl(target);
-      assert.equal(danger.disabled, true, 'and the control is inert');
-      assert.match(
-        danger.textContent,
-        /Cannot delete/,
-        'wearing the ENTRY’s own refusal label, so one record reads the same on both screens'
+      // THE CONTROL STAYS ENABLED, and that is `ui-integration/spec.md` requirement 16 rather
+      // than an oversight: "a disabled button satisfies any assertion that the delete did not
+      // happen while leaving the GM no explanation at all". The refusal is stated in the note
+      // and on the ARMED label, so the second press says the outcome before it is taken — the
+      // reading the entry's own danger card already ships.
+      const danger = () => dangerControl(target);
+      assert.equal(danger().disabled, false, 'the control is live, as requirement 16 requires');
+      assert.doesNotMatch(
+        danger().textContent,
+        /Delete 0 components/,
+        'and its idle verb makes no count claim it cannot keep'
       );
 
-      danger.click();
+      danger().click();
       await drain();
-      assert.deepEqual(calls, [], 'and a click on the inert control writes nothing');
+      assert.match(
+        danger().textContent,
+        /Cannot delete/,
+        'arming states the OUTCOME, in the ENTRY’s own words, before the second press'
+      );
+      assert.deepEqual(calls, [], 'arming writes nothing');
+
+      danger().click();
+      await drain();
+      assert.deepEqual(calls, [], 'and the confirmed press writes nothing either');
     });
 
     it('withholds the delete entirely when the call site has no delete leg', async () => {

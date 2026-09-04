@@ -262,9 +262,17 @@
     )
   );
 
+  /**
+   * THE IDLE VERB, WHICH PROMISES NOTHING IT WILL NOT DO.
+   *
+   * Counted where a count is true, and uncounted where nothing can go — `Delete 0 components…`
+   * is a promise of an outcome and `Delete 2 components…` over a fully-held selection is a false
+   * one. The entry's idle verb is the uncounted `Delete entry` for the same reason; this is its
+   * plural.
+   */
   const deleteLabel = $derived(
     deleteNote.refused
-      ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
+      ? text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteNone', 'Delete from the world…')
       : deletableCount === 1
         ? text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteOne', 'Delete 1 component…')
         : phrase(
@@ -274,6 +282,31 @@
               count: deletableCount,
             }
           )
+  );
+
+  /**
+   * THE ARMED LABEL BRANCHES, AND THE CONTROL NEVER GOES `disabled`.
+   *
+   * `ui-integration/spec.md` `### Scoped entity editor patterns` requirement 16 states both halves
+   * and states why: "the armed control stays ENABLED — a disabled button satisfies any assertion
+   * that the delete did not happen while leaving the GM no explanation at all", and "the armed
+   * label itself branches: `Confirm delete` where the delete will happen, `Cannot delete` where it
+   * is refused, so the second press states the outcome before it is taken."
+   *
+   * The world Component entry's danger card is the shipped reading of that requirement, and this
+   * is the same reading on the bulk panel — one record has to refuse the same way whichever screen
+   * a GM reaches it from, which is the whole point of extending the refusal here.
+   */
+  const deleteArmedLabel = $derived(
+    // The ARMED accessible name below carries the same sentence the note states, so the two
+    // cannot disagree — requirement 16's own rule, and what the entry's danger card already does.
+    deleteNote.refused
+      ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
+      : phrase(
+          'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteArmed',
+          'Confirm — delete {count} from the world',
+          { count: deletableCount }
+        )
   );
 
   // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT (issue 1371, round 2). The panel used to
@@ -676,20 +709,12 @@
         token="world-component-bulk-delete"
         armed={deleteArmed}
         busy={deleting === true}
-        disabled={applying === true || deleteNote.refused}
+        disabled={applying === true}
         idleLabel={deleteLabel}
-        armedLabel={phrase(
-          'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteArmed',
-          'Confirm — delete {count} from the world',
-          { count: deletableCount }
-        )}
+        armedLabel={deleteArmedLabel}
         busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
         idleAriaLabel={deleteLabel}
-        armedAriaLabel={phrase(
-          'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteArmed',
-          'Confirm — delete {count} from the world',
-          { count: deletableCount }
-        )}
+        armedAriaLabel={`${deleteArmedLabel} — ${deleteNote.text}`}
         describedBy="world-component-bulk-delete-note"
         onArm={() => (deleteArmed = true)}
         onDisarm={() => (deleteArmed = false)}
