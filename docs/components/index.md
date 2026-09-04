@@ -27,11 +27,11 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-A drop zone sits at the top of the catalogue for dragging in items, with a **+ Register item** button beside it.
-The button opens a searchable picker of world items not yet registered, so you can add one without leaving the sidebar or a compendium browser open first.
-
-Below that, a search field and a source filter share one row, and a **Membership** filter, a sort control, and an ascending/descending toggle share the row beneath.
+A search field and a source filter share one row of the toolbar, and a **Membership** filter, a sort control, and an ascending/descending toggle share the row beneath.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
+
+The list itself opens with a drop zone for dragging in items, so it scrolls with the rows rather than sitting fixed above the toolbar.
+A **+ Register item** button sits beside it and opens a searchable picker of world items not yet registered, so you can add one without leaving the sidebar or a compendium browser open first.
 
 Each row starts with a checkbox, then the component's icon and name.
 A pill beside the name states what kind of source it has, **Foundry item**, **Compendium**, or **No source item**, and a second **Broken link** pill appears when a linked world item's address no longer resolves to anything.
@@ -58,7 +58,7 @@ Where no system has rules for the component at all, the roster says so in place 
 
 ### Creating a component from an item
 
-Drag an item from the Items sidebar or a compendium browser onto the drop zone at the top of the catalogue.
+Drag an item from the Items sidebar or a compendium browser onto the drop zone at the top of the list.
 
 - If the item is not yet linked to any world component, Fabricate creates a new one and opens its entry.
 - If the item is already linked to a world component, by that item or by an alias it also matches, Fabricate opens the existing entry instead of creating a duplicate.
@@ -89,7 +89,8 @@ Removing drops those rules, rewrites every recipe in those systems that names th
 The world record is untouched, and no other system is affected.
 - **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it, from the same kind of inline search card.
 The reserved **General** category is refused here too.
-- **World tags.** Mark each tag to add, remove, or leave unchanged across every selected component.
+- **World tags.** From the same kind of inline search card, click a tag to cycle it between leave unchanged, add, and remove across every selected component.
+Once you have staged at least one, the tags you touched appear as their own run of chips above the card, coloured by direction, so the whole staged change is visible without scrolling the list.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -103,9 +104,12 @@ The reserved **General** category is refused here too.
 
 The panel states how many changes it is about to make before you apply them, and applies every staged change one at a time, so a large selection across several systems takes a moment.
 
-A separate **Delete** control at the foot of the panel removes every selected component from the world outright, along with its world defaults and every system's rules for it.
-Recipes that reference a deleted component stop resolving.
-It is a two-step control: one click arms it and states how many components it is about to delete, and a second click confirms, so a large deletion cannot happen from one click.
+A separate **Delete** control at the foot of the panel deletes every selected component that no crafting system currently has rules for, along with each one's world defaults.
+A selected component any crafting system still has rules for is left alone, and the confirmation names which systems are holding it back, the same refusal the single entry's own delete makes for one component at a time.
+Recipes that reference a component this control does delete stop resolving.
+It is a two-step control, and both states carry the count.
+The idle label already states how many components are about to be affected, such as **Delete 3 components…**.
+Arming it keeps that same count but switches the wording to a confirm state, naming the count again against deleting them from the world, and a second click confirms.
 
 ## The world Component entry
 
@@ -331,9 +335,10 @@ Below the identity callout you set the component's category, its tags, its essen
 
 A component's **Category** groups it in this system's browser.
 Pick it from the drop-down.
-If the linked world component has set a world category, the drop-down's first option reads **Inherit from world**, naming that value, and choosing it makes this system's category follow it.
-Choosing anything else overrides the category locally.
-The note beneath the field states which value this system currently resolves and whether that is inherited or overridden.
+If the linked world component has set a world category, the drop-down's first option reads **Inherit from world**, naming that value.
+Choosing it makes this system's category follow the world value, and choosing anything else overrides the category locally, but neither takes effect until you press **Save rules**.
+The choice is staged like the rest of the page: the **Unsaved** marker lights for it, and leaving with it unsaved is covered by the same confirm-first guard as everything else here.
+The note beneath the field previews which value this system would resolve and whether that is inherited or overridden, updating live as you choose even before you save.
 
 ### Tags
 
