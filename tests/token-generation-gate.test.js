@@ -80,12 +80,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import {
+  KNOWN_AREA_SCOPED_STRING_USES,
+  KNOWN_AREA_SCOPED_STRING_USE_TOTAL,
+  KNOWN_AREA_SCOPED_STYLE_READS,
+  KNOWN_AREA_SCOPED_STYLE_READ_TOTAL,
+} from './components/design-system-known-debt.js';
+import { assertRatchet, byCodePoint, tallyByKey } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import {
   STYLE_CORPUS_EXTENSIONS,
   STYLE_CORPUS_ROOTS,
   collectStyleCorpus,
   declarationsIn,
+  maskNonStyleRegions,
+  rulesIn,
   splitSelectorList,
 } from './helpers/styleBlockScan.js';
 
@@ -161,10 +170,25 @@ const INLINE_TARGETS = Object.freeze([
 /** `:root`, or one compound of a theme block's two-selector list. */
 const THEME_ROOT_COMPOUND = /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
 
-/** The prefix for an area-scoped custom property, which must not be read outside its area. */
+/**
+ * The prefix that DECLARES an intent to be area-scoped. It is no longer what the gate scans.
+ *
+ * Until issue 1497 the three clauses below selected their population by this prefix, and the
+ * measurement that motivated the change is stark: of the 24 `--fab-*` properties whose every
+ * declaration site sits inside the area, FIVE carry the prefix and nineteen do not.
+ * `--fab-recipe-col-io`, `--fab-toggle-knob` and `--fab-env-comp-grid` are as area-scoped as
+ * `--fab-manager-task-drop-grid` is; they simply were not named for it. A prefix gate polices the
+ * fifth of the population that already announced itself.
+ *
+ * So the prefix keeps ONE job — a name carrying it must still be area-scoped in fact, which is
+ * asserted below — and the SCANNED SET is now computed from where the declarations actually are.
+ */
 const AREA_SCOPED_PREFIX = '--fab-manager-';
 
-/** The area every `--fab-manager-*` property is scoped to. */
+/** The namespace prefix every token in this generation carries. */
+const TOKEN_PREFIX = '--fab-';
+
+/** The area an area-scoped property is scoped to. */
 const AREA_SELECTOR = '.fabricate-manager';
 
 /**
@@ -178,83 +202,40 @@ const AREA_SELECTOR = '.fabricate-manager';
 const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w-])`, 'u');
 
 /**
- * The three shapes that USE an area-scoped property, for the channels that are not CSS.
+ * The three shapes that USE one named property, for the channels that are not CSS.
  *
  * A use rather than the bare name: see the closing paragraph of the header. The three are the CSS
  * read, the CSS declaration, and the CSSOM pair — `el.style.setProperty('--fab-manager-x', v)`
  * and `getComputedStyle(el).getPropertyValue('--fab-manager-x')`, which reach the same property
  * from JavaScript carrying neither a `var(` nor a trailing colon, so the first two shapes are
- * blind to them. Zero live occurrences today; it is one line of scan for a channel that is
- * textually complete, which is the only kind a text scan can decide at all.
+ * blind to them.
  *
- * The quote class is `'` and `"` and deliberately NOT a backtick: twenty-nine comments under
- * `src/` write the prefix inside backticks in prose, to say which properties a component may not
- * reach, and banning that spelling would delete the rule's own documentation.
+ * The quote class is `'` and `"` and deliberately NOT a backtick: dozens of comments under `src/`
+ * write these names inside backticks in prose, to say which properties a component may not reach,
+ * and banning that spelling would delete the rule's own documentation. Measured on this corpus,
+ * that distinction carries seven prose mentions of an area-scoped name past the scan and stops
+ * five real uses.
+ *
+ * THE NAME IS ESCAPED AND BOUNDED, for the reason `AREA_COMPOUND` above is. A property name is
+ * interpolated into a pattern, so its own characters must not be read as syntax; and a name is a
+ * PREFIX of every longer name beginning with it, so without the trailing `(?![\w-])` the read and
+ * CSSOM shapes answer for the wrong property — `var(--fab-recipe-col-io)` would be reported as a
+ * use of `--fab-recipe-col`. That is a row naming a property the line it cites does not contain,
+ * which sends its reader looking for a use that is not there. The DECLARATION shape is left
+ * deliberately unbounded because `\s*:` already is the boundary: the longer name continues with a
+ * `-` where that shape requires a colon.
+ *
+ * @param {string} name A whole custom-property name, e.g. `--fab-recipe-col-io`.
+ * @returns {Array<{label: string, pattern: RegExp}>}
  */
-const AREA_USE_SHAPES = Object.freeze([
-  { label: 'read', pattern: new RegExp(`var\\(\\s*${AREA_SCOPED_PREFIX}`, 'u') },
-  { label: 'declaration', pattern: new RegExp(`${AREA_SCOPED_PREFIX}[\\w-]*\\s*:`, 'u') },
-  { label: 'CSSOM name', pattern: new RegExp(`['"]${AREA_SCOPED_PREFIX}`, 'u') },
-]);
-
-/**
- * Every rule in one comment-stripped stylesheet, as `{ selector, body, line }`.
- *
- * At-rule preludes (`@media`, `@container`, `@supports`, `@layer`) are NOT selectors, so a rule
- * nested inside one reports the inner prelude — which is what both callers need, since a
- * container query around a manager rule must not be read as that rule's selector. An at-rule with
- * no block of its own (`@import`, `@charset`) never opens a brace and is skipped by construction.
- *
- * `line` is the line the SELECTOR starts on, tracked by a `preludeStarted` flag rather than by
- * `prelude === ''`: the prelude accumulates the whitespace between two rules, so the emptiness
- * test only ever fired at offset zero and every rule was cited at the previous `}`. In a Svelte
- * file, where `maskNonStyleRegions` replaces the entire template with spaces, that put every
- * offence at line 1.
- *
- * @param {string} css Comment-stripped CSS, offsets intact.
- * @returns {Array<{selector: string, body: string, line: number}>}
- */
-function rulesIn(css) {
-  const rules = [];
-  const stack = [];
-  let prelude = '';
-  let preludeStarted = false;
-  let line = 1;
-  let preludeLine = 1;
-  for (let index = 0; index < css.length; index += 1) {
-    const character = css[index];
-    if (character === '\n') line += 1;
-    if (character === '{') {
-      const trimmed = prelude.trim().replace(/\s+/gu, ' ');
-      stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (character === '}') {
-      const open = stack.pop();
-      if (open && !open.selector.startsWith('@')) {
-        rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
-      }
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (character === ';' && stack.length === 0) {
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (!preludeStarted && !/\s/u.test(character)) {
-      preludeStarted = true;
-      preludeLine = line;
-    }
-    prelude += character;
-  }
-  return rules;
+function areaUseShapes(name) {
+  const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  const ends = String.raw`(?![\w-])`;
+  return [
+    { label: 'read', pattern: new RegExp(String.raw`var\(\s*${escaped}${ends}`, 'u') },
+    { label: 'declaration', pattern: new RegExp(String.raw`${escaped}\s*:`, 'u') },
+    { label: 'CSSOM name', pattern: new RegExp(`['"]${escaped}${ends}`, 'u') },
+  ];
 }
 
 /**
@@ -450,7 +431,10 @@ test('a rule is cited at the line its own selector starts on', () => {
   // the PREVIOUS rule's `}` — in a Svelte file, where `maskNonStyleRegions` blanks the whole
   // template, at line 1 for every offence in the file. That was a one-flag fix inside `rulesIn`
   // (`preludeStarted` rather than `prelude === ''`) which only ever changes failure-message text,
-  // so nothing above can see it regress. This is what sees it.
+  // so nothing above can see it regress. This is what sees it — and it now guards the walk for
+  // every caller rather than only this file: issue 1497 moved `rulesIn` into
+  // `tests/helpers/styleBlockScan.js` so the `:focus`, weight, shadow and radius gates could
+  // reuse it rather than write a fresh walk that would reacquire exactly this defect.
   //
   // Written as an invariant over the whole corpus rather than as one hand-picked `file:line`
   // pair, which would rot on the next edit to that stylesheet: masking and comment stripping both
@@ -486,21 +470,126 @@ test('a rule is cited at the line its own selector starts on', () => {
   );
 });
 
-test('an area-scoped manager property is declared and read only inside its area', () => {
+/**
+ * Every `--fab-*` property whose DECLARATION SITES all sit inside the area.
+ *
+ * THE SET IS COMPUTED, NOT NAMED, and that is the change issue 1497 made here. A prefix gate asks
+ * whether an author remembered to say a property was area-scoped; this asks where the property IS.
+ * Measured on this corpus, the two answers are 5 and 24 — so the prefix rule was policing a fifth
+ * of its own population and the other nineteen names were gated by nothing at all.
+ *
+ * EVERY compound of every declaring rule's selector list has to be inside the area, not merely one
+ * of them, for the reason trap 4 gives: the cascade applies a comma-joined rule to each compound
+ * separately, so `.fabricate-app .a, .fabricate-manager .b { --fab-x: … }` declares the property on
+ * a player surface too, and it is not area-scoped at all.
+ *
+ * A property with NO declaration anywhere is not in the set, because "every site is inside the
+ * area" is vacuously true of nothing and would sweep in every misspelling. The set is therefore
+ * built from the sites rather than filtered from a name list.
+ *
+ * @returns {{names: string[], sites: Map<string, Array<{file: string, line: number,
+ *   selector: string}>>}}
+ */
+let cachedAreaScoped = null;
+function areaScopedProperties() {
+  if (cachedAreaScoped === null) {
+    const sites = new Map();
+    for (const rule of shippedStyleRules()) {
+      for (const declaration of declarationsIn(rule.file, rule.body)) {
+        if (!declaration.property.startsWith(TOKEN_PREFIX)) continue;
+        if (!sites.has(declaration.property)) sites.set(declaration.property, []);
+        sites.get(declaration.property).push({ ...rule, property: declaration.property });
+      }
+    }
+    const names = [...sites.keys()]
+      .filter((name) =>
+        sites.get(name).every((rule) => everyCompound(rule.selector, (compound) => AREA_COMPOUND.test(compound)))
+      )
+      .sort(byCodePoint);
+    cachedAreaScoped = { names, sites };
+  }
+  return cachedAreaScoped;
+}
+
+/**
+ * The part of a file the CSS clauses do NOT read, so the string clause cannot double-count.
+ *
+ * `collectStyleCorpus` masks everything outside a `<style>` block; this is the complement of that
+ * mask, computed FROM it rather than by a second rule about where a block starts. Without it the
+ * scoped-style clause and the string clause report the same six declarations, and a reader
+ * lowering one baseline would be surprised by the other.
+ *
+ * A `.js` module has no style region, so it is returned whole.
+ *
+ * @param {string} file
+ * @param {string} source
+ * @returns {string} Same length, same newlines, style regions blanked.
+ */
+function nonStyleRegion(file, source) {
+  if (!file.endsWith('.svelte')) return source;
+  const masked = maskNonStyleRegions(source).split('\n');
+  return source
+    .split('\n')
+    .map((line, index) => (masked[index].trim() === '' ? line : ' '.repeat(line.length)))
+    .join('\n');
+}
+
+test('the area-scoped set is measured, and the prefix still means what it says', () => {
+  const { names, sites } = areaScopedProperties();
+
+  assert.ok(
+    sites.size > 100,
+    `only ${sites.size} distinct \`${TOKEN_PREFIX}\` properties are declared anywhere, against the ` +
+      '~140 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
+  );
+  assert.ok(
+    names.length >= 10,
+    `only ${names.length} properties measured as area-scoped, against the 24 this tree holds. A ` +
+      'set that has collapsed makes every clause below an absence check over nothing.'
+  );
+
+  // THE PREFIX IS NOW A CLAIM THE MEASUREMENT HAS TO AGREE WITH. This is what keeps the computed
+  // set from having a hole a prefix gate did not: declare `--fab-manager-x` on a player surface as
+  // well and it silently LEAVES the set, taking its own enforcement with it. Here that is a
+  // failure, named, rather than a property quietly ceasing to be gated.
+  const prefixed = [...sites.keys()].filter((name) => name.startsWith(AREA_SCOPED_PREFIX));
+  const escaped = prefixed.filter((name) => !names.includes(name));
+  assert.ok(prefixed.length > 0, 'no property carries the area prefix, so this control has no domain');
+  assert.deepEqual(
+    escaped.map((name) => `${name} — declared at ${sites.get(name).map((rule) => `${rule.file}:${rule.line}`).join(', ')}`),
+    [],
+    `a property named \`${AREA_SCOPED_PREFIX}*\` has a declaration site OUTSIDE ` +
+      `\`${AREA_SELECTOR}\`. The name promises area scoping and the tree no longer keeps that ` +
+      'promise, and the consequence is worse than the broken promise: the scanned set is computed ' +
+      'from declaration sites, so this property has just dropped out of it and is now gated by ' +
+      'nothing. Either move the stray declaration inside the area, or rename the property.'
+  );
+});
+
+test('an area-scoped property is declared and read only inside its area', () => {
   const allRules = shippedStyleRules();
   assertBothCorporaReached(allRules);
-  const rules = allRules.filter((rule) => rule.body.includes(AREA_SCOPED_PREFIX));
+  const { names } = areaScopedProperties();
+
+  // THE GLOBAL SHEET ONLY. A scoped `<style>` cannot satisfy this clause even in principle — its
+  // selectors are component class names, never `.fabricate-manager …` — so running this over both
+  // corpora would report every scoped read twice, once here and once in the clause below that owns
+  // that channel. The sheet is where these properties legitimately live, and this is what polices
+  // it. `assertBothCorporaReached` still runs over EVERYTHING, so the scoped half dropping out of
+  // the walk is still a failure here.
+  const rules = allRules.filter(
+    (rule) => rule.file.endsWith('.css') && names.some((name) => rule.body.includes(name))
+  );
 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
   // rather than against a directory. The obvious proxy — "no file outside `apps/manager/**`
-  // reads one" — is UNSATISFIABLE here: all of these properties are read from the global sheet,
+  // reads one" — is UNSATISFIABLE here: all of these properties are declared in the global sheet,
   // which is outside that directory, so the proxy would red on 100% of its own population on
   // arrival. Manager CSS living in the global stylesheet is the design, not the defect.
   assert.ok(
-    rules.length >= 10,
-    `only ${rules.length} rules mention \`${AREA_SCOPED_PREFIX}\`, against the fourteen — carrying ` +
-      'sixteen declaration and read sites — the global sheet holds. With none, the assertion ' +
-      'below is vacuous.'
+    rules.length >= 30,
+    `only ${rules.length} sheet rules mention one of the ${names.length} area-scoped properties, ` +
+      'against the ~90 this sheet holds. With none, the assertion below is vacuous.'
   );
 
   // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in
@@ -526,27 +615,29 @@ test('an area-scoped manager property is declared and read only inside its area'
   const offences = rules.flatMap((rule) => {
     const outside = compoundsFailing(rule.selector, (compound) => AREA_COMPOUND.test(compound));
     if (outside.length === 0) return [];
+    const named = names.filter((name) => rule.body.includes(name));
     return [
-      `${rule.file}:${rule.line} \`${rule.selector}\` — outside the area: \`${outside.join('`, `')}\``,
+      `${rule.file}:${rule.line} \`${rule.selector}\` — reads \`${named.join('`, `')}\` outside ` +
+        `the area: \`${outside.join('`, `')}\``,
     ];
   });
 
   assert.deepEqual(
     offences,
     [],
-    `\`${AREA_SCOPED_PREFIX}*\` is the prefix for an AREA-SCOPED custom property and must not be ` +
-      `declared or read outside \`${AREA_SELECTOR}\` — by EVERY compound of the rule's selector ` +
-      'list, because the cascade applies a comma-joined rule to each of them separately. Outside ' +
-      'the area the property is undefined, the declaration is invalid at computed-value time, and ' +
-      'the value falls back to inheritance — nothing fails, it just looks wrong. Each offence ' +
-      'names the compounds that sit outside the area: where they are some of several, split the ' +
-      'list so only the manager compound keeps this property; where they are the whole list, the ' +
-      'rule is reading an area-scoped property from outside the area, and what it wants is a ' +
-      'foundation token:\n  ' + offences.join('\n  ')
+    'an AREA-SCOPED custom property — one whose every declaration site sits inside ' +
+      `\`${AREA_SELECTOR}\` — must not be declared or read outside it, by EVERY compound of the ` +
+      "rule's selector list, because the cascade applies a comma-joined rule to each of them " +
+      'separately. Outside the area the property is undefined, the declaration is invalid at ' +
+      'computed-value time, and the value falls back to inheritance — nothing fails, it just ' +
+      'looks wrong. Each offence names the compounds that sit outside the area: where they are ' +
+      'some of several, split the list so only the manager compound keeps this property; where ' +
+      'they are the whole list, the rule is reading an area-scoped property from outside the ' +
+      'area, and what it wants is a foundation token:\n  ' + offences.join('\n  ')
   );
 });
 
-test('no Svelte scoped style reaches an area-scoped manager property', () => {
+test('no Svelte scoped style reaches an area-scoped property', () => {
   // A scoped `<style>` cannot guarantee its host renders under `.fabricate-manager`: a component
   // is placed in a directory, not in a DOM subtree, and `apps/manager/ComplicationSummaryRow` is
   // the standing counterexample — it lives under `apps/manager/` and is imported by two player
@@ -556,55 +647,108 @@ test('no Svelte scoped style reaches an area-scoped manager property', () => {
   // `selection-checkbox-mounted.test.js` already asserts this shape for one component. This
   // generalises it rather than replacing it with something weaker: that suite reads the primitive
   // it is about and fails with that primitive's name on it.
+  //
+  // IT IS A RATCHET RATHER THAN AN ABSENCE CHECK because widening the scanned set from the prefix
+  // to the measurement found six live sites. All six read one property, `--fab-recipe-control-font`,
+  // which two import modals and the scoped entity inspector use for their control type — three
+  // components that do render inside the manager today and none of which can prove it.
   const corpus = collectStyleCorpus({ roots: ['src'], extensions: ['.svelte'] });
   const files = Object.keys(corpus);
+  const { names } = areaScopedProperties();
 
   assert.ok(
     files.length > 100,
-    `only ${files.length} Svelte scoped blocks reached the scan, against the ~180 this tree holds. ` +
+    `only ${files.length} Svelte scoped blocks reached the scan, against the ~195 this tree holds. ` +
       'An absence gate over an empty corpus passes forever.'
   );
 
-  const offences = [];
+  const found = [];
   for (const [file, css] of Object.entries(corpus)) {
-    for (const [index, text] of css.split('\n').entries()) {
-      if (text.includes(AREA_SCOPED_PREFIX)) offences.push(`${file}:${index + 1} ${text.trim()}`);
+    for (const text of css.split('\n')) {
+      if (!text.includes(TOKEN_PREFIX)) continue;
+      for (const name of names) if (text.includes(name)) found.push({ file, name });
     }
   }
 
-  assert.deepEqual(
-    offences,
-    [],
-    `a Svelte scoped \`<style>\` reads or declares a \`${AREA_SCOPED_PREFIX}*\` property. A ` +
-      'component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot ' +
+  assertRatchet({
+    label: 'area-scoped properties reached from a Svelte scoped style',
+    baseline: KNOWN_AREA_SCOPED_STYLE_READS,
+    pinnedTotal: KNOWN_AREA_SCOPED_STYLE_READ_TOTAL,
+    observed: tallyByKey(found, (entry) => `${entry.file} | ${entry.name}`),
+    scanned: files.length,
+    floor: 100,
+    guidance:
+      'A component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot ' +
       `guarantee that its host renders under \`${AREA_SELECTOR}\` — and where it does not, the ` +
       'property is undefined and the declaration silently falls back to inheritance. Read a ' +
-      'foundation token, or move the rule into the global sheet under an area selector:\n  ' +
-      offences.join('\n  ')
+      'foundation token, or move the rule into the global sheet under an area selector.',
+  });
+});
+
+test('a use shape matches the whole property name and not a longer one starting with it', () => {
+  // BOTH POLARITIES OVER A SYNTHETIC PAIR, because no such pair exists in the corpus today — which
+  // is exactly the condition under which an unbounded pattern reads as correct. The two clauses
+  // above report `file | name` rows, and a prefix match puts a name on a row whose cited line does
+  // not hold it: the reader opens the file, searches for the property, and finds a different one.
+  const shapes = (name, text) =>
+    areaUseShapes(name)
+      .filter(({ pattern }) => pattern.test(text))
+      .map(({ label }) => label);
+
+  const shorter = '--fab-recipe-col';
+  const longer = `${shorter}-io`;
+
+  assert.deepEqual(
+    shapes(shorter, `  color: var(${longer});`),
+    [],
+    `\`var(${longer})\` is a use of ${longer} and of nothing else. A pattern with no trailing ` +
+      'boundary reports it against every name that is a prefix of it.'
+  );
+  assert.deepEqual(
+    shapes(shorter, `  el.style.setProperty('${longer}', value);`),
+    [],
+    'the CSSOM shape is anchored by a quote at one end only, so it needs the boundary at the other'
+  );
+  assert.deepEqual(
+    shapes(shorter, `  ${longer}: 4px;`),
+    [],
+    'the declaration shape is bounded by its own colon, which the longer name never reaches'
+  );
+
+  // The positives, so the boundary is narrowing the gate rather than emptying it.
+  assert.deepEqual(shapes(longer, `  color: var(${longer});`), ['read']);
+  assert.deepEqual(shapes(longer, `  ${longer}: 4px;`), ['declaration']);
+  assert.deepEqual(shapes(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
+  assert.deepEqual(
+    shapes(shorter, `  color: var(${shorter});`),
+    ['read'],
+    'the shorter name must still match its OWN use'
   );
 });
 
-test('no module or template under src/ spells an area-scoped manager property into a string', () => {
+test('no module or template under src/ spells an area-scoped property into a string', () => {
   // The CHANNEL THAT ACTUALLY HAPPENED, generalised. `chanceColorScale.js` returned
   // `'var(--fab-mv2-accent)'` as a string literal, and a `.js` module returning
-  // `'var(--fab-manager-task-drop-grid)'` is the same mistake against a live prefix: tests 3 and 4
-  // both read CSS, so neither can see it, and `--fab-manager-` is deliberately absent from
-  // `RETIRED_NAME_SHAPES` because the prefix is the rule rather than the offence. A `.svelte`
-  // TEMPLATE is the same channel — `style="… var(--fab-manager-x)"` sits outside every `<style>`
-  // block, so `collectStyleCorpus` masks it away — which is why both extensions are scanned here.
+  // `'var(--fab-manager-task-drop-grid)'` is the same mistake against a live name: the two clauses
+  // above both read CSS, so neither can see it. A `.svelte` TEMPLATE is the same channel —
+  // `style="… var(--fab-recipe-col-io)"` sits outside every `<style>` block — which is why both
+  // extensions are scanned here, and why the Svelte half is scanned over `nonStyleRegion` so the
+  // scoped-style clause above keeps its own six findings to itself.
   //
-  // Scanned by USE SHAPE, not by name: twenty-nine comments under `src/` name the prefix in order
-  // to say a component may NOT reach it, and a raw-name ban would delete the rule's own
+  // Scanned by USE SHAPE, not by name: dozens of comments under `src/` name these properties in
+  // order to say a component may NOT reach them, and a raw-name ban would delete the rule's own
   // documentation. `styles/` is excluded because the global sheet is where these properties
-  // legitimately live; test 3 is what polices it.
+  // legitimately live; the first clause is what polices it.
   //
-  // The three shapes are not the same as "prose is exempt", and the difference is measured: a
-  // comment writing a CONCRETE name followed by a colon matches the declaration shape, and one
-  // quoting a concrete name in straight quotes matches the CSSOM shape. Neither is live — all
-  // twenty-nine use the backticked `--fab-manager-*` wildcard spelling — but the exemption is for
-  // that spelling and not for comments as a class.
+  // THE FIVE ROWS ARE TWO DIFFERENT MISTAKES and the shapes tell them apart. `WorldToolEntryPage`
+  // and `ToolBreakageTab` READ `--fab-tool-breakage-chance-track-gradient` through a component
+  // prop, which is the `var(` shape. `ChanceSlider` DECLARES three of them into an inline `style`
+  // attribute, which is the declaration shape — and that one is invisible to every CSS clause
+  // here, because `maskNonStyleRegions` blanks the markup those declarations live in. A component
+  // in `components/` writing an area-scoped name is the widest version of this defect.
   const sources = collectWorkingTreeSources(['src'], ['.js', '.svelte']);
   const files = Object.keys(sources);
+  const { names } = areaScopedProperties();
 
   for (const extension of ['.js', '.svelte']) {
     const reached = files.filter((file) => file.endsWith(extension)).length;
@@ -615,27 +759,32 @@ test('no module or template under src/ spells an area-scoped manager property in
     );
   }
 
-  const offences = [];
+  const found = [];
   for (const [file, source] of Object.entries(sources)) {
-    for (const [index, text] of source.split('\n').entries()) {
-      for (const { label, pattern } of AREA_USE_SHAPES) {
-        if (pattern.test(text)) offences.push(`${file}:${index + 1} (${label}) ${text.trim()}`);
+    for (const text of nonStyleRegion(file, source).split('\n')) {
+      if (!text.includes(TOKEN_PREFIX)) continue;
+      for (const name of names) {
+        if (!text.includes(name)) continue;
+        if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) found.push({ file, name });
       }
     }
   }
 
-  assert.deepEqual(
-    offences,
-    [],
-    `a module or template under \`src/\` spells a \`${AREA_SCOPED_PREFIX}*\` property into a ` +
-      'string. A JavaScript module and a Svelte template are placed in a directory, not in a DOM ' +
-      `subtree, so neither can guarantee that the element it styles renders under ` +
-      `\`${AREA_SELECTOR}\` — and where it does not, the property is undefined, the declaration is ` +
-      'invalid at computed-value time, and the value falls back to inheritance. Return a ' +
+  assertRatchet({
+    label: 'area-scoped properties spelled into a string under src/',
+    baseline: KNOWN_AREA_SCOPED_STRING_USES,
+    pinnedTotal: KNOWN_AREA_SCOPED_STRING_USE_TOTAL,
+    observed: tallyByKey(found, (entry) => `${entry.file} | ${entry.name}`),
+    scanned: files.length,
+    floor: 400,
+    guidance:
+      'A JavaScript module and a Svelte template are placed in a directory, not in a DOM subtree, ' +
+      'so neither can guarantee that the element it styles renders under ' +
+      `\`${AREA_SELECTOR}\` — and where it does not, the property is undefined, the declaration ` +
+      'is invalid at computed-value time, and the value falls back to inheritance. Return a ' +
       'foundation token, or put the rule in the global sheet under an area selector. Prose may ' +
-      'still name the prefix, in the wildcard spelling the twenty-nine comments under `src/` ' +
-      'use — `--fab-manager-*` — which matches none of the three shapes; a concrete name ' +
-      'followed by a colon, or in straight quotes, does match wherever it is written:\n  ' +
-      offences.join('\n  ')
-  );
+      'still name the property, in the backticked spelling the comments under `src/` use, which ' +
+      'matches none of the three shapes; a name inside `var(`, followed by a colon, or in ' +
+      'straight quotes does match wherever it is written.',
+  });
 });

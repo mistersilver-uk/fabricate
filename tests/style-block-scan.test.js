@@ -62,6 +62,7 @@ import {
   maskNonStyleRegions,
   pixelValuesIn,
   resolveValueCandidates,
+  rulesIn,
   scanPixelDeclarations,
   scanPixelValues,
   splitSelectorList,
@@ -491,6 +492,68 @@ test('a selector list splits on its separators only, not on every comma', () => 
 
   // A stray closer must not drive the depth negative and swallow every later separator.
   assert.deepEqual(splitSelectorList('.a), .b'), ['.a)', '.b']);
+});
+
+test('a rule is cited at the line its own selector starts on, not at its brace', () => {
+  // THE HELPER'S OWN PROOF, mirroring the live-corpus invariant in `token-generation-gate.test.js`
+  // now that `rulesIn` is shared. That one asserts over the two shipped stylesheets, which is the
+  // stronger statement and stays where it is; this one is the fixture that says WHICH shapes the
+  // line number comes from, so the next caller of `rulesIn` finds the guarantee documented beside
+  // the helper rather than inside one gate that happens to still use it.
+  //
+  // The distinction only shows where a selector and its `{` are on DIFFERENT lines. A rule written
+  // `.a { … }` is cited identically by a correct implementation and by one that records the line
+  // of the brace, so a fixture built only from single-line rules proves nothing — which is the
+  // trap, because almost every rule a reader writes by hand is single-line. Two of the four rules
+  // below are therefore multi-line, and they are the two that move.
+  const lines = [
+    '.first {', //                     1
+    '  color: red;', //                2
+    '}', //                            3
+    '', //                             4
+    '.second,', //                     5
+    '.third {', //                     6
+    '  color: blue;', //               7
+    '}', //                            8
+    '', //                             9
+    '@media (min-width: 10px) {', //  10
+    '  .nested', //                   11
+    '  {', //                         12
+    '    color: green;', //           13
+    '  }', //                         14
+    '}', //                           15
+    '', //                            16
+    '.last { color: teal; }', //      17
+  ];
+  const rules = rulesIn(lines.join('\n'));
+
+  assert.deepEqual(
+    rules.map((rule) => `${rule.line}: ${rule.selector}`),
+    ['1: .first', '5: .second, .third', '11: .nested', '17: .last'],
+    'each rule is cited where its SELECTOR begins. `.second, .third` opens its brace on line 6 ' +
+      'and `.nested` on line 12, so an implementation recording the brace line agrees with this ' +
+      'one on the two single-line rules and disagrees on these two.'
+  );
+
+  // The at-rule is absent rather than reported with an `@media` "selector", and its child is
+  // present — the containing prelude is not the nested rule's selector.
+  assert.equal(
+    rules.some((rule) => rule.selector.startsWith('@')),
+    false,
+    'an at-rule prelude is not a selector, so `@media` opens no rule of its own'
+  );
+
+  // The same invariant the live corpus asserts, over the fixture: the cited line holds the first
+  // token of the selector. Written this way as well as by exact number because it is the form the
+  // gates depend on — a failure message sends its reader to a line, and this is what makes that
+  // line the right one.
+  for (const rule of rules) {
+    const [head] = rule.selector.split(/\s/u);
+    assert.ok(
+      lines[rule.line - 1].includes(head),
+      `${rule.selector} is cited at line ${rule.line}, which reads "${lines[rule.line - 1]}"`
+    );
+  }
 });
 
 test('the real corpus is both stylesheets, and its custom properties come from both', () => {
