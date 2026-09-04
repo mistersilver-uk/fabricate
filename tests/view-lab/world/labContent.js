@@ -2626,6 +2626,18 @@ const GATHERING_TASKS = [
       { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, dropRate: 30, enabled: true },
       { id: 'row-3', componentId: 'sm-silver-ore', quantity: 1, dropRate: 15, enabled: true },
       { id: 'row-4', componentId: 'sm-ruby', quantity: 1, dropRate: 5, enabled: true },
+      // COAL, and it is here to close a fixture gap rather than to enrich the seam. `sm-coal` is
+      // the lab's only component carrying world tags, so it is the component the world catalogue
+      // entry's preview rail is photographed on — and nothing in the world produced it, so the
+      // rail's `Produced by` group had no row and could only ever photograph its empty sentence.
+      // A drop row is the cheapest producer: `producedBy` is derived from recipe results and
+      // gathering drop rows alike, and a seam that yields ore yields the coal beside it.
+      //
+      // The four rates above read like a distribution summing to 100, but a `dropRate` is an
+      // INDEPENDENT per-row probability (`GatheringDropReferenceValidator`: an integer 0-100 per
+      // row, with no cross-row constraint), and the task's yield chance is
+      // `1 - ∏(1 - rate/100)`. So this row is appended rather than funded out of the others.
+      { id: 'row-5', componentId: 'sm-coal', quantity: 2, dropRate: 35, enabled: true },
     ],
   },
 ];
@@ -4115,7 +4127,12 @@ export function buildLabContent() {
         {
           id: 'lab-wildwood-resin',
           name: 'Wildwood Resin',
-          img: `${ICON_BASE}/commodities/tree/sap-drop-amber.webp`,
+          // A HARVESTED PATH, and the reason it had to change: the harvest carries no
+          // `icons/commodities/tree` family at all, so this seed 404'd. It was invisible until
+          // C6 restored the ghost row's medallion — nothing requested the image before — and it
+          // then failed `manager-components-world-cohort`'s console-error gate. Amber IS tree
+          // resin, so the subject and the colour the old filename named both survive.
+          img: `${ICON_BASE}/commodities/gems/gem-amber-insect-orange.webp`,
           description: 'Tapped from the reach’s oldest ironwoods. No system has rules for it yet.',
           originItemUuid: 'Item.lab-wildwood-resin',
           registeredItemUuid: 'Item.lab-wildwood-resin',
