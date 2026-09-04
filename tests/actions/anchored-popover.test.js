@@ -132,7 +132,14 @@ describe('anchoredPopover', () => {
 
     const handle = anchoredPopover(panel, options({ trigger }));
 
-    assert.equal(panel.parentNode, host, 'the panel is portaled into the resolved application root');
+    // `assert.ok(a === b)` and not `assert.equal(a, b)`: on failure node:assert serialises both
+    // operands to build its diff, and a happy-dom element's own enumerable state reaches its
+    // parents, its children and its owner document — so the failure allocates until the heap
+    // dies and the suite reports `# cancelled` with no message. The boolean fails in words.
+    assert.ok(
+      panel.parentNode === host,
+      'the panel is portaled into the resolved application root'
+    );
     assert.equal(
       panel.getAttribute('style'),
       'left: 100px; right: auto; width: 240px; max-height: 380px; top: 136px; bottom: auto;'
@@ -203,6 +210,70 @@ describe('anchoredPopover', () => {
       seen,
       [{ minLeft: 66, maxRight: 484 }],
       'the boundary is inset 16px on each side and expressed in host coordinates'
+    );
+    handle.destroy();
+  });
+
+  it('clamps the panel inside a string `bounds`, measured by the real picker layout', () => {
+    // THE FORWARDING, END TO END. Every other `bounds` case above stubs `layout` to return null
+    // and asserts the object the action computed — which leaves the LINE THAT HANDS IT ON
+    // (`hostRelativePopoverLayout`'s `minLeft`/`maxRight`) untested: delete that forwarding and
+    // all of those cases stay green, while a real panel jumps from 244 to 400 and hangs over the
+    // edge of the scroller it is supposed to be clipped inside.
+    const { host, root, trigger, panel } = scene({ trigger: box(400, 100, 80, 30) });
+    const scroller = measuring(document.createElement('div'), box(50, 0, 450, 800));
+    scroller.className = 'manager-main';
+    host.append(scroller);
+    scroller.append(root);
+
+    const handle = anchoredPopover(panel, options({ trigger, bounds: MANAGER_MAIN_SELECTOR }));
+
+    assert.equal(
+      panel.getAttribute('style'),
+      'left: 244px; right: auto; width: 240px; max-height: 380px; top: 136px; bottom: auto;',
+      'the 240px panel is pushed left so its right edge sits on the boundary (484 - 240); ' +
+        'left-aligned to the trigger and unclamped it would be 400'
+    );
+    handle.destroy();
+  });
+
+  it('skips a zero-sized or `display: contents` boundary and keeps walking up', () => {
+    // A `display: contents` element HAS NO BOX — it renders its children in its parent's flow and
+    // its rect is empty — so clipping a panel against it produces a boundary of nothing at all.
+    // `ActorSelectTopBar` ships two such wrappers. This is the arrangement that can tell the skip
+    // from its absence: the unusable candidates are NEARER the anchor than the real scroller, so
+    // a walk that took the first match would take one of them.
+    const { host, root, trigger, panel } = scene();
+    const scroller = measuring(document.createElement('div'), box(50, 0, 450, 800));
+    scroller.className = 'manager-main';
+    const contents = measuring(document.createElement('div'), box(200, 0, 100, 800));
+    contents.className = 'manager-main';
+    contents.setAttribute('style', 'display: contents');
+    const collapsed = measuring(document.createElement('div'), box(300, 0, 0, 0));
+    collapsed.className = 'manager-main';
+    host.append(scroller);
+    scroller.append(contents);
+    contents.append(collapsed);
+    collapsed.append(root);
+
+    const seen = [];
+    const handle = anchoredPopover(
+      panel,
+      options({
+        trigger,
+        bounds: pickerScrollerBounds,
+        layout: (triggerRect, panelRect, hostRect, bounds) => {
+          seen.push(bounds);
+          return null;
+        },
+      })
+    );
+
+    assert.deepEqual(
+      seen,
+      [{ minLeft: 66, maxRight: 484 }],
+      'the boundary is the real 50..500 scroller, not the collapsed box at 300 nor the ' +
+        '`display: contents` wrapper at 200..300'
     );
     handle.destroy();
   });
@@ -413,9 +484,13 @@ describe('anchoredPopover', () => {
     );
 
     assert.equal(measures, 1);
-    inner.dispatchEvent(new Event('scroll', { bubbles: true }));
+    // NOT `{ bubbles: true }`. A real `scroll` event does NOT bubble, which is precisely why the
+    // action listens in CAPTURE on `document` — a bubbling stand-in would reach the listener by
+    // a route the product never uses, and the suite would keep passing if the capture flag were
+    // dropped. These are dispatched as the browser dispatches them.
+    inner.dispatchEvent(new Event('scroll'));
     assert.equal(measures, 1, 'scrolling inside the panel moves neither the panel nor its trigger');
-    document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
+    document.body.dispatchEvent(new Event('scroll'));
     assert.equal(measures, 2, 'scrolling an ancestor still repositions');
     handle.destroy();
   });
