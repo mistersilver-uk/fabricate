@@ -437,7 +437,7 @@ test('every shipped-member row carries the status its specimen declares', () => 
     assert.ok(
       MEMBER_STATUSES.includes(row.status),
       `${row.path} carries status ${JSON.stringify(row.status)}, which is outside ` +
-        `${MEMBER_STATUSES.join(', ')}`
+        MEMBER_STATUSES.join(', ')
     );
   }
   for (const row of named) {
@@ -502,7 +502,8 @@ test('a divergent entry names the issue that decided it', () => {
   // decision and none has been taken, so a guard here would fail on a corpus that is CORRECT.
   // The property is written now so the first entry moved there arrives with its reason attached,
   // rather than acquiring the obligation after the fact.
-  for (const row of DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent')) {
+  const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');
+  for (const row of divergentRows) {
     assert.match(
       row.why,
       ISSUE_REFERENCE,
@@ -510,9 +511,10 @@ test('a divergent entry names the issue that decided it', () => {
         'decision was taken; a decision nobody can look up is indistinguishable from drift.'
     );
   }
-  for (const block of NAMING_BLOCKS.filter((candidate) =>
+  const divergentBlocks = NAMING_BLOCKS.filter((candidate) =>
     Object.values(candidate.perNameStatus).includes('divergent')
-  )) {
+  );
+  for (const block of divergentBlocks) {
     const start = librarySource.indexOf(`<h4>&lt;${block.names[0]}&gt;`);
     assert.match(
       librarySource.slice(start, librarySource.indexOf('</div>\n\n', start)),

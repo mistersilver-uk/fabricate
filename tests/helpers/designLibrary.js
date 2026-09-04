@@ -138,7 +138,7 @@ function distinct(values) {
  * @returns {DesignLibraryBlock}
  */
 function readBlock(block) {
-  const heading = block.querySelector('div.spec-head > h4');
+  const heading = block.querySelector(':scope div.spec-head > h4');
   const names = heading === null ? [] : primitiveNamesIn(heading.textContent);
   return {
     status: block.getAttribute('data-status'),
