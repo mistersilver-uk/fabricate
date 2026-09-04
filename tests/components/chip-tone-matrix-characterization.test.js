@@ -76,6 +76,43 @@ function declaredTones() {
 /** Tone → the single class it must add. The whole accepted vocabulary, in source order. */
 const TONE_MATRIX = declaredTones().map((tone) => [tone, `is-${tone}`]);
 
+/**
+ * The REAL `<style>` block, sliced at the tag on its own line rather than at the first
+ * occurrence of the string.
+ *
+ * The distinction is load-bearing, not pedantic: this component's own docblock says "Its CSS
+ * lives in this scoped `<style>`" at line 15, so an `indexOf` slice begins inside the PROSE and
+ * carries every comment in the file. Every mirror guard below then has a second way to pass —
+ * a rule that was deleted still "appears in the style block" as long as some paragraph names
+ * it — which is precisely the silent success these guards exist to remove.
+ */
+const styleBlock = chipSource.slice(chipSource.search(/^<style>$/m));
+
+/**
+ * The body of one rule, so an assertion reads on the declarations that rule actually states
+ * and cannot be answered by an identically-named declaration in the rule next to it.
+ *
+ * @param {string} className the state class, e.g. `is-inspector`
+ * @returns {string} the text from the rule head to its closing brace
+ */
+function ruleFor(className) {
+  const open = styleBlock.indexOf(`.manager-chip.${className} {`);
+  assert.notEqual(open, -1, `${className} still has a rule of its own`);
+  return styleBlock.slice(open, styleBlock.indexOf('}', open));
+}
+
+/**
+ * Where a rule head begins in the block, for the ORDER assertions. -1 when it has none.
+ *
+ * WHOLE-TOKEN, for the same reason the density mirror guard is: a bare `indexOf` for
+ * `.manager-chip.is-tag` finds `.manager-chip.is-tag-run` first, which is a different rule
+ * several hundred characters earlier, and an order assertion answered by the wrong rule is
+ * worse than no order assertion at all.
+ */
+function ruleIndex(className) {
+  return styleBlock.search(new RegExp(String.raw`\.manager-chip\.${className}(?![\w-])`));
+}
+
 function chipNode(target) {
   return target.querySelector('.manager-chip');
 }
@@ -114,7 +151,6 @@ describe('1036 Chip — tone matrix characterization', () => {
     // the class is there, the colour is not, and nothing says so. `is-disabled` and
     // `is-negative` ride joined selectors with `is-warning` / `is-danger`, so the check is
     // "the selector appears in a rule head", not "a rule starts with it".
-    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
     const unpainted = TONE_MATRIX.filter(
       ([, className]) => !styleBlock.includes(`.manager-chip.${className}`)
     ).map(([tone]) => tone);
@@ -257,11 +293,10 @@ describe('1371 Chip — density scale matrix', () => {
   });
 
   it('paints every declared density in the scoped style block', () => {
-    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
     // Whole-token match rather than `includes`, so a longer class that merely STARTS with a
     // shorter one cannot answer for it.
     const unpainted = declaredDensities()
-      .filter(([, className]) => !new RegExp(`\\.manager-chip\\.${className}(?![\\w-])`).test(styleBlock))
+      .filter(([, className]) => !new RegExp(String.raw`\.manager-chip\.${className}(?![\w-])`).test(styleBlock))
       .map(([density]) => density);
     assert.deepEqual(unpainted, [], 'every accepted density declares a geometry');
   });
@@ -306,13 +341,140 @@ describe('1371 Chip — density scale matrix', () => {
     // ratchet, so the block snaps to `--fab-space-chip` (6px) — the scale's own dense optical
     // step, and the nearer of the two neighbours once the reference's default line-height is
     // accounted for. 12px is `--fab-space-3` exactly.
-    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
-    const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const declares = (declaration) =>
-      new RegExp(`\\.manager-chip\\.is-tag-run\\s*\\{[^}]*${escape(declaration)}`);
-    assert.match(styleBlock, declares('padding: var(--fab-space-chip) var(--fab-space-3)'));
-    assert.match(styleBlock, declares('border-radius: 999px'));
-    assert.match(styleBlock, declares('font-size: 11px'));
-    assert.match(styleBlock, declares('font-weight: 600'));
+    const rule = ruleFor('is-tag-run');
+    assert.match(rule, /padding:\s*var\(--fab-space-chip\) var\(--fab-space-3\)/);
+    assert.match(rule, /border-radius:\s*999px/);
+    assert.match(rule, /font-size:\s*11px/);
+    assert.match(rule, /font-weight:\s*600/);
+  });
+
+  it('states the INSPECTOR band in tokens, at the reference values (issue 1371)', () => {
+    // `proto:5663`/`proto:5665` draw the browser inspector's `Tags in effect` run — both its
+    // halves, the world classification's tags and the system's own — at `padding: 3px 9px;
+    // border-radius: 999px; font: 600 10px`. Neither inset is on the published 4px scale that
+    // `spacing-scale-ratchet.test.js` enforces, so the vertical snaps up to `--fab-space-1`
+    // and the horizontal down to `--fab-space-2`; both snaps are one pixel and neither can move
+    // the rendered height, which the base rule's 20px floor decides either way.
+    const rule = ruleFor('is-inspector');
+    assert.match(rule, /padding:\s*var\(--fab-space-1\) var\(--fab-space-2\)/);
+    assert.match(rule, /border-radius:\s*999px/);
+    assert.match(rule, /font-size:\s*10px/);
+    assert.match(rule, /font-weight:\s*600/);
+    // GEOMETRY AND TYPE ONLY. The run's two halves are deliberately differently toned, so a
+    // density that painted a fill or an ink would flatten the distinction the run exists to
+    // draw — the rule `is-list` and `is-tag-run` already state, restated as an assertion here
+    // because this is the density whose reference DOES name colours beside the geometry.
+    assert.ok(!/(?:^|[^-])color:/.test(rule), 'the inspector density paints no ink and no fill');
+  });
+});
+
+/**
+ * THE EMPHASIS AXIS AND THE QUIET FACT PILL (issue 1371).
+ *
+ * The two blocks above characterize the chip's COLOUR FAMILY and its GEOMETRY. This one covers
+ * the third thing this revision gave it — a second colour axis — and the tone that had no
+ * spelling before it.
+ *
+ * `emphasis` exists because a parity run measured a defect that no tone can close. The
+ * reference draws the world Component entry's `World catalogue` badge INSIDE an `info-soft`
+ * callout as a flat plate behind an info hairline (`proto:1313`); `tone="info"` puts an
+ * `info-soft` fill on an `info-soft` panel, which that run reported as no background drift at
+ * all — the badge dissolving into the panel it is meant to stand on. Every one of the eleven
+ * tones paints a wash, so the answer is an axis rather than a twelfth tone.
+ *
+ * The assertions that matter most are the NEGATIVE and the ORDERING ones. The default chip must
+ * be byte-identical to what shipped at 60-odd call sites, an unrecognised value must fall back
+ * rather than emit a class nothing paints, and the rule must stay LAST in the block — every
+ * tone rule is (0,2,0), as this is, so a plate written earlier than `is-tag` would be beaten by
+ * that tone alone and the purple tag chip would be the one shape the emphasis never reached.
+ * That failure is invisible in a class-emission assertion: the class would be there and the
+ * paint would not.
+ */
+describe('1371 Chip — the outlined emphasis and the secondary tone', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  it('emits no emphasis class by default, and DROPS an unrecognised one', async () => {
+    const shipped = await harness.mount({});
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip'],
+      'a chip that does not ask for the plate is exactly its hook class — a second axis that leaked one class here would repaint every call site at once'
+    );
+    harness.remount();
+
+    const typo = await harness.mount({ emphasis: 'ghost' });
+    assert.deepEqual(
+      [...chipNode(typo).classList].filter((name) => name.startsWith('is-')),
+      [],
+      'a typo renders the shipped chip, exactly as an unrecognised tone does, rather than a selector nothing paints'
+    );
+  });
+
+  it('adds is-outlined and composes with the tone rather than replacing it', async () => {
+    const target = await harness.mount({ tone: 'info', emphasis: 'outlined' });
+    const chip = chipNode(target);
+    assert.ok(chip.classList.contains('is-outlined'), 'the emphasis paints its own class');
+    assert.ok(
+      chip.classList.contains('is-info'),
+      'and the tone survives, because the plate takes the FILL and leaves the family its edge and its ink'
+    );
+  });
+
+  it('composes with a density too, so the plate is not a scale', async () => {
+    // The reference's badge is a MICRO pill on a plate (`proto:1313`), which is two axes at
+    // once. A chip that could not be both would force the emphasis to restate a geometry, and
+    // a second statement of the chip's geometry is what issue 883 retired.
+    const target = await harness.mount({ tone: 'info', emphasis: 'outlined', density: 'list' });
+    const classes = [...chipNode(target).classList].filter((name) => name.startsWith('is-'));
+    assert.deepEqual(
+      classes.toSorted((a, b) => a.localeCompare(b)),
+      ['is-info', 'is-list', 'is-outlined'],
+      'three axes, three classes'
+    );
+  });
+
+  it('states the plate as ONE declaration, and states only the fill', () => {
+    // The design claim, as an assertion. `tone="info" emphasis="outlined"` must resolve to the
+    // info border and the info ink on a flat surface, and it does so by NOT restating them:
+    // the tone rules above already say them. Eleven tones times one rule — and the twelfth
+    // tone, whenever it arrives, is outlined for free. A future edit that spelled the edge and
+    // the ink out here would silently make the plate monochrome for every tone.
+    const rule = ruleFor('is-outlined');
+    assert.match(rule, /background:\s*var\(--fab-bg-1\)/, 'the flat plate is the theme surface token');
+    assert.ok(!/border-color:/.test(rule), 'the tone keeps its edge');
+    assert.ok(!/(?:^|[^-])color:/.test(rule), 'and the tone keeps its ink');
+  });
+
+  it('writes the emphasis AFTER every tone rule, so the plate wins the fill', () => {
+    // Equal specificity, so ORDER decides — and the tone that makes this sharp is `is-tag`,
+    // the only one whose fill is a `color-mix` rather than a token and the last tone rule in
+    // the block. This walks every declared tone rather than naming that one, so a tone added
+    // below the emphasis in a later change fails here instead of shipping a shape the plate
+    // cannot reach.
+    const outlined = ruleIndex('is-outlined');
+    assert.ok(outlined > 0, 'the emphasis has a rule');
+    const later = TONE_MATRIX.filter(([, className]) => ruleIndex(className) > outlined).map(
+      ([tone]) => tone
+    );
+    assert.deepEqual(later, [], 'no tone rule is written after the emphasis');
+  });
+
+  it('states the secondary tone in exactly the three reference tokens', () => {
+    // `proto:5721` draws the rules editor's salvage mode pill through the prototype's shared
+    // pill helper with the subtle surface, a plain hairline and the SECONDARY ink. `neutral`,
+    // its nearest neighbour here, inks the MUTED token and declares no fill at all, so it
+    // could not have said this without moving two dozen callers that mean something else.
+    const rule = ruleFor('is-secondary');
+    assert.match(rule, /border-color:\s*var\(--fab-border\)/);
+    assert.match(rule, /color:\s*var\(--fab-text-secondary\)/);
+    assert.match(rule, /background:\s*var\(--fab-surface-soft\)/);
+    assert.ok(
+      !/(?:padding|font-size|font-weight|min-height|border-radius):/.test(rule),
+      'and no geometry, because a tone that resized would reintroduce the drift this component removes'
+    );
   });
 });

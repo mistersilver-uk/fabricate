@@ -240,6 +240,98 @@ describe('StatusPill (mounted)', () => {
   });
 });
 
+/**
+ * `emphasis` IS ONE AXIS ACROSS THE TWO PRIMITIVES THAT HAVE IT (issue 1371).
+ *
+ * The same parity round gave `StatusPill` and the manager's `Chip` a prop of the same name with
+ * the same single value, and the two are now a hand-maintained mirror of each other: a caller
+ * who learns `emphasis="outlined"` on one expects it to mean the same word on the other, and
+ * nothing in either file can see the other rename its value, spell it `outline`, or add a
+ * second one on one side only. That is the rot this guard stops.
+ *
+ * IT LIVES HERE, in the file that owns `StatusPill`'s emphasis tests, because the claim is
+ * about the PAIR. Written in `Chip`'s own suite it would be a second copy of the same parse,
+ * and per-file copies of one block are exactly what the duplication gate counts; written in
+ * neither, the alignment is a comment in two docblocks and nothing else. It reads both sources
+ * as text and mounts nothing, so it needs no entry in this file's harness table.
+ *
+ * WHAT IT MUST NOT DO is demand the two TREATMENTS match, because they deliberately do not.
+ * Each supersedes the opposite axis, and each is right for what its own reference draws:
+ * `StatusPill`'s attribution badge (`proto:834`) is one neutral face whatever state it
+ * annotates, so its emphasis neutralises the EDGE and the INK and keeps the tone's fill;
+ * `Chip`'s catalogue badge (`proto:1313`) is a coloured badge that must not melt into the
+ * coloured panel it sits on, so its emphasis neutralises the FILL and keeps the tone's edge and
+ * ink. A later change that "harmonised" the two would break one of those screens, so the
+ * inversion is pinned as deliberate rather than left to read as an oversight.
+ */
+describe('emphasis is one axis across the two primitives that have it', () => {
+  const SOURCES = {
+    StatusPill: 'src/ui/svelte/components/StatusPill.svelte',
+    Chip: 'src/ui/svelte/apps/manager/Chip.svelte'
+  };
+
+  /**
+   * The accepted emphasis vocabulary, read from a component's own `EMPHASES` literal.
+   *
+   * @param {string} name
+   * @returns {string[]}
+   */
+  function declaredEmphases(name) {
+    const source = readFileSync(resolve(repoRoot, SOURCES[name]), 'utf8');
+    const start = source.indexOf('const EMPHASES = new Set([');
+    assert.notEqual(start, -1, `${name} still declares its emphasis vocabulary as \`EMPHASES\``);
+    const body = source.slice(source.indexOf('[', start), source.indexOf(']);', start));
+    const declared = [...body.matchAll(/'([\w-]+)'/g)].map(([, value]) => value);
+    assert.ok(declared.length > 0, `${name} declares at least one emphasis`);
+    return declared;
+  }
+
+  /**
+   * The declarations one component's emphasis rule states, with its comments stripped so a
+   * paragraph that mentions a property cannot answer for a declaration that states it.
+   *
+   * @param {string} name
+   * @param {string} stem the rule's class stem, e.g. `fab-status-pill`
+   * @returns {string[]} the property names, in source order
+   */
+  function emphasisProperties(name, stem) {
+    const source = readFileSync(resolve(repoRoot, SOURCES[name]), 'utf8');
+    const block = source.slice(source.search(/^<style>$/m)).replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+    const open = block.indexOf(`.${stem}.is-outlined {`);
+    assert.notEqual(open, -1, `${name} paints the outlined emphasis on \`.${stem}\``);
+    const body = block.slice(open, block.indexOf('}', open));
+    return [...body.matchAll(/(?:^|\n)\s*([a-z-]+)\s*:/g)].map(([, property]) => property);
+  }
+
+  it('spells the SAME vocabulary in both, so one word means one thing', () => {
+    assert.deepEqual(
+      declaredEmphases('Chip'),
+      declaredEmphases('StatusPill'),
+      'the two emphasis ramps are a mirror — a value added, renamed or dropped on one side must be answered on the other'
+    );
+  });
+
+  it('supersedes the OPPOSITE axis in each, which is deliberate and stays pinned', () => {
+    const pill = emphasisProperties('StatusPill', 'fab-status-pill');
+    const chip = emphasisProperties('Chip', 'manager-chip');
+
+    assert.ok(
+      pill.includes('border-color') && pill.includes('color'),
+      "the pill's emphasis neutralises the edge and the ink"
+    );
+    assert.ok(
+      !pill.includes('background'),
+      'and keeps the tone FILL, because its attribution badge is one neutral face whatever state it annotates'
+    );
+
+    assert.deepEqual(
+      chip,
+      ['background'],
+      "the chip's emphasis states the FILL and nothing else, so the tone keeps its edge and its ink and every tone is outlined by one rule"
+    );
+  });
+});
+
 describe('Medallion (mounted)', () => {
   it('renders the resolved image when one is passed', async () => {
     const root = await harnessFor('Medallion').mount({ src: 'icons/svg/book.svg', icon: 'fas fa-scroll' });

@@ -27,8 +27,15 @@
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
      `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
-     `tag`, or '' for the default neutral fill. Tone is colour only and never changes the
-     size; a tone that resized would reintroduce the drift this component removes.
+     `secondary`, `tag`, or '' for the default neutral fill. Tone is colour only and never
+     changes the size; a tone that resized would reintroduce the drift this component removes.
+   - emphasis: '' (the shipped chip) or 'outlined' — the chip as a FLAT PLATE rather than a
+     tinted wash, for a badge that has to stand ON a panel of its own colour family
+     (`proto:1313`). It is a SECOND AXIS and not a tenth tone: `tone` says which family the
+     chip belongs to, `emphasis` says whether that family arrives as a wash or as a plate, and
+     the two compose. Anything else resolves to '', exactly as an unrecognised `tone` does, so
+     a chip that does not ask for it is byte-identical to what shipped. Its rule is the last in
+     the style block, and carries the full note.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
@@ -66,8 +73,11 @@
      (`proto:4872`: a ~15px stadium at 9px/600 in the secondary ink on the soft surface) —
      'action', the page
      header's action cluster, where a chip stands in the same row as the Back / Delete /
-     Save buttons and has to be one of them — or 'tag-run', the scale of a chip that is a
-     CONTROL a GM clicks rather than a badge they read (issue 1371). The reference draws
+     Save buttons and has to be one of them — 'tag-run', the scale of a chip that is a
+     CONTROL a GM clicks rather than a badge they read (issue 1371) — or 'inspector', the
+     browser inspector's `Tags in effect` run, which is the DEFAULT chip's height at the
+     reference's own weight and inset rather than a fourth micro scale (its rule below carries
+     the measurement). The reference draws
      every tag chip that way, on the world Component entry (`proto:5401`) and in the rules
      editor's world-tag and own-tag runs (`proto:5692`, `proto:5707`): `padding: 5px 12px`,
      `border-radius: 999px`, `font: 600 11px`, a pill roughly 25px tall against the default
@@ -112,6 +122,7 @@
   let {
     tag = 'span',
     tone = '',
+    emphasis = '',
     mono = false,
     struck = false,
     icon = '',
@@ -170,12 +181,32 @@
     // membership into the success family, `neutral` would erase the tag language, and a
     // `class=` override would re-derive the tone back in the global sheet.
     'tag',
+    // SECONDARY (issue 1371): the quiet FACT pill. The reference's salvage mode pill
+    // (`proto:5721`) is drawn by its own shared pill helper as the subtle surface behind a
+    // plain hairline with the SECONDARY ink, and no tone here inks that. `neutral` is the
+    // nearest and is genuinely a different statement: it inks `--fab-text-muted`, declares no
+    // fill at all, and has two dozen callers meaning "a fact that is merely present". The mode
+    // pill is a step louder than that — it names the rule the GM is reading, on a surface of
+    // its own — and a step quieter than every semantic family.
+    'secondary',
   ]);
+
+  /**
+   * The emphasis vocabulary, closed for the same reason `TONES` is: an unrecognised value
+   * renders the SHIPPED chip rather than emitting an `is-*` class the style block does not
+   * paint, so a typo shows up as the default rather than as a declaration that silently does
+   * nothing. It is a `Set` rather than a ternary because the style block's mirror is guarded by
+   * a test that reads this literal, exactly as the tone matrix reads `TONES`.
+   *
+   * @type {ReadonlySet<string>}
+   */
+  const EMPHASES = new Set(['outlined']);
 
   const classes = $derived(
     [
       'manager-chip',
       TONES.has(tone) ? `is-${tone}` : '',
+      EMPHASES.has(emphasis) ? `is-${emphasis}` : '',
       safeSwatch ? 'has-swatch' : '',
       mono ? 'is-mono' : '',
       struck ? 'is-struck' : '',
@@ -187,6 +218,7 @@
       // matched by whole token, so the scale and the purple tone compose on one chip without
       // either reaching the other's rules.
       density === 'tag-run' ? 'is-tag-run' : '',
+      density === 'inspector' ? 'is-inspector' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -390,6 +422,23 @@
     color: var(--fab-text-muted);
   }
 
+  /* SECONDARY (issue 1371): the quiet FACT pill, one step louder than `neutral` above and one
+     step quieter than every semantic family. `proto:5721` draws the rules editor's salvage
+     mode pill through the prototype's shared pill helper with exactly these three: the subtle
+     surface, a plain `--fab-border` hairline and the SECONDARY ink. `--fab-text-secondary` IS
+     that reference's own secondary ink token, the same equivalence `StatusPill`'s outlined
+     emphasis rests on, so this states a token rather than approximating a colour.
+
+     THREE DECLARATIONS AND NO GEOMETRY, like every tone here. The mode pill's SCALE is
+     `density="list"` — see the micro-pill note in the props block above, which settles both of
+     the reference's micro pills onto that one value rather than adding a scale a pixel from a
+     shipped one. */
+  .manager-chip.is-secondary {
+    border-color: var(--fab-border);
+    color: var(--fab-text-secondary);
+    background: var(--fab-surface-soft);
+  }
+
   /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
      is the ink, for the reason that token was added at all — the raw accent over
      `--fab-accent-soft` measures under AA in `ironblood-forge`, and every other semantic
@@ -549,6 +598,47 @@
     font-weight: 600;
   }
 
+  /* INSPECTOR density (issue 1371): the component browser inspector's `Tags in effect` run.
+     `proto:5663` and `proto:5665` draw both halves of that run — the tags a component inherits
+     from the world classification, and the ones a system sets itself — at one geometry:
+     `padding: 3px 9px; border-radius: 999px; font: 600 10px`.
+
+     IT IS NOT A FOURTH MICRO SCALE, and that is a measurement rather than a preference. The
+     reference's pill is the SAME HEIGHT as the shipped default — its unauthored line box puts a
+     10px face at roughly 12px, so 3 + 12 + 3 plus the hairline is about 20px, which is exactly
+     the base rule's floor — so what a parity lane actually measured as open is TWO properties,
+     not a size: the base scale's `font-weight: 700` against the reference's 600, and its
+     `--fab-space-chip` horizontal inset against a wider one. `is-list` (15px) and `is-tag-run`
+     (25px) are both a different pill; this is the default pill, spoken more quietly.
+
+     THE OTHER TWO DECLARATIONS ARE NOT RESTATEMENTS of the base rule, which is why they are
+     written rather than omitted the way `is-tag-run` omits its floor. The base rule's 10px
+     corner and this 999px are IDENTICAL on one line — 999px clamps to half the shorter side —
+     and diverge the moment a long tag name wraps, where the reference draws a stadium. And
+     `0.62rem` tracks the host document's root font size while the reference's 10px does not,
+     so the two agree in the manager and can disagree wherever else this primitive is reused.
+
+     THE DEFAULT SCALE DOES NOT MOVE, which is the whole reason this is a density and not an
+     edit to the base rule. That rule is what 60-odd call sites render, and one run's parity
+     finding is not a mandate to restyle all of them.
+
+     BOTH INSETS SNAP TO THE PUBLISHED SCALE. 3px and 9px are off the 4px scale
+     `openspec/specs/ui-integration/spec.md` makes normative and
+     `tests/components/spacing-scale-ratchet.test.js` enforces as a ratchet — a gate, not a
+     preference — so the vertical takes `--fab-space-1` (4px, one more) and the horizontal
+     `--fab-space-2` (8px, one less). Neither snap can move the rendered height: 4 + 10 + 4 is
+     18px, still under the base rule's 20px floor, so the pill measures 20px either way.
+
+     GEOMETRY AND TYPE ONLY, no colour, for the reason `is-list` and `is-tag-run` state above
+     and which this run makes vivid: its two halves are deliberately DIFFERENTLY toned, and a
+     density that painted a fill would flatten the distinction the run exists to draw. */
+  .manager-chip.is-inspector {
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
      `--fab-chip-color` the root sets inline. Named `manager-chip-swatch` rather than
      anything matching `manager-chip` on its own, because `manager-layout.test.js`'s
@@ -574,5 +664,46 @@
     border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
     color: var(--fab-text);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-bg-3));
+  }
+
+  /* THE OUTLINED EMPHASIS (issue 1371): the chip as a FLAT PLATE.
+
+     `proto:1313` draws the world Component entry's `World catalogue` badge INSIDE an
+     `info-soft` callout, and does not tint it: the badge is a flat `--bg1` surface behind an
+     info hairline with info ink, so it reads as a different surface sitting ON the panel.
+     `tone="info"` alone cannot say that. It would put an `info-soft` fill on an `info-soft`
+     callout — measured equal, not estimated equal, by a parity run that reported no background
+     drift between the two — and the badge would dissolve into the panel it is meant to stand
+     on. That is the defect, and no combination of the ten tones closes it, because every one of
+     them paints a wash.
+
+     SO EMPHASIS IS A SECOND AXIS, not an eleventh tone. `tone` says which FAMILY the chip
+     belongs to; `emphasis` says whether that family arrives as a wash or as a plate. ONE
+     declaration expresses the whole of it, because the tone rules above already state the edge
+     and the ink it needs: `tone="info" emphasis="outlined"` is `--fab-info-border` and
+     `--fab-info-text` on `--fab-bg-1`, and a toneless outlined chip keeps the base rule's
+     `--fab-border` and `--fab-text`. Eleven tones times one rule, rather than eleven more rules
+     — and a tone added later is outlined for free.
+
+     IT IS THE MIRROR OF `StatusPill`'s EMPHASIS OF THE SAME NAME, and the axis it supersedes is
+     the OPPOSITE one. Stating that plainly because the shared prop name invites the assumption
+     that the two are the same declarations: that pill's outlined emphasis neutralises the EDGE
+     and the INK and keeps the tone's fill, because its reference draws one neutral attribution
+     badge whatever state it annotates (`proto:834`); this one neutralises the FILL and keeps
+     the tone's edge and ink, because its reference draws a coloured badge that must not melt
+     into a coloured panel. What the two genuinely share is the meaning of the word — a
+     hairline-edged plate rather than a tinted wash — which is why this is that prop's second
+     value and not a differently named prop.
+
+     WRITTEN LAST IN THE BLOCK, and that ordering is load-bearing rather than tidy. Every tone
+     rule is (0,2,0), as this is, so order decides the fill; `is-tag` immediately above is the
+     final tone rule and the only one whose fill is a `color-mix` rather than a token, so an
+     emphasis written anywhere earlier would be beaten by that tone alone and the purple tag
+     chip would be the one shape the plate did not reach. `is-struck` also states a fill and
+     also sits earlier, so a struck outlined chip keeps its dashed edge and its line-through and
+     takes the plate — the composition this axis promises, though no caller pairs the two
+     today. */
+  .manager-chip.is-outlined {
+    background: var(--fab-bg-1);
   }
 </style>
