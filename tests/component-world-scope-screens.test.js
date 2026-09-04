@@ -120,11 +120,39 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   });
 
   it('and the usage argument gains a component leg beside its two siblings', () => {
+    // RE-PINNED TO LANE STORE'S SHARED LIBRARY READ (revision 8). The essence leg took no
+    // argument and fetched the world's recipes itself; it is now handed the SAME `worldRecipes`
+    // array the projection's `recipes` key already binds, so the leg that was a second unfiltered
+    // read of the whole library is a pass of one that had already happened. This pin is a literal
+    // and stays one: the three legs and their three arguments are the claim, because an argument
+    // silently dropped from any of them restores exactly the per-publish cost the composition
+    // exists to remove, with no rendered symptom at all.
     assert.match(
       adminStore,
-      /usage: \{\s*component: _worldComponentUsage\(recipeCache\),\s*essence: _worldEssenceUsage\(\),\s*tool: _worldToolUsage\(recipeCache\),\s*\}/,
+      /usage: \{\s*component: _worldComponentUsage\(recipeCache\),\s*essence: _worldEssenceUsage\(worldRecipes\),\s*tool: _worldToolUsage\(recipeCache\),\s*\}/,
       'the projection already consumed this argument; two of three legs were wired and the ' +
         'third answered 0 recipes for every world component in the world'
+    );
+    // AND `worldRecipes` IS BOUND ONCE AND PASSED TWICE, which is what makes the line above a
+    // SHARED read rather than a renamed one. Without this half, an essence leg handed
+    // `_allRecipes()` inline — a second full library fetch per publish — matches nothing here
+    // only by luck of the identifier, and a `worldRecipes` re-derived per consumer would satisfy
+    // the regex above exactly while costing what the composition was written to stop.
+    //
+    // NOT ASSERTED AS A COUNT OF `_allRecipes()`, and that is measured rather than assumed: the
+    // reader's own DECLARATION, the essence leg's default parameter and two prose mentions all
+    // match that text, so a count is four-ish for reasons that have nothing to do with the claim.
+    // The two bindings below are what the claim actually is, and the leg's own default parameter
+    // belongs to the store's suite rather than to this one.
+    assert.match(
+      adminStore,
+      /const worldRecipes = _allRecipes\(\);/,
+      'the world library is read ONCE per publish and bound to a name'
+    );
+    assert.match(
+      adminStore,
+      /recipes: worldRecipes,/,
+      'and the projection input takes that binding rather than calling the reader again'
     );
     // AND THE TWO LEGS THAT WALK THE RECIPES SHARE ONE READ. The per-refresh recipe fetch is a
     // bounded budget the store's own suite asserts, and a second consumer reading the cohort
