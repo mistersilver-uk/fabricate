@@ -348,6 +348,96 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     );
   });
 
+  // ── `selectAllScope`: THE BAND WITHOUT ITS MASTER BOX (issue 1371, gap-list row 37) ────────
+  it('keeps the master box and the results wording under the shipped scope', async () => {
+    // THE DEFAULT HALF, asserted first and in both directions. A prop that suppressed the box
+    // for everybody would still satisfy every `'shown'` assertion below.
+    const root = await toolbar.mount({
+      pageSelectionState: 'some',
+      count: 3,
+      showSelectAllResults: true,
+      selectAllResultsCount: 9
+    });
+    assert.ok(
+      Boolean(root.querySelector('[data-component-select-all-page]')),
+      'the shipped band lost its tri-state box, so the three studios cannot start a selection from it'
+    );
+    assert.equal(
+      root.querySelector('[data-component-select-all-results]').textContent.trim(),
+      'Select all 9 results',
+      'the shipped band names the FILTERED set, which is the population its link acts on'
+    );
+  });
+
+  it('drops the master box and names the SHOWN rows under selectAllScope="shown"', async () => {
+    // `proto:592-596` draws a count, a standing sentence, one `Select all {n} shown` and Clear —
+    // no master box anywhere, and its one action selects the rows on screen. Both halves are one
+    // ruling, so both are asserted together: a variant that dropped the box and kept `results`
+    // would offer the filtered set with no way to take the page.
+    const root = await toolbar.mount({
+      pageSelectionState: 'some',
+      count: 3,
+      showSelectAllResults: true,
+      selectAllResultsCount: 9,
+      selectAllScope: 'shown'
+    });
+    assert.ok(
+      !root.querySelector('[data-component-select-all-page]'),
+      'the master box is still drawn beside a link that already covers the rows it acts on'
+    );
+    assert.ok(
+      !root.querySelector('.fab-bulk-selection-all'),
+      'and its label host goes with it — an empty click target is worse than no control'
+    );
+    assert.equal(
+      root.querySelector('[data-component-select-all-results]').textContent.trim(),
+      'Select all 9 shown',
+      'the one remaining action still names `results`, which is not the population it now takes'
+    );
+    // The count, the hint and Clear are untouched by the scope: it is a ruling about the
+    // select-all pair and nothing else.
+    assert.match(
+      root.querySelector('[data-component-selection-count]').textContent,
+      /3 selected/,
+      'the count is the fact the band acts on and is not part of this ruling'
+    );
+    assert.ok(Boolean(root.querySelector('[data-component-clear-selection]')), 'Clear survives');
+  });
+
+  it('renders NOTHING under "shown" while the selection is empty, rather than an empty row', async () => {
+    // Everything except the box lives behind `count > 0`, so suppressing the box leaves a
+    // bordered, padded row with no children — `.is-selection` in the global sheet gives that row
+    // its metrics and its hairline, so it is visible. `proto:591` gates the whole band on the
+    // selection for exactly this reason.
+    const empty = await toolbar.mount({ count: 0, selectAllScope: 'shown' });
+    assert.ok(
+      !empty.querySelector('[data-component-selection-toolbar]'),
+      'an empty band still renders its bordered row with nothing inside it'
+    );
+
+    // AND THE DEFAULT STILL RENDERS AT ZERO, which is the assertion that keeps the one above
+    // from being a licence to delete the band: the shipped studios show the box at zero selection
+    // because the box is how a selection starts.
+    const shipped = await toolbar.mount({ count: 0 });
+    assert.ok(
+      Boolean(shipped.querySelector('[data-component-selection-toolbar]')),
+      'the shipped band stopped rendering at zero selection, which deletes the control that starts one'
+    );
+  });
+
+  it('renders the shipped band for an unrecognised scope rather than deleting its box', async () => {
+    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state: a typo shows
+    // up as the default, never as a silently missing control.
+    for (const selectAllScope of ['results', 'Shown', 'page', '', undefined]) {
+      const root = await toolbar.mount({ count: 2, selectAllScope });
+      assert.ok(
+        Boolean(root.querySelector('[data-component-select-all-page]')),
+        `\`${String(selectAllScope)}\` is not a scope this band offers, so it renders the shipped one`
+      );
+      toolbar.remount();
+    }
+  });
+
   it('groups the two text actions at the trailing edge only when asked, and pays for the pair', () => {
     // ── WHY THIS IS A SOURCE ASSERTION AND NOT A MOUNTED ONE ─────────────────────────────────
     // happy-dom computes no cascade, so the mounted tree can state that `is-trailing` is on the

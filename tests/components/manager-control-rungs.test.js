@@ -31,6 +31,20 @@
  * things across eleven bars and that the bar takes a slot rather than choosing between them. So
  * the contract a caller opts into for a `<select>` is the class, and the field's prop emits that
  * same class.
+ *
+ * ── ROUND 6 ADDED ONE CONTROL TO EACH HALF ──────────────────────────────────────────────────
+ * The BUTTON joins M12b: `+ Register item` (`proto:570`) and `+ Add from catalogue`
+ * (`proto:1046`) are both drawn at 38, so `ManagerButton` emits the same `is-size-38` token the
+ * field does, and the sheet gives it the height alone — 34 and 38 are both inside the radius
+ * ladder's 34-38px band, so the corner the primitive already states is right at either height.
+ *
+ * `InspectorActionButton` joins M12a: its own scoped block declared `min-height: 34px` with
+ * `border-radius: 6px`, which is the identical off-ladder pairing on a second primitive, and the
+ * rules list measured it as the last line on `sys-inspector-foot-action`. It is a scoped block
+ * rather than a sheet rule, so it is read from the component's own source below — and that is
+ * also why no rule in `styles/fabricate.css` could have corrected it: that sheet ships at
+ * `layer(modules)` and an injected scoped block is unlayered, so a layered rule loses at any
+ * specificity.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -299,5 +313,106 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     const source = readFileSync(resolve(repoRoot, FIELD), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
+  });
+
+  // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
+  const BUTTON = 'src/ui/svelte/components/ManagerButton.svelte';
+  const buttonRule = '.fabricate-manager .manager-button.fab-manager-button.is-size-38';
+
+  it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
+    const [body] = bodiesOf(buttonRule);
+    assert.equal(pixels(valueOf(body, 'min-height')), 38, 'the button opts into the 38px rung');
+    // `min-height`, matching the property the rule it overrides declares: a `height` here would
+    // win the size argument while leaving a 34px floor underneath it.
+    assert.equal(valueOf(body, 'height'), null, 'the rung states min-height, as the rule it overrides does');
+    // AND NO RADIUS. Both rungs are inside the 34-38px band, so restating 9 here would be a
+    // second source of truth for one value — the failure the primitive's docblock exists to end.
+    assert.equal(
+      valueOf(body, 'border-radius'),
+      null,
+      'the rung restates a corner the primitive already declares for this whole band'
+    );
+    const [primitive] = bodiesOf('.fabricate-manager .manager-button.fab-manager-button');
+    assert.equal(
+      pixels(valueOf(primitive, 'border-radius')),
+      9,
+      'and that corner is 9 — the band’s, which is why the rung needs none of its own'
+    );
+    assert.ok(
+      BAND_9.includes(38) === false ? false : 38 >= BAND_9[0] && 38 <= BAND_9[1],
+      '38 is inside the band whose corner the primitive states'
+    );
+  });
+
+  it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
+    const [primitive] = bodiesOf('.fabricate-manager .manager-button.fab-manager-button');
+    assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
+    // A specificity claim, not a source-order one: the shipped rule is (0,3,0) and states the
+    // height, so an opt-in written at the same weight would be decided by where it was written.
+    assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
+  });
+
+  it('emits the same token the field does, as a LITERAL, for the dead-rule gate', async () => {
+    const source = readFileSync(resolve(repoRoot, BUTTON), 'utf8');
+    const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
+    assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
+    // ONE RUNG, ONE TOKEN. Two primitives spelling the same rung differently is the drift the
+    // shared name exists to prevent, and nothing else in the tree can see it.
+    const fieldScript = readFileSync(resolve(repoRoot, FIELD), 'utf8');
+    assert.equal(
+      (script.match(/'is-size-\d+'/g) ?? []).join(' '),
+      (fieldScript.match(/'is-size-\d+'/g) ?? []).join(' '),
+      'the button and the field name different rungs, so one ladder is spelled two ways'
+    );
+  });
+});
+
+describe('M12a — the inspector rail’s action button takes the corner its height is on', () => {
+  const ACTION = 'src/ui/svelte/apps/manager/InspectorActionButton.svelte';
+
+  /** One rule body from a component's own scoped block, comments stripped. */
+  function scopedRule(componentPath, selector) {
+    const source = readFileSync(resolve(repoRoot, componentPath), 'utf8');
+    const block = stripCssComments(source.slice(source.search(/^<style>$/m) + '<style>'.length));
+    const found = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+      ([, head]) => head.trim().replaceAll(/\s+/g, ' ') === selector
+    );
+    assert.equal(found.length, 1, `${componentPath} still declares exactly one \`${selector}\` rule`);
+    return found[0][2];
+  }
+
+  it('states the 34px control AND the band’s 9px corner on one rule', () => {
+    const body = scopedRule(ACTION, '.fab-inspector-action');
+    assert.equal(pixels(valueOf(body, 'min-height')), 34, 'this is still the rule that sizes the control');
+    assert.equal(
+      pixels(valueOf(body, 'border-radius')),
+      9,
+      'a 34px control is painting the chip rung the ladder gives to something at or below 24px'
+    );
+  });
+
+  it('is unreachable from the sheet, which is why the fix is in the component', () => {
+    // The measurement, not an opinion: `styles/fabricate.css` ships at `layer(modules)` and this
+    // block is injected unlayered, so a rule there is emitted, matches, and has its declaration
+    // discarded. A future author reaching for the sheet needs to find this stated.
+    const declarations = css
+      .split('}')
+      .filter((block) => /\.fab-inspector-action[^{]*\{/.test(block));
+    assert.deepEqual(
+      declarations,
+      [],
+      'a rule in the global sheet targets this primitive’s own element, where it cannot win'
+    );
+  });
+
+  it('leaves the primary’s retired 36px rung exactly as it stands, which is booked debt', () => {
+    // 36 is NOT on the ladder — `control-height-known-literals.js` already books it — and paying
+    // it down is a separate change with its own repaint. What matters here is that this edit did
+    // not quietly move it, and that 36 is inside the band the corner above serves, so the two
+    // are not in conflict.
+    const body = scopedRule(ACTION, '.fab-inspector-action.is-primary');
+    assert.equal(pixels(valueOf(body, 'min-height')), 36, 'the primary’s height is unchanged by this edit');
+    assert.ok(!LADDER_RUNGS.includes(36), '36 is still a retired rung, so this stays booked debt');
+    assert.equal(valueOf(body, 'border-radius'), null, 'and it states no corner, so it takes the 9 above');
   });
 });

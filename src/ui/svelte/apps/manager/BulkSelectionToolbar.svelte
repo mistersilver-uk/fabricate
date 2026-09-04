@@ -33,6 +33,38 @@
   where the prototype would not show it. That is correct; a collapsed group's rows are
   exactly the rows the page control cannot reach.
 
+  ── `selectAllScope`: ONE ACTION OVER THE SHOWN ROWS (issue 1371, gap-list row 37) ─────────
+
+  The world Component catalogue's band draws NEITHER of those two controls. `proto:592-596`
+  is a count, a standing sentence, one clickable `Select all {n} shown`, and Clear — no
+  master box anywhere, and the one action selects the rows on screen (`proto:5235`:
+  `rows.forEach(c => s2[c.id] = 1)`).
+
+  So this is ONE prop and not two, because the reference is one ruling: the box's job MOVES
+  INTO the link. Suppressing the box while leaving the link naming `results` would offer the
+  filtered set and no way to take the page; renaming the link while leaving the box would
+  offer the same population twice, one click apart. `bareActions` below argues the identical
+  case for the pair it governs — splitting a single ruling lets a caller take half of it.
+
+   - `'results'` — the default, and today's band exactly: the tri-state box over the
+     rendered rows, and `Select all {N} results` over the whole filtered set when the caller
+     says one is reachable. The Component, Recipe and Essence Studios are byte-identical
+     across this change.
+   - `'shown'` — no box, and the link reads `Select all {n} shown`. `pageSelectionState`,
+     `onTogglePage`, `selectAllLabel` and `pageBoxAttr` are inert under it, because the
+     control they parameterise is not rendered.
+
+  WHAT THE CALLER MUST WIRE, because this component names a population and does not choose
+  one: under `'shown'` the caller passes the count of the rows it is RENDERING as
+  `selectAllResultsCount` and points `onSelectAllResults` at those same rows. It should also
+  pass `showSelectAllResults` on whenever there is a selection, since the band otherwise has
+  no select-all affordance at all — the box that used to be one is gone.
+
+  AND THE BAND STOPS RENDERING WHEN IT WOULD BE EMPTY. Everything except the box lives
+  behind `count > 0`, so under `'shown'` a zero selection would leave a bordered row with
+  nothing in it. `proto:591` gates the whole band on `selActive` for exactly that reason.
+  Under the default the box is always there, so the root always renders and nothing moves.
+
   The model returns DATA (`describeBulkSelection`) and this component localizes it — the
   pure model carries no strings. Its four labels are NOUN-FREE, so they live in the neutral
   `Admin.Manager.BulkEdit.*` namespace rather than under either studio. (Written without its
@@ -64,6 +96,10 @@
     onTogglePage = () => {},
     onSelectAllResults = () => {},
     onClear = () => {},
+    // WHICH POPULATION THIS BAND'S SELECT-ALL NAMES, and therefore whether the tri-state master
+    // box is drawn at all. `'results'` is today's band exactly; `'shown'` is the reference's
+    // catalogue band. See the block above — it is one prop because the reference is one ruling.
+    selectAllScope = 'results',
     // The VISIBLE caption on the select-all box, when a caller wants one shorter than the shared
     // phrase. `''` — the default — keeps the shipped words, so the three studios are untouched.
     // See `selectAllCaption` below for why the accessible name does not follow it.
@@ -194,56 +230,87 @@
     })
   );
   const clearLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear'));
+
+  // A CLOSED SET WITH A FALLBACK, as `Chip`'s tone and `ManagerButton`'s role are: an
+  // unrecognised value renders the shipped band rather than silently deleting its master box.
+  const showsShown = $derived(selectAllScope === 'shown');
+
+  // The label the ONE action carries under `'shown'`. Built from its own key rather than from
+  // `SelectAllResults` with a swapped word, because `{count} results` and `{count} shown` are
+  // different sentences about different populations and a translator needs both.
+  const shownLabel = $derived(
+    format('FABRICATE.Admin.Manager.BulkEdit.SelectAllShown', 'Select all {count} shown', {
+      count: selectAllResultsCount,
+    })
+  );
+
+  // The band's whole content is the master box plus everything behind `count > 0`. With the box
+  // suppressed and nothing selected there is no content, and an empty bordered row is not a
+  // thing this component may render — the reference gates the band on the selection for the
+  // same reason. Under the default this is always true, so the root always renders.
+  const renders = $derived(!showsShown || count > 0);
 </script>
 
-<div class="{rowClass} is-selection" {...toolbarHook}>
-  <!--
-    `wrapper="contents"` because THIS element is the label: the box and its caption are one
-    click target, and nesting the primitive's own `<label>` inside another would be invalid
-    HTML with an ambiguous target. The focus ring therefore belongs to this host — the
-    primitive scopes its own ring to the wrapper IT renders — so the focus-ring rule below
-    is load-bearing, not decoration. Read its comment before touching its shape: this rule
-    reaches into another component's markup, and the obvious authoring of it compiles to
-    nothing at all.
-  -->
-  <label class="fab-bulk-selection-all">
-    <SelectionCheckbox
-      wrapper="contents"
-      size="md"
-      checked={pageSelectionState === 'all'}
-      indeterminate={pageSelectionState === 'some'}
-      ariaLabel={selectAllLabel}
-      {...pageBoxHook}
-      onChange={(on) => onTogglePage(on === true)}
-    />
-    <span class="fab-bulk-selection-all-label">{selectAllCaption}</span>
-  </label>
+{#if renders}
+  <div class="{rowClass} is-selection" {...toolbarHook}>
+    {#if !showsShown}
+      <!--
+        `wrapper="contents"` because THIS element is the label: the box and its caption are one
+        click target, and nesting the primitive's own `<label>` inside another would be invalid
+        HTML with an ambiguous target. The focus ring therefore belongs to this host — the
+        primitive scopes its own ring to the wrapper IT renders — so the focus-ring rule below
+        is load-bearing, not decoration. Read its comment before touching its shape: this rule
+        reaches into another component's markup, and the obvious authoring of it compiles to
+        nothing at all.
 
-  {#if count > 0}
-    <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
-    <span class="fab-bulk-selection-count" {...countHook}>
-      <i class={countIcon} aria-hidden="true"></i>
-      <span>{countLabel}</span>
-    </span>
-    {#if hint}
-      <span class="fab-bulk-selection-hint">{hint}</span>
+        SUPPRESSED UNDER `selectAllScope="shown"`, where the reference draws no master box at
+        all and the select-all link takes over the population it acted on.
+      -->
+      <label class="fab-bulk-selection-all">
+        <SelectionCheckbox
+          wrapper="contents"
+          size="md"
+          checked={pageSelectionState === 'all'}
+          indeterminate={pageSelectionState === 'some'}
+          ariaLabel={selectAllLabel}
+          {...pageBoxHook}
+          onChange={(on) => onTogglePage(on === true)}
+        />
+        <span class="fab-bulk-selection-all-label">{selectAllCaption}</span>
+      </label>
     {/if}
-    {#if showSelectAllResults}
+
+    {#if count > 0}
+      <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
+      <span class="fab-bulk-selection-count" {...countHook}>
+        <i class={countIcon} aria-hidden="true"></i>
+        <span>{countLabel}</span>
+      </span>
+      {#if hint}
+        <span class="fab-bulk-selection-hint">{hint}</span>
+      {/if}
+      {#if showSelectAllResults}
+        <button
+          type="button"
+          class="fab-bulk-selection-link"
+          class:is-trailing={trailingActions}
+          class:is-bare={bareActions}
+          {...resultsHook}
+          onclick={() => onSelectAllResults()}>{showsShown ? shownLabel : resultsLabel}</button
+        >
+      {/if}
       <button
         type="button"
-        class="fab-bulk-selection-link"
-        class:is-trailing={trailingActions}
-        class:is-bare={bareActions}
-        {...resultsHook}
-        onclick={() => onSelectAllResults()}>{resultsLabel}</button
+        class="fab-bulk-selection-clear"
+        {...clearHook}
+        onclick={() => onClear()}
       >
+        {#if !bareActions}<i class="fas fa-xmark" aria-hidden="true"></i>{/if}
+        <span>{clearLabel}</span>
+      </button>
     {/if}
-    <button type="button" class="fab-bulk-selection-clear" {...clearHook} onclick={() => onClear()}>
-      {#if !bareActions}<i class="fas fa-xmark" aria-hidden="true"></i>{/if}
-      <span>{clearLabel}</span>
-    </button>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   /* THEME-ROOT tokens only, like every scoped `<style>` in the product. The reason once

@@ -40,7 +40,8 @@
   Props:
    - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning' | 'info'; anything else
      resolves to 'subtle'.
-   - emphasis: '' (the shipped pill) or 'outlined' — see below; anything else resolves to ''.
+   - emphasis: '' (the shipped pill), 'outlined' or 'bare' — see below; anything else resolves
+     to ''.
    - icon: a Font Awesome class string (e.g. 'fas fa-lock'); omitted renders none.
    - label: the already-localized pill text.
    - title: optional hover text.
@@ -76,6 +77,38 @@
   three declarations are written after every tone rule so they win at equal specificity —
   the same construction, and the same rationale, as `Chip`'s `struck` variant. `subtle` is
   the tone it is drawn with; another tone composes, and keeps its own fill.
+
+  ── THE BARE EMPHASIS IS THE SAME BADGE INSIDE A DENSE ROW (issue 1371) ────────────────
+
+  `emphasis` names a FACE, and the two faces this pill draws differ in exactly one visible
+  thing: their edge. `outlined` GAINS a hairline, because the entry page draws the
+  attribution badge on a card with room around it. `bare` has NO edge at all, because the
+  world Component catalogue draws the SAME KIND of badge — the source attribution beside a
+  row's name (`proto:601`) — inside a list row eleven pixels tall in the gaps, where a
+  hairline on every row reads as a grid.
+
+  The reference states it as `gap:4px; padding:1px 7px; border-radius:999px; background:
+  var(--surface-raised); font:600 9px var(--sans); color:var(--subtle)`, with a 7px glyph and
+  no `border` property at all — so its computed edge is `0px none currentColor` where the
+  shipped pill's is `1px solid transparent`. Those three computed values are three of the six
+  parity lines this variant closes; the band and the type size are the other three.
+
+  IT SUPERSEDES NEITHER THE FILL NOR THE INK, which is what separates it from `outlined`. The
+  reference's row badge is `--surface-raised` under `--subtle`, and that IS the `subtle`
+  tone this pill already declares, reached rather than restated: `border: 0` resets the edge
+  COLOUR to `currentColor` in the same declaration, so the tone's own ink answers for it.
+  The catalogue's unlinked row draws the same badge in `warning`, and it keeps every colour
+  that tone states.
+
+  ONE AXIS, TWO ALTERNATIVES: `outlined` and `bare` are not composable and no caller passes
+  both, because `emphasis` resolves to a single value. A pill needing an edge asks for
+  `outlined`; a pill needing none asks for `bare`.
+
+  THE BAND IS THE DENSE UNIT PLUS THE HAIRLINE IT NO LONGER SPENDS. `--fab-space-chip` is
+  6px and the edge this face drops was 1px, so `calc(var(--fab-space-chip) + 1px)` is the
+  reference's 7px stated as a derivation rather than as a literal off the 4px scale — the
+  band the pill keeps is unchanged, the pixel simply moves from the border box into the
+  padding box.
 -->
 <script>
   let { tone = 'subtle', emphasis = '', icon = '', label = '', title = '' } = $props();
@@ -89,9 +122,12 @@
    * style block does not paint. `data-status-pill-emphasis` reports the RESOLVED value and
    * is OMITTED when there is none, so a default pill's DOM is byte-identical to what shipped.
    *
+   * Two values, one axis: `outlined` gains a hairline edge, `bare` has none. They are
+   * ALTERNATIVES and never compose — see the docblock above for the two references.
+   *
    * @type {ReadonlySet<string>}
    */
-  const EMPHASES = new Set(['outlined']);
+  const EMPHASES = new Set(['outlined', 'bare']);
 
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'subtle');
   const resolvedEmphasis = $derived(EMPHASES.has(emphasis) ? emphasis : '');
@@ -189,5 +225,38 @@
      moment anyone composed the two. */
   .fab-status-pill.is-outlined i:not(.fa-circle) {
     font-size: 8px;
+  }
+
+  /* THE BARE EMPHASIS (issue 1371). `proto:601` exactly: `gap:4px; padding:1px 7px; font:600
+     9px`, and NO `border` property, so the reference's computed edge is `0px none currentColor`
+     against this pill's `1px solid transparent`.
+
+     `border: 0` RATHER THAN `border-width: 0`, and the difference is the third of those three
+     computed values. The shorthand resets `border-color` to its initial `currentColor`, so the
+     edge takes the tone's own ink exactly as the reference's does; `border-width: 0` alone would
+     leave the base rule's `transparent` sitting on a zero-width edge, which measures as a
+     different computed colour for no reason a reader could see.
+
+     THE FILL AND THE INK ARE THE TONE'S, untouched — which is the whole difference between this
+     face and `is-outlined` above. `subtle` already declares the reference's `--surface-raised`
+     under `--fab-text-subtle`, so this face is that tone REACHED rather than restated, and the
+     catalogue's unlinked row keeps every colour `warning` states.
+
+     WRITTEN AFTER EVERY TONE RULE, for `is-outlined`'s reason: at (0,2,0) this ties each tone
+     rule, so `border: 0` wins on source order. It stands after `is-outlined` too, which is
+     immaterial to the cascade — `emphasis` resolves to one value, so the two classes are never
+     emitted together — and keeps the two faces in the order the docblock introduces them. */
+  .fab-status-pill.is-bare {
+    gap: var(--fab-space-1);
+    padding: 1px calc(var(--fab-space-chip) + 1px);
+    border: 0;
+    font-size: 9px;
+  }
+
+  /* `:not(.fa-circle)` for the reason the outlined glyph rule states in full: the 6px status DOT
+     is written earlier at the same (0,3,1), so an unqualified selector would tie it, win on
+     order, and inflate the On/Off dot the moment anyone composed the two. */
+  .fab-status-pill.is-bare i:not(.fa-circle) {
+    font-size: 7px;
   }
 </style>

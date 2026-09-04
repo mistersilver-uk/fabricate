@@ -223,6 +223,81 @@ describe('StatusPill (mounted)', () => {
     );
   });
 
+  // ── THE BARE EMPHASIS (issue 1371, gap-list row 13) ───────────────────────────────────
+  //
+  // `proto:601` draws the catalogue row's source badge as the SAME KIND of thing `outlined`
+  // draws on the entry page — an attribution pill — with one visible difference: it has no
+  // edge at all, because it sits in a list row where a hairline on every row reads as a grid.
+  // Measured against the shipped pill it is six computed lines: the edge's width, style and
+  // colour, the type size, and both inline paddings.
+  //
+  // The two assertions that matter most are the ones about what it does NOT do. It must not
+  // touch the tone's fill or ink — the reference's badge is `--surface-raised` under
+  // `--subtle`, which IS the `subtle` tone this pill already declares, and the catalogue's
+  // unlinked row draws the same badge in `warning` — and an absent `emphasis` must still
+  // render byte-identically to what shipped.
+  it('adds is-bare and reports the resolved emphasis when asked', async () => {
+    const root = await harnessFor('StatusPill').mount({
+      tone: 'subtle',
+      emphasis: 'bare',
+      icon: 'fas fa-link',
+      label: 'World item'
+    });
+    const pill = root.querySelector('[data-status-pill="subtle"]');
+    assert.ok(pill.classList.contains('is-bare'), 'the emphasis paints its own class');
+    assert.ok(
+      pill.classList.contains('is-subtle'),
+      'and it composes with the tone rather than replacing it'
+    );
+    assert.ok(
+      !pill.classList.contains('is-outlined'),
+      'the two faces are ALTERNATIVES on one axis — a pill wearing both would take the edge it exists to drop'
+    );
+    assert.equal(pill.getAttribute('data-status-pill-emphasis'), 'bare');
+  });
+
+  it('composes with a NON-subtle tone, because the row draws one', async () => {
+    // The catalogue's unlinked row is `tone="warning"` with the same face. If this variant
+    // stated a colour of its own, that row would lose the amber the tone is there to say.
+    const root = await harnessFor('StatusPill').mount({
+      tone: 'warning',
+      emphasis: 'bare',
+      label: 'Broken link'
+    });
+    const pill = root.querySelector('[data-status-pill="warning"]');
+    assert.ok(pill.classList.contains('is-warning') && pill.classList.contains('is-bare'));
+  });
+
+  it('states the bare pill in tokens, at the reference band, and touches no colour', () => {
+    // `proto:601`: `gap:4px; padding:1px 7px; font:600 9px`, a 7px glyph, and NO `border`
+    // property — so the reference's computed edge is `0px none currentColor`.
+    const rule = statusPillSource.slice(
+      statusPillSource.indexOf('.fab-status-pill.is-bare {'),
+      statusPillSource.lastIndexOf('</style>')
+    );
+    assert.match(rule, /gap:\s*var\(--fab-space-1\)/, '--fab-space-1 IS the reference 4px');
+    // The band is the dense unit plus the hairline the face no longer spends on an edge:
+    // `--fab-space-chip` is 6px, so this is 7px stated as a derivation rather than as a
+    // literal off the published 4px scale, which `spacing-scale-ratchet` would book as debt.
+    assert.match(rule, /padding:\s*1px calc\(var\(--fab-space-chip\) \+ 1px\)/);
+    // `border: 0`, not `border-width: 0`: the shorthand resets the edge COLOUR to
+    // `currentColor`, which is what makes the tone's own ink answer for it. `border-width`
+    // alone would leave the base rule's `transparent` on a zero-width edge — a different
+    // computed colour, for no reason a reader could see.
+    assert.match(rule, /(?:^|\n)\s*border:\s*0;/);
+    assert.match(rule, /font-size:\s*9px/);
+    assert.match(rule, /font-size:\s*7px/, 'and the leading glyph drops to the reference 7px');
+    // AND IT STATES NO COLOUR AT ALL. That is the whole difference from `is-outlined`, and it
+    // is what lets one variant serve both the linked and the broken row.
+    const declarations = rule
+      .replaceAll(/\/\*[\s\S]*?\*\//g, ' ')
+      .slice(0, rule.replaceAll(/\/\*[\s\S]*?\*\//g, ' ').indexOf('}'));
+    assert.ok(
+      !/(?:^|;|\n)\s*(?:color|background)\s*:/.test(declarations),
+      `the bare face states a colour of its own, so the tone stops deciding it: ${declarations}`
+    );
+  });
+
   it('states the outlined pill in tokens, at the reference band', () => {
     // `proto:834`: `padding:2px 8px; border:1px solid var(--border); font:600 9px; color:
     // var(--text2)`, with an 8px glyph. Every one of those is a theme-root token here —
@@ -330,7 +405,11 @@ describe('emphasis is one axis across the two primitives that have it', () => {
     // over a wash of it (`proto:5401`, `proto:5665`); no `StatusPill` in the reference does that,
     // and the pill has no `--fab-chip-color` vehicle to do it through.
     Chip: ['lit'],
-    StatusPill: []
+    // `StatusPill` only. The reference draws an EDGELESS attribution badge inside a dense list
+    // row (`proto:601`, the catalogue row's source pill); every `Chip` the reference draws in a
+    // row keeps an edge, and a chip's own `outlined` face exists to neutralise a FILL rather
+    // than an edge, so the word would mean the opposite thing there.
+    StatusPill: ['bare']
   };
 
   it('spells the SAME word for every face BOTH primitives draw', () => {

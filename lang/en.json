@@ -2109,6 +2109,7 @@
           "SelectRow": "Select {name} for bulk edit",
           "SelectedCount": "{count} selected",
           "SelectAllResults": "Select all {count} results",
+          "SelectAllShown": "Select all {count} shown",
           "Clear": "Clear",
           "PanelTitle": "Bulk edit",
           "ClearSelection": "Clear selection",

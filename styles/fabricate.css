@@ -26183,3 +26183,34 @@
   font-family: var(--fab-font-mono);
   font-weight: 500;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r9-prim2 — the manager button's opt-in 38px rung. Appended; no rule above this
+   block is edited by it.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── THE 38px BUTTON (issue 1371, gap-list rows 1 and 22) ────────────────────────────────────
+   38 IS A RUNG (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with
+   32 / 36 / 40 retired), and the reference draws the world component catalogue's
+   `+ Register item` (`proto:570`) and the system's `+ Add from catalogue` (`proto:1046`) at 38
+   against the 34 this control ships at. That is a size the ladder already publishes, so nothing
+   licensed the drop: the rung becomes reachable rather than the reference being adapted to it.
+   It is the same ruling M12b made for the toolbar's field and selects one block up, and it emits
+   the same `is-size-38` token, because it names the same rung of the same ladder.
+
+   IT IS OPT-IN AND ABSENT BY DEFAULT. `ManagerButton` emits `is-size-38` from its `size` prop
+   and emits nothing at all without one, so every shipped button is untouched by this rule.
+
+   THE HEIGHT ONLY, AND THE CORNER DELIBERATELY NOT. 34 and 38 are both inside the radius
+   ladder's 34-38px band, so the 9px `.manager-button.fab-manager-button` already states is the
+   right corner at either height — restating it here would be a second source of truth for one
+   value, which is the failure the primitive's own docblock exists to end. `min-height`, not
+   `height`, because that is the property the rule this overrides declares: a `height` here
+   would win the size argument while leaving a 34px floor underneath it.
+
+   SPECIFICITY, NOT SOURCE ORDER. `.fabricate-manager .manager-button.fab-manager-button` is
+   (0,3,0) and declares the 34px control; this adds the rung class, so it decides at (0,4,0)
+   wherever in the sheet it is written. */
+.fabricate-manager .manager-button.fab-manager-button.is-size-38 {
+  min-height: 38px;
+}

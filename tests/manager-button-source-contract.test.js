@@ -110,6 +110,25 @@ const FIXTURE_ALLOWLIST = Object.freeze([
     why: 'Population B, as above: the Checks preview actor picker trigger.',
   }),
   Object.freeze({
+    file: 'tests/components/manager-layout.test.js',
+    classes: 'manager-button',
+    count: 1,
+    why:
+      'BOTH sanctioned reasons at once, which is why it is a bare string rather than a forgotten ' +
+      'one. `data-probe="unconverted"` is the M12a half of a converted/unconverted pair (issue ' +
+      '1371): the primitive now paints the 34-38px band’s 9px corner and this probe measures ' +
+      'that an unconverted hand-written button is still on the base rule’s 6px, so the ruling is ' +
+      'proved scoped to the primitive rather than to the whole `.manager-button` family. Give it ' +
+      'the primitive class and it measures 9px, the equality goes vacuous, and the blast-radius ' +
+      'claim is gone. It is ALSO population B: `ComponentComplicationsSection` passes exactly ' +
+      'this string as a `SearchablePopover` `triggerClass`, so the product does render it.',
+    // The provenance, checked rather than asserted in prose above — see the loop below.
+    stillRenderedBy: Object.freeze({
+      file: 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
+      literal: 'triggerClass="manager-button"',
+    }),
+  }),
+  Object.freeze({
     file: 'tests/components/recipe-studio-font-size.test.js',
     classes: 'manager-button manager-recipe-component-trigger',
     count: 1,
@@ -307,6 +326,18 @@ test('no test fixture models a manager button the product no longer renders', ()
     assert.ok(
       entry.why && entry.why.length > 40,
       `${entry.file} allowlists \`${entry.classes}\` with no stated reason`
+    );
+
+    // An entry claiming the PRODUCT still renders its string says so with a path and a literal,
+    // and the claim is read rather than believed. A prose `why` cannot notice the call site it
+    // names being converted or deleted, which is the same rot this whole allowlist exists to
+    // catch one layer down — an exemption outliving the thing it exempts.
+    if (!entry.stillRenderedBy) continue;
+    const { file, literal } = entry.stillRenderedBy;
+    assert.ok(
+      readFileSync(join(repoRoot, file), 'utf8').includes(literal),
+      `${entry.file} allowlists \`${entry.classes}\` because ${file} writes \`${literal}\`, ` +
+        'and it no longer does — re-earn the exemption or drop it'
     );
   }
 });

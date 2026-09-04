@@ -36,6 +36,49 @@
    - children: the staged axes, rendered between the hero and Apply. They are FLEX ITEMS of
      this panel, so a caller emits its labels, controls and hints as siblings rather than
      wrapping them — the panel's uniform `gap` is the section rhythm.
+
+  ── THREE PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47) ───
+
+  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with three
+  differences, and each is a PARAMETER here rather than a fork or an in-place restyle — the
+  standing rule for a shared primitive that must behave differently at a second site. All
+  three default to exactly what ships, so the Component, Recipe and Essence Studios render
+  byte-identically across this change.
+
+   - clearLabel: the header action's label, ALREADY LOCALIZED. `proto:626` reads `Clear`
+     where this panel reads `Clear selection`, and the shorter word is right there: the
+     action sits under a `BULK EDIT` eyebrow in a rail that is showing nothing but the
+     selection, so "selection" is the only thing it could be clearing. `''` — the default —
+     keeps the shipped phrase and its `BulkEdit.ClearSelection` key.
+
+     A CALLER'S STRING rather than a second key chosen here, following the `heading` and
+     `applyLabel` idiom directly above: a panel that wants the shorter word is a panel that
+     has decided its own rail says enough, which is a fact about that screen.
+   - hint: the hero's standing sentence, ALREADY LOCALIZED. `proto:628` writes a sentence
+     naming the staging that panel actually offers — `Pick the systems to add them to, stage
+     a category or tags, then commit below.` — where this shell's noun-free default says
+     `Stage changes below, then apply to all at once.` `''` keeps the default and its
+     `BulkEdit.SelectedHint` key.
+
+     Named `hint` because that is what this component already calls the element
+     (`.fab-bulk-edit-hero-hint`) and the key (`SelectedHint`), and what
+     `BulkSelectionToolbar` calls its own muted standing sentence. One meaning, one name.
+   - dockFoot: a snippet rendered INSIDE the dock, under Apply. `proto:791-796` puts the
+     destructive `🗑 Delete N components` and its consequence note in the same bordered,
+     pinned foot as the primary action, on the dock's own 8px column rhythm — not above it
+     and not in the scrolling body.
+
+     A SNIPPET AND NOT A PROP PAIR, because what goes there is a caller's CONTROL: the
+     catalogue stages an `ArmedDangerButton` with a note under it, and a label-plus-callback
+     prop would force this shell to grow an arm/confirm contract that belongs to that
+     component. `children` already takes the staged axes the same way, for the same reason.
+
+     IT DOES NOT MOVE THE DOCK. The dock's sticky construction and its three negative bleeds
+     are unchanged, and the comment on `.fab-bulk-edit-dock` below is still exact: what the
+     snippet adds is a second flex child inside the same box. A caller placing a TALL control
+     there makes the dock taller, which eats into the scrollport the panel above it scrolls
+     in — that is the same trade `bulk-edit-dock-pinning.test.js` already bounds for a
+     sibling delete card, and the two are alternatives rather than a stack.
 -->
 <script>
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -47,6 +90,15 @@
     canApply = false,
     onClearSelection = () => {},
     onApply = () => {},
+    // An ALREADY-LOCALIZED override for the header action's label. `''` keeps the shipped
+    // `Clear selection`; see the props block above for why this is the caller's string.
+    clearLabel = '',
+    // An ALREADY-LOCALIZED override for the hero's standing sentence. `''` keeps the shipped
+    // noun-free copy.
+    hint = '',
+    // A snippet rendered inside the dock, UNDER Apply — the reference's destructive action and
+    // its consequence note (`proto:791-796`). Absent by default.
+    dockFoot = undefined,
     panelAttr = 'data-component-bulk-panel',
     clearAttr = 'data-component-bulk-clear',
     countAttr = 'data-component-bulk-count',
@@ -81,7 +133,10 @@
       onclick={() => onClearSelection()}
     >
       <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span>
+      <span
+        >{clearLabel ||
+          text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span
+      >
     </button>
   </header>
 
@@ -92,17 +147,18 @@
     <div class="fab-bulk-edit-hero-copy">
       <strong class="fab-bulk-edit-hero-title" {...countHook}>{heading}</strong>
       <span class="fab-bulk-edit-hero-hint"
-        >{text(
-          'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
-          'Stage changes below, then apply to all at once.'
-        )}</span
+        >{hint ||
+          text(
+            'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
+            'Stage changes below, then apply to all at once.'
+          )}</span
       >
     </div>
   </div>
 
   {@render children?.()}
 
-  <div class="fab-bulk-edit-dock">
+  <div class="fab-bulk-edit-dock" class:has-foot={Boolean(dockFoot)}>
     <ManagerButton
       class="fab-bulk-edit-apply"
       {...applyHook}
@@ -112,6 +168,7 @@
       <i class="fas fa-check-double" aria-hidden="true"></i>
       <span>{applyLabel}</span>
     </ManagerButton>
+    {@render dockFoot?.()}
   </div>
 </section>
 
@@ -343,6 +400,24 @@
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
+  }
+
+  /* THE DOCK'S COLUMN RHYTHM, STATED ONLY WHEN IT HAS A SECOND CHILD (issue 1371, gap-list
+     row 47). `proto:791` draws the foot as a `flex-direction:column` with `gap:8px` between the
+     primary action and the destructive one below it.
+
+     GATED ON THE SNIPPET rather than declared unconditionally, because with one child the two
+     display modes are not obviously identical and this rule may not repaint the three studios
+     that ship today: `.fab-bulk-edit-apply` carries `margin-top: var(--fab-space-1)`, whose
+     behaviour is a block-flow question in one mode and not a question at all in the other. With
+     no `dockFoot` the class is not emitted and the dock is byte-identical to what ships.
+
+     `--fab-space-2` IS the reference's 8px, so the rhythm is a token statement rather than an
+     approximation, and the dock's own three negative bleeds above are untouched. */
+  .fab-bulk-edit-dock.has-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an

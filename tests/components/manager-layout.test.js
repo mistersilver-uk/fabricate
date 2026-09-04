@@ -9484,6 +9484,14 @@ test('all three browser sort-direction toggles render as one control', async () 
     // this probe carries `manager-button` WITHOUT `fab-manager-button`, which is what an
     // unconverted hand-written button is and is still on the base rule's 6px. So the corner is
     // measured in a real browser on both sides of the conversion boundary instead.
+    //
+    // IT MODELS A STRING THE PRODUCT STILL RENDERS, which is what earns it its row in
+    // `manager-button-source-contract.test.js`'s fixture allowlist rather than a conversion:
+    // `ComponentComplicationsSection.svelte` passes a bare `triggerClass="manager-button"` to
+    // `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
+    // That allowlist row names the file and the literal and READS them, so this fixture cannot
+    // outlive the call site it models. Converting this probe would make it measure 9px, the
+    // equality below would hold trivially, and M12a's blast-radius claim would be gone.
     const unconverted = `<button type="button" class="manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
