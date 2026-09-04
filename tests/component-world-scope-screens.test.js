@@ -77,6 +77,10 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         './components/ComponentBulkEditPanel.svelte',
         './scoped/WorldComponentCataloguePage.svelte',
         './scoped/WorldComponentEntryPage.svelte',
+        // A STRING LEAF, not a screen. `componentListSubtitle` / `componentRulesSubtitle` are the
+        // C1 and D1 header subtitles, which the shell — not a page — renders, so the copy has to
+        // be reachable from here. It exports no component and mounts nothing.
+        './scoped/componentScoped.js',
       ],
       'a correction that had to import a new SCREEN COMPONENT would be building here rather ' +
         'than carrying a seam; the two page imports predate this change and are the placeholders'

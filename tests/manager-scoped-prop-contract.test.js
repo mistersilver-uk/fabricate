@@ -210,6 +210,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBulkEditPanel.svelte',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
+  // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE. The system Component rules header states the
+  // system's salvage resolution mode, and `.manager-header` is a sibling of `.manager-main`, so
+  // only the shell can render that band. The module is a frozen option list — a data leaf with no
+  // component and no store — and importing it beat restating the same labels a second time here.
+  './resolutionModeOptions.js',
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
   // beside its sibling below because this list is asserted SORTED. See the note on
   // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
@@ -221,6 +226,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/WorldToolCataloguePage.svelte',
   './scoped/WorldToolEntryPage.svelte',
   './scoped/WorldVocabularyPage.svelte',
+  // ADDED BY ISSUE 1371's C1/D1 HEADER SUBTITLES. `componentListSubtitle` and
+  // `componentRulesSubtitle` are the same kind of import-free presentation leaf as
+  // `essenceScoped.js` below, and for the same reason: the subtitle belongs to the header band,
+  // which only this file renders, so the page it describes cannot compose its own copy.
+  './scoped/componentScoped.js',
   // ADDED BY ISSUE 1372's HEADER-CREATE SEAM. The prototype puts `+ New essence` in the page
   // header band, which only this file renders; `mintEssenceId` is the epic's own import-free
   // presentation leaf and slugs the new record's id with suffix collision resolution, so the
