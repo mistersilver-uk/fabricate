@@ -107,9 +107,11 @@ The panel states how many changes it is about to make before you apply them, and
 A separate **Delete** control at the foot of the panel deletes every selected component that no crafting system currently has rules for, along with each one's world defaults.
 A selected component any crafting system still has rules for is left alone, and the confirmation names which systems are holding it back, the same refusal the single entry's own delete makes for one component at a time.
 Recipes that reference a component this control does delete stop resolving.
-It is a two-step control, and both states carry the count.
-The idle label already states how many components are about to be affected, such as **Delete 3 components…**.
-Arming it keeps that same count but switches the wording to a confirm state, naming the count again against deleting them from the world, and a second click confirms.
+It is a two-step control, and both labels count only the deletable ones, the selected components no system holds.
+The idle label states that count, such as **Delete 3 components…**, and arming it keeps the same count while switching the wording to a confirm state that names it again against deleting them from the world, and a second click confirms.
+When every selected component is held by a crafting system, the normal case on an upgraded world, there is nothing to count: the idle label reads **Delete from the world…** with no number.
+Clicking it does not arm a real confirmation.
+It reads **Cannot delete** instead, and the note beside it names which components are held and by which systems.
 
 ## The world Component entry
 
