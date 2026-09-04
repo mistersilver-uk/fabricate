@@ -490,8 +490,14 @@ export function splitSelectorList(selector) {
  *
  * That is recorded here because the defect is invisible to any assertion about WHICH rules were
  * found, so a fresh walk written beside this one would reacquire it and pass every count.
- * `token-generation-gate.test.js` keeps the clause that reds on it — `a rule is cited at the line
- * its own selector starts on` — and it is now the proof for every caller.
+ *
+ * TWO CLAUSES RED ON IT, and they are complementary rather than duplicated.
+ * `token-generation-gate.test.js` asserts the invariant over the two SHIPPED stylesheets — every
+ * rule of the ~4000 cited at a line that holds the first token of its own selector — which is the
+ * stronger statement and the one that catches a corpus the walk mis-reads. `style-block-scan.test.js`
+ * asserts it over a synthetic multi-rule fixture, which is the one that says which SHAPES the line
+ * comes from: a selector and its `{` on different lines is the only case where a correct
+ * implementation and one recording the brace's line disagree at all.
  *
  * @param {string} css Comment-stripped CSS, offsets intact — from {@link styleTextFor}.
  * @returns {Array<{selector: string, body: string, line: number}>}
