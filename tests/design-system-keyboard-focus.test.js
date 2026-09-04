@@ -1,9 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parse } from 'svelte/compiler';
+
+import {
+  UI_TEMPLATE_ROOT,
+  attributeText,
+  parsedTemplates,
+  walkElements,
+} from './helpers/svelteTemplateScan.js';
 
 /**
  * Foundry decides whether a keypress belongs to the focused element or to its own bindings by
@@ -46,10 +49,6 @@ import { parse } from 'svelte/compiler';
  * this suite asserts the walk FINDS targets before it asserts they are all compliant.
  */
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.join(HERE, '..');
-const UI_ROOT = path.join(REPO_ROOT, 'src', 'ui', 'svelte');
-
 /**
  * Foundry's `hasFocus` recognises these by TAG NAME alone, so they need no declaration.
  *
@@ -59,62 +58,27 @@ const UI_ROOT = path.join(REPO_ROOT, 'src', 'ui', 'svelte');
  * `button` entry. Those are the WORSE case: they handle the arrows themselves, with
  * `preventDefault()` and no `stopPropagation()`, so the keypress ran the tab strip AND panned the
  * canvas. `openspec/specs/design-system/spec.md` says "a button with a form" for this reason; the
- * walk below carries an `inForm` flag so the carve-out matches the spec rather than widening it.
+ * shared walk carries an `inForm` flag so the carve-out matches the spec rather than widening it.
  */
 const SELF_DECLARING_TAGS = new Set(['input', 'select', 'textarea']);
 
-function svelteFiles(dir, found = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) svelteFiles(full, found);
-    else if (entry.name.endsWith('.svelte')) found.push(full);
-  }
-  return found;
-}
-
 /**
- * Visit every `RegularElement` AND every `Component` in a parsed template.
+ * The corpus, parsed once for every clause in this file.
  *
- * COMPONENTS COUNT, and leaving them out is how this gate goes blind as the corpus converges
- * (issue 1039). `<ManagerToolbar tabindex="-1" data-keyboard-focus="true">` forwards both through
- * a rest spread onto the `<section>` the primitive writes, so the RENDERED element is exactly
- * the unrecognised non-form focus target this file exists to police — but the AST node is a
- * `Component`, so an element-only walk stops seeing it. Three of the manager's browser landmarks
- * became component tags in one change; had the walk stayed element-only, all three would have
- * silently left the compliance clause below AND taken the non-vacuity floor down with them,
- * which reads as "the corpus converged" rather than as "the guard lost three sites".
+ * `svelteFiles` and `walkElements` were DEFINED here until issue 1497 and now live in
+ * `tests/helpers/svelteTemplateScan.js`, whose docblock carries the reasons both are shaped the
+ * way they are — the regex that ended a tag at the `>` inside `use:portal={() => host()}`, and the
+ * element-only walk that lost three focus targets in one change when three manager landmarks
+ * became component tags. They moved because two other gates now need the same walk, and a second
+ * hand-written copy of it would reacquire both defects while passing every count.
  *
- * A component tag can only be a focus target through its own rest spread, so what is checked is
- * the same pair of attributes in the same place: nothing here knows or needs to know which
- * element the primitive renders.
- *
- * Recurses over EVERY own property rather than a hand-listed set of child keys, because an
- * element nested in an `{#if}`, an `{#each}`, a `{#snippet}` or a component's default slot hangs
- * off a differently-named branch in each case, and a hand-listed walk quietly skips whichever
- * branch it forgot. `parent` is skipped because the AST is cyclic through it.
- *
- * @param {unknown} node
- * @param {(element: object) => void} visit
- * @param {Set<object>} [seen]
+ * Lazily, so a walk failure is reported as a failing test rather than as an unattributed
+ * module-load throw that escapes the `# fail` count entirely.
  */
-function walkElements(node, visit, inForm = false, seen = new Set()) {
-  if (!node || typeof node !== 'object' || seen.has(node)) return;
-  seen.add(node);
-  if (Array.isArray(node)) {
-    for (const child of node) walkElements(child, visit, inForm, seen);
-    return;
-  }
-  let descendantsAreInForm = inForm;
-  if (node.type === 'RegularElement' || node.type === 'Component') {
-    visit(node, inForm);
-    if (node.type === 'RegularElement' && node.name.toLowerCase() === 'form') {
-      descendantsAreInForm = true;
-    }
-  }
-  for (const key of Object.keys(node)) {
-    if (key === 'parent') continue;
-    walkElements(node[key], visit, descendantsAreInForm, seen);
-  }
+let cachedTemplates = null;
+function templates() {
+  if (cachedTemplates === null) cachedTemplates = parsedTemplates(UI_TEMPLATE_ROOT);
+  return cachedTemplates;
 }
 
 /**
@@ -124,24 +88,18 @@ function walkElements(node, visit, inForm = false, seen = new Set()) {
  */
 function focusTargets() {
   const targets = [];
-  for (const file of svelteFiles(UI_ROOT)) {
-    const source = fs.readFileSync(file, 'utf8');
-    const ast = parse(source, { modern: true });
+  for (const { file, source, ast } of templates()) {
     walkElements(ast.fragment, (element, inForm) => {
       const tag = element.name.toLowerCase();
       if (SELF_DECLARING_TAGS.has(tag)) return;
       if (tag === 'button' && inForm) return;
-      const attributes = element.attributes || [];
-      const named = (name) =>
-        attributes.find((attribute) => attribute.type === 'Attribute' && attribute.name === name);
-      const tabindex = named('tabindex');
-      if (!tabindex || !/-1/.test(source.slice(tabindex.start, tabindex.end))) return;
-      if (named('contenteditable')) return;
-      const declaration = named('data-keyboard-focus');
+      const tabindex = attributeText(source, element, 'tabindex');
+      if (tabindex === null || !/-1/.test(tabindex)) return;
+      if (attributeText(source, element, 'contenteditable') !== null) return;
       targets.push({
-        file: path.relative(REPO_ROOT, file).replaceAll('\\', '/'),
+        file,
         tag: element.name,
-        declared: declaration ? source.slice(declaration.start, declaration.end) : null,
+        declared: attributeText(source, element, 'data-keyboard-focus'),
       });
     });
   }

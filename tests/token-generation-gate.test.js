@@ -86,6 +86,7 @@ import {
   STYLE_CORPUS_ROOTS,
   collectStyleCorpus,
   declarationsIn,
+  rulesIn,
   splitSelectorList,
 } from './helpers/styleBlockScan.js';
 
@@ -196,66 +197,6 @@ const AREA_USE_SHAPES = Object.freeze([
   { label: 'declaration', pattern: new RegExp(`${AREA_SCOPED_PREFIX}[\\w-]*\\s*:`, 'u') },
   { label: 'CSSOM name', pattern: new RegExp(`['"]${AREA_SCOPED_PREFIX}`, 'u') },
 ]);
-
-/**
- * Every rule in one comment-stripped stylesheet, as `{ selector, body, line }`.
- *
- * At-rule preludes (`@media`, `@container`, `@supports`, `@layer`) are NOT selectors, so a rule
- * nested inside one reports the inner prelude — which is what both callers need, since a
- * container query around a manager rule must not be read as that rule's selector. An at-rule with
- * no block of its own (`@import`, `@charset`) never opens a brace and is skipped by construction.
- *
- * `line` is the line the SELECTOR starts on, tracked by a `preludeStarted` flag rather than by
- * `prelude === ''`: the prelude accumulates the whitespace between two rules, so the emptiness
- * test only ever fired at offset zero and every rule was cited at the previous `}`. In a Svelte
- * file, where `maskNonStyleRegions` replaces the entire template with spaces, that put every
- * offence at line 1.
- *
- * @param {string} css Comment-stripped CSS, offsets intact.
- * @returns {Array<{selector: string, body: string, line: number}>}
- */
-function rulesIn(css) {
-  const rules = [];
-  const stack = [];
-  let prelude = '';
-  let preludeStarted = false;
-  let line = 1;
-  let preludeLine = 1;
-  for (let index = 0; index < css.length; index += 1) {
-    const character = css[index];
-    if (character === '\n') line += 1;
-    if (character === '{') {
-      const trimmed = prelude.trim().replace(/\s+/gu, ' ');
-      stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (character === '}') {
-      const open = stack.pop();
-      if (open && !open.selector.startsWith('@')) {
-        rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
-      }
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (character === ';' && stack.length === 0) {
-      prelude = '';
-      preludeStarted = false;
-      preludeLine = line;
-      continue;
-    }
-    if (!preludeStarted && !/\s/u.test(character)) {
-      preludeStarted = true;
-      preludeLine = line;
-    }
-    prelude += character;
-  }
-  return rules;
-}
 
 /**
  * The compounds of a selector LIST that FAIL `predicate` — trap 4.
@@ -450,7 +391,10 @@ test('a rule is cited at the line its own selector starts on', () => {
   // the PREVIOUS rule's `}` — in a Svelte file, where `maskNonStyleRegions` blanks the whole
   // template, at line 1 for every offence in the file. That was a one-flag fix inside `rulesIn`
   // (`preludeStarted` rather than `prelude === ''`) which only ever changes failure-message text,
-  // so nothing above can see it regress. This is what sees it.
+  // so nothing above can see it regress. This is what sees it — and it now guards the walk for
+  // every caller rather than only this file: issue 1497 moved `rulesIn` into
+  // `tests/helpers/styleBlockScan.js` so the `:focus`, weight, shadow and radius gates could
+  // reuse it rather than write a fresh walk that would reacquire exactly this defect.
   //
   // Written as an invariant over the whole corpus rather than as one hand-picked `file:line`
   // pair, which would rot on the next edit to that stylesheet: masking and comment stripping both
