@@ -105,6 +105,17 @@ a{color:var(--fab-accent)}
 .t-car{background:var(--fab-surface-soft);color:var(--fab-text-subtle)}
 .t-out{background:var(--fab-danger-soft);color:var(--fab-danger-text)}
 
+/* ENTRY STATUS — the chip beside a heading. Its value is `data-status` on the block, and on a
+   multi-name heading a `data-status-` attribute per name, which is what the coverage gate reads.
+   The chip is a SIBLING of the h4 and never inside it: the heading census pins every h4's text,
+   and nothing in this file may write a name in bare angle brackets — the file-wide name scan
+   reads this stylesheet's own text too. */
+.st{display:inline-block;font-family:var(--fab-font-mono);font-size:8px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.st-shipped{background:var(--fab-success-soft);color:var(--fab-success-text)}
+.st-target{background:var(--fab-accent-soft);color:var(--fab-accent-text)}
+.st-divergent{background:var(--fab-danger-soft);color:var(--fab-danger-text)}
+.st-prose{background:var(--fab-surface-soft);color:var(--fab-text-subtle)}
+
 /* THE KIT — these rules are the spec. */
 .k-kicker{font-family:var(--page-ui-face);font-weight:700;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--fab-text-subtle)}
 .k-kicker.accent{color:var(--fab-accent)}
@@ -299,9 +310,10 @@ a{color:var(--fab-accent)}
 <section id="use">
   <div class="sec-head"><span class="num">00</span><h2>How to use this</h2></div>
   <p class="lede">Read the foundations once. After that, work from section 13 backwards: find the screen archetype you are building, follow its recipe, and open a part's entry only when you need its API.</p>
+  <p class="lede" style="margin-top:12px">Every entry declares a STATUS beside its heading, and a heading naming several parts declares one per name. <span class="st st-target">target</span> means the entry is specified and the shipped component does not yet match it, or nothing ships &mdash; the specimen is what to build towards, not a description of the tree. <span class="st st-shipped">shipped</span> means the shipped component matches this specimen's API and geometry. <span class="st st-divergent">divergent</span> means a recorded decision keeps the shipped component different, and the entry names the issue that decided it. <span class="st st-prose">prose</span> is a section that specifies no part. The status is FIDELITY to the specimen; how far a surface has adopted a primitive is a different question, tracked by the source-contract exemptions rather than here. Section 16 carries the divergences that are recorded inline rather than as a whole-entry verdict.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The five rules that keep screens consistent</h4></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The five rules that keep screens consistent</h4><span class="st st-prose">prose</span></div>
     <div class="stage col">
       <div class="k-well" style="display:grid;gap:10px">
         <div><span class="k-kicker accent">1 · One component per job</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Where two surfaces do the same thing, they import the same component. If you are about to write a second version, the answer is a prop on the first.</p></div>
@@ -320,8 +332,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">01</span><h2>Colour</h2></div>
   <p class="lede">Four background levels carry all depth. Every name below is the shipped token; there is no unprefixed alias.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Depth &amp; interaction</h4><p class="why">Backgrounds nest downward: a page is bg-0, a card on it is bg-2, a well inside that card is bg-1. Interaction surfaces are translucent overlays, so they read correctly on any of the four.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Depth &amp; interaction</h4><span class="st st-prose">prose</span><p class="why">Backgrounds nest downward: a page is bg-0, a card on it is bg-2, a well inside that card is bg-1. Interaction surfaces are translucent overlays, so they read correctly on any of the four.</p></div>
     <div class="stage b0">
       <div class="unit"><span class="cap">--fab-bg-0</span><div style="width:120px;height:44px;border-radius:9px;background:var(--fab-bg-0);border:1px solid var(--fab-border)"></div><span class="k-hint">page ground</span></div>
       <div class="unit"><span class="cap">--fab-bg-1</span><div style="width:120px;height:44px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"></div><span class="k-hint">rails, rows, wells</span></div>
@@ -344,8 +356,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Entity tints</h4><p class="why">Thirteen tag tokens are declared in every theme. The eight above are offered in the picker; the five below are declared but not offered. The tint colours a glyph, a badge ink and a bar fill — never a chip background, which would double-code kind against state.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Entity tints</h4><span class="st st-prose">prose</span><p class="why">Thirteen tag tokens are declared in every theme. The eight above are offered in the picker; the five below are declared but not offered. The tint colours a glyph, a badge ink and a bar fill — never a chip background, which would double-code kind against state.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">sage</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-sage)"></div></div>
       <div class="unit"><span class="cap">mist</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-mist)"></div></div>
@@ -389,8 +401,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Open decision: the split between the eight and the five is undocumented and, as written, unjustified.</b> The stylesheet says the other five are &ldquo;decorative tints Core uses at fixed sites&rdquo;. That is true of <code>ember</code> only, which one file binds to the Downtime companion tint. <b><code>verdant</code>, <code>azure</code>, <code>bone</code> and <code>slate</code> have zero consumers anywhere</b> &mdash; declared in all seven themes, referenced nowhere.<br><br>Nor does collision with a reserved colour explain it: <code>verdant</code> is byte-identical to <code>--fab-success</code> and <code>azure</code> to <code>--fab-drop-rate-uncommon</code>, but three <em>pickable</em> tints already collide the same way &mdash; <code>mist</code> with <code>--fab-info</code>, <code>lavender</code> with <code>--fab-purple</code>, <code>butter</code> with <code>--fab-warning</code>. Any rule that excludes verdant and azure on collision grounds would have to retire those three too.<br><br><b>Recommendation:</b> replace the count with a rule. A tint is pickable unless it is a NEUTRAL that would read as text or as a disabled state (<code>bone</code> is near-white, <code>slate</code> is grey) or is BOUND to a fixed brand site (<code>ember</code>). That makes <b>ten</b> pickable by adding <code>verdant</code> and <code>azure</code>. Widening the picker is a runtime change with new localized labels, so it is recorded here as a decision for the maintainer rather than made in this change.<span class="cite">Evidence: <b>styles/fabricate.css</b> declares all 13 in 7 blocks, and the stylesheet references only <code>sage</code>; <b>managerColorTokens.js:24-31</b> enumerates the 8; the only consumer of the five is <b>WorldDowntimePreview.svelte:371</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The drop-rate ramp</h4><p class="why">Seven fixed hues, byte-identical in all seven themes. Wherever colour carries a reading it is banded: a value range maps to one of these, and the whole fill takes that colour. Nothing is interpolated, so a bar at 57% and one at 58% never land in a hue the ramp does not contain.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The drop-rate ramp</h4><span class="st st-prose">prose</span><p class="why">Seven fixed hues, byte-identical in all seven themes. Wherever colour carries a reading it is banded: a value range maps to one of these, and the whole fill takes that colour. Nothing is interpolated, so a bar at 57% and one at 58% never land in a hue the ramp does not contain.</p></div>
     <div class="stage" style="gap:10px">
       <div class="unit"><span class="cap">guaranteed</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-rate-guaranteed)"></div></div>
       <div class="unit"><span class="cap">common</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-rate-common)"></div></div>
@@ -408,8 +420,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">02</span><h2>Type</h2></div>
   <p class="lede">Spectral names things. The host UI face carries interface text. JetBrains Mono carries every number a GM will compare or tune.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The ladder</h4></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The ladder</h4><span class="st st-prose">prose</span></div>
     <div class="stage col" style="gap:0;padding:0">
       <div style="padding:12px 16px;border-bottom:1px solid var(--fab-border);display:flex;justify-content:space-between;gap:20px;align-items:baseline;flex-wrap:wrap"><span style="font-family:var(--fab-font-serif);font-size:22px;font-weight:600">Page title</span><span class="k-count">Spectral 600 · 22px</span></div>
       <div style="padding:12px 16px;border-bottom:1px solid var(--fab-border);display:flex;justify-content:space-between;gap:20px;align-items:baseline;flex-wrap:wrap"><span style="font-family:var(--fab-font-serif);font-size:19px;font-weight:600">Section heading</span><span class="k-count">Spectral 600 · 19px</span></div>
@@ -439,8 +451,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">03</span><h2>Space &amp; geometry</h2></div>
   <p class="lede">Padding, margin and gap come from a 4px scale. Radius and height are separate ladders and are not scale members.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Spacing scale</h4><p class="why">Padding, margin and gap come from here. Radius, width, height, border widths, font sizes, grid tracks and breakpoints are not spacing members and stay literal.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Spacing scale</h4><span class="st st-prose">prose</span><p class="why">Padding, margin and gap come from here. Radius, width, height, border widths, font sizes, grid tracks and breakpoints are not spacing members and stay literal.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:7px">
         <div style="display:flex;align-items:center;gap:12px"><span class="k-count" style="width:132px">--fab-space-2xs</span><div style="height:14px;width:2px;background:var(--fab-accent)"></div><span class="k-hint">2 · hairline</span></div>
@@ -456,8 +468,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The exempt literals.</b> Only two values stay outside the scale: <b>1px</b> hairlines, and one-off fixed dimensions in the <b>34&ndash;42px</b> range that reserve space for a fixed element rather than expressing spacing rhythm. Everything else snaps, and a geometry that genuinely cannot snap mints a scale member.<span class="cite"><b>ui-integration/spec.md:70-76</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Radius &amp; control height</h4><p class="why">Radius tracks the size of the thing: the smaller the control, the tighter the corner. Five heights, and one comfortable rung for anything that must be touch-reachable.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Radius &amp; control height</h4><span class="st st-prose">prose</span><p class="why">Radius tracks the size of the thing: the smaller the control, the tighter the corner. Five heights, and one comfortable rung for anything that must be touch-reachable.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">6 · chips</span><div style="width:74px;height:24px;border-radius:6px;background:var(--fab-bg-3)"></div></div>
       <div class="unit"><span class="cap">7 · 26&ndash;32</span><div style="width:74px;height:30px;border-radius:7px;background:var(--fab-bg-3)"></div></div>
@@ -476,8 +488,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>Why 44 exists.</b> The five smaller rungs cannot meet the 24&times;24 target minimum with real padding once a control carries a border and an icon, so the ladder needs one comfortable rung; the shipped stepper already exposes a <code>density</code> prop, though it selects 24px rather than a full rung. <b>Open call for the maintainer:</b> if you would rather solve hit targets per component through that prop than carry a sixth rung, this is the one line to delete.</div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Elevation</h4><p class="why">Elevation is for things that float over content. A card that merely sits on the page uses a border.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Elevation</h4><span class="st st-prose">prose</span><p class="why">Elevation is for things that float over content. A card that merely sits on the page uses a border.</p></div>
     <div class="stage b0" style="gap:26px">
       <div class="unit"><span class="cap">shadow-md</span><div style="width:150px;height:56px;border-radius:11px;background:var(--fab-bg-2);border:1px solid var(--fab-border);box-shadow:var(--fab-shadow-md)"></div><span class="k-hint">anchored menu</span></div>
       <div class="unit"><span class="cap">shadow-lg</span><div style="width:150px;height:56px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg)"></div><span class="k-hint">popover, picker</span></div>
@@ -491,8 +503,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">04</span><h2>States &amp; targets</h2></div>
   <p class="lede">These rules are cross-cutting, and are defined once here so that forty components do not each invent one.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The state set</h4></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The state set</h4><span class="st st-prose">prose</span></div>
     <div class="stage">
       <div class="unit"><span class="cap">rest</span><button class="k-btn">Apply to all</button></div>
       <div class="unit"><span class="cap">hover</span><button class="k-btn" style="background:var(--fab-surface-raised);color:var(--fab-text)">Apply to all</button></div>
@@ -512,8 +524,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The loading rule, and why it is a rule.</b> Foundry's bundled Font Awesome kills <code>fa-spin</code> under <code>prefers-reduced-motion</code>, and every shipped spinner is <code>aria-hidden</code>. A busy state expressed as a spinner alone is therefore conveyed by <b>nothing at all</b> to a reduced-motion user. A loading control MUST set <code>aria-busy</code> and change its label. The spinner is decoration.<span class="cite">Vendor rule in harvested <b>fontawesome/css/all.min.css:6</b> · <b>ArmedDangerButton.svelte:86,154</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Hit targets, naming, announcement</h4></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Hit targets, naming, announcement</h4><span class="st st-prose">prose</span></div>
     <div class="stage">
       <div class="unit"><span class="cap">24&times;24 minimum</span>
         <div style="display:flex;gap:16px;align-items:center">
@@ -547,8 +559,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">06</span><h2>Controls</h2></div>
   <p class="lede">Every API below carries its event contract, its accessible naming and its states.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Stepper&gt;</h4><p class="why">The most-used control in the app. The value is always an editable input inside the group — a click-only stepper is a keyboard regression.</p></div>
+  <div class="spec" data-status="target" data-status-Stepper="target">
+    <div class="spec-head"><h4>&lt;Stepper&gt;</h4><span class="st st-target">target</span><p class="why">The most-used control in the app. The value is always an editable input inside the group — a click-only stepper is a keyboard regression.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">integer</span><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="spec-step-1" aria-label="Quantity" value="2" readonly><button><svg class="i"><use href="#i-plus"/></svg></button></div></div>
       <div class="unit"><span class="cap">with unit</span><div class="k-pair"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="spec-step-2" aria-label="Amount in gold pieces" value="250" readonly><button><svg class="i"><use href="#i-plus"/></svg></button></div><span class="k-unit">gp</span></div></div>
@@ -566,8 +578,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The value is always editable.</b> A click-only stepper is a documented keyboard regression, which is why the shipped component states the rule in its own docblock. The API above is the shipped prop set. <code>allowUnset</code> carries the semantics that clearing commits <code>null</code> and that adjuncts step from <code>min ?? 0</code>, and the three aria names are derived by a shared helper because 23 call sites drifted when they were not. Its filled variant sets a 36px height, which is a value this ladder retires — a conflict recorded in the migrations rather than papered over.<span class="cite"><b>Stepper.svelte:3-6, 151-157</b> · <b>stepperLabels.js</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><p class="why">One component, six roles, two sizes. Each role names a VERB, not a colour: <b>neutral</b> is the secondary verb and the default, <b>primary</b> the create-or-commit verb (at most one per cluster), <b>ghost</b> the quiet navigational verb, <b>dashed</b> the append verb at the foot of the list it adds to, <b>danger</b> the destructive verb, and <b>warning</b> the override verb that proceeds against a flagged rule and destroys nothing.</p></div>
+  <div class="spec" data-status="target" data-status-Button="target" data-status-IconButton="shipped">
+    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><span class="st st-target">Button &middot; target</span><span class="st st-shipped">IconButton &middot; shipped</span><p class="why">One component, six roles, two sizes. Each role names a VERB, not a colour: <b>neutral</b> is the secondary verb and the default, <b>primary</b> the create-or-commit verb (at most one per cluster), <b>ghost</b> the quiet navigational verb, <b>dashed</b> the append verb at the foot of the list it adds to, <b>danger</b> the destructive verb, and <b>warning</b> the override verb that proceeds against a flagged rule and destroys nothing.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">page 38 · the header pair only</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="k-btn page primary">Save recipe</button><button class="k-btn page primary">New template</button><button class="k-btn page"><svg class="i"><use href="#i-cl"/></svg>Back</button><button class="k-btn page ghost">Cancel</button><button class="k-btn page danger"><svg class="i"><use href="#i-trash"/></svg>Delete</button></div></div>
     </div>
@@ -592,8 +604,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The icon-only half now ships, as its own component, and diverges from this specimen twice.</b> It was extracted from 82 hand-rolled <code>manager-icon-button</code> sites across 37 components; a census walking each component&rsquo;s Svelte AST found ONE element host, so it takes no polymorphism prop. <b>Geometry:</b> the shipped control is <b>34&times;34</b>, and 28 only inside <code>.manager-pagination</code> &mdash; so the <b>icon 28</b> above is the ladder value and 34 is the shipped pixel. That conflict is recorded rather than resolved, because repainting 82 sites is a restyle and this extraction&rsquo;s acceptance bar was that no frame moves. <b>Roles:</b> it takes NO role prop. Its modifiers mix roles (<code>is-danger</code>, <code>is-ghost</code>, <code>is-primary</code>) with states (<code>is-locked</code>, <code>is-roll-needed</code>) and one site compounds two of them as a treatment the sheet declares by name, so the vocabulary is a design ruling left open; every modifier travels as a pass-through <code>class</code>. What it DOES enforce is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 36 callers &middot; <b>ui-integration/spec.md</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
+  <div class="spec" data-status="shipped" data-status-Toggle="shipped">
+    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><span class="st st-shipped">shipped</span><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">on · accent</span><div class="k-tog on"><i></i></div></div>
       <div class="unit"><span class="cap">off</span><div class="k-tog off"><i></i></div></div>
@@ -612,8 +624,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>It ships, and it ships as THREE HOSTS.</b> The switch was a CSS convention over an element TREE &mdash; a track span, a knob span nested inside it, and an optional reading beside them &mdash; written out by hand at 37 sites in 26 components, two of which recorded in their own docblocks that they had to. <code>StatusToggle.svelte</code> owns that tree now and 25 components call it. The census also found that the shape is not one element: a pressable button, a read-only reading that announces itself as one labelled image because its mode cannot be switched off, and a real transparent checkbox inside a label. They are the closed <code>as</code> set above rather than three components, because each is the same control with a different host.<br><br><b>The shipped geometry conflicts with the numbers above, and the numbers stand.</b> The sheet draws a 34&times;20 track and a 14&times;14 knob travelling 14px, animated with <code>transform</code> rather than <code>margin-left</code>; this ladder specifies 38&times;22 and 18&times;18. Recorded as a migration rather than papered over &mdash; the conversion that made the switch one component was accepted on the bar that no published frame moves, so re-drawing it is the next change and not this one.<br><br><b>The rule is the surface, not the subject.</b> A list row gets a status button; the record’s own editor gets a toggle. A recipe is a record in both places, and its Enabled state ships as a toggle card across seven record editors, which composes this control rather than redrawing it.<span class="cite"><b>StatusToggle.svelte</b> — 25 callers · <b>ToggleCard.svelte</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Segmented&gt;</h4><p class="why">Two to four named options, exactly one chosen. Renders as a radio group, so the pseudo-element removal in section 05 applies.</p></div>
+  <div class="spec" data-status="shipped" data-status-Segmented="shipped">
+    <div class="spec-head"><h4>&lt;Segmented&gt;</h4><span class="st st-shipped">shipped</span><p class="why">Two to four named options, exactly one chosen. Renders as a radio group, so the pseudo-element removal in section 05 applies.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">default · in a well</span><div class="k-seg"><button>Flat</button><button class="sel">Full market</button><button>Deep sim</button></div></div>
       <div class="unit"><span class="cap">bare · no well</span><div class="k-seg bare"><button class="sel">Any of</button><button>All of</button></div></div>
@@ -626,8 +638,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>The <code>bare · no well</code> specimen above ships as <code>tone</code>, not as <code>well</code>.</b> That specimen is drawn with the exact two options the requirement row's tag-match control carries, and the shipped answer for it is a value on a <code>tone</code> prop rather than a <code>well</code> boolean — because the well is not the only thing that goes. The track is edged and the chosen segment lit in the TAG family, matching the requirement row's own border, its tag chips and its <code>+ Tag</code> pill; a boolean that only removed the well would still have left the one control that is about tags painted in the neutral warm family (issue 1373). It is distinct from the per-option <code>variant</code> ramp on the same component: <code>variant</code> tints one ACTIVE segment to say what CHOOSING it means, and <code>tone</code> says what the whole track is ABOUT. It carries the track's scale as well as its colour, so a caller passes no <code>density</code> beside it — and the scale is load-bearing rather than cosmetic, because this control is the only thing a tag requirement row carries that the other three kinds do not, and a taller track raises every tag row above its siblings.<span class="cite"><b>SegmentedControl.svelte</b> · <b>ui-integration/spec.md</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;OptionCards&gt;</h4><p class="why">A radio group with room to explain itself. Use it instead of a segmented control when the options need a sentence each, or when choosing one changes what else is on the page — the chosen card reveals its own configuration directly beneath the set.</p></div>
+  <div class="spec" data-status="target" data-status-OptionCards="target">
+    <div class="spec-head"><h4>&lt;OptionCards&gt;</h4><span class="st st-target">target</span><p class="why">A radio group with room to explain itself. Use it instead of a segmented control when the options need a sentence each, or when choosing one changes what else is on the page — the chosen card reveals its own configuration directly beneath the set.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">stacked &mdash; three or more, with the reveal</span>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -646,8 +658,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>A disabled option states why.</b> Opacity alone is not a reason, so a disabled option routes through <code>&lt;Locked&gt;</code> and carries its required <code>reason</code> — the shipped resolution-mode card proves the domain needs it, showing a visible “Coming soon” badge rather than a dimmed card.<span class="cite"><b>ResolutionModeCard.svelte:11-14</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Field&gt; &lt;Select&gt; &lt;Search&gt;</h4><p class="why">Text, number, mono expression, select and search share one shell. The kicker label above the field is part of the primitive, not something each screen re-invents.</p></div>
+  <div class="spec" data-status="target" data-status-Field="shipped" data-status-Select="target" data-status-Search="target">
+    <div class="spec-head"><h4>&lt;Field&gt; &lt;Select&gt; &lt;Search&gt;</h4><span class="st st-shipped">Field &middot; shipped</span><span class="st st-target">Select &middot; target</span><span class="st st-target">Search &middot; target</span><p class="why">Text, number, mono expression, select and search share one shell. The kicker label above the field is part of the primitive, not something each screen re-invents.</p></div>
     <div class="stage col">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
         <div class="k-lbl"><span class="k-kicker">Template name</span><div class="k-field">Frontier Outpost</div><span class="k-hint">Shown to players on arrival.</span></div>
@@ -690,8 +702,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>The SHELL ships; the control does not.</b> <code>Field.svelte</code> is the labelled column this entry describes as &ldquo;part of the primitive, not something each screen re-invents&rdquo; &mdash; a <code>flex-direction: column</code> box holding a kicker caption, the control and its hint &mdash; and 81 call sites across 23 components render it. The 38px control shell above it, the option list and the <code>value</code>/<code>onChange</code>/<code>options</code> API are NOT built, which is why <code>&lt;Select&gt;</code> and <code>&lt;Search&gt;</code> stay in the specified-but-unbuilt register while <code>&lt;Field&gt;</code> leaves it.<br><br><b>The shipped prop is a HOST, and the set is closed.</b> <code>as</code> takes <code>label</code>, <code>div</code> or <code>fieldset</code>, with no default and no fourth member. Measured across the corpus the convention it replaced used all three &mdash; 56 <code>label</code>, 31 <code>div</code>, 1 <code>fieldset</code> &mdash; and the difference is an accessible name rather than a treatment: a <code>label</code> field names the control it wraps and a <code>div</code> field must not, because 31 of those sites hold two controls, none, or one already named elsewhere. A missing or unrecognised value renders the inert <code>div</code> and warns, because <code>label</code> and <code>fieldset</code> both carry behaviour and neither may be reached by omission. <code>class</code> is APPENDED to <code>manager-field</code>, never a replacement, and every other attribute passes through.<span class="cite"><b>Field.svelte</b> &mdash; 81 callers · <b>ui-integration/spec.md</b> &sect;Shared product UI primitives</span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Checkbox&gt;</h4><p class="why">The box a gate list and a selection header both use. The tri-state is what a &ldquo;some rows selected&rdquo; header needs, and it is the state most hand-rolled checkboxes omit.</p></div>
+  <div class="spec" data-status="shipped" data-status-Checkbox="shipped">
+    <div class="spec-head"><h4>&lt;Checkbox&gt;</h4><span class="st st-shipped">shipped</span><p class="why">The box a gate list and a selection header both use. The tri-state is what a &ldquo;some rows selected&rdquo; header needs, and it is the state most hand-rolled checkboxes omit.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">off</span><div class="k-cb"><i><svg class="i"><use href="#i-check"/></svg></i></div></div>
       <div class="unit"><span class="cap">on</span><div class="k-cb on"><i><svg class="i"><use href="#i-check"/></svg></i></div></div>
@@ -715,8 +727,8 @@ a{color:var(--fab-accent)}
 <section id="pickers">
   <div class="sec-head"><span class="num">07</span><h2>Pickers &amp; bars</h2></div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;RangeBar&gt;</h4><p class="why">A tiled strip of spans whose dividers are dragged — outcome tiers against a DC, or the hours of the day. Spans tile the axis end to end, so dragging a divider moves the span that ends and the span that begins there together. They can never overlap or leave a gap.</p></div>
+  <div class="spec" data-status="target" data-status-RangeBar="target">
+    <div class="spec-head"><h4>&lt;RangeBar&gt;</h4><span class="st st-target">target</span><p class="why">A tiled strip of spans whose dividers are dragged — outcome tiers against a DC, or the hours of the day. Spans tile the axis end to end, so dragging a divider moves the span that ends and the span that begins there together. They can never overlap or leave a gap.</p></div>
     <div class="stage b0 col">
       <div class="unit"><span class="cap">outcome bands &mdash; 46px, fixed</span>
         <div style="position:relative;height:46px;border-radius:9px;background:var(--fab-bg-0);border:1px solid var(--fab-border);overflow:hidden;display:flex">
@@ -748,8 +760,8 @@ a{color:var(--fab-accent)}
     <div class="delta ok"><b>Planned migration: Gathering’s strip moves to 46 / r9 / bg-0.</b> The shipped strip records that those values were measured from the prototype and pinned by a parity fixture, and that the earlier 44 / 8 / raised-surface values were chosen rather than measured — a translucent raised surface let whatever the strip was stacked on show through an unfilled gap. Gathering’s 50 / r8 / bg-1 is that same mistake.<br><br>The height is <b>fixed</b> and never grows with content: a strip whose height varies shoves the tier rows’ steppers down the page, so a sublabel fits inside 46.<span class="cite"><b>ThresholdBandStrip.svelte:5-9, 51-60, 459-468, 504</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;LinkField&gt;</h4><p class="why">How a Fabricate record points at a game-world document. Three states in one component.</p></div>
+  <div class="spec" data-status="target" data-status-LinkField="target">
+    <div class="spec-head"><h4>&lt;LinkField&gt;</h4><span class="st st-target">target</span><p class="why">How a Fabricate record points at a game-world document. Three states in one component.</p></div>
     <div class="stage">
       <div class="unit" style="width:280px"><span class="cap">empty</span>
         <div style="height:104px;border-radius:11px;border:1px dashed var(--fab-border-strong);background:var(--fab-surface-soft);display:grid;place-items:center;text-align:center;gap:4px;padding:12px"><svg class="i" style="width:18px;height:18px;color:var(--fab-text-subtle)"><use href="#i-link"/></svg><div style="font-size:12px;font-weight:600;color:var(--fab-text-secondary)">Drop a game-world item here</div><div class="k-hint">or click to search the catalogue</div></div></div>
@@ -765,8 +777,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Match on <code>data.type</code>, store a uuid.</b> The drop discriminator is the document name Foundry puts in <code>data.type</code>. The drop path RESOLVES the payload rather than reading <code>data.uuid</code> directly. On the pinned build a compendium drag does carry a uuid; the shipped helper also tolerates a legacy <code>{pack, id}</code> shape, and resolving covers both without the call site knowing which arrived. A bare <code>id</code> is unresolvable without its collection, so the stored value is a uuid.<span class="cite"><b>dropUtils.js:1-19</b> · <b>ItemDropZone.svelte:11-24, 91-103</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;SearchPopover&gt;</h4><p class="why">One panel for picking anything from a catalogue — icons, components, characters, essences, tags, scenes. Four existing pickers collapse into this.</p></div>
+  <div class="spec" data-status="target" data-status-SearchPopover="target">
+    <div class="spec-head"><h4>&lt;SearchPopover&gt;</h4><span class="st st-target">target</span><p class="why">One panel for picking anything from a catalogue — icons, components, characters, essences, tags, scenes. Four existing pickers collapse into this.</p></div>
     <div class="stage b0" style="gap:26px;align-items:flex-start">
       <div class="unit" style="width:300px"><span class="cap">list form</span>
         <div style="border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:10px;display:grid;gap:8px">
@@ -798,8 +810,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Why the focus model is mandatory, not a preference.</b> Foundry treats an element as focused only if it is a form control, contentEditable, or a button with a form. Roving focus onto an option button re-arms the canvas bindings, so &uarr;&darr; would pan the map. Keeping focus in the input is the only model that works — which is what the shipped popover already does, by design.<span class="cite"><b>SearchablePopover.svelte:429, 535</b> (20 importing files) · <b>iconPickerPopover.js</b> · <b>portal.js</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;TintPicker&gt; &lt;ArtPathPicker&gt; &lt;Menu&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-TintPicker="shipped" data-status-ArtPathPicker="target" data-status-Menu="target">
+    <div class="spec-head"><h4>&lt;TintPicker&gt; &lt;ArtPathPicker&gt; &lt;Menu&gt;</h4><span class="st st-shipped">TintPicker &middot; shipped</span><span class="st st-target">ArtPathPicker &middot; target</span><span class="st st-target">Menu &middot; target</span></div>
     <div class="stage">
       <div class="unit"><span class="cap">tint &mdash; eight tokens, plus an optional custom colour</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -836,8 +848,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">08</span><h2>Marks &amp; atoms</h2></div>
   <p class="lede">Eight marks, routed by job rather than by eye. The domain model defines the Rail Marker Family; that vocabulary is canon and the rest resolve against it.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The mark vocabulary</h4></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The mark vocabulary</h4><span class="st st-prose">prose</span></div>
     <div class="stage col">
       <div class="unit"><span class="cap">rail markers &mdash; canon, four marks</span>
         <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
@@ -859,8 +871,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Two rules that keep the marks apart.</b> A list row gets a status button and the record’s own editor gets a toggle. And <b>unsaved is a Chip, not a Notice</b> — the smoke harness pins the chip, and a notice would claim the one blocking position for a state that blocks nothing. A record count is a <b>bare mono numeral</b>, never a filled pill.<span class="cite"><b>DOMAIN.md:76</b> · <b>styles/fabricate.css:12816</b> (643) · <b>ToggleCard.svelte</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Kicker&gt; &lt;IconChip&gt; &lt;StatBox&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-Kicker="target" data-status-IconChip="target" data-status-StatBox="target">
+    <div class="spec-head"><h4>&lt;Kicker&gt; &lt;IconChip&gt; &lt;StatBox&gt;</h4><span class="st st-target">Kicker &middot; target</span><span class="st st-target">IconChip &middot; target</span><span class="st st-target">StatBox &middot; target</span></div>
     <div class="stage">
       <div class="unit"><span class="cap">kicker &mdash; one size, one tracking</span><div style="display:grid;gap:8px"><span class="k-kicker">Free floor</span><span class="k-kicker accent">Rewards</span><div style="display:flex;gap:9px;align-items:center"><span class="k-kicker">Businesses at this tier</span><span style="flex:1;height:1px;background:var(--fab-border);min-width:40px"></span><span class="k-count">4</span></div></div>
         <span class="k-hint">Roughly 400 instances across the corpus, in 55 versions. Accent only when it names a whole section.</span></div>
@@ -873,8 +885,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Meter&gt; &lt;BandedBar&gt; &lt;StageBars&gt;</h4><p class="why">Four instruments, three components. Merging them leaves one component unable to carry one correct accessible role, which is why the shipped fill leaf renders none.</p></div>
+  <div class="spec" data-status="target" data-status-Meter="target" data-status-BandedBar="target" data-status-StageBars="target">
+    <div class="spec-head"><h4>&lt;Meter&gt; &lt;BandedBar&gt; &lt;StageBars&gt;</h4><span class="st st-target">Meter &middot; target</span><span class="st st-target">BandedBar &middot; target</span><span class="st st-target">StageBars &middot; target</span><p class="why">Four instruments, three components. Merging them leaves one component unable to carry one correct accessible role, which is why the shipped fill leaf renders none.</p></div>
     <div class="stage col">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px">
         <div class="unit"><span class="cap">meter &mdash; a value against a maximum</span>
@@ -912,8 +924,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">09</span><h2>Surfaces</h2></div>
   <p class="lede">Four ways of telling the reader something, and the rule that separates them.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-Callout="shipped" data-status-Notice="target" data-status-InfoStrip="target" data-status-Empty="shipped">
+    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4><span class="st st-shipped">Callout &middot; shipped</span><span class="st st-target">Notice &middot; target</span><span class="st st-target">InfoStrip &middot; target</span><span class="st st-shipped">Empty &middot; shipped</span></div>
     <div class="stage col">
       <div class="unit"><span class="cap">callout &mdash; explains a rule that is always true, and stays put</span>
         <div class="k-callout"><svg class="i"><use href="#i-info"/></svg><div>Time only &mdash; nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state.</div></div></div>
@@ -942,8 +954,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Validation is not a notice.</b> A shared validation surface ships with two callers and carries <code>passing</code>, <code>warnings</code> and <code>blocking</code> counts <em>simultaneously</em> — which is why it is its own primitive, and why non-blocking notices stack instead of replacing one another. Fabricate ships <b>no toast</b>: transient feedback is <code>ui.notifications</code>, which core renders over the module window anyway.<span class="cite"><b>EditorValidationSurface.svelte:9-13</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Card&gt; &lt;Well&gt; &lt;RowDisclosure&gt;</h4><p class="why">Two container levels only. A card sits on the page; a well nests inside a card.</p></div>
+  <div class="spec" data-status="target" data-status-Card="target" data-status-Well="target" data-status-RowDisclosure="target">
+    <div class="spec-head"><h4>&lt;Card&gt; &lt;Well&gt; &lt;RowDisclosure&gt;</h4><span class="st st-target">Card &middot; target</span><span class="st st-target">Well &middot; target</span><span class="st st-target">RowDisclosure &middot; target</span><p class="why">Two container levels only. A card sits on the page; a well nests inside a card.</p></div>
     <div class="stage b0">
       <div class="unit" style="width:280px"><span class="cap">card &mdash; radius 11, padding 16, bg-2</span>
         <div class="k-card"><div style="display:flex;gap:10px;align-items:center"><div class="k-ic s30" style="color:var(--fab-tag-butter)"><svg class="i"><use href="#i-star"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Wages &amp; upkeep</div></div><span class="k-badge">per tick</span></div></div></div>
@@ -962,8 +974,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">10</span><h2>Structures</h2></div>
   <p class="lede">The chrome and workflow surfaces. These are the parts most often rebuilt per screen, and the ones a new studio is most likely to hand-roll.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;AppTitleBar&gt;</h4><p class="why">The strip above both the page header and the nav rail. Byte-identical in 16 of 21 audited prototypes, and the documented home of the world clock.</p></div>
+  <div class="spec" data-status="target" data-status-AppTitleBar="target">
+    <div class="spec-head"><h4>&lt;AppTitleBar&gt;</h4><span class="st st-target">target</span><p class="why">The strip above both the page header and the nav rail. Byte-identical in 16 of 21 audited prototypes, and the documented home of the world clock.</p></div>
     <div class="stage b0 col">
       <div style="display:flex;align-items:center;gap:9px;padding:12px 16px;background:var(--fab-bg-0);border:1px solid var(--fab-border);border-radius:9px">
         <div class="k-ic" style="color:var(--fab-accent)"><svg class="i"><use href="#i-hammer"/></svg></div>
@@ -982,8 +994,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>The scope pill is a Badge tone.</b> Every prototype paints it as a hard-coded hex, which is the one place the title bar’s divergence lives; it takes a real tone like every other mark.</div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;NavSidebar&gt; &lt;AppRail&gt;</h4><p class="why">The player app's icon rail and the GM sidebar are one component with a variant — they share the item model and the active treatment. Nesting stops at one level; a third becomes a tab bar inside the destination.</p></div>
+  <div class="spec" data-status="target" data-status-NavSidebar="target" data-status-AppRail="target">
+    <div class="spec-head"><h4>&lt;NavSidebar&gt; &lt;AppRail&gt;</h4><span class="st st-target">NavSidebar &middot; target</span><span class="st st-target">AppRail &middot; target</span><p class="why">The player app's icon rail and the GM sidebar are one component with a variant — they share the item model and the active treatment. Nesting stops at one level; a third becomes a tab bar inside the destination.</p></div>
     <div class="stage b0" style="gap:20px;align-items:flex-start">
       <div class="unit"><span class="cap">app rail 72</span>
         <div style="width:72px;background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;padding:6px;display:grid;gap:2px"><div style="padding:8px 4px 7px;border-radius:9px;background:var(--fab-surface-active);display:grid;justify-items:center;gap:5px"><div style="position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center;background:var(--fab-accent-soft)"><svg class="i" style="width:20px;height:20px;color:var(--fab-accent)"><use href="#i-hammer"/></svg></div><span style="font-size:10px;font-weight:600;color:var(--fab-accent)">Crafting</span></div><div style="padding:8px 4px 7px;border-radius:9px;display:grid;justify-items:center;gap:5px"><div style="position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center"><svg class="i" style="width:20px;height:20px;color:var(--fab-text-subtle)"><use href="#i-flask"/></svg></div><span style="font-size:10px;font-weight:600;color:var(--fab-text-subtle)">Alchemy</span></div><div style="padding:8px 4px 7px;border-radius:9px;display:grid;justify-items:center;gap:5px"><div style="position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center"><svg class="i" style="width:20px;height:20px;color:var(--fab-text-subtle)"><use href="#i-leaf"/></svg></div><span style="font-size:10px;font-weight:600;color:var(--fab-text-subtle)">Gather</span></div><div style="padding:8px 4px 7px;border-radius:9px;display:grid;justify-items:center;gap:5px"><div style="position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center"><svg class="i" style="width:20px;height:20px;color:var(--fab-text-subtle)"><use href="#i-book"/></svg><span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-accent);color:var(--fab-on-accent);font-family:var(--fab-font-mono);font-size:9px;font-weight:500;display:grid;place-items:center;box-shadow:0 0 0 2px var(--fab-bg-1)">4</span></div><span style="font-size:10px;font-weight:600;color:var(--fab-text-subtle)">Journal</span></div></div></div>
@@ -1010,8 +1022,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>A parent is both a destination and a group.</b> The row navigates and carries <code>aria-current</code>; a separate chevron expands, and that chevron disables with a stated reason when collapsing would hide the current screen. Items carry an <b>id, not an href</b> — in a router-less client an in-app href navigates the game away and disconnects.<span class="cite"><b>CraftingSystemManagerRoot.svelte:9366-9394</b> (1185)</span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;PageHeader&gt; &lt;TabBar&gt;</h4><p class="why">Breadcrumb, title block, action pair, then a full-width tab bar. A studio never puts its tabs in a side rail.</p></div>
+  <div class="spec" data-status="target" data-status-PageHeader="target" data-status-TabBar="target">
+    <div class="spec-head"><h4>&lt;PageHeader&gt; &lt;TabBar&gt;</h4><span class="st st-target">PageHeader &middot; target</span><span class="st st-target">TabBar &middot; target</span><p class="why">Breadcrumb, title block, action pair, then a full-width tab bar. A studio never puts its tabs in a side rail.</p></div>
     <div class="stage b0 col">
       <div style="background:var(--fab-bg-0);border:1px solid var(--fab-border);border-radius:9px;overflow:hidden">
         <div style="padding:16px">
@@ -1046,8 +1058,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The tab bar draws the Rail Marker Family, and it is a capability rather than a per-strip choice.</b> The specimen above always showed two vehicles &mdash; bare counts on Tiers and Businesses, a filled warning badge on Validation &mdash; but the shipped <code>EditorTabs.svelte</code> could draw only the badge, so <code>KnowledgeTabs.svelte</code> rendered a record count as a chip (a substitution the near-neighbour rule forbids by name) and <code>ChecksEditorTabs.svelte</code> stayed a second implementation to keep its count and dot. Issue 1038 ruled that strip out of conversion because &ldquo;the two treatments are deliberately different&rdquo; &mdash; a deliberate STYLE divergence, which is the one kind a shared primitive may not record. Both strips are callers now.<span class="cite"><b>EditorTabs.svelte</b>, <b>ChecksEditorTabs.svelte</b>, <b>KnowledgeTabs.svelte</b> (1429)</span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;ListRow&gt; &lt;BrowseCard&gt; &lt;ViewToggle&gt; &lt;XrefList&gt;</h4><p class="why">Every browse list in the app is this row. It carries a size and a layout, which is what absorbs the card grid, the cross-reference list and two ruled-out candidates. A browse list is store-fed, so the row declares <b>loading</b> — skeleton rows rather than a collapsed list — and <b>error</b>, which replaces the body and keeps the header.</p></div>
+  <div class="spec" data-status="target" data-status-ListRow="target" data-status-BrowseCard="target" data-status-ViewToggle="target" data-status-XrefList="target">
+    <div class="spec-head"><h4>&lt;ListRow&gt; &lt;BrowseCard&gt; &lt;ViewToggle&gt; &lt;XrefList&gt;</h4><span class="st st-target">ListRow &middot; target</span><span class="st st-target">BrowseCard &middot; target</span><span class="st st-target">ViewToggle &middot; target</span><span class="st st-target">XrefList &middot; target</span><p class="why">Every browse list in the app is this row. It carries a size and a layout, which is what absorbs the card grid, the cross-reference list and two ruled-out candidates. A browse list is store-fed, so the row declares <b>loading</b> — skeleton rows rather than a collapsed list — and <b>error</b>, which replaces the body and keeps the header.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">default &mdash; 38px chip, serif name</span>
         <div style="display:grid;gap:8px">
@@ -1071,8 +1083,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;SelectionBar&gt; &lt;BulkEditPanel&gt;</h4><p class="why">The largest uncovered surface in the corpus. Six independent editors ship it, and two other entries depend on it: <code>&lt;TintPicker&gt;</code>&rsquo;s dense swatch size and its &ldquo;leave unchanged&rdquo; clear state both exist only for this surface.</p></div>
+  <div class="spec" data-status="target" data-status-SelectionBar="target" data-status-BulkEditPanel="target">
+    <div class="spec-head"><h4>&lt;SelectionBar&gt; &lt;BulkEditPanel&gt;</h4><span class="st st-target">SelectionBar &middot; target</span><span class="st st-target">BulkEditPanel &middot; target</span><p class="why">The largest uncovered surface in the corpus. Six independent editors ship it, and two other entries depend on it: <code>&lt;TintPicker&gt;</code>&rsquo;s dense swatch size and its &ldquo;leave unchanged&rdquo; clear state both exist only for this surface.</p></div>
     <div class="stage col">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:9px;background:var(--fab-accent-soft);border:1px solid var(--fab-accent-border);flex-wrap:wrap">
         <div class="k-cb ind"><i><svg class="i"><use href="#i-minus"/></svg></i></div>
@@ -1097,8 +1109,8 @@ a{color:var(--fab-accent)}
     <div class="delta">The player side is the same shape: bulk salvage carries the same count header, blocked-rows-with-reasons, apply preview and committed report.<span class="cite">6 prototype callers · <b>BulkEditPanelShell.svelte</b>, <b>BulkSelectionToolbar.svelte</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped as ONE closed component — four direct callers behind seven renderers, and nothing hand-rolls the arrangement any more. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
+  <div class="spec" data-status="target" data-status-ValidationList="target" data-status-ValidationSummary="target">
+    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><span class="st st-target">ValidationList &middot; target</span><span class="st st-target">ValidationSummary &middot; target</span><p class="why">Present in 11 of 21 prototypes and shipped as ONE closed component — four direct callers behind seven renderers, and nothing hand-rolls the arrangement any more. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:12px;align-items:center"><div class="k-ic s38" style="color:var(--fab-warning-text);background:var(--fab-warning-soft)"><svg class="i"><use href="#i-alert"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Nearly ready</div><div class="k-hint">Three warnings, one blocking issue. Players cannot craft this until the blocker clears.</div></div>
@@ -1118,8 +1130,8 @@ a{color:var(--fab-accent)}
     <div class="delta">The shipped component covers BOTH names in one surface: the verdict card and the grouped row list are one tab, not two, so neither name has an implementation of its own to point at and the manifest records the correspondence as unestablished rather than guessing which one the file is.<span class="cite">7 renderers · <b>EditorValidationSurface.svelte</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Modal&gt;</h4><p class="why">The manager's one modal chrome. It exists for a flow that must finish before anything else continues &mdash; today the two steps of an import: mapping folders, then reading the reference report.</p></div>
+  <div class="spec" data-status="shipped" data-status-Modal="shipped">
+    <div class="spec-head"><h4>&lt;Modal&gt;</h4><span class="st st-shipped">shipped</span><p class="why">The manager's one modal chrome. It exists for a flow that must finish before anything else continues &mdash; today the two steps of an import: mapping folders, then reading the reference report.</p></div>
     <div class="stage b0">
       <div style="width:100%;max-width:460px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--fab-border)">
@@ -1155,8 +1167,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>Why it is in the set, having been ruled out before.</b> The manager's modal chrome ships with <b>two</b> independent callers — the import folder-mapping step and the import report — which is the entry bar. Ruling it out as single-caller was wrong, and the consequence was that the whole import and export flow had no entry and no recipe. It is distinct from a core <code>DialogV2</code>: this is a mounted Svelte surface inside the manager, for a multi-step flow with its own state; a one-shot confirmation is still <code>confirmDialog</code>.<span class="cite"><b>ManagerModal.svelte</b> (issue 877) · <b>ImportFolderMappingModal.svelte</b> · <b>ImportReportModal.svelte</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;DataTable&gt;</h4><p class="why">A headed table for records read in columns rather than scanned as rows. Two ship today &mdash; the crafting IO table and the outcome-tier table, both player-side and neither headed or paged &mdash; and the journal's run history is a paged list. This is the one shape for all three, and the paged form is the arrangement the premium sibling already settled on.</p></div>
+  <div class="spec" data-status="target" data-status-DataTable="target">
+    <div class="spec-head"><h4>&lt;DataTable&gt;</h4><span class="st st-target">target</span><p class="why">A headed table for records read in columns rather than scanned as rows. Two ship today &mdash; the crafting IO table and the outcome-tier table, both player-side and neither headed or paged &mdash; and the journal's run history is a paged list. This is the one shape for all three, and the paged form is the arrangement the premium sibling already settled on.</p></div>
     <div class="stage col">
       <div style="border:1px solid var(--fab-border);border-radius:11px;background:var(--fab-bg-2);overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;flex-wrap:wrap">
@@ -1210,8 +1222,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>When a table, and when a list.</b> Reach for this only when a reader compares the same field DOWN a column — a date, an amount, a name. A record with a portrait, a status and two actions is a <code>&lt;ListRow&gt;</code>; forcing it into columns costs the art and the affordances and buys nothing. The tell is whether the columns would be worth sorting.</div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Pagination&gt; &lt;FilterBar&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-Pagination="target" data-status-FilterBar="target">
+    <div class="spec-head"><h4>&lt;Pagination&gt; &lt;FilterBar&gt;</h4><span class="st st-target">Pagination &middot; target</span><span class="st st-target">FilterBar &middot; target</span></div>
     <div class="stage col">
       <div class="unit" style="width:100%"><span class="cap">pagination &mdash; count left, pager centred, size right</span>
         <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--fab-border);background:var(--fab-bg-1);border-radius:0 0 9px 9px;flex-wrap:wrap">
@@ -1240,8 +1252,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The filter bar now ships — as TWO components, not one, and it owns its chrome rather than its controls.</b> `ManagerToolbar.svelte` was extracted from 11 hand-written <code>class="manager-toolbar"</code> sections, every one of them a <code>&lt;section&gt;</code>, measured by walking each component’s Svelte AST. <b>Where the corpus refuses this sketch.</b> The API above owns the controls as DATA (<code>toggles</code>, <code>selects</code>, <code>segments</code>, <code>sort</code>); the shipped corpus draws that control three different ways — a <code>&lt;label class="manager-filter"&gt;</code> wrapping a <code>&lt;select&gt;</code> (16 sites), a bare <code>&lt;select&gt;</code> carrying its own accessible name (2), and a <b>segmented control</b> (2) — so the bar takes a SLOT and does not choose between them. And the sketch specifies ONE component owning both bar and query where the tree has TWO: of the 23 hand-written search fields, <b>13 sit inside no bar at all</b>, one bar has no field and one has nothing else, so a field folded into the bar would have forced a bar around thirteen fields that have none. The field therefore ships separately as <code>ManagerSearchField.svelte</code>, and is recorded against <code>&lt;Search&gt;</code> at <b>section 06</b> rather than here — with the correspondence DECLINED, because that entry specifies one shell shared with text, number and select and the shipped pill is 34/6 with no kicker against the shell’s 38/9 with one. <b>Svelte API:</b> <code>children</code> (a snippet), <code>ariaLabel</code> (REQUIRED-shaped and gated in source — an unnamed <code>&lt;section&gt;</code> is not a landmark), <code>class</code> (an EXTRA class, appended) and a rest spread carrying every <code>data-*</code> hook and the three browsers’ <code>tabindex="-1"</code> focus target. <b>No variant prop:</b> the sheet’s four further treatments are anchored four different ways, one of them from a SCOPED rule in a consuming component and one of them (<code>:not(:has(.manager-toolbar-primary))</code>) a branch always taken, because — measured across <code>src/</code> — nothing writes that class at all. <b>The row <code>&lt;div&gt;</code> stays at the call site</b>, because <code>BulkSelectionToolbar</code> renders <code>&lt;div class="{rowClass} is-selection"&gt;</code> in its own template: that is how “the selection bar replaces the filter bar in place” is built, and it has broken once already.<span class="cite"><b>ManagerToolbar.svelte</b> — 11 callers · <b>ManagerSearchField.svelte</b> — 20 callers · <b>ui-integration/spec.md</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;Rail&gt; &lt;LogList&gt; &lt;TierTrack&gt; &lt;Avatar&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-Rail="target" data-status-LogList="target" data-status-TierTrack="target" data-status-Avatar="target">
+    <div class="spec-head"><h4>&lt;Rail&gt; &lt;LogList&gt; &lt;TierTrack&gt; &lt;Avatar&gt;</h4><span class="st st-target">Rail &middot; target</span><span class="st st-target">LogList &middot; target</span><span class="st st-target">TierTrack &middot; target</span><span class="st st-target">Avatar &middot; target</span></div>
     <div class="stage" style="align-items:flex-start;gap:20px">
       <div class="unit" style="width:290px"><span class="cap">inspector rail section</span>
         <div style="background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;padding:12px;display:grid;gap:12px">
@@ -1278,8 +1290,8 @@ a{color:var(--fab-accent)}
 <section id="composites">
   <div class="sec-head"><span class="num">11</span><h2>Composites</h2></div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;PickerRow&gt; &lt;ChoiceGroup&gt;</h4><p class="why">One row serves recipe ingredients and results, downtime rewards and requirements, gathering yields, faction tier rewards and trade-route goods. Build this once and five editors stop drifting.</p></div>
+  <div class="spec" data-status="target" data-status-PickerRow="target" data-status-ChoiceGroup="target">
+    <div class="spec-head"><h4>&lt;PickerRow&gt; &lt;ChoiceGroup&gt;</h4><span class="st st-target">PickerRow &middot; target</span><span class="st st-target">ChoiceGroup &middot; target</span><p class="why">One row serves recipe ingredients and results, downtime rewards and requirements, gathering yields, faction tier rewards and trade-route goods. Build this once and five editors stop drifting.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">empty &mdash; where every row starts</span>
         <div style="display:grid;gap:6px">
@@ -1348,8 +1360,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;SetPicker&gt;</h4><p class="why">Editing membership of a set too large to render inline — a component&rsquo;s tags, which books a recipe appears in, which recipes a book carries. It searches, it never dumps the whole set into the panel it sits in, and every selection is reversible before it is committed.</p></div>
+  <div class="spec" data-status="target" data-status-SetPicker="target">
+    <div class="spec-head"><h4>&lt;SetPicker&gt;</h4><span class="st st-target">target</span><p class="why">Editing membership of a set too large to render inline — a component&rsquo;s tags, which books a recipe appears in, which recipes a book carries. It searches, it never dumps the whole set into the panel it sits in, and every selection is reversible before it is committed.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">membership &mdash; one record&rsquo;s set</span>
         <div style="max-width:420px;display:grid;gap:8px">
@@ -1421,8 +1433,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>Why it is not just a multi-select popover.</b> Three obligations the search popover does not carry: the trigger is <b>bounded</b>, so a record in forty books renders four tokens and a count rather than forty; selection is <b>staged</b> and applied on commit, so a mis-click costs nothing and Clear is always reachable; and the bulk mode needs a <b>third state</b>, because an unchecked two-state box cannot distinguish &ldquo;remove this from all twelve&rdquo; from &ldquo;leave this one alone&rdquo;. Used by: component tags &middot; book membership &middot; recipe books &middot; bulk tag edit.<span class="cite">Book membership is stored as <b>recipeIds</b> on the book, so the same control drives both directions of the relation</span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;RuleRow&gt; &lt;RuleSentence&gt;</h4><p class="why">The condition editor behind triggers, gates and modifiers. The sentence is not decoration — it is how a GM checks they built what they meant.</p></div>
+  <div class="spec" data-status="target" data-status-RuleRow="target" data-status-RuleSentence="target">
+    <div class="spec-head"><h4>&lt;RuleRow&gt; &lt;RuleSentence&gt;</h4><span class="st st-target">RuleRow &middot; target</span><span class="st st-target">RuleSentence &middot; target</span><p class="why">The condition editor behind triggers, gates and modifiers. The sentence is not decoration — it is how a GM checks they built what they meant.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:10px;align-items:center"><div class="k-ic" style="color:var(--fab-tag-butter)"><svg class="i"><use href="#i-star"/></svg></div><span style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Natural 20</span><span class="grow"></span><button class="k-btn" style="height:28px;min-height:28px">Step up 1</button><button class="k-btn icon"><svg class="i"><use href="#i-cu"/></svg></button><button class="k-btn icon" style="color:var(--fab-danger-text)"><svg class="i"><use href="#i-trash"/></svg></button></div>
@@ -1444,8 +1456,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The sentence is assembled from localized keys, never concatenated.</b> A sentence built from fragments cannot be translated. The shipped app solves this twice, independently: whole-clause keys plus a translator-controlled frame and join — <em>“When {condition}, {effect}.”</em> with its own join string.<span class="cite"><b>lang/en.json:5495-5511</b> and <b>2809-2822</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag. A row also <b>opens in place</b> to its editing body, which is how recipe steps, component complications and result tiers are all authored.</p></div>
+  <div class="spec" data-status="target" data-status-SortableList="target">
+    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><span class="st st-target">target</span><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag. A row also <b>opens in place</b> to its editing body, which is how recipe steps, component complications and result tiers are all authored.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:6px">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)">
@@ -1525,8 +1537,8 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Live defect found while reviewing this.</b> The shipped band strip is a <code>&lt;span role="slider" tabindex="0"&gt;</code> handling arrows and Page keys, and <code>data-keyboard-focus</code> appears <b>nowhere in the tree</b> — zero occurrences across <code>src/</code> and <code>styles/</code>. Every band nudge currently also pans the canvas, and every Page key also zooms. Worth its own issue, independent of this reference.<span class="cite"><b>ThresholdBandStrip.svelte:412-433</b></span></div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>&lt;ExprInput&gt; &lt;RequirementChooser&gt;</h4></div>
+  <div class="spec" data-status="target" data-status-ExprInput="target" data-status-RequirementChooser="target">
+    <div class="spec-head"><h4>&lt;ExprInput&gt; &lt;RequirementChooser&gt;</h4><span class="st st-target">ExprInput &middot; target</span><span class="st st-target">RequirementChooser &middot; target</span></div>
     <div class="stage" style="align-items:flex-start;gap:22px">
       <div class="unit" style="width:300px"><span class="cap">expression &mdash; resolved only where an actor is in scope</span>
         <div class="k-lbl"><div class="k-field mono">1d20 + @prof + @abilities.dex.mod</div>
@@ -1580,8 +1592,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">12</span><h2>Sets &amp; groups</h2></div>
   <p class="lede">The container layer above the row. An <b>ingredient set</b> holds what a craft consumes; a <b>result set</b> holds what it produces. A recipe may carry several of each, and the resolution mode decides which set routes to which group.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>The two sets</h4><p class="why">A SET is the parent container. An ingredient set holds what a craft consumes; a result set holds what it produces. Both hold the <b>same two elements</b> &mdash; picker rows and choice groups &mdash; and differ only in which kinds their rows offer.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>The two sets</h4><span class="st st-prose">prose</span><p class="why">A SET is the parent container. An ingredient set holds what a craft consumes; a result set holds what it produces. Both hold the <b>same two elements</b> &mdash; picker rows and choice groups &mdash; and differ only in which kinds their rows offer.</p></div>
     <div class="stage" style="align-items:flex-start;gap:20px">
       <div class="unit" style="min-width:340px;flex:1"><span class="cap">ingredient set</span><div class="k-card" style="padding:12px;display:grid;gap:9px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-kicker">Ingredient set</span><span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:7px;background:var(--fab-surface-soft);border:1px solid var(--fab-border);font-family:var(--fab-font-serif);font-size:13px;font-weight:600;min-width:130px">Steel and hardwood</span><span style="flex:1"></span><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div><div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><span style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--fab-success);background:var(--fab-success-soft)"><svg class="i" style="width:11px;height:11px"><use href="#i-grid"/></svg></span><div class="k-field inline" style="width:110px;flex:none;height:28px">Component<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-mist)"><svg class="i" style="width:10px;height:10px"><use href="#i-hammer"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Steel Ingot</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-1" aria-label="Steel Ingot quantity" value="2" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn dashed" style="height:26px;min-height:26px;flex:none;font-size:10px">or&hellip;</button><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><div style="border-radius:9px;padding:9px;border:1px solid var(--fab-accent-border);background:var(--fab-accent-soft);display:grid;gap:6px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-badge accent" style="letter-spacing:.1em;font-size:8px;font-weight:700;text-transform:uppercase">Any one of</span></div><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><div class="k-field inline" style="width:110px;flex:none;height:28px">Component<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-sage)"><svg class="i" style="width:10px;height:10px"><use href="#i-hammer"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Oak Haft</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-2" aria-label="Oak Haft quantity" value="1" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:color-mix(in oklab,var(--fab-purple) 7%,var(--fab-bg-1));border:1px solid color-mix(in oklab,var(--fab-purple) 26%,transparent);flex-wrap:wrap"><div class="k-field inline" style="width:110px;flex:none;height:28px">Tag<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-chip" style="flex:none;background:var(--fab-purple-soft);color:var(--fab-purple);border-color:color-mix(in oklab,var(--fab-purple) 40%,transparent)">#Hardwood<svg class="i"><use href="#i-x"/></svg></span><button class="k-chip" style="flex:none;background:transparent;border:1px dashed color-mix(in oklab,var(--fab-purple) 40%,transparent);color:var(--fab-purple)"><svg class="i"><use href="#i-plus"/></svg>Tag</button><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-3" aria-label="Tagged item quantity" value="1" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><button class="k-btn dashed" style="height:26px;min-height:26px;justify-self:start;font-size:10px"><svg class="i"><use href="#i-plus"/></svg>Alternative</button></div><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><span style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--fab-info);background:var(--fab-info-soft)"><svg class="i" style="width:11px;height:11px"><use href="#i-flask"/></svg></span><div class="k-field inline" style="width:110px;flex:none;height:28px">Essence<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-aqua)"><svg class="i" style="width:10px;height:10px"><use href="#i-flask"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Vitality</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-4" aria-label="Essence amount" value="4" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn dashed" style="height:26px;min-height:26px;flex:none;font-size:10px">or&hellip;</button><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div></div><button class="k-btn dashed" style="height:28px;min-height:28px;justify-self:start"><svg class="i"><use href="#i-plus"/></svg>Requirement</button><span class="k-hint">A choice group here is the crafter deciding what to spend.</span></div></div>
       <div class="unit" style="min-width:340px;flex:1"><span class="cap">result set</span><div class="k-card" style="padding:12px;display:grid;gap:9px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-kicker">Result set</span><span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:7px;background:var(--fab-surface-soft);border:1px solid var(--fab-border);font-family:var(--fab-font-serif);font-size:13px;font-weight:600;min-width:130px">Fine blade</span><span style="flex:1"></span><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="k-hint" style="flex:none">Produced by</span><span style="display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 4px 0 8px;border-radius:6px;background:var(--fab-success-soft);border:1px solid color-mix(in oklab,var(--fab-success) 34%,transparent);font-size:10.5px;font-weight:600;color:var(--fab-success-text)"><svg class="i" style="width:8px;height:8px"><use href="#i-cl"/></svg>Success<button class="k-btn bare" style="width:16px;height:16px;min-height:16px;border-radius:4px"><svg class="i" style="width:7px;height:7px"><use href="#i-x"/></svg></button></span><span style="display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 4px 0 8px;border-radius:6px;background:var(--fab-success-soft);border:1px solid color-mix(in oklab,var(--fab-success) 34%,transparent);font-size:10.5px;font-weight:600;color:var(--fab-success-text)"><svg class="i" style="width:8px;height:8px"><use href="#i-cl"/></svg>Partial<button class="k-btn bare" style="width:16px;height:16px;min-height:16px;border-radius:4px"><svg class="i" style="width:7px;height:7px"><use href="#i-x"/></svg></button></span><button class="k-btn dashed" style="height:22px;min-height:22px;font-size:10px"><svg class="i"><use href="#i-plus"/></svg>Assign</button></div><div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><span style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--fab-success);background:var(--fab-success-soft)"><svg class="i" style="width:11px;height:11px"><use href="#i-grid"/></svg></span><div class="k-field inline" style="width:110px;flex:none;height:28px">Component<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-peach)"><svg class="i" style="width:10px;height:10px"><use href="#i-hammer"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Karrun Warblade</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-5" aria-label="Quantity produced" value="1" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn dashed" style="height:26px;min-height:26px;flex:none;font-size:10px">or&hellip;</button><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><div style="border-radius:9px;padding:9px;border:1px solid var(--fab-accent-border);background:var(--fab-accent-soft);display:grid;gap:6px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-badge accent" style="letter-spacing:.1em;font-size:8px;font-weight:700;text-transform:uppercase">Any one of</span></div><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><div class="k-field inline" style="width:110px;flex:none;height:28px">Currency<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-butter)"><svg class="i" style="width:10px;height:10px"><use href="#i-star"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Gold</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sc-6" aria-label="Currency awarded" value="50" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div><span class="k-unit">gp</span></div><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><div class="k-field inline" style="width:110px;flex:none;height:28px">Recipe knowledge<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-mist)"><svg class="i" style="width:10px;height:10px"><use href="#i-book"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Warblade</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div><button class="k-btn dashed" style="height:26px;min-height:26px;justify-self:start;font-size:10px"><svg class="i"><use href="#i-plus"/></svg>Alternative</button></div></div><button class="k-btn dashed" style="height:28px;min-height:28px;justify-self:start"><svg class="i"><use href="#i-plus"/></svg>Result</button><span class="k-hint">A choice group here is the player choosing their reward.</span></div></div>
@@ -1589,8 +1601,8 @@ a{color:var(--fab-accent)}
     <div class="delta"><b>The rows are the same component.</b> A set contains <code>&lt;PickerRow&gt;</code> and <code>&lt;ChoiceGroup&gt;</code> &mdash; there is no separate result row. What changes between the two sets is the <b>role</b> the set carries, which restricts the kinds the row&rsquo;s select offers: requirement kinds on the ingredient side, result kinds on the result side. Everything else about the row is identical, which is why the two sides never drift.<br><br><b>Both sets are renameable.</b> The name is the first control in the card, because it is what every other surface refers to the set by &mdash; a routing select, a validation message, a tier assignment. An unnamed set is addressable only by position, which is what makes a reordered list dangerous.</div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Routed by ingredients</h4><p class="why">The set the crafter satisfies decides the group. Each set names exactly one group; several sets may name the same one.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Routed by ingredients</h4><span class="st st-prose">prose</span><p class="why">The set the crafter satisfies decides the group. Each set names exactly one group; several sets may name the same one.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">&lt;RoutingOverview&gt; &mdash; the whole mapping on one screen</span>
         <div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge " style="flex:none;min-width:64px;justify-content:center">Set A</span><span class="k-hint grow" style="min-width:0">Steel Ingot &times;2 &middot; Oak Haft &times;1</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Fine blade<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">&nbsp;</span></div><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge " style="flex:none;min-width:64px;justify-content:center">Set B</span><span class="k-hint grow" style="min-width:0">Iron Ingot &times;2 &middot; Oak Haft &times;1</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Plain blade<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">shared &middot; 2</span></div><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge " style="flex:none;min-width:64px;justify-content:center">Set C</span><span class="k-hint grow" style="min-width:0">Scrap &times;4</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Plain blade<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">shared &middot; 2</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px"><button class="k-btn dashed"><svg class="i"><use href="#i-plus"/></svg>Ingredient set</button><button class="k-btn dashed"><svg class="i"><use href="#i-plus"/></svg>Result set</button></div></div>
@@ -1601,8 +1613,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Routed by check</h4><p class="why">The check outcome decides the group. Each tier names a group, and several tiers may name the same one.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Routed by check</h4><span class="st st-prose">prose</span><p class="why">The check outcome decides the group. Each tier names a group, and several tiers may name the same one.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">&lt;RoutingOverview&gt; &mdash; the same element, with tiers as the sources</span>
         <div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge success" style="flex:none;min-width:64px;justify-content:center">Critical</span><span class="k-hint grow" style="min-width:0">20+</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Masterwork<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">&nbsp;</span></div><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge success" style="flex:none;min-width:64px;justify-content:center">Success</span><span class="k-hint grow" style="min-width:0">15&ndash;19</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Fine blade<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">shared &middot; 2</span></div><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><span class="k-badge success" style="flex:none;min-width:64px;justify-content:center">Partial</span><span class="k-hint grow" style="min-width:0">10&ndash;14</span><span class="k-hint" style="flex:none">produces</span><div class="k-field inline" style="width:170px;flex:none;background:var(--fab-success-soft);border-color:color-mix(in oklab,var(--fab-success) 40%,transparent);color:var(--fab-success-text)">Fine blade<svg class="i chev"><use href="#i-cd"/></svg></div><span class="k-hint" style="flex:none;width:84px;text-align:right;white-space:nowrap">shared &middot; 2</span></div><div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);opacity:.6"><span class="k-badge danger" style="flex:none;min-width:64px;justify-content:center">Failure</span><span class="k-hint grow">below 10</span><span class="k-hint" style="flex:none">routing not permitted by this system</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px"><button class="k-btn dashed"><svg class="i"><use href="#i-plus"/></svg>Result set</button><button class="k-btn ghost"><svg class="i"><use href="#i-star"/></svg>Edit outcome tiers</button></div></div>
@@ -1613,16 +1625,16 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>Simple and alchemy &mdash; the reserved failure set</h4><p class="why">Neither mode routes: one ingredient set, one success result set, and nothing to assign. What they add is a second result set selected <b>by role</b> rather than by any mapping &mdash; the results a failed check awards, where the system allows results on failure.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>Simple and alchemy &mdash; the reserved failure set</h4><span class="st st-prose">prose</span><p class="why">Neither mode routes: one ingredient set, one success result set, and nothing to assign. What they add is a second result set selected <b>by role</b> rather than by any mapping &mdash; the results a failed check awards, where the system allows results on failure.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:8px"><div class="k-card" style="padding:12px;display:grid;gap:9px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-kicker">Result set</span><span style="display:inline-flex;align-items:center;gap:7px;font-family:var(--fab-font-serif);font-size:13px;font-weight:600;color:var(--fab-success-text)"><svg class="i" style="width:11px;height:11px"><use href="#i-lock"/></svg>Success</span><span style="flex:1"></span><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div><div style="display:flex;gap:6px;align-items:center"><span class="k-hint">Produced by</span><span class="k-hint" style="color:var(--fab-text-secondary)">a passed check &mdash; no assignment</span></div><div style="margin-top:-4px"><span class="k-badge">reserved role</span></div><div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><span style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--fab-success);background:var(--fab-success-soft)"><svg class="i" style="width:11px;height:11px"><use href="#i-grid"/></svg></span><div class="k-field inline" style="width:110px;flex:none;height:28px">Component<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-peach)"><svg class="i" style="width:10px;height:10px"><use href="#i-hammer"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Karrun Warblade</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sr-16" aria-label="Quantity produced" value="1" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn dashed" style="height:26px;min-height:26px;flex:none;font-size:10px">or&hellip;</button><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div></div><button class="k-btn dashed" style="height:28px;min-height:28px;justify-self:start"><svg class="i"><use href="#i-plus"/></svg>Result</button></div><div class="k-card" style="padding:12px;display:grid;gap:9px;border-color:var(--fab-danger-border)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="k-kicker">Result set</span><span style="display:inline-flex;align-items:center;gap:7px;font-family:var(--fab-font-serif);font-size:13px;font-weight:600;color:var(--fab-danger-text)"><svg class="i" style="width:11px;height:11px"><use href="#i-lock"/></svg>Failure</span><span style="flex:1"></span><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div><div style="display:flex;gap:6px;align-items:center"><span class="k-hint">Produced by</span><span class="k-hint" style="color:var(--fab-text-secondary)">a failed check &mdash; no assignment</span></div><div style="margin-top:-4px"><span class="k-badge danger">reserved role</span></div><div style="display:grid;gap:6px"><div style="display:flex;align-items:center;gap:7px;padding:7px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);flex-wrap:wrap"><span style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--fab-success);background:var(--fab-success-soft)"><svg class="i" style="width:11px;height:11px"><use href="#i-grid"/></svg></span><div class="k-field inline" style="width:110px;flex:none;height:28px">Component<svg class="i chev"><use href="#i-cd"/></svg></div><span style="display:inline-flex;align-items:center;gap:7px;min-width:170px;height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong)"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-bg-3);display:grid;place-items:center;flex:none;color:var(--fab-tag-slate)"><svg class="i" style="width:10px;height:10px"><use href="#i-hammer"/></svg></span><span style="font-size:11px;font-weight:600;white-space:nowrap">Scrap Steel</span><span style="flex:1"></span><button class="k-btn bare" style="width:20px;height:20px;min-height:20px;border-radius:5px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span style="flex:1;min-width:6px"></span><div class="k-pair" style="flex:none"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="sr-17" aria-label="Quantity produced" value="1" readonly style="width:30px;height:24px"><button><svg class="i"><use href="#i-plus"/></svg></button></div></div><button class="k-btn dashed" style="height:26px;min-height:26px;flex:none;font-size:10px">or&hellip;</button><button class="k-btn bare" style="flex:none"><svg class="i" style="width:9px;height:9px"><use href="#i-x"/></svg></button></div></div><button class="k-btn dashed" style="height:28px;min-height:28px;justify-self:start"><svg class="i"><use href="#i-plus"/></svg>Result</button><span class="k-hint">Optional. Leave it empty and a failed check produces nothing.</span></div><div style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)"><div class="grow"><div style="font-size:12.5px;font-weight:600">Award results on a failed check</div><div class="k-hint">Adds the reserved Failure set to this recipe.</div></div><div class="k-tog on"><i></i></div></div></div>
       <span class="k-hint">These two are <b>selected by role and never by index or name</b>, so neither carries a source list, neither can be assigned to anything, and <b>neither is renameable</b> &mdash; a rename would change nothing, because nothing refers to them by name. The lock glyph says which sets those are. The Failure set is optional: absent, or authored and left empty, a failed check produces nothing. Validation counts only the non-failure set toward &ldquo;exactly one success set&rdquo;, so carrying a failure set never makes a simple recipe invalid.<br><br>A set name may not be a reserved failure keyword &mdash; <code>fail</code>, <code>failure</code>, <code>miss</code>, <code>none</code> and their siblings &mdash; because the routed modes match an outcome against those words, and a set borrowing one would be selected by the failure path rather than by its tier. <b>Progressive has no reserved failure set at all.</b></span>
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>What each mode allows</h4><p class="why">The three modes these surfaces route between. <code>progressive</code> and <code>alchemy</code> are real modes with their own shapes &mdash; progressive notably awards every result set whose threshold the roll meets, rather than selecting one &mdash; and are specified in the resolution-modes capability rather than here.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>What each mode allows</h4><span class="st st-prose">prose</span><p class="why">The three modes these surfaces route between. <code>progressive</code> and <code>alchemy</code> are real modes with their own shapes &mdash; progressive notably awards every result set whose threshold the roll meets, rather than selecting one &mdash; and are specified in the resolution-modes capability rather than here.</p></div>
     <div class="stage col">
       <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:520px">
         <thead><tr>
@@ -1646,8 +1658,8 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">13</span><h2>Screen recipes</h2></div>
   <p class="lede">This app has four screen archetypes &mdash; browse, editor, player and validation. Build from the recipe down, not from the parts up. A settings screen is an editor without a breadcrumb or a back-and-save pair, because it edits a scope rather than a record.</p>
 
-  <div class="spec">
-    <div class="spec-head"><h4>A · Browse screen</h4><p class="why">A list of records you can filter, sort, page, select and open. Recipes, components, essences, settlements, businesses, parties — all the same screen.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>A · Browse screen</h4><span class="st st-prose">prose</span><p class="why">A list of records you can filter, sort, page, select and open. Recipes, components, essences, settlements, businesses, parties — all the same screen.</p></div>
     <div class="stage b0" style="padding:0">
       <div style="width:100%;background:var(--fab-bg-0);display:grid;grid-template-rows:auto auto 1fr auto">
         <div style="display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--fab-border)"><div class="k-ic s22" style="color:var(--fab-accent)"><svg class="i"><use href="#i-hammer"/></svg></div><span style="font-family:var(--fab-font-serif);font-size:13px;font-weight:600">Fabricate</span><span class="k-badge accent" style="font-size:8.5px">Karrun Forgecraft</span><span class="grow"></span><span class="k-fact"><svg class="i"><use href="#i-clock"/></svg><b style="font-size:11px">Day 214</b></span></div>
@@ -1676,8 +1688,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>B · Editor screen</h4><p class="why">One record, opened. Breadcrumb back to its list, tabs across its facets, cards down the body, an inspector rail answering &ldquo;what does this affect?&rdquo;</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>B · Editor screen</h4><span class="st st-prose">prose</span><p class="why">One record, opened. Breadcrumb back to its list, tabs across its facets, cards down the body, an inspector rail answering &ldquo;what does this affect?&rdquo;</p></div>
     <div class="stage b0" style="padding:0">
       <div style="width:100%;background:var(--fab-bg-0)">
         <div style="padding:14px 16px 0">
@@ -1708,8 +1720,8 @@ a{color:var(--fab-accent)}
     </div>
   </div>
 
-  <div class="spec">
-    <div class="spec-head"><h4>C · Player screen</h4><p class="why">The other side of everything the GM authored. An icon rail, a browse column, and a detail pane that resolves what the craft will actually take.</p></div>
+  <div class="spec" data-status="prose">
+    <div class="spec-head"><h4>C · Player screen</h4><span class="st st-prose">prose</span><p class="why">The other side of everything the GM authored. An icon rail, a browse column, and a detail pane that resolves what the craft will actually take.</p></div>
     <div class="stage b0" style="padding:0">
       <div style="width:100%;background:var(--fab-bg-0);display:grid;grid-template-columns:72px 200px minmax(0,1fr)">
         <div style="border-right:1px solid var(--fab-border);padding:8px 6px;display:grid;gap:2px;align-content:start"><div style="padding:7px 4px 6px;border-radius:9px;background:var(--fab-surface-active);display:grid;justify-items:center;gap:4px"><div style="width:44px;height:44px;border-radius:11px;display:grid;place-items:center;background:var(--fab-accent-soft)"><svg class="i" style="width:19px;height:19px;color:var(--fab-accent)"><use href="#i-hammer"/></svg></div><span style="font-size:9.5px;font-weight:600;color:var(--fab-accent)">Craft</span></div><div style="padding:7px 4px 6px;border-radius:9px;display:grid;justify-items:center;gap:4px"><div style="width:44px;height:44px;border-radius:11px;display:grid;place-items:center"><svg class="i" style="width:19px;height:19px;color:var(--fab-text-subtle)"><use href="#i-flask"/></svg></div><span style="font-size:9.5px;font-weight:600;color:var(--fab-text-subtle)">Alchemy</span></div><div style="padding:7px 4px 6px;border-radius:9px;display:grid;justify-items:center;gap:4px"><div style="width:44px;height:44px;border-radius:11px;display:grid;place-items:center"><svg class="i" style="width:19px;height:19px;color:var(--fab-text-subtle)"><use href="#i-leaf"/></svg></div><span style="font-size:9.5px;font-weight:600;color:var(--fab-text-subtle)">Gather</span></div></div>
@@ -1738,8 +1750,8 @@ a{color:var(--fab-accent)}
       <div><h5>Rules</h5><ul><li><b>No premium signal, in any state</b> — no badge, no padlocked entry, no teaser tab, no upgrade offer. Canon is absolute on this, and it is why <code>&lt;PremiumPanel&gt;</code> and <code>Locked.upgrade</code> left the set.</li><li>The player never authors — every chooser is a read-only mirror of the GM's group.</li><li>Craft is <b>one</b> primary action per pane. Everything else is quiet.</li></ul></div>
     </div>
   </div>
-<div class="spec">
-    <div class="spec-head"><h4>D · Validation screen</h4><p class="why">Every editor has one, and it is the same screen every time: a verdict, the counts, then the issues grouped by the part of the record they belong to. A GM who has read one has read all of them.</p></div>
+<div class="spec" data-status="prose">
+    <div class="spec-head"><h4>D · Validation screen</h4><span class="st st-prose">prose</span><p class="why">Every editor has one, and it is the same screen every time: a verdict, the counts, then the issues grouped by the part of the record they belong to. A GM who has read one has read all of them.</p></div>
     <div class="stage b0" style="padding:0">
       <div style="width:100%;background:var(--fab-bg-0)">
         <div style="padding:14px 16px;display:grid;gap:12px">
