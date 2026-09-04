@@ -151,7 +151,7 @@ function corpus() {
 }
 
 /**
- * Every prop destructured from `$props()` in one template, with its default's source text.
+ * Every prop destructured from `$props()` in one template, with what its default IS.
  *
  * Read from the SCRIPT AST rather than by matching braces in the text. The brace-matching version
  * of this scan was written first and has two failure modes that both under-report: a default
@@ -162,10 +162,17 @@ function corpus() {
  * A `RestElement` is skipped: `...rest` names no prop, and there is nothing about its contents a
  * template scanner can decide.
  *
- * @param {{source: string, ast: object}} template
- * @returns {Array<{name: string, default: string|null, line: number}>}
+ * THE TWO DEFAULT FIELDS ARE SEPARATE ON PURPOSE, because the two clauses ask different questions
+ * of them and `null` would be ambiguous across both. `defaultsToString` says the default is a
+ * string LITERAL — as opposed to absent, or `undefined`, or an expression — and `stringDefault`
+ * carries its value, which may legitimately be the empty string. A single field could not tell
+ * "defaults to `''`" from "has no string default", and the empty-string case is precisely the
+ * defect the second clause exists to find.
+ *
+ * @param {{ast: object}} template
+ * @returns {Array<{name: string, defaultsToString: boolean, stringDefault: string|null}>}
  */
-function propsOf({ source, ast }) {
+function propsOf({ ast }) {
   const props = [];
   const visit = (node) => {
     if (
@@ -182,11 +189,9 @@ function propsOf({ source, ast }) {
       const defaulted = value.type === 'AssignmentPattern';
       props.push({
         name: property.key.name ?? property.key.value,
-        default: defaulted ? source.slice(value.right.start, value.right.end) : null,
         defaultsToString:
           defaulted && value.right.type === 'Literal' && typeof value.right.value === 'string',
         stringDefault: defaulted && value.right.type === 'Literal' ? value.right.value : null,
-        line: source.slice(0, property.start).split('\n').length,
       });
     }
   };
