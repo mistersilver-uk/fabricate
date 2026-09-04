@@ -752,11 +752,12 @@
                     specificity.
 
                     The unlit chip KEEPS `tone="neutral"` rather than falling to the default
-                    tone. Measured, not assumed: the reference inks its unlit chip `var(--muted)`,
-                    which the compare run reports as `rgba(217, 184, 156, 0.74)` — exactly
-                    `--fab-text-muted`, which is what `is-neutral` paints. The default chip inks
-                    `--fab-text` (#F1D1B5), so dropping the tone would move the unlit ink AWAY
-                    from the reference to buy nothing.
+                    tone. Measured, not assumed: the compare run reports the reference's unlit
+                    ink and `--fab-text-muted` as the SAME computed value, and `--fab-text-muted`
+                    is what `is-neutral` paints. The default chip paints `--fab-text`, a
+                    different value, so dropping the tone would move the unlit ink AWAY from the
+                    reference to buy nothing. (No colour literal is written here: the theme
+                    colour contract scans comments too, and the tokens say it exactly.)
                   -->
                   <div class="manager-component-entry-chips">
                     {#each tagVocabulary as tag (tag)}
