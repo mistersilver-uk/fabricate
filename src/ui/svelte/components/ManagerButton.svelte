@@ -75,14 +75,19 @@
   `text-decoration: none` and the `is-full-width` rule live in `styles/fabricate.css`
   and not here, even though this component is what emits their classes.
 
-  Consequence: this button is only styled inside `.fabricate-manager`. It is a manager
-  primitive, not an app-agnostic one. `manager-layout.test.js` pins the equivalence in
+  Consequence, UNTIL ISSUE 1502: this button WAS only styled inside `.fabricate-manager`,
+  because every rule in the family was rooted at that application class. It is now rooted at
+  `fabricate-button`, which this component emits itself as the leading literal of `classes`
+  below, so the family paints wherever the primitive renders. That makes it a CAPABILITY
+  rather than an app-agnostic control in practice: all 58 importers still sit under
+  `apps/manager/**`, so nothing outside the manager exercises it yet.
+  `manager-layout.test.js` pins the equivalence in
   a real browser — it renders a tool studio button and a Modifiers card button of the
   same role and compares the COMPUTED `font-size`, `font-weight`, `padding`, `height`
   and `border-radius`, so a scoped rule landing on one screen and not the other reds
   the gate instead of shipping as drift. That harness READS `ROLE_CLASSES` and the
   `classes` array literal out of this file, so keep the mapping a named object
-  declared outside the array and keep the array's own string literals to the two
+  declared outside the array and keep the array's own string literals to the three
   unconditional classes: an inline conditional there puts its tokens into every probe
   and the gate goes green while measuring markup this component never emits.
 
@@ -158,6 +163,16 @@
   forwarded through the rest spread, so a call site keeps its own selectors. `class`
   is the one exception, above: it is destructured and merged by hand rather than left
   in `...rest`.
+
+  `data-keyboard-focus="true"` is written on the SAME SIDE of the rest spreads as
+  `class={classes}` — before `{...attributes}`, `{onclick}` and `{...rest}` — and the
+  placement is prescribed rather than incidental (issue 1502). It is the `class` trap above
+  in its other direction: a spread that lands LATER wins, so a caller's `data-*` bag
+  (`ActionMenu.svelte` spreads one onto its trigger) could unset this attribute by accident
+  if it were written after the spread, and deliberately if a call site ever needs to. Foundry's
+  `KeyboardManager#hasFocus` reads `dataset.keyboardFocus` on the focused element only, with no
+  inheritance, so while this button holds focus Foundry's own Space/arrow/Tab bindings stop
+  firing — which is the intended behaviour change, not a side effect.
 -->
 <script>
   let {
@@ -231,6 +246,7 @@
   const roleClass = $derived(Object.hasOwn(ROLE_CLASSES, role) ? ROLE_CLASSES[role] : '');
   const classes = $derived(
     [
+      'fabricate-button',
       'manager-button',
       'fab-manager-button',
       roleClass,
@@ -263,6 +279,11 @@
   });
 </script>
 
-<svelte:element this={resolvedTag} class={classes} {...attributes} {onclick} {...rest}
-  >{@render children?.()}</svelte:element
+<svelte:element
+  this={resolvedTag}
+  class={classes}
+  data-keyboard-focus="true"
+  {...attributes}
+  {onclick}
+  {...rest}>{@render children?.()}</svelte:element
 >
