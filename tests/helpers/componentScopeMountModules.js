@@ -99,15 +99,23 @@ export const SCOPED_LIST_RAW_MODULES = Object.freeze([
 /**
  * The overlay closure `SearchablePopover` binds.
  *
- * Both pickers in the catalogue's bulk panel are that primitive, so its two actions and its two
+ * Both pickers in the catalogue's bulk panel are that primitive, so its actions and its
  * positioning leaves are in the tree whether or not a test opens one.
+ *
+ * `anchoredPopover.js` and `overlayBounds.js` joined the closure at issue 1500, which replaced
+ * every floating panel's hand-written positioning pass with one action: the popover imports the
+ * action, the action imports `portal.js` and `overlayHost.js`, and the picker's shipped clipping
+ * boundary is a value from `overlayBounds.js`. `ActionMenu` reaches the same two through the same
+ * action, so a tree with a kebab needs them even when it renders no picker at all.
  *
  * @type {readonly string[]}
  */
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);
 
