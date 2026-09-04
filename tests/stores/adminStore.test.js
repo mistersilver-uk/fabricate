@@ -9092,15 +9092,26 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
    * PER CRAFTING SYSTEM, and that count cannot come from the threaded cohort because the
    * threaded cohort is the SELECTED system's alone. So the budget is three plus ONE PER
    * CRAFTING SYSTEM, and this fixture holds exactly one.
+   *
+   * ── THE UNFILTERED READ IS BUDGETED TOO (issue 1371, round 8) ─────────────────────────
+   * `getRecipes({})` copies the WHOLE library rather than one system's cohort, and it is the
+   * one read on this path that `RecipeManager`'s cohort index cannot make cheap — so it is
+   * the more expensive of the two quantities and it was going UNCOUNTED here, which is how
+   * it silently became two. The world-scope publish takes one for `buildWorldScopeState`'s
+   * `recipes` argument (issue 1392) and the world essence usage leg took a second for the
+   * same snapshot; they now share one. Counted on the same counter shape as the cohort, for
+   * the same reason: a third consumer has to move this number deliberately.
    */
   it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
     const services = createMockServices();
     const realRecipeManager = services.getRecipeManager();
     let cohortFetches = 0;
+    let libraryFetches = 0;
     services.getRecipeManager = () => ({
       ...realRecipeManager,
       getRecipes: (filter) => {
         if (filter?.craftingSystemId) cohortFetches += 1;
+        else libraryFetches += 1;
         return realRecipeManager.getRecipes(filter);
       },
     });
@@ -9109,6 +9120,7 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
     await store.selectSystem('sys1');
 
     cohortFetches = 0;
+    libraryFetches = 0;
     await store.refresh();
     assert.equal(
       cohortFetches,
@@ -9117,10 +9129,17 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
         'system for the world Tool usage count, and the row projection is not one of them: ' +
         'it projects from the array the refresh already holds'
     );
+    assert.equal(
+      libraryFetches,
+      1,
+      'and it copies the WHOLE recipe library exactly once: the world-scope publish and the ' +
+        'world essence usage leg want the same snapshot, so they take the same one'
+    );
 
-    // POSITIVE CONTROL, same fixture, same counter: the counter is live and the budget is
-    // per-refresh rather than a one-off.
+    // POSITIVE CONTROL, same fixture, same counters: they are live and both budgets are
+    // per-refresh rather than one-off.
     await store.refresh();
     assert.equal(cohortFetches, 8, 'the counter CAN go up — by exactly one refresh worth');
+    assert.equal(libraryFetches, 2, 'and so can the library one, by exactly one');
   });
 });

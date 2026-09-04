@@ -21,8 +21,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { get } from 'svelte/store';
 
+import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
+import { recipeReferencesComponent } from '../../src/utils/recipeComponentReferences.js';
 import { getItemMatchUuids } from '../../src/utils/sourceReferenceUnion.js';
 import { makeWorldScopeStoreFake } from '../helpers/worldScopeStoreFixture.js';
 
@@ -55,6 +58,67 @@ async function openStore(harness, entities) {
 
 function componentsOf(harness) {
   return Array.isArray(harness.system.components) ? harness.system.components : [];
+}
+
+/**
+ * Give the harness's crafting-system manager the SANCTIONED component delete — the shipped one.
+ *
+ * ## It runs `CraftingSystemManager`'s own method body, not a description of it
+ *
+ * `deleteComponents` and everything under it (`_deleteComponentSet`, `_stripComponentsFromRecipes`)
+ * touch `this` only through named collaborators, so the real prototype methods are invoked against
+ * a bag holding a recipe manager, a `getSystem` and a `save`. The reference repair under test is
+ * therefore the SHIPPED cascade — every referencing recipe rewritten once, the ones left without a
+ * usable shape clamped to disabled, essence source links cleared — rather than a second
+ * implementation of it in a fixture, which is the way a test double quietly stops matching the
+ * thing it stands for.
+ *
+ * `makeEssenceStoreHarness` ships no `deleteComponents` (it was written for the essence suites), and
+ * `tests/helpers/**` belongs to no one lane, so the seam is installed here.
+ *
+ * @param {object} harness the essence store harness.
+ * @returns {{calls: Array<{systemId: string, componentIds: string[]}>, infos: string[]}} what the
+ *   store asked for, and what the GM was told.
+ */
+function installSanctionedComponentDelete(harness) {
+  const proto = CraftingSystemManager.prototype;
+  const infos = [];
+  // `deleteComponents` announces the cascade through the Foundry global. Undeclared, `ui?.` is a
+  // ReferenceError rather than `undefined`, so the notification sink is installed too — and it is
+  // what the recipe-cascade disclosure is read from below.
+  globalThis.ui = {
+    notifications: {
+      info: (message) => {
+        infos.push(String(message));
+      },
+    },
+  };
+  const managerish = {
+    recipeManager: {
+      getRecipes: (filter) => harness.services.getRecipeManager().getRecipes(filter),
+      updateRecipe: async (recipeId, json) => {
+        const index = harness.recipes.findIndex((recipe) => recipe.id === recipeId);
+        if (index !== -1) harness.recipes[index] = json;
+      },
+      save: async () => {},
+      notifyRecipesChanged: () => {},
+    },
+    getSystem: (systemId) => harness.systemManager.getSystem(systemId),
+    save: async () => {},
+    _assertGM: () => {},
+    _notifySystemsChanged: () => {},
+    _cleanupSalvageRunsForComponent: async () => {},
+    _reconcileAlchemySignaturesAfterDeletion: async () => {},
+    _stripComponentsFromRecipes: proto._stripComponentsFromRecipes,
+    _deleteComponentSet: proto._deleteComponentSet,
+  };
+  const calls = [];
+  harness.systemManager.deleteComponents = async (systemId, componentIds) => {
+    calls.push({ systemId, componentIds: [...componentIds] });
+    harness.writes.push({ kind: 'deleteComponents', componentIds: [...componentIds] });
+    return await proto.deleteComponents.call(managerish, systemId, componentIds);
+  };
+  return { calls, infos };
 }
 
 test('1371: adopting a world component writes BOTH halves, membership first', async () => {
@@ -188,6 +252,7 @@ test('1371: removing a component deletes BOTH halves', async () => {
   // just removed it from, with the world layer silently no longer consulted.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
   await store.worldScope.component.addToSystem('ingot', 'sys1');
 
   assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), true);
@@ -297,4 +362,190 @@ test('1371: a gathering task contributes its DROPS to producedBy, off dropRows',
   // is labelled `Recipes` — so a leg that counted it there would make the number disagree with
   // its own label, which is the failure the tool leg's own note records.
   assert.equal(entries.find((entry) => entry.id === 'ingot')?.recipeCount, 0);
+});
+
+/**
+ * A recipe that names the component, in the system it is being removed from. Its ingredient set
+ * holds exactly one option, so stripping the component empties the group, empties the set, and
+ * leaves the recipe with no ingredient sets at all — the shape `recipeLostItsShape` clamps to
+ * disabled. Both consequences of the cascade are therefore observable on one fixture.
+ */
+const NAILS_RECIPE = Object.freeze({
+  id: 'r-nails',
+  name: 'Iron Nails',
+  craftingSystemId: 'sys1',
+  enabled: true,
+  ingredientSets: [
+    { id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ componentId: 'ingot', quantity: 2 }] }] },
+  ],
+  resultGroups: [{ id: 'res-1', results: [{ componentId: 'nail', quantity: 10 }] }],
+});
+
+test('1371: removing a component from a system REPAIRS the recipes that name it', async () => {
+  // REVIEWER 2, ROUND 5 (blocking, data integrity). The in-system half used to filter the
+  // `components` array and call `updateSystem`, which normalizes, asserts uniqueness and saves —
+  // and repairs NOTHING. So `Remove from this system`, reachable from the entry's per-system rows,
+  // the system rules roster and the catalogue's bulk `Remove from` group, left every recipe in that
+  // system referencing a component id the system no longer held: no rewrite, no disable, no
+  // statement. Deleting the same component from the component list has always cascaded; the two
+  // now leave the same system behind.
+  const harness = makeEssenceStoreHarness({
+    components: [],
+    recipes: [structuredClone(NAILS_RECIPE)],
+  });
+  const { store } = await openStore(harness, [LINKED]);
+  const sanctioned = installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+
+  // PRE-CONDITION: the recipe really does reference the component before the removal. Without it
+  // the assertions below pass on a fixture the cascade never had to touch.
+  assert.ok(
+    recipeReferencesComponent(harness.recipes[0], 'ingot'),
+    'PRE-CONDITION: the recipe names the component being removed'
+  );
+
+  assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), true);
+
+  // THE OUTCOME FIRST, so a regression reddens on the state the GM is left with rather than on
+  // the seam that produces it.
+  assert.ok(
+    !recipeReferencesComponent(harness.recipes[0], 'ingot'),
+    'the recipe no longer names a component this system does not have'
+  );
+  assert.equal(
+    harness.recipes[0].enabled,
+    false,
+    'and a recipe left with no ingredient set at all is clamped to disabled rather than offered ' +
+      'to players as permanently unsatisfiable'
+  );
+  assert.ok(
+    sanctioned.infos.some((message) => message.includes('updated 1 recipe(s)')),
+    'and the GM is TOLD how far it reached — the cascade the bulk panel copy must disclose'
+  );
+  assert.deepEqual(
+    sanctioned.calls,
+    [{ systemId: 'sys1', componentIds: ['ingot'] }],
+    'because the removal goes through the SANCTIONED delete, which is where the repair lives'
+  );
+});
+
+test('1371: the sanctioned delete seam is the one the store feature-detects', async () => {
+  // A MIRROR GUARD. `partComponentFromSystem` refuses the whole removal when the manager has no
+  // `deleteComponents` — the shape `adoptWorldTool` uses for `upsertTool` — so a rename on the
+  // manager would not fail here, it would make every `Remove from this system` control silently
+  // write nothing at all. This is the assertion that reddens instead.
+  assert.equal(typeof CraftingSystemManager.prototype.deleteComponents, 'function');
+  assert.equal(typeof CraftingSystemManager.prototype._deleteComponentSet, 'function');
+});
+
+test('1371: a manager that cannot delete refuses the WHOLE removal, not half of it', async () => {
+  // The harness ships no `deleteComponents`, which is exactly the state the guard is written for.
+  // Removing the membership record and then failing to remove the in-system row is the worse of
+  // the two outcomes: the read union's "no world half for this row" branch pushes such a record
+  // through UNCHANGED, so the component goes on resolving in a system the GM has removed it from
+  // with the world layer silently no longer consulted.
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+  delete harness.systemManager.deleteComponents;
+
+  assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), false);
+
+  assert.deepEqual(
+    Object.values(scope.payload.membership).map((record) => record.entityId),
+    ['ingot'],
+    'the membership record is NOT removed on its own'
+  );
+  assert.deepEqual(
+    componentsOf(harness).map((record) => record.id),
+    ['ingot'],
+    'and the in-system record still stands, so the two halves still agree'
+  );
+});
+
+/**
+ * Refuse the in-system seed the way the shipped manager refuses it: through
+ * `_assertUniqueComponentSourcesForSystem` itself.
+ *
+ * That method reads only its `system` argument, so the REAL assertion is invoked against the
+ * system the write would produce. The refusal under test is therefore the shipped one — two
+ * in-system components claiming one source uuid, which is exactly the duplicate-source state the
+ * world entry's own `Review & merge` band exists to surface — rather than a stand-in error.
+ *
+ * @param {object} harness the essence store harness.
+ * @returns {void}
+ */
+function refuseDuplicateSourceWrites(harness) {
+  const shipped = harness.systemManager.updateSystem;
+  harness.systemManager.updateSystem = async (systemId, updates) => {
+    CraftingSystemManager.prototype._assertUniqueComponentSourcesForSystem.call(
+      harness.systemManager,
+      { ...harness.system, ...updates }
+    );
+    return await shipped(systemId, updates);
+  };
+}
+
+/** A system component already claiming the source uuid the world component would seed. */
+const CLAIMANT = Object.freeze({
+  id: 'scrap',
+  name: 'Iron Scrap',
+  originItemUuid: 'Item.ingot-origin',
+});
+
+test('1371: a REFUSED seed rolls the membership record back and reports it', async () => {
+  // REVIEWER 3, ROUND 5 (high). The composition wrote membership and then awaited the seed
+  // uncaught, so a refusal left BOTH the ghost state the verb exists to prevent — a membership
+  // record with no in-system row, which the read union cannot draw — and an unhandled rejection
+  // escaping the catalogue's bulk loop, where it skipped every remaining component and never
+  // cleared the selection. `adoptWorldTool` had the rollback all along; this mirrors it.
+  const harness = makeEssenceStoreHarness({ components: [{ ...CLAIMANT }] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  refuseDuplicateSourceWrites(harness);
+
+  const answer = await store.worldScope.component.addToSystem('ingot', 'sys1');
+
+  assert.equal(answer, false, 'the verb ANSWERS rather than throwing, so a bulk loop continues');
+  assert.deepEqual(
+    Object.values(scope.payload.membership),
+    [],
+    'and the membership record this call wrote is removed again, so no ghost survives'
+  );
+  assert.deepEqual(
+    componentsOf(harness).map((record) => record.id),
+    ['scrap'],
+    'the system keeps exactly what it had'
+  );
+  assert.equal(harness.notifications.error.length, 1, 'the GM is told, once');
+  assert.ok(
+    harness.notifications.error[0].includes('Iron Scrap'),
+    'and the message names the component already claiming the source, which is what the GM has ' +
+      'to go and merge'
+  );
+});
+
+test('1371: but a membership record it did NOT write is left alone', async () => {
+  // THE ROLLBACK IS GUARDED ON THIS CALL'S OWN WRITE, and the state is reachable: a record written
+  // before this composition shipped, or one left by an earlier refusal, has no in-system row. On
+  // such a record `addToSystem` answers `false` (already a member) and the seed still runs — and
+  // an unguarded rollback would then DELETE membership the GM authored earlier because an
+  // unrelated duplicate refused the seed.
+  const harness = makeEssenceStoreHarness({ components: [{ ...CLAIMANT }] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  refuseDuplicateSourceWrites(harness);
+
+  assert.equal(await store.worldScope.component.addToSystem('ingot', 'sys1'), false);
+
+  assert.deepEqual(
+    Object.values(scope.payload.membership).map((record) => record.entityId),
+    ['ingot'],
+    'the pre-existing membership record survives the refusal'
+  );
+  assert.equal(harness.notifications.error.length, 1, 'and the GM is still told the seed failed');
 });

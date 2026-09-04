@@ -603,11 +603,14 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // world entry states them as two lists: "Used by" is what a GM checks before removing a
     // component, and "Produced by" before deleting the thing that makes it.
     //
-    // IT IS PROJECTED EVEN THOUGH NO SURFACE DRAWS IT YET, and that is deliberate rather than
-    // premature. Round 1 computed it and stopped here, which made the leg unobservable from
-    // anywhere — and the gathering half of it was reading a key stored tasks never carry, so it
-    // reported nothing on every world and no test could have said so. An absent `usage` answers
-    // `[]`, exactly as `requiredBy` does, so no other entity type moves.
+    // TWO SURFACES DRAW IT: the world component entry's preview rail, through
+    // `componentEntryPreviewGroups` in `scoped/componentScoped.js`, and the component rules
+    // editor's own rail in `ComponentEditView.svelte`. Round 1 computed it and stopped HERE,
+    // which made the leg unobservable from anywhere — and the gathering half of it was reading a
+    // key stored tasks never carry, so it reported nothing on every world and no test could have
+    // said so. Both were fixed together, and a note still saying "no surface draws it yet" would
+    // send the next lane looking for a consumer to write. An absent `usage` answers `[]`, exactly
+    // as `requiredBy` does, so no other entity type moves.
     producedBy: Array.isArray(entityUsage?.producedBy) ? [...entityUsage.producedBy] : [],
     // WHETHER THE WORLD MASTER SWITCH LEAVES THIS ENTITY ON. Read through `isWorldEnabled`, so
     // an ABSENT flag — every record in every world that has never touched the switch — answers

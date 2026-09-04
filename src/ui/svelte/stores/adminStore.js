@@ -5251,11 +5251,18 @@ export function createAdminStore(services) {
    * inventing the NUMBER would put a fabricated figure in front of a GM deciding whether a change
    * is safe. Fabricate can answer it for real, so it does.
    *
+   * ── THE WORLD-WIDE RECIPE READ IS THE CALLER'S, NOT THIS LEG'S ──────────────────────────────
+   * `getRecipes({})` copies the WHOLE library, and since issue 1392 `buildWorldScopeState` takes
+   * one for its own `recipes` argument — so this leg calling `_allRecipes()` itself made the
+   * unfiltered read happen TWICE per publish for one snapshot. The default keeps every other
+   * caller (and every test) working while the publish path threads its single read through,
+   * exactly as `recipeCache` threads the per-system cohort through the two legs that walk it.
+   *
+   * @param {object[]} [recipes] every recipe in the world; read here when the caller has none.
    * @returns {Record<string, {componentCount: number, recipeCount: number}>} keyed by essence id.
    */
-  function _worldEssenceUsage() {
+  function _worldEssenceUsage(recipes = _allRecipes()) {
     const components = _allComponents();
-    const recipes = _allRecipes();
     const usage = {};
     for (const system of _allSystems()) {
       const definitions = Array.isArray(system?.essenceDefinitions)
@@ -5591,6 +5598,14 @@ export function createAdminStore(services) {
     // scales that budget by the crafting-system count.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-call cache, never state
     const recipeCache = new Map();
+    // AND ONE WORLD-WIDE READ, SHARED THE SAME WAY (issue 1371, round 8). `_allRecipes()` is
+    // `getRecipes({})` — a copy of the whole library, and the one read on this path that is NOT
+    // cohort-indexed. It was being taken twice per publish once issue 1392 added the `recipes`
+    // argument beside the essence leg that already took its own; both want the same snapshot, so
+    // they take the same one. The per-system cohorts stay separate reads on purpose: they are
+    // answered from `RecipeManager`'s own cohort index, and `adminStore.test.js` bounds them as a
+    // fixed per-refresh budget.
+    const worldRecipes = _allRecipes();
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
@@ -5598,13 +5613,14 @@ export function createAdminStore(services) {
       // `### GM World Scoped Entity Routes` requirement 7 enumerates a projection's
       // REGISTRATION but not its INPUTS, and nothing in `{stores, systems, usage}` can answer a
       // world-wide recipe question — so the World Vocabulary's recipe-category reference count
-      // was underivable from inside the file that owns it. `_allRecipes()` already exists and
-      // is already invoked on every publish, so this adds no new corpus read. The counting
-      // itself lives in `worldScopeProjection.js`, an open file.
-      recipes: _allRecipes(),
+      // was underivable from inside the file that owns it. `_allRecipes()` already exists and is
+      // already invoked on every publish, so this adds no new corpus read — a claim that is true
+      // because the essence leg is handed THIS array rather than taking a second one. The
+      // counting itself lives in `worldScopeProjection.js`, an open file.
+      recipes: worldRecipes,
       usage: {
         component: _worldComponentUsage(recipeCache),
-        essence: _worldEssenceUsage(),
+        essence: _worldEssenceUsage(worldRecipes),
         tool: _worldToolUsage(recipeCache),
       },
     });
@@ -5968,6 +5984,26 @@ export function createAdminStore(services) {
    * record for a component this system already has, and overwriting its authored essences,
    * salvage or difficulty would be a destructive reading of "Add".
    *
+   * ── AND A REFUSED SEED ROLLS THE MEMBERSHIP RECORD BACK (issue 1371, round 8) ──────────────
+   * `updateSystem` really does refuse: `_assertUniqueComponentSourcesForSystem` throws when two
+   * in-system components claim one source uuid, which is exactly the duplicate-source state the
+   * world entry's own `Review & merge` band exists to surface. Left to throw, that would leave
+   * BOTH the ghost state this verb was composed to prevent — a membership record with no
+   * in-system row, which the read union cannot draw — and an unhandled rejection escaping the
+   * catalogue's bulk loop, where it skips every remaining component and never clears the
+   * selection. So the second half is wrapped exactly as {@link adoptWorldTool} wraps its own:
+   * the membership record written by THIS call is removed again, the GM is told, and the verb
+   * answers `false`.
+   *
+   * ONLY THE RECORD THIS CALL WROTE IS REMOVED. `addToSystem` answers `false` for a component
+   * that was already a member, and rolling back on that answer would delete a membership record
+   * the GM authored earlier because an unrelated duplicate refused the seed.
+   *
+   * AND IT ISSUES NO `refresh()` ON THE WAY OUT, where `adoptWorldTool` must. That verb composes
+   * over the WRAPPED family, so its own `addToSystem` already re-published the membership record
+   * it then removes; this one composes UNDER the wrap and calls `worldScopeFamilies` directly, so
+   * nothing has been published to correct and the `false` return correctly spends no re-projection.
+   *
    * @param {string} entityId the world component id.
    * @param {string} systemId the crafting system to join it to.
    * @returns {Promise<boolean>} whether anything was written.
@@ -5977,10 +6013,23 @@ export function createAdminStore(services) {
     const system = typeof systemId === 'string' ? systemId.trim() : '';
     if (!target || !system) return false;
     const joined = await worldScopeFamilies.component.addToSystem(target, system);
-    const seeded = await _seedInSystemComponent(target, system);
-    // NO `refresh()` HERE. `_republishingFamily` wraps this verb with every other one, so a
-    // second call would re-project twice per click and would leave the wrapper looking optional.
-    return joined || seeded;
+    try {
+      const seeded = await _seedInSystemComponent(target, system);
+      // NO `refresh()` HERE. `_republishingFamily` wraps this verb with every other one, so a
+      // second call would re-project twice per click and would leave the wrapper looking optional.
+      return joined || seeded;
+    } catch (error) {
+      if (joined === true) await worldScopeFamilies.component.removeFromSystem(target, system);
+      // PLAIN ENGLISH, DELIBERATELY, AND IT IS A FOLLOW-UP RATHER THAN A CHOICE. The Tool twin
+      // reads `localize('…Tools.AddToSystemFailed')`; the component key does not exist in
+      // `lang/en.json` yet and this lane does not own that file, and `localize` answers a MISSING
+      // key with the key itself — so naming one here would put `FABRICATE.…` on screen instead of
+      // a sentence. The eight sibling failure paths in this store already notify this way.
+      services.notify?.error?.(
+        `The component could not be added to this system. ${error?.message || ''}`.trim()
+      );
+      return false;
+    }
   }
 
   /**
@@ -6017,6 +6066,27 @@ export function createAdminStore(services) {
    * THE WORLD ENTITY AND EVERY OTHER SYSTEM ARE UNTOUCHED, which is the whole distinction from
    * deleting the world component itself.
    *
+   * ── THE IN-SYSTEM HALF IS A DELETE, SO IT TAKES THE DELETE PATH (issue 1371, round 8) ──────
+   * Removing the row from the `components` array with `updateSystem` is not the same operation
+   * as deleting the component, and the difference is every REFERENCE to it. `deleteComponents`
+   * routes through `_deleteComponentSet` — "remove the components, repair every reference to
+   * them, and persist once" — which rewrites every recipe in this system that names the id,
+   * disables the ones left without a usable shape, clears essence source links pointing at it,
+   * cleans up its salvage runs and reconciles alchemy signatures. A filtering `updateSystem`
+   * does none of that, so it left this system's recipes naming a component the system no longer
+   * has, with nothing on screen saying so.
+   *
+   * IT IS THE SAME OPERATION THE COMPONENT LIST'S OWN DELETE PERFORMS, and that is the point:
+   * "remove from this system" and "delete this system's component" leave the same system behind.
+   * The world entity is what survives one and not the other.
+   *
+   * A MANAGER THAT CANNOT DELETE REFUSES THE WHOLE ACTION rather than half of it, on
+   * {@link adoptWorldTool}'s precedent: it checks for `upsertTool` BEFORE writing the membership
+   * record because a write it cannot complete is worse than one it never starts. Here the
+   * asymmetry is sharper still — removing the membership record and then failing to remove the
+   * row leaves the component resolving in a system the GM has removed it from, with the world
+   * layer no longer consulted, which is the exact defect this verb is composed to prevent.
+   *
    * @param {string} entityId the world component id.
    * @param {string} systemId the crafting system to remove it from.
    * @returns {Promise<boolean>} whether anything was written.
@@ -6025,27 +6095,45 @@ export function createAdminStore(services) {
     const target = typeof entityId === 'string' ? entityId.trim() : '';
     const system = typeof systemId === 'string' ? systemId.trim() : '';
     if (!target || !system) return false;
+    const systemManager = services.getCraftingSystemManager?.();
+    const holdsRecord = _inSystemComponents(systemManager, system).some(
+      (record) => String(record?.id ?? '').trim() === target
+    );
+    if (holdsRecord && typeof systemManager?.deleteComponents !== 'function') return false;
     const parted = await worldScopeFamilies.component.removeFromSystem(target, system);
-    const dropped = await _dropInSystemComponent(target, system);
+    const dropped = holdsRecord ? await _dropInSystemComponent(target, system) : false;
     return parted || dropped;
   }
 
   /**
-   * Drop the in-system `components` row for one component, when it is present.
+   * One system's in-system `components` array, or `[]` when there is no such system.
+   *
+   * @param {object|null|undefined} systemManager
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  function _inSystemComponents(systemManager, systemId) {
+    const system = systemManager?.getSystem?.(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
+  }
+
+  /**
+   * Delete the in-system `components` row for one component, through the sanctioned cascade.
+   *
+   * `deleteComponents` is the SET form, called with the one id, so the reference repair, the
+   * recipe disable count, the salvage clean-up and the alchemy reconciliation all run exactly as
+   * they do for the component list's own delete — and its `deleted` count is the honest answer to
+   * "was a row removed", including `0` for an id this system does not hold.
    *
    * @param {string} entityId
    * @param {string} systemId
    * @returns {Promise<boolean>} whether a row was removed.
    */
   async function _dropInSystemComponent(entityId, systemId) {
-    const systemManager = services.getCraftingSystemManager();
-    const system = systemManager?.getSystem?.(systemId);
-    if (!system) return false;
-    const existing = Array.isArray(system.components) ? system.components : [];
-    const components = existing.filter((record) => String(record?.id ?? '').trim() !== entityId);
-    if (components.length === existing.length) return false;
-    await systemManager.updateSystem(systemId, { components });
-    return true;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.deleteComponents !== 'function') return false;
+    const outcome = await systemManager.deleteComponents(systemId, [entityId]);
+    return Number(outcome?.deleted ?? 0) > 0;
   }
 
   /**
@@ -6269,6 +6357,17 @@ export function createAdminStore(services) {
   // record for the read union to push through unchanged — the mirror defect the component family
   // composes `partComponentFromSystem` to avoid. Named here as a follow-up on the tool path
   // rather than fixed from a component lane.
+  //
+  // THE SAME FOLLOW-UP CARRIES THE UNCOMPENSATED TWO-KEY SPLIT ON BOTH FAMILIES (issue 1371,
+  // round 8, recorded rather than built). Every composed membership verb here writes TWO world
+  // settings — `componentScope` (or its tool twin) and `craftingSystems` — one after the other,
+  // with no pre-state snapshot and no reverse-order compensation. `adoptWorldTool` and
+  // `joinComponentToSystem` each undo their OWN first write when the second is refused, which is
+  // the reachable half; what neither can report is a compensation that itself fails, and neither
+  // `removeFromSystem` path compensates at all. Restoring a membership record after a partial
+  // delete would manufacture the very ghost state the rollback exists to prevent, so the remove
+  // paths deliberately do not try. Closing this properly means one transactional seam over both
+  // settings, which belongs to the tool follow-up above and not to a component lane.
   const worldScopeApi = {
     ...worldScope,
     tool: { ...worldScope.tool, addToSystem: adoptWorldTool },
