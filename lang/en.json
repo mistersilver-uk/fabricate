@@ -6271,7 +6271,6 @@
             "EntryMissingHint": "This entry is open on a component the world corpus no longer holds. Return to the catalogue and choose one.",
             "EntryTabsLabel": "Component definition sections",
             "TabValidation": "Validation",
-            "WorldPill": "World definition",
             "FieldName": "Name",
             "FieldDescription": "Description",
             "WorldCategory": "World category",

@@ -1345,7 +1345,15 @@ describe('CraftingSystemManager source contract', () => {
       'Drop items to add components'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.Origin, 'Origin');
-    assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, 'Compendium');
+    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it — are
+    // RETIRED (issue 1371, maintainer parity round 5). They labelled the browser row's origin
+    // column, which the C5 rebuild replaced with the reference's one-line row: the origin is now
+    // carried by the source filter and the linked/unlinked face, neither of which names a
+    // provenance in words. Nothing under `src/` reads any of the four, so `lang-keys-no-orphans`
+    // reds on the key the moment it is put back — asserting its ABSENCE is what keeps this
+    // inventory and that ratchet describing the same en.json. `SourceOriginLinked` survives only
+    // as an explicit `KNOWN_ORPHANS` debt entry, which is the baseline, not a live reference.
+    assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Title, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Library, 'Tags & Categories');
     assert.equal(

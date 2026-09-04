@@ -25888,7 +25888,7 @@
   font-size: 0.69rem;
 }
 
-/* === #1371 r5a — world component entry ======================================================
+/* ══ THE WORLD COMPONENT ENTRY, SECOND PARITY PASS (issue 1371, r5a) ═══════════════════════════
    The second parity pass over Part A, measured with `scripts/visual-parity` against
    `artifacts/proto-markup.txt` rather than read off the frames. Every rule below closes one
    line the `compare --screen entry` run reported, and the line it closes is cited beside it.
