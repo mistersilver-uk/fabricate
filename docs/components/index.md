@@ -27,14 +27,21 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-Every row is a shared identity, backed by one game-world item.
-Each row states how many recipes name it, and how many of your crafting systems currently have rules for it, as a fraction such as **3/6 systems**.
+Each row starts with a checkbox, then the component's icon, name, a source badge such as **Linked Foundry item**, and its description.
+A row also states how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**.
 A component no crafting system has adopted yet is marked **Unused**.
-Filter by whether a component has a linked source item, and sort by source item to group linked components ahead of unlinked ones.
+Filter by whether a component has a linked source item, and sort by name or by source item to group linked components ahead of unlinked ones.
+
+### Inspecting a component
 
 Select a row to inspect it on the right.
-The inspector states the component's world category (or **No world category**), how many world tags it carries and whether any are muted somewhere, which recipes use it, and a standing note explaining what is and is not shared with every crafting system (see [What the catalogue actually shares](#what-the-catalogue-actually-shares) below).
-Choose **Edit component** to open its full entry.
+The inspector opens with a **Catalogue entry** heading, the component's name over a caption naming its source, a **Source identity** card, and a **Global tags** card.
+
+The **Source identity** card states the source item's identifying address and any aliases recorded for it.
+The **Global tags** card states the component's world category, or says there is none, then lists its world tags as chips below, or says there are none, and carries an **Edit** link to the world Tags & Categories screen.
+
+Below those two cards, a roster lists every crafting system that has rules for this component, each with a **Rules** link to open it there, and states how many systems in total have rules for it, paged if there are more than a handful.
+**Open catalogue entry**, pinned at the foot of the inspector, opens the component's full entry.
 
 ### Creating a component from an item
 
@@ -60,12 +67,12 @@ Every crafting system whose Component Rules currently inherit the world category
 ### Bulk editing components
 
 Tick more than one row's checkbox to open the bulk panel in place of the single-component inspector.
-From there you can stage:
+From there you can stage four kinds of change:
 
-- **System membership.** Choose **Add to** or **Remove from**, then pick one or more crafting systems.
+- **System membership.** Choose **Add to** or **Remove from** for the direction, then search for and pick one or more crafting systems to apply it to.
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
 Removing drops those rules but leaves the world record untouched.
-- **World category.** Pick a category already used elsewhere in the corpus, or choose **No world category** to clear it.
+- **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it.
 The reserved **General** category is refused here too.
 - **World tags.** Mark each tag to add, remove, or leave unchanged across every selected component.
 
@@ -85,73 +92,72 @@ Deleting a world component is a single-record action from its own entry, describ
 
 ## The world Component entry
 
-Choose **Edit component** on a catalogue row, or drop a new item onto the catalogue, to open a component's entry.
-The header band across the top carries **Back**, **Delete**, and **Save**.
+Choose **Open catalogue entry** on a selected row, or drop a new item onto the catalogue, to open a component's entry.
+The header band across the top carries **Back** and **Save entry**, with an **Unsaved changes** marker while a change is pending.
+Two tabs sit below it, **Catalogue entry** and **Validation**.
 
 ### Identity
 
-Type the component's **Name** and **Description** here.
-Both start out as a snapshot taken from the linked item when you first link it, or when you replace the link, and you can then edit them independently of the item.
-Only the name and description are held until you press **Save**.
-Everything else on this screen, including the linked item, the world category, world tags, muting, membership, and delete, takes effect immediately.
+For a component linked to a Foundry item, the name and description are shown as read-only text under a **Linked Foundry item** pill, and a note explains that they refresh from the linked item and that every system shows the same three.
+You cannot type over them here.
+Only a component with no linked source item takes typed **Name** and **Description** fields instead, held until you press **Save entry**.
+Everything else on this screen, including the linked item, the world category, world tags, membership, and delete, takes effect immediately.
 
 If you leave with an unsaved name or description, Fabricate asks whether to save, discard, or keep editing.
-A note beneath the fields states how many systems currently share this identity.
 
-### Linked item
+### Source identity
 
-Drop an item onto the source area to link or replace it, or use **Unlink Item** to remove the link.
+Drop an item onto the source area to link or replace it, or choose **Unlink** to remove the link.
 Replacing the link takes a fresh name, image, and description snapshot from the new item.
-**Copy** copies the linked item's UUID.
+**Copy** copies the linked item's identifying address.
 
-**Also matches** lets you add other item UUIDs this component should also be recognised as.
+**Aliases** lets you add other item addresses this component should also be recognised as.
 This is useful when the same component has previously been represented by more than one item, for example after re-pointing a compendium link, so copies players already hold keep matching it.
 
-### World category
+### World classification
 
-Type a category, or pick one already used by another component from the suggestions.
+One **World classification** card holds both the component's category and its world tags.
+
+Pick the **Category** from the drop-down, or leave it at **No world category**.
 The reserved **General** category cannot be set here.
 Typing it, in any capitalisation or with extra spaces, is refused with a warning explaining that General is the fallback every component uses already, so leave the field blank instead.
+A note beneath the field tells you what is actually happening, stating how many systems currently inherit this world category and how many override it locally, once at least one system has rules for it.
 
-The note beneath the field tells you what is actually happening:
-
-- With no crafting systems using this component yet, it says so.
-- Once at least one system has rules for it, it states how many inherit this world category and how many override it locally.
-
-**Edit world vocabulary** opens the world Tags & Categories screen, where the category list itself is authored.
-
-### World tags
-
-Add or remove world tags here.
-The note beneath them states how many are set, and, once any crafting system mutes one, how many systems mute at least one.
+Click a tag pill to apply or clear that world tag on the record.
+A note beneath them states how many are currently set.
+**Edit world vocabulary** opens the world Tags & Categories screen, where the tag list itself is authored.
+A new world tag cannot be minted from this card.
+Add it to the vocabulary first, then it appears here to apply.
 
 {: .note }
-> World tags and world category and name behave differently.
+> World tags and the world category and name behave differently.
 > Every crafting system whose rules inherit the world category resolves that value.
-> World tags, and their per-system muting below, are visible on this entry and on the Component Rules screen, but are not yet applied to what any crafting system's own tag list actually is.
+> World tags are visible on this entry and, read-only, on the Component Rules screen, but are not yet applied to what any crafting system's own tag list actually is.
 
-### Per-system rows and tag muting
+### Systems using this component
 
-Below the identity and world classification cards, one row lists every crafting system.
-Filter by **All**, **With rules**, or **Without**, and search by name.
-Each row shows the system's name, whether its rules inherit or override the world category, and a summary of what it currently resolves.
+Below World classification, a card lists every crafting system.
+Filter by **All**, **With rules**, or **Without**, each stating its own count, and search by name.
+Each row shows the system's name and its resolution mode, and, for a member system, a short summary of what it currently resolves.
 
-- **Open rules** (member rows only) opens that system's Component Rules screen for this component.
-- **Add** or **Remove** joins or removes this component from that system.
-Adding creates rules in that system that inherit the world category.
+- **View system rules** opens that system's Component Rules screen for this component.
+It appears on member rows only.
+- The exit icon beside it removes this component from that system once you confirm.
 Removing deletes that system's rules for it, leaving the world record and every other system untouched.
-- For a system that already has rules, and while this component carries at least one world tag, a row of tag chips lets you mute individual world tags for that system alone.
-A muted tag is shown dimmed with a crossed-out eye.
-An active one carries a globe.
-This is the only place per-system tag muting is authored.
-The Component Rules screen for that system shows the same muted state read-only, with a link back here.
+- A system this component is not yet in carries a dashed **Add to system** button instead.
+Adding creates rules in that system that inherit the world category.
+
+**Add to systems…**, in the card's own header, reveals the systems this component is not yet in so you can add it to any of them from the same list.
+
+Per-system tag muting is not authored from this screen.
 
 ### Deleting a component
 
-If no crafting system has rules for this component, **Delete** removes it for good, along with the world record.
+At the foot of the entry, a danger card names how many crafting systems currently have rules for this component and carries **Delete entry**.
 
-If one or more crafting systems have rules for it, deleting is refused, and the reason is stated on the **Delete** button itself and above the per-system rows.
-It names the first few affected systems and tells you to remove the component from each one first, using the per-system rows above.
+If no crafting system has rules for this component, confirming removes it for good, along with the world record.
+If one or more crafting systems have rules for it, the card explains that first, and the confirm control itself reads **Cannot delete** instead of letting you proceed.
+Remove the component from each of those systems first, using the systems card above.
 Because the world-scope upgrade gives every pre-existing component a full set of system rules, this refusal is the normal state for most components on an upgraded world, not an edge case.
 
 ### Validation
@@ -161,13 +167,20 @@ A missing source item or an empty name blocks saving.
 No world category and no world tags are reported as warnings, not blockers, because a legitimately blank entry is not broken.
 A system that inherits an unset world category simply supplies its own.
 
+### How players see it
+
+A rail on the right, present on both tabs, shows the same preview a player sees: the component drawn as an inventory tile, its world tags, and a short note on its scope.
+Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
+The rail updates live as you edit the entry.
+
 ## Component Rules
 
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
+**Add from catalogue**, in the header, opens the world Component catalogue, where you can register a new component or select an existing one and add it to this system from its entry.
 
-Selecting a component that has a world record shows a banner across the top of the list, stating that its name, art, and description are authored in the world Component catalogue and shared with the other systems that have it, with an **Edit shared definition** link to that component's world entry.
-The editor carries its own version of this banner too, described below.
+Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
+The editor carries its own version of this card too, described below.
 
 ## Adding Components
 
@@ -243,18 +256,20 @@ If your Foundry version does not support this drag shape, use single-item drops 
 ## Browsing Components
 
 The **Component Rules** screen lists the system's components as a single grouped list.
-Each row shows the component's name and a short description line.
+Each row shows the component's name and a short description line, together with a **Salvage** pill when the component can be broken down, a run of essence dots, a **Recipes** count, and a labelled **Edit rules** control.
 
 The toolbar above the list gives you:
 
 - a **Category** filter, defaulting to **All categories**
 - an essence filter, defaulting to **All essences**
+- a **Select all** checkbox, which opens bulk actions in the inspector once anything is selected
 - a **Group by category** switch, on by default
 - a **Sort by** control offering **Name**, **Category**, **Essences**, and **Salvage**, with a button to flip between ascending and descending
 
-While **Group by category** is on, the list is split into a heading per category with a count of the components in it, and you can collapse a group you are not working on.
+While **Group by category** is on, the list is split into a heading per category with a count of the components in it.
+Groups do not collapse.
 The reserved **General** category is always shown last, because it is the catch-all rather than a category you chose.
-Long lists are paged, and the count above the list tells you which components you are looking at, such as **1–25 of 60**.
+Long lists are paged, and the count above the list tells you which components you are looking at.
 
 A component's category here is this system's own resolved value.
 See [Category](#category) below for how that relates to the world category.
@@ -263,55 +278,50 @@ Your filters, sort, grouping, and page survive opening a component and coming ba
 
 ### Bringing in world components this system has not adopted
 
-A three-way filter above the list controls which components you see:
+A two-way filter above the list controls which components you see:
 
 - **In this system** shows components this system already has rules for.
 This is the default.
 - **All world components** widens the list to every component the world Component catalogue holds, including ones this system has never adopted.
-The ones this system has no rules for yet are shown as ghost rows, with no category, essences, or salvage, because nothing here states behaviour for a component this system has no rules for.
-Choose **Add** on a ghost row to give it rules here.
-- **Overriding** narrows the list to components whose category this system has overridden rather than inherited.
+The ones this system has no rules for yet are shown as dimmed ghost rows, with a **Not in this system** pill in place of **Salvage**, an em dash where the **Recipes** count would be, and a dashed **Add to system** control in place of **Edit rules**.
 
-Each filter option states its own count, and the toolbar states how many components inherit the world category and how many override it, once at least one does.
+Each filter option states its own count.
 
 ## Editing Component Rules
 
 Open a component in the **Component Rules** screen to edit it.
 The editor is a single scrolling page rather than a form with a side panel.
-**Back** sits next to **Save** at the top, so leaving and saving are in the same place.
+**Back** sits next to **Save rules** at the top, with an **Unsaved changes** marker while a change is pending.
+Two tabs sit below it, **Component rules** and **Validation**.
 If you leave with unsaved changes, Fabricate asks you to confirm first.
 
-The page starts with an **Identity** strip carrying the component's icon, name, and description.
-When a component is backed by a Foundry item, its name, image, and description follow that item and cannot be typed here.
-The identity strip is also where you manage that link:
+The page starts with one identity callout carrying the component's icon and name.
+When the component has a world record, the callout also carries a **World catalogue** pill, a note stating how many systems share this identity, and an **Edit shared identity** link to the component's world entry.
+A component with no world record carries a note saying its name, image, and description are this system's own instead.
+Name, image, and description are never typed on this screen.
+They come from wherever they are actually authored, the linked item or the world entry.
 
-- drop a Foundry item onto the source area to replace the linked item
-- click the source item's name to open its sheet
-- use the **Source actions** menu for **Copy source UUID** and **Unlink Source Item**
-
-Replacing or unlinking a source takes effect immediately and is not held until you press **Save**, unlike the rest of the page.
-
-Opening a component with a world record shows a banner at the top of the editor.
-It states that the name, image, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, and that everything below the banner belongs to this system alone.
-Choose **Edit shared definition** to go there.
-
-Below the identity strip you set the component's category, its tags, its essences, and its salvage setup.
+Below the identity callout you set the component's category, its tags, its essences, and its salvage setup.
 
 ### Category
 
 A component's **Category** groups it in this system's browser.
-If the linked world component has a world category, a switch beside the field lets this system inherit it or override it.
-While inheriting, the value is shown read-only and the note explains which value it currently resolves to.
-Turn the switch off to author this system's own category instead.
-The switch is only offered when the world catalogue has actually set a category to inherit from.
-A system with nothing to inherit supplies its own category outright, with no switch shown.
+Pick it from the drop-down.
+If the linked world component has set a world category, the drop-down's first option reads **Inherit from world**, naming that value, and choosing it makes this system's category follow it.
+Choosing anything else overrides the category locally.
+The note beneath the field states which value this system currently resolves and whether that is inherited or overridden.
 
-### World tags
+### Tags
 
-Below the system's own writable tag list, and only while the linked world component carries world tags, a separate read-only **World tags** card states how many are in effect here and how many are muted, and lists them with the same dimmed, crossed-out-eye styling the world entry uses for a muted tag.
-This card is read-only.
-Muting a world tag is authored on the component's world entry, not here.
-**Edit world tags** opens that entry directly.
+A **Tags** card sits beside Category.
+
+While the linked world component carries world tags, they are listed read-only at the top of the card, under a caption naming where they are muted.
+A muted world tag is shown struck through and dimmed.
+Muting a world tag is not authored from this screen.
+**Edit world tags** opens the component's world entry.
+
+Below that, this system's own tags are listed as a click-to-toggle pill run.
+A note beneath both groups states how many tags are in effect here and how many world tags are muted.
 
 When the system's recipe resolution mode is Progressive, a **Progressive difficulty** card appears for setting the value spent against the crafting roll.
 See [Setting Component Difficulty]({% link crafting/recipes/progressive.md %}#setting-component-difficulty).
