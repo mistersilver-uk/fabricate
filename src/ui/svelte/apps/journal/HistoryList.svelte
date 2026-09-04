@@ -102,17 +102,34 @@
     min-width: 0;
   }
 
-  /* Theme the unstyled manager-pagination markup in the player scope (mirrors the
-     gathering environment list) using base tokens only. Anchored to the local
-     scoped wrapper so it cannot bleed beyond this list. */
+  /* Theme the manager-pagination markup in the player scope (mirrors the gathering
+     environment list) using base tokens only. Anchored to the local scoped wrapper so it
+     cannot bleed beyond this list.
+
+     ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base`
+     declarations below are what stops that moving the frame. `Pagination` and `IconButton`
+     are rooted at the classes they emit, so `styles/fabricate.css` paints this player-app
+     pager where it previously only painted the manager's — the markup is no longer
+     "unstyled" here, which is why that word is gone from the sentence above. Every property
+     this block already declares still WINS (a Svelte `:global` block is injected unlayered;
+     the sheet is imported at `layer(modules)`), so only the remainder is newly painted, and
+     each `1502 base` declaration restates what the remainder rendered BEFORE the widening.
+     This pager declares LESS than its five siblings, so its remainder is the larger one: the
+     per-property audit for all six player callers is in `components/Pagination.svelte`'s
+     docblock. */
   .journal-history-body :global(.manager-pagination) {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
     gap: var(--fab-space-2);
-    padding-top: var(--fab-space-2);
     font-size: 12px;
     color: var(--fab-text-muted);
+    /* 1502 base: the sheet newly paints all four `padding` longhands, a `border-top` and a
+       `background` on this bar. It has only ever had top padding, no rule and no fill — so
+       the `padding-top` here becomes the full shorthand rather than gaining three siblings. */
+    padding: var(--fab-space-2) 0 0;
+    border-top: none;
+    background: transparent;
   }
 
   /* Only the summary shrinks (ellipsis); the nav and per-page picker stay put so
@@ -128,6 +145,11 @@
   .journal-history-body :global(.manager-pagination-page) {
     color: var(--fab-text);
     white-space: nowrap;
+    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
+       label. It has always been a content-width flex item at the inherited weight; the
+       sheet's `text-align: center` is adopted and is inert on a content-width box. */
+    min-width: auto;
+    font-weight: inherit;
   }
 
   .journal-history-body :global(.manager-pagination-size) {
@@ -140,6 +162,12 @@
   }
 
   .journal-history-body :global(.manager-icon-button) {
+    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
+       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
+       `min-height: 0` and `font: inherit`. Restated, so the chevron keeps its 14px glyph.
+       The 2em minimum is this arrow's own 28px, so only the glyph was at stake here. */
+    min-height: var(--button-size, 2em);
+    font-size: var(--font-size-14, 0.875rem);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -164,5 +192,17 @@
     gap: var(--fab-space-2);
   }
 
-  /* The per-page <select> chrome is themed globally (.fabricate-app select). */
+  /* The per-page <select> colours are themed globally (`.fabricate-app select`), and its
+     geometry was Foundry core's until issue 1502 — the sheet's re-rooted
+     `.fabricate-pagination .manager-pagination-size select` now reaches it and would give it
+     the manager's 28px box and a 64px floor. Its own colours are the SAME four declarations
+     `.fabricate-app select` already made, so only the geometry is restated here. */
+  .journal-history-body :global(.manager-pagination-size select) {
+    /* 1502 base: Foundry core sizes every select `height: var(--input-height)` and sets
+       `line-height` to match; the sheet's `font: inherit` shorthand newly resets that
+       line-height, and its `min-width: 64px` is newly painted. */
+    height: var(--input-height, 2rem);
+    line-height: var(--input-height, 2rem);
+    min-width: auto;
+  }
 </style>
