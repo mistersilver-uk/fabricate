@@ -127,6 +127,19 @@ test('the three class strings under measurement are the ones the primitives emit
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
+
+  // AND THE FIXTURE BELOW WRITES EXACTLY THOSE STRINGS. The markup states its classes as
+  // literals so the repository's own fixture census can read them (see `CONTROLS`), which only
+  // stays honest while the literal and the component agree — so the agreement is asserted rather
+  // than assumed. A primitive that changes what it emits reds here, naming the control, instead
+  // of leaving this file measuring markup the product stopped rendering.
+  for (const control of CONTROLS) {
+    assert.ok(
+      control.markup('bare').includes(`class="${control.classes}"`),
+      `the ${control.id} fixture does not write \`class="${control.classes}"\`, which is what ` +
+        'the primitive emits'
+    );
+  }
 });
 
 /** The three hosts, which differ ONLY in the class on the wrapping `<div>`. */
@@ -136,29 +149,47 @@ const HOSTS = Object.freeze([
   Object.freeze({ id: 'manager', className: 'fabricate fabricate-manager' }),
 ]);
 
-/** The controls, and the element inside each host that is measured. */
+/**
+ * The controls, and the element inside each host that is measured.
+ *
+ * THE CLASS ATTRIBUTES ARE LITERALS, and the reads above are what stop them drifting. Building
+ * them by interpolation was the first shape of this file and it was wrong for a reason worth
+ * recording: `searchable-popover-area-scope.test.js` is a TEXT SCANNER over `tests/`, and a
+ * fixture that spells its classes as `class="${…}"` is invisible to it. This file would then have
+ * been a new blind spot in the census — and a carrier no scanner could see is precisely the defect
+ * that cost issue 1502 a whole extra phase, when twelve `triggerClass="…"` sites went unrepaired
+ * because the census probe only matched `class="manager-button`.
+ *
+ * So the markup says what it renders, in the open, and the pinning test above asserts every
+ * literal against the value read out of the component. A literal that drifts from the primitive
+ * reds there rather than quietly measuring the wrong control here.
+ *
+ * EACH FRAGMENT IS ONE UNBROKEN TEMPLATE LITERAL, and that is a constraint rather than a style.
+ * The same scanner walks `<tag …>` with an attribute run that alternates `"[^"]*"` and `'[^']*'`,
+ * so an OPEN TAG split across a `'…' + \`…\`` join puts the join's own apostrophe inside the tag
+ * and lets the alternation run past the `>` that should have ended it. Measured on the first draft
+ * of this file: splitting the pager arrow's `<button …>` across two fragments corrupted the tag
+ * stack and made the census report this file's `<nav>` and page label as rootless — a false
+ * offender produced entirely by where the source happened to wrap. Long lines here, one tag each.
+ */
 const CONTROLS = Object.freeze([
   Object.freeze({
     id: 'manager-button',
+    classes: MANAGER_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="${MANAGER_BUTTON_CLASSES}" data-probe="${host}-manager-button">` +
-      '<span>Save</span></button>',
+      `<button type="button" class="fabricate-button manager-button fab-manager-button" data-probe="${host}-manager-button"><span>Save</span></button>`,
   }),
   Object.freeze({
     id: 'icon-button',
+    classes: ICON_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="${ICON_BUTTON_CLASSES}" data-probe="${host}-icon-button" ` +
-      'aria-label="Delete"><i class="fas fa-trash"></i></button>',
+      `<button type="button" class="fabricate-icon-button manager-icon-button" data-probe="${host}-icon-button" aria-label="Delete"><i class="fas fa-trash"></i></button>`,
   }),
   Object.freeze({
     id: 'pagination',
+    classes: PAGINATION_CLASSES,
     markup: (host) =>
-      `<section class="${PAGINATION_CLASSES}" data-probe="${host}-pagination">` +
-      '<span class="manager-pagination-summary">Showing 1-4 of 8</span>' +
-      '<nav class="manager-pagination-nav">' +
-      `<button type="button" class="${ICON_BUTTON_CLASSES}" data-probe="${host}-pagination-arrow" ` +
-      'aria-label="Previous"><i class="fas fa-chevron-left"></i></button>' +
-      '<span class="manager-pagination-page">1 of 2</span></nav></section>',
+      `<section class="fabricate-pagination manager-pagination" data-probe="${host}-pagination"><span class="manager-pagination-summary">Showing 1-4 of 8</span><nav class="manager-pagination-nav"><button type="button" class="fabricate-icon-button manager-icon-button" data-probe="${host}-pagination-arrow" aria-label="Previous"><i class="fas fa-chevron-left"></i></button><span class="manager-pagination-page">1 of 2</span></nav></section>`,
   }),
 ]);
 
