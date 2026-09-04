@@ -14,6 +14,7 @@ The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row 
 Measured facts about the tree are written in the PAST TENSE with the commit they were measured on, because a measurement is true of a commit rather than for ever.
 Target text is written as MUST or SHOULD.
 A present-tense claim about what the code does is therefore a defect in this document whatever the code does, since nothing dates it and no reader can tell a fact that has expired from one that never held.
+A measurement taken on a branch is dated to that branch commit, which a squash merge does not keep, so the docs pass that follows the merge re-labels it to the merge commit — the first SHA a reader can check it against.
 
 ### Corpus and authority
 
