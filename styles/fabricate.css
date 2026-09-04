@@ -5596,7 +5596,7 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-pagination {
+.fabricate-pagination.manager-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5609,17 +5609,35 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-pagination-summary {
+/* THE PAGER'S OWN KEYBOARD RING (issue 1502). Now that this family is rooted at the class
+   `Pagination.svelte` emits rather than at an application root, it renders in areas whose
+   own bare-element ring it can no longer assume — `design-system/spec.md` puts that chrome
+   on the primitive. The declarations are the two area rings' verbatim (`:1043-1044`,
+   `:1605-1606`), so nothing moves where an area ring already reached.
+
+   BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too, TIES
+   `.fabricate-app select:focus-visible` and wins on source order — which would delete that
+   rule's `outline: none` + inset `box-shadow` and reinstate the clipped-outline defect on
+   the per-page select that it exists to prevent. The `<select>` keeps the area ring in both
+   apps (issues 1504 and 1510). The arrows are `<IconButton>`s and take that primitive's
+   ring as well; this rule is not redundant, because it also covers a non-IconButton button
+   in the pager. */
+.fabricate-pagination button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-pagination .manager-pagination-summary {
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-pagination-nav {
+.fabricate-pagination .manager-pagination-nav {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-pagination-page {
+.fabricate-pagination .manager-pagination-page {
   min-width: 96px;
   text-align: center;
   color: var(--fab-text);
@@ -5629,14 +5647,14 @@
 /* `Per page` IS TWO WORDS AND ONE LABEL (issue 1373). In a wrapping pager row it broke
    across two lines beside a 28px select, which set the bar's own height off its siblings'
    and read as a stray word. The label is short and fixed in every locale this ships. */
-.fabricate-manager .manager-pagination-size {
+.fabricate-pagination .manager-pagination-size {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-pagination-size select {
+.fabricate-pagination .manager-pagination-size select {
   height: 28px;
   min-width: 64px;
   border: 1px solid var(--fab-border);
@@ -13706,7 +13724,16 @@ a.fabricate-button.manager-button {
   outline-offset: 2px;
 }
 
-.fabricate-manager .manager-pagination .manager-icon-button {
+
+/* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502).
+   Its ancestor is the primitive's OWN class, not a caller's container, so `design-system/spec.md`
+   does not exempt it as a caller override: `Pagination` is the thing that says its arrows are
+   28px rather than the 34px the icon button ships at, so the rule is re-rooted at
+   `.fabricate-pagination` with the family class it already carried. (0,3,0) before and after,
+   so it still beats the 34px rule above for `width`/`height`/`flex` and still leaves that
+   rule's `padding: 0` in force. It is exempt to BOTH area-scope entries in both states,
+   because neither primitive writes the other's class. */
+.fabricate-pagination.manager-pagination .manager-icon-button {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
