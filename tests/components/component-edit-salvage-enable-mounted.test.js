@@ -541,6 +541,25 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     harness.remount();
   });
 
+  it('AC5: and the mode pill is the reference MICRO pill, not the default chip', async () => {
+    // `proto:5721` builds it from the prototype's own `pill()` helper (`proto:3893`):
+    // `padding: 2px 8px`, a stadium corner, `600 9.5px`. That is `Chip`'s `density="list"` to
+    // within a pixel, and it is the same scale the identity callout's `World catalogue` badge
+    // takes — the reference draws ONE micro pill and uses it in both places, so a second answer
+    // here would be a scale this screen invented.
+    const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
+    const pill = target.querySelector('[data-salvage-mode]');
+    assert.ok(
+      pill.classList.contains('is-list'),
+      `the mode pill takes the micro scale; it carried "${pill.className}"`
+    );
+    assert.ok(
+      !pill.classList.contains('is-tag-run'),
+      'and not the tag run, which is the scale of a chip a GM CLICKS — this one is read-only'
+    );
+    harness.remount();
+  });
+
   it('AC5: each mode names itself', async () => {
     for (const [mode, label] of [
       ['simple', /Simple/],

@@ -5141,22 +5141,31 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector: '[data-component-edit-section="world-tags"]',
     expectContained: [
-      // THE EXIT, inside the card head. A read-only card that names where its list is authored
-      // and offers no route there leaves a GM scrolled to the tags with nothing to do but scroll
-      // back up to the banner.
+      // THE EXIT AND THE MERGE NOTE ARE CONTAINED BY THE CARD, not by the world-tag GROUP, and
+      // the difference is what this pair was getting wrong. Parity round 4 rebuilt this card into
+      // a head, TWO labelled groups and a merge note; `[data-component-edit-section="world-tags"]`
+      // is the first of those groups, so the exit (which sits in the head, beside the title) and
+      // the note (which sits under BOTH groups, because it counts them together) are its SIBLINGS
+      // and can never be inside it. The case had asked for exactly that and failed every render
+      // since — "is clipped or extends outside", which reads as a layout defect and is really a
+      // capture state that did not co-evolve with the surface it captures.
       {
-        container: '[data-component-edit-section="world-tags"]',
+        container: '[data-component-edit-section="tags"]',
         target: '[data-component-edit-world-tags-exit]',
       },
-      // And the two chip states, which are the card's whole subject: `bulk` is muted in this
-      // system and `fuel` is not, so a card painting one treatment for both fails here.
+      {
+        container: '[data-component-edit-section="tags"]',
+        target: '[data-component-edit-world-tags-note]',
+      },
+      // The chip states ARE the group's own subject, and stay scoped to it: `bulk` is muted in
+      // this system and `fuel` is not, so a card painting one treatment for both fails here.
       {
         container: '[data-component-edit-section="world-tags"]',
         target: '[data-component-edit-world-tag="bulk"]',
       },
       {
         container: '[data-component-edit-section="world-tags"]',
-        target: '[data-component-edit-world-tags-note]',
+        target: '[data-component-edit-world-tag="fuel"]',
       },
     ],
     kinds: ['manager', 'components'],

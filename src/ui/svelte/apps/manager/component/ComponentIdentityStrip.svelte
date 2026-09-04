@@ -95,10 +95,25 @@
         >{component?.name || '—'}</span
       >
       {#if hasWorldEntry}
-        <!-- `proto:1313`: the pill is `--fab-bg-1` INSIDE an info hairline, and it reads
-             `World catalogue`. The shipped pill was an `info-soft` fill reading
-             `World definition` (gap-list row 131). -->
-        <Chip class="manager-component-world-pill" icon="fas fa-globe" data-component-world-pill>
+        <!-- `proto:1313`: the reference's MICRO pill — `padding: 2px 8px`, a stadium corner and
+             `600 9px` — reading `World catalogue`. The shipped pill was a default-scale chip
+             reading `World definition` (gap-list row 131).
+
+             `density="list"` IS that micro scale, to within the one pixel of vertical padding
+             `Chip.svelte` records: `1px 8px`, radius 999, 9px/600. It is deliberately not a new
+             `micro` value, for the reason that component's docblock gives.
+
+             AND THE PAINT IS NOT WIRED, because no shipped tone expresses it. The reference
+             draws a FLAT `--bg1` plate inside an info hairline with info ink, so the pill reads
+             as a separate surface from the `info-soft` callout it sits on; `tone="info"` would
+             put an `info-soft` fill on an `info-soft` callout, which is the very defect gap-list
+             row 131 records. A `manager-component-world-pill` rule in `styles/fabricate.css`
+             used to state the reference's three colours at two classes and was INERT —
+             that sheet is imported at `layer(modules)` and `Chip`'s own block is unlayered, so
+             all six of its declarations lost — and this round's `compare` measured every one of
+             them landing on the primitive's default instead. It is deleted rather than carried;
+             the three colour lines are a finding against `Chip`'s tone catalogue. -->
+        <Chip density="list" icon="fas fa-globe" data-component-world-pill>
           <span
             >{text('FABRICATE.Admin.Manager.Component.WorldCataloguePill', 'World catalogue')}</span
           >

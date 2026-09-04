@@ -25297,6 +25297,21 @@
   line-height: 1.5;
 }
 
+/* THE DANGLING-SOURCE REMEDIATION PARAGRAPH. Not a parity rule — the reference draws no such
+   paragraph at all (`proto:1247-1266` enumerates the inspector's five blocks and this is not one
+   of them), and it is recorded as a retained subject-only element beside the markup that emits
+   it. This rule exists because C7 RENAMED the class and never wrote the replacement: on `main`
+   the paragraph carried `environment-stale-warning` and borrowed that block's pair
+   (`:10663-10667`), so after the rename it rendered as unstyled body text — the one thing on
+   this panel a GM has to act on, drawn as though it were prose. The pair is carried across
+   verbatim rather than re-derived, because nothing about the warning changed except where its
+   markup lives. */
+.fabricate-manager .manager-component-inspector-warning {
+  margin: 0;
+  color: var(--fab-danger-text);
+  font-size: 0.74rem;
+}
+
 /* `proto:1268`: the pinned foot — a top hairline over the inspector's own surface, holding ONE
    primary action. `position: sticky` keeps it at the bottom of the scrolling column without this
    component owning a grid. */
@@ -25371,17 +25386,17 @@
   font-size: 0.56rem;
 }
 
-/* `proto:1313`: the `World catalogue` pill is `--fab-bg-1` INSIDE an info hairline and inked
-   `--fab-info-text`. The shipped pill was an `info-soft` FILL, which read as the same surface as
-   the callout it sits on (gap-list row 131). */
-.fabricate-manager .manager-chip.manager-component-world-pill {
-  border-color: var(--fab-info-border);
-  border-radius: 999px;
-  background: var(--fab-bg-1);
-  color: var(--fab-info-text);
-  font-weight: 600;
-  font-size: 0.56rem;
-}
+/* THE `World catalogue` PILL'S PAINT IS NOT WRITEABLE HERE, and the six declarations that used
+   to try are deleted rather than kept as a comment on a rule nobody could see (issue 1371,
+   parity round 6). `proto:1313` draws it as a flat `--bg1` plate inside an info hairline inked
+   `--fab-info-text`; the rule stated exactly that at `.fabricate-manager .manager-chip.…`, and
+   `compare` measured the pill's `border-color`, `border-radius`, `background`, `color`,
+   `font-weight` and `font-size` ALL landing on `Chip.svelte`'s own defaults. Layers decide, not
+   specificity: `module.json` gives this sheet no layer so Foundry imports it at
+   `layer(modules)`, `Chip`'s `css: 'injected'` block lands unlayered, and an unlayered
+   declaration beats a layered one at any specificity. The pill's SCALE now comes from
+   `density="list"` on the primitive; its colours need a tone `Chip` does not yet have, which is
+   a finding against that component rather than a rule to write here. */
 
 /* ── D4. CATEGORY ALONGSIDE TAGS (`proto:1319`) ──────────────────────────────────────────── */
 .fabricate-manager .manager-component-rules-duo {

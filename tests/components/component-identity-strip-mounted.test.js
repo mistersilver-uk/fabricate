@@ -131,6 +131,29 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
     harness.remount();
   });
 
+  it('and that pill is the reference MICRO scale, taken from the primitive', async () => {
+    // `proto:1313` draws it at `padding: 2px 8px`, a stadium corner and `600 9px`, which is
+    // `Chip`'s shipped `density="list"` to within the one pixel of vertical padding that
+    // component's docblock records. The class is the assertion because the geometry is declared
+    // in `Chip.svelte`'s scoped block and nowhere else: a caller that restated it in the global
+    // sheet would be INERT, which is exactly what the deleted
+    // `.manager-chip.manager-component-world-pill` rule was — that sheet is imported at
+    // `layer(modules)` and the primitive's block is unlayered, so all six of its declarations
+    // lost, and this round's `compare` measured every one of them landing on the default.
+    const { props } = track();
+    const target = await harness.mount(props);
+    const pill = target.querySelector('[data-component-world-pill]');
+    assert.ok(
+      pill.classList.contains('is-list'),
+      `the pill takes the micro scale from the primitive; it carried "${pill.className}"`
+    );
+    assert.ok(
+      !pill.classList.contains('manager-component-world-pill'),
+      'and it no longer carries the hook of a rule that could never paint it'
+    );
+    harness.remount();
+  });
+
   it('has no source drop target, no source kebab and no premise note', async () => {
     // The removal, stated. Every one of these was a per-capability case in this suite before
     // parity round 4; the source Item is authored on the world entry now.

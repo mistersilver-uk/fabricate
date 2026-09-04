@@ -256,9 +256,22 @@
             <div class="manager-chip-row" data-component-tag-list>
               {#each tagsInEffect as entry (entry.tag)}
                 <!-- Each chip NAMES ITS ORIGIN in a `title`, because the split counter above
-                     says how many came from where and the chips themselves must say which. -->
+                     says how many came from where and the chips themselves must say which — and
+                     it names it in COLOUR too, which is the half that was inverted. `proto:5663`
+                     inks a WORLD tag blue and `proto:5665` inks the system's OWN tag purple, the
+                     same pairing the rules editor's two runs use (`proto:5692`/`proto:5711`);
+                     this run had world purple and own neutral, so the two screens disagreed
+                     about what purple means. Measured by the `sys-inspector-tag-chip` region.
+
+                     THE SCALE IS THE DEFAULT CHIP, deliberately, and that is a measurement:
+                     `proto:5663` draws this pill at `padding: 3px 9px; border-radius: 999px;
+                     font: 600 10px` with no line-height, which lays out ~20px tall — exactly the
+                     default chip's height, and at 20px a 999px corner and the default's 10px are
+                     the same rendered corner. Neither shipped variant is nearer: `list` would
+                     draw it 13px tall and `tag-run` 25px. The residue is the base scale's own
+                     weight and horizontal inset, which belong to `Chip`, not to this caller. -->
                 <Chip
-                  tone={entry.source === 'world' ? 'tag' : 'neutral'}
+                  tone={entry.source === 'world' ? 'info' : 'tag'}
                   data-component-tag={entry.tag}
                   data-component-tag-source={entry.source}
                   title={entry.source === 'world'

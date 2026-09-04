@@ -13,6 +13,7 @@
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -1019,6 +1020,58 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
       inherited.querySelector('[data-component-category-source]').textContent.trim(),
       'inherited from world',
       'the other branch reads differently, so the line is derived rather than a constant'
+    );
+  });
+
+  it('inks a WORLD tag blue and the system\u2019s OWN tag purple, as both screens do', async () => {
+    // `proto:5663` inks a world tag blue and `proto:5665` inks the system's own purple, which is
+    // the same pairing the rules editor's two runs use one route away. This panel had it the
+    // other way round — world purple, own neutral — so the two component screens disagreed about
+    // what purple means, and the split counter above the run was the only thing saying which was
+    // which. `is-info` and `is-tag` are `Chip`'s families for exactly those two colours.
+    const root = await mountCoal();
+    const chip = (tag) => root.querySelector(`[data-component-tag="${tag}"]`);
+
+    assert.ok(
+      chip('fuel').classList.contains('is-info'),
+      `the world tag takes the info family; it carried "${chip('fuel').className}"`
+    );
+    assert.ok(
+      chip('sooty').classList.contains('is-tag'),
+      `and the system's own takes the tag family; it carried "${chip('sooty').className}"`
+    );
+    assert.ok(
+      !chip('fuel').classList.contains('is-tag'),
+      'and the two are different families rather than one tone with a second class on it'
+    );
+  });
+
+  it('draws the dangling-source warning in a class the stylesheet actually paints', async () => {
+    // A DRIFT GUARD, not a style assertion. On `main` this paragraph carried
+    // `environment-stale-warning` and borrowed that rule's danger ink; the C7 rebuild renamed it
+    // to a panel-local class and never wrote the replacement, so the one thing on this screen a
+    // GM has to act on rendered as unstyled body text. Nothing failed, because a class with no
+    // rule behind it is invisible to every gate that reads the markup alone.
+    //
+    // So the class is read OFF THE RENDERED NODE and looked up in the sheet: renaming it in the
+    // component reds this, and deleting the rule reds it too, which neither a hard-coded selector
+    // nor a mounted-only check can both do.
+    const root = await mountCoal({ selectedComponent: selectedCoal({ sourceMissing: true }) });
+    const warning = root.querySelector('[data-component-source-missing]');
+    assert.ok(Boolean(warning), 'the remediation paragraph renders in the dangling-link state');
+
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const painted = [...warning.classList].filter((token) => sheet.includes(`.${token} {`));
+    assert.deepEqual(
+      painted,
+      ['manager-component-inspector-warning'],
+      `no rule in styles/fabricate.css paints any class this paragraph carries ` +
+        `("${warning.className}"), so it renders as body text`
+    );
+
+    assert.ok(
+      !(await mountCoal()).querySelector('[data-component-source-missing]'),
+      'and it is withheld when the source resolves, so the state above is a branch'
     );
   });
 

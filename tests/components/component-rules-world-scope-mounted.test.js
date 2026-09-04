@@ -358,6 +358,81 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
     });
 
+    it('and BOTH runs are drawn at the reference TAG-RUN scale, lit, unlit and struck', async () => {
+      // `proto:5692` and `proto:5711` draw every tag chip on this screen at `padding: 5px 11-12px`,
+      // a stadium corner and `600 11px` — the scale of a chip a GM CLICKS rather than reads. Two
+      // parity lanes measured that one mismatch as ~34 of this screen's 117 drift lines, the
+      // largest single cause on it. The scale is `Chip`'s `density="tag-run"`, and it composes
+      // with the three paints rather than replacing any of them, which is the claim here: one
+      // size across a run that draws a lit chip, an unlit one and a switched-off one.
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+
+      const scaled = (selector) =>
+        [...target.querySelectorAll(selector)].map((chip) => chip.classList.contains('is-tag-run'));
+
+      assert.deepEqual(
+        scaled('[data-component-edit-world-tag]'),
+        [true, true],
+        'the world run — an unmuted chip AND the muted one, which is the struck face'
+      );
+      assert.deepEqual(
+        scaled('[data-component-edit-tag-toggle]'),
+        [true, true],
+        "and the system's own run — a checked chip AND an unchecked one"
+      );
+
+      const muted = target.querySelector('[data-component-edit-world-tag="bulk"]');
+      assert.ok(
+        muted.classList.contains('is-tag-run') && muted.classList.contains('is-struck'),
+        `the scale and the switched-off paint compose; the muted chip carried "${muted.className}"`
+      );
+      const lit = target.querySelector('[data-component-edit-tag-toggle="ore"]');
+      assert.ok(
+        lit.classList.contains('is-tag-run') && lit.classList.contains('is-tag'),
+        `and so do the scale and the lit purple; the checked chip carried "${lit.className}"`
+      );
+    });
+
+    it('and the WORLD run is inked blue where the system run is purple, per the reference', async () => {
+      // `proto:5692` inks a world tag blue and `proto:5711` inks the system's own purple, and the
+      // two runs stand one label apart. A single tone across both would make the card's two
+      // groups distinguishable only by their labels, which is what the colour is for.
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+      assert.ok(
+        target
+          .querySelector('[data-component-edit-world-tag="fuel"]')
+          .classList.contains('is-info'),
+        'the unmuted world tag takes the info family'
+      );
+      assert.ok(
+        !target.querySelector('[data-component-edit-tag-toggle="ore"]').classList.contains('is-info'),
+        'and the system run does not, so the two really are different families'
+      );
+    });
+
+    it('the RAIL preview draws its tags at the micro scale instead, because they are read', async () => {
+      // `proto:6147`, the shared preview builder this rail renders through: `padding: 2px 8px;
+      // border-radius: 999px; font: 600 9px` in the tag tone. A preview tag is a fact, not a
+      // control, so it takes `list` where the two authoring runs above take `tag-run` — the same
+      // split the reference draws, at two scales in one screen.
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+      const rail = target.querySelector('[data-component-rail-tags]');
+      assert.ok(Boolean(rail), 'the rail renders its tag row');
+      const chips = [...rail.querySelectorAll('.manager-chip')];
+      assert.ok(chips.length > 0, 'with at least one chip in it, so the check below is not vacuous');
+      assert.deepEqual(
+        chips.map((chip) => [chip.classList.contains('is-list'), chip.classList.contains('is-tag-run')]),
+        chips.map(() => [true, false]),
+        'every preview chip is the micro pill and none of them is the control scale'
+      );
+    });
+
     it('and the write path it declines to use IS available to it', async () => {
       // The read-only-ness is NOT structural: this view declares `actions`, and the call site
       // binds it to the component family — the one family carrying `setMutedTags`. So after this

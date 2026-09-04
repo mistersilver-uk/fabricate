@@ -1468,8 +1468,17 @@
                   <!-- `struck` is the reference's MUTED paint (`proto:5692`): a dashed hairline,
                        the `surface-soft` fill and a struck-through label. NOT `disabled` — the
                        `Chip` primitive joins `is-disabled` to the WARNING family, which would
-                       paint a muted tag amber and read as a hazard the GM must act on. -->
+                       paint a muted tag amber and read as a hazard the GM must act on.
+
+                       `density="tag-run"` is the SCALE the same reference line states —
+                       `padding: 5px 12px`, a stadium corner, `600 11px` — and it is the scale of
+                       a chip that is a control rather than a badge. It composes with the two
+                       paints above and shares no property with either, so a lit tag, a muted tag
+                       and a struck one all render at one size. `info` rather than `tag` because
+                       the reference inks the WORLD run blue and the system's OWN run purple
+                       (`proto:5692` against `proto:5711`); the run below is the purple one. -->
                   <Chip
+                    density="tag-run"
                     tone={worldMutedTags.includes(tag) ? 'muted' : 'info'}
                     struck={worldMutedTags.includes(tag)}
                     icon={worldMutedTags.includes(tag)
@@ -1494,6 +1503,7 @@
                   <Chip
                     tag="button"
                     type="button"
+                    density="tag-run"
                     tone={option.checked ? 'tag' : 'neutral'}
                     icon="fas fa-tag"
                     aria-pressed={option.checked === true}
@@ -1820,10 +1830,16 @@
                    off. Hiding it meant authoring an ordered progressive list, or a
                    routed set of groups, with nothing on screen saying which — precisely
                    when the panel is at its most confusing. -->
-                <!-- `proto:5721`: the SUBTLE pill — the `surface-soft` fill, the `--fab-border`
-                   hairline and the secondary ink — not the info family. The mode is a fact about
-                   the system, not a state the GM must act on. -->
+                <!-- `proto:5721`: the reference's MICRO pill helper (`pill()`, `proto:3893`) — a
+                   `surface-soft` fill, the `--fab-border` hairline, the secondary ink and
+                   `padding: 2px 8px` at `600 9.5px` on a stadium corner. Not the info family: the
+                   mode is a fact about the system, not a state the GM must act on.
+
+                   `density="list"` is that micro scale on the primitive, as it is for the
+                   identity pill above; the remaining half-pixel of type and the one percentage
+                   point of fill are the primitive's, not this call site's. -->
                 <Chip
+                  density="list"
                   tone="neutral"
                   icon={salvageModeOption?.icon || ''}
                   class="manager-salvage-mode-pill"
@@ -2688,9 +2704,16 @@
           <p class="manager-component-rules-preview-category" data-component-rail-category>
             {categoryLabel(categoryLocked ? worldCategory : categoryDraft)}
           </p>
+          <!-- The rail's preview tags are the reference's MICRO pill in the tag tone
+               (`proto:6147`, the shared preview builder this rail renders through:
+               `padding: 2px 8px; border-radius: 999px; font: 600 9px`, purple). They are read,
+               not clicked, so they take `list` where the editor's two authoring runs above take
+               `tag-run`. No region measures this chip, so the scale is quoted from the
+               reference's own style string rather than compared — named as a gap in the
+               handoff. -->
           <div class="manager-chip-row" data-component-rail-tags>
             {#each railTagChips as tag (tag)}
-              <Chip tone="tag" icon="fas fa-tag">{tag}</Chip>
+              <Chip tone="tag" density="list" icon="fas fa-tag">{tag}</Chip>
             {/each}
           </div>
           <p class="manager-component-rules-preview-art">
