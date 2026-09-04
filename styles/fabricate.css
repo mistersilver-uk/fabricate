@@ -24138,3 +24138,811 @@
 .fabricate-manager .manager-inline-link i {
   font-size: 0.44rem;
 }
+
+/* ══ PART A — THE WORLD COMPONENT CATALOGUE ENTRY (issue 1371, maintainer parity round 4) ══════
+   `proto:805-1022`, rebuilt card by card. EVERY RULE HERE IS GLOBAL RATHER THAN SCOPED, and that
+   is forced rather than preferred: over half of them paint markup a CHILD component renders — the
+   `InspectorCard` shell, `ManagerButton`, `ManagerSearchField`, `SegmentedControl`,
+   `ArmedDangerButton`, `ItemDropZone` and `ScopedEntityPreview` — and a Svelte-scoped rule stamps
+   its hash only on the elements the declaring component itself writes, so every one of them would
+   compile to a selector nothing carries.
+
+   GEOMETRY FOLLOWS `openspec/specs/design-system/spec.md:213-237` wherever the reference falls
+   between rungs, and each snap is named at the declaration rather than left as a silent value:
+   card radius 12 -> 11, control radius on a 26-32px control -> 7 and on a 34-38px one -> 9, the
+   reference's 15px card padding -> `--fab-space-4`, its 14px stack gap and 10/11px band paddings
+   -> `--fab-space-3`, its 22px page inline padding -> `--fab-space-5`. Radius, width, height and
+   font size are NOT spacing-scale members (`spec.md:230`) and are written as literals. */
+
+/* ── A0. THE PAGE FRAME ──────────────────────────────────────────────────────────────────────
+   TWO COLUMNS, AND THE RAIL IS THE SECOND ONE. Round 3 nested the rail inside the tab panel, so
+   it scrolled away with the cards and was absent from the Validation tab entirely. Each column
+   owns its own scroller, which is what keeps the rail in place while the panel moves. */
+.fabricate-manager .manager-component-entry-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 326px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fabricate-manager .manager-component-entry-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* THE TAB STRIP'S OWN BAND (`proto:823`): 22px inline padding and a 22px gap, both snapped to
+   `--fab-space-5`, on a bottom hairline. `flex: 0 0 auto` is load-bearing — a flex item defaults
+   to `flex-shrink: 1`, and on a short window the strip would compress into the panel. */
+.fabricate-manager .manager-component-entry-column > .manager-editor-tabs {
+  flex: 0 0 auto;
+  gap: var(--fab-space-5);
+  padding: 0 var(--fab-space-5);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* THE SCROLLER. `padding-bottom: 40px` is the reference's own value and is a documented literal
+   exemption from the spacing scale (`ui-integration`: one-off fixed dimensions in the 34-42px
+   range), because it is breathing room under the last card rather than a rhythm step. */
+.fabricate-manager .manager-component-entry-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--fab-space-4) var(--fab-space-5) 40px;
+  overflow: auto;
+}
+
+/* Every region the panel stacks is `flex: 0 0 auto` for the reason above: a card carrying
+   `overflow: hidden` collapses to nothing on a short window while every selector naming it still
+   matches, which is a defect no assertion can see. */
+.fabricate-manager .manager-component-entry-panel > * {
+  flex: 0 0 auto;
+}
+
+/* ── THE CARD, AND THE HEAD EVERY CARD SHARES ────────────────────────────────────────────────
+   `proto:845`, `:882` and `:921` draw one head: a 12px glyph in the card's own ink, an `h3` at
+   14px serif, a 10px muted subtitle, and an optional trailing action. Round 3 drew a bare
+   uppercase kicker on each, which is a FIELD label doing a SECTION head's job. */
+.fabricate-manager .manager-component-entry-card {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  background: var(--fab-bg-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+}
+
+.fabricate-manager .manager-component-entry-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-card-head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.fabricate-manager .manager-card-glyph {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
+  font-size: 0.75rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-card-glyph.is-info {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-card-glyph.is-tag {
+  color: var(--fab-purple);
+}
+
+.fabricate-manager .manager-card-glyph.is-accent {
+  color: var(--fab-accent);
+}
+
+/* SERIF AND SENTENCE CASE, at 14px. It is NOT `.manager-card-title`, which is this manager's
+   UPPERCASE micro-label at 700 — the two would otherwise be the same element wearing two
+   meanings, and the reference draws both, one above the other, inside the same card. */
+.fabricate-manager .manager-card-heading {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* The card subtitle is the header band's `.manager-subtitle` at the CARD's scale. A size taken
+   from the layout context is permitted; the family, weight and ink stay the primitive's. */
+.fabricate-manager .manager-component-entry-card-head .manager-subtitle {
+  margin: 0;
+  font-size: 0.63rem;
+  line-height: 1.45;
+}
+
+.fabricate-manager .manager-component-entry-note {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.59rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-component-entry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* ── A3. THE IDENTITY CARD ───────────────────────────────────────────────────────────────────
+   `proto:833-843`: a 56px chip, a copy column, and a trailing compact drop target. */
+.fabricate-manager .manager-component-entry-identity-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-identity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-identity-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* THE NAME IS A VALUE, NOT A FIELD, for a linked record: 18px serif at 600. */
+.fabricate-manager .manager-component-entry-identity-name {
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* And a field ONLY where there is no linked item to refresh from, at the same 18px so the two
+   states are the same line rather than two layouts. */
+.fabricate-manager .manager-component-entry-identity-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-identity-description {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.fabricate-manager .manager-component-entry-identity-textarea {
+  min-width: 0;
+  padding: var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-component-entry-identity-note {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.625rem;
+  line-height: 1.45;
+}
+
+/* THE TRAILING DROP TARGET, in `ItemDropZone`'s compact form: a fixed 176px column so the copy
+   beside it keeps a stable measure whatever the component is called. */
+.fabricate-manager .manager-component-entry-identity-body .manager-item-drop-zone {
+  flex: 0 0 176px;
+  align-self: stretch;
+}
+
+/* ── A4. THE SOURCE IDENTITY CARD ────────────────────────────────────────────────────────────
+   `proto:845-879`. The uuid well is a `--fab-bg-1` inset at the row rung (radius 9). */
+.fabricate-manager .manager-component-entry-uuid-well {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-component-entry-uuid-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-uuid-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+}
+
+/* The linked Item's own address, in the mono face because it is an identifier a GM copies rather
+   than reads. `tabular-nums` is not wanted: this is not a column of numerals. The mono face ships
+   400 and 500 only, so the reference's 500 lands unchanged. */
+.fabricate-manager .manager-component-entry-uuid {
+  display: block;
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias.
+   28 IS a rung, so it is kept rather than snapped up, and radius 7 is its ladder partner. */
+.fabricate-manager .manager-component-entry-mini-action.manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-2);
+  border-radius: 7px;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires:
+   switching a control off must take its colours from `.manager-button:disabled` and keep the
+   shape it had when enabled. */
+.fabricate-manager .manager-component-entry-mini-action.manager-button:not(:disabled) {
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-component-entry-alias-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-alias-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+}
+
+.fabricate-manager .manager-component-entry-alias-field > i {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.56rem;
+}
+
+.fabricate-manager .manager-component-entry-alias-field > input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+}
+
+/* Zero aliases is the NORMAL state of a healthy record, so it is a sentence rather than a count. */
+.fabricate-manager .manager-component-entry-alias-empty {
+  color: var(--fab-text-disabled);
+  font-size: 0.625rem;
+}
+
+.fabricate-manager .manager-component-entry-duplicate {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-duplicate .manager-callout {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── A5. THE WORLD CLASSIFICATION CARD ───────────────────────────────────────────────────────
+   ONE card, two columns (`proto:888`). Round 3 shipped two cards with one kicker each. */
+.fabricate-manager .manager-component-entry-classification-body {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-classification-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* A `<select>`, not a free-text input with a datalist (`proto:890`). 34px is the snapped rung and
+   9 is its radius. */
+.fabricate-manager .manager-component-entry-category-select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+
+  /* OPAQUE, NOT THE REFERENCE'S `surface-soft`. A translucent `<select>` background opens a
+     LIGHT native popup in every browser, which `manager-layout.test.js` holds as a gate over
+     every manager select; `--fab-bg-1` is the nearest opaque token to the reference's fill. */
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ── A6. SYSTEMS USING THIS COMPONENT ────────────────────────────────────────────────────────
+   `proto:920-953`. The card pads NOTHING and clips its children; each band pads itself, which is
+   what lets the rows band scroll inside the card's own radius. */
+.fabricate-manager .manager-component-entry-systems-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-component-entry-systems-head {
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
+.fabricate-manager .manager-component-entry-head-action.manager-button {
+  flex: 0 0 auto;
+  height: 30px;
+  min-height: 30px;
+  margin-left: auto;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 0.69rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-head-action.manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-component-entry-systems-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* A 150px input inside a 30px well, not a full-width search bar (`proto:928`). The wrapper caps
+   the primitive's own `flex: 1 1 260px`, and the fill and rung are the reference's. */
+.fabricate-manager .manager-component-entry-systems-search {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-systems-search .manager-search {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-systems-search .manager-search input {
+  width: 150px;
+  height: 30px;
+  background: var(--fab-surface-soft);
+  border-radius: 7px;
+}
+
+.fabricate-manager .manager-component-entry-system-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.66rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* IT SCROLLS AT 330px. The row count is a property of the WORLD's crafting-system roster rather
+   than of the component, so on a twenty-system world an unbounded list makes this card the tab. */
+.fabricate-manager .manager-component-entry-systems {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+  max-height: 330px;
+  overflow: auto;
+}
+
+.fabricate-manager .manager-component-entry-system {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-component-entry-system:last-child {
+  border-bottom: 0;
+}
+
+/* THE FIXED NAME COLUMN. 196px is a track size, not a spacing step, so it is a literal. */
+.fabricate-manager .manager-component-entry-system-identity {
+  flex: 0 0 auto;
+  width: 196px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-system-name {
+  display: block;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager
+  .manager-component-entry-system.is-outsider
+  .manager-component-entry-system-name {
+  color: var(--fab-text-muted);
+}
+
+/* THE MODE SUB-LINE, which round 3 replaced with a warning-toned chip stating a different fact. */
+.fabricate-manager .manager-component-entry-system-mode {
+  display: block;
+  color: var(--fab-text-subtle);
+  font-size: 0.59rem;
+  font-weight: 500;
+}
+
+/* THE MIDDLE COLUMN: one ellipsised line, never a paragraph under the row. */
+.fabricate-manager .manager-component-entry-system-summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.69rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-system-summary.is-absent {
+  color: var(--fab-text-disabled);
+}
+
+.fabricate-manager .manager-component-entry-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-component-entry-system-rules.manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-system-rules.manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-muted);
+}
+
+/* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3
+   drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the
+   reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
+.fabricate-manager .manager-component-entry-system-add.manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: dashed;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-system-add.manager-button:not(:disabled) {
+  background: transparent;
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-muted);
+}
+
+/* THE EXIT ICON: a 26px square in the row's own clothing (`proto:944`), not a labelled danger
+   button. The CONTROL is still the shared `ArmedDangerButton` — its arm/disarm two-step, its
+   Escape and blur disarm and its single-armed-token invariant are exactly the shipped ones — and
+   only its skin is the row's, which is a SIZE and a surface taken from the layout context rather
+   than a re-derived control. The danger ink returns the moment it is armed, which is the state
+   where the colour is the warning. */
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 0.625rem;
+}
+
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager
+  .manager-component-entry-row-actions
+  .manager-button.is-danger.is-armed:not(:disabled) {
+  width: auto;
+  padding: 0 var(--fab-space-2);
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger > span:empty {
+  display: none;
+}
+
+.fabricate-manager .manager-component-entry-system-empty {
+  padding: var(--fab-space-3) var(--fab-space-4);
+  color: var(--fab-text-disabled);
+  font-size: 0.625rem;
+  line-height: 1.5;
+}
+
+/* ── A7. DELETE FROM THE WORLD ───────────────────────────────────────────────────────────────
+   `proto:928-936`: the danger card at the foot, in place of the header `Delete`. */
+.fabricate-manager .manager-scoped-entry-danger {
+  padding: var(--fab-space-3) var(--fab-space-4);
+  background: var(--fab-danger-soft);
+  border-color: var(--fab-danger-border);
+}
+
+.fabricate-manager .manager-component-entry-danger-body {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-danger-body > i {
+  flex: 0 0 auto;
+  color: var(--fab-danger-text);
+  font-size: 0.81rem;
+}
+
+.fabricate-manager .manager-component-entry-danger-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-danger-title {
+  margin: 0;
+  color: var(--fab-danger-text);
+  font-family: var(--fab-font-serif);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-danger-note {
+  margin: var(--fab-space-2xs) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
+/* The armed danger control at the 34px rung (32 is retired), radius 9, transparent on the card's
+   own danger hairline rather than the sheet's filled danger treatment. */
+.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger {
+  flex: 0 0 auto;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 9px;
+  font-size: 0.69rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger:not(:disabled) {
+  background: transparent;
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+/* ── A8. THE PREVIEW RAIL ────────────────────────────────────────────────────────────────────
+   `proto:985-1020`. The rail is the grid's second column with its own scroller and a left
+   hairline, so it stays put while the panel scrolls and is drawn on BOTH tabs. */
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview {
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--fab-space-4);
+  background: var(--fab-bg-2);
+  border-left: 1px solid var(--fab-border);
+  overflow: auto;
+}
+
+.fabricate-manager .manager-component-entry-preview-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile-column {
+  flex: 0 0 118px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile-label {
+  margin: 0 0 var(--fab-space-chip);
+  color: var(--fab-text-subtle);
+  font-size: 0.59rem;
+  font-weight: 600;
+}
+
+/* THE TILE ITSELF, which round 3 did not draw at all. It is the one region of this screen that
+   shows a GM what a player meets, so it carries the art at inventory scale rather than at the
+   40px identity scale every other rail uses. */
+.fabricate-manager .manager-component-entry-preview-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 118px;
+  height: 110px;
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  color: var(--fab-accent);
+  font-size: 1.75rem;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile > img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.fabricate-manager .manager-component-entry-preview-quantity {
+  position: absolute;
+  top: var(--fab-space-1);
+  right: var(--fab-space-1);
+  padding: 0 var(--fab-space-1);
+  background: var(--fab-bg-0);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.56rem;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-component-entry-preview-status {
+  position: absolute;
+  right: var(--fab-space-1);
+  bottom: var(--fab-space-1);
+  left: var(--fab-space-1);
+  padding: var(--fab-space-2xs) var(--fab-space-1);
+  background: var(--fab-warning-soft);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  font-size: 0.53rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.fabricate-manager .manager-component-entry-preview-name {
+  margin: var(--fab-space-chip) 0 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-preview-facts {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-category {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.69rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-art {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.59rem;
+  line-height: 1.45;
+}
+
+/* THE RAIL STACKS UNDER THE PANEL below the threshold rather than compressing to a column too
+   narrow to read, which is the ruling the shared list frame already makes about its inspector. */
+@container fabricate-manager (max-width: 1000px) {
+  .fabricate-manager .manager-component-entry-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-component-entry-page > .manager-scoped-preview {
+    border-left: 0;
+    border-top: 1px solid var(--fab-border);
+  }
+}

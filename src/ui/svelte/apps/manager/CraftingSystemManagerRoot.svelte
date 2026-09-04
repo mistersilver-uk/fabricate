@@ -3407,7 +3407,10 @@
 
   function handleWorldComponentEntryDraft(handle) {
     worldComponentEntryHandle = handle ?? null;
-    if (!handle) worldComponentEntryDirty = false;
+    if (!handle) {
+      worldComponentEntryDirty = false;
+      worldComponentEntrySubtitle = '';
+    }
   }
 
   function handleWorldComponentEntryDirty(dirty) {
@@ -3415,23 +3418,53 @@
   }
 
   /**
-   * The world component entry's header `Delete`, reported by the page as an ACTION DESCRIPTOR.
+   * THE WORLD COMPONENT ENTRY ROUTE'S HEADER NAMES THE COMPONENT (issue 1371, parity round 4).
    *
-   * The page owns the labels, the consequence sentences and — uniquely on this entity type — the
-   * REFUSAL, because all three are derived from values only the editor holds. This half is the arm
-   * token, which is the shell's because exactly one armed control at a time is a window-wide
-   * invariant and this is where that invariant already lives.
+   * The same decision as the essence and tool entry branches above, reached the same way: the
+   * reference heads this screen with the record's own chip, its NAME at 20px serif and one line
+   * saying what it IS (`proto:813-815`), where what shipped was the generic page header every
+   * route falls through to. The page cannot draw it — `.manager-header` is a SIBLING of
+   * `.manager-main` — so the RECORD is resolved here, out of the corpus this shell already
+   * publishes to the page.
    *
-   * @type {{token: string, label: string, armedLabel: string, idleAriaLabel: string,
-   *   armedAriaLabel: string, run: () => Promise<void>}|null}
+   * A MISSING RECORD FALLS BACK to the generic title and subtitle below rather than printing an
+   * empty header, which is the same guard both sibling branches make.
    */
-  let worldComponentEntryDelete = $state(null);
-  let worldComponentEntryDeleteArmed = $state('');
+  const worldComponentEntryRecord = $derived(
+    currentView === 'world-component-entry'
+      ? ((worldScopeState.component?.entries ?? []).find(
+          (candidate) => candidate?.id === worldScopedEntryId
+        ) ?? null)
+      : null
+  );
 
-  function handleWorldComponentEntryDelete(descriptor) {
-    worldComponentEntryDelete = descriptor ?? null;
-    if (!descriptor) worldComponentEntryDeleteArmed = '';
+  /**
+   * WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here — the same
+   * arrangement the tool entry uses. The page already resolves the source TYPE for its own lock
+   * pill, so resolving it a second time up here would put one pair of copy keys in two files and
+   * let the band and the card disagree about one record.
+   *
+   * @type {string}
+   */
+  let worldComponentEntrySubtitle = $state('');
+
+  function handleWorldComponentEntrySubline(subline) {
+    worldComponentEntrySubtitle = typeof subline === 'string' ? subline : '';
   }
+
+  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK, off the shared `scopedEntryDraftIdentity`
+  // channel the breadcrumb's last crumb also reads. `??` and not `||`: an editor reporting an
+  // EMPTY name is reporting a real authored state, and it falls through to `viewTitle()`.
+  const worldComponentEntryName = $derived(
+    worldComponentEntryRecord
+      ? (scopedEntryDraftField('name') ?? worldComponentEntryRecord.entity?.name ?? '')
+      : ''
+  );
+  const worldComponentEntryImage = $derived(
+    worldComponentEntryRecord
+      ? (scopedEntryDraftField('img') ?? worldComponentEntryRecord.entity?.img ?? '')
+      : ''
+  );
 
   /**
    * Flush the world component entry editor's buffered edit.
@@ -10551,6 +10584,23 @@
               <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
             </div>
           </div>
+        {:else if worldComponentEntryRecord}
+          <!-- The component's own identity header (issue 1371, parity round 4), the twin of the
+             two branches above and rendered from the same block. The medallion carries the linked
+             Item's art where there is one; `Medallion` falls back to the glyph when `src` is
+             empty, which is the unlinked case and the one this screen has to draw without
+             inventing a picture for. -->
+          <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
+            <Medallion src={worldComponentEntryImage} icon="fas fa-cube" size={44} glyph={22} />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={worldComponentEntryName}>
+                {worldComponentEntryName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-world-component-entry-subline>
+                {worldComponentEntrySubtitle}
+              </p>
+            </div>
+          </div>
         {:else if worldToolEntryRecord}
           <!-- The Tool's own identity header, the twin of the essence branch above. The
              medallion carries the linked Item's art where there is one; `Medallion` falls back
@@ -10723,11 +10773,12 @@
               Until this branch existed the component entry was the only entry route with no way
               to save at all.
 
-              DELETE IS BETWEEN THEM, on the placement `### GM World Tool Screens` requirement 5
-              settled — and on this entity type it REFUSES while any system has rules for the
-              component, which is epic decision 7. The refusal itself is the PAGE's, because it is
-              derived from the membership rows only the editor holds; what this branch owns is the
-              slot and the arm token.
+              DELETE IS NOT HERE (issue 1371, parity round 4). It was moved into this slot on the
+              world Tool entry's precedent, and the reference draws it as a `Delete from the world`
+              danger card at the FOOT of the Catalogue entry tab (`proto:928-936`) — which is also
+              the only placement that can state the reach, and the REFUSAL epic decision 7
+              requires, as visible body copy rather than only in an armed control's accessible
+              name. The card is the page's; this band carries Back and Save alone.
 
               BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit gate
               as the rail and the breadcrumb, so an unsaved edit prompts whichever of the three
@@ -10745,7 +10796,6 @@
               saving={worldComponentEntrySaving}
               onBack={() => setView('world-components')}
               onSave={saveWorldComponentEntry}
-              danger={worldComponentEntryDelete ? worldComponentDeleteAction : undefined}
             />
           {:else if currentView === 'world-essences'}
             <!--
@@ -12361,7 +12411,7 @@
         onDraftChange={handleWorldComponentEntryDraft}
         onDirtyChange={handleWorldComponentEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
-        onDeleteChange={handleWorldComponentEntryDelete}
+        onSublineChange={handleWorldComponentEntrySubline}
       />
     {:else if currentView === 'world-essences'}
       <WorldEssenceCataloguePage
@@ -16171,33 +16221,11 @@
   tools` and `Save tool` — the design's own order. The copy and the write are the PAGE's, and
   arrive as a descriptor over `onDeleteChange`; what lives here is the arm token, because the
   manager's invariant is one armed control at a time across the whole window.
--->
-{#snippet worldComponentDeleteAction()}
-  <!--
-    THE ARMED CONTROL STAYS ENABLED EVEN WHEN THE DELETE WILL BE REFUSED, and that is the whole
-    point: `armedAriaLabel` is the refusal sentence, and it names the systems to remove the
-    component from first. A `disabled` button would satisfy any assertion about the call never
-    happening while leaving the GM with no explanation at all — and on a migrated world, where the
-    migration wrote a membership record for every definition in every contributing system, that is
-    every component they can reach.
-  -->
-  <ArmedDangerButton
-    token={worldComponentEntryDelete?.token ?? ''}
-    armed={Boolean(worldComponentEntryDelete?.token) &&
-      worldComponentEntryDeleteArmed === worldComponentEntryDelete.token}
-    idleLabel={worldComponentEntryDelete?.label ?? ''}
-    armedLabel={worldComponentEntryDelete?.armedLabel ?? ''}
-    idleAriaLabel={worldComponentEntryDelete?.idleAriaLabel ?? ''}
-    armedAriaLabel={worldComponentEntryDelete?.armedAriaLabel ?? ''}
-    onArm={(token) => (worldComponentEntryDeleteArmed = token)}
-    onDisarm={() => (worldComponentEntryDeleteArmed = '')}
-    onConfirm={() => {
-      worldComponentEntryDeleteArmed = '';
-      worldComponentEntryDelete?.run?.();
-    }}
-  />
-{/snippet}
 
+  THE COMPONENT ENTRY HAD A TWIN OF THIS SNIPPET AND NO LONGER DOES (issue 1371, parity round 4):
+  the reference deletes a catalogue entry from a danger CARD at the foot of its Catalogue entry
+  tab, which is where the reach and the refusal can be read rather than only heard.
+-->
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
     token={worldToolEntryDelete?.token ?? ''}

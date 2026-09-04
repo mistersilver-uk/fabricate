@@ -353,13 +353,28 @@ describe('no chrome is inlined into a shell', () => {
 });
 
 describe('the two file-naming gates neither shell may trip', () => {
-  it('no new scoped component starts with `World`', () => {
+  it('no new scoped component starts with `World` unless it is a declared entry child', () => {
     // `manager-contract.test.js` filters this directory on that prefix and asserts exactly seven
-    // placeholder pages; an eighth `World…` file makes that count wrong.
+    // placeholder PAGES; an eighth `World…` file makes that count wrong unless both gates agree
+    // it is a child. The world Component entry's rebuild (issue 1371, parity round 4) added
+    // three, each a card or the rail rather than a route, and this list is the second half of
+    // that agreement — the first is `SCOPED_ENTRY_CHILDREN` in the contract suite.
+    const CHILDREN = [
+      'WorldComponentEntryPreviewRail.svelte',
+      'WorldComponentEntrySourceCard.svelte',
+      'WorldComponentEntrySystemsCard.svelte',
+    ];
     const worldFiles = readdirSync(resolve(repoRoot, SCOPED_DIR)).filter(
       (name) => name.startsWith('World') && name.endsWith('.svelte')
     );
-    assert.equal(worldFiles.length, 7, 'the seven placeholder pages, and nothing else');
+    assert.deepEqual(
+      worldFiles.filter((name) => !CHILDREN.includes(name)).length,
+      7,
+      'the seven placeholder pages, and nothing else'
+    );
+    for (const child of CHILDREN) {
+      assert.ok(worldFiles.includes(child), `${child} is one of the declared children`);
+    }
   });
 
   it('no shell carries a literal route hook attribute', () => {

@@ -1629,6 +1629,13 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-source="sm-coal"]',
       },
+      // THE PREVIEW RAIL IS THE GRID'S SECOND COLUMN (issue 1371, parity round 4), so it is in
+      // the FIRST frame rather than below a fold: it no longer scrolls with the card stack, and
+      // this claim is what would red if it were nested back inside the tab panel.
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-preview-tile]',
+      },
       // THE CATEGORY CARD'S CLAIMS MOVED TO THE TAGS CASE (issue 1371, round 2), because that is
       // the frame the card is fully drawn in. It sat one line inside this frame's fold, and the
       // restored `Edit world vocabulary` exit — a button on the card's head row, where a kicker
@@ -1640,6 +1647,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      // THE THREE CHILDREN THE ENTRY WAS REBUILT AS (issue 1371, parity round 4). Without them a
+      // change to the source card or the rail maps to NO case, and the capture job publishes an
+      // unrelated frame — which is the failure this registry exists to prevent. The systems card
+      // claims the third case below, which is the frame it is drawn in.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySourceCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
@@ -1656,7 +1669,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `sm-coal` again: it is the one lab component with world tags AND a member muting one, so
     // the tag list, its note and the N-by-M mute grid are all here.
     id: 'world-component-entry-tags',
-    label: 'Manager — World Component entry, world tags',
+    label: 'Manager — World Component entry, world classification',
     reaches: 'beyond',
     smokeLabels: [],
     steps: [
@@ -1667,18 +1680,19 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-scoped-entry-tags="sm-coal"]', scroll: true },
     ],
     expectView: 'world-component-entry',
-    expectSelector: '[data-scoped-entry-tags="sm-coal"]',
+    // ONE CARD, TWO COLUMNS (issue 1371, parity round 4): `proto:881-910` draws category and tags
+    // in a single `World classification` card, and the two-card split this case used to
+    // photograph is gone. The card is the container for every claim below, which is exactly what
+    // would red if it were split again.
+    //
+    // THE N-BY-M MUTE GRID IS GONE WITH IT, and its claim with it: the reference draws no
+    // per-system tag mute anywhere on this screen, so there is no longer a frame that could show
+    // one. That removal is reported to the maintainer rather than absorbed here.
+    expectSelector: '[data-scoped-entry-category="sm-coal"]',
     expectContained: [
       {
-        container: '[data-scoped-entry-tags="sm-coal"]',
-        target: '[data-scoped-entry-tag-note]',
-      },
-      // THE CATEGORY CARD, WHOLE, INCLUDING ITS RESTORED VOCABULARY EXIT. Scrolling to the tag
-      // card puts the category card immediately above it and fully in frame, which the definition
-      // case's unscrolled position no longer does.
-      {
-        container: '[data-scoped-page="world-component-entry"]',
-        target: '[data-scoped-entry-category="sm-coal"]',
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-category-label]',
       },
       {
         container: '[data-scoped-entry-category="sm-coal"]',
@@ -1689,13 +1703,65 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-entry-vocabulary-exit]',
       },
       {
-        container: '[data-scoped-page="world-component-entry"]',
-        target: '[data-scoped-entry-mutes="lab-smithing"]',
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-tags="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag-note]',
       },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
+  }),
+  managerCase({
+    // THE MAINTAINER'S SECOND EXHIBIT (issue 1371, parity round 4): `Systems using this
+    // component`, and the `Delete from the world` card under it. Neither was photographed by any
+    // case — the systems card sat below the fold of both frames above, and deletion was a header
+    // button until this round moved it into a card at the foot of the tab.
+    //
+    // `sm-coal` again, so all three entry cases follow ONE navigation and differ only in scroll
+    // position, which is what keeps them comparable frame to frame.
+    id: 'world-component-entry-systems',
+    label: 'Manager — World Component entry, systems and deletion',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-delete-card]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-systems="sm-coal"]',
+    expectContained: [
+      // THE HEAD, ITS ACTION AND THE SEGMENTED FILTER, which round 3 drew as a bare kicker
+      // reading the data and a `<select>`.
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-add-to-systems]',
+      },
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-system-filter="without"]',
+      },
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-system-count]',
+      },
+      // AND THE DANGER CARD, with its reach note beside the armed control.
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-delete-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySystemsCard\.svelte$/,
+    ],
   }),
   managerCase({
     // THE VALIDATION TAB, on the ONE lab component that fails a blocking check: `lab-unbound-salt`

@@ -4376,8 +4376,23 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const declared = (source, attribute, constant) =>
       source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
       source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
+    // THE SEVEN PAGES, AND THE THREE `WorldComponentEntry*` CHILDREN THAT ARE NOT PAGES (issue
+    // 1371, parity round 4). The world Component entry was rebuilt to the reference as four
+    // files; each child renders a CARD or the rail, declares no route identity and carries no
+    // route hook. They are excluded BY NAME rather than by "has no PAGE_ID", because the
+    // non-vacuity assertion below exists precisely to catch a page that stopped declaring one.
+    const SCOPED_ENTRY_CHILDREN = new Set([
+      'WorldComponentEntryPreviewRail.svelte',
+      'WorldComponentEntrySourceCard.svelte',
+      'WorldComponentEntrySystemsCard.svelte',
+    ]);
     const pages = readdirSync(scopedDir)
-      .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
+      .filter(
+        (entry) =>
+          entry.startsWith('World') &&
+          entry.endsWith('.svelte') &&
+          !SCOPED_ENTRY_CHILDREN.has(entry)
+      )
       .map((entry) => {
         const source = readFileSync(resolve(scopedDir, entry), 'utf8');
         return {

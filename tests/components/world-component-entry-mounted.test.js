@@ -34,7 +34,12 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
   ],
   compiledExtras: [
-    'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    // THE ENTRY'S OWN THREE CHILDREN (issue 1371, parity round 4). Each is imported STATICALLY by
+    // the page, so an omission HANGS this suite and is reported as `# cancelled`, not `# fail`.
+    'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
+    'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte',
+    'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -54,23 +59,58 @@ const harness = createComponentScopeHarness({
 const scopeFor = componentScopeFor;
 const drain = drainMicrotasks;
 
+/**
+ * THE ROSTER WITH ITS RESOLUTION MODES, which the shared fixture's `{id, name}` pairs do not
+ * carry. The entry's system row draws that mode as its sub-line (`proto:936`), so a roster that
+ * cannot answer draws no sub-line at all — and a suite mounting the shared pairs would assert an
+ * empty string on both rows and call the two rows discriminating.
+ *
+ * The two modes DIFFER on purpose: one row per mode is what makes "the sub-line reads the row's
+ * own system" a measurement rather than a coincidence.
+ */
+const ENTRY_SYSTEMS = Object.freeze([
+  Object.freeze({ id: 'sys-forge', name: 'Forge', resolutionMode: 'progressive' }),
+  Object.freeze({ id: 'sys-alchemy', name: 'Alchemy', resolutionMode: 'simple' }),
+]);
+
 /** Mount the entry on one component, with a recording action bag and the draft wires captured. */
 async function open(entityId, overrides) {
   const { calls, actions } = recordingComponentActions();
-  const reports = { dirty: [], handles: [], deletes: [], vocabulary: [], rules: [] };
+  const reports = { dirty: [], handles: [], sublines: [], vocabulary: [], rules: [] };
   const target = await harness.mount({
     scope: scopeFor(overrides),
     actions,
     entityId,
     systemId: 'sys-forge',
+    systems: ENTRY_SYSTEMS,
     worldItems: [],
     onDirtyChange: (dirty) => reports.dirty.push(dirty),
     onDraftChange: (handle) => reports.handles.push(handle),
-    onDeleteChange: (descriptor) => reports.deletes.push(descriptor),
+    onSublineChange: (subline) => reports.sublines.push(subline),
     onOpenWorldVocabulary: () => reports.vocabulary.push(true),
     onOpenSystemRules: (id, systemId) => reports.rules.push([id, systemId]),
   });
   return { target, calls, actions, reports };
+}
+
+/**
+ * Re-project one entry with world-usage references attached.
+ *
+ * The shared fixture wires NO `requiredBy` / `producedBy`, because the projection takes them from
+ * a `usage` map the admin store computes over every system's recipes and gathering tasks — a
+ * corpus this suite does not build. Patching the projected entry is the smallest way to reach the
+ * populated face without restating that whole leg.
+ *
+ * @param {object} scope
+ * @param {string} entityId
+ * @param {{requiredBy: object[], producedBy: object[]}} usage
+ * @returns {object}
+ */
+function withUsage(scope, entityId, usage) {
+  return {
+    ...scope,
+    entries: scope.entries.map((entry) => (entry.id === entityId ? { ...entry, ...usage } : entry)),
+  };
 }
 
 describe('world Component entry editor (issue 1371)', () => {
@@ -83,9 +123,12 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the identity edit is BUFFERED and saved explicitly', () => {
-    // AC-7.
+    // AC-7, ON THE UNLINKED RECORD. `proto:834-841` draws a linked component's name, art and
+    // description as READ-ONLY values under a lock pill, because the linked Item owns them; the
+    // editable pair survives only for a record with no source item, which is the one state where
+    // nothing else can name it. `orphan` is that record in the shared fixture.
     it('does not write on change, and reports the dirty state up', async () => {
-      const { target, calls, reports } = await open('ingot');
+      const { target, calls, reports } = await open('orphan');
       const name = target.querySelector('[data-scoped-entry-name]');
       assert.ok(Boolean(name), 'the entry renders its name field');
 
@@ -106,7 +149,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the reported handle saves ONLY the changed field', async () => {
-      const { target, calls, reports } = await open('ingot');
+      const { target, calls, reports } = await open('orphan');
       const name = target.querySelector('[data-scoped-entry-name]');
       name.value = 'Wrought Iron Ingot';
       name.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -121,14 +164,14 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(writes.length, 1, 'one write, not one per buffered field');
       assert.deepEqual(
         writes[0].args,
-        ['ingot', { name: 'Wrought Iron Ingot' }],
+        ['orphan', { name: 'Wrought Iron Ingot' }],
         'saving the whole identity record would restate the description over whatever another ' +
           'client wrote to it meanwhile — which is what requirement 14 forbids'
       );
     });
 
     it('and a discard puts the field back without writing anything', async () => {
-      const { target, calls, reports } = await open('ingot');
+      const { target, calls, reports } = await open('orphan');
       const name = target.querySelector('[data-scoped-entry-name]');
       name.value = 'Something Else';
       name.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -137,7 +180,7 @@ describe('world Component entry editor (issue 1371)', () => {
       reports.handles.filter(Boolean).at(-1).discard();
       await drain();
 
-      assert.equal(target.querySelector('[data-scoped-entry-name]').value, 'Iron Ingot');
+      assert.equal(target.querySelector('[data-scoped-entry-name]').value, 'Unbound Salt');
       assert.deepEqual(calls, [], 'discarding writes nothing at all');
     });
   });
@@ -150,48 +193,51 @@ describe('world Component entry editor (issue 1371)', () => {
       const { target, calls } = await open('ingot');
       const picker = target.querySelector('[data-scoped-entry-category-input]');
       assert.ok(Boolean(picker), 'the entry renders its category picker');
+      assert.equal(picker.tagName, 'SELECT', 'a select over the vocabulary, not free text');
 
-      picker.value = 'Reagent';
+      picker.value = 'Raw';
       picker.dispatchEvent(new window.Event('change', { bubbles: true }));
       await drain();
 
       assert.deepEqual(
         calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
-        [{ verb: 'updateWorldDefaultSection', args: ['ingot', 'category', 'Reagent'] }]
+        [{ verb: 'updateWorldDefaultSection', args: ['ingot', 'category', 'Raw'] }]
       );
     });
 
-    it('REFUSES the reserved bucket, and does not CLEAR the value doing it', async () => {
-      // The picker is the enforcement point: nothing below it can refuse the token, and since
-      // issue 1372 a world `general` really does reset every inheriting system on the next read.
-      //
-      // BUT A REFUSAL THAT WRITES ABSENCE IS A DELETION. Round 1 forwarded `''`, so typing
-      // `General` into a component that already had `Refined` silently blanked the authored value
-      // with no message — a refusal the GM experiences as data loss.
-      const notices = [];
-      const previousUi = globalThis.ui;
-      globalThis.ui = { notifications: { warn: (message) => notices.push(message) } };
-      try {
-        const { target, calls } = await open('ingot');
-        const picker = target.querySelector('[data-scoped-entry-category-input]');
-        picker.value = ' GENERAL ';
-        picker.dispatchEvent(new window.Event('change', { bubbles: true }));
-        await drain();
-
-        assert.deepEqual(
-          calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
-          [],
-          'nothing is written at all, so the authored category survives'
-        );
-        assert.equal(picker.value, 'Refined', 'and the control shows what is actually stored');
-        assert.equal(notices.length, 1, 'and the GM is told why');
-      } finally {
-        if (previousUi === undefined) delete globalThis.ui;
-        else globalThis.ui = previousUi;
-      }
+    it('and its FIRST option is the unset one, so clearing is reachable', async () => {
+      // `proto:891` writes `No world category` as the first option. A picker whose only options
+      // are authored values cannot express "this record has none", which is the state every
+      // freshly created component is in.
+      const { target } = await open('ingot');
+      const options = [...target.querySelectorAll('[data-scoped-entry-category-input] option')];
+      assert.equal(options[0].value, '');
+      assert.equal(options[0].textContent.trim(), 'No world category');
     });
 
-    it('but a BLANK input still clears it, because that is a real edit', async () => {
+    it('never OFFERS the reserved bucket, whatever the corpus already holds', async () => {
+      // The picker is the enforcement point: nothing below it can refuse the token, and since
+      // issue 1372 a world `general` really does reset every inheriting system on the next read.
+      // A `<select>` moves the refusal from the COMMIT to the OFFER — a value that is not an
+      // option cannot be chosen — so this is the assertion that carries it, driven from a corpus
+      // that really does hold the reserved bucket on a sibling record.
+      const { target } = await open('ingot', {
+        defaults: [
+          { id: 'ingot', category: 'Refined' },
+          { id: 'coal', category: ' GENERAL ' },
+        ],
+      });
+      const offered = [...target.querySelectorAll('[data-scoped-entry-category-input] option')].map(
+        (option) => option.value
+      );
+      assert.ok(offered.includes('Refined'), 'the authored vocabulary is offered');
+      assert.ok(
+        !offered.some((value) => value.trim().toLowerCase() === 'general'),
+        `the reserved bucket must never be offered; the picker held ${offered.join(', ')}`
+      );
+    });
+
+    it('but the BLANK option still clears it, because that is a real edit', async () => {
       // The positive control on the refusal: an empty field is a GM removing the world category
       // deliberately, and a guard that refused every non-offered value would break it.
       const { target, calls } = await open('ingot');
@@ -207,76 +253,107 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
-  describe('per-system tag muting is gated on membership and names its system', () => {
-    // AC-12's entry half.
-    it('forwards setMutedTags with the SYSTEM the chip was authored on', async () => {
+  describe('the world tags are a TOGGLE RUN over the vocabulary, not an add field', () => {
+    // `proto:899-901` draws the world tag list as click-to-toggle chips over the world
+    // vocabulary, with no add field and no remove glyph on this card: authoring the vocabulary
+    // itself is behind `Edit world vocabulary ↗`. Round 3 drew `✕ fuel` removable chips over an
+    // `Add a world tag` field, which is a second authority for the same list.
+    it('applies an unlit tag by writing the WHOLE list, not a delta', async () => {
+      // `setWorldTags` replaces the array. A screen that forwarded only the tag it touched would
+      // clear every other tag on the record, and the projection would agree with it.
       const { target, calls } = await open('coal');
-      const chip = target.querySelector('[data-scoped-entry-mute="sys-forge|fuel"]');
-      assert.ok(Boolean(chip), 'a member row renders one mute chip per world tag');
+      const unlit = target.querySelector('[data-scoped-entry-tag="fuel"]');
+      assert.ok(Boolean(unlit), 'the run offers every tag the world vocabulary holds');
 
+      target.querySelector('[data-scoped-entry-tag="bulk"]').click();
+      await drain();
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'setWorldTags'),
+        [{ verb: 'setWorldTags', args: ['coal', ['fuel']] }],
+        'clearing `bulk` keeps `fuel`'
+      );
+    });
+
+    it('and lights an unapplied one, so the toggle runs both ways', async () => {
+      // The positive control: a run wired only to removal passes the assertion above.
+      const { target, calls } = await open('ingot');
+      const chip = target.querySelector('[data-scoped-entry-tag="fuel"]');
+      assert.ok(Boolean(chip), 'a record with no tags of its own still sees the vocabulary');
       chip.click();
       await drain();
-
       assert.deepEqual(
-        calls.filter((call) => call.verb === 'setMutedTags'),
-        [{ verb: 'setMutedTags', args: ['coal', 'sys-forge', ['bulk', 'fuel']] }],
-        'passing the ENTITY id where the system id belongs finds no membership record, returns ' +
-          'false, and changes nothing — with no rendered symptom at all'
+        calls.filter((call) => call.verb === 'setWorldTags'),
+        [{ verb: 'setWorldTags', args: ['ingot', ['fuel']] }]
       );
     });
 
-    it('and the control is ABSENT on a non-member row', async () => {
-      const { target } = await open('coal');
-      assert.ok(
-        !target.querySelector('[data-scoped-entry-mute^="sys-alchemy|"]'),
-        'the write refuses silently without a membership record, so an ungated chip would be a ' +
-          'control that does nothing on every click forever'
-      );
-      // The positive control: the member row's chips ARE rendered, so the absence above is a
-      // measurement rather than a selector that matches nothing anywhere.
-      assert.ok(Boolean(target.querySelector('[data-scoped-entry-mute^="sys-forge|"]')));
-    });
+    it('each chip is a real button reporting whether the tag is applied', async () => {
+      // AC-28. A `<span onclick>` passes a pointer hit-test and is unreachable by keyboard, and
+      // a toggle that does not report its state is a control a screen reader cannot read back.
+      //
+      // TWO RECORDS, because the fixture's tag vocabulary is `coal`'s OWN pair: on `coal` both
+      // chips are lit, and only a record that holds neither can supply the unapplied face.
+      const { target: applying } = await open('coal');
+      const { target: empty } = await open('ingot');
+      const applied = applying.querySelector('[data-scoped-entry-tag="bulk"]');
+      const unapplied = empty.querySelector('[data-scoped-entry-tag="bulk"]');
 
-    it('each chip is a real button reporting its muted state', async () => {
-      // AC-28. A `<span onclick>` passes a pointer hit-test and is unreachable by keyboard.
-      const { target } = await open('coal');
-      const muted = target.querySelector('[data-scoped-entry-mute="sys-forge|bulk"]');
-      const unmuted = target.querySelector('[data-scoped-entry-mute="sys-forge|fuel"]');
-
-      for (const chip of [muted, unmuted]) {
+      for (const chip of [applied, unapplied]) {
         assert.equal(chip.tagName, 'BUTTON', 'a clickable chip is a real button');
         assert.equal(chip.getAttribute('type'), 'button');
       }
-      assert.equal(muted.getAttribute('aria-pressed'), 'true');
-      assert.equal(unmuted.getAttribute('aria-pressed'), 'false');
+      assert.equal(applied.getAttribute('aria-pressed'), 'true');
+      assert.equal(unapplied.getAttribute('aria-pressed'), 'false');
     });
 
-    it('and its accessible name states the tag AND the system', async () => {
-      // An N-by-M grid of bare tag names is ambiguous the moment it leaves visual context.
+    it('and its accessible name states the DIRECTION as well as the tag', async () => {
+      // A run of bare tag names says nothing out of visual context, and the two directions are
+      // the same words unless the name carries the verb.
+      const { target: applying } = await open('coal');
+      const { target: empty } = await open('ingot');
+      assert.match(
+        applying.querySelector('[data-scoped-entry-tag="bulk"]').getAttribute('aria-label'),
+        /Remove the world tag bulk/
+      );
+      assert.match(
+        empty.querySelector('[data-scoped-entry-tag="bulk"]').getAttribute('aria-label'),
+        /Apply the world tag bulk/
+      );
+    });
+
+    it('and the card carries NO add field, because the vocabulary is authored elsewhere', async () => {
       const { target } = await open('coal');
-      const label = target
-        .querySelector('[data-scoped-entry-mute="sys-forge|bulk"]')
-        .getAttribute('aria-label');
-      assert.match(label, /bulk/);
-      assert.match(label, /Forge/);
+      assert.ok(!target.querySelector('[data-scoped-entry-tag-input]'));
+      assert.ok(!target.querySelector('[data-scoped-entry-tag-add]'));
     });
   });
 
   describe('deleting a component any system has rules for is REFUSED', () => {
-    // AC-15. Asserted on the CALL, never on a disabled attribute: a disabled button satisfies
-    // "the delete did not happen" while leaving the GM no explanation at all.
-    it('reports an ENABLED descriptor whose armed name states the refusal', async () => {
-      const { reports } = await open('ingot');
-      const descriptor = reports.deletes.filter(Boolean).at(-1);
-      assert.ok(Boolean(descriptor), 'the page reports a delete descriptor to the header band');
-      assert.match(descriptor.armedAriaLabel, /cannot be deleted yet/);
-      assert.match(descriptor.armedAriaLabel, /Forge/);
-      assert.match(descriptor.armedAriaLabel, /Alchemy/, 'and names BOTH member systems');
+    // AC-15, from the FOOT CARD rather than a header descriptor (`proto:928-936`). Asserted on
+    // the CALL, never on a disabled attribute: a disabled button satisfies "the delete did not
+    // happen" while leaving the GM no explanation at all.
+    function deleteControl(target) {
+      const card = target.querySelector('[data-scoped-entry-delete-card]');
+      assert.ok(Boolean(card), 'the Catalogue entry tab ends in a Delete from the world card');
+      const control = card.querySelector('[data-armed]');
+      assert.ok(Boolean(control), 'and the card carries the armed control');
+      return control;
+    }
+
+    it('states the refusal as VISIBLE body copy, naming the systems that cause it', async () => {
+      const { target } = await open('ingot');
+      const note = target.querySelector('[data-scoped-entry-delete-note]');
+      assert.ok(Boolean(note), 'the refusal is body copy, not only an accessible name');
+      assert.match(note.textContent, /cannot be deleted yet/);
+      assert.match(note.textContent, /Forge/);
+      assert.match(note.textContent, /Alchemy/, 'and names BOTH member systems');
     });
 
     it('and confirming it does NOT call deleteEntity', async () => {
-      const { calls, reports } = await open('ingot');
-      await reports.deletes.filter(Boolean).at(-1).run();
+      const { target, calls } = await open('ingot');
+      deleteControl(target).click();
+      await drain();
+      deleteControl(target).click();
       await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'deleteEntity'),
@@ -289,14 +366,30 @@ describe('world Component entry editor (issue 1371)', () => {
     it('but a component NO system has rules for is deleted', async () => {
       // THE POSITIVE CONTROL, and without it a screen that never deletes anything at all passes
       // every assertion above.
-      const { calls, reports } = await open('resin');
-      const descriptor = reports.deletes.filter(Boolean).at(-1);
-      assert.match(descriptor.armedAriaLabel, /nothing else is affected/);
-      await descriptor.run();
+      const { target, calls } = await open('resin');
+      assert.match(
+        target.querySelector('[data-scoped-entry-delete-note]').textContent,
+        /nothing else is affected/
+      );
+      deleteControl(target).click();
+      await drain();
+      deleteControl(target).click();
       await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'deleteEntity'),
         [{ verb: 'deleteEntity', args: ['resin'] }]
+      );
+    });
+
+    it('and the header band carries no Delete at all', async () => {
+      // `proto:817-819` puts Back and Save on the band and nothing else. The page reported a
+      // descriptor into the shell's `danger` slot until round 4; a page that still reports one
+      // would draw the control in BOTH places.
+      const { target } = await open('ingot');
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-delete-card]')));
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-delete-refusal]'),
+        'and the separate refusal callout above the systems card is gone with it'
       );
     });
   });
@@ -348,37 +441,32 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
-  describe('the delete refusal is VISIBLE, and the armed name contains its visible label', () => {
-    // E.3 / AC-16. Round 1 put the refusal only in the armed control's accessible name, so the
-    // sighted flow was: click Delete, watch it read `Cannot delete`, click again, and nothing at
-    // all happens — no toast, no sentence, no state change.
-    it('renders the refusal beside the systems that cause it', async () => {
+  describe('the delete control names its consequence in BOTH faces', () => {
+    // E.3 / AC-16 and WCAG 2.5.3 Label in Name: a control whose accessible name omits its visible
+    // string is unactivatable by speech input, and `ArmedDangerButton` states that requirement
+    // and cannot enforce it because the labels are authored by the page.
+    it('reads Cannot delete when armed over a component with rules', async () => {
       const { target } = await open('ingot');
-      const callout = target.querySelector('[data-scoped-entry-delete-refusal]');
-      assert.ok(Boolean(callout), 'the refusal is body copy, not only an accessible name');
-      assert.match(callout.textContent, /Forge/, 'and it names the systems holding rules');
-    });
-
-    it('and WITHHOLDS it for a component no system has rules for', async () => {
-      // The positive control: an always-rendered callout tells a deletable component it cannot be
-      // deleted, which is the same defect facing the other way.
-      const { target } = await open('resin');
-      assert.ok(!target.querySelector('[data-scoped-entry-delete-refusal]'));
-    });
-
-    it('and the armed accessible name STARTS with the armed visible label', async () => {
-      // WCAG 2.5.3 Label in Name: a control whose accessible name omits its visible string is
-      // unactivatable by speech input. `ArmedDangerButton` states the requirement and cannot
-      // enforce it, because the descriptor is authored here.
-      const { reports } = await open('ingot');
-      const descriptor = reports.deletes.filter(Boolean).at(-1);
-      assert.ok(Boolean(descriptor), 'the page reports a delete descriptor');
-      assert.equal(descriptor.armedLabel, 'Cannot delete');
+      const control = target.querySelector('[data-scoped-entry-delete-card] [data-armed]');
+      control.click();
+      await drain();
+      const armed = target.querySelector('[data-scoped-entry-delete-card] [data-armed]');
+      assert.equal(armed.textContent.trim(), 'Cannot delete');
       assert.ok(
-        descriptor.armedAriaLabel.startsWith(descriptor.armedLabel),
-        `the armed name must contain its visible label; it read "${descriptor.armedAriaLabel}"`
+        armed.getAttribute('aria-label').startsWith('Cannot delete'),
+        `the armed name must contain its visible label; it read "${armed.getAttribute('aria-label')}"`
       );
-      assert.ok(descriptor.idleAriaLabel.includes(descriptor.label));
+    });
+
+    it('and Confirm delete over one that can be, so the two faces are discriminating', async () => {
+      const { target } = await open('resin');
+      const control = target.querySelector('[data-scoped-entry-delete-card] [data-armed]');
+      assert.ok(control.getAttribute('aria-label').includes('Delete entry'));
+      control.click();
+      await drain();
+      const armed = target.querySelector('[data-scoped-entry-delete-card] [data-armed]');
+      assert.equal(armed.textContent.trim(), 'Confirm delete');
+      assert.ok(armed.getAttribute('aria-label').startsWith('Confirm delete'));
     });
   });
 
@@ -394,16 +482,34 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the membership filter NARROWS the rows, carrying its own counts', async () => {
+      // `proto:929` draws three PRESSABLE SEGMENTS, each with a trailing count badge; round 3
+      // shipped a `<select>` whose option labels carried the counts in parentheses. The badge is
+      // asserted per segment, because a filter that states the widened and narrowed sets is what
+      // makes choosing between them legible before the click.
       const { target } = await open('resin');
-      const select = target.querySelector('[data-scoped-entry-system-filter]');
-      assert.ok(Boolean(select), 'the card renders its membership filter');
+      const segments = [...target.querySelectorAll('[data-scoped-entry-system-filter]')].map(
+        (segment) => [
+          segment.getAttribute('data-scoped-entry-system-filter'),
+          segment.querySelector('[data-segment-badge]')?.textContent.trim(),
+        ]
+      );
+      assert.deepEqual(
+        segments,
+        [
+          ['all', '2'],
+          ['with', '0'],
+          ['without', '2'],
+        ],
+        'each segment states the set choosing it would show'
+      );
       assert.equal(target.querySelectorAll('[data-scoped-entry-system]').length, 2);
 
-      const withRules = target.querySelector('[data-scoped-entry-system-filter-option="with"]');
-      assert.match(withRules.textContent, /\(0\)/, 'the option states the set it would show');
-
-      select.value = 'with';
-      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      const radio = target.querySelector(
+        '[data-scoped-entry-system-filter="with"] input[type="radio"]'
+      );
+      assert.ok(Boolean(radio), 'the segment is a real radio, not a span with a click handler');
+      radio.checked = true;
+      radio.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
       await drain();
       assert.equal(
         target.querySelectorAll('[data-scoped-entry-system]').length,
@@ -434,41 +540,62 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('and each row states its MODE and what that system resolves', async () => {
-      // The row used to carry a name and a membership cluster and nothing else, so the one
-      // question the card exists to answer — what does THIS system get — needed a route change.
+    it('and each row states its SYSTEM RESOLUTION MODE under the name', async () => {
+      // `proto:936` puts the system's own resolution mode under its name at 9.5px. Round 3 drew
+      // a warning-toned `Overrides world category` CHIP there instead, which states a different
+      // fact about a different record.
       const { target } = await open('ingot');
-      const inheriting = target.querySelector('[data-scoped-entry-system-mode="sys-forge"]');
-      const overriding = target.querySelector('[data-scoped-entry-system-mode="sys-alchemy"]');
-      assert.ok(Boolean(inheriting) && Boolean(overriding), 'both rows state a mode');
-      assert.notEqual(
-        inheriting.textContent.trim(),
-        overriding.textContent.trim(),
-        'and the two modes read differently, which is the whole claim'
+      const forge = target.querySelector('[data-scoped-entry-system-mode="sys-forge"]');
+      const alchemy = target.querySelector('[data-scoped-entry-system-mode="sys-alchemy"]');
+      assert.ok(Boolean(forge) && Boolean(alchemy), 'both rows state a mode');
+      assert.equal(forge.textContent.trim(), 'Progressive');
+      assert.equal(
+        alchemy.textContent.trim(),
+        'Simple',
+        'and each reads its OWN roster entry, not the first one'
       );
+    });
+
+    it('and the summary column is ONE line of clauses beside the name, not a paragraph under it', async () => {
+      const { target } = await open('coal');
+      const row = target.querySelector('[data-scoped-entry-system="sys-forge"]');
+      const summary = target.querySelector('[data-scoped-entry-system-summary="sys-forge"]');
+      assert.ok(Boolean(summary));
+      assert.equal(
+        summary.parentElement,
+        row,
+        'the summary is a COLUMN of the row (`proto:937`), not a sibling block below it'
+      );
+      // `coal` overrides its category in Forge and mutes one of its two world tags there.
+      assert.match(summary.textContent, /Its own category/);
+      assert.match(summary.textContent, /1 tag/, 'the muted tag is not counted as in effect');
+    });
+
+    it('and an INHERITING member names the world value it resolves', async () => {
+      // The positive control on the clause above: a summary hard-wired to `Its own category`
+      // passes that assertion on every row.
+      const { target } = await open('ingot');
       assert.match(
         target.querySelector('[data-scoped-entry-system-summary="sys-forge"]').textContent,
-        /Refined/,
-        'the inheriting row resolves the world value'
+        /Refined/
       );
       // THE OVERRIDE BRANCH NAMES NO VALUE, and that is the assertion rather than an omission:
       // the published system row does not carry an overriding system's category, so a summary
-      // that stated one would be stating `row.category ?? ''` — which renders as `Resolves No
-      // world category` beside a chip reading `Overrides world category`.
+      // that stated one would be stating `row.category ?? ''`.
       const overrideSummary = target.querySelector(
         '[data-scoped-entry-system-summary="sys-alchemy"]'
       ).textContent;
-      assert.match(overrideSummary, /own category in its rules/);
+      assert.match(overrideSummary, /Its own category/);
       assert.ok(
         !/No world category/.test(overrideSummary),
         'and it never says the system resolves nothing over a world record that HAS a category'
       );
     });
 
-    it('and a NON-MEMBER row says nothing resolves there, rather than naming a category', async () => {
+    it('and a NON-MEMBER row says nothing REACHES it, rather than naming a category', async () => {
       const { target } = await open('resin');
       const summary = target.querySelector('[data-scoped-entry-system-summary="sys-forge"]');
-      assert.match(summary.textContent, /No rules here/);
+      assert.match(summary.textContent, /No rules — invisible to recipes in this system/);
     });
   });
 
@@ -499,34 +626,67 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
-  describe('the attribution sentence counts MEMBERS, because the entry has no system', () => {
-    // The rendered half of the pure `entry`-surface coverage. The sibling surfaces say "shared
-    // with N OTHER systems", where "other" means "other than the system you are editing" — a
-    // referent this screen does not have. A page that reused either of those sentences reads
-    // plausibly and is wrong by one on every component.
-    it('reads "the 1 system" for a component exactly one system holds', async () => {
-      const { target } = await open('coal');
-      const note = target.querySelector('[data-scoped-entry-attribution]');
-      assert.ok(Boolean(note), 'the identity card renders its attribution sentence');
-      assert.equal(
-        note.textContent.trim(),
-        'Shared by the 1 system that has rules for this component.'
-      );
+  describe('identity is READ-ONLY for a linked record, and says why', () => {
+    // `proto:834-841`, and the single biggest information-model divergence round 3 shipped: it
+    // drew a `Name` input and a `Description` textarea, which is a second authority for three
+    // values the linked Foundry Item already owns and refreshes.
+    it('draws the name as a VALUE under a lock pill naming the source type', async () => {
+      const { target } = await open('ingot');
+      const name = target.querySelector('[data-scoped-entry-name]');
+      assert.ok(Boolean(name));
+      assert.notEqual(name.tagName, 'INPUT', 'a linked name is not an editable field');
+      assert.equal(name.textContent.trim(), 'Iron Ingot');
+
+      const pill = target.querySelector('[data-scoped-entry-linked-pill]');
+      assert.ok(Boolean(pill), 'and the lock pill states what it is linked to');
+      assert.match(pill.textContent, /Linked Foundry item/);
     });
 
-    it('and states the unused case as a sentence rather than as a zero', async () => {
-      const { target } = await open('resin');
+    it('and the description with it, over the note that says both refresh', async () => {
+      const { target } = await open('ingot');
+      const description = target.querySelector('[data-scoped-entry-description]');
+      assert.ok(Boolean(description));
+      assert.notEqual(description.tagName, 'TEXTAREA');
       assert.equal(
         target.querySelector('[data-scoped-entry-attribution]').textContent.trim(),
-        'No system has rules for this component yet.'
+        'Name, image and description refresh from the linked item. Every system shows the same three.'
       );
     });
 
-    it('and pluralises for the two-system record, so the branches are discriminating', async () => {
+    it('but a record with NO source item keeps both fields, because nothing else can name it', async () => {
+      // The positive control, and the product ruling this lane reports rather than assumes: an
+      // unlinked component has no Item to refresh from, so the editable pair is the only way its
+      // name exists at all.
+      const { target } = await open('orphan');
+      assert.equal(target.querySelector('[data-scoped-entry-name]').tagName, 'INPUT');
+      assert.equal(target.querySelector('[data-scoped-entry-description]').tagName, 'TEXTAREA');
+      assert.match(
+        target.querySelector('[data-scoped-entry-linked-pill]').textContent,
+        /No source item/
+      );
+    });
+
+    it('and the standing disclosure paragraph and world banner are gone', async () => {
+      // Both were subject-only and displaced the reference's FIRST card (`proto:833`). What they
+      // said is said by the identity note above and the classification card's own subtitle.
       const { target } = await open('ingot');
-      const text = target.querySelector('[data-scoped-entry-attribution]').textContent.trim();
-      assert.equal(text, 'Shared by the 2 systems that have rules for this component.');
-      assert.ok(!text.includes('other system'), 'and never borrows the per-system sentence');
+      assert.ok(!target.querySelector('[data-scoped-entry-disclosure]'));
+      assert.ok(!target.querySelector('[data-scoped-entry-world-banner]'));
+    });
+  });
+
+  describe('the header band is told what the record IS and how far it reaches', () => {
+    // `proto:815`. The band drew the PAGE name and a generic subtitle; the reference draws the
+    // entity. The page reports the sub-line up because it already resolves the source type for
+    // its own lock pill, and resolving it twice is how a band and a card come to disagree.
+    it('reports the source type and the membership reach', async () => {
+      const { reports } = await open('ingot');
+      assert.equal(reports.sublines.at(-1), 'Linked Foundry item · rules in 2 of 2 systems');
+    });
+
+    it('and says so for an unlinked record too, so the branches are discriminating', async () => {
+      const { reports } = await open('orphan');
+      assert.equal(reports.sublines.at(-1), 'No source item · rules in 1 of 2 systems');
     });
   });
 
@@ -594,25 +754,42 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.deepEqual(calls, [{ verb: 'removeFromSystem', args: ['ingot', 'sys-alchemy'] }]);
     });
 
-    it('and Open rules sits in the ROW HEAD beside Remove, not on a line of its own', async () => {
-      // `proto:5455-5468` draws it as an auto-width control on the NAME line next to the remove
-      // glyph. Round 2 gave it a full-width line below the chips, where it read as the row's
-      // PRIMARY action while being its least consequential one — the destructive verb beside it
-      // is the one that needs the weight — and cost a row of height per system on a card whose
-      // length is a property of the world rather than of the component.
+    it('and the member row trails `View system rules` beside the exit icon', async () => {
+      // `proto:942-945` draws the two together in the row's trailing cluster. Round 3 drew
+      // `Open rules` plus a 97px labelled `🗑 Remove` danger button.
       const { target } = await open('ingot');
       const exit = rowOf(target, 'sys-forge').querySelector('[data-scoped-entry-system-rules]');
       assert.ok(Boolean(exit), 'the member row offers its exit');
+      assert.equal(exit.textContent.trim(), 'View system rules');
 
-      const head = exit.closest('.manager-component-entry-system-head');
-      assert.ok(Boolean(head), 'and it is INSIDE the row head rather than a sibling below it');
-      assert.ok(
-        Boolean(head.querySelector('[data-armed]')),
-        'sharing that head with Remove, which is the cluster the prototype puts it beside'
+      const cluster = exit.closest('.manager-component-entry-row-actions');
+      assert.ok(Boolean(cluster), 'and it is inside the row trailing cluster');
+      const remove = cluster.querySelector('[data-armed]');
+      assert.ok(Boolean(remove), 'sharing that cluster with the removal control');
+      assert.equal(
+        remove.textContent.trim(),
+        '',
+        'which is a bare glyph until it is armed (`proto:944`), not a labelled danger button'
       );
       assert.ok(
         !exit.classList.contains('is-full-width'),
-        'and it is sized to its content rather than stretched across the row'
+        'and neither control is stretched across the row'
+      );
+    });
+
+    it('and the NON-MEMBER row trails a DASHED add with no hint paragraph', async () => {
+      // The maintainer's stated example. Round 3 drew a full-width filled green `is-primary`
+      // `+ Add to this system` with an explanatory line beside it; `proto:948` draws a 28px
+      // transparent control on a dashed hairline, labelled `Add to system`, and nothing else.
+      const { target } = await open('resin');
+      const add = rowOf(target, 'sys-forge').querySelector('[data-scoped-membership-add]');
+      assert.ok(Boolean(add));
+      assert.equal(add.textContent.trim(), 'Add to system');
+      assert.ok(add.classList.contains('is-dashed'), `it read "${add.className}"`);
+      assert.ok(!add.classList.contains('is-primary'), 'never the filled accent treatment');
+      assert.ok(
+        !target.querySelector('[data-scoped-membership-hint]'),
+        'and the hint paragraph beside it is gone with it'
       );
     });
 
@@ -670,6 +847,202 @@ describe('world Component entry editor (issue 1371)', () => {
       );
       assert.equal(escape.defaultPrevented, true, 'and is consumed, so no ancestor surface closes');
       assert.deepEqual(calls, [], 'and nothing was written on the way through');
+    });
+  });
+  describe('every card is HEADED, not kickered', () => {
+    // `proto:845`, `:882` and `:921` draw one head three times: a glyph in the card's own ink, an
+    // `h3` at 14px serif, and a sentence saying what the card decides. Round 3 drew a bare
+    // uppercase kicker on each — a FIELD label doing a SECTION head's job — and on the systems
+    // card the kicker read the DATA (`2 OF 6 SYSTEMS HAVE RULES`) rather than naming the card.
+    const HEADS = [
+      ['[data-scoped-entry-source-card]', 'Source identity', 'fa-fingerprint'],
+      ['[data-scoped-entry-classification-card]', 'World classification', 'fa-tags'],
+      ['[data-scoped-entry-systems-card]', 'Systems using this component', 'fa-layer-group'],
+    ];
+
+    for (const [selector, heading, glyph] of HEADS) {
+      it(`heads ${heading} with a glyph, a serif h3 and a subtitle`, async () => {
+        const { target } = await open('ingot');
+        const card = target.querySelector(selector);
+        assert.ok(Boolean(card), `the tab renders ${heading}`);
+
+        const title = card.querySelector('.manager-card-heading');
+        assert.ok(Boolean(title), 'the head carries a heading element');
+        assert.equal(title.tagName, 'H3');
+        assert.equal(title.textContent.trim(), heading);
+        assert.ok(
+          Boolean(card.querySelector(`.manager-card-glyph.${glyph}`)),
+          `and its own ${glyph} glyph`
+        );
+        assert.ok(
+          card.querySelector('.manager-subtitle')?.textContent.trim().length > 0,
+          'and a sentence under it saying what the card decides'
+        );
+      });
+    }
+
+    it('and the classification card holds BOTH the category and the tags', async () => {
+      // `proto:881-910` draws ONE card with a `minmax(0,260px) minmax(0,1fr)` body. Round 3 drew
+      // two cards, `World category` and `World tags`, and the split put the vocabulary exit on
+      // only one of them.
+      const { target } = await open('coal');
+      const card = target.querySelector('[data-scoped-entry-classification-card]');
+      assert.ok(Boolean(card.querySelector('[data-scoped-entry-category-input]')));
+      assert.ok(Boolean(card.querySelector('[data-scoped-entry-tags]')));
+      assert.ok(Boolean(card.querySelector('[data-scoped-entry-vocabulary-exit]')));
+      assert.ok(
+        Boolean(card.querySelector('[data-scoped-entry-category-label]')),
+        'each column carries its own micro-label (`proto:889`, `:898`)'
+      );
+      assert.ok(Boolean(card.querySelector('[data-scoped-entry-tags-label]')));
+    });
+
+    it('and the systems head trails its own Add to systems… action', async () => {
+      const { target } = await open('ingot');
+      const card = target.querySelector('[data-scoped-entry-systems-card]');
+      const action = card.querySelector('[data-scoped-entry-add-to-systems]');
+      assert.ok(Boolean(action), '`proto:925` pins it to the head trailing edge');
+      assert.equal(action.textContent.trim(), 'Add to systems…');
+    });
+
+    it('and the vocabulary exit is a bare text action, not a filled button', async () => {
+      // `proto:886` draws it as accent ink with a trailing external-link mark. Round 3 drew a
+      // filled 34px `ManagerButton` with a leading `fa-tags`.
+      const { target } = await open('ingot');
+      const exit = target.querySelector('[data-scoped-entry-vocabulary-exit]');
+      assert.ok(exit.classList.contains('manager-inline-link'), `it read "${exit.className}"`);
+      assert.ok(!exit.classList.contains('manager-button'));
+      assert.ok(Boolean(exit.querySelector('.fa-arrow-up-right-from-square')));
+    });
+  });
+
+  describe('the preview rail is a COLUMN of the page, drawn on both tabs', () => {
+    // `proto:986`. Round 3 nested the rail inside the Definition tab's scrolling panel, so
+    // scrolling to the systems card left it blank (`subject-entry-definition-scroll-03.png`) and
+    // the Validation tab had no rail at all.
+    it('sits beside the tab panel rather than inside it', async () => {
+      const { target } = await open('ingot');
+      const rail = target.querySelector('[data-scoped-entry-preview]');
+      assert.ok(Boolean(rail), 'the page renders its rail');
+      assert.ok(
+        !rail.closest('[data-scoped-entry="world-component-entry"]'),
+        'a rail inside the tab panel scrolls away with the cards'
+      );
+      assert.ok(
+        rail.parentElement.classList.contains('manager-component-entry-page'),
+        `the rail is a child of the page grid; it read "${rail.parentElement.className}"`
+      );
+    });
+
+    it('and survives the switch to Validation', async () => {
+      const { target } = await open('ingot');
+      target.querySelector('[data-scoped-entry-tab="validation"]').click();
+      await drain();
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-validation]')),
+        'the tab really switched'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-preview]')),
+        'and the rail is still drawn'
+      );
+    });
+
+    it('draws the inventory tile, the resolved category and the effective tags', async () => {
+      // `proto:990-1000`. None of this existed in round 3, which drew a `World defaults` rule
+      // list — the same three values the cards beside it already author.
+      const { target } = await open('coal');
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-preview-tile]')));
+      assert.equal(
+        target.querySelector('[data-scoped-entry-preview-category]').textContent.trim(),
+        'Raw'
+      );
+      const tags = [
+        ...target.querySelectorAll('[data-scoped-entry-preview-tags] .manager-chip'),
+      ].map((chip) => chip.textContent.trim());
+      assert.deepEqual(tags, ['fuel', 'bulk']);
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-preview-scope-note]')));
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-preview-live]')));
+    });
+
+    it('and both fact groups, each with its own empty sentence', async () => {
+      // `proto:1003-1017`. `entry.requiredBy` and `entry.producedBy` are both projected; the
+      // fixture wires neither, so this is the EMPTY face — and an absent group and an empty one
+      // say different things, only one of which is ever true here.
+      const { target } = await open('ingot');
+      const sentences = [...target.querySelectorAll('.manager-scoped-preview-fact-empty')].map(
+        (node) => node.textContent.trim()
+      );
+      assert.deepEqual(sentences, ['No recipe requires it yet.', 'Nothing produces it yet.']);
+      const kickers = [
+        ...target.querySelectorAll('[data-scoped-entry-preview] .manager-kicker'),
+      ].map((node) => node.textContent.trim());
+      assert.deepEqual(kickers, ['How players see it', 'Used by', 'Produced by']);
+    });
+
+    it('and the fact rows carry their reference and its badge when the corpus has one', async () => {
+      // The positive control on the empty faces above: a rail hard-wired to its empty sentences
+      // passes every assertion in the previous test.
+      const target = await harness.mount({
+        scope: withUsage(scopeFor(), 'ingot', {
+          requiredBy: [
+            {
+              id: 'r1',
+              name: 'Forge a Blade',
+              kind: 'recipe',
+              systemId: 'sys-forge',
+              systemName: 'Forge',
+            },
+          ],
+          producedBy: [
+            {
+              id: 't1',
+              name: 'Pan the Shallows',
+              kind: 'gathering',
+              systemId: 'sys-forge',
+              systemName: 'Forge',
+            },
+          ],
+        }),
+        actions: recordingComponentActions().actions,
+        entityId: 'ingot',
+        systemId: 'sys-forge',
+        systems: ENTRY_SYSTEMS,
+        worldItems: [],
+      });
+      const rows = [...target.querySelectorAll('[data-scoped-entry-preview-rule]')];
+      assert.equal(rows.length, 2, 'one row per reference, across both groups');
+      assert.match(rows[0].textContent, /Forge a Blade/);
+      assert.match(rows[0].textContent, /Ingredient/);
+      assert.match(rows[1].textContent, /Pan the Shallows/);
+      assert.match(
+        rows[1].textContent,
+        /Gathering/,
+        'the produced-by badge names the KIND the corpus actually carries'
+      );
+    });
+  });
+
+  describe('the tab strip names the CATALOGUE ENTRY and badges its validation state', () => {
+    // `proto:824`. Round 3 read `Definition`, and badged the Validation tab only on a failure —
+    // so a clear record and an unchecked one drew the same tab.
+    it('reads Catalogue entry, and ticks when nothing blocks or warns', async () => {
+      const { target } = await open('coal');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tab="definition"]').textContent.trim(),
+        'Catalogue entry'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tab-badge="validation"]').textContent.trim(),
+        '✓'
+      );
+    });
+
+    it('and carries the blocking COUNT when there is one', async () => {
+      const { target } = await open('orphan');
+      const badge = target.querySelector('[data-scoped-entry-tab-badge="validation"]');
+      assert.equal(badge.getAttribute('data-badge-tone'), 'danger');
+      assert.notEqual(badge.textContent.trim(), '✓');
     });
   });
 });

@@ -372,26 +372,42 @@ describe('the deep link names a route that resolves, and the gateway wires it', 
 
 describe('no new scoped file trips either naming gate', () => {
   // AC-2. The catalogue's bulk panel is a `scoped/` sibling, so both gates reach it.
-  it('the World-prefixed file count is unchanged', () => {
+  // THE THREE `WorldComponentEntry*` CHILDREN ARE THE FOURTH THROUGH SIXTH FILES THIS GATE SEES
+  // (issue 1371, parity round 4). The seven PAGES are unchanged; what grew is the set of `World…`
+  // named files, so the count moves and the claim under it does not: what the gate actually
+  // protects is that a child never carries a route hook, which is the assertion below.
+  const WORLD_CHILDREN = [
+    'WorldComponentEntryPreviewRail.svelte',
+    'WorldComponentEntrySourceCard.svelte',
+    'WorldComponentEntrySystemsCard.svelte',
+  ];
+
+  it('the World-prefixed file count matches the seven pages plus their named children', () => {
     const worldFiles = readdirSync(resolve(repoRoot, SCOPED)).filter(
       (entry) => entry.startsWith('World') && entry.endsWith('.svelte')
     );
     assert.equal(
       worldFiles.length,
-      7,
-      'a new child named World… would make the placeholder-page count eight'
+      7 + WORLD_CHILDREN.length,
+      'a new file named World… must be a page or one of the declared children'
     );
+    for (const child of WORLD_CHILDREN) {
+      assert.ok(worldFiles.includes(child), `${child} is one of them`);
+    }
   });
 
   it('and the new children carry NEITHER route-hook attribute name', () => {
     // The route→page map is built by matching those attribute NAMES literally against every file
     // in this directory, COMMENTS INCLUDED, so a child mentioning one claims a route a page owns.
-    const panel = read(`${SCOPED}/ComponentCatalogueBulkPanel.svelte`);
-    for (const hook of ['data-scoped-page', 'data-scoped-placeholder']) {
-      assert.ok(
-        !panel.includes(hook),
-        `the bulk panel must not name ${hook} anywhere, comments included`
-      );
+    const children = ['ComponentCatalogueBulkPanel.svelte', ...WORLD_CHILDREN];
+    for (const child of children) {
+      const source = read(`${SCOPED}/${child}`);
+      for (const hook of ['data-scoped-page', 'data-scoped-placeholder']) {
+        assert.ok(
+          !source.includes(hook),
+          `${child} must not name ${hook} anywhere, comments included`
+        );
+      }
     }
   });
 });

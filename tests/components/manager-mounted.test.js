@@ -318,6 +318,14 @@ function compileManagerRoot() {
   // above: the page imports it statically, so it is in this root's graph whether or not
   // anything ticks a row, and an omission HANGS this file rather than failing one test in it.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte');
+  // THE WORLD COMPONENT ENTRY'S THREE OWN CHILDREN (issue 1371, parity round 4): the source
+  // identity card, the systems card and the player-preview rail. The entry page imports all
+  // three STATICALLY, so they are in this root's graph regardless of which tab is open — and an
+  // omission does not fail one test here, it HANGS the whole file and is reported as
+  // `# cancelled` with no message.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.

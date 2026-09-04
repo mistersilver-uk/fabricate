@@ -802,3 +802,336 @@ export function componentBulkWriteCount({ selected, systems, category, tags }) {
   const systemCount = Number(systems) || 0;
   return rows * systemCount + (category ? rows : 0) + (tags ? rows : 0);
 }
+
+// ── THE WORLD CATALOGUE ENTRY'S OWN MODEL (issue 1371, maintainer parity round 4) ─────────────
+//
+// Everything below answers a question the ENTRY screen asks and no other component surface does:
+// what its header band says, what a system row's two lines read, which filters its systems card
+// offers, and what its player-preview rail lists. They live here rather than in the page for the
+// reason the rest of this module does — a `.svelte` file's derivations are unreachable from a
+// unit test, and every one of these has branches a mounted assertion would have to reach through
+// the DOM to see.
+
+/**
+ * The world tag vocabulary the corpus already carries.
+ *
+ * THE TWIN OF {@link authoredWorldComponentCategories}, and it exists for the same reason: there
+ * is no world tag ROSTER to read. The World Vocabulary store that will publish one is PR 7's, so
+ * the union of what is actually authored across every catalogue entry is the honest list, and it
+ * is what the entry's classification card offers as toggles.
+ *
+ * @param {object|null} scope the component family's world-scope projection.
+ * @returns {string[]} sorted, de-duplicated, blank-free.
+ */
+export function authoredWorldComponentTags(scope) {
+  const seen = new Set();
+  for (const entry of Array.isArray(scope?.entries) ? scope.entries : []) {
+    for (const raw of Array.isArray(entry?.defaults?.tags) ? entry.defaults.tags : []) {
+      const tag = typeof raw === 'string' ? raw.trim() : '';
+      if (tag) seen.add(tag);
+    }
+  }
+  return [...seen].sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The header band's subtitle: what the record IS, then how far it reaches.
+ *
+ * The reference heads this screen with the ENTITY rather than with the page name, and states the
+ * source type before the reach — a GM opening an entry asks "is this linked, and who uses it" in
+ * that order, and the reach alone is true of a broken record too.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string) => string} text
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentEntryHeaderSubtitle(entry, text, phrase) {
+  const rows = Array.isArray(entry?.systems) ? entry.systems : [];
+  return phrase(
+    'FABRICATE.Admin.Manager.Scoped.Component.Entry.HeaderSubtitle',
+    '{source} · rules in {members} of {total} systems',
+    {
+      source: componentSourceLine(entry, text),
+      members: rows.filter((row) => row?.member === true).length,
+      total: rows.length,
+    }
+  );
+}
+
+/**
+ * The resolution-mode labels the entry's system rows carry as their sub-line.
+ *
+ * KEYED OFF THE ROSTER'S OWN `resolutionMode`, which the admin store's system projection already
+ * publishes, rather than off anything this screen resolves. The reference draws four of them;
+ * this map carries the SIX the crafting-system model actually has, because a system set to a mode
+ * the reference never drew would otherwise render an empty sub-line that reads as "no mode".
+ *
+ * @type {Readonly<Record<string, readonly [string, string]>>}
+ */
+const COMPONENT_SYSTEM_MODE_LABELS = Object.freeze({
+  simple: ['FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeSimple', 'Simple'],
+  progressive: ['FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeProgressive', 'Progressive'],
+  routed: ['FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeRouted', 'Routed'],
+  routedByIngredients: [
+    'FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeRoutedByIngredients',
+    'Routed by ingredients',
+  ],
+  routedByCheck: [
+    'FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeRoutedByCheck',
+    'Routed by check',
+  ],
+  alchemy: ['FABRICATE.Admin.Manager.Scoped.Component.Entry.ModeAlchemy', 'Alchemy'],
+});
+
+/**
+ * One system's resolution mode, as the row's sub-line reads it.
+ *
+ * `Object.hasOwn`, never a plain index: `constructor` and `toString` are reachable from a roster
+ * value and an inherited member would answer a two-element array this map never declared.
+ *
+ * @param {unknown} resolutionMode the roster value.
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string} the empty string when the roster cannot answer, which draws no sub-line.
+ */
+export function componentSystemModeLabel(resolutionMode, text) {
+  const token = String(resolutionMode ?? '');
+  if (!Object.hasOwn(COMPONENT_SYSTEM_MODE_LABELS, token)) return '';
+  const [key, fallback] = COMPONENT_SYSTEM_MODE_LABELS[token];
+  return text(key, fallback);
+}
+
+/**
+ * One system row's MIDDLE COLUMN: one ellipsised line saying what that system resolves.
+ *
+ * ── THE NON-MEMBER BRANCH NAMES THE CONSEQUENCE, NOT THE ABSENCE ─────────────────────────────
+ * "No rules" alone is a fact about the record; the reference's sentence says what follows from it
+ * — nothing in that system can reach the component — which is the thing a GM is deciding about.
+ *
+ * ── AND THE MEMBER BRANCH ONLY CLAIMS WHAT THE PROJECTION CARRIES ────────────────────────────
+ * The published system row carries `member`, `inherited`, `recipeCount` and `mutedTags` and
+ * NOTHING else. So the category clause names the world value while the row inherits and says the
+ * value is the system's own while it overrides — reading `row.category` would print
+ * `No world category` for an overriding system, which is false rather than merely vague.
+ *
+ * @param {object} row the projected system row.
+ * @param {object} options
+ * @param {string} options.worldCategory the authored world default, or the empty string.
+ * @param {string[]} options.worldTags the authored world tag list.
+ * @param {(key: string, fallback: string) => string} options.text
+ * @param {(key: string, fallback: string, data?: object) => string} options.phrase
+ * @returns {{member: boolean, text: string}}
+ */
+export function componentSystemRowSummary(row, { worldCategory, worldTags, text, phrase }) {
+  if (row?.member !== true) {
+    return {
+      member: false,
+      text: text(
+        'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryNone',
+        'No rules — invisible to recipes in this system'
+      ),
+    };
+  }
+  const muted = Array.isArray(row?.mutedTags) ? row.mutedTags.length : 0;
+  const tags = Math.max(0, (Array.isArray(worldTags) ? worldTags.length : 0) - muted);
+  const recipes = Number(row?.recipeCount) || 0;
+  const clauses = [
+    componentRowCategoryClause(row, worldCategory, text),
+    phrase(
+      tags === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryTagsOne'
+        : 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryTags',
+      tags === 1 ? '{count} tag' : '{count} tags',
+      { count: tags }
+    ),
+    phrase(
+      recipes === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryRecipesOne'
+        : 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryRecipes',
+      recipes === 1 ? '{count} recipe' : '{count} recipes',
+      { count: recipes }
+    ),
+  ];
+  return { member: true, text: clauses.join(' · ') };
+}
+
+/**
+ * The category half of a member row's summary, in its three branches.
+ *
+ * @param {object} row
+ * @param {string} worldCategory
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+function componentRowCategoryClause(row, worldCategory, text) {
+  if (row?.inherited?.category === false) {
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryOwnCategory',
+      'Its own category'
+    );
+  }
+  const authored = String(worldCategory ?? '').trim();
+  if (authored) return authored;
+  return text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category');
+}
+
+/**
+ * The systems card's three segments, each carrying its own count.
+ *
+ * The counts are computed over the SAME arrays the rows are filtered from, so the widened and the
+ * narrowed set are both legible before either is chosen.
+ *
+ * @param {{total: number, members: number}} counts
+ * @returns {Array<{value: string, labelKey: string, fallback: string, badge: number}>}
+ */
+export function componentEntrySystemFilters({ total, members }) {
+  const all = Number(total) || 0;
+  const withRules = Number(members) || 0;
+  return [
+    {
+      value: 'all',
+      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterAll',
+      fallback: 'All',
+      badge: all,
+    },
+    {
+      value: 'with',
+      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWith',
+      fallback: 'With rules',
+      badge: withRules,
+    },
+    {
+      value: 'without',
+      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWithout',
+      fallback: 'Without',
+      badge: Math.max(0, all - withRules),
+    },
+  ];
+}
+
+/**
+ * The preview rail's two kickered fact groups, in the shape `ScopedEntityPreview` takes.
+ *
+ * ── WHY THE BADGES ARE `Ingredient` / `Recipe` / `Gathering` ─────────────────────────────────
+ * The reference badges the produced-by rows `Recipe` and `Salvage`. The world component usage leg
+ * publishes exactly two producing kinds — a recipe's result set and a gathering task's drop rows
+ * — and carries no salvage producer at all, so a `Salvage` badge here would name a relation
+ * nothing in the corpus can be. `Gathering` is the kind that IS there.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {Array<{kicker: string, rows: object[], emptyNote: string, hookAttribute: string}>}
+ */
+export function componentEntryPreviewGroups(entry, text) {
+  const required = Array.isArray(entry?.requiredBy) ? entry.requiredBy : [];
+  const produced = Array.isArray(entry?.producedBy) ? entry.producedBy : [];
+  return [
+    {
+      kicker: text('FABRICATE.Admin.Manager.Scoped.Component.Entry.UsedByKicker', 'Used by'),
+      hookAttribute: 'data-world-component-required-by',
+      emptyNote: text(
+        'FABRICATE.Admin.Manager.Scoped.Component.Entry.UsedByEmpty',
+        'No recipe requires it yet.'
+      ),
+      rows: required.map((reference) =>
+        componentEntryPreviewRow(
+          reference,
+          text('FABRICATE.Admin.Manager.Scoped.Component.Entry.BadgeIngredient', 'Ingredient')
+        )
+      ),
+    },
+    {
+      kicker: text(
+        'FABRICATE.Admin.Manager.Scoped.Component.Entry.ProducedByKicker',
+        'Produced by'
+      ),
+      hookAttribute: 'data-world-component-produced-by',
+      emptyNote: text(
+        'FABRICATE.Admin.Manager.Scoped.Component.Entry.ProducedByEmpty',
+        'Nothing produces it yet.'
+      ),
+      rows: produced.map((reference) =>
+        componentEntryPreviewRow(
+          reference,
+          reference?.kind === 'gathering'
+            ? text('FABRICATE.Admin.Manager.Scoped.Component.Entry.BadgeGathering', 'Gathering')
+            : text('FABRICATE.Admin.Manager.Scoped.Component.Entry.BadgeRecipe', 'Recipe')
+        )
+      ),
+    },
+  ];
+}
+
+/**
+ * One fact row in either preview group.
+ *
+ * The id carries the KIND and the SYSTEM as well as the record id: a recipe and a gathering task
+ * can share an id across two systems, and a keyed `{#each}` over a colliding key renders one row
+ * and drops the other.
+ *
+ * @param {object} reference
+ * @param {string} badge
+ * @returns {object}
+ */
+function componentEntryPreviewRow(reference, badge) {
+  const kind = String(reference?.kind ?? 'recipe');
+  return {
+    id: `${kind}-${reference?.systemId ?? ''}-${reference?.id ?? ''}`,
+    icon: kind === 'gathering' ? 'fas fa-leaf' : 'fas fa-scroll',
+    title: String(reference?.name ?? reference?.id ?? ''),
+    subtitle: String(reference?.systemName ?? reference?.systemId ?? ''),
+    badge,
+    badgeTone: kind === 'gathering' ? 'info' : 'neutral',
+  };
+}
+
+/**
+ * How many OTHER catalogue entries name the same source item.
+ *
+ * ── WHY THIS IS A REAL STATE AND NOT A HYPOTHETICAL ──────────────────────────────────────────
+ * `aliasItemUuids` exists because one Foundry Item can be reached by more than one address, and a
+ * copy-import preserves ids: two entries pointing at one item is what an import that ran twice
+ * leaves behind, and it is the state the source-identity card exists to make visible.
+ *
+ * Every address a record answers to counts — its registered uuid, its origin uuid and its aliases
+ * — because import matches on the union of them, so two entries collide the moment ANY pair
+ * intersects rather than only when their primary uuids are equal.
+ *
+ * @param {object|null} entry the entry under edit.
+ * @param {object|null} scope the component family's world-scope projection.
+ * @returns {number}
+ */
+export function componentDuplicateSourceCount(entry, scope) {
+  const mine = componentSourceAddresses(entry?.entity);
+  if (mine.size === 0) return 0;
+  let duplicates = 0;
+  for (const candidate of Array.isArray(scope?.entries) ? scope.entries : []) {
+    if (!candidate || candidate.id === entry?.id) continue;
+    for (const address of componentSourceAddresses(candidate.entity)) {
+      if (mine.has(address)) {
+        duplicates += 1;
+        break;
+      }
+    }
+  }
+  return duplicates;
+}
+
+/**
+ * Every item address one world component answers to.
+ *
+ * @param {object|null} entity
+ * @returns {Set<string>}
+ */
+function componentSourceAddresses(entity) {
+  const addresses = new Set();
+  for (const raw of [
+    entity?.registeredItemUuid,
+    entity?.originItemUuid,
+    ...(Array.isArray(entity?.aliasItemUuids) ? entity.aliasItemUuids : []),
+  ]) {
+    const uuid = typeof raw === 'string' ? raw.trim() : '';
+    if (uuid) addresses.add(uuid);
+  }
+  return addresses;
+}
