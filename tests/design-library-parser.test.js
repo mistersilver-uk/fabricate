@@ -40,13 +40,24 @@ const FIXTURE = [
   '<!doctype html><html><head>',
   '<style>.spec-head{display:flex}.spec-head h4{margin:0}.spec-head .why{font-size:12px}</style>',
   '</head><body>',
-  '<div class="spec"><div class="spec-head"><h4>&lt;Anchored&gt;</h4>',
+  '<div class="spec" data-status="shipped" data-status-Anchored="shipped">',
+  '<div class="spec-head"><h4>&lt;Anchored&gt;</h4><span class="k-status">shipped</span>',
   '<p class="why">Its dense variant exists only for <code>&lt;CitedInWhy&gt;</code>.</p></div></div>',
-  '<div class="spec"><div class="spec-head"><h4>Depth &amp; interaction</h4></div></div>',
+  '<div class="spec" data-status="prose"><div class="spec-head"><h4>Depth &amp; interaction</h4>',
+  '</div></div>',
   '<section id="ruledout"><span class="k-mono">&lt;Declined&gt;</span>',
   '<p class="k-hint">Composes out of members already in the set.</p></section>',
   '</body></html>',
 ].join('');
+
+/**
+ * The same fixture with every status attribute stripped, and nothing else changed.
+ *
+ * The point of the properties below is that a MISSING status is reported as `null` rather than
+ * defaulted, and a fixture that only ever carries them cannot show that. Derived from the fixture
+ * by deletion so the two can never describe different documents.
+ */
+const UNDECLARED_FIXTURE = FIXTURE.replaceAll(/ data-status(-[A-Za-z]+)?="[a-z]+"/g, '');
 
 const parsed = parseDesignLibrary(FIXTURE);
 
@@ -104,4 +115,59 @@ test('blocks are elements, not occurrences of the class name in the stylesheet',
 test('headings are reported decoded, which is what the census pins', () => {
   assert.deepEqual(parsed.headings, ['<Anchored>', 'Depth & interaction']);
   assert.deepEqual(parsed.nonPrimitiveHeadings, ['Depth & interaction']);
+});
+
+test('a block reports its own status and each of its names against a per-name status', () => {
+  assert.deepEqual(
+    parsed.blocks.map((block) => block.status),
+    ['shipped', 'prose'],
+    'a block no longer reports the `data-status` its own element carries'
+  );
+  assert.deepEqual(parsed.blocks[0].perNameStatus, { Anchored: 'shipped' });
+  assert.deepEqual(
+    parsed.blocks[0].names,
+    ['Anchored'],
+    'the per-name record is keyed on the heading names, so it inherits the h4 anchor rather ' +
+      'than re-deriving one'
+  );
+});
+
+test('the per-name lookup folds case, because the DOM does', () => {
+  // The fixture writes `data-status-Anchored`. Nothing may require an author to write the
+  // attribute lowercased to be seen, because a name spelled `<ArtPathPicker>` is unreadable that
+  // way and an unreadable attribute is one that gets typed wrong.
+  assert.ok(
+    FIXTURE.includes('data-status-Anchored='),
+    'the fixture no longer writes the attribute in the name’s own case, so this proves nothing'
+  );
+  assert.equal(parsed.blocks[0].perNameStatus.Anchored, 'shipped');
+});
+
+test('a block that declares no status reports null, and is not defaulted', () => {
+  assert.ok(
+    !UNDECLARED_FIXTURE.includes('data-status'),
+    'the stripped fixture still carries a status attribute, so the substitution missed'
+  );
+  assert.equal(
+    [...FIXTURE.matchAll(/ data-status(-[A-Za-z]+)?="/g)].length,
+    3,
+    'the substitution above is characterised by what it removes, so the count it removes is ' +
+      'stated here: two block statuses and one per-name status'
+  );
+  const undeclared = parseDesignLibrary(UNDECLARED_FIXTURE);
+  assert.deepEqual(
+    undeclared.blocks.map((block) => block.status),
+    [null, null],
+    'a missing status was answered with a value nobody wrote, which is the defect the coverage ' +
+      'gate reads this field to catch'
+  );
+  assert.deepEqual(undeclared.blocks[0].perNameStatus, { Anchored: null });
+});
+
+test('the chip beside the h4 is not part of the heading the census pins', () => {
+  // The whole reason the chip is a SIBLING of the `h4`. If it were inside, every pinned heading
+  // in `tests/design-system-coverage.test.js` would carry its status as text.
+  assert.ok(FIXTURE.includes('<span class="k-status">shipped</span>'), 'the fixture has no chip');
+  assert.deepEqual(parsed.headings, ['<Anchored>', 'Depth & interaction']);
+  assert.equal(parsed.nameOccurrences, 1, 'the chip contributed a name-shaped token');
 });
