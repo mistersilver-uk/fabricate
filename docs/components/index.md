@@ -27,10 +27,12 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-Each row starts with a checkbox, then the component's icon, name, a source badge such as **Linked Foundry item**, and its description.
-A row also states how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**.
+Each row starts with a checkbox, then the component's icon and name, then how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**.
 A component no crafting system has adopted yet is marked **Unused**.
-Filter by whether a component has a linked source item, and sort by name or by source item to group linked components ahead of unlinked ones.
+A row with no linked source item also carries a **No source item** warning pill.
+A linked row carries no such pill, and no row shows its description here.
+Filter by whether a component has a linked source item, and sort by name or by source item.
+Sorting by source item groups linked components ahead of unlinked ones in one fixed order, and while it is chosen the ascending and descending toggle has nothing to do, so it has no effect.
 
 ### Inspecting a component
 
@@ -67,9 +69,9 @@ Every crafting system whose Component Rules currently inherit the world category
 ### Bulk editing components
 
 Tick more than one row's checkbox to open the bulk panel in place of the single-component inspector.
-From there you can stage four kinds of change:
+From there you can stage three kinds of change, across four groups:
 
-- **System membership.** Choose **Add to** or **Remove from** for the direction, then search for and pick one or more crafting systems to apply it to.
+- **System membership.** Choose **Add to** or **Remove from** for the direction, then use the **Systems** group beside it to search for and pick one or more crafting systems to apply it to.
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
 Removing drops those rules but leaves the world record untouched.
 - **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it.
@@ -119,8 +121,7 @@ This is useful when the same component has previously been represented by more t
 One **World classification** card holds both the component's category and its world tags.
 
 Pick the **Category** from the drop-down, or leave it at **No world category**.
-The reserved **General** category cannot be set here.
-Typing it, in any capitalisation or with extra spaces, is refused with a warning explaining that General is the fallback every component uses already, so leave the field blank instead.
+The reserved **General** category is never offered as an option here, whatever capitalisation or spacing another system used to author it, because it is the fallback every component uses already.
 A note beneath the field tells you what is actually happening, stating how many systems currently inherit this world category and how many override it locally, once at least one system has rules for it.
 
 Click a tag pill to apply or clear that world tag on the record.
@@ -149,7 +150,8 @@ Adding creates rules in that system that inherit the world category.
 
 **Add to systems…**, in the card's own header, reveals the systems this component is not yet in so you can add it to any of them from the same list.
 
-Per-system tag muting is not authored from this screen.
+Fabricate does not currently offer a way to mute an individual world tag for one crafting system.
+A tag you apply in World classification above is either on or off for every system that has rules for this component.
 
 ### Deleting a component
 
@@ -177,7 +179,7 @@ The rail updates live as you edit the entry.
 
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
-**Add from catalogue**, in the header, opens the world Component catalogue, where you can register a new component or select an existing one and add it to this system from its entry.
+**Add from catalogue**, in the header, opens the world Component catalogue, where you can drop an item to create a component or select an existing one and add it to this system from its entry.
 
 Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
@@ -291,7 +293,7 @@ Each filter option states its own count.
 
 Open a component in the **Component Rules** screen to edit it.
 The editor is a single scrolling page rather than a form with a side panel.
-**Back** sits next to **Save rules** at the top, with an **Unsaved changes** marker while a change is pending.
+**Back** sits next to **Save rules** at the top, with an **Unsaved** marker while a change is pending.
 Two tabs sit below it, **Component rules** and **Validation**.
 If you leave with unsaved changes, Fabricate asks you to confirm first.
 
@@ -315,16 +317,40 @@ The note beneath the field states which value this system currently resolves and
 
 A **Tags** card sits beside Category.
 
-While the linked world component carries world tags, they are listed read-only at the top of the card, under a caption naming where they are muted.
-A muted world tag is shown struck through and dimmed.
-Muting a world tag is not authored from this screen.
-**Edit world tags** opens the component's world entry.
+While the linked world component carries world tags, they are listed at the top of the card, under a caption reading **From the world**.
+Each is shown lit or, if it is muted for this system, struck through and dimmed, but the caption's promise of clicking to mute is not kept: this run is read-only, and Fabricate does not currently offer a way to mute one from any screen.
+**Edit world tags** opens the component's world entry, where the world tags themselves are applied or cleared.
 
 Below that, this system's own tags are listed as a click-to-toggle pill run.
 A note beneath both groups states how many tags are in effect here and how many world tags are muted.
 
+### Essence contribution
+
+Once this system has essences of its own, an **Essence contribution** card lists one stepper per essence, for how much of each this component contributes.
+These values are keyed to the essences this system currently uses, so a system that drops an essence drops its contribution with it.
+
+### Salvage
+
+A **Salvage** card names this system's salvage resolution mode as a read-only pill, such as **Routed by check**, and carries the **Salvage this component** toggle beside it.
+What the component actually yields, and how the resolution mode shapes the panel below the toggle, is covered in full in [Component Salvage]({% link components/salvage.md %}#component-salvage).
+
+### Progressive difficulty
+
 When the system's recipe resolution mode is Progressive, a **Progressive difficulty** card appears for setting the value spent against the crafting roll.
 See [Setting Component Difficulty]({% link crafting/recipes/progressive.md %}#setting-component-difficulty).
-For the salvage panel, see [Component Salvage]({% link components/salvage.md %}#component-salvage).
+
+### Complications
+
 Once at least one activity in your system resolves progressively, a **Complications** section also appears for authoring the consequences that fire when this component is produced by a progressive result.
 See [Complications]({% link components/complications.md %}).
+
+### Validation
+
+The Validation tab lists the same checks as **Component rules**, grouped as **Classification** and **Salvage**.
+A check that does not apply to this system's setup, such as an outcome-routing check on a system with no routed salvage, is left off rather than shown passing.
+
+### How players see it
+
+A rail on the right, present on both tabs, shows the same preview a player sees in this system: the component drawn as an inventory tile, its category, its tags, and a short note on its scope.
+Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
+The rail updates live as you edit, and states that art, name and description come from the world catalogue entry.
