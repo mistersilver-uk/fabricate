@@ -23,16 +23,13 @@ export function portal(node, target) {
   }
 
   /**
-   * @param {HTMLElement | string | ((node: HTMLElement) => HTMLElement | null) | null} value
+   * @param {HTMLElement | ((node: HTMLElement) => HTMLElement | null) | null} value
    * @returns {HTMLElement | null}
    */
   function resolveTarget(value) {
     const resolved = typeof value === 'function' ? value(node) : value;
 
     if (!resolved) return null;
-    if (typeof resolved === 'string') {
-      return document.querySelector(resolved);
-    }
 
     return resolved instanceof HTMLElement ? resolved : null;
   }
