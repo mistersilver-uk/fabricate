@@ -537,6 +537,32 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  it('hands the world VOCABULARY store to the manager, which nothing else can see', () => {
+    // THE FIFTH WIRING EDIT OF ISSUE 1392, and the only one with no other guard. `src/main.js`
+    // constructs, loads, publishes and replicates the store, and three loops in
+    // `tests/scoped-definition-read-and-basis.test.js` pin those. This line is what carries it
+    // into the MANAGER, and its omission is silent end to end: the vocabulary leg reads `null`,
+    // `projectWorldVocabulary` publishes `{available: false, total: 0}` — a legitimate shape —
+    // the rail badge reads 0, the screen is empty, and every adminStore unit test stays green
+    // because each one injects its own services bag.
+    const services = appSource.slice(
+      appSource.indexOf('  _buildServices() {'),
+      appSource.indexOf('  _prepareSvelteProps(context) {')
+    );
+    assert.ok(services.length > 0, 'located _buildServices');
+    assert.ok(
+      services.includes('getComponentScopeStore: () =>'),
+      'the slice reaches the world-store block, so the assertion below is a measurement'
+    );
+    assert.ok(
+      services.includes(
+        'getVocabularyScopeStore: () => game?.fabricate?.getVocabularyScopeStore?.() ?? null,'
+      ),
+      'the manager must resolve the world vocabulary store through `game.fabricate`, under the ' +
+        'accessor name the adminStore read and write legs already call'
+    );
+  });
+
   it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
     assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
     assert.ok(

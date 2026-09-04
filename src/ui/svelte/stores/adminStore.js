@@ -5290,9 +5290,15 @@ export function createAdminStore(services) {
    * surface that asks the world-scope question.
    *
    * ── WHY IT IS COMPUTED HERE ──────────────────────────────────────────────────────────────
-   * `worldScopeProjection` is handed a corpus and a roster and no recipes at all, and the
+   * Both counters already exist in this module, beside the cards that state them, and the
    * recipe manager is already on this store's injected services bag. So the counting lives
    * where the corpus does and the projection attaches the answer, keyed by entity id.
+   *
+   * The earlier reason recorded here — "`worldScopeProjection` is handed a corpus and a roster
+   * and no recipes at all" — is FALSE since issue 1392: `buildWorldScopeState` takes a
+   * `recipes` argument now, supplied one line below from `_allRecipes()`. It is repaired rather
+   * than left standing because a stale recorded rationale is what sends the next lane looking
+   * for a seam that already exists.
    *
    * A tool id is the same string in every system that has the world Tool — the read union
    * matches an in-system record to its world entity BY ID — so scanning each system's own
@@ -5371,6 +5377,14 @@ export function createAdminStore(services) {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
+      // Issue 1392 (epic 1357, PR 7a): THE ONE ADDED EXECUTABLE LINE IN THIS GATEWAY FILE.
+      // `### GM World Scoped Entity Routes` requirement 7 enumerates a projection's
+      // REGISTRATION but not its INPUTS, and nothing in `{stores, systems, usage}` can answer a
+      // world-wide recipe question — so the World Vocabulary's recipe-category reference count
+      // was underivable from inside the file that owns it. `_allRecipes()` already exists and
+      // is already invoked on every publish, so this adds no new corpus read. The counting
+      // itself lives in `worldScopeProjection.js`, an open file.
+      recipes: _allRecipes(),
       usage: { essence: _worldEssenceUsage(), tool: _worldToolUsage() },
     });
   }

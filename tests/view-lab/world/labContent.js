@@ -4190,6 +4190,92 @@ export function buildLabContent() {
       // unauthored state, and the system Tool Rules tri-state has a world token to name.
       toolBreakage: { authority: 'toolSpecific' },
     },
+    // ── THE WORLD COMPONENT SCOPE, SEEDED WITH EXACTLY ONE RECORD (issue 1392) ─────────────
+    //
+    // The lab seeds no `migrationVersion`, so `1.30.0`'s world-scope pass runs on every build
+    // and LIFTS a world component record out of each system's own `components[]`, electing each
+    // record's `category` from the donor system. That is the whole world component corpus this
+    // fixture needs, and it is why nothing here restates it: the migration's per-pair guard
+    // (`migrateWorldScopeEntities`) skips an entity whose default is already present, so
+    // authoring the lifted half by hand would fight the pass rather than extend it.
+    //
+    // WHAT THE MIGRATION CANNOT PRODUCE is the pair of states the world Tags & Categories screen
+    // exists to make readable, and both are authored on this ONE world-only record:
+    //
+    //  - a world component default carrying a world CATEGORY that no system component carries,
+    //    so `Curios` publishes `0 references` and is STILL confirm-gated, because deleting it
+    //    rewrites this default. That row is the whole point of the one-click gate being a
+    //    conjunction rather than the reference count alone.
+    //  - a world component default carrying a world TAG, `moss`. The migration deliberately
+    //    leaves world `tags` unauthored (`data-models/spec.md:2349-2350`) because the tag merge
+    //    is additive, so a GM-authored world tag is a world-scope grant no membership record
+    //    mirrors — which is why the reference count INCLUDES the defaults' tags and EXCLUDES
+    //    their category. Without this record that asymmetry is invisible in every frame.
+    //
+    // It carries its own `entities` row rather than hanging an orphan default off nothing, on
+    // the `lab-tool-unlinked` precedent above: a world record no system has adopted is a real
+    // state, and it reaches no system's read union because it has no membership record. Its
+    // image is REUSED from a component already in this fixture rather than guessed from the
+    // naming convention — `img` is unvalidated, so a wrong path 404s silently and the capture
+    // harness fails the whole case behind the layout assertion.
+    componentScope: {
+      entities: [
+        {
+          id: 'lab-world-component-curio',
+          name: 'Tidewrack Curio',
+          img: `${ICON_BASE}/commodities/stone/ore-chunk-blue.webp`,
+          description: 'A world component record no crafting system has adopted yet.',
+        },
+      ],
+      defaults: {
+        'lab-world-component-curio': {
+          id: 'lab-world-component-curio',
+          category: 'Curios',
+          tags: ['moss'],
+        },
+      },
+    },
+    // ── THE WORLD VOCABULARY (issue 1392, epic 1357, PR 7a) ────────────────────────────────
+    //
+    // Authored so the `world-vocabulary` case photographs a POPULATED screen, and authored to
+    // put all THREE affordance states in one frame rather than three rows of the same one:
+    //
+    //  - REFERENCED: `Reagents` (14 components), `Weaponsmithing` (8 recipes), `ingot` (6
+    //    components). These render the `fas fa-link` reference chip and a neutral delete
+    //    control, and open the two-step confirm.
+    //  - ZERO REFERENCES BUT NOT SILENTLY DELETABLE: `Curios`. Nothing in any system carries it,
+    //    so it reads `0 references` — and it is still confirm-gated, because the world component
+    //    default above carries it. A row that read `Unused` here under a red one-click delete
+    //    would state one thing and do another.
+    //  - GENUINELY UNUSED: `Curiosities`. No recipe uses it and a recipe category rewrites
+    //    nothing on deletion — the world corpus holds no recipe record — so it renders the muted
+    //    `Unused` chip under the destructive delete and goes in one click.
+    //
+    // `moss` sits between the first two: its only reference is the world default's tag, so it
+    // reads `1 reference` and is confirm-gated. If the count ever excluded the defaults' tags it
+    // would read `Unused` and offer a one-click delete that silently rewrites a world component.
+    //
+    // Entry ids are the trimmed lowercased names, which is what the store derives and what
+    // `buildVocabularyUsage` keys its maps on. Authoring them here rather than letting the
+    // normalizer derive them keeps the fixture in the shape the setting actually persists.
+    worldVocabulary: {
+      componentCategories: [
+        { id: 'raw materials', name: 'Raw Materials' },
+        { id: 'reagents', name: 'Reagents' },
+        { id: 'refined', name: 'Refined' },
+        { id: 'curios', name: 'Curios' },
+      ],
+      componentTags: [
+        { id: 'ore', name: 'ore' },
+        { id: 'ingot', name: 'ingot' },
+        { id: 'moss', name: 'moss' },
+      ],
+      recipeCategories: [
+        { id: 'weaponsmithing', name: 'Weaponsmithing' },
+        { id: 'refining', name: 'Refining' },
+        { id: 'curiosities', name: 'Curiosities' },
+      ],
+    },
     // Exposed so the uuid index can resolve an owned recipe-item copy back to the book it is a
     // copy OF. Without an index entry the copy still matches its definition (matching is by uuid,
     // not by document) but every surface that resolves the source through `fromUuid` renders it

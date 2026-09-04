@@ -1,0 +1,134 @@
+import { writable, get } from 'svelte/store';
+import {
+  getCharacterPrerequisitePresetsForFoundrySystem,
+  seedCharacterPrerequisitePresets,
+} from '../../../config/characterPrerequisitePresets.js';
+import {
+  getCurrencyPresetsForFoundrySystem,
+  seedCurrencyPresets,
+} from '../../../config/currencyPresets.js';
+import {
+  getDefaultProviderId,
+  getProviderCanonicalUnits,
+} from '../../../config/currencyProviders.js';
+import { getFabricateFlag } from '../../../config/flags.js';
+import {
+  getCharacterModifierPresetsForFoundrySystem,
+  seedCharacterModifierPresets,
+} from '../../../config/gatheringCharacterModifierPresets.js';
+import {
+  normalizeCharacterPrerequisite,
+  normalizeCharacterPrerequisiteList,
+} from '../../../systems/characterPrerequisites.js';
+import {
+  buildExportPayload,
+  validateImportData,
+  prepareForImport,
+  makeExportFilename,
+} from '../../../systems/CraftingSystemExporter.js';
+import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
+import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
+import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
+import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
+import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
+import {
+  buildLearnedRecipeActorIndex,
+  describeRecipeDeleteImpact,
+} from '../../../utils/recipeDeleteImpact.js';
+import {
+  isGeneralRecipeCategory,
+  normalizeCustomRecipeCategories,
+} from '../../../utils/recipeCategories.js';
+import {
+  isGeneralComponentCategory,
+  normalizeCustomComponentCategories,
+} from '../../../utils/componentCategories.js';
+import { withCategoryIcon } from '../../../utils/categoryIcons.js';
+import { plainTextDescription } from '../../../utils/plainTextDescription.js';
+import {
+  planRecipeCategoryReassignments,
+  planComponentCategoryReassignments,
+  planTagRemovals,
+  planRecipeTagRemovals,
+} from '../../../utils/vocabularyCascade.js';
+import {
+  canAddCurrencySubUnit,
+  CURRENCY_MACRO_KEYS,
+  normalizeCurrencyUnit,
+  normalizeWorldCurrencyConfig,
+} from '../../../systems/currencyProfile.js';
+import {
+  authoredCheckModifierIds,
+  isRollExpression,
+  resolveModifierBounds,
+} from '../../../systems/checkModifierResolver.js';
+import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import {
+  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
+  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
+  conditionSettingsToCurrent,
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from '../../../systems/gatheringComposition.js';
+import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
+import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import { Tool } from '../../../models/Tool.js';
+import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
+import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
+import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
+import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
+import {
+  localizeRecipeActivationError,
+  localizeRecipePersistenceError,
+} from '../../../utils/recipeActivationMessages.js';
+import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.js';
+import {
+  activityFailureResultPolicy,
+  normalizeFailureResultPolicy,
+} from '../../../utils/failureResultPolicy.js';
+import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
+import {
+  seedToolRepairRequirements as _seedToolRepairRequirements,
+  TOOL_BREAKAGE_AUTHORITIES,
+  TOOL_SECTIONS,
+} from '../../../systems/toolScope.js';
+import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
+import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
+import {
+  defaultKnowledgeTab,
+  projectKnowledgeSnapshot,
+} from '../apps/manager/knowledge/knowledgeStudio.js';
+import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
+import {
+  TIME_OF_DAY_ICONS,
+  WEATHER_ICONS,
+  WEATHER_FALLBACK_ICON,
+} from '../util/gatheringConditionIcons.js';
+import {
+  createRecipeGraphIndex,
+  buildBoundedRecipeGraph,
+  layoutGraph,
+} from '../util/recipeGraphBuilder.js';
+import {
+  buildItemCards as _buildItemCards,
+  republishHydratedItemCards as _republishHydratedItemCards,
+} from './adminComponentRowProjection.js';
+import {
+  buildRecipeList as _buildRecipeList,
+  withoutDerivedRecipeProjectionFields,
+} from './adminRecipeRowProjection.js';
+import {
+  clonePlain as _clonePlain,
+  fallbackRandomID as _fallbackRandomID,
+  normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+} from './adminStoreInternals.js';
+import {
+  buildSelectedSystemViewData as _buildSelectedSystemViewData,
+  enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
+} from './adminSystemInspectorProjection.js';
+import { createWorldScopeActions } from './worldScopeActions.js';
+import {
+  buildWorldScopeState as _buildWorldScopeState,
+  emptyWorldScopeState as _emptyWorldScopeState,
+} from './worldScopeProjection.js';

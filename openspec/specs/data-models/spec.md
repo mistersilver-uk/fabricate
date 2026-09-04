@@ -646,7 +646,10 @@ CraftingSystem = {
 36. **EIGHT in-system keys are SHADOWED by a world scope setting and remain LIVE AND AUTHORITATIVE FOR EVERY KEY THEY DECIDE** (issue 1359, epic 1357; the blanket form RETIRED at issue 1372).
     They are `components`, `essenceDefinitions`, `tools`, `componentCategories`, `itemTags`, `categories`, `componentCategoryIcons` and `categoryIcons`.
     Each is marked `SHADOWED` in the shape above; `tools` is declared under `## Tool` requirement 2 rather than in that shape and carries the same note.
-    Since `1.30.0` the three ENTITY keys are shadowed by a corpus that is actually WRITTEN, and the five vocabulary keys are not: `fabricate.worldVocabulary` does not exist, so those five have no destination and nothing shadows them but this note.
+    Since `1.30.0` the three ENTITY keys are shadowed by a corpus that is actually WRITTEN, and since issue 1392 THREE OF THE FIVE vocabulary keys are too — **the correction is per key, not blanket**.
+    `fabricate.worldVocabulary` exists and carries three lists, so `componentCategories`, `itemTags` and `categories` now have a destination; `componentCategoryIcons` and `categoryIcons` still have NONE, and for those two the original reason survives unchanged.
+    All eight stay LIVE AND AUTHORITATIVE either way: nothing reads the world half of the three lists until the consumer sweep, so what has changed for them is the REASON they are unshadowed — a destination now exists and no consumer resolves it — and not the fact.
+    This requirement's retirement remains bound to that sweep.
 
     **WHAT THIS REQUIREMENT'S OWN RETIREMENT RETIRES IS THE LIFTED IDENTITY FIELDS, NOT THE ARRAYS — and for two of the three it is never the array.**
     The shed binds to THIS requirement retiring, not to the read repointing that has already happened: readers now enter through the read union, and the arrays are unchanged.
@@ -2052,7 +2055,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > **STILL NOT LIVE**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
 > **What `## CraftingSystem` REQUIREMENT 36's OWN RETIREMENT retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and that requirement states which and why.
 > The shed is bound to that requirement rather than to the read repointing, which has already happened and removed nothing.
-> The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
+> The three vocabulary LISTS have a destination since issue 1392 — `fabricate.worldVocabulary`, modelled by `## World Vocabulary` — and nothing reads it until the consumer sweep; the two vocabulary ICON MAPS still have no destination at all.
 > `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
 >
 > **REACHABLE FOR ESSENCES, EXPOSED BUT UNREACHABLE FOR COMPONENTS AND TOOLS**, as of issue 1372.
@@ -2181,7 +2184,8 @@ SystemMembershipRecord = {
     A per-entity module that needs a SHAPE rule over its own section (the component category's trim-or-absent rule, for instance) states it at the normalizer rather than in a resolver branch, so that the inheriting and overriding branches carry the same guarantee.
     The scope descriptor's optional `coerceSection` hook is where that rule is declared; it runs on BOTH records, and answering `undefined` from it means the section is ABSENT rather than an override of nothing.
 12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
-    The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags` and their parallel icon maps; that vocabulary, its layering, its icon maps and its deletion semantics are modelled separately (epic 1357, PR 7).
+    The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags`; that vocabulary, its layering and its deletion semantics are modelled by `## World Vocabulary`.
+    ITS ICON MAPS ARE NOT PART OF IT: the World Vocabulary carries no icon map at all, so `componentCategoryIcons` and `categoryIcons` remain per-system with no world half, and where a world category's icon lives is the consumer sweep's decision (`## World Vocabulary` requirement 6).
     The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
     The reserved `general` component category is not part of that vocabulary and stays implicit.
 
@@ -2229,7 +2233,8 @@ SystemMembershipRecord = {
     ABSENCE IS PART OF THAT SCHEMA: a field the elected identity does not carry is not minted, and the migration DELETES it from the in-system record too, so the two copies agree on absence as well as on value.
     NO BEHAVIOUR FIELD IS EVER ON AN ENTITY: behaviour lives on the membership record and, when a GM authors one, on the world defaults.
 
-    `fabricate.worldVocabulary` is deliberately not among the three keys — the World Vocabulary is modelled separately (requirement 12) and PR 7 is what registers it — and this requirement does not FORBID it; it records that the key is not yet among them and presupposes that it will be.
+    `fabricate.worldVocabulary` is not among the three keys, and since issue 1392 registered it that is a SETTLED BOUNDARY rather than a not-yet.
+    This table enumerates the three SCOPED-ENTITY layers and the World Vocabulary is not one of them (requirement 12, and `## World Vocabulary`); it is a fourth world setting of the same registration shape, modelled in its own section.
 14. **The three keys are SEPARATE ON PURPOSE, and the reason is seededness independence rather than write amplification.**
     `isSeeded()` is the predicate that makes a destructive prune decidable (requirement 16), and on a SHARED key it cannot be honest per entity type: a store writes the whole object, so one entity type's first write persists the others as empty and converts an UNKNOWN basis into a real, empty, PRUNABLE one in a single keystroke.
     `## CharacterLibraries` requirement 1 shares one key for two libraries only so that a fourth near-identical persistence shell is not written, and a parameterized store factory removes that reason; it survives that hazard only because its legacy in-system half still vouches for the ids, which three entity types whose references reach recipe ingredients, results, salvage, gathering drop rows, tool links and essence source components would not.
@@ -2354,7 +2359,8 @@ That hazard is independent of which system authored the list, which is why no do
    "Authored" is ABSENCE, not truthiness, and specifically not the `general` default `## Component` requirement 13 gives `Component.category`.
    The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
    The failure this rule prevents is a RESET to `general` in every inheriting system on the first resolve, not a blank — a blank is unreachable, because an absent world category falls through to the local value.
-   A world category the GM later deletes reaches the resolver as absence and takes that same path; `## CraftingSystem` requirement 6d governs the system-scope deletion case today.
+   A world category the GM later deletes reaches the resolver as absence and takes that same path.
+   The WORLD-scope deletion case is governed by `## World Vocabulary` requirement 7, which CLEARS the world default's `category` rather than reassigning it to `general` — forbidden here — so the resolver reaches absence and the local value falls through, exactly as this requirement already describes; `## CraftingSystem` requirement 6d governs the system-scope case.
    **The `general` prohibition binds an IMPORT-TIME write of a carried world default as well as the migration's election**, because since issue 1364 the migration is no longer the only writer: an import carries world defaults elected in another world, and every constraint on them is RE-DECIDED against the DESTINATION's merged corpus rather than the corpus the value was elected in (`import-export/spec.md` -> World-default constraint re-check on import).
    An authored category is a token matched against `CraftingSystem.componentCategories`, so BOTH normalizers trim it and coerce a whitespace-only or non-string one to ABSENCE (requirement 11's shape-rule clause).
    That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
@@ -2522,6 +2528,86 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
    `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
    `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
+
+## World Vocabulary
+
+### Purpose
+
+Model the vocabularies a world authors ONCE and every crafting system draws from — component
+categories, component tags and recipe categories — so that the same category is not authored
+per system and left to drift.
+
+TOP-LEVEL, and deliberately not a sub-section of `## Scoped Entity Definitions`.
+Requirement 12 there states the World Vocabulary is a separate concern and NOT a fourth layer, and
+`ui-integration/spec.md` records that folding the two together loses the boundary this file draws:
+a scoped entity is a RECORD with an identity, world defaults and per-system membership, and a
+vocabulary is a set of VALUES those records take.
+
+### Requirements
+
+1. **The World Vocabulary holds three independent vocabularies** — component categories, component
+   tags and recipe categories — never merged with one another, aliased or cross-populated.
+2. **It is persisted as ONE world setting**, `fabricate.worldVocabulary` (`scope: "world"`,
+   `config: false`, `type: Object`, default `{}`).
+   It is deliberately not a fourth member of `## Scoped Entity Definitions` requirement 13's
+   three-key table: those are the scoped-entity layers and this is not one.
+   One key for three vocabularies is the OPPOSITE of that requirement's three-key decision, and it
+   is safe here only because requirement 5 below keeps seededness honest per kind on a shared key
+   and requirement 6 keeps every destructive prune off this setting.
+3. **An entry is `{id, name}`**, with `id` derived from the trimmed lowercased name and used as the
+   de-duplication key and as the join key against the reference counter.
+   Nothing renames an entry, which is why the id is derived rather than minted.
+   De-duplication is on `id`, FIRST-WINS.
+   **This DIVERGES from the system-scope rule and the divergence is temporary and owned**:
+   `normalizeComponentCategory` preserves authored casing so `Reagent` and `reagent` remain
+   distinct system categories, while `## CraftingSystem` requirement 6c already keys their shared
+   icon map by the lowercased name — the inconsistency issue 1397 is the symptom of.
+   The world rule is the one the icon maps and the reference counter already assume; reconciling
+   the system half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
+   per-kind list `## Scoped Entity Definitions` requirement 12 mandates, is issue 1411's.
+4. **Each vocabulary's reserved general bucket is not a world entry.**
+   It is implicit per system, never persisted, and refused on add at both scopes
+   (`## CraftingSystem` requirements 1-2 for recipes, 6a for components).
+   Component tags have no reserved bucket and refuse nothing.
+5. **The setting preserves KEY ABSENCE per kind**, and `isSeeded(kind)` answers from raw key
+   presence — `false`, never a throw, for an unrecognised kind — so "never authored" and "authored
+   and emptied" stay distinguishable.
+   This DEPARTS from `## CharacterLibraries` and from the scoped-entity store shell, both of which
+   mark every sub-key seeded on any write: the persisted payload OMITS a kind that has never been
+   written, and a write seeds only the kinds it carries.
+   The refusal of an unrecognised kind must not be a throw, because the shared corpus reader that
+   the scoped-entity legs use probes this store with THEIR sub-key names inside a guard that
+   converts any throw into an unavailable projection — a legitimate published shape, with no error
+   and no failing test, that would silently blank the screen and its badge.
+6. **The in-system vocabularies stay live and authoritative.**
+   `## CraftingSystem` requirement 36 is unchanged; the system normalizer emits
+   `componentCategories`, `categories` and `itemTags` exactly as before; the world half of the
+   category-icon prune basis is deliberately NOT wired; and **the world vocabulary carries no icon
+   map** — `componentCategoryIcons` and `categoryIcons` still have no world destination, and where
+   a world category's icon lives is the consumer sweep's decision.
+   Wiring the world half into that basis is what the refusal prevents: a union basis is KNOWN
+   wherever either half is known, so it would arm the sharpest of the prune sites in a state that
+   prunes nothing today.
+7. **Deleting a world entry clears it from the world component DEFAULTS that carry it, the defaults
+   write is FIRST and AWAITED, and the vocabulary write is issued ONLY after the first has resolved
+   successfully.**
+   A failed first write abandons the cascade and changes nothing.
+   The two writes are separate settings and therefore non-atomic; ordering and gating the defaults
+   first means a torn write leaves an unused vocabulary entry — re-deletable, and the first leg is
+   idempotent so a retry converges — rather than a world default naming an entry no vocabulary
+   offers, a state only re-authoring fixes.
+   The gate is also the only thing that guarantees a remote client sees the two replication
+   broadcasts in the authored order.
+   A world default's `category` is CLEARED, never reassigned to `general` (forbidden by
+   `### Component scope` requirement 2), so the resolver reaches absence and the local value falls
+   through; `## CraftingSystem` requirement 6d remains the system-scope counterpart.
+   Nothing else cascades: a system's own `componentCategories`, `categories` and `itemTags` arrays,
+   its components and its recipes are untouched, and a membership record's `mutedTags` entry naming
+   a deleted tag is left in place and is inert — the tag resolver filters only the WORLD tags by
+   the muted set, so an orphaned mute cannot suppress a system's own same-named tag, and it
+   re-applies if the tag is re-added.
+   A recipe category's deletion rewrites nothing at all, because the world corpus holds no recipe
+   record.
 
 ## Tool
 

@@ -138,6 +138,7 @@
     "src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte | 4",
     "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte | 1",
     "src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte | 2",
+    "src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte | 1",
     "src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte | 1",
     "src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte | 3",

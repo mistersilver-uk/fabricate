@@ -197,11 +197,29 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * No file carries the `<!-- native select: … -->` marker today. `BulkEditSelect.svelte` and
  * `InventorySystemSelector.svelte` each carry a DOCBLOCK reason, which is not the marker and does
  * not exempt them; they are baselined like the rest.
+ *
+ * ONE ROW WAS ADDED AFTER THAT MEASUREMENT, at issue 1392: the World Vocabulary screen's sort
+ * key, `scoped/WorldVocabularyPage.svelte`. It is the FIRST growth this table has taken since it
+ * was measured, which is worth saying out loud — a debt table that grows once without anyone
+ * noticing grows twice.
+ *
+ * It is banked rather than exempted, and the marker is not used: that exemption is for a surface
+ * which genuinely cannot host a Svelte component, and this one can. Nor is it banked for want of a
+ * picker. `apps/manager/SearchablePopover.svelte` is the shipped shared picker and COULD take this
+ * control today — `showSearch={false}` with `triggerHasPopup="listbox"` is the bare-list shape, and
+ * four call sites already render it that way.
+ *
+ * It is banked on the maintainer's decision, for CONVERGENCE. The control is the same one as the
+ * sort key select in `scoped/EntityListInspectorFrame.svelte`, the row above — one of that file's
+ * two, the other being a lane filter — which this page's own header records it duplicates
+ * deliberately. Converting one of a duplicated pair leaves the manager asking for a sort key two
+ * different ways a screen apart. Issue 1504 builds `<Select>` and converts that frame, and issue
+ * 1510 sweeps the manager's call sites onto it; both rows leave together there.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 99;
+export const KNOWN_NATIVE_SELECT_TOTAL = 100;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.

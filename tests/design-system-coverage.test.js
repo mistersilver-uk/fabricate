@@ -568,7 +568,13 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 31 shipped rows the library does not name.
+ * The 34 shipped rows the library does not name.
+ *
+ * RE-COUNTED at issue 1392 rather than incremented. The heading said 31 while the register
+ * held 33, so it was already two out before this change added one — the list itself is pinned
+ * by equality against the manifest and never drifted, but the figure a reader trusts without
+ * counting had. It is 34, and it is the length of the list below and of the manifest rows
+ * carrying `library: null`, which the property beneath asserts are the same set.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
@@ -630,6 +636,11 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
+  // `library.html` specimen names. Its row adjudicates `<SetPicker>`, the nearest entry, and
+  // records why the correspondence is not made — a vocabulary editor is not one record's
+  // membership of a set.
+  'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',

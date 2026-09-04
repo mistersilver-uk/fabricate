@@ -26,6 +26,7 @@ import {
   createEssenceScopeStore,
   createToolScopeStore
 } from './systems/worldScopeStores.js';
+import { createWorldVocabularyStore } from './systems/WorldVocabularyStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
@@ -1120,6 +1121,15 @@ class Fabricate {
     this.essenceScopeStore.load();
     this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
     this.toolScopeStore.load();
+    // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY store, beside the three above for
+    // consistency and for the shipped source-order assertion. Its own HARD ordering constraint is
+    // only "after `registerSettings()`", because `ClientSettings#assertSetting` throws on an
+    // unregistered key; the prune-basis rationale above belongs to the three entity stores, and
+    // this store is deliberately wired into no basis at all (`## World Vocabulary` requirement
+    // 6). A mis-order here therefore degrades to a permanently unseeded store, an empty Tags &
+    // Categories screen and a rail badge reading 0 — visible, not destructive.
+    this.worldVocabularyStore = createWorldVocabularyStore({ getSetting, setSetting });
+    this.worldVocabularyStore.load();
     // 1.30.0 (issue 1370, epic 1357): THE WORLD IDENTITY DRIFT AUDIT, run once per session.
     //
     // HERE, AND NOT IN THE MIGRATION'S NOTICE SLOT. That slot sits inside `_runMigrations()`,
@@ -1983,6 +1993,32 @@ class Fabricate {
    */
   getToolScopeStore() {
     return this.toolScopeStore ?? null;
+  }
+
+  /**
+   * Get the world VOCABULARY store (issue 1392, epic 1357, PR 7a).
+   *
+   * DELIBERATELY UNGATED, and for its OWN reason rather than the borrowed one above. (The
+   * readiness helper is not named here in full: `scoped-definition-read-and-basis.test.js` reads
+   * a fixed-length slice after each accessor, so the token would land inside its NEIGHBOUR's
+   * window and redden a guard about a different method.) Nothing normalizes against this store,
+   * so the issue-970 shape the three entity accessors guard against does not apply.
+   * What does apply is `worldScopeProjection`'s `readCorpus`, which reaches it through
+   * `adminStore` inside a `try`/`catch` that converts ANY throw into `{corpus: null}` — and that
+   * publishes as `{available: false, total: 0}`, a legitimate shape with no error, no console
+   * line and no failing test. A readiness throw here would therefore not surface as a crash; it
+   * would silently blank the world Tags & Categories screen and its rail badge on any client
+   * that opened the manager a moment early.
+   *
+   * THE NAME IS FIXED BY ITS CONSUMER. `adminStore`'s read and write legs both resolve it as
+   * `services.getVocabularyScopeStore?.() ?? null`, and both shipped ahead of this store inside
+   * a gateway file `### GM World Scoped Entity Routes` requirement 7 closes to this lane — so a
+   * differently-named accessor could only be reconciled by reopening that file.
+   *
+   * @returns {object|null}
+   */
+  getVocabularyScopeStore() {
+    return this.worldVocabularyStore ?? null;
   }
 
   /**
@@ -5140,6 +5176,10 @@ Hooks.once('ready', async () => {
     componentScopeStore: fabricate.componentScopeStore,
     essenceScopeStore: fabricate.essenceScopeStore,
     toolScopeStore: fabricate.toolScopeStore,
+    // Issue 1392. Same silent failure as the three above: without it the world vocabulary leg
+    // receives `undefined`, the key is still "handled", and the client's vocabulary stays at
+    // whatever it read at boot for the rest of the session.
+    worldVocabularyStore: fabricate.worldVocabularyStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {

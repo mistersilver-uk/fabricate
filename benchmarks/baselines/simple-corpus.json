@@ -199,6 +199,20 @@
         "worldScopeEntities": 2500,
         "worldScopeBytes": 656382
       }
+    },
+    "worldScopeProjection.buildWorldScopeState": {
+      "description": "THE MANAGER WORLD PUBLISH (issue 1392). `buildWorldScopeState` runs on every settings-bridge reload and every crafting data change, and the World Vocabulary leg added a reference count over the whole world to it. Measured 5 times against a SEEDED 2,500-entity world component corpus, the 5,000-component in-system library and the whole 10,000-recipe corpus. The pass is O(records) against a shipped `_worldEssenceUsage` that is O(essences x records), but it is MEASURED rather than assumed — and `referencedVocabularyRows` is what stops the number being reported for a join that matched nothing.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "worldScopePublishes": 5,
+        "worldVocabularyTotal": 16,
+        "worldVocabularyRows": 16,
+        "referencedVocabularyRows": 16,
+        "gatedVocabularyRows": 16,
+        "worldScopeEntries": 2500,
+        "worldVocabularyBytes": 544
+      }
     }
   }
 }

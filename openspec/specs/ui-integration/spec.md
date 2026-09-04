@@ -2096,9 +2096,13 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    The Foundry smoke is the CONFIRMING run and is never the only evidence the label and id sets agree.
 7. **The gateway files carry every seam a later scoped-entity or vocabulary change needs, and are closed to those changes.**
    `CraftingSystemManagerRoot.svelte`, `adminStore.js`, `styles/fabricate.css` and the Foundry smoke harness carry every route token, rail entry, aside clause, store action, published key and rail locator those changes need, so each of them changes only its own screens.
-   The obligation is evaluated on THOSE changes, as `git diff --name-only origin/main...HEAD` containing none of the four paths.
+   The obligation is evaluated on a change REOPENING A GATEWAY FILE TO BUILD A SCREEN, as `git diff --name-only origin/main...HEAD` containing none of the four paths.
+   A change reopening one for a NAMED MISSING SEAM is not evaluated by that test at all — it would fail it by construction — and is evaluated instead on the diff-borne evidence the closure clause below requires, plus a stated and bounded count of added executable lines, and it names the seam in the amendment it lands with.
    **It binds the PRODUCER side of a published key as well as the consumer side**, which is where it was first got wrong: a rail badge wired to read `worldScope.vocabulary.total` is closed, but a projection that could only ever be handed the three entity stores is not — so the admin store reads an OPTIONAL fourth `vocabulary` store leg on the WRITE path as well as the read path, through the same optional-accessor idiom as its siblings.
    The read leg answers `null` and the projection answers `{available: false, total: 0}` until a vocabulary store is registered; the write leg is inert until the world-scope action module declares a vocabulary family, and the store, its service accessor, its projection and that family all live outside the four paths.
+   **That list enumerates a projection's REGISTRATION and not its INPUTS, and the distinction is what the vocabulary lane's own correction turned on.**
+   The world-scope projection is handed the scope stores, the crafting-system roster and the per-entity-type usage record, and NOTHING in that set can answer a world-wide recipe question — so a per-entry reference count over the whole world was underivable from the open files no matter how the producer was written.
+   The corpus-supplying argument at the projection's call site is therefore a seam this enumeration does not name, and supplying it is a correction rather than a violation.
    **AND IT BINDS THE DATA SEAM ON THE SAME MECHANISM AS THE ROUTING SEAM.**
    This corpus registers no component context and exports no store singleton, and no manager component imports a store module, so every value reaches a child as a DECLARED PROP and there is no other route to one.
    The shell therefore hands each world scoped-entity page and each system-scope entity view the published world corpus for its entity type, that type's world-scope write path, the crafting-system roster the membership rows were built against, and the selected system's id — exactly as requirement 3 hands a catalogue `onOpenEntry` and an entry `entityId` and `onBackToCatalogue`.
@@ -2123,6 +2127,10 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    **A gateway closure is a claim that an enumeration is COMPLETE, and it is void for a seam the enumeration does not name.**
    Reopening a gateway file to supply a NAMED missing seam is a correction that extends this requirement; reopening one to build a screen is a violation of it.
    The distinction is not decidable from a diff's file names, so a correction claim is EVIDENCED on the reopening change's own diff — by an unchanged-render or import-surface assertion — rather than asserted in its description.
+   **THE RULE COVERS THE CLASS AND NOT ONLY ITS FIRST INSTANCE.**
+   Three separate one-line omissions in these files surfaced within one release, which is evidence that the enumeration was written against the SCREENS that existed rather than against the SEAMS later lanes need — so the correction path is a standing part of this requirement rather than a one-off dispensation.
+   A lane taking it states the seam, bounds the diff, evidences the bound, and amends this requirement with what the instance teaches; a lane that merely wants a file open does not qualify.
+   The three are recorded with their outcomes so the next lane inherits the ledger rather than re-deriving it: the system vocabulary view's world-scope prop bundle is owned by the `svocab` change; the `toolBreakage` allowlist gap is CLOSED unconditionally in the admin store's published system projection; and the world-wide recipe corpus is the World Vocabulary change's ONE added executable line at the world-scope projection's call site.
 8. **At the collapsed 56px rail width no leaf renders its count badge.**
    `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
    Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
@@ -2130,7 +2138,8 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
 ### GM World Vocabulary Route
 
 World exposes `Tags & Categories` as a world rail leaf, matching the shipped `### GM Travel Route` shape: one route token, ungated, reachable with no crafting system selected.
-It is the authoring surface for the World Vocabulary — component categories, component tags and recipe categories — each with a usage count and a deletion warning naming how many inheriting rule sets are affected.
+It is the authoring surface for the World Vocabulary — component categories, component tags and recipe categories — each carrying a REFERENCE COUNT and a deletion warning stating what deletion changes FOR THAT KIND.
+The second number is per kind rather than one distributive promise: how many inheriting crafting systems for component categories, how many world components for component tags, and for recipe categories that no recipe is rewritten at all.
 
 It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the separation is a decision rather than an accident of drafting: a spec heading is a corpus noun rather than a screen title, there is no authored label covering all four world leaves, and the World Vocabulary is NOT a scoped-entity layer — it holds the vocabularies those entities draw from, which is the boundary `data-models/spec.md` draws in terms.
 
@@ -2141,6 +2150,30 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    It is the fourth of the four badges `### GM World Scoped Entity Routes` requirement 1 names, and it is the only one that is not a corpus of scoped entities.
    **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
    It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
+5. **The three vocabularies are authored at world scope, independently, and are never merged WITH ONE ANOTHER, aliased or cross-populated.**
+   The per-kind world/system layering `## Scoped Entity Definitions` requirement 12 mandates is a different axis and is unaffected by this.
+   Each vocabulary's reserved general bucket is not a world entry: it is implicit per system, never persisted, and refused on add at both scopes through the shipped guards — so the world badge and a system tab badge legitimately differ by one per category vocabulary.
+6. **A per-entry number at world scope is a REFERENCE COUNT over the whole world**, computed by the same counter the system-scope screen uses, run over every crafting system's records and — for component tags — additionally over the world component defaults' tags.
+   The tag asymmetry is non-mirroring rather than exclusivity: the migration deliberately left world tags unauthored because the tag merge is additive, so a GM-authored world tag is a world-scope grant no membership record mirrors, unlike the world default category a migrated world elected from a system that already carries it.
+   It is COUNTED and never derived from a name.
+   **An entry deletes in one click only when NOTHING NAMES IT AND its deletion rewrites nothing anywhere in the world** — both conditions, never either alone.
+   An entry any record names opens the two-step confirm even when deletion rewrites nothing, which is the standing case for recipe categories; an entry no record names opens it too when deletion would rewrite a world default.
+   The confirm states what deletion changes and what it does not.
+   Neither the count alone nor the rewrite set alone is ever the gate — and neither is ever the AFFORDANCE either: the row's unused marking and its destructive-delete styling state the same predicate the gate reads, so no row is ever marked unused, or painted with the immediate-delete treatment, while its deletion rewrites something.
+   A reference count of zero that is nevertheless confirm-gated renders as its count, not as `Unused`.
+7. **The deletion surface states the reference count and the kind's second number**, and the page reports the OUTCOME of the underlying cascade.
+   The cascade itself is a data-model rule and lives in `## World Vocabulary` requirement 7; what belongs here is that the screen is the reporter, because the write path posts no notice of its own and the platform already posts one for a server-refused world-setting write.
+8. **The deletion sentence's substitution tokens and the one-click gate are per-ROW data, not per-panel copy.**
+   The vocabulary panel primitive is shared by every vocabulary surface at either scope.
+   A surface whose confirm must state a second number, or whose one-click predicate reads more than the reference count alone — at world scope a strictly NARROWER conjunction, per requirement 6, and never a wider one — supplies those on the row rather than forking the primitive or writing a rule in the module stylesheet.
+   That is `design-system/spec.md`'s extend-with-a-defaulted-prop rule applied to the two fields that carry them, and the shipped callers pass neither and render byte-identically.
+   The same is true of the two renderings that ADVERTISE the gate — the row's usage chip and the delete control's destructive tone.
+   All three read one per-row predicate; a primitive whose behaviour reads the row while its affordance reads a different field states one thing and does another, which is the failure `design-system/spec.md` already rules on for the single-select inset bar.
+9. **The screen renders the three vocabularies simultaneously, never as tabs**: the two category vocabularies in a two-column grid and the component-tag vocabulary full width beneath them, matching the reference.
+   Each is the shared vocabulary panel primitive, with the page supplying its head — icon, title, subline — and its sort control, and the primitive supplying the add form, the search, the entry count, the rows and the empty states.
+   The page's panel is the card; the primitive's add form runs flush inside it, because a form authored to float on the bare pane draws its own card and two nested cards invert the reference's own nesting.
+   The page states no entry count in the head, because the primitive already publishes one.
+   A panel column is never narrower than the primitive's own row-card track, so the grid collapses to one column before that floor is crossed; the row's trailing delete control is the element a violation clips, and the released full-width body clips horizontally rather than scrolling.
 
 ### GM World Essence Screens
 

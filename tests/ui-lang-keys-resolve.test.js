@@ -163,8 +163,8 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    40,
-    'expected 40 legitimate namespace bases to resolve to an object — ' +
+    41,
+    'expected 41 legitimate namespace bases to resolve to an object — ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
       'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base, and from 43 to 40 ' +
@@ -186,7 +186,11 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       'Another is `NAMESPACE` in ' +
       '`src/ui/svelte/apps/manager/checks/checkTriggerPresets.js` (issue 1096), the base its ' +
       'two preset labels and their six per-kind effect phrases are localized under — the same ' +
-      'pure-data-table shape, for the same reason. Two more are the Preview and Tabs ' +
+      'pure-data-table shape, for the same reason. Another is `LANG_ROOT` in ' +
+      '`src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js` (issue 1392), the base the ' +
+      'world Tags & Categories screen composes every per-vocabulary string under: that page ' +
+      'renders ONE panel block for three vocabularies, so the middle segment is data and the ' +
+      'base is the literal. Two more are the Preview and Tabs ' +
       'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
       'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time.'
   );

@@ -68,6 +68,24 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // no-state hero and the world Tool entry is unreachable, because the only way in is a
   // catalogue row.
   put('toolScope', content.toolScope);
+  // The WORLD COMPONENT scope and the WORLD VOCABULARY (issue 1392, epic 1357, PR 7a). Both
+  // beside `toolScope` for its reason and read from `labContent`, where the fixture states what
+  // each record exists to make photographable.
+  //
+  // `componentScope` here is a PARTIAL seed - one world-only record and its default, with no
+  // `membership` key at all - and the partiality is deliberate rather than an omission, matching
+  // the `essenceScope` seed below. `1.30.0`'s world-scope pass lifts the rest out of the systems
+  // on every lab build, and its per-pair guard skips an entity whose default is already present,
+  // so this record survives the pass rather than being overwritten by it.
+  //
+  // POSITION AMONG THE PUTS IS COSMETIC. The shim's settings map answers a SEEDED key with its
+  // seed whether or not `registerSettings()` has declared it, so nothing here depends on the
+  // registration landing first. What DOES depend on it is production, where
+  // `ClientSettings#assertSetting` throws on an unregistered key — and that ordering is pinned
+  // by the source-order assertions in `tests/scoped-definition-read-and-basis.test.js`, not by
+  // this file.
+  put('componentScope', content.componentScope);
+  put('worldVocabulary', content.worldVocabulary);
   // FIVE parties, and every one of them earns its place in the World > Parties card list:
   // the pane is paged at four, searchable once more than one exists, and draws its enable
   // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in

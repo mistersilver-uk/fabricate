@@ -200,11 +200,26 @@ function _scopeEntityBasis(store, legacy) {
  * not been written deletes EVERY authored category icon — and the normalizer is a whitelist
  * rebuild, so the loss persists on the next save.
  *
- * The world half is `fabricate.worldVocabulary`, which epic 1357 registers in PR 7 and which this
- * change deliberately does not: a persisted key whose values carry no canonical meaning is a live
- * shape with no description. Until it exists there is no world store to consult, so this is `null`
- * exactly when the in-system vocabulary is empty. The signature takes the NORMALIZED list so the
- * basis and the emitted vocabulary cannot disagree.
+ * `fabricate.worldVocabulary` EXISTS SINCE ISSUE 1392, AND THIS BASIS DELIBERATELY DOES NOT READ
+ * IT. That is a decision rather than an omission, and it is recorded on three grounds:
+ *
+ *  1. NOTHING KEYS AN ICON MAP ON A WORLD CATEGORY. `system.componentCategoryIcons` and
+ *     `categoryIcons` are per-system maps and the World Vocabulary carries none of its own
+ *     (`## World Vocabulary` requirement 6); there is no world icon to protect here yet.
+ *  2. WIDENING IT WOULD ARM A DESTRUCTIVE PRUNE IN A STATE THAT PRUNES NOTHING TODAY. This is
+ *     the sharpest of the seven prune sites, and a union basis is KNOWN wherever either half is
+ *     known — so on a world that has authored a world vocabulary and a system whose own
+ *     vocabulary is empty, the basis flips from `null` to a real, narrow, PRUNABLE set and
+ *     deletes every authored icon outside the world list. Today that state prunes nothing.
+ *  3. THE SHARED-KEY SEEDEDNESS HAZARD IS ONLY HALF-SOLVED. `WorldVocabularyStore` keeps
+ *     `isSeeded(kind)` honest by omitting an unwritten kind from its payload, which is what a
+ *     basis would have to consult — but the consumer sweep that makes a world category actually
+ *     READABLE by a system is PR 8b's, so a basis wired now would be pruning against a
+ *     vocabulary no consumer resolves.
+ *
+ * So this stays `null` exactly when the in-system vocabulary is empty. Whether the world half
+ * joins it is PR 8b's decision, taken together with where a world category's icon lives. The
+ * signature takes the NORMALIZED list so the basis and the emitted vocabulary cannot disagree.
  *
  * @param {string[]} vocabulary The system's normalized category vocabulary.
  * @returns {string[]|null} `null` means UNKNOWN — prune nothing.
