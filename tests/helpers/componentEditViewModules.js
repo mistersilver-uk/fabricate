@@ -43,9 +43,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
   // withhold a disabled essence from the quantity grid.
   'src/utils/essenceValidation.js',
-  // The component category vocabulary (issue 676), imported by ComponentEditView.
-  // A deliberately import-free leaf, so this single entry suffices.
-  'src/utils/componentCategories.js',
+  // The component category vocabulary (issue 676) is imported by ComponentEditView too, and is
+  // no longer restated here: issue 1392 put it in `COMPONENT_SCOPE_LEAF_MODULES` above, because
+  // `worldVocabulary.js` asks it whether a name is the general bucket and every tree spreading
+  // that tier now needs it.
   // The salvage DC control's pure option model (issue 676). Import-free leaf.
   'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by

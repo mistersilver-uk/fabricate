@@ -47,6 +47,16 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
+  // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
+  // per-entry references now, so its own static closure reaches the vocabulary core and the
+  // shipped counter. The harness validates this closure and names the miss, unlike the
+  // hand-rolled trees elsewhere.
+  'src/systems/worldVocabulary.js',
+  'src/utils/vocabularyUsage.js',
+  // `worldVocabulary.js`'s own two leaves: it asks each category vocabulary whether a name is
+  // the general bucket, so both travel with it.
+  'src/utils/componentCategories.js',
+  'src/utils/recipeCategories.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
   'src/systems/componentScope.js',
