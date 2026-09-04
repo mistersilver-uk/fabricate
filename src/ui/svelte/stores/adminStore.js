@@ -6020,16 +6020,36 @@ export function createAdminStore(services) {
       return joined || seeded;
     } catch (error) {
       if (joined === true) await worldScopeFamilies.component.removeFromSystem(target, system);
-      // PLAIN ENGLISH, DELIBERATELY, AND IT IS A FOLLOW-UP RATHER THAN A CHOICE. The Tool twin
-      // reads `localize('…Tools.AddToSystemFailed')`; the component key does not exist in
-      // `lang/en.json` yet and this lane does not own that file, and `localize` answers a MISSING
-      // key with the key itself — so naming one here would put `FABRICATE.…` on screen instead of
-      // a sentence. The eight sibling failure paths in this store already notify this way.
-      services.notify?.error?.(
-        `The component could not be added to this system. ${error?.message || ''}`.trim()
-      );
+      services.notify?.error?.(_componentJoinFailureMessage(error));
       return false;
     }
+  }
+
+  /**
+   * The message a REFUSED component seed puts in front of the GM.
+   *
+   * ── IT CARRIES THE REASON, WHICH IS THE HALF THE GM CAN ACT ON ────────────────────────────
+   * The refusal that is actually reachable here names both components claiming one source uuid
+   * (`… is claimed by both Iron Scrap (scrap) and Iron Ingot (ingot)`), and that pair is what the
+   * GM has to go and merge. So the key takes an `{error}` parameter rather than the Tool twin's
+   * bare `Try again.` — same key shape, one more thing said.
+   *
+   * ── AND IT CANNOT PRINT THE KEY ───────────────────────────────────────────────────────────
+   * `localize` answers a MISSING key with the key itself, so `localize(k) || fallback` never
+   * reaches its fallback and would put `FABRICATE.…` on screen. This is the store's own shipped
+   * idiom for that (`_essenceDeleteDialogContent`, `_componentDeleteDialogContent`): take the
+   * answer only when it is not the key back. `lang-keys-no-orphans` and `ui-lang-keys-resolve`
+   * are what keep the key present; this is what keeps a GM from ever reading one.
+   *
+   * @param {unknown} error the refusal thrown by the in-system write.
+   * @returns {string}
+   */
+  function _componentJoinFailureMessage(error) {
+    const detail = error?.message ? String(error.message) : '';
+    const key = 'FABRICATE.Admin.Manager.Component.AddToSystemFailed';
+    const localized = services.localize?.(key, { error: detail });
+    if (localized && localized !== key) return localized.trim();
+    return `The component could not be added to this system. ${detail}`.trim();
   }
 
   /**

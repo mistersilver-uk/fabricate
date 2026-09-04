@@ -2703,6 +2703,7 @@
           "GhostListLabel": "World components this system has no rules for",
           "GhostAdd": "Add to system",
           "GhostAddNamed": "Add {name} to this system",
+          "AddToSystemFailed": "The component could not be added to this system. {error}",
           "WorldTags": {
             "Edit": "Edit world tags",
             "GroupLabel": "From the world · click to mute here"

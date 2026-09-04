@@ -523,6 +523,23 @@ test('1371: a REFUSED seed rolls the membership record back and reports it', asy
     'and the message names the component already claiming the source, which is what the GM has ' +
       'to go and merge'
   );
+
+  // THE MESSAGE IS LOCALIZED, AND CANNOT DEGRADE TO THE KEY. `localize` answers a MISSING key
+  // with the key itself — which this harness reproduces exactly, by returning every key verbatim
+  // — so the notification here is coming from the English floor rather than from a translation,
+  // and that is the branch worth pinning: it is what a world with an incomplete `lang` file gets.
+  const request = harness.localizations.find(
+    (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.AddToSystemFailed'
+  );
+  assert.ok(Boolean(request), 'the key is asked for, so a translation CAN answer');
+  assert.ok(
+    String(request.data?.error ?? '').includes('Iron Scrap'),
+    'and the reason is handed over as `{error}`, so the localized string can state it too'
+  );
+  assert.ok(
+    !harness.notifications.error[0].startsWith('FABRICATE.'),
+    'and no GM ever reads a raw key'
+  );
 });
 
 test('1371: but a membership record it did NOT write is left alone', async () => {
