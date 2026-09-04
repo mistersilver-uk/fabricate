@@ -442,11 +442,15 @@ describe('the reachability banner names exactly the entity types still unreachab
     assert.ok(pages.length >= 7, `the walk resolved ${pages.length} world scoped pages`);
   });
 
-  it('and the only page still delegating is the World Vocabulary, which is not a scoped entity', () => {
-    // Excluded BY NAME rather than by inference: `### GM World Vocabulary Route` states that the
-    // World Vocabulary is not a scoped-entity corpus, so it is outside the set this banner is
-    // about however its body is built.
-    assert.deepEqual(delegatingPages(), ['WorldVocabularyPage.svelte']);
+  it('and no world page delegates to the shared placeholder at all any more', () => {
+    // THIS WAS `['WorldVocabularyPage.svelte']` UNTIL ISSUE 1392 LANDED ON `main`. The vocabulary
+    // route was the last delegating world page — excluded from the unreachable set BY NAME rather
+    // than by inference, because `### GM World Vocabulary Route` states it is not a scoped-entity
+    // corpus — and PR 7a of epic 1357 gave it a real body. So the answer is now empty for two
+    // independent reasons, and the clause below still excludes it by name so that a vocabulary
+    // page which ever went back to delegating would red HERE rather than in the banner's derived
+    // scoped-entity set, where it does not belong.
+    assert.deepEqual(delegatingPages(), []);
   });
 
   it('the banner PARAGRAPH is matched by a named anchor rather than by a bare regex over prose', () => {
@@ -472,7 +476,9 @@ describe('the reachability banner names exactly the entity types still unreachab
     assert.match(
       paragraph,
       /world-vocabulary/,
-      'naming the one route that still delegates and why it is outside the set'
+      'still naming `world-vocabulary` and why it is outside the set: it is the one route the ' +
+        'banner has to account for separately, because it renders a world screen without being ' +
+        'a scoped-entity corpus at all'
     );
   });
 
