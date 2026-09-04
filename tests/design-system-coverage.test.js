@@ -291,6 +291,283 @@ test('no library entry recorded as unbuilt ships as a component', () => {
 });
 
 /**
+ * The closed status vocabulary, and the two shapes it takes.
+ *
+ * spec.md requirement "Every entry carries a status" states three values for an ENTRY and adds
+ * `prose` for a library block that specifies no primitive at all. The fourth value exists so the
+ * attribute is UNIVERSAL: with it, a block carrying no status is always a defect, and the
+ * properties below never have to decide whether a silent block was meant to be exempt.
+ *
+ * Written as two lists rather than one with a filter, because the difference between them is the
+ * whole distinction: `prose` is legal on a block and illegal on a name or a manifest row, and one
+ * list would make that a comment rather than an assertion.
+ */
+const MEMBER_STATUSES = ['target', 'shipped', 'divergent'];
+
+/** @see MEMBER_STATUSES */
+const BLOCK_STATUSES = [...MEMBER_STATUSES, 'prose'];
+
+/**
+ * How this corpus writes an issue reference, which a `divergent` entry owes.
+ *
+ * `issue 1373`, not the hash form — that one is what the colour gate over `src/ui` and `styles`
+ * rejects, and these registers follow the same convention so a sentence can move between them.
+ */
+const ISSUE_REFERENCE = /\bissue \d+\b/u;
+
+/**
+ * A block's own status, derived from the statuses of the names it declares.
+ *
+ * `divergent` beats `target` beats `shipped`, so a block reads as met only when everything it
+ * specifies is met. DERIVED rather than hand-typed: a multi-name block is the one place where a
+ * block-level value could be written to disagree with the names under it, and the entry that
+ * exercises the rule is live — the field block declares `shipped` for the field shell and
+ * `target` for the select and the search, so the roll-up is proved by the corpus and not only
+ * by this comment.
+ *
+ * @param {string[]} statuses every per-name status in one block
+ * @returns {string} the block's value
+ */
+function weakest(statuses) {
+  if (statuses.includes('divergent')) return 'divergent';
+  if (statuses.includes('target')) return 'target';
+  return 'shipped';
+}
+
+/** Every primitive name the library declares, against the status its own block gives it. */
+const PER_NAME_STATUS = new Map(
+  library.blocks.flatMap((block) => Object.entries(block.perNameStatus))
+);
+
+/** The blocks that name at least one primitive. */
+const NAMING_BLOCKS = library.blocks.filter((block) => block.names.length > 0);
+
+/** The blocks that name none — section prose. @see NAMING_BLOCKS */
+const PROSE_BLOCKS = library.blocks.filter((block) => block.names.length === 0);
+
+test('every library block declares a status from the closed vocabulary', () => {
+  assert.ok(library.blocks.length > 0, 'the parser found no `div.spec`, so this has no domain');
+  assert.equal(
+    library.blocks.length,
+    library.blockCount,
+    'a `div.spec` no longer holds exactly one `div.spec-head`. The status records are keyed on ' +
+      'the outer element and every count above is keyed on the inner one, so the two registers ' +
+      'would silently stop describing the same blocks.'
+  );
+  for (const block of library.blocks) {
+    assert.ok(
+      BLOCK_STATUSES.includes(block.status),
+      `a library block headed ${JSON.stringify(block.names.join(' ') || 'section prose')} ` +
+        `declares status ${JSON.stringify(block.status)}. Every block declares one of ` +
+        `${BLOCK_STATUSES.join(', ')}: a specimen with no status reads as a description of the ` +
+        'tree, which is what this vocabulary exists to stop.'
+    );
+  }
+});
+
+test('a block that names a primitive gives every name its own status', () => {
+  assert.ok(NAMING_BLOCKS.length > 0, 'no block names a primitive, so this has no domain');
+  assert.equal(
+    NAMING_BLOCKS.length,
+    library.headings.length - library.nonPrimitiveHeadings.length,
+    'the naming blocks and the naming headings disagree in number, so one of the two anchors is ' +
+      'reading a different set of elements'
+  );
+  for (const block of NAMING_BLOCKS) {
+    assert.notEqual(
+      block.status,
+      'prose',
+      `${block.names.join(' ')} is declared section prose and names ${block.names.length} ` +
+        'primitive(s). `prose` exempts a block from every correspondence below.'
+    );
+    for (const name of block.names) {
+      assert.ok(
+        MEMBER_STATUSES.includes(block.perNameStatus[name]),
+        `${name} is named by a heading and declares status ` +
+          `${JSON.stringify(block.perNameStatus[name])}. A heading naming several primitives ` +
+          'gives each its own, so no name inherits a verdict passed on a different component.'
+      );
+    }
+  }
+});
+
+/**
+ * A naming heading holds its names and NOTHING else, which is what keeps the chip outside it.
+ *
+ * The prose census above pins its 20 headings by exact text, so a chip moved into one of those reds
+ * immediately. The other 30 have no such pin: they are read for the names they yield, and `shipped`
+ * or `IconButton · target` yields none, so every property in this file would still pass with the
+ * status written inside the `h4` that the parser and the migrations table both describe as sitting
+ * beside it. This is the pin for those 30, and it is the whole reason the block carries its heading.
+ *
+ * Compared DECODED, in the parser's own form, so a pure re-escaping of an entity does not red it.
+ */
+test('a naming heading is its names and nothing else, so no chip has moved inside it', () => {
+  assert.ok(NAMING_BLOCKS.length > 0, 'no block names a primitive, so this has no domain');
+  for (const block of NAMING_BLOCKS) {
+    assert.equal(
+      block.heading,
+      block.names.map((name) => `<${name}>`).join(' '),
+      `the heading of the ${JSON.stringify(block.names.join(' '))} entry carries text beyond the ` +
+        'names it declares. A status chip belongs beside the `h4` and not inside it: the heading ' +
+        'is the vocabulary, and a value describing the tree written there is read as part of it.'
+    );
+  }
+});
+
+test('a block that names no primitive is declared as prose', () => {
+  assert.ok(PROSE_BLOCKS.length > 0, 'every block names a primitive, so this has no domain');
+  for (const block of PROSE_BLOCKS) {
+    assert.equal(
+      block.status,
+      'prose',
+      'a section-prose block declares an entry status. It specifies no component, so `target` ' +
+        'there claims an implementation is owed for something nothing could implement.'
+    );
+  }
+});
+
+test('a block’s own status is the weakest of the names it declares', () => {
+  const mixed = NAMING_BLOCKS.filter(
+    (block) => new Set(Object.values(block.perNameStatus)).size > 1
+  );
+  assert.ok(
+    mixed.length > 0,
+    'no block declares two different per-name statuses, so every block satisfies the roll-up ' +
+      'below trivially and this property proves nothing about it'
+  );
+  for (const block of NAMING_BLOCKS) {
+    assert.equal(
+      block.status,
+      weakest(Object.values(block.perNameStatus)),
+      `${block.names.join(' ')} declares ${JSON.stringify(block.status)} over per-name statuses ` +
+        `${JSON.stringify(block.perNameStatus)}. A block reads as met only when everything it ` +
+        'specifies is met, so the block value is derived rather than chosen.'
+    );
+  }
+});
+
+/**
+ * The ordering itself, over inputs the corpus does not contain.
+ *
+ * `divergent` has no live instance — no block and no member row declares it — so the property above
+ * ranks it against nothing: delete that branch from {@link weakest} and every corpus block still
+ * agrees with what is left. The rule is a rule about three values, and the third is exactly the one
+ * a maintainer reaches for under pressure, so it is pinned here rather than left to a future entry
+ * to discover.
+ */
+test('the roll-up ranks all three values, including the one no entry declares today', () => {
+  assert.equal(weakest(['shipped', 'divergent']), 'divergent');
+  assert.equal(weakest(['divergent', 'target']), 'divergent');
+  assert.equal(weakest(['target', 'shipped', 'divergent']), 'divergent');
+  assert.equal(weakest(['shipped', 'target']), 'target');
+  assert.equal(weakest(['shipped', 'shipped']), 'shipped');
+  assert.equal(weakest(['shipped']), 'shipped');
+});
+
+test('every shipped-member row carries the status its specimen declares', () => {
+  // The domain is the MEMBER table alone, never `MANIFEST_ROWS`. That constant also spreads
+  // `NOT_A_PRIMITIVE`, whose rows record non-membership rather than a member's fidelity and carry
+  // no status at all — quantifying over it would report eleven absent fields as defects.
+  assert.ok(DESIGN_SYSTEM_PRIMITIVES.length > 0, 'the member table is empty, so this is vacuous');
+  const named = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.library !== null);
+  assert.ok(
+    named.length > 0,
+    'no member row names a library entry, so the correspondence below has no domain and only ' +
+      'the vocabulary clause would run'
+  );
+  for (const row of DESIGN_SYSTEM_PRIMITIVES) {
+    assert.ok(
+      MEMBER_STATUSES.includes(row.status),
+      `${row.path} carries status ${JSON.stringify(row.status)}, which is outside ` +
+        MEMBER_STATUSES.join(', ')
+    );
+  }
+  for (const row of named) {
+    assert.equal(
+      row.status,
+      PER_NAME_STATUS.get(row.library.slice(1, -1)),
+      `${row.path} records ${row.library} as ${JSON.stringify(row.status)} and that specimen ` +
+        `declares ${JSON.stringify(PER_NAME_STATUS.get(row.library.slice(1, -1)))}. The two ` +
+        'halves are one correspondence: a row free to disagree with its specimen is a second ' +
+        'opinion about the same fact, and a reader has no way to tell which half is stale.'
+    );
+  }
+});
+
+test('a member row naming no specimen is a target by construction', () => {
+  const unnamed = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.library === null);
+  assert.ok(unnamed.length > 0, 'every member row names a specimen, so this has no domain');
+  for (const row of unnamed) {
+    assert.ok(
+      row.status === 'target' || row.status === 'divergent',
+      `${row.path} names no library entry and carries status ${JSON.stringify(row.status)}. ` +
+        'There is no specimen for it to match, so `shipped` claims a fidelity to nothing; the ' +
+        'specimen it is owed is the target.'
+    );
+  }
+});
+
+test('a recorded non-member carries no status, because it is not a member', () => {
+  assert.ok(NOT_A_PRIMITIVE.length > 0, 'the non-member table is empty, so this is vacuous');
+  for (const row of NOT_A_PRIMITIVE) {
+    assert.ok(
+      !('status' in row),
+      `${row.path} is an adjudicated NON-MEMBER and carries a status. Status is a member's ` +
+        'fidelity to its specimen; on a non-member it reads as "unbuilt", which is the opposite ' +
+        'of what that table records.'
+    );
+  }
+});
+
+test('every entry recorded as specified-but-unbuilt is declared a target', () => {
+  // DERIVED from the register above rather than restated. That quadrant is already pinned by
+  // exact equality there, so a second hand-typed list of the same names would be a copy free to
+  // disagree with it — and the copy is the one nothing would notice.
+  assert.ok(SPECIFIED_ONLY.length > 0, 'the unbuilt register is empty, so this has no domain');
+  for (const name of SPECIFIED_ONLY) {
+    assert.ok(
+      PER_NAME_STATUS.has(name),
+      `${name} is recorded as specified-but-unbuilt and its specimen declares no status for it`
+    );
+    assert.notEqual(
+      PER_NAME_STATUS.get(name),
+      'shipped',
+      `${name} is recorded as specified-but-unbuilt and its specimen declares it shipped. ` +
+        'Nothing implements it, so there is nothing for the specimen to match.'
+    );
+  }
+});
+
+test('a divergent entry names the issue that decided it', () => {
+  // NO DOMAIN GUARD, and that is deliberate rather than an omission. Nothing is `divergent` today:
+  // spec.md requirement "Every entry carries a status" reserves that value for a maintainer
+  // decision and none has been taken, so a guard here would fail on a corpus that is CORRECT.
+  // The property is written now so the first entry moved there arrives with its reason attached,
+  // rather than acquiring the obligation after the fact.
+  const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');
+  for (const row of divergentRows) {
+    assert.match(
+      row.why,
+      ISSUE_REFERENCE,
+      `${row.path} is recorded divergent and its judgement names no issue. "Divergent" means a ` +
+        'decision was taken; a decision nobody can look up is indistinguishable from drift.'
+    );
+  }
+  const divergentBlocks = NAMING_BLOCKS.filter((candidate) =>
+    Object.values(candidate.perNameStatus).includes('divergent')
+  );
+  for (const block of divergentBlocks) {
+    const start = librarySource.indexOf(`<h4>&lt;${block.names[0]}&gt;`);
+    assert.match(
+      librarySource.slice(start, librarySource.indexOf('</div>\n\n', start)),
+      ISSUE_REFERENCE,
+      `${block.names.join(' ')} declares a divergent name and its entry names no issue`
+    );
+  }
+});
+
+/**
  * The 31 shipped rows the library does not name.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason

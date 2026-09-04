@@ -3,7 +3,7 @@
 The **target** visual language for any Fabricate screen — the Player app and the GM
 authoring app.
 Colour is never hard-coded: everything is driven by `--fab-*` custom properties, and one
-attribute chooses which of the six themes is live.
+attribute chooses which of the seven themes is live.
 Build to this reference and the output drops into either app and reskins with every theme.
 
 > **The `design-system` capability is the authority on the primitive set.**
@@ -23,8 +23,9 @@ Build to this reference and the output drops into either app and reskins with ev
 > (`applyFabricateTheme`) are the source of truth.
 > Where this document disagrees with them, they win — treat the disagreement as a bug in this
 > file.
-> Sections marked **aspirational** describe a target the shipped code has not reached yet;
-> each names the tracked proposal that would make it true.
+> A section describing a TARGET rather than the shipped tree must say so in its own words and
+> name the tracked proposal that would make it true.
+> None does today: the typography section said so for a ramp that has since shipped.
 
 ## 0. When to use this
 
@@ -51,8 +52,9 @@ Unknown ids fall back to the default (`fabricate`).
   <div class="fabricate crafting-system-manager">…</div> <!-- GM -->
 ```
 
-The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb`,
-`starglass-arcana`, and `foundry-native`.
+The seven theme ids are `fabricate`, `foundry-native`, `mythwright`, `ironblood-forge`,
+`hearth-herb`, `starglass-arcana` and `sovereign`.
+All seven are dark.
 
 ### 1.1a Two CASCADE layers, and the module sheet is the weaker one
 
@@ -128,11 +130,11 @@ control height  26 · 28 · 30 · 34 · 38 · 44   (32 · 36 · 40 are RETIRED)
 thumbnails and portraits carry their own ladder and are not controls
 ```
 
-### 1.4 The six themes
+### 1.4 The seven themes
 
 The palettes are **not** duplicated here — `styles/fabricate.css` is the single source of
 truth for every colour literal, and copying them into this file only invites drift.
-Read the `:root[data-fabricate-theme="…"]` blocks there for the live values, and ship all six.
+Read the `:root[data-fabricate-theme="…"]` blocks there for the live values, and ship all seven.
 The default `fabricate` block is reproduced once below as a shape reference; treat the file, not
 this snippet, as authoritative.
 
@@ -181,36 +183,41 @@ ink for the SOLID accent fill, which `--fab-accent-text` does not replace.
 **Rarity / drop-rate ramp** (`--fab-drop-rate-*`, theme-constant):
 `guaranteed` `common` `uncommon` `rare` `very-rare` `legendary`.
 
-**Essence tags** (`--fab-tag-*`, per-theme tinted dots):
-`sage` `mist` `lavender` `rose` `peach` `butter` `aqua` `mauve`.
+**Entity tints** (`--fab-tag-*`, per-theme tinted dots):
+Thirteen are declared in every theme.
+Eight are offered in the picker — `sage` `mist` `lavender` `rose` `peach` `butter` `aqua`
+`mauve` — and five are declared but not offered: `ember` `verdant` `azure` `bone` `slate`.
+The tint colours a glyph, a badge ink or a bar fill, never a chip background, which would
+double-code kind against state.
+The `design-system` capability owns that rule and records which of the eight break the hue
+promise across themes; do not restate the measurements here.
 
-## 3. Typography — aspirational
+## 3. Typography
 
-> **Aspirational.**
-> The shipped app inherits Foundry's `--font-primary` (Signika in practice) for everything and
-> has no serif or mono token: `--fab-font-mono` is referenced once but never defined, so it
-> falls back to generic `monospace`.
-> The type ramp below is the target.
-> Adopting it is a tracked proposal — add `@font-face` for Spectral and JetBrains Mono, define
-> `--fab-font-serif` / `--fab-font-sans` / `--fab-font-mono` tokens, and apply serif to
-> entity/name surfaces and mono to dice/IDs.
-> Until then, style names and prose with the inherited `--font-primary`.
+> **Shipped.**
+> `styles/fabricate.css` declares `--fab-font-serif` (Spectral) and `--fab-font-mono`
+> (JetBrains Mono) in its `:root` block, with real `@font-face` rules for both, so use the
+> tokens rather than a font stack.
+> There is no `--fab-font-sans` and there is not meant to be: sans is Foundry core's Signika
+> through `--font-primary`, which every surface already inherits.
+> A serif heading must name the element it renders on — bare headings take core's colour and
+> margins — and the `design-system` capability states that rule and the shipped ramp's sizes.
+> The table below is the ROLE map, not a second copy of those sizes.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Role | Font (target) | Weight / size / lh |
-|---|---|---|
-| Page title | Spectral (serif) | 600 · 40px / 1.05 |
-| Section heading | Spectral | 600 · 30px / 1.1 |
-| Panel / entity title | Spectral | 600 · 20–22px / 1.15 |
-| Card / item name | Spectral | 600 · 13–14px |
-| Big value | Spectral | 700 · 28–30px · semantic colour |
-| Body copy | Signika (sans) | 400 · 13–14px / 1.5 |
-| Control / button label | Signika | 600–700 · 12–14px |
-| Section kicker | Signika | 700 · 10–11px · UPPER · tracking .12–.16em |
-| Dice / IDs | JetBrains Mono | 400–500 · 10–12px |
+| Role | Face |
+|---|---|
+| Page title, section heading, panel or entity title, card and row names, stat values | `--fab-font-serif` |
+| Body copy, control and button labels, section kickers | `--font-primary`, Foundry's Signika |
+| Dice formulas, run ids, token names, counts | `--fab-font-mono` |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The SIZES and weights each rung takes are the type ladder rendered in section 03 of
+`openspec/specs/design-system/library.html`, at the values the app ships.
+They are not restated here, because this file had them wrong: it drew the page title at 40px
+against the shipped 22px, and a second copy of a ladder is a second answer to one question.
 
 The intent: **serif names, sans explains.**
 If it names a thing (item, recipe, page) it takes the serif; UI, prose, and labels take the
@@ -605,7 +612,7 @@ Critical/Warning count pills + a green-check / red-x checklist.
    `openspec/specs/design-system/spec.md`, which §4 cites and reproduces — 32 / 36 / 40 are
    RETIRED control heights, and 40 is a thumbnail size.
 7. **No colour literals in UI.**
-   Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
+   Only `var(--fab-*)`; verify the screen reskins under all seven themes before calling it done.
 8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**
    A Playwright repro that loads only `styles/fabricate.css` — or even Foundry's and the
    system's stylesheets too — omits the ancestor a view-scoped rule needs, so it renders

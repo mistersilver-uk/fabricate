@@ -72,13 +72,25 @@
  *
  * ── ROW SHAPE ──────────────────────────────────────────────────────────────────────────────────
  *
- *   { path, library, evidence, why }              on {@link DESIGN_SYSTEM_PRIMITIVES}
+ *   { path, library, status, evidence, why }      on {@link DESIGN_SYSTEM_PRIMITIVES}
  *   { path, library, evidence, callers, why }     on {@link NOT_A_PRIMITIVE}
  *
  * `path`    Repository-relative POSIX path of the shipped implementation, exactly as a diff names
  *           it. Asserted to exist on disk.
  * `library` The name of this primitive's entry in `openspec/specs/design-system/library.html`,
  *           written as it appears there (`'<Stepper>'`), or JSON `null`.
+ * `status`  MEMBER ROWS ONLY. `'target'`, `'shipped'` or `'divergent'`: how faithfully this shipped
+ *           component matches the library specimen its `library` names, per spec.md requirement
+ *           "Every entry carries a status". It MUST equal the per-name status that specimen
+ *           declares, and `tests/design-system-coverage.test.js` fails when the two disagree — the
+ *           field is one half of a correspondence, not a second opinion. A row whose `library` is
+ *           `null` carries `'target'` by construction: there is no specimen to be faithful to, so
+ *           the specimen it is owed is the target. It is NOT a measure of adoption; a primitive can
+ *           be `'shipped'` while most of the tree still hand-rolls what it replaces, which is what
+ *           the `deferred: root convergence pending` exemptions in the source-contract tests count.
+ *           The two non-member tables carry no status, because a row there records NON-MEMBERSHIP
+ *           rather than a member's fidelity, and giving it one would invite the reading that a
+ *           declined candidate is merely unbuilt.
  * `evidence` `'broad'` or `'targeted'`. See below — this is the field with consequences, and the
  *           integrity test asserts that EVERY row carries one of the two, so no row can be exempt
  *           from both clauses by a typo.
@@ -324,7 +336,8 @@ function byCodePoint(left, right) {
  * sorts explicitly, because an authoring order that happens to be sorted is a coincidence and the
  * first hand-added row appended in the wrong place would silently change what the derivation emits.
  *
- * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
+ * @type {readonly {path: string, library: string|null, status: string, evidence: string,
+ *   why: string}[]}
  */
 export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimitives);
 

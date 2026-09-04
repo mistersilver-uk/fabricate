@@ -92,7 +92,12 @@ import {
  * roughly zero — still does. These are the enforced figures; the reference counts they quote
  * are not, and say so.
  */
-const STYLESHEET_DECLARATION_FLOOR = 470;
+// 470 against 530 until issue 1498 deleted the 367 rule blocks that matched no element, at base
+// `0eff5b36e`, taking this corpus to 491. Re-derived at the ratio it was originally chosen at —
+// 470/530 of 491 is 435 — so the "has not shrunk by a fifth" headroom below still means what it
+// meant. It was not breached; it is re-banked so both floors keep one relationship to their
+// corpora rather than drifting apart every time a sweep lands.
+const STYLESHEET_DECLARATION_FLOOR = 435;
 const SVELTE_DECLARATION_FLOOR = 380;
 
 /** The corpus is walked once. Lazily, so a walk failure is reported as a test rather than as an

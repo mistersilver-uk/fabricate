@@ -104,6 +104,9 @@ These mirrors rot silently otherwise.
 - For PR screenshot evidence, the View Lab is the producer and usually needs no recommendation at all: the `capture` CI job maps your changed files to cases and publishes the affected frames on every push.
 Render locally when you want to see a state before pushing — `node scripts/view-lab-screenshots.mjs apps <case-ids>`, seconds per frame, no Docker.
 If your change reaches a state no case covers, say so in the handoff and add the case: an uncovered state publishes an unrelated frame, which is the failure this registry exists to prevent.
+- For a screen with a design prototype, read `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` before writing UI code.
+Work the delta's reachable-state matrix: register a View Lab case for any state it names without one, write the mounted test that ACTS on each state's controls, and paste the mutation proof for every acceptance criterion.
+Where the prototype and the design-system library conflict, escalate to the driver BEFORE implementing rather than shipping the divergence and recording it in the handoff.
 - Recommend `npm run test:foundry` only when the task depends on Foundry runtime integration, the user asks for live Foundry evidence, or the affected view is outside the case registry; then the producer is the scoped `npm run test:foundry:screenshots`, which captures the changed-file-affected views (from `mapChangedFilesToViews`) as full real-Foundry app windows.
 Do not recommend it to re-photograph a view the registry already covers — it costs ~31s per frame against the lab's ~5s and cannot run in CI.
 The workflow driver owns that run and separates harness infrastructure failures from product regressions.

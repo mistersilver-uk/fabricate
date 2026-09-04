@@ -19,6 +19,15 @@
  * reason its own docblock gives: "counted, so that deleting one of two identical probes is not
  * silently absorbed". It costs 38 rows instead of 30.
  *
+ * ── THE GLOBAL SHEET IS ALREADY IN THIS CORPUS ─────────────────────────────────────────
+ * Recorded because it reads like a gap and is not one (issue 1497). `collectStyleCorpus` walks
+ * `['src', 'styles']`, so `styles/fabricate.css` is scanned by this ladder exactly as the Svelte
+ * scoped blocks are: SIX of the 37 rows below are sheet rows and they carry 39 of the 73
+ * occurrences — more than half the debt in one file. A proposal to "extend the corpus to the
+ * sheet" would therefore be extending it to somewhere it already reaches, and would produce no
+ * new rows while looking like an enforcement win. What the sheet does still need is a gate for
+ * the OTHER geometry ladders, and that is `tests/components/design-system-debt-ratchets.test.js`.
+ *
  * ── WHY EACH ROW CARRIES ITS RESOLVED TEXT ──────────────────────────────────────────────
  * The scan resolves `var()` to a fixed point, so it MANUFACTURES literals the source line does
  * not contain. Without the resolved text beside the raw, a future reader opens a row whose cited
@@ -84,12 +93,18 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * on specificity and sets `min-height: 34px`, so the retired literal this baseline recorded
  * was a value no GM ever saw. A browser measurement in `manager-layout.test.js` is what
  * found that; a text scan cannot, which is the limitation this baseline is honest about.
+ *
+ * It was 80 until issue 1498 deleted the 367 rule blocks in `styles/fabricate.css` that
+ * matched no element, at base `0eff5b36e`: seven of these declarations were inside them. That
+ * is not a rung being reached, it is a control that was never rendered going away, which is
+ * the other honest way this number falls.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 80;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 73;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
- * chose them: 530 under `styles/**` and 440 in Svelte scoped blocks.
+ * chose them: 491 under `styles/**` and 440 in Svelte scoped blocks. The first was 530 until
+ * issue 1498 deleted the dead rule blocks at base `0eff5b36e`.
  *
  * ILLUSTRATIVE, and named so, because nothing asserts them. They appear only inside a failure
  * message, to tell a reader how far below the expected magnitude a broken scan has fallen —
@@ -104,7 +119,7 @@ export const KNOWN_RETIRED_HEIGHT_TOTAL = 80;
  * unrelated work and teach the next author to re-baseline a number without reading it. The
  * enforced figures are the floors, which are the ones with a failure mode worth stopping.
  */
-export const FLOOR_REFERENCE_STYLESHEET_DECLARATIONS = 530;
+export const FLOOR_REFERENCE_STYLESHEET_DECLARATIONS = 491;
 
 /** The Svelte half of {@link FLOOR_REFERENCE_STYLESHEET_DECLARATIONS}. Illustrative likewise. */
 export const FLOOR_REFERENCE_SVELTE_DECLARATIONS = 440;
@@ -143,10 +158,10 @@ const ROWS = Object.freeze([
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte | min-height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
   'styles/fabricate.css | height | 32 | 4 | 32px => 32px',
-  'styles/fabricate.css | height | 36 | 14 | 36px => 36px',
+  'styles/fabricate.css | height | 36 | 11 | 36px => 36px',
   'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
-  'styles/fabricate.css | min-height | 32 | 9 | 32px => 32px',
-  'styles/fabricate.css | min-height | 36 | 8 | 36px => 36px',
+  'styles/fabricate.css | min-height | 32 | 6 | 32px => 32px',
+  'styles/fabricate.css | min-height | 36 | 7 | 36px => 36px',
   'styles/fabricate.css | min-height | 40 | 4 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
 ]);
 

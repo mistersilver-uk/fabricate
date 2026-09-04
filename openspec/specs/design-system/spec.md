@@ -11,14 +11,21 @@ That file is part of this capability rather than a companion to it: it is the sa
 The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
 
+Measured facts about the tree are written in the PAST TENSE with the commit they were measured on, because a measurement is true of a commit rather than for ever.
+Target text is written as MUST or SHOULD.
+A present-tense claim about what the code does is therefore a defect in this document whatever the code does, since nothing dates it and no reader can tell a fact that has expired from one that never held.
+A measurement taken on a branch is dated to that branch commit, which a squash merge does not keep, so the docs pass that follows the merge re-labels it to the merge commit — the first SHA a reader can check it against.
+
 ### Corpus and authority
 
 The design system's corpus is **this repository only** — the GM manager and the player app under `src/ui/`, and the Core prototypes that feed them.
 The Economy module and the premium Downtime companion are separate products and are explicitly OUT of corpus, because a signature count weighted by a codebase this repository does not govern cannot justify a primitive in it.
 A prototype whose implementation brief names a module other than Core is out of corpus, and a count derived from it MUST be re-derived before it is cited.
 
-Precedence is fixed, highest first: `openspec/specs/` and `DOMAIN.md`; a shipped component's own props and its stated reasons; a CI gate that already fails on the alternative; then this capability.
-Where a primitive already ships, its props ARE the specification and a proposal that drops one MUST state why in the same change, or it is an omission rather than a decision.
+Precedence is fixed, highest first: the other capabilities under `openspec/specs/` and `DOMAIN.md`; then this capability's `target` text, the library specimen included; then an entry recorded `divergent`, with its reason and the issue that decided it; then a CI gate.
+The order this replaces put a shipped component's own props ABOVE this capability, which made every divergence self-ratifying: a component that had drifted from its specimen became the specification by drifting, and the specimen it contradicted had no standing left to say so.
+A CI gate is last rather than absent, because a gate is evidence about the tree and this capability is where the tree is told what to be; when the two disagree it is the gate that gets changed.
+Where a primitive ships and its props differ from its specimen, the specimen is the TARGET and the entry's status says so; a proposal that drops a specified prop MUST state why in the same change, or it is an omission rather than a decision.
 
 ## Requirements
 
@@ -35,6 +42,8 @@ A candidate that decomposes entirely into existing members is a COMPOSITION and 
 A candidate MUST have two or more independent callers to enter the set.
 An independent caller is any other file under `src/` that imports the component by path, which is the reading a gate can decide and the one `scripts/lib/componentImporters.js` implements.
 A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
+That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
+`tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
 "Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
@@ -64,6 +73,36 @@ An exact caller list on a primitive with dozens of importers would make an unrel
 - **WHEN** a proposed primitive can be built from members already in the set with no new behaviour
 - **THEN** it is recorded in the ruled-out register with the composition that replaces it
 - **AND** it does not enter the set
+
+### Requirement: Every entry carries a status
+
+Every specimen in `openspec/specs/design-system/library.html` and every row of the shipped-member table in `scripts/lib/designSystemPrimitives.json` MUST carry a status drawn from a closed vocabulary, and a library block that specifies no primitive carries `prose` so the attribute is universal and its absence is always a defect rather than a category.
+`target` means the entry is specified and the shipped component does not yet match it, or nothing ships at all.
+`shipped` means the shipped component matches the specimen's API and geometry.
+An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
+`divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
+A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 30 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+
+Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
+An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
+A single inline disagreement between a shipped component and its specimen puts that entry at `target`, and the library's planned-migrations table carries the row that says what the disagreement is and what it moves to.
+That row is not a licence to leave the entry at `shipped`, and it is not `divergent` either, which is reserved for a decision that the component STAYS different.
+
+A shipped-member row that names no library entry carries `target` by construction rather than by judgement: there is no specimen to measure it against, so the specimen it is owed is the target.
+`tests/design-system-coverage.test.js` is the gate, and it fails on a missing status, on a value outside the vocabulary, on a name in a heading that carries no status of its own, on a manifest row whose status contradicts its specimen, and on a `divergent` entry that names no issue.
+
+#### Scenario: A child issue lands the implementation an entry specified
+
+- **WHEN** a change makes a shipped component match its specimen's API and geometry
+- **THEN** the same change flips both the specimen's status and its manifest row's status to `shipped`
+- **AND** the coverage gate fails if it flips only one of the two
+
+#### Scenario: A change makes a shipped component disagree with its specimen
+
+- **WHEN** a change alters a component recorded `shipped` so that it no longer matches its specimen
+- **THEN** the change flips the entry back to `target`, or records the disagreement as `divergent` with the issue that decided it
+- **AND** the entry is not left at `shipped`, which would be a claim about the tree that nothing else in the repository can check
 
 ### Requirement: A shared primitive's class family is rooted at the primitive, not at an app
 
@@ -174,6 +213,7 @@ Re-deriving the eight is a palette change across seven theme blocks and is recor
 
 Elevation is for surfaces that float OVER content and MUST come from `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`.
 A card that merely sits on the page uses a border and no shadow.
+`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block and pins the ones that are none of those three, allowing only `none` and an inset ring — a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 
 #### Scenario: A primitive needs a colour the token set does not name
 
@@ -195,12 +235,13 @@ Area scoping is spelled out rather than numbered.
 An AREA-SCOPED property is one declared only under the root of a single area, and it MUST NOT be declared or read outside that area, because a shared primitive that reads one renders correctly inside the area and unstyled everywhere else — an out-of-scope custom property makes the declaration invalid at computed-value time rather than failing.
 Every compound of a rule's selector list is judged separately, since the cascade applies a comma-joined rule to each of them.
 `--fab-manager-` is the prefix a NEW area-scoped property under `.fabricate-manager` takes, and carrying the prefix is SUFFICIENT to be governed by this rule but NOT necessary: a set of properties declared exclusively under `.fabricate-manager` selectors predates the convention, carries no prefix, and is bound by the rule all the same — `--fab-recipe-cluster-cols` and `--fab-env-comp-grid` are the same species as the five that do carry it.
-Only the prefixed ones are gated, because a gate reading names cannot tell an unprefixed manager-only property from a foundation token; the prefix is what makes the rule machine-decidable, which is why a new one takes it.
+The GATED SET is computed from DECLARATION SITES rather than read off the prefix: a `--fab-*` property every one of whose declarations sits inside the area is area-scoped, whatever it is called.
+A prefix gate would police a fifth of its own population — measured, five of the twenty-four area-scoped properties carry the prefix — and the nineteen that predate the convention would be bound by this requirement and by nothing else.
+Carrying the prefix therefore remains a CLAIM the measurement must agree with: a `--fab-manager-*` property with a declaration outside the area fails `tests/token-generation-gate.test.js`, because such a property has silently dropped out of the computed set and is now gated by nothing.
 A Svelte scoped `<style>` MUST NOT reach an area-scoped property at all: a component is placed in a directory, not in a DOM subtree, so its own CSS cannot guarantee where its host renders.
 Nor may a `.js` module or a `.svelte` template spell one into a string, which is the channel a CSS-only scan cannot see and the one that has actually occurred; `tests/token-generation-gate.test.js` reads the global sheet and every scoped `<style>` as CSS, and matches a `var()` read or a `name:` declaration in `src/**` `.js` and `.svelte` text.
 
 The forwarding-alias rule below is scoped to COLOUR, and that is narrower than a namespace-wide ban on the single-declaration alias shape.
-The narrowing is deliberate and is recorded rather than left to be inferred: the five `--fab-space-*` semantic aliases are exactly that shape, they are a PUBLISHED vocabulary that `ui-integration` names value by value, and a namespace-wide ban would have made them a carve-out instead of a consistent case.
 A colour alias is different in kind because the value it forwards is the one thing a theme swap must be able to change.
 No gate decides the colour case on its own; what a gate can decide is that the retired names do not return, which is what `tests/token-generation-gate.test.js` holds.
 
@@ -219,7 +260,11 @@ Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for control
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
 
+`tests/components/design-system-debt-ratchets.test.js` holds the RADIUS ladder over both stylesheet corpora, resolving a `var()` token to its definitions first so that moving a banned value into a custom property does not pay the debt down.
+`tests/components/control-height-ladder.test.js` holds the control-height ladder the same way.
+
 Padding, margin and gap MUST derive from the spacing scale in `ui-integration`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
+`tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
 Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and MUST NOT be derived from `--fab-space-*`.
 They are written as literals by default, and a token is minted for one of them only where the value is SHARED across surfaces or DERIVED from another, in which case the token's declaration MUST record which it is.
 Two shipped pairs illustrate the two kinds, as examples rather than as a closed list a further token would have to join: `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry two radii off the ladder for the elements they paint, shared by the Books & Scrolls tab and the item-page inspector so that correcting them onto the ladder stays a one-line edit.
@@ -228,6 +273,8 @@ A token of this kind is a local convenience and never a ladder: naming one for a
 Type follows the ladder in `ui-integration`: the serif face names things, the mono face carries every number a GM compares or tunes, and the interface face stays host-owned and untokenized.
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.
 Emphasis in mono comes from size and ink.
+`tests/components/design-system-debt-ratchets.test.js` holds both halves of the weight rule: that no `font-weight` anywhere leaves the 400/500/600/700 ramp, and that no rule setting `var(--fab-font-mono)` asks for a weight above 500.
+It joins a rule to a same-selector twin elsewhere in the same file, because the corpus repeatedly sets the family in a base rule and the weight in a `@media`-nested copy, and a rule-local reading would exempt every one of those.
 
 #### Scenario: A geometry falls between two rungs
 
@@ -240,6 +287,8 @@ Emphasis in mono comes from size and ink.
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
+`tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
+Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for six application roots, and it is recognised by the SHAPE of those blocks — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 
 A loading control MUST set `aria-busy` and change its label or text.
@@ -247,6 +296,8 @@ A spinner alone is insufficient because Foundry's bundled Font Awesome disables 
 
 Motion is limited to a 140ms ease on a control state change, and nothing else animates.
 Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
+NOTHING GATES THE 140ms FIGURE AND NOTHING SHIPS IT: measured across both stylesheet corpora, the durations written are 120ms seventeen times, 150ms nine times, and four others, and 140ms appears nowhere at all.
+So this sentence names a rung the product has never used, which makes it a decision owed rather than a rule enforced — either the ladder becomes 120/150 and a gate holds it, or the corpus moves onto 140 — and it is recorded here as unenforced so that the next reader does not mistake the silence for compliance.
 
 A SELECTED face is a FILL and an EDGE.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
@@ -269,6 +320,10 @@ Joining a multi-select row to a radio card's selected treatment is the shape thi
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+
+A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
+An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
+`tests/design-system-required-names.test.js` holds both, over the flat primitive directory and every manifest row under `apps/manager/`.
 
 A change with no visible focus consequence MUST be announced through a live region, and focus MUST move BEFORE the announcement is made, because polite speech is cancelled by a focus change.
 Reorder announces the moved item, its new position and the total.
@@ -293,6 +348,7 @@ A count pip on such an item sits on the OUTER CORNER of that well with a ground-
 Every primitive renders inside a Foundry ApplicationV2 window, inside Foundry's own CSS and event handling, and MUST satisfy the following.
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
+`tests/components/design-system-debt-ratchets.test.js` fails any `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
 A container query adds no specificity, so the narrow case is declared after the wide one.
 The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
 A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be.
@@ -303,6 +359,7 @@ A focusable element that is not a form control, contentEditable, or a button wit
 The condition is HOLDING FOCUS, not handling keys: an element that handles nothing still takes every keystroke the GM aims at it and hands it to the canvas, so `tabindex="-1"` on a non-form element is itself the trigger, since that attribute exists only to make the element a focus target.
 The carve-out for a button is FORM-SCOPED and stays that way: `hasFocus` answers `!!focused.form`, so a button outside a form is exactly as unrecognised as a bare div, and a roving-tabindex tab strip — which handles the arrows and calls `preventDefault()` without `stopPropagation()` — runs its own handler AND pans the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
+`tests/design-system-keyboard-focus.test.js` holds all three populations this obliges, and for two of them it holds a pinned baseline rather than an absence: the `tabindex="-1"` targets are compliant, while the elements that carry a static `tabindex="0"` and an interactive role, and the buttons with no ancestor form, are counted debt that the shared primitives emitting the attribute will collapse.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
 A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
 Where the list has a search field, that field holds focus.
@@ -313,6 +370,9 @@ Core clips at `.window-content` and the manager adds further clipping boundaries
 The portal target and the coordinate origin MUST be the same element, because the fault is not either choice on its own but the two disagreeing: a surface that names one root resolves nothing outside it, so the portal silently no-ops while the positioning falls back to viewport coordinates written onto a node that never moved, and the panel draws in the wrong place with byte-identical markup.
 A document-wide lookup for a root is worse rather than safer, since it finds that application wherever it is and portals the surface into a different window.
 The eligible roots are `.fabricate-manager` and `.fabricate-app`, and a root is eligible only while it is a POSITIONED element, because an absolutely positioned panel appended to a static one takes its containing block from somewhere else entirely.
+The list is TWO and stays two.
+Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the four windows joining the contract does not extend the eligible list.
+A window that needs a root picks whichever of the two matches what it IS — a GM authoring surface or a play surface — rather than minting one for itself, because each new root is another ancestor a portal resolver must know about and another family a primitive can be accidentally scoped under.
 A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 
 A primitive MUST set its own `height` and `min-height` on any button and its own width on any input, because Foundry's element rules otherwise crop or stretch it.
@@ -329,6 +389,8 @@ Foundry owns the picker dialog, the path is an implementation detail, and a long
 
 A native `select` renders its option popup through the operating system, which reaches it only through the control’s own computed background and `color-scheme`, and differs by browser and platform even then.
 Whenever the options need a selected tick, a group heading, a per-option description, a badge, or a reason for being unavailable, the control MUST render its own option list using the floating-surface geometry instead of a native popup.
+`tests/components/design-system-debt-ratchets.test.js` counts every native `<select>` twice over, once as a parsed element in the Svelte templates and once as markup in a JavaScript template string, since a DialogV2 body cannot host a component and is therefore the one place the rule may not reach.
+A single element is exempted by a `<!-- native select: reason -->` comment on the lines above it, which makes the exception a written decision rather than a silent one.
 
 #### Scenario: A non-input element can hold focus
 
@@ -449,7 +511,6 @@ It toggles membership, stays open across choices and marks several options selec
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
 It has been adopted: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which is the shipped surface the unscoping and the portal-host resolver are now proved by rather than merely permitted for.
-The icon, colour, essence-source and recipe-duration pickers do NOT: their panel rules are still written under `.fabricate-manager`, so a caller outside it would render a panel with no `position: absolute` to be placed by, and unscoping each family belongs to its own change rather than to a conversion before it.
 
 #### Scenario: A converted menu renders no query field
 
@@ -689,7 +750,12 @@ Consistency across machines is the reason, so a surface MUST NOT opt back into t
 There is ONE exception, and it is structural rather than discretionary: a select inside a Foundry-owned dialog body.
 `DialogV2` cleans its content and re-serialises it through `innerHTML`, so no mounted component and no attached listener survives, its callers read their value back through `form.elements`, and its `dialog` element has no application root to portal into.
 A select there stays native, and the surrounding stylesheet gives the control a themed background, because `color-scheme` alone does not reach the popup.
-A component that ships native for a stated reason of its own outranks this requirement under the precedence order above, and two do so today.
+There is no second exception by prose.
+A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
+An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
+Measured at `aa3c4a3fe`, by that gate's own parse of the Svelte templates: 99 native `select` elements across 38 `.svelte` files — 64 in the manager outside its root, 16 in `CraftingSystemManagerRoot.svelte`, 12 in the interactables windows, 6 in the player apps and 1 in `Pagination.svelte` — plus four written into JavaScript dialog bodies.
+No file carried the marker.
+The two components long counted as the stated exceptions, `BulkEditSelect.svelte` and `InventorySystemSelector.svelte`, carry a DOCBLOCK rather than the marker and are baselined with the rest in `tests/components/design-system-known-debt.json`.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live, and is dropped where the trigger already states the value.
 
@@ -812,6 +878,8 @@ An inspector rail is OPTIONAL and several shipped editors have none; where one i
 A blocking notice is the only element permitted between the tab bar and the first card.
 An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
+`openspec/specs/ui-integration/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
+The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with identity and a single primary action, then progress, then requirements.
 The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
@@ -830,7 +898,8 @@ The row MUST name the implementation path and MUST record the caller count that 
 It MUST also name the library entry it corresponds to, unless the primitive ships with no specimen at all, in which case it carries `library: null` and the undocumented register in `tests/design-system-coverage.test.js` names it; that register is pinned by exact equality, and shortening it is the only direction the debt is meant to move.
 The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
-An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference; the library records which entries currently do so, and closing that list is tracked as a debt rather than presented as complete.
+An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference.
+The library records which entries currently do so: section 16's "Entries carried without an API" row names the twenty-five, across eight specimens, and closing that list is tracked as a debt rather than presented as complete.
 
 A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
 `tests/design-system-coverage.test.js` is the gate those prohibitions are enforced through: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.

@@ -3,282 +3,329 @@
     {
       "path": "src/ui/svelte/apps/manager/ArmedDangerButton.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The two-step arm-then-confirm destructive control (4 callers). `library.html:570` specifies `danger` as one of six ROLES on the single button primitive and `library.html:1815` records a bespoke destructive panel as a surface Foundry already owns, so the arm is a carve-out neither entry claims by name."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkDeleteCard.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The shared bulk-DELETE card (3 callers, issue 1132). `library.html:1058` specifies `<SelectionBar>` and `<BulkEditPanel>` for this surface and names no delete card. Targeted because it renders in all three studios but is photographed only by the four `*-bulk-delete-*` frames, which `ui-pr-screenshot-evidence.mjs` routes it to; the bulk-EDIT frames do not contain it."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
       "library": "<BulkEditPanel>",
+      "status": "target",
       "evidence": "targeted",
       "why": "The bulk panel shell (3 callers, issue 1010). `library.html:1058` names it and calls this \"the largest uncovered surface in the corpus\". Targeted: exactly two studios consume it and both claim it by `sourceMatches`."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkEditSection.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "A section inside the bulk panel (3 callers, issue 1010). `library.html:1058` specifies the PANEL, not its internal sectioning. Targeted for the same reason as its shell."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkEditSelect.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The bulk panel's leave-unchanged select (2 callers, issue 1010). `library.html:646` specifies `<Select>` as one shell shared with text, number and search, and records the leave-unchanged clear state on `<TintPicker>` rather than on the field shell. Targeted for the same reason as its shell."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte",
       "library": "<SelectionBar>",
+      "status": "target",
       "evidence": "targeted",
       "why": "The bulk selection toolbar (3 callers, issue 1010). Named at `library.html:1058`. Targeted for the same reason as its shell."
     },
     {
       "path": "src/ui/svelte/apps/manager/Callout.svelte",
       "library": "<Callout>",
+      "status": "target",
       "evidence": "broad",
-      "why": "Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice."
+      "why": "Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice. `target` rather than `shipped` because that entry states a Svelte API for `<Notice>` alone: a specimen that names no props gives nothing to match, and issue 1505 writes Callout's."
     },
     {
       "path": "src/ui/svelte/apps/manager/Chip.svelte",
       "library": "<IconChip>",
+      "status": "target",
       "evidence": "broad",
       "why": "The highest-traffic primitive in the codebase at 67 callers. `library.html:858` groups `<Kicker> <IconChip> <StatBox>` as the mark vocabulary and this is the icon chip. Broad by an enormous margin — attributing a chip change to one window would be a lie about where it lands."
     },
     {
       "path": "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The complication summary row (5 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1429` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`."
     },
     {
       "path": "src/ui/svelte/apps/manager/EditorTabs.svelte",
       "library": "<TabBar>",
+      "status": "target",
       "evidence": "targeted",
       "why": "The editor tab strip. TEN importers under `src/`, which is the membership bar's own predicate, and NINE of them are wrapping strips: the system, environment, recipe-item, Checks, Knowledge, recipe, essence, tool and vocabulary strips each wrap it, while `scoped/WorldEssenceEntryPage` renders it inline without a wrapper. Both numbers are written out because this row said `8 callers` while nine files imported it — the inline caller was uncounted, and a single figure cannot say whether it means importers or wrappers. `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Its specimen also draws TWO Rail Marker Family vehicles on one bar — `Tiers 3` and `Businesses 23` as bare counts beside a warning badge on Validation — so drawing the family is part of what the entry specifies, not an extension of it, and spec.md requirement \"Near-neighbour primitives are routed by a stated rule\" forbids substituting one vehicle for another. Issue 1038 ruled the Checks section strip OUT of conversion, led by the reason that its count \"is a bare mono numeral, not a chip — the two treatments are deliberately different\"; that ruling was never recorded in this manifest, and it was wrong twice over — a deliberate STYLE divergence is the one kind a shared primitive may not record, and the strip was RIGHT about the marks while the primitive was too narrow to express them. Issue 1429 made the family a capability instead, and the Checks strip is a caller as of that change. Issue 1038's OTHER three conversions stand and are counted above — the recipe, essence and tool editors — and the capabilities they needed (a chip accessible name, a chip modifier class, the `positive` tone spelling and a suppressible tab hook) live on the primitive rather than in a hand-rolled strip. Issue 1429 converted the LAST hand-rolled strip, `TagsCategoriesView`'s inlined vocabulary tablist, by extracting it as `VocabularyTabs` first — it had survived issue 1038 only because it was not a standalone component and so was never counted. Its record counts moved from the neutral chip onto the count vehicle in the same change, the same substitution the Knowledge strip carried. The one manager strip still recorded as NOT a caller is `downtime/WorldDowntimeTabs`, in {@link NOT_A_PRIMITIVE}, and that row records CONVERSION-PENDING work rather than a justified divergence — read it there before re-deriving the question. Targeted: one frame per wrapping editor claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/EditorValidationSurface.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "THE editor validation surface, and a CLOSED one since issue 1444 (4 direct callers, 7 renderers): every surface in the manager that draws the aggregate header over the grouped row stack goes through it, so `manager-recipe-val-*` and `manager-recipe-rail-*` have exactly one writer. `library.html` splits validation into `<ValidationList>` and `<ValidationSummary>`; this one component covers both roles, so the correspondence is still not established and is left for the conformance change to adjudicate rather than guessed at here."
     },
     {
       "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
       "library": "<Empty>",
+      "status": "target",
       "evidence": "broad",
-      "why": "Named at `library.html:911`. 43 callers, second only to `Chip`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because both representative frames are POPULATED states, so the dashed panel it draws appears in neither."
+      "why": "Named at `library.html:911`. 43 callers, second only to `Chip`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because both representative frames are POPULATED states, so the dashed panel it draws appears in neither. `target` rather than `shipped` because that entry states a Svelte API for `<Notice>` alone: a specimen that names no props gives nothing to match."
     },
     {
       "path": "src/ui/svelte/apps/manager/ExplainerCard.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The explainer card (3 callers). `library.html:911` groups `<Callout> <Notice> <InfoStrip> <Empty>` under one head and carries no prose distinguishing `<Notice>` from `<InfoStrip>`, so which of the two this card is cannot be read off the library."
     },
     {
       "path": "src/ui/svelte/apps/manager/IconFactRow.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The labelled icon-and-fact row (5 callers). `<StatBox>` (`library.html:858`) is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so the correspondence is not made."
     },
     {
       "path": "src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The inline vocabulary add field (2 callers, `VocabularyPanel.svelte` and `ImportFolderMappingModal.svelte`). No `library.html` entry names it. Targeted: `manager-tags-categories-normal` claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/InspectorActionButton.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "THE right-hand inspector's action button, and the row issue 1446 finally moved. `src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte` (issue 1036) and `src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte` (issue 1400) both import it, so it clears the two-caller bar. It sat in {@link NOT_A_PRIMITIVE} through two issues after the second adopter landed, with its own text saying it was OWED A MOVE nobody had made — which is why the change that moved it also ships the guard that re-measures a caller claim against the tree, rather than only the move. `library: null` is a judgement, and it follows `ArmedDangerButton` rather than `InspectorCard`. `library.html:570` heads its block `<Button> <IconButton>` and specifies \"One component, six roles, two sizes\"; `ManagerButton.svelte` claims that entry and IS that closed role set. This file's four tones — neutral, primary, danger and warning — are four of those six roles by name, and it exists precisely BECAUSE it could not be `.manager-button`: its own header records that `.fabricate-manager .manager-button.is-primary` is three classes against a scoped rule's two, so reusing the class would put the primitive's own tones behind the global sheet's. A second file claiming the entry would assert that the tree holds ONE button component where it measurably holds two. That is the `ManagerSearchField` call — `library: null` rather than claim `<Search>` and assert a shell the tree does not have — not the `InspectorCard` one, which claims `<Card>` and diverges on radius and padding, a divergence in VALUES on the file that IS the entry. The one library entry that names this surface at all rules itself out: `library.html:1243`'s inspector rail section is \"Read-only by convention — it shows consequences and links out, and never hosts the editing controls\", and this is the editing controls. Targeted, and its claim set is complete only as of issue 1446. The four `manager-essences-*` frames name this path in `sourceMatches`. `world-essence-catalogue` renders it too — its `essenceInspectorFoot` snippet is the `Open definition` primary, and that case asserts `[data-scoped-list-inspector-foot]` is inside the inspector — and it did NOT claim it, so a change here published four frames of one caller and none of the other. That claim is added. No `BROAD_SIGNAL_CASE_OVERRIDES` entry is owed: an override is consulted only for a BROAD signal, and a targeted row reaches its frames through `sourceMatches`."
     },
     {
       "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
       "library": "<LinkField>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:747` — \"How a Fabricate record points at a game-world document. Three states in one component.\" 6 callers spread across the checks, component, essence, recipe-item and tool editors, which is why no single frame is the honest evidence."
     },
     {
       "path": "src/ui/svelte/apps/manager/ManagerModal.svelte",
       "library": "<Modal>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:1104` and `:1137` name it and its two callers — the import folder-mapping step and the import report — and `:1137` records that ruling it out as single-caller was wrong."
     },
     {
       "path": "src/ui/svelte/apps/manager/ModifierLibraryRow.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The manager's library ENTRY ROW — glyph tile, name, value in the mono face, and the caller's own trailing control (3 callers, issue 1373). It was inline markup in `checks/CraftingModifierCatalogueCard.svelte` and moved out at round 4, when the Tool Studio's check-bonus picker was ruled onto the same row rather than a stack of option cards; round 5 added the third caller, the Tool Studio's character-prerequisite list, because `proto:4741` states the reference's prerequisite row with the same string as `proto:4752`'s bonus row and the two lists sat one section apart drawn as two different rows. The control is the seam: an eligibility toggle on the Checks screen, a radio on the bonus (one modifier), a checkbox on the prerequisites (several at once). Round 6 made the row's ANATOMY two declared variants of it rather than one shape forced on both lists: `controlPlacement` ('trailing' | 'leading') and `textLayout` ('inline' | 'stacked'), each defaulting to the shipped rendering, because `proto:2331`-`2333` and `proto:2361`-`2364` are one geometry string with two anatomies and round 5 had recorded that difference as a deviation instead of carrying it. The glyph follows `controlPlacement` rather than taking a third prop - the tile is what makes the glyph a row's leading anchor, and a row that leads with a control already has one - so `proto:2332`'s bare accent glyph and `proto:2363`'s tile are one rule. Only the prerequisite list opts in; the Checks Studio caller passes neither prop and its frame is byte-identical. `library` is null because `library.html` specifies no entry row: `:626`'s `<OptionCards>` is the CARD group this row replaced at one of the call sites and is emphatically not it, and no row primitive there covers a library entry. Targeted rather than broad because all three consumers are named and the frames that photograph each claim it by `sourceMatches` — `manager-checks-crafting-modifiers` for the catalogue, the three `*-tool-*bonus*` and `world-tool-entry-requirements` cases for the bonus picker, and `manager-tool-prerequisites-selected-1280x720` for the prerequisite list."
     },
     {
       "path": "src/ui/svelte/apps/manager/RadioCardGroup.svelte",
       "library": "<OptionCards>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:626` — \"A radio group with room to explain itself.\" 9 callers."
     },
     {
       "path": "src/ui/svelte/apps/manager/ResolutionModeCard.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The resolution-mode chooser card (2 callers, `CraftingSettingsView.svelte` and `GatheringEconomyView.svelte`). `library.html:1606` defers the modes themselves to the resolution-modes capability and specifies no card for choosing one. Targeted: `manager-system-edit-normal` claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
       "library": "<SearchPopover>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:764` — \"One panel for picking anything from a catalogue\". 20 callers over 24 call sites as issue 1458 lands, up from 16: three hand-rolled trigger-plus-listbox add menus (`GatheringEventEditView`, `GatheringTaskEditView`, `ModifierPillSelect`) and the recipe item editor’s Link-recipe menu converted onto it. That change also gave it the `triggerHasPopup` capability, which absorbs the one axis the ten hand-rolled popovers disagreed on — four announced `aria-haspopup=\"dialog\"` and four `listbox`, and the split tracked whether the panel rendered a query field. Carries a THREE-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because it now has three deliberate presentations (inline-search trigger, value-bearing trigger with the search row, and the search-less option list) and neither representative frame opens a popover at all. Its class family is still the legacy World › Travel name `.manager-travel-*`, which this conversion knowingly concentrates rather than renames, so the rename that follows is a one-file edit plus the sheet. The SCOPING half of that sentence is withdrawn at issue 1472 and written out rather than deleted: it claimed 113 rules in that family and every one of them under `.fabricate-manager`, which was true of the sheet the plan was drafted against and false of the sheet it merged into — issue 1464 re-rooted the family thirteen minutes before the first row repeating it landed, and nothing re-measured. The family is 65 `.manager-travel-*` rules in `styles/fabricate.css`: 29 `.manager-travel-*` rules under `.fabricate-picker` in `styles/fabricate.css`, which are the primitive’s own on its own namespace root, and 36 `.manager-travel-*` rules under `.fabricate-manager` in `styles/fabricate.css`, which are the World › Travel SCREEN plus manager callers’ overrides of their own trigger sites. The picker-rooted figure rose by one at issue 1373: the empty branch took its own class, `.manager-travel-popover-empty`, because a list owns a scroll and an inset and a one-line note owns neither. Those three figures are re-derived from the stylesheet by `tests/design-system-coverage.test.js` rather than asserted, which is exactly what the sentence they replace lacked. The scoping is therefore no longer a reason anything cannot convert, and the two PLAYER-app rows in {@link NOT_A_PRIMITIVE} no longer rest on it."
     },
     {
       "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
       "library": "<Segmented>",
+      "status": "shipped",
       "evidence": "broad",
       "why": "`library.html:613` — two to four named options, exactly one chosen, rendered as a radio group. 11 callers."
     },
     {
       "path": "src/ui/svelte/apps/manager/SubjectModifierPicker.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The subject-and-modifier picker (2 callers, `ComponentEditView.svelte` and `GatheringTaskEditView.svelte`). `library.html:1406` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", so this picker is specified as part of that editor rather than as an entry of its own. Targeted: one modifier-pick frame per caller claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/ToggleCard.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "A titled card wrapping a binary control (7 callers). `<Toggle>` (`library.html:595`) is the bare control and `<Card>` (`:941`) is the container, so a card-plus-toggle is a COMPOSITION of two entries under spec.md requirement \"The primitive set is a closed, versioned vocabulary\" rather than an entry itself. Recorded here because it SHIPS with seven callers; whether the set should contain it is the conformance change's question."
     },
     {
       "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
       "library": null,
+      "status": "target",
       "evidence": "targeted",
       "why": "The environment editor's composition list (issue 1321). `src/ui/svelte/apps/manager/environment/EnvironmentTasksTab.svelte` and `src/ui/svelte/apps/manager/environment/EnvironmentEventsTab.svelte` both import it, parameterised by `kind`, so it clears the two-caller bar. Its row claimed ONE caller and named `environment/EnvironmentCompositionTab.svelte` for it — a file that has never existed anywhere in this repository — and every gate passed on it. That is the finding issue 1446 was opened on, and the reason the non-member rows carry a MEASURED `callers` field now instead of a sentence. The two callers are sibling TABS of one editor, so \"independent\" is worth stating rather than assuming. Each renders the list against a different entity kind, a different composition model and a different set of menu verbs, so a change made for one is a change the other has to survive, which is what the bar protects. What they are not is two different SCREENS, and the reading applied here is the mechanical one this module states: an importer is any other file under `src/` that imports the component by path. That is the reading a guard can decide, and a bar decided by judgement alone is the bar this row was recorded against wrongly. `library: null`, and three entries were considered rather than one. `library.html:1049` heads `<ListRow> <BrowseCard> <ViewToggle> <XrefList>` and states that \"every browse list in the app is this row\"; this is measurably not that row, because it renders FOUR sections at once — Included, Available to add, Excluded and a paged Non-matching — each an independent `<ul>` with its own empty state, and its verbs move a row BETWEEN them. `<SetPicker>` (`library.html:1351`) is the entry for editing set membership and rules itself out in its own sentence: it \"never dumps the whole set into the panel it sits in\", and dumping the whole set into the panel is exactly what this does. `<SortableList>` (`library.html:1447`) requires \"both affordances always\", the grip AND the chevrons, and this offers drag alone and only in the ranked-event mode. Claiming any of the three would assert a shape the tree does not have, which is the `ManagerSearchField` call again. Its issue 1458 adjudication was CORRECT AND IS NOW SPENT, and both halves are recorded because a row that quietly loses an argument is how this register drifted before. Its four popovers were adjudicated against `SearchablePopover` and ruled a different widget: each was `aria-haspopup=\"menu\"` opening a `role=\"menu\"` of `role=\"menuitem\"` children — an ACTION menu — while the picker renders `role=\"listbox\"`/`role=\"option\"`, a SELECTION control, so converting them would have changed what a screen reader announces from \"menu, four items\" to \"listbox, four options, none selected\". That reasoning stands. What it did not do is look in the other direction: `component/ComponentIdentityStrip.svelte` had ALREADY gone the way the adjudication forbade, and its two source commands were being announced as selectable options in a listbox under an `aria-haspopup=\"dialog\"` trigger. Issue 1477 answered the register’s own open question — this row said in as many words that the group was \"still a legitimate candidate for a shared ACTION-menu primitive of its own\" with the strip as a fifth site — by extracting `components/ActionMenu.svelte`. So this file is that primitive’s CALLER now, at four sites, and the strip is the second caller that clears the two-caller bar. It carries no `<style>` block at all, so nothing was at risk from the scoped-rule failure a class moving onto a component tag causes; the family it painted lived in `styles/fabricate.css` and is rooted at the primitive. Targeted, and no `BROAD_SIGNAL_CASE_OVERRIDES` entry is owed. All four cases that claim it do so through `^src/ui/svelte/apps/manager/environment/`, the same directory-anchored pattern that claims both callers, so every frame that renders either caller already publishes on a change here — `manager-environment-edit-blind-weights` and `manager-environment-edit-automatic-force-add` are named for two of this component’s own controls. An override would be inert regardless: it is consulted only for a BROAD signal."
     },
     {
       "path": "src/ui/svelte/components/ActionMenu.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "THE overflow action menu (2 callers, issue 1477). It exists because ONE meaning was implemented twice and the copy that reused a shared primitive was the semantically wrong one: `environment/CompositionList.svelte` hand-rolled four correct `role=\"menu\"` blocks, while `component/ComponentIdentityStrip.svelte` reached for `SearchablePopover` — its own comment called that \"the house action-menu vehicle\" — and announced \"Copy source UUID\" and \"Unlink Source Item\" as `role=\"option\"` rows of a `role=\"listbox\"`, with `aria-selected` on each, under an `aria-haspopup=\"dialog\"` trigger. That is exactly the conversion issue 1458 refused to make from the other side. The bar is cleared by those two importing files and by nothing else: `role=\"menu\"` appeared in a single file before this change, so an extraction from `CompositionList` alone would have been a local component rather than a primitive, and the SECOND caller is the one that had gone wrong. `library: null`, and `<Menu>` was considered rather than assumed away. `library.html:801` names it in the `<TintPicker> <ArtPathPicker> <Menu>` block and `:831` says what it is — \"what `<PickerRow>`’s `allowAny` opens\", the kind-choice menu whose specimen draws a current-value row on `--fab-surface-active`. That control is a `SearchablePopover` today and this component is not it, so claiming the name would assert a correspondence the tree does not have and would re-import the selection reading this change exists to remove; adjudicating `<Menu>` belongs to the `allowAny` menu’s own change. Its family is rooted at the two namespace classes the component writes — 8 `.manager-action-menu-*` rules under `.fabricate-action-menu-panel` in `styles/fabricate.css`, plus one root rule on `.fabricate-action-menu` — because the panel is portaled out of the component’s own root and a portaled node keeps its classes and loses its ancestors. It carries no `<style>` block. Broad because it sits under `src/ui/svelte/components/`, where the directory leg of `BROAD_SIGNAL_PATTERN` claims it whatever anyone thinks of the count, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the one published frame that OPENS a menu — established from the static import closure, not from the frames: neither representative case can reach it, because `ComponentsBrowserView` and `FabricateAppRoot` hold neither caller in their transitive `.svelte` import closures."
     },
     {
       "path": "src/ui/svelte/components/ChanceSlider.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "A single-value percentage slider (4 callers). `<RangeBar>` (`library.html:714`) specifies a TILED strip of spans whose dividers are dragged, which is `ThresholdBandStrip`, not this."
     },
     {
       "path": "src/ui/svelte/components/CollapsibleGroupHeader.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The category-group header of a grouped browser list (2 callers). `<ListRow>` (`library.html:1033`) specifies the ROW; the group header above a run of rows is not one of the four entries under that head."
     },
     {
       "path": "src/ui/svelte/components/EssenceSourceSelector.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The essence source picker (2 callers). `library.html:764` names essences among the catalogues its four existing pickers COLLAPSE INTO `<SearchPopover>`; this file is one of those pickers and is not that panel today, so recording the name would fill the conformant quadrant with work not done. Issue 1458 measured what the collapse costs and left it: the TRIGGER is a drop-target image tile with an empty state and a corner glyph, sitting beside a clear button inside a `dragDrop` shell, and `SearchablePopover` owns its trigger button outright — so the conversion needs a caller-owned trigger SNIPPET the primitive does not have. Its option list is a GRID of image tiles rather than a row list, its popover is bounded 280-420px against the primitive’s 240-340, and its empty message varies by whether the catalogue is empty or the query matched nothing. Four capabilities for one caller is a redesign, not a conversion."
     },
     {
       "path": "src/ui/svelte/components/Field.svelte",
       "library": "<Field>",
+      "status": "shipped",
       "evidence": "broad",
       "why": "THE manager's labelled form field, the `.manager-field` column (issue 1428). 81 callers across 23 components, second only to `ManagerButton` under `components/`. `library.html:646` heads its block `<Field> <Select> <Search>` and states that \"the kicker label above the field is part of the primitive, not something each screen re-invents\" — which is exactly the box this ships. The block's other two names stay in the specified-but-unbuilt register: the 38px control shell, the option list and the `value`/`onChange`/`options` API are not built, and this claims the entry at the same granularity `Chip` claims `<IconChip>` from a block that also names `<Kicker>` and `<StatBox>`. Carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because neither representative frame renders a `.manager-field` at all: `manager-components-normal` is a browse list and `fabricate-app-shell` is the player shell."
     },
     {
       "path": "src/ui/svelte/components/FillBar.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The product's one horizontal fill bar (2 callers). `library.html:872` splits the instrument into `<Meter>`, `<BandedBar>` and `<StageBars>` and states that merging them leaves one component unable to carry a correct accessible role, \"which is why the shipped fill leaf renders none\" — this is that leaf, so it corresponds to no single entry by the library's own account."
     },
     {
       "path": "src/ui/svelte/components/IconButton.svelte",
       "library": "<IconButton>",
+      "status": "target",
       "evidence": "broad",
       "why": "The manager's icon-only push-button (36 callers, issue 1422), extracted from 82 hand-rolled `class=\"manager-icon-button\"` sites across 37 components. `library.html:570` heads one specimen `<Button> <IconButton>` and specifies the icon size on that ladder (`icon 28x28 - radius 7`) with `ariaLabel` REQUIRED when icon-only, which is the entry this row names. Two divergences from that specimen are deliberate and are recorded rather than smoothed over: the shipped control is 34px (`fabricate.css:13935`), 28px only inside `.manager-pagination`, so the ladder value and the shipped pixel disagree and this change does not repaint 82 sites to settle it; and it takes NO `role` prop, because its modifiers mix roles with states and one site compounds two, so the vocabulary is a design ruling left open rather than folded into a sweep whose acceptance bar is that no frame moves. Broad by reach rather than by count alone: it lands in nearly every studio, browser, inspector and editor tab, and through `Pagination` it reaches the player apps too."
     },
     {
       "path": "src/ui/svelte/components/IconPicker.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one. Issue 1458 measured the collapse and left it: this picker needs FIVE capabilities the primitive lacks — a PINNED resolved row above an alphabetical list of ~1000 (without it the picker always opens on `abacus`), `horizontalAlign: iconOnly ? 'left' : 'right'` against the primitive’s hard-coded `left`, a measured `listMaxHeight` fed back into the layout, a `style` on the trigger for the colour swatch, and `oncontextmenu`/`onkeydown` pass-throughs the trigger’s own attribute set would override. Its rows also wrap the glyph in a `.essence-icon-picker-preview` tile the primitive renders bare, so the conversion changes what eight callers draw."
     },
     {
       "path": "src/ui/svelte/components/InspectorCard.svelte",
       "library": "<Card>",
+      "status": "target",
       "evidence": "broad",
       "why": "THE manager's card shell (19 callers, issue 1427), extracted from 80 hand-written `class=\"manager-inspector-card\"` sections across 20 components — every one of them a `<section>`, measured by walking each component's Svelte AST, so it takes no polymorphism prop. `library.html:941` heads one specimen `<Card> <Well> <RowDisclosure>` and states \"two container levels only; a card sits on the page, a well nests inside a card\" — this is that card, and the entry was in the specified-but-unbuilt register until it shipped. Two divergences from that specimen are deliberate and recorded rather than smoothed over: the shipped box is radius 8 with `--fab-space-3` padding on `--fab-overlay-light-04` (`fabricate.css:13663`) against the specimen's radius 11 / padding 16 / bg-2, and the sheet declares three further treatments keyed on a modifier class (`.manager-checks-card`), on an ANCESTOR (`.manager-checks-rail`, which reaches cards carrying no modifier at all) and on a positioning state (`.is-sticky`, which — measured across `src/` — no component writes at all) — so it takes NO variant prop, because a vocabulary spanning three different anchors is a design ruling and not something to settle inside a sweep whose acceptance bar is that no frame moves. `<Well>`, the level below it, remains unbuilt. Broad by reach: the Checks Studio, both environment inspectors, the essence and tool inspectors, the books-and-scrolls inspector, the Tool Studio authority card and the shared bulk-delete card all render it, and the deferred root holds 32 more sites. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because NEITHER representative frame contains a card at all."
     },
     {
       "path": "src/ui/svelte/components/ManagerButton.svelte",
       "library": "<Button>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:570` — one component, six roles, two sizes, each role naming a VERB. The shipped `role` prop is that closed set, made required-shaped precisely because the CSS-convention version drifted. 50 callers, the most of anything under `components/`."
     },
     {
       "path": "src/ui/svelte/components/ManagerSearchField.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "THE manager's search field (20 callers, issue 1039), extracted from 23 hand-written `class=\"manager-search\"` labels — every one of them a `<label>` wrapping an `<i class=\"fas fa-search\">` and an `<input type=\"search\">`, measured by walking each component's Svelte AST, so it takes no polymorphism prop and no icon prop. `library:null` is a judgement, not an omission. `library.html:649` specifies `<Search>` as ONE OF THREE modes SHARING ONE SHELL with a kicker label above the field, at height 38 / radius 9. The shipped pill is not that shell: it is 34 / radius 6 (`fabricate.css:5730`), it carries no kicker and no label prop — its accessible name is an `aria-label` on the inner input at all 20 sites — and the manager's select mode is a separate treatment (`.manager-filter select`, `:5741`) this component does not touch, while the shell itself now ships as `Field.svelte` claiming `<Field>`. Recording the correspondence would assert that the shipped tree has the one shell the library specifies, which it measurably does not, so the entry stays in the specified-but-unbuilt register and the adjudication belongs to whichever change unifies the three modes. Same call, and the same reason, as `EditorValidationSurface`. Three of the 23 sites are ADJUDICATED OPT-OUTS rather than deferrals: `GatheringTaskEditView.svelte:1747` and both `CraftingSystemManagerRoot.svelte` sites render a `.manager-tag-suggestions` typeahead list inside the label, which makes them comboboxes belonging to `SearchablePopover`, and the root's two additionally take `bind:this` on the label for popover positioning — which on a COMPONENT tag binds the component instance, not its host element. Broad by reach: every browse screen plus four editors and three rosters. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because the representative pair reaches only the base density."
     },
     {
       "path": "src/ui/svelte/components/ManagerToolbar.svelte",
       "library": "<FilterBar>",
+      "status": "target",
       "evidence": "broad",
       "why": "THE manager's filter bar (11 callers, issue 1039), extracted from 11 hand-written `class=\"manager-toolbar\"` sections — every one of them a `<section>`, measured by walking each component's Svelte AST, so it takes no polymorphism prop. A raw grep says TWELVE and is wrong: `GatheringTaskEditView.svelte:1784` is a `.manager-toolbar-pills` chip row on a `<div>`, and `\\b` matches before a hyphen. `library.html:1211` heads `<Pagination> <FilterBar>` and `spec.md`'s browse archetype names \"the filter bar\" as a fixed element of every browse screen; this is that bar, and the entry was in the specified-but-unbuilt register until it shipped. THREE divergences from the specimen are recorded rather than smoothed over. (1) The library's FilterBar API owns its controls as DATA — `query`, `toggles`, `selects`, `segments`, `sort`, `result`, `onClear` — and the shipped bar owns only the CHROME and takes its controls as children, because the corpus's filter control is three different things (a `<label class=\"manager-filter\">` wrapping a `<select>`, 16 sites; a bare `<select>` carrying its own accessible name, 2; and `<SegmentedControl>`, 2) and no bar is in a position to choose between them. (2) The sketch specifies ONE component owning both bar and query, and the corpus has TWO: 13 of the 23 search fields render inside no bar at all, so a field folded into the bar would have forced a bar around each of them. The field ships as `ManagerSearchField.svelte`, recorded separately below. (3) It takes NO variant prop — the sheet declares four further treatments anchored four different ways, two of them scrolling caps (`.manager-environments-toolbar`, `.manager-task-toolbar`), one sized from a SCOPED rule in `scoped/EntityListInspectorFrame.svelte` rather than from the sheet at all, and one (`.manager-toolbar:not(:has(.manager-toolbar-primary))`) a branch that is ALWAYS taken because — measured across `src/` — no component writes `.manager-toolbar-primary`, so the grid form at `fabricate.css:5671` is declared and never rendered. Broad by reach: every browse screen in the manager renders it. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because the representative pair reaches only the base treatment."
     },
     {
       "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
       "library": "<TintPicker>",
+      "status": "target",
       "evidence": "broad",
-      "why": "`library.html:797`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`."
+      "why": "`library.html:797`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `target` rather than `shipped` because that entry states geometry with no Svelte API section: a specimen that names no props gives nothing to match."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The flat identity tile for recipe rows and inspectors (13 callers). `<Avatar>` (`library.html:1225`) is a person mark in a rail; this renders a record's linked image with a glyph fallback, so the correspondence is not made."
     },
     {
       "path": "src/ui/svelte/components/ModifierPillSelect.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "A dropdown-plus-removable-pills multi-select (2 callers, issue 770). `<SetPicker>` (`library.html:1333`) specifies editing membership of a set too large to render inline, and states it never dumps the whole set into its panel — this control renders every unselected option in a listbox, so it is not that primitive. Its ADD MENU is `SearchablePopover` since issue 1458, which is why the pill row and the menu are now two different things rather than one hand-rolled widget; the conversion needed the primitive to absorb `triggerAriaDisabled`, the at-cap state that must refuse to open while staying focusable, because the post-removal focus fallback lands on that very button and `focus()` on a `disabled` one silently no-ops. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry as of that change: `manager-recipe-edit-crafting-modifier-cap-reached` is the one frame that draws its single remaining painted rule, the at-cap trigger treatment."
     },
     {
       "path": "src/ui/svelte/components/Pagination.svelte",
       "library": "<Pagination>",
+      "status": "target",
       "evidence": "broad",
       "why": "Named at `library.html:1196`. 22 callers across every browse surface in the manager."
     },
     {
       "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
       "library": "<Checkbox>",
+      "status": "shipped",
       "evidence": "broad",
       "why": "`library.html:689` — \"The box a gate list and a selection header both use\", including the tri-state a some-rows-selected header needs. 8 callers."
     },
     {
       "path": "src/ui/svelte/components/StatusPill.svelte",
       "library": null,
+      "status": "target",
       "evidence": "broad",
       "why": "The row and inspector state pill, six tones (13 callers). The library's mark vocabulary (`library.html:835`, `:858`) specifies marks that carry KIND; this pill carries STATE, and `library.html:348` states that colouring a chip background by kind would double-code kind against state — so it is deliberately not one of those marks."
     },
     {
       "path": "src/ui/svelte/components/StatusToggle.svelte",
       "library": "<Toggle>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (25 callers, issue 1040). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here."
     },
     {
       "path": "src/ui/svelte/components/Stepper.svelte",
       "library": "<Stepper>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:551` — \"The most-used control in the app\", and 23 callers here agree. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming the gathering economy actor frame, which is the only published frame that renders filled steppers, disabled steppers and a rolled-max placeholder at once."
     },
     {
       "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
       "library": "<RangeBar>",
+      "status": "target",
       "evidence": "broad",
       "why": "`library.html:714` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not."
     }

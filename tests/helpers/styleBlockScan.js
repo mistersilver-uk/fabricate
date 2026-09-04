@@ -466,6 +466,86 @@ export function splitSelectorList(selector) {
 }
 
 /**
+ * Every RULE in one comment-stripped stylesheet, as `{ selector, body, line }`.
+ *
+ * MOVED HERE FROM `tests/token-generation-gate.test.js` (issue 1497), which was its only caller
+ * and is now one of several: the `:focus`, weight, shadow and radius gates in
+ * `tests/components/design-system-debt-ratchets.test.js` each need a rule's SELECTOR beside its
+ * declarations, which {@link declarationsIn} deliberately does not carry. It sits next to
+ * {@link splitSelectorList} because the two are always used together — a rule reports its whole
+ * selector LIST, and the cascade applies each item of that list separately.
+ *
+ * At-rule preludes (`@media`, `@container`, `@supports`, `@layer`) are NOT selectors, so a rule
+ * nested inside one reports the inner prelude — which is what every caller needs, since a
+ * container query around a manager rule must not be read as that rule's selector. An at-rule with
+ * no block of its own (`@import`, `@charset`) never opens a brace and is skipped by construction.
+ *
+ * ── THE LINE NUMBER IS THE PART A RE-IMPLEMENTATION GETS WRONG ──────────────────────────
+ * `line` is the line the SELECTOR starts on, tracked by a `preludeStarted` flag rather than by
+ * `prelude === ''`: the prelude accumulates the whitespace between two rules, so the emptiness
+ * test only ever fired at offset zero and every rule was cited at the previous `}`. In a Svelte
+ * file, where `maskNonStyleRegions` replaces the entire template with spaces, that put EVERY
+ * OFFENCE AT LINE 1 — a gate reporting a hundred findings, all of them at the same wrong place in
+ * a 20,000-line stylesheet.
+ *
+ * That is recorded here because the defect is invisible to any assertion about WHICH rules were
+ * found, so a fresh walk written beside this one would reacquire it and pass every count.
+ *
+ * TWO CLAUSES RED ON IT, and they are complementary rather than duplicated.
+ * `token-generation-gate.test.js` asserts the invariant over the two SHIPPED stylesheets — every
+ * rule of the ~4000 cited at a line that holds the first token of its own selector — which is the
+ * stronger statement and the one that catches a corpus the walk mis-reads. `style-block-scan.test.js`
+ * asserts it over a synthetic multi-rule fixture, which is the one that says which SHAPES the line
+ * comes from: a selector and its `{` on different lines is the only case where a correct
+ * implementation and one recording the brace's line disagree at all.
+ *
+ * @param {string} css Comment-stripped CSS, offsets intact — from {@link styleTextFor}.
+ * @returns {Array<{selector: string, body: string, line: number}>}
+ */
+export function rulesIn(css) {
+  const rules = [];
+  const stack = [];
+  let prelude = '';
+  let preludeStarted = false;
+  let line = 1;
+  let preludeLine = 1;
+  for (let index = 0; index < css.length; index += 1) {
+    const character = css[index];
+    if (character === '\n') line += 1;
+    if (character === '{') {
+      const trimmed = prelude.trim().replace(/\s+/gu, ' ');
+      stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
+      prelude = '';
+      preludeStarted = false;
+      preludeLine = line;
+      continue;
+    }
+    if (character === '}') {
+      const open = stack.pop();
+      if (open && !open.selector.startsWith('@')) {
+        rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
+      }
+      prelude = '';
+      preludeStarted = false;
+      preludeLine = line;
+      continue;
+    }
+    if (character === ';' && stack.length === 0) {
+      prelude = '';
+      preludeStarted = false;
+      preludeLine = line;
+      continue;
+    }
+    if (!preludeStarted && !/\s/u.test(character)) {
+      preludeStarted = true;
+      preludeLine = line;
+    }
+    prelude += character;
+  }
+  return rules;
+}
+
+/**
  * The index just past the `)` that closes the `(` at or after `from`, or -1 when nothing does.
  *
  * @param {string} text
