@@ -330,10 +330,13 @@
    */
   async function deleteBulk(entityIds, clearSelection) {
     if (bulkDeleting || bulkApplying) return;
-    // ONLY WHAT THE PLAN SAYS MAY GO (epic decision 7). The panel disables the control when the
-    // plan frees nothing and names the held records in its own note, but the refusal is enforced
-    // HERE as well as stated there: a disabled button is a presentation of a rule and this is the
-    // one call that writes, so the two are not allowed to be the same statement made once.
+    // ONLY WHAT THE PLAN SAYS MAY GO (epic decision 7). The panel states the refusal in its own
+    // note and in its ARMED LABEL, which reads `Cannot delete` where the plan frees nothing —
+    // the control stays ENABLED throughout, because `ui-integration/spec.md` requirement 16 says
+    // a disabled button satisfies any assertion that the delete did not happen while leaving the
+    // GM no explanation at all. So the refusal is enforced HERE as well as stated there: the
+    // press is reachable, this is the one call that writes, and a rule the GM can still walk into
+    // is not allowed to live only in a label.
     const { deletable } = componentBulkDeletePlan(entries, entityIds);
     if (deletable.length === 0) {
       clearSelection();
