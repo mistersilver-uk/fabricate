@@ -184,9 +184,18 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
         sites: 6,
       }),
+      // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.manager-button`s is
+      // gone: the reference draws ONE primary plus a kebab, so the inspector now renders a
+      // single `InspectorActionButton` — a primitive whose own header records that it is
+      // deliberately NOT `.manager-button` — with the other three commands as `ActionMenu`
+      // DATA rather than as controls. Licensed by the same rule as every other movement in
+      // this ledger: the four SITES left the product, rather than leaving this instrument's
+      // view. The entry is kept at 0 rather than dropped, so the two ledger checks below —
+      // that the file writes no literal `class="manager-button"` and that the instrument
+      // derives no site in it — keep guarding it against a regression.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
-        sites: 4,
+        sites: 0,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte', sites: 1 }),
@@ -462,7 +471,13 @@ const REVIEWED = [
         // below already records — reached by the rule, not attributable to this file by a static
         // count. The number is the container's own population read from the tree, so it moves
         // whenever a header branch gains or loses a control it renders itself.
-        buttons: 28,
+        //
+        // 28 -> 29 with issue 1371's C1 `+ Add from catalogue` (`proto:1046`), the `components`
+        // branch's first header action of its own: the system Components header carried nothing
+        // on the right, so the only route to adopt a world component into the system was the
+        // list's `All world components` cohort. It is a `role="primary"` `<ManagerButton>` this
+        // file renders itself, so it moves the `is-primary` count one line below by one too.
+        buttons: 29,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -504,7 +519,11 @@ const REVIEWED = [
         // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
         // — the reference's Essence Rules header carries nothing on the right, and an essence's
         // identity is a world record no system-scope screen authors.
-        buttons: 14,
+        //
+        // 14 -> 15 with issue 1371's C1 `+ Add from catalogue`, which is the header's loudest
+        // action on the Components route and is therefore booked in both this entry and the
+        // unqualified one above it.
+        buttons: 15,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -1372,11 +1391,18 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // re-read every booked file from the tree, so neither a deleted nor a booked-but-unconverted
   // component can stay silently mismatched, and the paragraph above is the reason a number
   // that moved needs a stated cause rather than a quiet edit.
+  //
+  // AND 128 -> 124 AT ISSUE 1371's C7.6, which is the fourth licensed movement and the largest:
+  // `ComponentBrowserInspector`'s four-button stacked action column collapsed to one
+  // `InspectorActionButton` plus an `ActionMenu`, so four SITES left the product on the same
+  // screen, in a file the ledger already holds. The component COUNT does not move with them —
+  // the file stays booked at 0 rather than being dropped, so it keeps answering the two ledger
+  // checks below — which is why 41 is unchanged while 128 is not.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    128,
-    'the conversion is 128 sites, whether or not a given one has been converted yet'
+    124,
+    'the conversion is 124 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
