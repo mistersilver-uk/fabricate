@@ -391,6 +391,30 @@ test('a block that names a primitive gives every name its own status', () => {
   }
 });
 
+/**
+ * A naming heading holds its names and NOTHING else, which is what keeps the chip outside it.
+ *
+ * The prose census above pins its 20 headings by exact text, so a chip moved into one of those reds
+ * immediately. The other 30 have no such pin: they are read for the names they yield, and `shipped`
+ * or `IconButton · target` yields none, so every property in this file would still pass with the
+ * status written inside the `h4` that the parser and the migrations table both describe as sitting
+ * beside it. This is the pin for those 30, and it is the whole reason the block carries its heading.
+ *
+ * Compared DECODED, in the parser's own form, so a pure re-escaping of an entity does not red it.
+ */
+test('a naming heading is its names and nothing else, so no chip has moved inside it', () => {
+  assert.ok(NAMING_BLOCKS.length > 0, 'no block names a primitive, so this has no domain');
+  for (const block of NAMING_BLOCKS) {
+    assert.equal(
+      block.heading,
+      block.names.map((name) => `<${name}>`).join(' '),
+      `the heading of the ${JSON.stringify(block.names.join(' '))} entry carries text beyond the ` +
+        'names it declares. A status chip belongs beside the `h4` and not inside it: the heading ' +
+        'is the vocabulary, and a value describing the tree written there is read as part of it.'
+    );
+  }
+});
+
 test('a block that names no primitive is declared as prose', () => {
   assert.ok(PROSE_BLOCKS.length > 0, 'every block names a primitive, so this has no domain');
   for (const block of PROSE_BLOCKS) {
