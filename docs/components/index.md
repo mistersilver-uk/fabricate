@@ -96,6 +96,7 @@ Only the name and description are held until you press **Save**.
 Everything else on this screen, including the linked item, the world category, world tags, muting, membership, and delete, takes effect immediately.
 
 If you leave with an unsaved name or description, Fabricate asks whether to save, discard, or keep editing.
+A note beneath the fields states how many systems currently share this identity.
 
 ### Linked item
 
@@ -165,7 +166,8 @@ A system that inherits an unset world category simply supplies its own.
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
 
-After you open a component that has a world record, a banner across the top of the list states that its name, art, and description are authored in the world Component catalogue and shared with the other systems that have it, with an **Edit shared definition** link to that component's world entry.
+Selecting a component that has a world record shows a banner across the top of the list, stating that its name, art, and description are authored in the world Component catalogue and shared with the other systems that have it, with an **Edit shared definition** link to that component's world entry.
+The editor carries its own version of this banner too, described below.
 
 ## Adding Components
 
@@ -288,6 +290,10 @@ The identity strip is also where you manage that link:
 - use the **Source actions** menu for **Copy source UUID** and **Unlink Source Item**
 
 Replacing or unlinking a source takes effect immediately and is not held until you press **Save**, unlike the rest of the page.
+
+Opening a component with a world record shows a banner at the top of the editor.
+It states that the name, image, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, and that everything below the banner belongs to this system alone.
+Choose **Edit shared definition** to go there.
 
 Below the identity strip you set the component's category, its tags, its essences, and its salvage setup.
 
