@@ -127,8 +127,10 @@
 </script>
 
 <!-- `fabricate-color-picker-popover` is this primitive's NAMESPACE root (issue 1470). ONE class,
-     because this component's root element IS the panel it portals: root and panel are the same node,
-     so a second class would name the same element twice. -->
+     because this component's root element IS the panel that gets portaled: root and panel are the
+     same node, so a second class would name the same element twice. The portal is the CALLER's —
+     `anchoredPopover`, applied to the node this component registers — but the class arithmetic is
+     the same either way, since a portaled node keeps its classes and loses its ancestors. -->
 <span
   bind:this={popoverRoot}
   class="fabricate-color-picker-popover manager-color-picker-popover"

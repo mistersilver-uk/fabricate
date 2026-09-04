@@ -37,9 +37,9 @@
  * HOW MANY NAMESPACE ROOTS A PRIMITIVE NEEDS IS A PROPERTY OF ITS PORTAL SHAPE, not a count to
  * copy. A portalled node keeps its classes and loses its ancestors, so a component that portals a
  * panel out of its own root needs one class on each — `SearchablePopover`, `IconPicker` and
- * `EssenceSourceSelector` do. `ManagerColorPicker` portals nothing (its panel is a separate
- * component) and `ManagerColorPopover`'s root element IS the panel it portals, so those two carry
- * one class each. They are listed here as ONE primitive because they render one class family
+ * `EssenceSourceSelector` do. `ManagerColorPicker` portals nothing itself (its panel is a separate
+ * component, which it drives `anchoredPopover` against) and `ManagerColorPopover`'s root element
+ * IS the panel that gets portaled, so those two carry one class each. They are listed here as ONE primitive because they render one class family
  * between them, and `.manager-color-swatch` — painted by both, in two different subtrees after
  * the portal — is why that family's rules need both roots.
  *
