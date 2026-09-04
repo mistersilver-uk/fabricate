@@ -251,11 +251,24 @@ export function anchoredPopover(node, params = {}) {
     );
   }
 
-  /** Did this event start inside the panel? See `ignoreScrollWithin`. */
+  /**
+   * Did this event start inside the panel? See `ignoreScrollWithin`.
+   *
+   * THE TARGET IS NOT ALWAYS A NODE. `resize` fires on `window`, and `Node.contains()` takes a
+   * `Node?` — so `node.contains(window)` THROWS rather than answering false. The six copies this
+   * action replaces all carried that shape, and in the one caller that sets `ignoreScrollWithin`
+   * (`IconPicker`) it meant a window resize threw out of the listener and the reposition it was
+   * supposed to trigger never ran. Issue 1500 fixes it here: a non-`Node` target did not start
+   * inside the panel, so a resize now RE-MEASURES. That is this action's one deliberate
+   * behaviour change, and it moves the panel back to its trigger after a resize instead of
+   * leaving it where the pre-resize measurement put it.
+   */
   function startedInsidePanel(event) {
     const target = event?.target;
     if (!target) return false;
-    return target === node || node.contains?.(target) === true;
+    if (target === node) return true;
+    if (!(target instanceof Node)) return false;
+    return node.contains(target) === true;
   }
 
   function onViewportChange(event) {

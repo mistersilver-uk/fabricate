@@ -96,6 +96,11 @@ function installWindowEvents() {
   };
   globalThis.removeEventListener = (type, handler) => registry.get(type)?.delete(handler);
   globalThis.dispatchEvent = (event) => {
+    // A REAL `window.dispatchEvent` SETS `event.target` TO THE WINDOW, and the window is not a
+    // `Node`. happy-dom leaves `target` null until a real dispatch, so a shim that skipped this
+    // would hand every listener an event with no target — which is the one input that made
+    // `node.contains(event.target)` safe by accident. The resize case below depends on it.
+    Object.defineProperty(event, 'target', { configurable: true, value: globalThis });
     for (const handler of [...(registry.get(event.type) ?? [])]) handler(event);
     return true;
   };
@@ -412,6 +417,48 @@ describe('anchoredPopover', () => {
     assert.equal(measures, 1, 'scrolling inside the panel moves neither the panel nor its trigger');
     document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
     assert.equal(measures, 2, 'scrolling an ancestor still repositions');
+    handle.destroy();
+  });
+
+  it('repositions on a window resize even while scrolls inside the panel are ignored', () => {
+    // THE ONE DECLARED BEHAVIOUR CHANGE (issue 1500 r2). `resize` fires on `window`, and
+    // `Node.contains()` takes a `Node?` — so the shipped `node.contains(event.target)` THREW on
+    // every window resize in the one caller that sets `ignoreScrollWithin` (`IconPicker`), and
+    // the reposition it was supposed to trigger never ran. A resize moves the host, so this is
+    // exactly the event that must not be dropped.
+    const { trigger, panel } = scene();
+    // happy-dom's `contains` accepts ANY value and answers false, so this defect is invisible in
+    // it — which is why it survived six copies and a conversion. `Node.contains()` is specified
+    // to take a `Node?`, and a browser throws a TypeError on anything else, so the panel is given
+    // the browser's contract here. Without this the case would pass over the bug it exists for.
+    const containsNode = panel.contains.bind(panel);
+    panel.contains = (other) => {
+      if (!(other instanceof Node)) {
+        throw new TypeError("Failed to execute 'contains' on 'Node': parameter 1 is not of type 'Node'.");
+      }
+      return containsNode(other);
+    };
+
+    let measures = 0;
+    const handle = anchoredPopover(
+      panel,
+      options({
+        trigger,
+        ignoreScrollWithin: true,
+        layout: (...args) => {
+          measures += 1;
+          return pickerLayout(...args);
+        },
+      })
+    );
+
+    assert.equal(measures, 1);
+    window.dispatchEvent(new Event('resize'));
+    assert.equal(
+      measures,
+      2,
+      'a window resize re-measures: the window is not a Node, so it did not start inside the panel'
+    );
     handle.destroy();
   });
 
