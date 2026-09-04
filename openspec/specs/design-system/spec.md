@@ -11,14 +11,20 @@ That file is part of this capability rather than a companion to it: it is the sa
 The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
 
+Measured facts about the tree are written in the PAST TENSE with the commit they were measured on, because a measurement is true of a commit rather than for ever.
+Target text is written as MUST or SHOULD.
+A present-tense claim about what the code does is therefore a defect in this document whatever the code does, since nothing dates it and no reader can tell a fact that has expired from one that never held.
+
 ### Corpus and authority
 
 The design system's corpus is **this repository only** — the GM manager and the player app under `src/ui/`, and the Core prototypes that feed them.
 The Economy module and the premium Downtime companion are separate products and are explicitly OUT of corpus, because a signature count weighted by a codebase this repository does not govern cannot justify a primitive in it.
 A prototype whose implementation brief names a module other than Core is out of corpus, and a count derived from it MUST be re-derived before it is cited.
 
-Precedence is fixed, highest first: `openspec/specs/` and `DOMAIN.md`; a shipped component's own props and its stated reasons; a CI gate that already fails on the alternative; then this capability.
-Where a primitive already ships, its props ARE the specification and a proposal that drops one MUST state why in the same change, or it is an omission rather than a decision.
+Precedence is fixed, highest first: the other capabilities under `openspec/specs/` and `DOMAIN.md`; then this capability's `target` text, the library specimen included; then an entry recorded `divergent`, with its reason and the issue that decided it; then a CI gate.
+The order this replaces put a shipped component's own props ABOVE this capability, which made every divergence self-ratifying: a component that had drifted from its specimen became the specification by drifting, and the specimen it contradicted had no standing left to say so.
+A CI gate is last rather than absent, because a gate is evidence about the tree and this capability is where the tree is told what to be; when the two disagree it is the gate that gets changed.
+Where a primitive ships and its props differ from its specimen, the specimen is the TARGET and the entry's status says so; a proposal that drops a specified prop MUST state why in the same change, or it is an omission rather than a decision.
 
 ## Requirements
 
@@ -66,6 +72,34 @@ An exact caller list on a primitive with dozens of importers would make an unrel
 - **WHEN** a proposed primitive can be built from members already in the set with no new behaviour
 - **THEN** it is recorded in the ruled-out register with the composition that replaces it
 - **AND** it does not enter the set
+
+### Requirement: Every entry carries a status
+
+Every specimen in `openspec/specs/design-system/library.html` and every row of the shipped-member table in `scripts/lib/designSystemPrimitives.json` MUST carry a status drawn from a closed vocabulary, and a library block that specifies no primitive carries `prose` so the attribute is universal and its absence is always a defect rather than a category.
+`target` means the entry is specified and the shipped component does not yet match it, or nothing ships at all.
+`shipped` means the shipped component matches the specimen's API and geometry.
+`divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
+A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
+The status is declared on the block rather than inside the heading, because the heading census pins every heading's text verbatim and a status written there would be part of the vocabulary it is describing.
+
+Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
+An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
+A single inline disagreement between a shipped component and its specimen is recorded as a row in the library's planned-migrations table rather than by moving the whole entry to `divergent`, which is reserved for a decision that the component STAYS different.
+
+A shipped-member row that names no library entry carries `target` by construction rather than by judgement: there is no specimen to measure it against, so the specimen it is owed is the target.
+`tests/design-system-coverage.test.js` is the gate, and it fails on a missing status, on a value outside the vocabulary, on a name in a heading that carries no status of its own, on a manifest row whose status contradicts its specimen, and on a `divergent` entry that names no issue.
+
+#### Scenario: A child issue lands the implementation an entry specified
+
+- **WHEN** a change makes a shipped component match its specimen's API and geometry
+- **THEN** the same change flips both the specimen's status and its manifest row's status to `shipped`
+- **AND** the coverage gate fails if it flips only one of the two
+
+#### Scenario: A change makes a shipped component disagree with its specimen
+
+- **WHEN** a change alters a component recorded `shipped` so that it no longer matches its specimen
+- **THEN** the change flips the entry back to `target`, or records the disagreement as `divergent` with the issue that decided it
+- **AND** the entry is not left at `shipped`, which would be a claim about the tree that nothing else in the repository can check
 
 ### Requirement: A shared primitive's class family is rooted at the primitive, not at an app
 
