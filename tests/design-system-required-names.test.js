@@ -97,8 +97,16 @@ const NAME_BEARING_PROP = /^aria[A-Z]|Label$|^label$/u;
  */
 const LOCALIZATION_KEY = /^[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$/u;
 
-/** `aria-label={someProp}` and nothing else — no `||`, no `?:`, no call. */
-const BARE_PROP_BINDING = /^aria-label=\{([A-Za-z_$][\w$]*)\}$/u;
+/**
+ * `aria-label={someProp}` and nothing else — no `||`, no `?:`, no call.
+ *
+ * THE QUOTES ARE OPTIONAL BECAUSE SVELTE'S ARE. `aria-label="{label}"` is the same binding written
+ * with the quotes left on, and it is a spelling authors reach for by habit from plain HTML — so
+ * requiring the unquoted form put every quoted one OUTSIDE the population rather than in it, which
+ * is a gate that a defect can leave by adding two characters. No file in this corpus writes the
+ * quoted form today, which is precisely why nothing noticed.
+ */
+const BARE_PROP_BINDING = /^aria-label=["']?\{([A-Za-z_$][\w$]*)\}["']?$/u;
 
 /**
  * The corpus: the flat primitive directory plus every manifest row under `apps/manager/`.
@@ -316,6 +324,27 @@ test('no shared component defaults an accessible name to untranslated text', () 
       'lang files carry the words, as `DropZone` does; or, where the caller always has a better ' +
       'name than the primitive could invent, default to `undefined` and require it.',
   });
+});
+
+test('the binding pattern reads the quoted spelling of a prop binding too', () => {
+  // SYNTHETIC AND BOTH POLARITIES. Svelte accepts `aria-label={label}` and `aria-label="{label}"`
+  // as the same binding, and this corpus happens to write only the first — so the live rows cannot
+  // tell a pattern that reads both from one that reads one. The clause below reports the bindings
+  // that can render EMPTY, and a spelling it does not match is a site it silently does not police.
+  const bound = (text) => (BARE_PROP_BINDING.exec(text) ?? [])[1] ?? null;
+
+  assert.equal(bound('aria-label={label}'), 'label', 'the unquoted spelling is the live one');
+  assert.equal(bound('aria-label="{label}"'), 'label', 'quotes around an expression change nothing');
+  assert.equal(bound("aria-label='{label}'"), 'label', 'and Svelte accepts either quote');
+
+  // The exclusions, which are what keeps this population down to the bindings that can render
+  // empty: a guarded binding omits the attribute instead, and neither a literal nor a call is a
+  // prop this gate can resolve a default for.
+  assert.equal(bound('aria-label={label || undefined}'), null, 'the guarded shape is compliant');
+  assert.equal(bound('aria-label="{label || undefined}"'), null, 'guarded, quotes or not');
+  assert.equal(bound('aria-label="Delete"'), null, 'a literal is not a prop binding');
+  assert.equal(bound('aria-label={localize(key)}'), null, 'a call has no prop default to read');
+  assert.equal(bound('aria-label={a ? b : c}'), null, 'nor has a conditional');
 });
 
 test('no aria-label can render empty and suppress the name the content already gives', () => {
