@@ -11,6 +11,13 @@
   - It is a real `<button type="button">`. The reference prototype used a bare
     `<span>` with an inline click attribute, which is neither focusable nor
     keyboard-operable and MUST NOT be copied.
+  - It WRITES THE FAMILY ROOT, `fabricate-button`, first in its own class attribute
+    (issue 1502). This component is a CONSUMER of the `manager-button` CSS contract and
+    not of `ManagerButton.svelte` — a deferral that stands, and that
+    `manager-button-source-contract.test.js` still pins — but the contract is now rooted at
+    the class the primitive emits rather than at `.fabricate-manager`, so a carrier that
+    spells `class="manager-button …"` without the root matches nothing in the family and
+    renders as a bare Foundry `<button>`. One token, no composition, no new props.
   - The caller keys the armed token on the TARGET DOCUMENT ID, never a row index.
     The Knowledge surface re-projects its rows asynchronously from actor/item
     hooks, so an index-keyed token is a destructive-misfire bug: arm row 2, let
@@ -150,7 +157,7 @@
 <button
   bind:this={element}
   type="button"
-  class="manager-button is-danger"
+  class="fabricate-button manager-button is-danger"
   class:is-armed={armed}
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}
