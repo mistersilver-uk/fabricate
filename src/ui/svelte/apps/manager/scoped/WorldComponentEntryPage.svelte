@@ -564,7 +564,20 @@
                         >{shownName}</span
                       >
                       <span data-scoped-entry-linked-pill>
-                        <StatusPill tone="subtle" icon="fas fa-lock" label={sourceLabel} />
+                        <!--
+                          `emphasis="outlined"` IS THE REFERENCE'S LOCK PILL (`proto:834`): 9px
+                          secondary ink on a hairline, on a 2px/8px band. The primitive's own
+                          scoped `<style>` is unlayered and this module's sheet is imported at
+                          `layer(modules)`, so no rule in `styles/fabricate.css` can reach it at
+                          any specificity — the variant is the only way to say this, and it is
+                          opt-in so every other `subtle` pill keeps its filled face.
+                        -->
+                        <StatusPill
+                          tone="subtle"
+                          emphasis="outlined"
+                          icon="fas fa-lock"
+                          label={sourceLabel}
+                        />
                       </span>
                     {:else}
                       <input
@@ -731,11 +744,26 @@
                   <p class="manager-micro-label" data-scoped-entry-tags-label>
                     {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.TagsLabel', 'Tags')}
                   </p>
+                  <!--
+                    THE TAG RUN IS A CONTROL RUN, NOT A BADGE RUN (`proto:5401`): 600/11px on a
+                    5px/12px band at radius 999. `density="tag-run"` is the primitive's opt-in
+                    scale for exactly that, and it is the only way to say it — the chip's own
+                    scoped style is unlayered and beats this module's layered sheet at any
+                    specificity.
+
+                    The unlit chip KEEPS `tone="neutral"` rather than falling to the default
+                    tone. Measured, not assumed: the reference inks its unlit chip `var(--muted)`,
+                    which the compare run reports as `rgba(217, 184, 156, 0.74)` — exactly
+                    `--fab-text-muted`, which is what `is-neutral` paints. The default chip inks
+                    `--fab-text` (#F1D1B5), so dropping the tone would move the unlit ink AWAY
+                    from the reference to buy nothing.
+                  -->
                   <div class="manager-component-entry-chips">
                     {#each tagVocabulary as tag (tag)}
                       <Chip
                         tag="button"
                         type="button"
+                        density="tag-run"
                         tone={worldTags.includes(tag) ? 'tag' : 'neutral'}
                         data-scoped-entry-tag={tag}
                         aria-pressed={worldTags.includes(tag)}

@@ -715,6 +715,93 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
+  describe('the three controls this module\'s STYLESHEET cannot reach are drawn by a prop', () => {
+    /*
+     * WHY THESE THREE ARE PINNED HERE AND NOT IN `styles/fabricate.css`.
+     *
+     * `module.json` publishes one stylesheet and Foundry imports an unlayered module sheet at
+     * `layer(modules)`, while a Svelte component's own `<style>` block is injected UNLAYERED. An
+     * unlayered normal declaration beats a layered one at ANY specificity, so the lock pill's
+     * type, the tag run's scale and the filter's shape and paint cannot be written in the sheet
+     * — measured in round 5, where a five-compound selector left the chip at the primitive's
+     * 9.92px and only `!important` moved it.
+     *
+     * Each is therefore an OPT-IN prop on the primitive, and a prop that stops being passed
+     * regresses silently to the shipped face: the control still renders, still behaves, and the
+     * rest of this suite still passes. That is exactly the class of defect nothing else here can
+     * see, which is why the three assertions below are on the resolved variant rather than on a
+     * measured pixel this suite has no way to read.
+     */
+    it('the linked lock pill is the OUTLINED emphasis over the subtle tone', async () => {
+      // `proto:834` draws it at 9px secondary ink on a `--fab-border` hairline over a 2px/8px
+      // band; the shipped `subtle` face is 9.92px on no border at 1px/4px. `tone` still says
+      // WHAT it is, so both props are asserted — an emphasis that had displaced the tone would
+      // repaint the pill's surface as well as its band.
+      const { target } = await open('ingot');
+      const pill = target.querySelector('[data-scoped-entry-linked-pill] .fab-status-pill');
+      assert.ok(Boolean(pill), 'a linked record draws the pill');
+      assert.equal(
+        pill.getAttribute('data-status-pill-emphasis'),
+        'outlined',
+        'the primitive reports the RESOLVED emphasis, so a dropped prop reads as an absent one'
+      );
+      assert.ok(
+        pill.classList.contains('is-subtle'),
+        `and the tone survives beside it, but read "${pill.className}"`
+      );
+    });
+
+    it('every world-tag chip carries the TAG-RUN scale, lit and unlit alike', async () => {
+      // `proto:5401` draws the run at 600/11px on a 5px/12px band at radius 999 — a chip that is
+      // a CONTROL, not a badge. BOTH faces, because `density` and `tone` are separate props: a
+      // wiring that passed the scale only on the lit branch would draw two chip sizes in one run,
+      // and the fixture's `coal` (both tags applied) cannot show the unlit face at all.
+      const { target: applying } = await open('coal');
+      const { target: empty } = await open('ingot');
+      const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
+      const unlit = empty.querySelector('[data-scoped-entry-tag="bulk"]');
+      for (const chip of [lit, unlit]) {
+        assert.ok(
+          chip.classList.contains('is-tag-run'),
+          `each chip carries the run's own scale, and read "${chip.className}"`
+        );
+      }
+      assert.ok(lit.classList.contains('is-tag'), 'the applied chip keeps the purple fill');
+      assert.ok(
+        unlit.classList.contains('is-neutral'),
+        `and the unapplied one keeps the neutral tone, whose ink is the reference's own \`--muted\`, but read "${unlit.className}"`
+      );
+    });
+
+    it('the systems filter is a PILL run on the SOFT accent track', async () => {
+      // `proto:5457`: three unenclosed segments at radius 999, the chosen one on the soft accent
+      // and the rest on a `--fab-bg-1` fill behind a hairline, all three at 600.
+      const { target } = await open('resin');
+      const track = target.querySelector('[data-scoped-entry-system-filters]');
+      assert.ok(Boolean(track), 'the card draws the filter');
+      // WHOLE-TOKEN MATCHING, never `className.includes`: `is-accent` is a PREFIX of
+      // `is-accent-soft` and BOTH tracks ship, so a substring test would call the solid accent
+      // present here and would keep passing if the tone were changed to it.
+      assert.ok(
+        track.classList.contains('is-pill'),
+        `the construction is the pill run, and read "${track.className}"`
+      );
+      assert.ok(track.classList.contains('is-accent-soft'), 'and the paint is the soft accent');
+      assert.ok(
+        !track.classList.contains('is-accent'),
+        'and NOT the solid accent track, which paints the chosen segment as a filled button'
+      );
+      assert.ok(
+        track.classList.contains('is-compact'),
+        'the scale is untouched: shape and tone are orthogonal to density'
+      );
+      assert.ok(
+        Boolean(track.querySelector('[data-scoped-entry-system-filter="all"] .is-badge')),
+        'and the tally stays the `badge` slot, which inks the idle numeral subtle and lets the chosen one inherit the accent'
+      );
+    });
+  });
+
   describe('the header band is told what the record IS and how far it reaches', () => {
     // `proto:815`. The band drew the PAGE name and a generic subtitle; the reference draws the
     // entity. The page reports the sub-line up because it already resolves the source type for

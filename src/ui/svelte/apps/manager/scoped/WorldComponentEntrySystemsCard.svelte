@@ -192,8 +192,19 @@
         inputAttrs={{ 'data-scoped-entry-system-search': '' }}
       />
     </div>
+    <!--
+      THE FILTER IS A PILL RUN ON A SOFT ACCENT TRACK (`proto:5457`): three unenclosed segments
+      at radius 999, the chosen one on `--fab-accent-soft` behind `--fab-accent-border` in
+      `--fab-accent`, the rest on a `--fab-bg-1` fill behind a hairline in `--fab-text-muted`,
+      all three at 600. `shape` is the construction and `tone` is the paint, so both are opt-in
+      and neither moves another `SegmentedControl`. The tallies stay on `badge`, not `count`:
+      `.manager-segment-count.is-badge` inks the idle numeral `--fab-text-subtle` and lets the
+      chosen one inherit the accent, which is what the reference draws.
+    -->
     <SegmentedControl
       density="compact"
+      shape="pill"
+      tone="accent-soft"
       options={filters}
       value={filter}
       onChange={(next) => (filter = next)}

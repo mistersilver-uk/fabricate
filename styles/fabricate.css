@@ -25769,33 +25769,34 @@
   padding: 0;
 }
 
-/* ── WHAT THIS SHEET CANNOT SAY ABOUT A SVELTE-SCOPED PRIMITIVE ──────────────────────────────
-   Three parity lines on this screen are a primitive's own type and paint — `StatusPill`'s lock
-   pill (`proto:834`: 9px secondary ink, outlined, on a 2px/8px band, against the primitive's
-   9.92px filled 1px/4px `subtle`), `Chip`'s world-tag run (`proto:5401`: 11px/600 on a 5px/12px
-   band at radius 999, against 9.92px/700 on 4px/6px at radius 10) and `SegmentedControl`'s
-   filter (`proto:5457`: all three segments at 600 on a `--fab-bg-1` idle fill at radius 999).
-   NONE of them can be written in this file, at any specificity, and that is a fact about the
-   CASCADE rather than about the selectors:
+/* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ───────────
+   The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter
+   (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint
+   can be written here, at any specificity. That is a fact about the CASCADE rather than about
+   the selectors:
 
    `module.json` publishes exactly one stylesheet, `styles/fabricate.css`, and Foundry imports an
    unlayered module sheet at `layer(modules)` — `tests/view-lab/cascade.css` reproduces that. A
    Svelte component's own `<style>` block is injected by the bundler as an UNLAYERED `<style>`
    element, and an unlayered normal declaration beats a layered one no matter how specific the
-   layered selector is. Measured, not reasoned: with the chip rule written here as `.fabricate-manager
-   .manager-component-entry-classification .manager-component-entry-chips
+   layered selector is. Measured, not reasoned: with the chip rule written here as
+   `.fabricate-manager .manager-component-entry-classification .manager-component-entry-chips
    .manager-chip[data-scoped-entry-tag]` — five compound selectors against the primitive's three
    — the chip stayed at the primitive's 9.92px, and marking the SAME declaration `!important`
    (which reverses layer order) moved it to 11px while the non-important `font-weight` beside it
    stayed at 700.
 
-   So the honest fix for all three is a PROP on the primitive, and the props are named in this
-   change's deviations. `!important` would work and is not taken: it wins the same argument for
-   every other caller of that primitive too, which is the opposite of what a per-site variant is
-   for. It also means the shipped
+   So all three are said by an OPT-IN PROP on the primitive instead, and the entry passes them:
+   `StatusPill emphasis="outlined"`, `Chip density="tag-run"` and `SegmentedControl shape="pill"
+   tone="accent-soft"`. `!important` would also have worked and was not taken: it wins the same
+   argument for every other caller of that primitive too, which is the opposite of what a
+   per-site variant is for. There is deliberately NO rule in this block for any of the three —
+   a rule that cannot change a measured value is dead, so none was written.
+
+   The same cascade fact means the shipped
    `.fabricate-manager [data-tool-player-preview] .fab-status-pill.is-subtle` rule above (issue
-   1373) is inert for the same reason — reported rather than deleted from a lane that does not
-   own that screen. */
+   1373) is inert. Reported rather than deleted from a lane that does not own that screen; its
+   fix is the `emphasis` prop this screen now uses. */
 
 /* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ───────────
    Copy and Unlink share one geometry and one surface, and the reference separates them by INK
