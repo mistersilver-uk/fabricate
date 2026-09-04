@@ -175,6 +175,17 @@
      into `styles/fabricate.css` when more than one component needs the same rule.
      `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical
      guard that now catches it; it shipped once before that guard existed.
+   - element: bindable, the rendered DOM node. `bind:this` on a component yields the
+     component INSTANCE rather than its node, so a caller that must MEASURE or FOCUS the
+     button has no other way to reach it. `Chip.svelte` — the same manager primitive
+     family, and the other primitive `SearchablePopover` renders its trigger through —
+     already spells this capability that way; one meaning, one name.
+
+     It exists for exactly that caller. `SearchablePopover` anchors its portaled panel on
+     the trigger's bounding box and returns focus to it on close, and its `triggerButton`
+     form renders this component; without the node it would fall back to the picker ROOT,
+     a `position: relative` block-level `<div>` whose width is the flex slot's rather than
+     the button's, and the panel would hang off the wrong edge.
    - children: the label snippet. Content is a snippet rather than a `label` string
      because the shipped call sites interleave an `<i>` glyph with localized text and
      some wrap the text in its own `<span>`.
@@ -198,6 +209,9 @@
     size = '',
     disabled = false,
     onclick = () => {},
+    // The rendered DOM node, for a caller that must measure or focus it. See the props block
+    // above; `null` until mount, and unbound callers never observe it.
+    element = $bindable(null),
     children = undefined,
     // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
     // to be a named prop rather than a rest key: the rest spread lands after `class={…}` in
@@ -316,6 +330,11 @@
   });
 </script>
 
-<svelte:element this={resolvedTag} class={classes} {...attributes} {onclick} {...rest}
-  >{@render children?.()}</svelte:element
+<svelte:element
+  this={resolvedTag}
+  bind:this={element}
+  class={classes}
+  {...attributes}
+  {onclick}
+  {...rest}>{@render children?.()}</svelte:element
 >

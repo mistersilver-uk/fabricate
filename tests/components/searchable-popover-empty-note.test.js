@@ -34,6 +34,7 @@ import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -49,11 +50,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-empty-note-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
-  compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-  ],
+  compiledModules: SEARCHABLE_POPOVER_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/components/SearchablePopover.svelte',
 });
 
