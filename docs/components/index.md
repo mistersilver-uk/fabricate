@@ -27,7 +27,7 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-Each row starts with a checkbox, then the component's icon and name, then how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**.
+Each row starts with a checkbox, then the component's icon and name, then how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**, and a trailing **Edit component** control.
 A component no crafting system has adopted yet is marked **Unused**.
 A row with no linked source item also carries a **No source item** warning pill.
 A linked row carries no such pill, and no row shows its description here.
