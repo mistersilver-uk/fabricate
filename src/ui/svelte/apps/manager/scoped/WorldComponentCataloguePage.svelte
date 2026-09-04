@@ -43,6 +43,7 @@
   import {
     authoredWorldComponentCategories,
     componentAliasNote,
+    componentBulkDeletePlan,
     componentGlobalTagNote,
     componentMembershipScopeFilter,
     componentRowStats,
@@ -329,9 +330,18 @@
    */
   async function deleteBulk(entityIds, clearSelection) {
     if (bulkDeleting || bulkApplying) return;
+    // ONLY WHAT THE PLAN SAYS MAY GO (epic decision 7). The panel disables the control when the
+    // plan frees nothing and names the held records in its own note, but the refusal is enforced
+    // HERE as well as stated there: a disabled button is a presentation of a rule and this is the
+    // one call that writes, so the two are not allowed to be the same statement made once.
+    const { deletable } = componentBulkDeletePlan(entries, entityIds);
+    if (deletable.length === 0) {
+      clearSelection();
+      return;
+    }
     bulkDeleting = true;
     try {
-      for (const entityId of entityIds) {
+      for (const entityId of deletable) {
         await actions?.deleteEntity?.(entityId);
       }
     } finally {
@@ -526,6 +536,7 @@
     {tagOptions}
     applying={bulkApplying}
     deleting={bulkDeleting}
+    deletePlan={componentBulkDeletePlan(entries, selectedIds)}
     onClearSelection={() => ctx?.clearSelection?.()}
     onApply={(staged) => applyBulk(selectedIds, staged, () => ctx?.clearSelection?.())}
     onDelete={actions?.deleteEntity

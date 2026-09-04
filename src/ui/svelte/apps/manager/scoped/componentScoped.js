@@ -761,6 +761,127 @@ export function componentDeleteNote(systemNames, phrase) {
 }
 
 /**
+ * WHICH OF A BULK SELECTION CAN ACTUALLY BE DELETED, and which systems are holding the rest.
+ *
+ * ── WHY THE BULK PANEL REFUSES AT ALL (epic decision 7) ──────────────────────────────────────
+ * The world Component ENTRY refuses to delete a record any system still has rules for
+ * ({@link componentDeleteNote}), and it refuses because the delete is not recoverable: the world
+ * record, its defaults and every system's rules for it go together, and every recipe that names
+ * it stops resolving. The bulk panel deleted the same records without asking, so the SAME record
+ * was undeletable one screen away and deletable in a tick-box — and the tick-box is the path a
+ * GM reaches with twenty rows selected and no per-row sentence in front of them.
+ *
+ * So the panel refuses the same members the entry does. It refuses them INDIVIDUALLY rather than
+ * refusing the whole instruction, because a mixed selection is the normal one: a GM ticking a
+ * page of rows to clear out the unused ones should not have the whole delete withheld by one row
+ * that is in use, and should not be left guessing WHICH row that was. The plan therefore answers
+ * both halves — what will be deleted, and what was skipped and by whom — and the panel prints
+ * the second half where the consequence note already stands.
+ *
+ * MEMBERSHIP IS READ OFF THE JOIN ROWS, not off `membershipCount`, because the refusal has to
+ * NAME the systems and the count cannot. `componentMemberCount` stays the reader for anything
+ * that only counts.
+ *
+ * @param {Array<object>} entries the catalogue's projected entries.
+ * @param {string[]} entityIds the ticked rows, in list order.
+ * @returns {{deletable: string[], blocked: Array<{id: string, name: string, systemNames: string[]}>}}
+ */
+export function componentBulkDeletePlan(entries, entityIds) {
+  const wanted = new Set((Array.isArray(entityIds) ? entityIds : []).map((id) => String(id ?? '')));
+  const deletable = [];
+  const blocked = [];
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const id = String(entry?.id ?? '');
+    if (!id || !wanted.has(id)) continue;
+    const systemNames = (Array.isArray(entry?.systems) ? entry.systems : [])
+      .filter((row) => row?.member === true)
+      .map((row) => String(row?.systemName || row?.systemId || ''))
+      .filter(Boolean);
+    if (systemNames.length === 0) {
+      deletable.push(id);
+    } else {
+      blocked.push({
+        id,
+        name: String(entry?.entity?.name ?? '').trim() || id,
+        systemNames,
+      });
+    }
+  }
+  return { deletable, blocked };
+}
+
+/**
+ * The bulk delete's consequence note, in the three states the plan can be in.
+ *
+ * It is the SAME sentence the free case always carried when nothing is held, so a selection with
+ * no members reads exactly as it did. The other two name the skipped components and the systems
+ * holding them, because "some were skipped" is a worse answer than no answer: it tells a GM the
+ * instruction did not do what they asked without telling them what to do next.
+ *
+ * The list is capped at three components for the reason {@link componentDeleteNote}'s is: on a
+ * migrated world every component that existed at `1.30.0` is a member everywhere, so an uncapped
+ * list is a paragraph rather than a sentence.
+ *
+ * @param {{deletable: string[], blocked: Array<{name: string, systemNames: string[]}>}} plan
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {{refused: boolean, text: string}} `refused` when NOTHING in the selection can go.
+ */
+export function componentBulkDeleteNote(plan, phrase) {
+  const deletable = Array.isArray(plan?.deletable) ? plan.deletable : [];
+  const blocked = Array.isArray(plan?.blocked) ? plan.blocked : [];
+  if (blocked.length === 0) {
+    return {
+      refused: false,
+      text: phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteNote',
+        'This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving.'
+      ),
+    };
+  }
+  const shown = blocked
+    .slice(0, 3)
+    .map((held) =>
+      phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteHeldEntry', '{name} ({systems})', {
+        name: held?.name ?? '',
+        systems: (Array.isArray(held?.systemNames) ? held.systemNames : []).join(', '),
+      })
+    )
+    .join('; ');
+  const remainder = blocked.length - 3;
+  const detail =
+    remainder > 0
+      ? phrase(
+          'FABRICATE.Admin.Manager.Scoped.Component.DeleteReachMore',
+          '{names} and {count} more',
+          { names: shown, count: remainder }
+        )
+      : shown;
+  if (deletable.length === 0) {
+    return {
+      refused: true,
+      text: phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteAllHeld',
+        'Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Remove them from those systems first.',
+        { detail }
+      ),
+    };
+  }
+  return {
+    refused: false,
+    text: phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteSkipping',
+      'Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Remove them from those systems first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.',
+      {
+        deletable: deletable.length,
+        count: deletable.length + blocked.length,
+        skipped: blocked.length,
+        detail,
+      }
+    ),
+  };
+}
+
+/**
  * The system rules list's cohort filter, as `SegmentedControl` options.
  *
  * -- TWO SEGMENTS, NOT THREE OPTIONS ON A `<select>` ----------------------------------------
@@ -983,7 +1104,13 @@ export function componentBulkMembershipModes(phrase) {
       label: phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveFrom', 'Remove from'),
       note: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveNote',
-        'Every selected component loses its rules in each chosen system. The world record is untouched.'
+        // THE CASCADE IS DISCLOSED, not just the overrides (issue 1371 r9-cat, lane STORE's
+        // sentence). `removeFromSystem` runs the in-system delete through `deleteComponents`,
+        // which repairs every reference, disables the recipes left without a usable ingredient
+        // set or result, cleans up salvage and reconciles alchemy. The old sentence named only
+        // the overrides, so a GM removing twenty components from a system was told the world
+        // record was safe and never told their recipes were about to be rewritten.
+        'Removing these components from the selected systems also rewrites every recipe in those systems that names them, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.'
       ),
     },
   ];

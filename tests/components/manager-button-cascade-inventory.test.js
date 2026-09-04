@@ -847,6 +847,23 @@ const REVIEWED = [
     why: 'Travel parties override popover trigger, population B.',
   },
   {
+    id: globalRule('.fabricate-manager .manager-button.manager-world-component-register-action'),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE SEEDED LIST. The world Component catalogue`s `+ Register item` (issue 1371 ' +
+      'M10), which is a `SearchablePopover` `triggerClass` site and therefore population B: the ' +
+      'popover writes the class onto its own `<button>` and never adds `fab-manager-button`. ' +
+      'The rule states the reference`s 38px rung, its 9px corner and a one-line label ' +
+      '(`proto:570`); re-chaining it would repaint a control the sweep is not converting.',
+  },
+  {
+    id: globalRule(
+      '.fabricate-manager .manager-button.manager-world-component-register-action:not(:disabled):hover'
+    ),
+    disposition: 'EXCLUDE',
+    why: 'The hover half of the entry above, on the same population-B trigger.',
+  },
+  {
     id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
     why:
@@ -1458,30 +1475,39 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // Licensed by the same rule as the entries above: each of the six SITES left the product,
   // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
   // field in the same place on the same screen; none was silently unconverted.
-  // AND TWO ARRIVED AT ISSUE 1371, taking the count to 14. The world Component catalogue's bulk
-  // panel stages two SEARCHABLE pickers — the crafting systems it will add to or remove from, and
-  // the world category it will write — and both are `SearchablePopover` on the recipe bulk
-  // panel's precedent, which is the only shipped panel that stages one inside a `BulkEditSection`.
-  // A hand-rolled picker in their place would be a second implementation of that primitive, which
-  // the duplication gate counts; both stay unconverted on the standing argument above, because
-  // converting a `triggerClass` site changes `SearchablePopover`'s own trigger contract rather
-  // than this call site's.
+  // AND ISSUE 1371 MOVED IT TWICE, NET −1, TO 13 — and the first half of that is this note
+  // keeping the promise the version below it made.
   //
-  // AND THE ARGUMENT FOR THOSE TWO IS A SHIPPED SIBLING, WHICH IS THE ONE CLASS THIS ROUND
-  // VOIDED. "The recipe bulk panel's precedent" cites neither a prototype line nor a rung: the
-  // reference draws both staging groups as an inline search with rows and a pager beneath it
-  // (`proto:590-697`), not as a popover trigger. That is a defect in the panel rather than in
-  // this pin — a debt COUNTER records what shipped, and while two triggers ship the honest
-  // count is 14 — so the count is left where the panel put it and the panel is what moves.
-  // When the bulk panel's two pickers become inline (maintainer ruling M10), both sites leave
-  // the product exactly as issue 1373's six did and THIS NUMBER GOES BACK TO 12 in the same
-  // change, with the sentence above rewritten to say the sites left rather than that they are
-  // licensed. A ratchet that stayed at 14 after the triggers were gone would be booking debt
-  // nothing owes.
+  // What stood here said TWO ARRIVED, taking the count to 14: the world Component catalogue's
+  // bulk panel staged its crafting systems and its world category as two `SearchablePopover`
+  // triggers, argued from "the recipe bulk panel's precedent". The paragraph under it then
+  // voided its own argument — a shipped sibling is not a reference — recorded that the
+  // reference draws both groups as an inline search with rows and a pager beneath it
+  // (`proto:590-697`), and committed this pin in as many words: when maintainer ruling M10 made
+  // those pickers inline, "both sites leave the product exactly as issue 1373's six did and
+  // THIS NUMBER GOES BACK TO 12 in the same change, with the sentence above rewritten to say
+  // the sites left rather than that they are licensed."
+  //
+  // M10 landed and they left. `ComponentCatalogueBulkPanel.svelte` writes no `triggerClass` at
+  // all now: all three staging groups are one inline inset rendered three times, with their own
+  // search field, row window and pager. That is −2, exactly as promised, and 12 is where the
+  // count would rest if nothing else had moved.
+  //
+  // ONE ARRIVED IN THE SAME RULING, WHICH IS WHY THE NUMBER IS 13 AND NOT 12. M10 also builds
+  // `+ Register item` beside the world-scope drop zone (`proto:570`), and it is a picker rather
+  // than a bare button because the prototype's own handler for it is `d.onStub` — there is no
+  // reference behaviour to copy and a control that opens nothing is the dead affordance that
+  // screen already refuses. `SearchablePopover` is the shipped chooser, so
+  // `WorldComponentCataloguePage.svelte` is a 13th population-B site. It stays unconverted on
+  // the standing argument every entry above uses: converting a `triggerClass` site changes
+  // `SearchablePopover`'s own trigger contract rather than this call site's.
+  //
+  // The two rules that style it — `.manager-world-component-register-action` and its `:hover`
+  // — are dispositioned EXCLUDE in the register above, for that same reason.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    14,
-    'plus the 14 SearchablePopover triggerClass sites named as debt'
+    13,
+    'plus the 13 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

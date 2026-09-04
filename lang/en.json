@@ -6365,7 +6365,7 @@
             "BulkAddTo": "Add to",
             "BulkRemoveFrom": "Remove from",
             "BulkAddNote": "Every selected component gains rules in each chosen system, inheriting the world category.",
-            "BulkRemoveNote": "Every selected component loses its rules in each chosen system. The world record is untouched.",
+            "BulkRemoveNote": "Removing these components from the selected systems also rewrites every recipe in those systems that names them, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.",
             "BulkStaged": "Staged",
             "BulkNoSystems": "None",
             "BulkSystemCount": "{count} chosen",
@@ -6375,7 +6375,7 @@
             "BulkCategorySearch": "Search categories",
             "BulkCategoryNoMatch": "No world category matches that search.",
             "BulkTagState": "{added} added · {removed} removed",
-            "BulkNoTags": "No world tags are authored yet. Add one on a component entry first.",
+            "BulkNoTags": "No world tags are authored yet. Create them in Tags & Categories first.",
             "BulkPerComponentNote": "Names and source links stay per component. What you can change in bulk is which systems these components belong to, and their world category and tags.",
             "Entry": {
               "TabCatalogue": "Catalogue entry",
@@ -6476,7 +6476,10 @@
             "BulkDeleteOne": "Delete 1 component…",
             "BulkDeleteArmed": "Confirm — delete {count} from the world",
             "BulkDeleteBusy": "Deleting…",
-            "BulkDeleteNote": "This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving."
+            "BulkDeleteNote": "This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving.",
+            "BulkDeleteHeldEntry": "{name} ({systems})",
+            "BulkDeleteSkipping": "Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Remove them from those systems first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.",
+            "BulkDeleteAllHeld": "Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Remove them from those systems first."
           },
           "Essence": {
             "BackToCatalogue": "Back to the catalogue",
@@ -6646,7 +6649,7 @@
             "Remove": "Remove",
             "RemoveConfirm": "Confirm?",
             "Removing": "Removing…",
-            "RemoveConsequence": "Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched."
+            "RemoveConsequence": "Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes."
           }
         },
         "Knowledge": {

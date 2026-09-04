@@ -929,6 +929,49 @@ describe('world Component Catalogue (issue 1371)', () => {
       }
     });
 
+    it('discloses the RECIPE CASCADE on the remove note, not just the overrides', async () => {
+      // Lane STORE's disclosure, never wired. `removeFromSystem` runs the in-system delete
+      // through `deleteComponents`, which repairs every reference, disables the recipes left
+      // without a usable ingredient set or result, cleans up salvage and reconciles alchemy —
+      // and the note said only that the world record was untouched. A GM removing twenty
+      // components from a system was told the safe half and never the consequential half.
+      const { target } = await selectedCatalogue();
+      target.querySelector('[data-world-component-bulk-mode-option="remove"]').click();
+      await drain();
+      const note = target.querySelector('[data-world-component-bulk-mode-state]').textContent;
+      assert.match(note, /rewrites every recipe in those systems that names them/);
+      assert.match(note, /disables any recipe left without a usable ingredient set or result/);
+      assert.match(
+        note,
+        /The world record is untouched, and no other system changes\./,
+        'and the reassuring half survives — the finding is that it was the ONLY half'
+      );
+    });
+
+    it('sends a GM with no world tags to the screen that mints them', async () => {
+      // The empty state read `Add one on a component entry first.` and no entry mints a world
+      // tag: the vocabulary is authored on Tags & Categories, which is where the inspector's own
+      // `Global tags` exit already goes. A dead instruction is worse than none.
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        // `defaults: []` strips the world tags off the corpus, which is the only way this empty
+        // state is reachable at all — the shipped fixture authors two.
+        scope: scopeFor({ defaults: [] }),
+        systems: COMPONENT_SYSTEMS,
+        actions,
+      });
+      await selectTwo(target);
+      const empty = target.querySelector('[data-world-component-bulk-tags-empty]');
+      assert.ok(Boolean(empty), 'the empty state is reached');
+      assert.match(empty.textContent, /Create them in Tags & Categories first\./);
+      assert.doesNotMatch(
+        empty.textContent,
+        /component entry/i,
+        'and it no longer sends a GM to a screen that cannot do it'
+      );
+      assert.deepEqual(calls, [], 'reading an empty state writes nothing');
+    });
+
     it('draws each axis as an INLINE inset, not as a popover trigger', async () => {
       // Gap-list rows 43-45. A popover hides the corpus behind a click, so a GM cannot see that a
       // search matched nothing, cannot see how many systems there are, and cannot read a staged
@@ -1054,15 +1097,45 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    /**
+     * Mount with a recording bag and tick ONE FREE RECORD AND ONE IN USE.
+     *
+     * `resin` is a member of no system; `ingot` has rules in Forge and in Alchemy. That pairing
+     * is the whole point of the delete assertions below: a selection where every record is free
+     * cannot see the refusal, and one where every record is held cannot see that the free ones
+     * still go. The corpus already carries both, which is why no fixture is added for it.
+     *
+     * @returns {Promise<{target: HTMLElement, calls: Array<{verb: string, args: unknown[]}>}>}
+     */
+    async function mixedSelection() {
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions,
+      });
+      for (const id of ['resin', 'ingot']) {
+        target.querySelector(`[data-scoped-list-select="${id}"]`).click();
+        await drain();
+      }
+      return { target, calls };
+    }
+
+    /** The danger leg's control, whatever primitive draws it. */
+    function dangerControl(target) {
+      return target.querySelector(
+        '[data-world-component-bulk-danger] .manager-button, ' +
+          '[data-world-component-bulk-danger] button'
+      );
+    }
+
     it('offers the armed bulk delete, and writes only from its confirmed state', async () => {
       // Gap-list row 47. The most destructive verb in the product, behind the manager's one
       // two-step idiom: arming states the count, and only the confirmed press writes.
-      const { target, calls } = await selectedCatalogue();
-      const danger = () =>
-        target.querySelector('[data-world-component-bulk-danger] .manager-button, ' +
-          '[data-world-component-bulk-danger] button');
+      const { target, calls } = await mixedSelection();
+      const danger = () => dangerControl(target);
       assert.ok(Boolean(danger()), 'the danger leg is drawn');
-      assert.match(danger().textContent, /Delete 2 components/);
+      assert.match(danger().textContent, /Delete 1 component/);
 
       danger().click();
       await drain();
@@ -1073,9 +1146,75 @@ describe('world Component Catalogue (issue 1371)', () => {
       await drain();
       assert.deepEqual(
         calls.map((call) => `${call.verb}:${call.args[0]}`),
-        ['deleteEntity:ingot', 'deleteEntity:coal'],
-        'and the confirmed press deletes each selected record in turn, never concurrently'
+        ['deleteEntity:resin'],
+        'and the confirmed press deletes the free record, and only that one'
       );
+    });
+
+    it('refuses the members the ENTRY refuses, and names them and their systems', async () => {
+      // Epic decision 7. The world Component entry will not delete a record any system still has
+      // rules for; this panel deleted exactly those records without asking, which made the same
+      // record undeletable one screen away and deletable in a tick-box.
+      const { target, calls } = await mixedSelection();
+      const note = target.querySelector('[data-world-component-bulk-delete-note]');
+      assert.ok(Boolean(note), 'the consequence note is drawn');
+      assert.equal(
+        note.getAttribute('data-world-component-bulk-delete-note'),
+        'proceed',
+        'a mixed selection PROCEEDS: one held row does not withhold the whole instruction'
+      );
+      assert.match(note.textContent, /Deletes 1 of 2/, 'and it counts what will actually go');
+      assert.match(
+        note.textContent,
+        /Iron Ingot \(Forge, Alchemy\)/,
+        'and NAMES the skipped record and the systems holding it — "some were skipped" without ' +
+          'saying which is worse than saying nothing'
+      );
+      assert.equal(
+        dangerControl(target).disabled,
+        false,
+        'and the control is live, because something can go'
+      );
+
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => call.args[0]),
+        ['resin'],
+        'the write reaches the free record only'
+      );
+    });
+
+    it('and withholds the delete outright when every selected record is held', async () => {
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions,
+      });
+      // `ingot` and `coal` both have rules in Forge.
+      await selectTwo(target);
+      const note = target.querySelector('[data-world-component-bulk-delete-note]');
+      assert.equal(
+        note.getAttribute('data-world-component-bulk-delete-note'),
+        'refused',
+        'the note states a refusal rather than a consequence'
+      );
+      assert.match(note.textContent, /none of them can be deleted/);
+      assert.match(note.textContent, /Remove them from those systems first/);
+      const danger = dangerControl(target);
+      assert.equal(danger.disabled, true, 'and the control is inert');
+      assert.match(
+        danger.textContent,
+        /Cannot delete/,
+        'wearing the ENTRY’s own refusal label, so one record reads the same on both screens'
+      );
+
+      danger.click();
+      await drain();
+      assert.deepEqual(calls, [], 'and a click on the inert control writes nothing');
     });
 
     it('withholds the delete entirely when the call site has no delete leg', async () => {

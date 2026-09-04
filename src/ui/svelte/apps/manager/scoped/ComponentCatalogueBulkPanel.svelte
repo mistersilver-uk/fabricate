@@ -80,6 +80,7 @@
   import { paginateRows } from '../../../../../utils/browserPagination.js';
   import {
     componentBulkApplyLabel,
+    componentBulkDeleteNote,
     componentBulkMembershipModes,
     componentBulkWriteCount,
   } from './componentScoped.js';
@@ -146,6 +147,12 @@
     onClearSelection = () => {},
     onApply = () => {},
     onDelete = null,
+    // WHICH OF THE SELECTION THE DELETE MAY TOUCH (epic decision 7). `{deletable, blocked}` from
+    // `componentBulkDeletePlan`, computed by the page because only the page holds the projected
+    // entries. `null` means "every selected component is free", which is what the panel assumed
+    // before the refusal existed, so a call site that has not been taught the plan behaves as it
+    // did rather than silently withholding a delete.
+    deletePlan = null,
   } = $props();
 
   /** The unstaged sentinel, shared by both tracks and by the Apply gate. */
@@ -231,16 +238,42 @@
     )
   );
 
+  /**
+   * THE DELETE'S THREE FACTS, ALL READ OFF ONE PLAN (epic decision 7).
+   *
+   * A selection with nothing held resolves to `{deletable: <all of them>, blocked: []}`, which is
+   * what a `null` plan is normalised to — so the counts, the labels and the note are all exactly
+   * what they were before the refusal existed on any selection that would not have been refused.
+   */
+  const plan = $derived({
+    deletable: Array.isArray(deletePlan?.deletable) ? deletePlan.deletable : null,
+    blocked: Array.isArray(deletePlan?.blocked) ? deletePlan.blocked : [],
+  });
+  // The COUNT THE DELETE WOULD ACTUALLY WRITE, which is what both labels say and what the note
+  // counts. Without a plan it is the whole selection.
+  const deletableCount = $derived(plan.deletable === null ? count : plan.deletable.length);
+  const deleteNote = $derived(
+    componentBulkDeleteNote(
+      {
+        deletable: plan.deletable ?? Array.from({ length: count }, (_, index) => index),
+        blocked: plan.blocked,
+      },
+      phrase
+    )
+  );
+
   const deleteLabel = $derived(
-    count === 1
-      ? text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteOne', 'Delete 1 component…')
-      : phrase(
-          'FABRICATE.Admin.Manager.Scoped.Component.BulkDelete',
-          'Delete {count} components…',
-          {
-            count,
-          }
-        )
+    deleteNote.refused
+      ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
+      : deletableCount === 1
+        ? text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteOne', 'Delete 1 component…')
+        : phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.BulkDelete',
+            'Delete {count} components…',
+            {
+              count: deletableCount,
+            }
+          )
   );
 
   // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT (issue 1371, round 2). The panel used to
@@ -617,7 +650,7 @@
     <p class="manager-muted fab-bulk-component-empty" data-world-component-bulk-tags-empty>
       {text(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkNoTags',
-        'No world tags are authored yet. Add one on a component entry first.'
+        'No world tags are authored yet. Create them in Tags & Categories first.'
       )}
     </p>
   {/if}
@@ -628,6 +661,14 @@
     panel's last content instead — directly above the dock, in the same reading order, with the
     same consequence note under it. Moving it INTO the dock needs an opt-in on the shell, which no
     lane owns this revision; it is recorded rather than worked around.
+
+    AND IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7). The world Component entry will not
+    delete a record any system still has rules for, and this panel used to delete exactly those
+    records without asking — the same record undeletable one screen away and deletable in a
+    tick-box, on the path a GM reaches with a page of rows selected. The plan splits the
+    selection: the button counts and writes only the free ones, the note NAMES the held ones and
+    the systems holding them, and the control goes `disabled` with the entry's own `Cannot
+    delete` label when nothing in the selection can go at all.
   -->
   {#if onDelete}
     <div class="fab-bulk-component-danger" data-world-component-bulk-danger>
@@ -635,19 +676,19 @@
         token="world-component-bulk-delete"
         armed={deleteArmed}
         busy={deleting === true}
-        disabled={applying === true}
+        disabled={applying === true || deleteNote.refused}
         idleLabel={deleteLabel}
         armedLabel={phrase(
           'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteArmed',
           'Confirm — delete {count} from the world',
-          { count }
+          { count: deletableCount }
         )}
         busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
         idleAriaLabel={deleteLabel}
         armedAriaLabel={phrase(
           'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteArmed',
           'Confirm — delete {count} from the world',
-          { count }
+          { count: deletableCount }
         )}
         describedBy="world-component-bulk-delete-note"
         onArm={() => (deleteArmed = true)}
@@ -657,11 +698,12 @@
           onDelete();
         }}
       />
-      <p class="fab-bulk-component-note" id="world-component-bulk-delete-note">
-        {text(
-          'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteNote',
-          'This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving.'
-        )}
+      <p
+        class="fab-bulk-component-note"
+        id="world-component-bulk-delete-note"
+        data-world-component-bulk-delete-note={deleteNote.refused ? 'refused' : 'proceed'}
+      >
+        {deleteNote.text}
       </p>
     </div>
   {/if}

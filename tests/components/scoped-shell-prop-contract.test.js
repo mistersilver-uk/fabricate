@@ -1133,3 +1133,71 @@ describe('componentScoped.js stays the import-free leaf its consumers assume', (
     );
   });
 });
+
+/**
+ * BOTH REMOVE SENTENCES DISCLOSE THE RECIPE CASCADE (issue 1371 r9-cat, lane STORE's disclosure).
+ *
+ * Removing a component from a system is not a membership edit. `adminStore`'s
+ * `_dropInSystemComponent` runs the in-system delete through `deleteComponents`, which repairs
+ * every reference, DISABLES the recipes left without a usable ingredient set or result, cleans up
+ * salvage and reconciles alchemy. Both sentences named only the overrides and then reassured the
+ * GM that the world record was untouched — the safe half of the truth, told without the
+ * consequential half, on the two controls that fire that cascade.
+ *
+ * PINNED AS COPY RATHER THAN AS A RENDER, because the two live on different screens (the bulk
+ * panel's `Remove from` note and the entry's per-system row) and neither suite can see the other.
+ * What can rot is the sentence, and it rots identically in both places.
+ *
+ * NOTE FOR WHOEVER READS THIS NEXT: `Scoped.Membership.RemoveConsequence` has TWO consumers, not
+ * one — `WorldComponentEntrySystemsCard.svelte` and the shared `MembershipActions.svelte`, which
+ * the ESSENCE screens render as well. The cascade is real for components and is NOT reproduced by
+ * the essence path (`_dropInSystemEssence` filters `essenceDefinitions` and writes, with no
+ * reference repair and no recipe disable), so the shared key now says something of essences that
+ * their own store does not do. Making it accurate needs either a scope-specific key on the entry
+ * card or a scope-aware note prop on `MembershipActions`; neither file is this lane's, and the
+ * collision is recorded here rather than resolved silently.
+ */
+describe('the two remove sentences disclose what removal actually does', () => {
+  const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+  const scoped = lang.FABRICATE.Admin.Manager.Scoped;
+
+  const CASCADE = [
+    /rewrites every recipe/,
+    /disables any recipe left without a usable ingredient set or result/,
+  ];
+
+  it('the bulk panel’s `Remove from` note names the rewrite and the disable', () => {
+    const note = scoped.Component.BulkRemoveNote;
+    assert.ok(typeof note === 'string' && note.length > 0, 'NON-VACUITY: the key resolves');
+    for (const clause of CASCADE) assert.match(note, clause);
+    assert.match(note, /The world record is untouched, and no other system changes\./);
+  });
+
+  it('and the per-system row says the same thing in the singular', () => {
+    const note = scoped.Membership.RemoveConsequence;
+    assert.ok(typeof note === 'string' && note.length > 0, 'NON-VACUITY: the key resolves');
+    for (const clause of CASCADE) assert.match(note, clause);
+    assert.match(note, /\{entity\}/, 'and it still interpolates both of its own tokens');
+    assert.match(note, /\{system\}/);
+  });
+
+  it('neither one still stops at the overrides, which is the finding', () => {
+    // The exact spelling both carried, as a negative: a sentence that names only what is NOT
+    // written is the one this pin exists to keep out.
+    for (const note of [scoped.Component.BulkRemoveNote, scoped.Membership.RemoveConsequence]) {
+      assert.doesNotMatch(note, /Its overrides go with it/);
+      assert.doesNotMatch(note, /loses its rules in each chosen system/);
+    }
+  });
+
+  it('and the shared key’s SECOND consumer is still there, so the note above is not stale', () => {
+    // The whole point of the recorded collision: if this ever stops matching, the essence
+    // overclaim is gone and the note in this block's header should go with it.
+    const shared = sourceOf(`${SCOPED_DIR}/MembershipActions.svelte`);
+    assert.match(
+      shared,
+      /FABRICATE\.Admin\.Manager\.Scoped\.Membership\.RemoveConsequence/,
+      'MembershipActions still reads the shared key, so essence rows still read this sentence'
+    );
+  });
+});
