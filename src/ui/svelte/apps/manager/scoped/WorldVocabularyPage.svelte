@@ -494,7 +494,15 @@
        whose pane is `--fab-bg-0`; inside a `--fab-bg-1` panel it is the panel's own fill. */
     background: var(--fab-bg-0);
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-recipe-control-font)` deliberately not.
+       That property is declared once, on `.fabricate-manager` (`styles/fabricate.css:1252`), which
+       makes it AREA-SCOPED: a scoped block is attached to a component, and a component is placed in
+       a directory rather than in a DOM subtree, so this rule cannot guarantee its host renders
+       under that root. Where it does not, the property is undefined and the declaration falls back
+       to inherited type with no warning anywhere. No foundation token carries this value, so the
+       value itself is written — `0.72rem`, which is what that property is declared as, and the
+       same figure `.wvocab-status` below already writes for the same reason. */
+    font-size: 0.72rem;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
