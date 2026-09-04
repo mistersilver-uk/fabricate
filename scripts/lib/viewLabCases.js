@@ -980,6 +980,30 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
   /^src\/ui\/extensionRegistry\.js$/,
 ]);
 
+/**
+ * The shared positioning seam every OPEN popover frame draws (issue 1500).
+ *
+ * `actions/anchoredPopover.js` is the measure, flip, clamp, portal and re-measure pass seven
+ * surfaces used to hand-write, and `util/overlayBounds.js` holds the clipping boundaries those
+ * copies hard-coded. Both are new files, and neither is a BROAD-SIGNAL path — they sit under
+ * `actions/` and `util/`, not `components/` — so neither can be a `BROAD_SIGNAL_CASE_OVERRIDES`
+ * key: that map is consulted only once a change is already a broad signal, and its own test
+ * requires every key in it to be a broad-signal file.
+ *
+ * So they route the ordinary way, by being named in the `sourceMatches` of the cases that OPEN a
+ * panel. Without this a change to either mapped to `fabricate-app-shell` alone — the fallback
+ * frame, which draws no popover at all — and a regression in the pass that places every floating
+ * surface in the product would have published one frame that could not contain it.
+ *
+ * These are the seven `SearchablePopover` open-state frames plus nothing else; `ActionMenu`'s own
+ * open frame reaches the same pair through its broad-signal override, since that component IS a
+ * broad-signal file.
+ */
+const ANCHORED_POPOVER_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
+  /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
+]);
+
 export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipes-editor-roundtrip',
@@ -3181,6 +3205,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -4425,6 +4450,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -4472,6 +4498,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -6429,6 +6456,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Gathering(EventEditView|TaskEditView)\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -6791,6 +6819,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -6829,6 +6858,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim (issue 1185
@@ -9036,6 +9066,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   playerCase({
