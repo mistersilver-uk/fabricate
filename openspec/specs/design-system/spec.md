@@ -200,7 +200,6 @@ A Svelte scoped `<style>` MUST NOT reach an area-scoped property at all: a compo
 Nor may a `.js` module or a `.svelte` template spell one into a string, which is the channel a CSS-only scan cannot see and the one that has actually occurred; `tests/token-generation-gate.test.js` reads the global sheet and every scoped `<style>` as CSS, and matches a `var()` read or a `name:` declaration in `src/**` `.js` and `.svelte` text.
 
 The forwarding-alias rule below is scoped to COLOUR, and that is narrower than a namespace-wide ban on the single-declaration alias shape.
-The narrowing is deliberate and is recorded rather than left to be inferred: the five `--fab-space-*` semantic aliases are exactly that shape, they are a PUBLISHED vocabulary that `ui-integration` names value by value, and a namespace-wide ban would have made them a carve-out instead of a consistent case.
 A colour alias is different in kind because the value it forwards is the one thing a theme swap must be able to change.
 No gate decides the colour case on its own; what a gate can decide is that the retired names do not return, which is what `tests/token-generation-gate.test.js` holds.
 
