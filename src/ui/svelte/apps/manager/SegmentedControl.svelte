@@ -465,13 +465,20 @@
   /* SOFT ACCENT TONE (issue 1371): the filter's paint, where BOTH states have a face. Colour
      only — see the `tone` note — so it states no size and composes with `density="compact"` and
      `shape="pill"`. `proto:5457` verbatim, and every value is the token that already holds it:
-     `--fab-accent-soft` is `rgb(232 198 167 / 16%)` against the reference's `rgba(232,198,167,.16)`,
-     `--fab-accent-border` is its `.48`, and `--fab-accent` is `#E8C6A7` — the same three bytes.
+     the reference's accent at sixteen percent IS `--fab-accent-soft`, its accent at forty-eight
+     IS `--fab-accent-border`, and its solid accent IS `--fab-accent` — measured byte for byte in
+     this theme, not approximated — which is why nothing here has to be written as a literal, and
+     why this note names the tokens rather than quoting the reference's raw values:
+     `theme-colour-contract.test.js` scans prose under `src/ui/**` as well as declarations. That
+     these three tokens are the ones this tone states is pinned by
+     `segmented-control-mounted.test.js`; that each equals the reference was measured once, from
+     the design's own markup, and is recorded in the issue rather than re-derived here.
 
      `--fab-bg-1` for the idle fill is the ONE licensed departure, and it is this epic's standing
-     one: the reference draws `#111A23` and the shipped ramp is a step brighter throughout, so the
-     token that HOLDS this role here is `--fab-bg-1` and reaching for `--fab-bg-0` to match a
-     literal would put this control on a different ramp from the card it sits in.
+     one: the reference draws the darker ramp step and the shipped ramp is a step brighter
+     throughout (the issue-676 ruling), so the token that HOLDS this role here is `--fab-bg-1`,
+     and reaching down to `--fab-bg-0` to match the reference's own value would put this control
+     on a different ramp from the card it sits in.
 
      Written after the `is-compact` and `is-field` blocks it composes with, so its fills win over
      their active paint at equal specificity, and after `is-accent` so the two accent controls read

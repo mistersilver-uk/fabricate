@@ -77,10 +77,10 @@
      the two vertical insets stay open by 1px under the spacing-scale deviation below, and
      the remaining 3 are the caller's `tone`, not this scale's.
 
-     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws — a
-     `rgba(201,160,220,.16)` fill on a `rgba(201,160,220,.5)` edge — is the SHIPPED `tone="tag"`,
-     which already mixes `--fab-purple` at exactly 16% and 50%; the unlit and the switched-off
-     faces are `tone`/`struck`. Keeping the two axes apart is what lets one run draw lit, unlit
+     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws is its own purple
+     at sixteen percent behind an edge of the same purple at fifty — which is the SHIPPED
+     `tone="tag"`, mixing `--fab-purple` at exactly those two ratios; the unlit and the
+     switched-off faces are `tone`/`struck`. Keeping the two axes apart is what lets one run draw lit, unlit
      and struck chips at one size, which is what that run is.
 
      THE REFERENCE'S MICRO PILL IS ALREADY HERE, and is deliberately not a second value. Both

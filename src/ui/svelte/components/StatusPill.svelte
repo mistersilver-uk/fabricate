@@ -167,9 +167,10 @@
 
   /* THE OUTLINED EMPHASIS (issue 1371). `proto:834` exactly: a 2x8 band, a `--fab-border`
      hairline, `600 9px` in the SECONDARY ink. `--fab-text-secondary` IS the reference's
-     `--text2` — both resolve to `#D9B89C` here — so this is a token statement rather than an
-     approximation, and the band lands on `--fab-space-2xs` and `--fab-space-2`, which are 2px
-     and 8px exactly. No literal is spent, so the spacing ratchet is untouched.
+     `--text2` — the two resolve to the same value in this theme, measured rather than matched by
+     eye — so this is a token statement rather than an approximation, and the band lands on
+     `--fab-space-2xs` and `--fab-space-2`, which are 2px and 8px exactly. No literal is spent
+     here either, so the spacing ratchet is untouched.
 
      WRITTEN AFTER EVERY TONE RULE so its edge and ink win at equal specificity — both this and
      a tone rule are (0,2,0) — while the tone keeps the FILL it declares. That ordering is
