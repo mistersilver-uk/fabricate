@@ -95,6 +95,15 @@ function distinct(values) {
 }
 
 /**
+ * @typedef {object} DesignLibraryBlock
+ * @property {string|null} status the block's `data-status`, or `null` when it carries none
+ * @property {string|null} heading its decoded `h4` text, or `null` when it holds no `h4`
+ * @property {string[]} names the primitive names its `h4` yields, in document order
+ * @property {Record<string, string|null>} perNameStatus each of those names against its own
+ *   `data-status-<Name>`, `null` where the block carries no attribute for it
+ */
+
+/**
  * @typedef {object} DesignLibrary
  * @property {number} blockCount every `div.spec-head` on the page
  * @property {number} headingCount every `div.spec-head > h4`; equal to `blockCount` when the
@@ -105,7 +114,44 @@ function distinct(values) {
  * @property {number} nameOccurrences total names across all headings, duplicates included
  * @property {string[]} fileWideNames distinct primitive-shaped names ANYWHERE on the page
  * @property {string[]} namesOutsideHeadings `fileWideNames` that no heading yields
+ * @property {DesignLibraryBlock[]} blocks one record per `div.spec`, in document order
  */
+
+/**
+ * One `div.spec`'s status record: the block's own declared status and its per-name statuses.
+ *
+ * THE ATTRIBUTES SIT ON `div.spec`, NOT ON THE `h4`, and the block reports its heading text so
+ * that placement is checkable. The census in `tests/design-system-coverage.test.js` pins verbatim
+ * text for the PROSE headings alone; a naming heading is read only for the names it yields, and a
+ * status written inside one yields none of its own, so nothing above this field would notice a chip
+ * that moved into an `h4`. `heading` is what the coverage gate compares against the names, and the
+ * block element is the right host for the attributes for a second reason besides: `blockCount`
+ * counts `div.spec-head` rather than `div.spec`, so an attribute here moves no existing count.
+ *
+ * A MISSING ATTRIBUTE READS AS `null` RATHER THAN AS A DEFAULT. `tests/design-system-coverage.test.js`
+ * fails on an entry that declares no status, and a parser that substituted `'target'` for silence
+ * would answer that gate with a value nobody wrote — the shape of unreachable configuration this
+ * whole pair of files exists to make visible.
+ *
+ * THE PER-NAME LOOKUP IS LOWERCASED because HTML attribute names are case-insensitive: the source
+ * writes `data-status-Button` so a reader can see which name it governs, and the parser stores it
+ * back under `Button` so a consumer never has to know that the DOM folded the case.
+ *
+ * @param {Element} block a `div.spec`
+ * @returns {DesignLibraryBlock}
+ */
+function readBlock(block) {
+  const heading = block.querySelector(':scope div.spec-head > h4');
+  const names = heading === null ? [] : primitiveNamesIn(heading.textContent);
+  return {
+    status: block.getAttribute('data-status'),
+    heading: heading === null ? null : heading.textContent,
+    names,
+    perNameStatus: Object.fromEntries(
+      names.map((name) => [name, block.getAttribute(`data-status-${name.toLowerCase()}`)])
+    ),
+  };
+}
 
 /**
  * Parse a design-library document.
@@ -129,6 +175,7 @@ export function parseDesignLibrary(html) {
   const occurrences = headings.flatMap((heading) => primitiveNamesIn(heading));
   const names = distinct(occurrences);
   const fileWideNames = distinct(primitiveNamesIn(document.documentElement.textContent));
+  const blocks = [...document.querySelectorAll('div.spec')].map(readBlock);
 
   window.close();
 
@@ -141,5 +188,6 @@ export function parseDesignLibrary(html) {
     nameOccurrences: occurrences.length,
     fileWideNames,
     namesOutsideHeadings: fileWideNames.filter((name) => !names.includes(name)),
+    blocks,
   };
 }
