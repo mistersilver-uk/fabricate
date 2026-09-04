@@ -229,13 +229,39 @@ function selectorLookups(text) {
  * naming. `const LABEL = 'Add tag'` and `const KEY = 'biomes'` are excluded by the same rule
  * without an allowlist to maintain.
  *
+ * FOUR SPELLINGS THIS MISSED, each one measured escaping before the pattern was widened:
+ *
+ *   - `bounds: '.fabricate-manager'` — an object PROPERTY, and the likeliest shape the offence
+ *     returns in: every caller converted at issue 1500 hands the selector to the action inside an
+ *     options object, so it is never bound to a name at all.
+ *   - `let` beside `const`. The keyword says nothing about what the value is.
+ *   - a TEMPLATE LITERAL. `selectorLookups` has accepted backticks for a call argument since it
+ *     was widened, so a value reader that refused them was inconsistent with the reader it is
+ *     paired with, and the inconsistency was the way out.
+ *   - the OPPOSITE quote inside the body, which the old `[^'"]*` excluded both of. That one did
+ *     not merely stop short, because the closing delimiter backreferenced the opening one: the
+ *     match failed outright, and `const HOST = '[role="dialog"] .fabricate-manager'` was read as
+ *     NO selector rather than as a fragment. Each alternative below excludes only its own
+ *     delimiter, exactly as the call reader's do, so that value is now read whole.
+ *
+ * The bodies stop at a newline for the reason they do there: a selector never spans one, and an
+ * unterminated quote would otherwise swallow the rest of the file.
+ *
+ * THE PROPERTY BRANCH IS KEYED ON THE NAME `bounds`, which is the one exception to "detected by
+ * what the value is" above and a deliberate one: accepting ANY property name would widen the read
+ * population from stated boundaries to every selector-shaped string in every object literal under
+ * `src/ui`. The cost is that a boundary handed over as `host:` or `boundary:` is still out of
+ * sight — the next gap to close, if one is ever written that way.
+ *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
  */
 function boundsSelectors(text) {
-  return [...text.matchAll(/const\s+\w+\s*=\s*(['"])([.[][^'"]*)\1/g)].map((match) => ({
+  const pattern =
+    /(?:(?:const|let)\s+\w+\s*=|\bbounds\s*:)\s*(?:'([.[][^'\n]*)'|"([.[][^"\n]*)"|`([.[][^`\n]*)`)/g;
+  return [...text.matchAll(pattern)].map((match) => ({
     call: 'bounds',
-    selector: match[2],
+    selector: match[1] ?? match[2] ?? match[3],
   }));
 }
 
@@ -424,19 +450,37 @@ test('the selector extractor reads every spelling a host lookup can take', () =>
       'an attribute clause in front of it passes this gate'
   );
 
-  // The constant reader, over a name the first form of it required and a name it did not. Both are
-  // the same coupling, and neither is more likely than the other to be what the next author types.
+  // The value reader, over every spelling a STATED selector takes: a name the first form of it
+  // required and a name it did not, `let` beside `const`, a template literal, and the object
+  // PROPERTY the converted callers actually write — `bounds:` in an options object, which is the
+  // one shape the offence is likeliest to return in and the one this reader was blindest to. All
+  // five are the same coupling, and none is more likely than the others to be what the next
+  // author types.
   for (const source of [
     `const MANAGER_HOST_SELECTOR = '.fabricate-manager';`,
     `const PORTAL_HOME = '.fabricate-manager';`,
+    `let MANAGER_BOUNDS = '.fabricate-manager';`,
+    'const TEMPLATE_HOME = `.fabricate-manager`;',
+    `const options = { bounds: '.fabricate-manager' };`,
   ]) {
     assert.deepEqual(
       boundsSelectors(source),
       [{ call: 'bounds', selector: '.fabricate-manager' }],
-      `\`boundsSelectors\` does not read \`${source}\`, so lifting a root into a constant is a ` +
-        'way out of this gate'
+      `\`boundsSelectors\` does not read \`${source}\`, so stating a root as a value rather than ` +
+        'passing it to a call is a way out of this gate'
     );
   }
+
+  // The opposite quote in the STATED shape, kept separate for the reason the call reader keeps its
+  // own: the selector is what differs rather than the spelling around it. An attribute clause is
+  // quoted CSS, and the old body excluded both quotes behind a backreferenced delimiter, so a
+  // value written this way matched nothing at all and the root inside it was invisible.
+  assert.deepEqual(
+    boundsSelectors(`const HOST = '[role="dialog"] .fabricate-manager';`),
+    [{ call: 'bounds', selector: '[role="dialog"] .fabricate-manager' }],
+    'a stated selector carrying the opposite quote is truncated or dropped, so an offence lifted ' +
+      'into a constant behind an attribute clause passes this gate'
+  );
 
   // AND IT IS NOT MATCHING EVERYTHING. A widened predicate that answered "selector" to any string
   // constant would satisfy every assertion above and turn the offence clause into noise.
