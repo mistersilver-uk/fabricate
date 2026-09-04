@@ -6408,6 +6408,7 @@
             "Entry": {
               "TabCatalogue": "Catalogue entry",
               "HeaderSubtitle": "{source} \u00b7 rules in {members} of {total} systems",
+              "Unsaved": "Unsaved changes",
               "IdentityNote": "Name, image and description refresh from the linked item. Every system shows the same three.",
               "IdentityDropTitle": "Drop a world or compendium item to replace",
               "SourceTitle": "Source identity",

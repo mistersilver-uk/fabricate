@@ -25882,3 +25882,27 @@
 .fabricate-manager .manager-component-entry-system.is-outsider {
   background: var(--fab-surface-soft);
 }
+
+/* ── A1. THE UNSAVED MARKER IN THE HEADER BAND (`proto:817`) ─────────────────────────────────
+   A 7px warning dot and the words beside the action pair, shown only while the draft is dirty.
+   The dot is a DECORATION rather than a control, so its 7px is a shape and not a ladder rung;
+   the gap and the inline margin are the scale's. */
+.fabricate-manager .manager-header-unsaved {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  margin-right: var(--fab-space-1);
+  color: var(--fab-warning-text);
+  font-weight: 600;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-header-unsaved-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fab-warning);
+}

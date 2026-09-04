@@ -10816,6 +10816,26 @@
               as the rail and the breadcrumb, so an unsaved edit prompts whichever of the three
               ways out a GM takes.
             -->
+            <!--
+              THE UNSAVED MARKER, WHICH THE BAND HAD NOWHERE (`proto:817`, gap-list row 53). This
+              is an explicit-save screen, and the only thing that said so was `Save entry` going
+              from disabled to enabled — a state a GM reads as "the button woke up", not as "your
+              edit is not written yet". The reference draws a 7px warning dot and the words beside
+              the pair, and it is the only thing in the band that appears and disappears.
+
+              A SIBLING OF THE PAIR RATHER THAN A SLOT ON IT. `ScopedEntryHeaderActions` owns the
+              ORDER of back-and-save and nothing else, which is the reason its `danger` slot sits
+              BETWEEN them; a marker that is not one of the verbs would make that component the
+              union of its callers, which its own docblock declines. It reads the same
+              `worldComponentEntryDirty` the Save's disabled state does, so the two cannot
+              disagree.
+            -->
+            {#if worldComponentEntryDirty}
+              <span class="manager-header-unsaved" data-world-component-entry-unsaved>
+                <span class="manager-header-unsaved-dot" aria-hidden="true"></span>
+                {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.Unsaved', 'Unsaved changes')}
+              </span>
+            {/if}
             <ScopedEntryHeaderActions
               backAttribute="data-world-component-back"
               saveAttribute="data-world-component-save"
