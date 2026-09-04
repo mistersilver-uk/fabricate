@@ -24427,24 +24427,56 @@
   min-width: 0;
 }
 
-/* A `<select>`, not a free-text input with a datalist (`proto:890`). 34px is the snapped rung and
-   9 is its radius. */
-.fabricate-manager .manager-component-entry-category-select {
+/* THE CATEGORY PICKER (`proto:890-893`). A picker over the world's vocabulary, not a free-text
+   input with a datalist — and, since issue 1371 revision 8, `SearchablePopover`'s trigger rather
+   than a native `<select>`, so the drop-down it opens is the app's own rather than the operating
+   system's. 34px is the snapped rung and 9 is its radius; the reference draws 8, which is on no
+   rung (`design-system/spec.md` puts 34-38px on 9).
+
+   THE FILL IS THE REFERENCE'S. It was `--fab-bg-1` for as long as the element was a `<select>`: a
+   translucent select background opens a LIGHT native popup in every browser, which
+   `manager-layout.test.js` gates. A popover panel is painted by this sheet, so that constraint
+   left with the element and `--fab-surface-soft` is `proto:890`'s own value. */
+.fabricate-manager .manager-component-entry-category-picker {
+  width: 100%;
+}
+
+.fabricate-manager .manager-component-entry-category-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
   height: 34px;
   padding: 0 var(--fab-space-2);
-
-  /* OPAQUE, NOT THE REFERENCE'S `surface-soft`. A translucent `<select>` background opens a
-     LIGHT native popup in every browser, which `manager-layout.test.js` holds as a gate over
-     every manager select; `--fab-bg-1` is the nearest opaque token to the reference's fill. */
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-soft);
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
   color: var(--fab-text);
   font-size: 11.5px;
   font-weight: 500;
+  text-align: left;
   cursor: pointer;
+}
+
+/* THE VALUE SPAN, REACHED THROUGH THE PRIMITIVE'S OWN `valueClass` SEAM rather than by naming
+   `.manager-travel-picker-value` from outside it. Both selectors would paint the same element, and
+   the difference is that the second adds a rule to a class family whose count `SearchablePopover`
+   states in its own register row — `design-system-coverage.test.js` re-derives that number from
+   this sheet and fails on a claim that has drifted, which is exactly what happened when this rule
+   was first written that way. A category name is a GM's own word and can be long, so it
+   ellipsises rather than pushing the chevron off the control. */
+.fabricate-manager .manager-component-entry-category-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-category-trigger:hover,
+.fabricate-manager .manager-component-entry-category-trigger:focus-visible {
+  border-color: var(--fab-accent-border);
+  outline: none;
 }
 
 /* ── A6. SYSTEMS USING THIS COMPONENT ────────────────────────────────────────────────────────

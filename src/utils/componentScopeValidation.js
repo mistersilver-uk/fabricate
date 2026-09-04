@@ -202,6 +202,22 @@ function checkStatus(check) {
 }
 
 /**
+ * Pick the singular or the plural `[key, fallback]` pair for a count.
+ *
+ * A helper rather than a ternary at the call site, because the pair is TWO literals and a
+ * conditional spanning four strings inside an object literal is where a key and its fallback come
+ * to disagree about which number they describe.
+ *
+ * @param {number} count
+ * @param {readonly [string, string]} one
+ * @param {readonly [string, string]} many
+ * @returns {readonly [string, string]}
+ */
+function oneOrMany(count, one, many) {
+  return count === 1 ? one : many;
+}
+
+/**
  * One check's title, in the two states it has.
  *
  * @param {string} id
@@ -242,12 +258,23 @@ function checkTitle(id, check, phrase, context) {
           'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategorySet',
           'World category is set',
         ],
+    // THE SINGULAR IS A KEY, NOT A ROUNDING. A record with exactly one world tag rendered
+    // `1 world tags set` — every other counted string in this family ships a `…One` twin, and a
+    // row on the tab whose whole job is to report a count must not be the one that reads wrong at
+    // the commonest count of all.
     worldTags: missing
       ? ['FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsMissing', 'No world tags']
-      : [
-          'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsSet',
-          '{count} world tags set',
-        ],
+      : oneOrMany(
+          data.count,
+          [
+            'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsSetOne',
+            '{count} world tag set',
+          ],
+          [
+            'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsSet',
+            '{count} world tags set',
+          ]
+        ),
     systemRules: missing
       ? [
           'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemRulesMissing',
@@ -290,9 +317,16 @@ function checkDetail(id, check, phrase) {
       'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategoryMissingNote',
       'Systems that inherit fall back to their own list.',
     ],
+    // NOT `Nothing merges into system tag lists.` (issue 1371, revision 8). That sentence stated
+    // the absent half of a merge whose present half does not exist: `tags` is not a section, so
+    // the read union discards the resolver's additive merge and a world tag reaches no system's
+    // effective list however many are set. Saying "nothing merges" implies that something would,
+    // which is the same claim the classification subtitle was struck for, in the negative.
+    // The replacement is the sentence `componentWorldTagNote` already states for the same absence
+    // on the Definition tab, so the two tabs report one fact in one form rather than two.
     worldTags: [
       'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsMissingNote',
-      'Nothing merges into system tag lists.',
+      'Each system relies on its own list.',
     ],
     systemCategory: [
       'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemCategoryMissingNote',

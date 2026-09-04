@@ -16,11 +16,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
   componentScopeFor,
   createComponentScopeHarness,
   drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -29,6 +31,11 @@ const harness = createComponentScopeHarness({
   tmpPrefix: 'fabricate-world-component-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte',
   rawExtras: [
+    // THE POPOVER'S FOUR LEAVES (issue 1371, revision 8). The world category picker is
+    // `SearchablePopover` now rather than a native `<select>`, so its dismiss action, its portal,
+    // its layout helper and its overlay host are all in this tree's STATIC graph — and a module
+    // missing from this manifest HANGS the suite and reports `# cancelled`, never `# fail`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
@@ -48,6 +55,27 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+  ],
+});
+
+/**
+ * THE SOURCE CARD ON ITS OWN, for the one prop the page cannot exercise.
+ *
+ * `onReviewDuplicates` is withheld by the entry page on purpose — there is no merge screen to
+ * route to — so its rendered arm has no path through the page's tree. Rather than give the page a
+ * prop no call site passes, the card is mounted directly; the factory means this costs a manifest
+ * of three extras rather than a second copy of the harness arrangement.
+ */
+const sourceCardHarness = createComponentScopeHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-world-component-entry-source-',
+  componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
+  rawExtras: ['src/ui/svelte/actions/dragDrop.js', 'src/ui/svelte/util/dropUtils.js'],
+  compiledExtras: [
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
@@ -73,10 +101,25 @@ const ENTRY_SYSTEMS = Object.freeze([
   Object.freeze({ id: 'sys-alchemy', name: 'Alchemy', resolutionMode: 'simple' }),
 ]);
 
-/** Mount the entry on one component, with a recording action bag and the draft wires captured. */
+/**
+ * Mount the entry on one component, with a recording action bag and the draft wires captured.
+ *
+ * THE FOUR SHELL CALLBACKS ARE RECORDED TOO (issue 1371, revision 8). The source card's replace,
+ * unlink and copy, and the missing state's way back, are not `actions` verbs: they resolve a
+ * Foundry document or reach the clipboard, so the page reports them UP and the shell performs
+ * them. A mount that left them at their `() => {}` defaults could not tell a wired control from a
+ * control wired to nothing, which is exactly the state all three shipped in.
+ */
 async function open(entityId, overrides) {
   const { calls, actions } = recordingComponentActions();
-  const reports = { dirty: [], handles: [], sublines: [], vocabulary: [], rules: [] };
+  const reports = {
+    dirty: [],
+    handles: [],
+    sublines: [],
+    vocabulary: [],
+    rules: [],
+    shell: [],
+  };
   const target = await harness.mount({
     scope: scopeFor(overrides),
     actions,
@@ -89,6 +132,10 @@ async function open(entityId, overrides) {
     onSublineChange: (subline) => reports.sublines.push(subline),
     onOpenWorldVocabulary: () => reports.vocabulary.push(true),
     onOpenSystemRules: (id, systemId) => reports.rules.push([id, systemId]),
+    onSourceDrop: (data) => reports.shell.push(['drop', data?.uuid ?? null]),
+    onUnlinkSource: (...args) => reports.shell.push(['unlink', ...args]),
+    onCopySourceUuid: (uuid) => reports.shell.push(['copy', uuid]),
+    onBackToCatalogue: () => reports.shell.push(['back']),
   });
   return { target, calls, actions, reports };
 }
@@ -189,14 +236,45 @@ describe('world Component entry editor (issue 1371)', () => {
     // AC-11. `worldScopeActions` refuses any name outside `COMPONENT_SECTIONS` BEFORE it writes,
     // and reports nothing — so `'categories'` or `'componentCategory'` is a control that silently
     // does nothing forever, with no rendered symptom.
+    //
+    // THE ASSERTION MOVED WITH THE CONTROL (issue 1371, revision 8). The picker was a native
+    // `<select>` and is now `SearchablePopover`, so the write is reached by OPENING the panel and
+    // clicking an option rather than by assigning `value` and dispatching `change`. Every claim
+    // below is the same claim; only the path to it changed.
+
+    /**
+     * Open the category picker and answer its option buttons, in render order.
+     *
+     * @param {HTMLElement} target
+     * @returns {Promise<HTMLElement[]>}
+     */
+    async function openCategoryPicker(target) {
+      const trigger = target.querySelector('[data-scoped-entry-category-input]');
+      assert.ok(Boolean(trigger), 'the entry renders its category picker');
+      trigger.click();
+      await drain();
+      return [...target.querySelectorAll('[data-popover-option]')];
+    }
+
     it('forwards (entityId, "category", value)', async () => {
       const { target, calls } = await open('ingot');
-      const picker = target.querySelector('[data-scoped-entry-category-input]');
-      assert.ok(Boolean(picker), 'the entry renders its category picker');
-      assert.equal(picker.tagName, 'SELECT', 'a select over the vocabulary, not free text');
+      const trigger = target.querySelector('[data-scoped-entry-category-input]');
+      assert.ok(Boolean(trigger), 'the entry renders its category picker');
+      assert.notEqual(
+        trigger.tagName,
+        'SELECT',
+        'the OS drop-down is gone: this is the app own picker, which the debt ratchet requires'
+      );
+      assert.equal(
+        trigger.getAttribute('aria-haspopup'),
+        'listbox',
+        'and it announces the bare list it actually opens, not a dialog'
+      );
 
-      picker.value = 'Raw';
-      picker.dispatchEvent(new window.Event('change', { bubbles: true }));
+      const options = await openCategoryPicker(target);
+      const raw = options.find((option) => option.textContent.trim() === 'Raw');
+      assert.ok(Boolean(raw), `the corpus vocabulary is offered; read ${options.length} options`);
+      raw.click();
       await drain();
 
       assert.deepEqual(
@@ -210,45 +288,62 @@ describe('world Component entry editor (issue 1371)', () => {
       // are authored values cannot express "this record has none", which is the state every
       // freshly created component is in.
       const { target } = await open('ingot');
-      const options = [...target.querySelectorAll('[data-scoped-entry-category-input] option')];
-      assert.equal(options[0].value, '');
+      const options = await openCategoryPicker(target);
+      assert.equal(options[0].getAttribute('data-popover-option'), '__no-world-category');
       assert.equal(options[0].textContent.trim(), 'No world category');
     });
 
     it('never OFFERS the reserved bucket, whatever the corpus already holds', async () => {
       // The picker is the enforcement point: nothing below it can refuse the token, and since
       // issue 1372 a world `general` really does reset every inheriting system on the next read.
-      // A `<select>` moves the refusal from the COMMIT to the OFFER — a value that is not an
-      // option cannot be chosen — so this is the assertion that carries it, driven from a corpus
-      // that really does hold the reserved bucket on a sibling record.
+      // The picker moves the refusal from the COMMIT to the OFFER — a value that is not an option
+      // cannot be chosen — so this is the assertion that carries it, driven from a corpus that
+      // really does hold the reserved bucket on a sibling record.
       const { target } = await open('ingot', {
         defaults: [
           { id: 'ingot', category: 'Refined' },
           { id: 'coal', category: ' GENERAL ' },
         ],
       });
-      const offered = [...target.querySelectorAll('[data-scoped-entry-category-input] option')].map(
-        (option) => option.value
+      const offered = (await openCategoryPicker(target)).map((option) =>
+        option.getAttribute('data-popover-option')
       );
       assert.ok(offered.includes('Refined'), 'the authored vocabulary is offered');
       assert.ok(
-        !offered.some((value) => value.trim().toLowerCase() === 'general'),
+        !offered.some((value) => String(value).trim().toLowerCase() === 'general'),
         `the reserved bucket must never be offered; the picker held ${offered.join(', ')}`
       );
     });
 
     it('but the BLANK option still clears it, because that is a real edit', async () => {
-      // The positive control on the refusal: an empty field is a GM removing the world category
+      // The positive control on the refusal: the empty option is a GM removing the world category
       // deliberately, and a guard that refused every non-offered value would break it.
       const { target, calls } = await open('ingot');
-      const picker = target.querySelector('[data-scoped-entry-category-input]');
-      picker.value = '';
-      picker.dispatchEvent(new window.Event('change', { bubbles: true }));
+      const options = await openCategoryPicker(target);
+      options[0].click();
       await drain();
 
       assert.deepEqual(
         calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
         [{ verb: 'updateWorldDefaultSection', args: ['ingot', 'category', ''] }]
+      );
+    });
+
+    it('and the trigger reads the PERSISTED value, so a refusal needs no restore step', async () => {
+      // What replaced `control.value = worldCategory`. The `<select>` held its own selection, so a
+      // refused choice had to be pushed back onto the element; the trigger is painted from the
+      // record, so there is nothing to put back — and this is the assertion that would red if a
+      // later change gave the trigger local selection state.
+      const { target } = await open('ingot');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-category-input]').textContent.trim(),
+        'Refined'
+      );
+      const { target: unset } = await open('resin');
+      assert.equal(
+        unset.querySelector('[data-scoped-entry-category-input]').textContent.trim(),
+        'No world category',
+        'and a record with no world category says so on the control itself'
       );
     });
   });
@@ -600,7 +695,21 @@ describe('world Component entry editor (issue 1371)', () => {
       );
       // `coal` overrides its category in Forge and mutes one of its two world tags there.
       assert.match(summary.textContent, /Its own category/);
-      assert.match(summary.textContent, /1 tag/, 'the muted tag is not counted as in effect');
+      // AND IT STATES NO TAG COUNT AT ALL (issue 1371, revision 8). The clause read
+      // `{n} tags`, computed as the world list minus this system's mutes — a number NO system
+      // resolves, because `tags` is not a section and the read union discards the resolver's
+      // additive merge. `coal` is the fixture record that carries two world tags AND a mute in
+      // this very system, so it is the one row where a restored clause would have a number to
+      // print: this assertion is on the record that can red.
+      assert.ok(
+        !/\btags?\b/i.test(summary.textContent),
+        `the row claims no per-system tag count, and read "${summary.textContent}"`
+      );
+      assert.match(
+        summary.textContent,
+        /recipes?/,
+        'while the clauses the projection CAN answer survive'
+      );
     });
 
     it('and an INHERITING member names the world value it resolves', async () => {
@@ -1221,5 +1330,301 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(badge.getAttribute('data-badge-tone'), 'danger');
       assert.notEqual(badge.textContent.trim(), '✓');
     });
+  });
+
+  describe('the source card ACTS: all three controls forward, none is decoration', () => {
+    // THE COVERAGE THAT DID NOT MOVE WITH THE BEHAVIOUR (issue 1371, revision 8). M7 retired
+    // `onReplaceSource` / `onUnlinkSource` / `onCopySourceUuid` from the rules editor and
+    // `component-identity-strip-mounted.test.js` deleted the three tests that proved them. The
+    // behaviours arrived HERE and nothing followed them: a no-op substituted for each of the
+    // three handlers left 672 tests green.
+    //
+    // Each is asserted on the FORWARDED ARGUMENT LIST rather than on a post-state, for this
+    // screen's standing reason — none of the three writes anything the projection republishes,
+    // so there is no post-state to read.
+    it('Unlink reports the cut UP, because the shell owns the document write', async () => {
+      const { target, calls, reports } = await open('ingot');
+      const unlink = target.querySelector('[data-scoped-entry-source-unlink]');
+      assert.ok(Boolean(unlink), 'a linked record offers the cut');
+      unlink.click();
+      await drain();
+      assert.deepEqual(reports.shell, [['unlink']]);
+      assert.deepEqual(calls, [], 'and it is not an `actions` verb, so nothing was written here');
+    });
+
+    it('and it is WITHHELD for a record with no link, so the control never lies', async () => {
+      // The negative arm the page wires with `sourceLinked ? onUnlinkSource : null`. Without it a
+      // card that always drew Unlink would pass the assertion above and offer a GM a cut with
+      // nothing to cut.
+      const { target } = await open('orphan');
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-source-unlink]'),
+        'an unlinked record offers no cut'
+      );
+    });
+
+    it('Copy hands the source uuid to the clipboard seam and acknowledges it', async () => {
+      // THE ARGUMENT IS THE ASSERTION. The clipboard write is silent, so a control wired to
+      // `onCopySourceUuid()` with no argument — or with the entry id, one identifier away —
+      // copies an empty string or the wrong string and looks identical either way.
+      const { target, reports } = await open('ingot');
+      const copy = target.querySelector('[data-scoped-entry-source-copy]');
+      assert.ok(Boolean(copy));
+      assert.equal(copy.textContent.trim(), 'Copy');
+      copy.click();
+      await drain();
+      assert.deepEqual(reports.shell, [['copy', 'Item.ingot-source']]);
+      assert.equal(
+        target.querySelector('[data-scoped-entry-source-copy]').textContent.trim(),
+        'Copied',
+        'and the label acknowledges, which is the whole feedback a silent clipboard write has'
+      );
+    });
+
+    it('a drop on the replace target forwards the dropped uuid, and refuses a non-Item', async () => {
+      // `proto:856-861`. The drop is the only way to RE-POINT a linked record, and it goes
+      // through the same shipped `ItemDropZone` guard every other zone uses — so the rejected
+      // table is asserted beside the accepted one, or a zone that dropped its document-type check
+      // would pass on the accepted arm alone.
+      const { target, reports } = await open('ingot');
+      const zone = target.querySelector('[data-item-drop-zone="component-source"]');
+      assert.ok(Boolean(zone), 'the source card offers its replace target');
+
+      dispatchDrop(zone, { type: 'Item', uuid: 'Item.replacement' });
+      await drain();
+      assert.deepEqual(reports.shell, [['drop', 'Item.replacement']]);
+
+      dispatchRejectedDrops(zone);
+      await drain();
+      assert.equal(
+        reports.shell.filter(([kind]) => kind === 'drop').length,
+        1,
+        'an Actor, a Macro and a uuid-less payload all bounce'
+      );
+    });
+
+    it('and the IDENTITY card carries its own replace target, wired to the same seam', async () => {
+      // `proto:842` ends the read-only identity row with a second prompt-only zone. Two zones,
+      // one seam: a page that wired the identity zone to nothing would still draw it.
+      const { target, reports } = await open('ingot');
+      dispatchDrop(target.querySelector('[data-item-drop-zone="component-identity"]'), {
+        type: 'Item',
+        uuid: 'Item.from-identity',
+      });
+      await drain();
+      assert.deepEqual(reports.shell, [['drop', 'Item.from-identity']]);
+    });
+  });
+
+  describe('the alias row WRITES, rather than only enabling itself', () => {
+    // The other half of `Add alias is inert until a uuid is typed`. That test proves the DISABLED
+    // state and stops there, so a button that enabled correctly and committed nothing — or
+    // committed the wrong list shape — passed it.
+    it('Add alias appends the TYPED uuid to the list already on the record', async () => {
+      const { target, calls } = await open('ingot');
+      const field = target.querySelector('[data-scoped-entry-alias-input]');
+      field.value = 'Item.second-source';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      target.querySelector('[data-scoped-entry-alias-add]').click();
+      await drain();
+
+      // THE WHOLE LIST, NOT A DELTA. `updateEntity` replaces the field it is given, so a write of
+      // `[uuid]` alone would silently drop `Item.ingot-legacy` — the alias the fixture record
+      // already answers to, and the one a re-pointed link exists to keep matching.
+      assert.deepEqual(calls, [
+        {
+          verb: 'updateEntity',
+          args: ['ingot', { aliasItemUuids: ['Item.ingot-legacy', 'Item.second-source'] }],
+        },
+      ]);
+      assert.equal(
+        target.querySelector('[data-scoped-entry-alias-input]').value,
+        '',
+        'and the field clears, so a second Enter cannot commit the same uuid twice'
+      );
+    });
+
+    it('and Enter commits it too, which is what the placeholder promises', async () => {
+      const { target, calls } = await open('ingot');
+      const field = target.querySelector('[data-scoped-entry-alias-input]');
+      assert.match(field.getAttribute('placeholder'), /then Enter/);
+      field.value = 'Item.typed-then-entered';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      field.dispatchEvent(
+        new target.ownerDocument.defaultView.KeyboardEvent('keydown', {
+          key: 'Enter',
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+      await drain();
+      assert.deepEqual(calls, [
+        {
+          verb: 'updateEntity',
+          args: ['ingot', { aliasItemUuids: ['Item.ingot-legacy', 'Item.typed-then-entered'] }],
+        },
+      ]);
+    });
+  });
+
+  describe('`Add to systems…` reveals the addable cohort', () => {
+    // `proto:925` draws a modal picker over the non-member systems; this repository has no such
+    // overlay and `actions` exposes only the per-pair `addToSystem`, so the control narrows the
+    // card to the systems the component is NOT in. That is a real behaviour with a real
+    // consequence for what is on screen, and it was named by a lab `expectContained` and one
+    // presence query — clicked by neither.
+    it('narrows the card to the systems the component has no rules in', async () => {
+      // `orphan` is a member of `sys-forge` and not of `sys-alchemy`, so the widened and the
+      // narrowed sets are DIFFERENT — on a record that is a member of both, or of neither, this
+      // control could do nothing at all and still pass.
+      const { target } = await open('orphan');
+      assert.equal(target.querySelectorAll('[data-scoped-entry-system]').length, 2);
+
+      target.querySelector('[data-scoped-entry-add-to-systems]').click();
+      await drain();
+
+      const shown = [...target.querySelectorAll('[data-scoped-entry-system]')].map((row) =>
+        row.getAttribute('data-scoped-entry-system')
+      );
+      assert.deepEqual(shown, ['sys-alchemy'], 'only the system it can still be added to');
+      assert.match(
+        target.querySelector('[data-scoped-entry-system-count]').textContent,
+        /1 of 2/,
+        'and the count follows what the head action did'
+      );
+      const chosen = target.querySelector(
+        '[data-scoped-entry-system-filter="without"] input[type="radio"]'
+      );
+      assert.ok(
+        chosen.checked,
+        'the segmented filter moves with it, so the narrowing is legible and reversible'
+      );
+      assert.ok(
+        Boolean(
+          target.querySelector('[data-scoped-entry-system="sys-alchemy"] [data-scoped-membership-add]')
+        ),
+        'and every revealed row carries the Add this control exists to reach'
+      );
+    });
+  });
+
+  describe('the duplicate-source band offers a merge route only where one exists', () => {
+    /** A corpus in which `resin` claims the SAME source item as `ingot`. */
+    const SHARED_SOURCE = {
+      entities: [
+        {
+          id: 'ingot',
+          name: 'Iron Ingot',
+          description: 'A bar of worked iron.',
+          img: 'icons/commodities/metal/ingot-worn-iron.webp',
+          originItemUuid: 'Item.ingot-source',
+          registeredItemUuid: 'Item.ingot-source',
+          aliasItemUuids: ['Item.ingot-legacy'],
+        },
+        { id: 'orphan', name: 'Unbound Salt', description: 'No Item behind it.' },
+        {
+          id: 'resin',
+          name: 'Wildwood Resin',
+          description: 'Tapped from an ironwood.',
+          originItemUuid: 'Item.ingot-source',
+        },
+        { id: 'coal', name: 'Coal', description: 'Fuel.', originItemUuid: 'Item.coal-source' },
+      ],
+    };
+
+    it('states the duplicate, and WITHHOLDS the review action the page has no route for', async () => {
+      // The shipped arrangement, asserted as one claim rather than two: the BAND draws because
+      // the state it reports is real, and the action does not because this repository has no
+      // merge screen and the page therefore passes no handler. A card that drew the action
+      // anyway would hand a GM a button that does nothing — the failure `onUnlink` and
+      // `onOpenWorldVocabulary` are both withheld to avoid on this same screen.
+      const { target } = await open('ingot', SHARED_SOURCE);
+      const band = target.querySelector('[data-scoped-entry-duplicate-source]');
+      assert.ok(Boolean(band), 'the band reports the shared source item');
+      assert.match(band.textContent, /1 other catalogue entry names the same source item/);
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-duplicate-review]'),
+        'and no dead Review & merge sits beside it'
+      );
+    });
+
+    it('and the band is absent when no other entry claims the same item', async () => {
+      const { target } = await open('ingot');
+      assert.ok(!target.querySelector('[data-scoped-entry-duplicate-source]'));
+    });
+  });
+
+  describe('the MISSING entry is a dead end with exactly one way out, and it is wired', () => {
+    // The issue-1373 pattern on a new screen: `[data-tool-empty-browse-world]` shipped inert
+    // because its state was reached by no test and no capture case. This state is reachable — a
+    // GM opens the entry on a component the world corpus no longer holds — the Back button is the
+    // screen's only affordance, and until now it was proven neither to exist nor to act.
+    it('draws the missing state, and Back reports UP so the owner runs its exit guard', async () => {
+      const { target, reports } = await open('no-such-component');
+      const state = target.querySelector('[data-scoped-entry-state="missing"]');
+      assert.ok(Boolean(state), 'the page states that it is open on nothing');
+      assert.match(state.textContent, /No component chosen/);
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-identity-card]'),
+        'and draws none of the editor behind it'
+      );
+
+      const back = target.querySelector('[data-scoped-entry-back]');
+      assert.ok(Boolean(back), 'the empty state offers the one way out');
+      back.click();
+      await drain();
+      assert.deepEqual(reports.shell, [['back']]);
+    });
+
+    it('and a component the corpus DOES hold draws the editor instead', async () => {
+      // The positive control. A page hard-wired to the empty state passes every assertion above.
+      const { target } = await open('ingot');
+      assert.ok(!target.querySelector('[data-scoped-entry-state="missing"]'));
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-identity-card]')));
+    });
+  });
+});
+
+describe('the world Component entry source card, mounted on its own (issue 1371)', () => {
+  // WHY A SECOND HARNESS. `onReviewDuplicates` is the card's own opt-in prop and the entry page
+  // deliberately passes none, so the POSITIVE arm — the action renders and calls its handler — is
+  // unreachable through the page. Mounting the card is what lets both arms be proved, and it is
+  // what stops the prop from becoming the dead API a reviewer found on `InheritRow`.
+  before(async () => {
+    await sourceCardHarness.setup();
+  });
+
+  after(() => {
+    sourceCardHarness.teardown();
+  });
+
+  it('renders `Review & merge` for a caller that HAS a route, and calls it', async () => {
+    const merges = [];
+    const target = await sourceCardHarness.mount({
+      entryId: 'ingot',
+      sourceUuid: 'Item.ingot-source',
+      aliasUuids: [],
+      duplicateCount: 2,
+      onReviewDuplicates: () => merges.push(true),
+    });
+    const review = target.querySelector('[data-scoped-entry-duplicate-review]');
+    assert.ok(Boolean(review), 'the action appears beside the band');
+    assert.equal(review.textContent.trim(), 'Review & merge');
+    review.click();
+    await drainMicrotasks();
+    assert.deepEqual(merges, [true]);
+  });
+
+  it('and the band still draws without one, because the state it reports is real', async () => {
+    const target = await sourceCardHarness.mount({
+      entryId: 'ingot',
+      sourceUuid: 'Item.ingot-source',
+      aliasUuids: [],
+      duplicateCount: 2,
+    });
+    assert.ok(Boolean(target.querySelector('[data-scoped-entry-duplicate-source]')));
+    assert.ok(!target.querySelector('[data-scoped-entry-duplicate-review]'));
   });
 });

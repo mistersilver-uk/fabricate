@@ -413,6 +413,60 @@ describe('the entry validation check set renders at its declared severity', () =
     );
   });
 
+  it('BLOCKS on an empty name, which no fixture in this file ever drove', () => {
+    // `name` is a blocking check and every fixture here named the record `Iron Ingot`, so
+    // collapsing the evaluator's `trimmed(context.name) ? 'authored' : 'missing'` to a bare
+    // `'authored'` left this whole file green at 32/32 and the entry's mounted suite green at
+    // 64/64. Three claims, because the defect can hide in any one of them: the SEVERITY the row
+    // renders at, the TITLE it renders, and whether it reaches the Blocking tally the hero and
+    // the tab badge are both painted from.
+    //
+    // WHITESPACE, NOT THE EMPTY STRING. `''` is refused by `Boolean` as well as by `trim()`, so a
+    // check that dropped the trim would still pass on it; `'   '` is a name a GM can really type
+    // and is the one input that discriminates between the two.
+    const { groups, counts } = componentScopeValidationPresentation(
+      { ...blank, name: '   ', hasSourceLink: true, resolvedCategory: 'Refined' },
+      phrase
+    );
+    const row = groups.flatMap((group) => group.rows).find((entry) => entry.id === 'name');
+    assert.ok(Boolean(row), 'the identity group renders a row for the name');
+    assert.equal(row.status, 'block');
+    assert.equal(row.title, 'Name is empty');
+    assert.equal(
+      counts.blocking,
+      1,
+      'and it is the ONLY blocking row on this fixture, so the tally is its own rather than the ' +
+        'missing source item being counted twice'
+    );
+  });
+
+  it('and a named record passes that row, so the check is discriminating', () => {
+    const { groups, counts } = componentScopeValidationPresentation(
+      { ...blank, hasSourceLink: true, resolvedCategory: 'Refined' },
+      phrase
+    );
+    const row = groups.flatMap((group) => group.rows).find((entry) => entry.id === 'name');
+    assert.equal(row.status, 'pass');
+    assert.equal(row.title, 'Name is set');
+    assert.equal(counts.blocking, 0);
+  });
+
+  it('and the world-tag row counts ONE tag in the singular', () => {
+    // Reviewer finding 9: `WorldTagsSet` shipped as `{count} world tags set` with no `…One` twin,
+    // so a record with exactly one world tag rendered `1 world tags set`. Both arms, because a
+    // key wired to the singular unconditionally reads just as wrong at two.
+    const titleFor = (worldTags) =>
+      componentScopeValidationPresentation(
+        { ...blank, worldTags, hasSourceLink: true, resolvedCategory: 'Refined' },
+        phrase
+      )
+        .groups.flatMap((group) => group.rows)
+        .find((entry) => entry.id === 'worldTags').title;
+
+    assert.equal(titleFor(['ore']), '1 world tag set');
+    assert.equal(titleFor(['ore', 'fuel']), '2 world tags set');
+  });
+
   it('and reports SIX passes on a complete record, so failure is discriminating', () => {
     const { counts } = componentScopeValidation({
       name: 'Iron Ingot',

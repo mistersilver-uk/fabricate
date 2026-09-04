@@ -933,15 +933,27 @@ export function componentSystemModeLabel(resolutionMode, text) {
  * value is the system's own while it overrides — reading `row.category` would print
  * `No world category` for an overriding system, which is false rather than merely vague.
  *
+ * ── AND THERE IS NO TAG CLAUSE, BECAUSE NO SYSTEM RESOLVES A TAG COUNT ───────────────────────
+ * It used to read `{n} tags`, computed as `worldTags.length - mutedTags.length`. That number is
+ * a tag set NOTHING resolves: `tags` is not a section, so the read union's trailing re-spread
+ * discards the resolver's additive merge and every system's effective tag list is its own,
+ * whatever this record holds. The row was therefore stating a per-system fact about a merge that
+ * has no consumer — the same false half of the merge the classification subtitle asserted, in
+ * numeric form, and the one this file's own docblock at the head calls worse than no note.
+ *
+ * THE SYSTEM'S OWN TAG COUNT WOULD BE TRUE AND IS NOT AVAILABLE HERE. It lives on the in-system
+ * component record, which this projection does not publish — `buildSystemRow` carries the four
+ * fields above and nothing more — so the honest clause is NO clause rather than a second wrong
+ * number. Restoring one means publishing the count first.
+ *
  * @param {object} row the projected system row.
  * @param {object} options
  * @param {string} options.worldCategory the authored world default, or the empty string.
- * @param {string[]} options.worldTags the authored world tag list.
  * @param {(key: string, fallback: string) => string} options.text
  * @param {(key: string, fallback: string, data?: object) => string} options.phrase
  * @returns {{member: boolean, text: string}}
  */
-export function componentSystemRowSummary(row, { worldCategory, worldTags, text, phrase }) {
+export function componentSystemRowSummary(row, { worldCategory, text, phrase }) {
   if (row?.member !== true) {
     return {
       member: false,
@@ -951,18 +963,9 @@ export function componentSystemRowSummary(row, { worldCategory, worldTags, text,
       ),
     };
   }
-  const muted = Array.isArray(row?.mutedTags) ? row.mutedTags.length : 0;
-  const tags = Math.max(0, (Array.isArray(worldTags) ? worldTags.length : 0) - muted);
   const recipes = Number(row?.recipeCount) || 0;
   const clauses = [
     componentRowCategoryClause(row, worldCategory, text),
-    phrase(
-      tags === 1
-        ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryTagsOne'
-        : 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryTags',
-      tags === 1 ? '{count} tag' : '{count} tags',
-      { count: tags }
-    ),
     phrase(
       recipes === 1
         ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SummaryRecipesOne'

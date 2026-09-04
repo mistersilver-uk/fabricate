@@ -58,6 +58,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
   import WorldComponentEntryPreviewRail from './WorldComponentEntryPreviewRail.svelte';
   import WorldComponentEntrySourceCard from './WorldComponentEntrySourceCard.svelte';
   import WorldComponentEntrySystemsCard from './WorldComponentEntrySystemsCard.svelte';
@@ -129,6 +130,16 @@
    * @type {readonly string[]}
    */
   const IDENTITY_FIELDS = Object.freeze(['name', 'img', 'description']);
+
+  /**
+   * The `data-popover-option` token for the category picker's UNSET choice.
+   *
+   * Prefixed and hyphenated so it cannot collide with an authored category: the option's id
+   * is the empty string, which the primitive stamps as no attribute at all.
+   *
+   * @type {string}
+   */
+  const UNSET_CATEGORY_OPTION = '__no-world-category';
 
   let activeTab = $state('definition');
   // ONE ARMED CONTROL AT A TIME ACROSS THE WHOLE PAGE. The systems card's exit icons and the
@@ -312,6 +323,28 @@
     ])
   );
 
+  const noCategoryLabel = $derived(
+    text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category')
+  );
+
+  /**
+   * THE PICKER'S OPTION LIST, unset option FIRST (`proto:891`).
+   *
+   * A picker whose only choices are authored values cannot express "this record has none", which
+   * is the state every freshly created component is in — and clearing a world category is a real
+   * edit rather than a refusal, so the empty choice is a first-class option rather than an absence
+   * of one. Its `dataId` is a reserved token rather than its own empty id: `data-popover-option`
+   * is stamped only for a TRUTHY value, so an empty one would leave the single option a capture
+   * walk and a mounted test most need to address with no handle at all.
+   *
+   * The list can never be empty, so this call site passes no `emptyHint`: the primitive's empty
+   * panel is unreachable here.
+   */
+  const categoryPickerOptions = $derived([
+    { id: '', label: noCategoryLabel, dataId: UNSET_CATEGORY_OPTION },
+    ...categoryOptions.map((option) => ({ id: option, label: option, dataId: option })),
+  ]);
+
   // THE WORLD TAG VOCABULARY THE CARD TOGGLES OVER. The reference draws no add field on this card
   // (`proto:899-901`): authoring the vocabulary is behind `Edit world vocabulary ↗`, and what this
   // card does is apply and clear the tags the world already has.
@@ -434,16 +467,28 @@
    * The refusal once shipped as `offered[0] ?? ''`, so a refused value cleared the authored one
    * with no message. BLANK IS STILL A REAL EDIT: an empty option is a GM clearing the category
    * deliberately and must keep working; only a NON-BLANK value the offer list refuses is turned
-   * away, and the control is put back to what is stored.
+   * away, and nothing is written for it.
    *
-   * @param {HTMLSelectElement} control
+   * ── AND THE CONTROL PUTS ITSELF BACK, BECAUSE IT NEVER LEFT ─────────────────────────────
+   * The picker's trigger is painted from `worldCategory`, the persisted value, rather than from an
+   * internal selection, so a refused choice needs no restore step: nothing moved. The `<select>`
+   * this replaced held its own selection and did need one — `control.value = worldCategory` — and
+   * that difference is why this guard no longer takes a control at all.
+   *
+   * ── IT IS THE SECOND LINE, NOT THE FIRST ────────────────────────────────────────────────
+   * The OFFER is the enforcement point and always was: `offeredWorldComponentCategories` builds
+   * the option list, so the reserved bucket is not among the choices and a GM cannot pick it. This
+   * guard is what keeps that true for a value arriving any other way — and it is deliberately not
+   * deleted as unreachable, because the layer below it cannot refuse the token at all and a picker
+   * is a rendering decision that a later revision may change again.
+   *
+   * @param {string} value the chosen option's id, which is the category or the empty string.
    * @returns {void}
    */
-  function commitWorldCategory(control) {
-    const raw = String(control?.value ?? '');
+  function commitWorldCategory(value) {
+    const raw = String(value ?? '');
     const offered = offeredWorldComponentCategories([raw]);
     if (offered.length === 0 && raw.trim() !== '') {
-      control.value = worldCategory;
       notifyWarn(
         text(
           'FABRICATE.Admin.Manager.Scoped.Component.CategoryReserved',
@@ -486,7 +531,7 @@
    * every branch without going through the DOM.
    *
    * @param {object} row
-   * @param {{worldCategory: string, worldTags: string[]}} context
+   * @param {{worldCategory: string}} context
    * @returns {{member: boolean, text: string}}
    */
   function summaryFor(row, context) {
@@ -677,10 +722,20 @@
                       'World classification'
                     )}
                   </h3>
+                  <!--
+                    THE SUBTITLE STATES THE HALF THAT IS CONSUMED AND STOPS (issue 1371, revision
+                    8). It read `Set once here, merged into every system that has rules for it`,
+                    which is true of the CATEGORY and false of the TAGS: an inheriting section
+                    really does resolve from the world default, while `tags` is not a section, so
+                    the read union's trailing re-spread discards the resolver's additive merge and
+                    no system resolves a world tag at all. One sentence made both claims, and the
+                    shipped rule in `ui-integration/spec.md` is that no surface may assert the
+                    false half while the merge is unconsumed.
+                  -->
                   <p class="manager-subtitle">
                     {text(
                       'FABRICATE.Admin.Manager.Scoped.Component.Entry.ClassificationSubtitle',
-                      'Set once here, merged into every system that has rules for it.'
+                      'Set once here. The category resolves in every system that inherits it; the tags stay on this record.'
                     )}
                   </p>
                 </div>
@@ -714,26 +769,45 @@
                       'Category'
                     )}
                   </p>
-                  <select
-                    class="manager-component-entry-category-select"
+                  <!--
+                    THE CATEGORY PICKER IS THE SHARED POPOVER, NOT A NATIVE `<select>` (issue
+                    1371, revision 8). A native select draws the OPERATING SYSTEM's drop-down: it
+                    carries none of this app's type, colour or spacing, and it cannot be themed at
+                    all — which is why `design-system-debt-ratchets` counts one as new debt, and
+                    why this control was the branch's single new entry against that gate.
+
+                    `showSearch={false}` because the world's category vocabulary is a handful of
+                    fixed names, and because it is what keeps `triggerHasPopup="listbox"`
+                    truthful: with a query field the panel is a dialog CONTAINING a listbox, and
+                    the trigger would announce a control the GM never gets.
+
+                    AND THE FILL IS THE REFERENCE'S NOW. The rule under this class used to hold
+                    `--fab-bg-1` with a note that a translucent `<select>` background opens a
+                    LIGHT native popup in every browser. There is no native popup any more, so
+                    `proto:890`'s own `surface-soft` fill is reachable and the deviation that
+                    opaque fill was recorded as is retired with the element.
+                  -->
+                  <SearchablePopover
+                    options={categoryPickerOptions}
                     value={worldCategory}
-                    aria-label={text(
+                    showSearch={false}
+                    showChevron
+                    triggerHasPopup="listbox"
+                    pickerClass="manager-component-entry-category-picker"
+                    triggerClass="manager-component-entry-category-trigger"
+                    valueClass="manager-component-entry-category-value"
+                    triggerLabel={worldCategory || noCategoryLabel}
+                    triggerAriaLabel={text(
                       'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
                       'World category'
                     )}
-                    data-scoped-entry-category-input
-                    onchange={(event) => commitWorldCategory(event.currentTarget)}
-                  >
-                    <option value=""
-                      >{text(
-                        'FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory',
-                        'No world category'
-                      )}</option
-                    >
-                    {#each categoryOptions as option (option)}
-                      <option value={option}>{option}</option>
-                    {/each}
-                  </select>
+                    dialogAriaLabel={text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
+                      'World category'
+                    )}
+                    triggerData={{ 'data-scoped-entry-category-input': '' }}
+                    onChoose={(option) => commitWorldCategory(option)}
+                  />
                   <p class="manager-component-entry-note" data-scoped-entry-category-note>
                     {categoryNote}
                   </p>
@@ -759,6 +833,18 @@
                     different value, so dropping the tone would move the unlit ink AWAY from the
                     reference to buy nothing. (No colour literal is written here: the theme
                     colour contract scans comments too, and the tokens say it exactly.)
+
+                    r8-prim: wire — THE LIT CHIP STILL WAITS FOR ITS VARIANT (UX F10). The
+                    reference inks and tints the lit tag in the tag hue (`proto:5401`,
+                    `proto:5665`), and `tone="tag"` does not paint that: the compare run measures
+                    the lit chip's border in the tag hue but its FILL as a grey-blue mix and its
+                    INK as the default warm text token, which is the ONE surviving colour
+                    divergence on this screen. The fix is an opt-in lit variant on the shared
+                    `Chip`, the same shape lane E shipped for `struck` and `density="tag-run"`,
+                    NOT an in-place restyle of `tone="tag"` (six other callers) and not a fourth
+                    chip component. Lane PRIM owns that primitive this revision; wire it here the
+                    moment it lands, and re-run `compare --screen entry` to close the three
+                    `entry-tag-chip` colour lines.
                   -->
                   <div class="manager-component-entry-chips">
                     {#each tagVocabulary as tag (tag)}
@@ -801,7 +887,6 @@
               rows={systemRows}
               {systems}
               {worldCategory}
-              {worldTags}
               {armedToken}
               {text}
               {phrase}

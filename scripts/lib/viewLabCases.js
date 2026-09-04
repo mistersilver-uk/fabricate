@@ -1711,6 +1711,13 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-entry-tag-note]',
       },
     ],
+    // THE TAG CHIP OWNS ITS OWN CENTRE (issue 1371, revision 8 — UX F13). The world tag run is a
+    // wrapping row of 999-radius chips inside a two-column grid column, and a chip is a real
+    // `<button>` with `aria-pressed`: a run that overflowed its column, or a card head that
+    // overlapped it, would leave a chip present in the DOM, correct in every mounted assertion
+    // and unclickable on screen. `elementFromPoint` at the chip's centre is the only check that
+    // can tell those apart, and no mounted suite can make it — happy-dom lays nothing out.
+    expectCenterHit: '[data-scoped-entry-tag="fuel"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
@@ -1757,6 +1764,28 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-entry-delete-note]',
       },
     ],
+    // TWO POINTER PROOFS ON ONE FRAME (issue 1371, revision 8 — UX F13), because these are the two
+    // controls on this screen a compressed row can swallow and no mounted test can see: happy-dom
+    // lays nothing out, so every mounted assertion about either passes on a zero-sized target.
+    //
+    // `expectCenterHit` takes the member row's EXIT ICON in its IDLE face, which is the narrowest
+    // thing this screen draws — a 26px icon-only control in a trailing cluster that shares one
+    // flex row with an ellipsising summary column and, on a member row, with `View system rules`.
+    // That is the exact geometry the delta names: a row whose middle column refuses to shrink
+    // compresses the cluster instead, and the icon keeps its box in the DOM while losing its
+    // centre.
+    //
+    // `expectClick` takes the DELETE, and it is the stronger check of the two — a real Playwright
+    // pointer click, whose actionability pass fails on an obscured, zero-sized or covered target
+    // rather than dispatching a synthetic event at it. Clicking ARMS the control, which writes
+    // nothing (the token is page-local) and cannot delete anything (`sm-coal` has rules in
+    // `lab-smithing`, so the confirm is refused by the page itself). What it buys beyond the
+    // proof is the frame: this case now publishes the armed REFUSAL — `Cannot delete` over the
+    // note naming the system that causes it — which is the state the refusal exists for and
+    // which no frame has ever shown.
+    expectCenterHit:
+      '[data-scoped-entry-system="lab-smithing"] [data-arm-token="scoped-membership-remove:sm-coal|lab-smithing"]',
+    expectClick: '[data-arm-token="world-component-delete:sm-coal"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [

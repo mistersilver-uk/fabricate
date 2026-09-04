@@ -38,7 +38,6 @@
     /** The crafting-system roster, for the resolution mode each row states. */
     systems = [],
     worldCategory = '',
-    worldTags = [],
     armedToken = '',
     text = (key, fallback) => fallback,
     phrase = (key, fallback) => fallback,
@@ -227,7 +226,7 @@
 
   <ul class="manager-component-entry-systems" role="list">
     {#each visibleRows as row (row.systemId)}
-      {@const summary = summaryFor(row, { worldCategory, worldTags })}
+      {@const summary = summaryFor(row, { worldCategory })}
       <li
         class="manager-component-entry-system"
         class:is-outsider={row.member !== true}
