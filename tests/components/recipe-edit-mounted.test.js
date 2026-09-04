@@ -5533,7 +5533,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openBooks = books.querySelector('[data-recipe-open-books]');
     assert.equal(
       openBooks?.className,
-      'manager-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button manager-button fab-manager-button manager-recipe-tab-action',
       'Open Books & Scrolls keeps its own class and the primitive`s'
     );
     editHarness.remount();
@@ -5545,7 +5545,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openAccess = access.querySelector('[data-recipe-open-access]');
     assert.equal(
       openAccess?.className,
-      'manager-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button manager-button fab-manager-button manager-recipe-tab-action',
       'Manage access keeps its own class and the primitive`s'
     );
     editHarness.remount();

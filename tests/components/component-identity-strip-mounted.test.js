@@ -195,8 +195,8 @@ describe('ComponentIdentityStrip — source capabilities (issue 676, AC3)', () =
     assert.equal(trigger.getAttribute('aria-expanded'), 'false');
     assert.equal(
       trigger.className,
-      'manager-icon-button manager-component-overflow-trigger',
-      'the rendered class attribute is byte-identical to the one the picker trigger carried, ' +
+      'fabricate-icon-button manager-icon-button manager-component-overflow-trigger',
+      'the rendered class attribute carries the primitive`s root class first, ' +
         'because `<ActionMenu>` renders `<IconButton>` and that primitive writes the shared class'
     );
 
