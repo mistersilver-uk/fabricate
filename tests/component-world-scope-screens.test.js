@@ -75,6 +75,16 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         './component/ComponentEditorHeader.svelte',
         './components/ComponentBrowserInspector.svelte',
         './components/ComponentBulkEditPanel.svelte',
+        // THE `Add from catalogue` PICKER (revision 8, M9). It IS a new component import into the
+        // gateway, and it is the one this requirement most needs justified — so it is justified
+        // rather than waved through. It is not a SCREEN: it mints no route (the route enumeration
+        // below is unchanged and asserted as a whole set), it renders no `data-scoped-page`, and
+        // it is unreachable from the nav. It is a DIALOG, and a dialog has to be hosted from the
+        // gateway because `ManagerModal` portals its panel to the application root and a dialog
+        // rendered from inside a view dies with that view — which is why the folder-mapping and
+        // import-report dialogs are mounted here too. What it replaces is a header action that
+        // navigated to a route token that does not exist.
+        './scoped/ComponentAddFromCatalogueDialog.svelte',
         './scoped/WorldComponentCataloguePage.svelte',
         './scoped/WorldComponentEntryPage.svelte',
         // A STRING LEAF, not a screen. `componentListSubtitle` / `componentRulesSubtitle` are the
@@ -298,6 +308,104 @@ describe('the two world component pages declare only what their call site passes
   });
 });
 
+describe('the `Add from catalogue` header action opens a picker and navigates nowhere (M9)', () => {
+  // Revision 5's control read `openWorldScopedEntry('world-component-' + 'catalogue', '')`. That
+  // token is a VIEW LAB CASE ID rather than a route: `WORLD_SCOPED_VIEWS` does not carry it, the
+  // view chain has no branch for it, and `openWorldScopedEntry` assigns whatever token it is
+  // handed — so pressing the header action dropped the GM on the crafting-systems library. It
+  // survived four gate runs because `data-component-add-from-catalogue` appeared in NO test file.
+  //
+  // THE TOKEN IS SPLIT ACROSS A CONCATENATION IN THIS COMMENT, deliberately, because the
+  // assertion below is `comments included` — a file that could not write the literal at all would
+  // be unable to explain what it forbids.
+  //
+  // THE FORWARD IS ASSERTED AT SOURCE because the seam is what a mounted suite cannot see: the
+  // picker's own behaviour has its own file, and what broke here was the WIRE.
+  const DEAD_TOKEN = `world-component-${'catalogue'}`;
+  const body = withoutComments(rootSource);
+
+  it('the token that resolves to nothing is gone from the gateway entirely', () => {
+    // COMMENTS INCLUDED. The revision-5 line came with a comment claiming the handler widened the
+    // list's own membership filter, which it never did — so the prose was as wrong as the call,
+    // and a scan over stripped source would have left the claim standing.
+    assert.ok(
+      !rootSource.includes(DEAD_TOKEN),
+      'the gateway names the dead token nowhere, in code or in prose'
+    );
+    // NON-VACUITY: the token IS a live capture-case id, so a scan that had stopped matching
+    // anything would report the same clean answer above.
+    assert.ok(
+      readFileSync(resolve(repoRoot, 'scripts/lib/viewLabCases.js'), 'utf8').includes(DEAD_TOKEN),
+      'the case registry still owns it, so the assertion above is about the gateway'
+    );
+  });
+
+  it('the header action opens the picker, and the picker is mounted with the composed write', () => {
+    assert.match(
+      body,
+      /data-component-add-from-catalogue\s+onclick=\{\(\) => \(componentAddFromCatalogueOpen = true\)\}/,
+      'the action sets the picker open and calls no navigation helper at all'
+    );
+    const mount = /<ComponentAddFromCatalogueDialog\s([\s\S]*?)\/>/.exec(body);
+    assert.ok(mount, 'the gateway mounts the picker');
+    assert.match(
+      mount[1],
+      /onAdd=\{\(entityId\) => store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)\}/,
+      'wired to the COMPOSED adoption — the generic membership-only write would leave every ' +
+        'adopted component invisible to the very list it was adopted into'
+    );
+    assert.match(mount[1], /open=\{componentAddFromCatalogueOpen\}/);
+    assert.match(mount[1], /systemId=\{selectedSystemId \|\| ''\}/);
+  });
+});
+
+describe('the deep link into a system’s Component Rules is a capability, not just a wire', () => {
+  // QE 5. `openSystemComponentRules` is new at issue 1371 and named by no test: replacing its
+  // whole body with `return false;` left 628 tests green. Both controls that reach it — the world
+  // catalogue inspector's `Rules ↗` and the entry's `View system rules ↗` — were covered only up
+  // to a test-local spy, which proves the FORWARD and says nothing about what is forwarded TO.
+  //
+  // ASSERTED AT SOURCE because the handler lives in the gateway, which one 29,000-line suite
+  // mounts and which needs a whole world corpus to reach this state from. The click half now has
+  // real coverage at both call sites (`world-component-catalogue-mounted` and
+  // `world-component-entry-mounted`); this is the half those cannot see.
+  const body = withoutComments(rootSource);
+
+  it('it selects the system FIRST and commits the route only if that succeeded', () => {
+    const handler =
+      /function openSystemComponentRules\(_entityId, systemId\) \{([\s\S]*?)\n  \}/.exec(body);
+    assert.ok(handler, 'the gateway declares the handler');
+    assert.match(
+      handler[1],
+      /if \(!systemId\) return false;/,
+      'a missing system is refused rather than committing a route with nothing selected'
+    );
+    assert.match(
+      handler[1],
+      /return afterTruthyResult\(selectSystem\(systemId, 'components'\), \(\) => \{\s*activeView = 'components';\s*\}\);/,
+      'the selection is committed through the shared guard and the route is set INSIDE it, so a ' +
+        'refused selection (an unsaved-changes prompt the GM cancels) leaves the view where it was'
+    );
+    // NON-VACUITY, and it is the whole point: a body replaced by `return false;` matches the
+    // handler regex and neither assertion above, which is exactly the mutation that survived.
+    assert.ok(
+      handler[1].includes('activeView'),
+      'the handler still commits a view; a stubbed body would satisfy a wire-only assertion'
+    );
+  });
+
+  it('and both controls that reach it are wired to it, rather than to a default no-op', () => {
+    assert.equal(
+      [...body.matchAll(
+        /onOpenSystemRules=\{\(entityId, systemId\) => openSystemComponentRules\(entityId, systemId\)\}/g
+      )].length,
+      2,
+      'the world catalogue and the world entry both route into the COMPONENT handler; a mount ' +
+        'left defaulted is silently inert and a mounted test would pass against the default'
+    );
+  });
+});
+
 describe('the catalogue composes the shell and inlines nothing', () => {
   // AC-3. A page that hand-rolled the frame's filter, pager or bulk bar would render the same
   // pixels and be a third copy of a composition three lanes share.
@@ -403,7 +511,11 @@ describe('no new scoped file trips either naming gate', () => {
   it('and the new children carry NEITHER route-hook attribute name', () => {
     // The route→page map is built by matching those attribute NAMES literally against every file
     // in this directory, COMMENTS INCLUDED, so a child mentioning one claims a route a page owns.
-    const children = ['ComponentCatalogueBulkPanel.svelte', ...WORLD_CHILDREN];
+    const children = [
+      'ComponentCatalogueBulkPanel.svelte',
+      'ComponentAddFromCatalogueDialog.svelte',
+      ...WORLD_CHILDREN,
+    ];
     for (const child of children) {
       const source = read(`${SCOPED}/${child}`);
       for (const hook of ['data-scoped-page', 'data-scoped-placeholder']) {

@@ -189,6 +189,31 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.equal(target.querySelectorAll('[data-scoped-system]').length, 2);
     });
 
+    it('the member row’s `Rules ↗` FIRES, with the pair the gateway’s handler takes', async () => {
+      // QE 5. This control is newly live on this screen (`systemRowAction="navigate"`), and it
+      // was clicked by NOTHING anywhere — so the deep link into a system's Component Rules list
+      // was proven to exist and never proven to act. Replacing the gateway's
+      // `openSystemComponentRules` body with `return false;` left 628 tests green.
+      //
+      // THE ARGUMENT PAIR IS THE ASSERTION, not the call count: the handler's signature is
+      // `(entityId, systemId)` and the two are the same SHAPE of string, so a row wired with them
+      // reversed selects a system named after a component and refuses — silently, because a
+      // refused exit stays refused.
+      const opened = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        onOpenSystemRules: (entityId, systemId) => opened.push([entityId, systemId]),
+      });
+      await inspect(target, 'ingot');
+      const link = target.querySelector('[data-scoped-list-system-rules="sys-alchemy"]');
+      assert.ok(Boolean(link), 'the member row draws its deep link');
+      link.click();
+      await drain();
+      assert.deepEqual(opened, [['ingot', 'sys-alchemy']]);
+    });
+
     it('and a member row is MARKED, which the emitted state attribute never painted', async () => {
       const target = await mount();
       await inspect(target, 'coal');

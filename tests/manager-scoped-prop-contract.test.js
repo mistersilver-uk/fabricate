@@ -218,6 +218,13 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
   // beside its sibling below because this list is asserted SORTED. See the note on
   // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
+  // ADDED BY ISSUE 1371's M9 RULING. The system Component Rules list's `Add from catalogue` is
+  // the reference's in-place PICKER, not a route change, and `ManagerModal` portals its panel to
+  // the application root — so, like the folder-mapping and import-report dialogs already pinned
+  // above, it has to be mounted from the shell or it dies with the view that opened it. It mints
+  // no route and renders no `data-scoped-page`; see `component-world-scope-screens.test.js` for
+  // the requirement-7 evidence.
+  './scoped/ComponentAddFromCatalogueDialog.svelte',
   './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',

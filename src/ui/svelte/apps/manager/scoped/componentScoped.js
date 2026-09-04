@@ -698,6 +698,11 @@ export function componentInheritState(systemRow, phrase) {
  * in-system re-spread discards it, so a note counting the merge would state a number no system
  * resolves.
  *
+ * ITS FOUR KEYS ARE `TagCount…`, NOT `TagMerge…` (revision 8). The rendered sentence was already
+ * true, but the key NAMES said `merge` — and a key name is what the next author reads when they
+ * look for "the string about the tag merge" and then writes one. Renamed with the two subtitles
+ * that did assert the merge, so nothing under this card names a merge no system performs.
+ *
  * @param {{effective: number, muted: number}} counts
  * @param {(key: string, fallback: string, data?: object) => string} phrase
  * @returns {string}
@@ -711,15 +716,15 @@ export function componentTagMergeNote({ effective, muted }, phrase) {
   const mutedCount = Number(muted) || 0;
   const left = phrase(
     effectiveCount === 1
-      ? 'FABRICATE.Admin.Manager.Component.TagMergeEffectiveOne'
-      : 'FABRICATE.Admin.Manager.Component.TagMergeEffective',
+      ? 'FABRICATE.Admin.Manager.Component.TagCountEffectiveOne'
+      : 'FABRICATE.Admin.Manager.Component.TagCountEffective',
     effectiveCount === 1 ? '{count} tag in effect here' : '{count} tags in effect here',
     { count: effectiveCount }
   );
   const right = phrase(
     mutedCount === 1
-      ? 'FABRICATE.Admin.Manager.Component.TagMergeMutedOne'
-      : 'FABRICATE.Admin.Manager.Component.TagMergeMuted',
+      ? 'FABRICATE.Admin.Manager.Component.TagCountMutedOne'
+      : 'FABRICATE.Admin.Manager.Component.TagCountMuted',
     mutedCount === 1 ? '{count} world tag muted' : '{count} world tags muted',
     { count: mutedCount }
   );
@@ -1287,6 +1292,16 @@ export function componentSalvageSummary(
 /**
  * The system rules LIST header's subtitle -- this system's own posture, not a generic sentence.
  *
+ * ── IT NAMES THE CATEGORY AND NOT THE TAGS, BECAUSE ONLY ONE OF THE TWO RESOLVES ──────────
+ * It read `world category and tags merge in` until revision 8. The category half is true — the
+ * read union resolves the world default for a membership record that inherits the section. The
+ * TAG half is not: `resolveComponentTags` folds the world set, the mutes and the system's own
+ * list into an effective one, and NOTHING CONSUMES ITS ANSWER — the read union discards it, so
+ * a world tag reaches no craft in any system today. `componentScope.js`'s own docblock states
+ * that at length, and `### GM World Component Screens` makes it a rule: no surface may assert
+ * the false half of the merge while it is unconsumed. A header that told a GM otherwise invites
+ * them to author a tag on the world record instead of in the system that actually reads one.
+ *
  * @param {{systemName: string, salvageModeLabel: string}} options
  * @param {(key: string, fallback: string, data?: object) => string} phrase
  * @returns {string}
@@ -1294,7 +1309,7 @@ export function componentSalvageSummary(
 export function componentListSubtitle({ systemName, salvageModeLabel }, phrase) {
   return phrase(
     'FABRICATE.Admin.Manager.Component.ListSubtitle',
-    'Component rules in {system} · {mode} salvage · world category and tags merge in; essences, salvage and overrides are this system’s own.',
+    'Component rules in {system} · {mode} salvage · the world category resolves in; tags, essences, salvage and overrides are this system’s own.',
     { system: systemName, mode: salvageModeLabel }
   );
 }

@@ -19,10 +19,12 @@
     toggleComponentSelection,
   } from '../../../../utils/componentBulkEditModel.js';
   import {
+    COMPONENT_DEFAULT_PAGE_SIZE,
     COMPONENT_SORT_KEYS,
     buildComponentBrowserModel,
     componentCategoryOptions,
     createComponentBrowserState,
+    groupComponentsByCategory,
   } from '../../../../utils/componentBrowserModel.js';
   import { getComponentCategoryLabel } from '../../../../utils/componentCategories.js';
   import {
@@ -229,6 +231,49 @@
     })
   );
   const filteredComponents = $derived(model.filtered);
+
+  // ── ONE WINDOW OVER THE WHOLE COHORT ──────────────────────────────────────────────────────
+  //
+  // THE PAGER AND THE BODY HAVE TO COUNT THE SAME LIST. Until revision 8 the ghost half was
+  // rendered as an UNPAGINATED column after the paginated member list, while `Pagination` was fed
+  // the member count alone: on a world with a large component corpus and a system holding a few,
+  // the widened cohort drew every remaining world component in one column under a pager reading
+  // `1–10 of 8`. That is both halves of the standing objection at once — a surface enumerating a
+  // whole corpus without paging it, under a count that describes a different list.
+  //
+  // THE COHORT IS `sorted MEMBERS then GHOSTS`, and one window is taken across the join. The two
+  // halves stay separate lists in the markup, for the reason the ghost note there gives — a ghost
+  // has no category, no difficulty and no salvage answer, so folding it into the model would put
+  // unadoptable rows through a grouping and a sort that mean nothing for them — but they are ONE
+  // paginated sequence, so a page can hold members, ghosts, or the boundary between them.
+  //
+  // THE ARITHMETIC IS HERE RATHER THAN IN `buildComponentBrowserModel`, and deliberately: that
+  // model is the shared filter→sort→paginate→group pipeline both studios read, and the ghost
+  // cohort is a fact about THIS screen. What it does mean is that the model's own `pageIndex`,
+  // `pageCount` and `rangeStart/End` describe the member half only and must not be read below —
+  // `paginateRows` CLAMPS its page index into the member page count, so on a page that lies
+  // wholly past the members `model.page` answers the LAST member page rather than nothing.
+  // Everything the body and the pager use is derived from `cohort*` for exactly that reason.
+  const cohortPageSize = $derived(
+    Math.max(1, Math.trunc(Number(ui.pageSize)) || COMPONENT_DEFAULT_PAGE_SIZE)
+  );
+  const memberCount = $derived(model.totalCount);
+  const cohortTotalCount = $derived(memberCount + visibleGhostRows.length);
+  const cohortPageCount = $derived(Math.max(1, Math.ceil(cohortTotalCount / cohortPageSize)));
+  const cohortPageIndex = $derived(
+    Math.min(Math.max(0, Math.trunc(Number(ui.pageIndex)) || 0), cohortPageCount - 1)
+  );
+  const cohortWindowStart = $derived(cohortPageIndex * cohortPageSize);
+  const cohortWindowEnd = $derived(cohortWindowStart + cohortPageSize);
+  // `slice` clamps both bounds on its own, so a window entirely past the members answers `[]`
+  // here and a window entirely before them answers `[]` for the ghosts.
+  const memberWindow = $derived(model.sorted.slice(cohortWindowStart, cohortWindowEnd));
+  const ghostWindow = $derived(
+    visibleGhostRows.slice(
+      Math.max(0, cohortWindowStart - memberCount),
+      Math.max(0, cohortWindowEnd - memberCount)
+    )
+  );
   // The expensive half of a component card — its linked source document, the "Missing"
   // badge and the live description fallback — is resolved for the PAGE and nothing else
   // (issue 1081). `hydrate()` is idempotent and memoized per card. Called off the card rather
@@ -236,17 +281,23 @@
   // pull it into the dependency closure of every mounted suite that renders this tree, where a
   // module missing from the harness allowlist HANGS the suite as `# cancelled`.
   $effect(() => {
-    for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
+    for (const card of memberWindow) card?.hydrate?.()?.catch?.(() => {});
   });
   const page = $derived({
-    components: model.page,
-    pageIndex: model.pageIndex,
-    pageCount: model.pageCount,
-    totalCount: model.totalCount,
-    rangeStart: model.rangeStart,
-    rangeEnd: model.rangeEnd,
+    components: memberWindow,
+    pageIndex: cohortPageIndex,
+    pageCount: cohortPageCount,
+    totalCount: cohortTotalCount,
+    rangeStart: cohortTotalCount === 0 ? 0 : cohortWindowStart + 1,
+    rangeEnd: Math.min(cohortWindowEnd, cohortTotalCount),
   });
-  const groups = $derived(model.groups);
+  // GROUPED OVER THE COHORT WINDOW, not over the model's own page, so the headers describe the
+  // rows actually drawn. `categoryTotals` stays the model's: a group header states its bucket's
+  // size in the whole FILTERED cohort beside the count on this page, which is what issue 676
+  // settled and what a total recomputed from the window would break.
+  const groups = $derived(
+    ui.groupByCategory ? groupComponentsByCategory(memberWindow, model.categoryTotals) : []
+  );
 
   // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
   // `pageIds` is the set of RENDERED MEMBER row ids. Ghost rows are not in it and carry no
@@ -516,7 +567,10 @@
     componentCohortCountText(
       {
         allWorld: allWorldCohort,
-        shown: page.components.length + visibleGhostRows.length,
+        // `shown` IS THE WINDOW, both halves of it. It reads `{shown} shown · {mine} of {all} in
+        // this system`, so it has to count what is on screen; `mine` and `all` beside it are the
+        // cohort totals and are unwindowed on purpose.
+        shown: page.components.length + ghostWindow.length,
         total: (itemCards || []).length,
         mine: (itemCards || []).length,
         all: (itemCards || []).length + ghostRows.length,
@@ -605,8 +659,19 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">
+      <!--
+        THREE CONTROLS AT 38px IN THE REFERENCE, SHIPPING AT 34 (UX F5, `proto:1053-1055`).
+
+        38 IS a rung — the published ladder is 26 / 28 / 30 / 34 / 38 / 44, and only 32 / 36 / 40
+        are retired — so nothing licenses the gap; the search field and both selects are simply
+        one rung short. `ManagerSearchField` and the toolbar selects gain an opt-in 38px size in
+        lane PRIM this revision (M12b), and each `// r8-prim: wire size` marker below is where
+        that prop lands. They are markers rather than a local height, because a per-screen
+        override of a shared primitive is the thing the size prop exists to prevent.
+      -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component
            types into this field rather than depending on where that component happens to sort. -->
+      <!-- r8-prim: wire size — `sys-toolbar-search`, `proto:1053`, 38px. -->
       <ManagerSearchField
         data-component-search=""
         value={itemSearchTerm || ''}
@@ -620,6 +685,7 @@
 
       <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls
            each announce themselves in sentence case reads as a form. -->
+      <!-- r8-prim: wire size — `sys-toolbar-category-filter`, `proto:1054`, 38px. -->
       <select
         class="manager-component-category-filter"
         data-component-category-filter
@@ -639,6 +705,7 @@
       </select>
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
+        <!-- r8-prim: wire size — `sys-toolbar-essence-filter`, `proto:1055`, 38px. -->
         <select
           class="manager-component-essence-filter"
           data-component-essence-filter
@@ -862,12 +929,19 @@
           render, with nothing on screen explaining why. Reported to the driver as the one
           knowing divergence from C6's row table.
 
-          They are rendered as their own list AFTER the paginated one — a different verb with a
+          They are rendered as their own list AFTER the member one — a different verb with a
           different membership answer — rather than folded into the model, which would put
           unadoptable rows through a category grouping and a difficulty sort that mean nothing
           for them.
+
+          THEY ARE STILL PAGED, THROUGH THE SAME WINDOW (revision 8). A separate list is not an
+          unpaginated one: `ghostWindow` is the tail of the ONE window taken across
+          `members ++ ghosts`, so this list holds the part of the current page that falls past the
+          member half, and the pager above counts both. Round 5 shipped this `{#each}` over the
+          WHOLE ghost cohort while `Pagination` was fed the member count — every remaining world
+          component in one column, under a count describing a different list.
         -->
-        {#if visibleGhostRows.length > 0}
+        {#if ghostWindow.length > 0}
           <ul
             class="manager-component-group-body manager-component-ghost-body"
             data-component-ghost-body
@@ -877,7 +951,7 @@
               'World components this system has no rules for'
             )}
           >
-            {#each visibleGhostRows as ghost (ghost.id)}
+            {#each ghostWindow as ghost (ghost.id)}
               <ComponentRow {...ghostRowProps(ghost)} />
             {/each}
           </ul>

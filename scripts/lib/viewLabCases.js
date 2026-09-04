@@ -5170,18 +5170,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector: '[data-component-edit-section="world-tags"]',
     expectContained: [
-      // THE EXIT AND THE MERGE NOTE ARE CONTAINED BY THE CARD, not by the world-tag GROUP, and
-      // the difference is what this pair was getting wrong. Parity round 4 rebuilt this card into
-      // a head, TWO labelled groups and a merge note; `[data-component-edit-section="world-tags"]`
-      // is the first of those groups, so the exit (which sits in the head, beside the title) and
-      // the note (which sits under BOTH groups, because it counts them together) are its SIBLINGS
-      // and can never be inside it. The case had asked for exactly that and failed every render
-      // since — "is clipped or extends outside", which reads as a layout defect and is really a
-      // capture state that did not co-evolve with the surface it captures.
-      {
-        container: '[data-component-edit-section="tags"]',
-        target: '[data-component-edit-world-tags-exit]',
-      },
+      // THE COUNT NOTE IS CONTAINED BY THE CARD, not by the world-tag GROUP, and the difference is
+      // what this pair was getting wrong. Parity round 4 rebuilt this card into a head, TWO
+      // labelled groups and a count note; `[data-component-edit-section="world-tags"]` is the
+      // first of those groups, so the note (which sits under BOTH groups, because it counts them
+      // together) is its SIBLING and can never be inside it. The case had asked for exactly that
+      // and failed every render since — "is clipped or extends outside", which reads as a layout
+      // defect and is really a capture state that did not co-evolve with the surface it captures.
+      //
+      // THE `Edit world tags` EXIT WAS THE THIRD PAIR HERE AND IS GONE (revision 8, M11). The
+      // reference draws no action in this card's head, so the shipped head is glyph + title +
+      // subtitle and there is nothing left to contain. A capture state outlives the surface it
+      // captures unless it is edited with it — which is why this entry is removed rather than
+      // left to fail as a layout finding.
       {
         container: '[data-component-edit-section="tags"]',
         target: '[data-component-edit-world-tags-note]',
@@ -5243,6 +5244,36 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  }),
+  managerCase({
+    // THE `Add from catalogue` PICKER, OPEN AND MULTI-SELECTED (issue 1371, M9). The header action
+    // it hangs off had NO frame and no test at all through revision 5 — which is how it shipped
+    // navigating to a token that resolves to nothing. A control with no capture state publishes
+    // an unrelated frame when it changes, which is the failure this registry exists to prevent.
+    id: 'manager-components-add-from-catalogue',
+    label: 'Manager — Components add from catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-add-from-catalogue]' },
+      // TWO ROWS TICKED, BY STATE RATHER THAN BY ID. A picked row carries `is-picked`, so
+      // `:not(.is-picked)` is always the first UNPICKED row and two of these steps tick the first
+      // two — with no dependence on which world components the lab fixture happens to sort first,
+      // which an id-named step would silently acquire.
+      { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
+      { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
+    ],
+    expectView: 'components',
+    expectSelector: '[data-component-add-from-catalogue-dialog]',
+    kinds: ['manager', 'components'],
+    // THE PICKER'S OWN FILE, AND NOT `ManagerModal.svelte`. The shared modal chrome is a BROAD
+    // SIGNAL, so `selectRenderFileCases` never reaches a per-case pattern naming it and the
+    // declaration would do nothing — `design-system-primitives.test.js` (b) reds exactly that.
+    // A chrome change selects the representative pair instead.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-components-bulk-edit',

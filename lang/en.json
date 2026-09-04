@@ -2687,10 +2687,10 @@
           "DeleteNamed": "Delete {name}"
         },
         "Component": {
-          "TagMergeEffective": "{count} tags in effect here",
-          "TagMergeEffectiveOne": "{count} tag in effect here",
-          "TagMergeMuted": "{count} world tags muted",
-          "TagMergeMutedOne": "{count} world tag muted",
+          "TagCountEffective": "{count} tags in effect here",
+          "TagCountEffectiveOne": "{count} tag in effect here",
+          "TagCountMuted": "{count} world tags muted",
+          "TagCountMutedOne": "{count} world tag muted",
           "SharedNoteList": "Name, art and description are authored in the world catalogue and shared with {count} other systems.",
           "SharedNoteListOne": "Name, art and description are authored in the world catalogue and shared with {count} other system.",
           "SharedNoteEditor": "Name, image and description are authored in the world catalogue and shared with {count} other systems. Everything below belongs to {system} alone.",
@@ -2705,8 +2705,7 @@
           "GhostAddNamed": "Add {name} to this system",
           "AddToSystemFailed": "The component could not be added to this system. {error}",
           "WorldTags": {
-            "Edit": "Edit world tags",
-            "GroupLabel": "From the world · click to mute here"
+            "GroupLabel": "From the world"
           },
           "Kicker": "Components View",
           "Actions": "Component actions",
@@ -2997,7 +2996,7 @@
             "NoTags": "No tags are defined for this system yet.",
             "ApplyTag": "Apply {name}",
             "OwnGroup": "{system}’s tags",
-            "SubtitleWorld": "World tags merge with {system}’s own.",
+            "SubtitleWorld": "The world record’s tags are listed here; {system}’s own are the ones in effect.",
             "SubtitleOwn": "{system}’s item tags. Another system’s tags are its own business."
           },
           "EssencesEdit": {
@@ -3059,9 +3058,23 @@
           "ProgressiveDifficultyMicro": "DC",
           "ProgressiveDifficultyDecrement": "Decrease difficulty",
           "ProgressiveDifficultyIncrement": "Increase difficulty",
-          "ListSubtitle": "Component rules in {system} · {mode} salvage · world category and tags merge in; essences, salvage and overrides are this system’s own.",
+          "ListSubtitle": "Component rules in {system} · {mode} salvage · the world category resolves in; tags, essences, salvage and overrides are this system’s own.",
           "RulesSubtitle": "{system} rules · {category} · {mode}",
           "AddFromCatalogue": "Add from catalogue",
+          "AddFrom": {
+            "Title": "Add from catalogue to {system}",
+            "Subtitle": "New rules start empty. Nothing is inherited from the catalogue.",
+            "Close": "Close",
+            "SearchPlaceholder": "Search the catalogue…",
+            "SearchLabel": "Search catalogue components",
+            "SelectNamed": "Add {name} to {system}",
+            "MemberCount": "{count} other systems",
+            "MemberCountOne": "{count} other system",
+            "SelectedCount": "{count} selected",
+            "Apply": "Add {count} to {system}",
+            "EmptyAll": "{system} already has rules for every component in the catalogue.",
+            "EmptySearch": "No catalogue component matches that search."
+          },
           "SaveRules": "Save rules",
           "CountCatalogueEntries": "{shown} of {total} catalogue entries",
           "CountCohort": "{shown} shown · {mine} of {all} in this system",

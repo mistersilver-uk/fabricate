@@ -198,12 +198,32 @@
   const categoryInheritOffered = $derived(
     worldMember && componentCategoryInheritOffered(worldCategory)
   );
-  const categoryLocked = $derived(categoryInheritOffered && categoryInheriting);
+  // THE STAGED INHERIT FLAG, WHICH IS THE OTHER HALF OF A DRAFT (revision 8).
+  //
+  // `null` means the GM has not touched the control this session, so the persisted flag stands.
+  // Anything else is a PENDING choice that has not been written yet, and it is read everywhere
+  // `categoryInheriting` used to be read directly — the lock, the note, the select's value and
+  // the rail — so the whole screen previews the choice while it is still a draft.
+  //
+  // Until revision 8 the switch was a write that landed the instant it was chosen, while the
+  // category VALUE beside it was buffered until Save. A GM who picked a concrete category and
+  // then backed out left the system silently switched from inheriting to overriding, with no
+  // save, nothing on screen saying so, and no way back except finding the control again. Both
+  // halves of one choice now land together, on Save; see `handleSave` for the ORDER and for what
+  // a half-failed save leaves behind.
+  let categoryInheritDraft = $state(null);
+  const categoryInheritStaged = $derived(
+    categoryInheritDraft === null ? categoryInheriting : categoryInheritDraft
+  );
+  const categoryInheritDirty = $derived(
+    categoryInheritDraft !== null && categoryInheritDraft !== categoryInheriting
+  );
+  const categoryLocked = $derived(categoryInheritOffered && categoryInheritStaged);
   const categoryNote = $derived(
     componentCategoryNote(
       {
         worldCategory,
-        inheriting: categoryInheriting,
+        inheriting: categoryInheritStaged,
         systemName: String(worldSystemRow?.systemName ?? systemId),
       },
       format
@@ -264,6 +284,10 @@
       // authored field missing from the signature means the editor never re-emits its
       // draft, so the root's dirty state and Save never see it (issue 676).
       categoryDraft,
+      // The staged INHERIT half gets its own term for the same reason, and it is a THREE-valued
+      // one rather than a boolean: `null` (untouched) and a staged value equal to the persisted
+      // one are different states, and only one of them is dirty.
+      String(categoryInheritDraft),
       essenceDraft
         .map((opt) => `${opt.id}:${opt.quantity}`)
         .sort()
@@ -282,6 +306,9 @@
     if (componentKey === lastComponentKey) return;
     tagDraft = cloneTagOptions(tagOptions);
     categoryDraft = normalizeComponentCategory(component?.category);
+    // Reset with the drafts it belongs to. Left standing, a staged inherit choice would be
+    // re-applied to the NEXT component opened in this editor.
+    categoryInheritDraft = null;
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
     complicationsDraft = cloneComplications(component?.complications);
@@ -478,23 +505,25 @@
   );
 
   /**
-   * Apply the one control's choice, which is TWO writes on the two transitions that need them.
+   * Stage the one control's choice, which is TWO writes on the two transitions that need them.
    *
-   * The inherit flag is a MEMBERSHIP write and the category is a DRAFT edit, so choosing a
+   * The inherit flag is a MEMBERSHIP write and the category is an IN-SYSTEM one, so choosing a
    * concrete category while inheriting has to clear the flag as well — otherwise the read union
    * re-applies the world value after the in-system re-spread and the typed value is discarded on
    * the very next read, which is what `categoryLocked` used to prevent by disabling the control.
+   *
+   * NEITHER HALF IS WRITTEN HERE. Both are staged and both land in `handleSave`. The flag used to
+   * be written immediately while the value was buffered, which made one control half-committing:
+   * a discarded draft still left the system switched from inheriting to overriding.
    *
    * @param {string} value
    */
   function setCategorySelection(value) {
     if (value === INHERIT_OPTION) {
-      actions?.setSectionInherited?.(component?.id, systemId, 'category', true);
+      categoryInheritDraft = true;
       return;
     }
-    if (categoryInheritOffered && categoryInheriting) {
-      actions?.setSectionInherited?.(component?.id, systemId, 'category', false);
-    }
+    if (categoryInheritOffered) categoryInheritDraft = false;
     setCategory(value);
   }
 
@@ -505,11 +534,19 @@
       system: systemLabel,
     })
   );
+  // THE WORLD BRANCH STATES WHAT IS TRUE, WHICH IS NOT WHAT THE REFERENCE STATES (revision 8).
+  // `proto:5690` writes `World tags merge with {system}'s own.` and the runtime does not do that:
+  // `resolveComponentTags` computes the additive set and the read union's trailing in-system
+  // re-spread DISCARDS it, so no system resolves a world tag today. `### GM World Component
+  // Screens` makes that a rule rather than a preference — no surface may assert the false half of
+  // the merge while it is unconsumed — so this is a licensed departure from the reference's copy
+  // and the only one on this card. The card still SHOWS the world run, because showing a list is
+  // not claiming it reaches anything; the sentence just stops promising the merge.
   const tagCardSubtitle = $derived(
     worldTags.length > 0
       ? format(
           'FABRICATE.Admin.Manager.Component.TagsEdit.SubtitleWorld',
-          'World tags merge with {system}’s own.',
+          'The world record’s tags are listed here; {system}’s own are the ones in effect.',
           { system: systemLabel }
         )
       : format(
@@ -793,6 +830,10 @@
 
   function isDirty() {
     if (!component) return false;
+    // THE INHERIT FLAG IS A DRAFT FIELD LIKE ANY OTHER since revision 8. Omit it and the failure
+    // is the issue-651 / issue-676 one verbatim: the GM flips the switch, nothing is ever dirty,
+    // Save never enables, and the choice is silently discarded on exit.
+    if (categoryInheritDirty) return true;
     if (categoryDraft !== normalizeComponentCategory(component?.category)) return true;
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
@@ -1295,12 +1336,47 @@
   // their own branch. There is no `result` temporary to leave unassigned, and the save is
   // still awaited exactly once — an extra async hop here would move the failure notice a
   // microtask later than the mounted route tests observe it.
+  //
+  // ── ONE SAVE, TWO SETTINGS KEYS, AND THE ORDER IS THE ANSWER (revision 8) ─────────────────
+  // The category is TWO facts in two world settings keys: the VALUE lives on the in-system
+  // component record (`craftingSystems`, written by `onSave`) and the INHERIT flag lives on the
+  // membership record (`componentScope`, written by `setSectionInherited`). There is no
+  // transaction across them, so one of the two can land alone and the ordering decides what a
+  // half-failed save leaves on screen.
+  //
+  // THE FLAG GOES FIRST, DELIBERATELY. `setSectionInheritance` SEEDS the local block with the
+  // world value when a switch goes off, so a flag-only landing leaves the system overriding with
+  // the value it was already resolving — the EFFECTIVE category does not move, and the GM sees
+  // `Save failed` over a screen that still reads the way it did. The other order fails worse: the
+  // value would be written into a record the read union still masks with the world default, so
+  // the GM's typed category would be persisted and invisible, which is the discarded-edit defect
+  // this whole change is about.
+  //
+  // Neither half runs if the flag write refuses, and `saveFailed` covers both, so a refusal is
+  // never reported as a success.
   async function handleSave(event) {
     event?.preventDefault();
     if (!component?.id || saving) return;
     saveFailed = false;
     const updates = buildUpdates();
     try {
+      if (categoryInheritDirty) {
+        const inherited = await actions?.setSectionInherited?.(
+          component.id,
+          systemId,
+          'category',
+          categoryInheritDraft
+        );
+        if (inherited === false) {
+          saveFailed = true;
+          return;
+        }
+        // THE STAGED VALUE IS NOT CLEARED HERE, and that is not an omission. Clearing it would
+        // hand the display back to `categoryInheriting` in the same tick, before the store has
+        // republished the membership record — so the select would snap to the OLD state and then
+        // snap back one publish later. Left staged, it stops being dirty the moment the persisted
+        // flag catches up with it, which is the same condition and no flicker.
+      }
       const result = await onSave(component.id, updates);
       if (result === false) saveFailed = true;
     } catch {
@@ -1419,16 +1495,22 @@
         <!--
           D4.2. TWO LABELLED TAG GROUPS AND A MERGE NOTE (gap-list row 137). The world tags were a
           card of their own, one panel away from the system's own flat chip grid; the reference
-          draws them as the FIRST group inside this card, under
-          `FROM THE WORLD · CLICK TO MUTE HERE`, with the system's own beneath.
+          draws them as the FIRST group inside this card, with the system's own beneath.
 
           THE WORLD GROUP IS READ-ONLY HERE, per D-r5: muting is authored on the world entry,
           where the list and its exceptions are visible together and where the projection reads
-          the state back. The reference's label still names the interaction, so the label is the
-          reference's one string this card cannot honour literally — it reads as a caption of
-          where muting happens rather than an instruction, and the exit beside it is the route.
-          The two PAINTS both apply either way, because a read-only chip must still show which
-          tags are muted.
+          the state back. The two PAINTS both apply either way, because a read-only chip must
+          still show which tags are muted.
+
+          == THE CAPTION IS `FROM THE WORLD`, AND THERE IS NO HEAD ACTION (M11) ================
+          The reference captions the run `FROM THE WORLD · CLICK TO MUTE HERE` (`proto:1332`) and
+          draws NO action in the card head (`proto:1329-1339`). Revision 5 kept the reference's
+          caption and added an `Edit world tags` exit beside the title to make the instruction
+          reachable. The maintainer ruled on both: the caption drops the clause the product cannot
+          honour — an instruction a GM cannot follow is worse than a plain label — and the
+          subject-only head action is DROPPED rather than kept, so the head is glyph + title +
+          subtitle exactly as the reference draws it. The route to the world record has not gone:
+          the attribution banner at the top of this editor is the same seam and still carries it.
         -->
         <section class="manager-component-rules-card" data-component-edit-section="tags">
           <div class="manager-component-rules-card-head">
@@ -1437,31 +1519,12 @@
               <h3>{text('FABRICATE.Admin.Manager.Component.TagsEdit.Title', 'Tags')}</h3>
               <p class="manager-component-rules-card-sub">{tagCardSubtitle}</p>
             </div>
-            {#if worldEntry}
-              <button
-                type="button"
-                class="manager-inline-link"
-                data-component-edit-world-tags-exit
-                onclick={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, worldEntry.id)}
-              >
-                <span
-                  >{text(
-                    'FABRICATE.Admin.Manager.Component.WorldTags.Edit',
-                    'Edit world tags'
-                  )}</span
-                >
-                <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-              </button>
-            {/if}
           </div>
 
           {#if worldEntry && worldTags.length > 0}
             <div class="manager-component-tag-group" data-component-edit-section="world-tags">
               <p class="manager-micro-label">
-                {text(
-                  'FABRICATE.Admin.Manager.Component.WorldTags.GroupLabel',
-                  'From the world · click to mute here'
-                )}
+                {text('FABRICATE.Admin.Manager.Component.WorldTags.GroupLabel', 'From the world')}
               </p>
               <div class="manager-component-tag-run" data-component-edit-world-tags>
                 {#each worldTags as tag (tag)}
@@ -2679,11 +2742,6 @@
     scopeNoteHook="data-component-rail-scope"
     factGroups={railFactGroups}
     ruleTile
-    liveNote={text(
-      'FABRICATE.Admin.Manager.Component.Rail.LiveNote',
-      'This preview updates live as you edit.'
-    )}
-    liveNoteHook="data-component-rail-live"
   >
     {#snippet tile()}
       <div class="manager-component-rules-preview-head">
@@ -2733,6 +2791,35 @@
         </div>
       </div>
     {/snippet}
+
+    <!--
+      THE LIVE FOOTER IS THE SHELL'S TRAILING SNIPPET, NOT ITS `liveNote` REGION (UX F7).
+
+      `ScopedEntityPreview` draws `liveNote` in a FIXED position — third, above the fact groups —
+      and `proto:1516` draws `{{ d.pr.pv.live }}` as the rail's LAST child, after `Produced by`.
+      Passing the prop put the strip between the scope sentence and `Used by`, so the rail read
+      `…what a player sees · this updates live · used by · produced by` where the reference reads
+      `…used by · produced by · this updates live`.
+
+      THIS IS THE SIBLING RAIL'S OWN ANSWER, applied here rather than invented:
+      `WorldComponentEntryPreviewRail` records the same fact and solves it the same way. The
+      alternative — a `liveNotePlacement` prop on the shell — would be a third arrangement for a
+      region both of its component callers want in ONE place, and the shell already publishes a
+      trailing snippet for exactly this.
+
+      IT KEEPS THE SHELL'S CLASS AND HOOK. `${classPrefix}-live` is what
+      `styles/fabricate.css` paints and what every selector naming this strip resolves through, so
+      moving the strip must not rename it: the class is restated literally here because the stem
+      is the shell's prop, not this file's.
+    -->
+    <aside class="manager-component-rules-preview-live" data-component-rail-live>
+      <i class="fas fa-circle-check" aria-hidden="true"></i><span
+        >{text(
+          'FABRICATE.Admin.Manager.Component.Rail.LiveNote',
+          'This preview updates live as you edit.'
+        )}</span
+      >
+    </aside>
   </ScopedEntityPreview>
 </main>
 

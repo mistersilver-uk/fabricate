@@ -318,6 +318,14 @@ function compileManagerRoot() {
   // above: the page imports it statically, so it is in this root's graph whether or not
   // anything ticks a row, and an omission HANGS this file rather than failing one test in it.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte');
+  // ── issue 1371 r8-list ──────────────────────────────────────────────────────────────────
+  // The system Component Rules list's `Add from catalogue` PICKER (M9). The ROOT imports it
+  // statically and mounts it unconditionally beside the two import dialogs, so it is in this
+  // root's graph whether or not the header action is ever clicked — and an omission does not
+  // fail one test here, it HANGS the whole file and is reported as `# cancelled` with no
+  // message. Its own leaves (`ManagerModal`, `ManagerSearchField`, `SelectionCheckbox`,
+  // `ManagerButton`) are all already registered above for other callers.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentAddFromCatalogueDialog.svelte');
   // THE WORLD COMPONENT ENTRY'S THREE OWN CHILDREN (issue 1371, parity round 4): the source
   // identity card, the systems card and the player-preview rail. The entry page imports all
   // three STATICALLY, so they are in this root's graph regardless of which tab is open — and an

@@ -123,6 +123,7 @@
   import GrantAccessInspector from './GrantAccessInspector.svelte';
   import ItemPageInspector from './ItemPageInspector.svelte';
   import RecipeItemEditor from './RecipeItemEditor.svelte';
+  import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
   import {
@@ -554,6 +555,11 @@
   // `buildImportReportContent` output once a system import completes, and this renders
   // it in the same ManagerModal chrome the mapping step above uses.
   let importReportContent = $state(null);
+  // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
+  // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere, so
+  // its open state is one boolean here beside the manager's two other dialogs. It cannot outlive
+  // its route: `ManagerModal` dismisses on an outside click, and every nav control is outside it.
+  let componentAddFromCatalogueOpen = $state(false);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -8570,17 +8576,32 @@
    * — COPY rather than a world-addressable definition source: its uuid dies with its parent, while
    * a compendium Item resolves on every client.
    *
-   * ── IT FAILS CLOSED, AND THE FAILURE IT GUARDS IS A NULL RETURN RATHER THAN A THROW ────
-   * The real parser does not throw. It RETURNS `null` — for a non-string input, for a relative
-   * uuid with no `relative` option, and for an odd embedded-part count — so a gate written as
+   * ── IT FAILS CLOSED, AND THE FAILURE IT GUARDS DIFFERS BY BUILD ────────────────────────
+   * THE NULL RETURN IS THE 14.365 STORY. On the VERIFIED build the parser does not throw: it
+   * RETURNS `null` — for a non-string input, for a relative uuid with no `relative` option, and
+   * for an odd embedded-part count — so a gate written as
    * `Number(parse(uuid)?.embedded?.length) > 0` inside a try/catch reads every one of those as
-   * "not embedded" and ACCEPTS it, while the catch it relies on is unreachable in a live client:
-   * every global the parser dereferences is present, and its prefix-tree lookup always answers a
-   * node. That is fail-OPEN wearing a fail-closed comment.
+   * "not embedded" and ACCEPTS it, while the catch it relies on is unreachable there: every
+   * global the parser dereferences is present, and its prefix-tree lookup always answers a node.
+   * That is fail-OPEN wearing a fail-closed comment, which is why the null result is branched on
+   * explicitly rather than left to the catch.
    *
-   * So the null result is branched on explicitly, and the try/catch stays as the outer floor for
-   * a parser that does throw on some future build. The parser reads three globals unguarded,
-   * which is why this lives here rather than in a pure module.
+   * THE THROW IS THE 13.351 STORY, AND 13 IS THE DECLARED MINIMUM (`module.json`
+   * `compatibility.minimum`). The two builds guard the head of the function differently:
+   * 14.365 opens `if ( typeof uuid !== "string" ) return null;` and then returns `null` for a
+   * relative uuid with no `relative` option, while 13.351 opens `if ( !uuid ) return null;` and
+   * falls a relative uuid THROUGH to the split path. So on the minimum build a TRUTHY NON-STRING
+   * reaches `uuid.split(".")` and raises a `TypeError`. The try/catch is therefore a LIVE FLOOR
+   * on the minimum build rather than a hypothetical one, and deleting it as dead code would be
+   * true only of the verified build.
+   *
+   * (The refusal ANSWER is the same on both: the shapes this rejects are rejected by part count,
+   * which both builds compute identically, and `ItemDropZone.handleDrop` rejects a non-string
+   * uuid before it ever reaches here. The version split is about which guard is load-bearing,
+   * not about which uuids are accepted.)
+   *
+   * The parser reads three globals unguarded, which is why this lives here rather than in a pure
+   * module.
    *
    * @param {string} uuid
    * @returns {boolean}
@@ -11030,12 +11051,24 @@
           {:else if currentView === 'components'}
             <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The header had no action
                  at all, so the only route to adopt a world component into this system was the
-                 list's own `All world components` cohort. This lands on the same cohort with the
-                 filter already widened, which is what the reference's action does. -->
+                 list's own `All world components` cohort.
+
+                 IT OPENS THE REFERENCE'S MODAL AND NAVIGATES NOWHERE (M9). Revision 5 handed
+                 `openWorldScopedEntry` a VIEW LAB CASE ID — a token in no route table and no view
+                 branch — and that helper assigns whatever it is given, so the control dropped the
+                 GM on the systems library. The token is deliberately not spelled here: its
+                 absence from this file, COMMENTS INCLUDED, is what
+                 `component-world-scope-screens.test.js` asserts. The reference's own action is
+                 not a route change at all: `proto:1046` binds `onAddFrom`, which at `proto:5545`
+                 sets `modal: 'addFrom'`.
+
+                 `// r8-prim: wire size` — `proto:1046` draws this action at 38px and it ships at
+                 34. 38 IS a rung, so nothing licenses the gap; the `size` prop is lane PRIM's to
+                 publish on the shared button base this revision. -->
             <ManagerButton
               role="primary"
               data-component-add-from-catalogue
-              onclick={() => openWorldScopedEntry('world-component-catalogue', '')}
+              onclick={() => (componentAddFromCatalogueOpen = true)}
               disabled={!selectedSystemId}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
@@ -16266,6 +16299,28 @@
     open={importReportContent !== null}
     content={importReportContent}
     onClose={() => (importReportContent = null)}
+  />
+
+  <!--
+    THE SYSTEM COMPONENT RULES LIST'S `Add from catalogue` PICKER (issue 1371, M9).
+
+    HOSTED HERE, beside the two import dialogs, for the reason those two are: `ManagerModal`
+    portals its panel to the nearest Fabricate application root, and a dialog rendered from
+    inside a view is destroyed the moment that view is swapped. This is the manager's third
+    dialog and its third mount at this level; it is not a new pattern.
+
+    IT PASSES THE COMPOSED WRITE, NOT THE RAW ONE. `store.worldScope.component.addToSystem` is
+    `joinComponentToSystem` — the verb that writes the membership record AND seeds the in-system
+    row. The generic membership-only write would leave every adopted component invisible to the
+    very list the GM adopted it into.
+  -->
+  <ComponentAddFromCatalogueDialog
+    open={componentAddFromCatalogueOpen}
+    systemId={selectedSystemId || ''}
+    systemName={selectedSystem?.name || ''}
+    entries={worldScopeState.component?.entries ?? []}
+    onAdd={(entityId) => store?.worldScope?.component?.addToSystem?.(entityId, selectedSystemId)}
+    onClose={() => (componentAddFromCatalogueOpen = false)}
   />
 
   <!--

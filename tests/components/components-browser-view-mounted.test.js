@@ -574,6 +574,29 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     });
   }
 
+  /**
+   * A world corpus of `count` records, NONE of which this system has a record for.
+   *
+   * A parameterised sibling of `ghostScope()` above rather than a widening of it: every existing
+   * assertion in this block is written against those three named records, and the paging
+   * assertions need a cohort that spans a page boundary. Zero-padded names so the list order is
+   * also numeric order.
+   */
+  function wideGhostScope(count) {
+    return projectComponentScope({
+      entityType: 'component',
+      corpus: {
+        entities: Array.from({ length: count }, (_, index) => ({
+          id: `wg-${String(index + 1).padStart(2, '0')}`,
+          name: `World Record ${String(index + 1).padStart(2, '0')}`,
+        })),
+        defaults: [],
+        membership: [],
+      },
+      systems: WORLD_SYSTEMS,
+    });
+  }
+
   /** How the cohort switch is thrown, now that it is a segmented track rather than a select. */
   function widen(root) {
     root.querySelector('[data-component-membership-option="all"] input').click();
@@ -753,6 +776,71 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     flushSync();
 
     assert.deepEqual(calls, [['w-2', 'sys-1']]);
+  });
+
+  it('pages the GHOST half through the same window, so the pager and the body agree', async () => {
+    // Reviewer finding 4. The ghost list used to render OUTSIDE the paginated `{#each}` while
+    // `Pagination` was fed the member count alone: on a world with a large component corpus and a
+    // system holding a few, the widened cohort drew every remaining world component in one column
+    // beneath a pager reading `1–10 of 8`. Both halves of that are defects — an unbounded column,
+    // and a count describing a different list from the one under it.
+    //
+    // THE FIXTURE IS BIGGER THAN ONE PAGE ON PURPOSE. AC-8's three-ghost fixture cannot see this:
+    // at three ghosts under a 25-row page the unpaginated list and the correct one are the same
+    // list, which is why four gate runs passed over it.
+    const root = await browser.mount({
+      itemCards: manyGeneral(8),
+      scope: wideGhostScope(5),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+    });
+    widen(root);
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    const memberRows = () => root.querySelectorAll('[data-component-member="true"]').length;
+    const ghostRows = () => root.querySelectorAll('[data-component-member="false"]').length;
+    const summary = () => root.querySelector('[data-pagination-summary]').textContent.trim();
+
+    assert.equal(summary(), 'Showing 1–10 of 13', 'the pager counts BOTH halves of the cohort');
+    assert.equal(memberRows(), 8, 'page one holds every member');
+    assert.equal(ghostRows(), 2, '…and exactly the two ghosts the window has room for');
+
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.equal(summary(), 'Showing 11–13 of 13');
+    assert.equal(memberRows(), 0, 'page two is past the members entirely');
+    assert.equal(
+      ghostRows(),
+      3,
+      'and holds the REST of the ghost cohort — a member page clamped back into range would ' +
+        'redraw the last member page here instead'
+    );
+  });
+
+  it('and the toolbar count states the WINDOW, not the whole widened cohort', async () => {
+    // The count reads `{shown} shown · {mine} of {all} in this system`. `shown` is what is on
+    // screen, so it has to move with the page; `mine` and `all` are cohort totals and must not.
+    const root = await browser.mount({
+      itemCards: manyGeneral(8),
+      scope: wideGhostScope(5),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+    });
+    widen(root);
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    const count = () => root.querySelector('[data-component-count]').textContent.trim();
+
+    assert.equal(count(), '10 shown · 8 of 13 in this system');
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.equal(count(), '3 shown · 8 of 13 in this system');
   });
 
   it('states the cohort each sentence is true of, and never the other', async () => {
