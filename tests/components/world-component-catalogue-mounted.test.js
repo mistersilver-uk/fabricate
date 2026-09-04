@@ -375,6 +375,53 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    // Gap-list row 1 / M10 / M12, and the reason `SearchablePopover` grew a `triggerButton`
+    // form: `proto:570` draws this control at 38px, 38 is a published rung, and the rung's own
+    // selector is `.manager-button.fab-manager-button.is-size-38` — `fab-manager-button` is
+    // written by `ManagerButton` and by nothing else. So a trigger imitating the primitive with
+    // `triggerClass="manager-button …"` could not reach the rung however it was spelt, and the
+    // sheet had to restate a height and a corner the primitive already owns.
+    //
+    // The CLASS LIST is the assertion because the class list is the mechanism. A height read off
+    // this mount would be `happy-dom`'s guess with no stylesheet attached, which is why the
+    // measured 38px lives in the parity run and the reachability lives here.
+    it('renders `Register item` through the real ManagerButton, at the 38px rung', async () => {
+      const target = await mountLead();
+      const action = target.querySelector('[data-scoped-list-register-item]');
+      const classes = [...action.classList].filter((name) => !name.startsWith('svelte-'));
+
+      assert.ok(
+        classes.includes('fab-manager-button'),
+        'the trigger must carry the class only `ManagerButton` writes — without it the rung ' +
+          'below matches nothing and the control drops to Foundry`s own button height'
+      );
+      assert.ok(
+        classes.includes('is-size-38'),
+        'and the rung itself, which is what makes 38 reachable without a per-site sheet rule'
+      );
+      assert.ok(
+        classes.includes('manager-world-component-register-action'),
+        '`triggerClass` still travels: `ManagerButton`s `class` prop APPENDS, so this site`s own ' +
+          'paint rule keeps matching'
+      );
+      assert.ok(
+        classes.includes('manager-button'),
+        'the base token comes from the primitive now rather than from the call site, so the ' +
+          'sheet rule keyed on it is unaffected by the conversion'
+      );
+
+      // AND IT IS STILL THE POPOVER'S TRIGGER. A `ManagerButton` that had stopped opening the
+      // panel would satisfy every clause above while deleting the affordance.
+      assert.equal(action.getAttribute('aria-expanded'), 'false');
+      action.click();
+      await drain();
+      assert.equal(
+        action.getAttribute('aria-expanded'),
+        'true',
+        'the primitive receives the popover`s own click and ARIA contract through the spread'
+      );
+    });
+
     it('hands the chosen Item to the SAME resolver a sidebar drag reaches', async () => {
       const drops = [];
       const target = await mountLead({ onCreateFromItemDrop: (data) => drops.push(data) });

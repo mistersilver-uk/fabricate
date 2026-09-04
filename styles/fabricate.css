@@ -26139,26 +26139,33 @@
 
 /* ── THE `Register item` ACTION (gap-list row 1, M10) ────────────────────────────────────────
    `proto:570` draws it 38px tall on a 9px corner in the success family with `--on-accent` ink.
-   38 IS A RUNG (`design-system/spec.md:215-216`) and 9 is the radius the ladder gives 34-38, so
-   both values are the published ones rather than the reference's own being copied past the
-   ladder.
 
-   IT IS AUTHORED HERE because `SearchablePopover` renders the trigger in its OWN template, so
-   the page's scoped block carries a hash this element never wears — the same mechanism the
-   selection band's note records one block up. */
+   THE GEOMETRY IS THE PRIMITIVE'S NOW, AND ONLY THE PAINT IS HERE (issue 1371 r10). This rule
+   used to state `height: 38px`, `min-height: 38px` and `border-radius: 9px`, because the control
+   was a `SearchablePopover` trigger rendered as a bare `<button class={triggerClass}>` and the
+   rung's own selector — `.manager-button.fab-manager-button.is-size-38` — demands a class only
+   `ManagerButton` writes. The popover has a `triggerButton` form now and this site uses it, so
+   38 arrives from that rung and 9 from the primitive's control rule, and the three declarations
+   are retired rather than restated: a second source of truth for a published value is the exact
+   failure `ManagerButton.svelte`'s own header exists to end.
+
+   What is left is what the primitive does not own: the success family, the reference's label
+   size and weight, and the one-line clamp.
+
+   IT IS STILL AUTHORED HERE, and for the unchanged reason: `SearchablePopover` renders the
+   trigger in its OWN template, so the page's scoped block carries a hash this element never
+   wears — the same mechanism the selection band's note records one block up. */
 .fabricate-manager .manager-button.manager-world-component-register-action {
   flex: 0 0 auto;
-  height: 38px;
-  min-height: 38px;
 
-  /* `proto:570` writes the label at 12.5px/700; the shared manager button inherits the
-     application's 14px, which is a step larger than every other control on the band. */
+  /* `proto:570` writes the label at 12.5px/700; the shared manager button states 0.72rem, which
+     is a step smaller than the reference's own. This rule ties the primitive's control rule at
+     (0,3,0) and stands later in the sheet, so it decides. */
   font-size: 0.78rem;
 
   /* AND THE VERB HOLDS ONE LINE. It stands beside a drop zone that takes the column's slack, so
      without this the two words wrap and the 38px control grows to 54px — measured in the lab. */
   white-space: nowrap;
-  border-radius: 9px;
   border-color: var(--fab-success-border);
   background: var(--fab-success);
   color: var(--fab-on-success);

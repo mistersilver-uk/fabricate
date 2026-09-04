@@ -490,27 +490,31 @@
       pickers are it — so no second one is built here.
     -->
     <!--
-      WHY THIS ONE CONTROL STILL STATES ITS OWN RUNG, now that `ManagerButton` publishes a 38px
-      size (issue 1371 r9-prim2). Re-verified against the tree rather than assumed.
+      THE CONTROL TAKES ITS RUNG FROM THE PRIMITIVE (issue 1371 r10). The note here used to
+      explain why it could not: `SearchablePopover` rendered a bare `<button class={triggerClass}>`
+      with a `triggerChip` form and no `ManagerButton` form, so `is-size-38` handed to it in
+      `triggerClass` matched nothing — the rung's selector demands `fab-manager-button`, which
+      only the primitive writes — and this site restated a height and a corner the primitive
+      already owns.
 
-      `ManagerButton`'s rung is `.fabricate-manager .manager-button.fab-manager-button.is-size-38`,
-      and `fab-manager-button` is the class the PRIMITIVE writes. This trigger is not that
-      primitive: `SearchablePopover` renders a bare `<button class={triggerClass}>` and offers a
-      `triggerChip` form but no `ManagerButton` form, so `is-size-38` handed to it in
-      `triggerClass` would match nothing and take the control back to Foundry's own button height
-      and corner. That is population B in `manager-button-cascade-inventory.test.js`, and the two
-      sheet rules behind this class are dispositioned EXCLUDE there for exactly this reason.
+      That trigger form now exists, and this is its first consumer: `triggerButton={{ size: '38' }}`
+      renders the real `ManagerButton`, so `min-height: 38px` arrives from
+      `.manager-button.fab-manager-button.is-size-38` and the 9px corner from the primitive's own
+      control rule. `styles/fabricate.css` keeps only this site's PAINT — the success family, the
+      12.5px/700 label and the one-line clamp — and its `height`, `min-height` and `border-radius`
+      are retired there rather than restated here.
 
-      So `styles/fabricate.css` keeps this site's `height`, `min-height` and `border-radius`, and
-      the honest follow-up is a `ManagerButton` trigger form on `SearchablePopover` — which would
-      retire all thirteen population-B overrides at once rather than this one by hand.
-      `cat-header-action` measures 38px and reports no height line today, so nothing is pending
-      on the SCREEN; what is pending is one shared trigger contract.
+      `triggerClass` still carries the site class: `ManagerButton`'s `class` prop APPENDS to
+      `manager-button fab-manager-button`, so the rule behind it keeps matching, and only the
+      hand-written `manager-button` token goes. This site therefore leaves population B in
+      `manager-button-cascade-inventory.test.js` (13 → 12); the other twelve `triggerClass` sites
+      are a follow-up, because converting one is a change to that site's own paint.
     -->
     <SearchablePopover
       options={registerableItems}
       pickerClass="fab-world-component-register-picker"
-      triggerClass="manager-button manager-world-component-register-action"
+      triggerButton={{ size: '38' }}
+      triggerClass="manager-world-component-register-action"
       triggerIcon="fas fa-plus"
       triggerLabel={text('FABRICATE.Admin.Manager.Scoped.Component.RegisterItem', 'Register item')}
       triggerAriaLabel={text(
