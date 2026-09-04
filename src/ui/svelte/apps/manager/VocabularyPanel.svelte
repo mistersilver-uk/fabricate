@@ -231,10 +231,10 @@
 </script>
 
 <!-- `label || undefined` rather than `label`, the guarded spelling `IconButton` and
-     `SelectionCheckbox` ship. `label` defaults to the empty string, and an EMPTY
-     `aria-label` does not fall back to the element's content — it replaces the name with
-     nothing, so a panel rendered without one announces as an unnamed region rather than by
-     the heading inside it. Omitting the attribute is what leaves that name in place. -->
+     `SelectionCheckbox` ship. `label` defaults to the empty string, and an EMPTY `aria-label` is
+     not the same as no `aria-label`: it REPLACES the accessible name with nothing rather than
+     leaving the element to take one from anything else. Omitting the attribute leaves the element
+     with no name, which is the honest state for a caller that passed none. -->
 <section class="manager-vocabulary-panel" aria-label={label || undefined}>
   <p class="manager-vocabulary-desc manager-muted">{hint}</p>
 

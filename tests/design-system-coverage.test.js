@@ -568,7 +568,13 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 32 shipped rows the library does not name.
+ * The 34 shipped rows the library does not name.
+ *
+ * RE-COUNTED at issue 1392 rather than incremented. The heading said 31 while the register
+ * held 33, so it was already two out before this change added one — the list itself is pinned
+ * by equality against the manifest and never drifted, but the figure a reader trusts without
+ * counting had. It is 34, and it is the length of the list below and of the manifest rows
+ * carrying `library: null`, which the property beneath asserts are the same set.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
