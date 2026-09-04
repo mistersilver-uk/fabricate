@@ -27,13 +27,20 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-Each row starts with a checkbox, then the component's icon and name, then how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **1/6 systems**, and a trailing **Edit component** control.
-A component no crafting system has adopted yet is marked **Unused**.
-A row with no linked source item also carries a **No source item** warning pill.
-A linked row carries no such pill, and no row shows its description here.
+A drop zone sits at the top of the catalogue for dragging in items, with a **+ Register item** button beside it.
+The button opens a searchable picker of world items not yet registered, so you can add one without leaving the sidebar or a compendium browser open first.
+
+Below that, a search field and a source filter share one row, and a **Membership** filter, a sort control, and an ascending/descending toggle share the row beneath.
+**Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
+
+Each row starts with a checkbox, then the component's icon and name.
+A pill beside the name states what kind of source it has, **Foundry item**, **Compendium**, or **No source item**, and a second **Broken link** pill appears when a linked world item's address no longer resolves to anything.
+Below the name, a second line shows the component's description, or says it has none.
+Two right-aligned columns state how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **2/6 systems**.
+A pencil control at the row's trailing edge, titled **Open catalogue entry**, opens the component's full entry directly.
+
 Filter by whether a component has a linked source item, and sort by name or by source item.
-Sorting by source item groups linked components ahead of unlinked ones in one fixed order.
-While it is chosen, the ascending and descending toggle has nothing to order, so it greys out until you sort by name again.
+Sorting by source item groups linked components ahead of unlinked ones, or the reverse when you flip the ascending and descending toggle, with equally-grouped rows kept in name order either way.
 
 ### Inspecting a component
 
@@ -76,9 +83,11 @@ Tick more than one row's checkbox to open the bulk panel in place of the single-
 From there you can stage three kinds of change, across four groups:
 
 - **System membership.** Choose **Add to** or **Remove from** for the direction, then use the **Systems** group beside it to search for and pick one or more crafting systems to apply it to.
+Each group is its own inline card with a search field, a scrollable list of rows to pick from, and a pager, so you can see and search the whole set without a separate popup.
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
-Removing drops those rules but leaves the world record untouched.
-- **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it.
+Removing drops those rules, rewrites every recipe in those systems that names the removed component, and disables a recipe left without a usable ingredient set or result because of it.
+The world record is untouched, and no other system is affected.
+- **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it, from the same kind of inline search card.
 The reserved **General** category is refused here too.
 - **World tags.** Mark each tag to add, remove, or leave unchanged across every selected component.
 
@@ -93,8 +102,10 @@ The reserved **General** category is refused here too.
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The panel states how many changes it is about to make before you apply them, and applies every staged change one at a time, so a large selection across several systems takes a moment.
-There is no bulk delete here.
-Deleting a world component is a single-record action from its own entry, described below.
+
+A separate **Delete** control at the foot of the panel removes every selected component from the world outright, along with its world defaults and every system's rules for it.
+Recipes that reference a deleted component stop resolving.
+It is a two-step control: one click arms it and states how many components it is about to delete, and a second click confirms, so a large deletion cannot happen from one click.
 
 ## The world Component entry
 
@@ -124,12 +135,13 @@ This is useful when the same component has previously been represented by more t
 
 One **World classification** card holds both the component's category and its world tags.
 
-Pick the **Category** from the drop-down, or leave it at **No world category**.
+Pick the **Category** from the field, or leave it at **No world category**.
+It opens as Fabricate's own themed list rather than your browser's native drop-down, to match the rest of the screen.
 The reserved **General** category is never offered as an option here, whatever capitalisation or spacing another system used to author it, because it is the fallback every component uses already.
 A note beneath the field tells you what is actually happening, stating how many systems currently inherit this world category and how many override it locally, once at least one system has rules for it.
 
 Click a tag pill to apply or clear that world tag on the record.
-A note beneath them states how many are currently set.
+A note beneath them states how many world tags are set on this record, and, if any are muted for a crafting system, how many.
 **Edit world vocabulary** opens the world Tags & Categories screen, where the tag list itself is authored.
 A new world tag cannot be minted from this card.
 Add it to the vocabulary first, then it appears here to apply.
@@ -148,7 +160,8 @@ Each row shows the system's name and its resolution mode, and, for a member syst
 - **View system rules** opens that system's Component Rules screen for this component.
 It appears on member rows only.
 - The exit icon beside it removes this component from that system once you confirm.
-Removing deletes that system's rules for it, leaving the world record and every other system untouched.
+Removing deletes that system's rules for it, rewrites every recipe in that system that names it, and disables a recipe left without a usable ingredient set or result because of it.
+The world record and every other system are untouched.
 - A system this component is not yet in carries a dashed **Add to system** button instead.
 Adding creates rules in that system that inherit the world category.
 
@@ -184,7 +197,10 @@ The rail updates live as you edit the entry.
 
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
-**Add from catalogue**, in the header, opens the world Component catalogue, where you can drop an item to create a component or select an existing one and add it to this system from its entry.
+**Add from catalogue**, in the header, opens a picker listing every world catalogue component this system does not already hold.
+Search by name and tick as many as you want.
+Confirming gives each one fresh rules in this system, inheriting the world category, with the confirm button itself naming how many components and which system they are joining.
+New rules start empty otherwise, the same blank starting point as any other new addition to this system.
 
 Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
@@ -291,6 +307,7 @@ A two-way filter above the list controls which components you see:
 This is the default.
 - **All world components** widens the list to every component the world Component catalogue holds, including ones this system has never adopted.
 The ones this system has no rules for yet are shown as dimmed ghost rows, with a **Not in this system** pill in place of **Salvage**, an em dash where the **Recipes** count would be, and a dashed **Add to system** control in place of **Edit rules**.
+Adopted and not-yet-adopted components share one page together, so a page you turn to can mix both kinds of row.
 
 Each filter option states its own count.
 
@@ -322,10 +339,11 @@ The note beneath the field states which value this system currently resolves and
 
 A **Tags** card sits beside Category.
 
-While the linked world component carries world tags, they are listed at the top of the card, under a caption reading **From the world · click to mute here**.
+While the linked world component carries world tags, they are listed at the top of the card, under a caption reading **From the world**.
 Each is shown lit or, if it is muted for this system, struck through and dimmed.
-The caption's promise is not kept, because this run is read-only, and Fabricate does not currently offer a way to mute one from any screen.
-**Edit world tags** opens the component's world entry, where the world tags themselves are applied or cleared.
+This run is read-only, and Fabricate does not currently offer a way to mute one from any screen.
+The card carries no link of its own back to the world entry.
+Use the **Edit shared identity** link on the identity callout at the top of the page to reach it, where the world tags themselves are applied or cleared.
 
 Below that, this system's own tags are listed as a click-to-toggle pill run.
 A note beneath both groups states how many tags are in effect here and how many world tags are muted.
