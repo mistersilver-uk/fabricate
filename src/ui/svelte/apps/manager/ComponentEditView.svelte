@@ -2811,19 +2811,18 @@
   .manager-salvage-stage-complications-head .manager-salvage-stage-edit {
     flex: 0 0 auto;
   }
-  /* THE UNAUTHORED-WORLD-VALUE BRANCH of the category note (issue 1371). It renders only where
-     no inherit switch is offered, so it is the row's whole explanation rather than a caption
-     under a control. Static class name, so `lint:svelte:warnings` stays at zero. */
-  .manager-component-cat-note {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin: 0;
-    font-size: 0.68rem;
-    line-height: 1.5;
-  }
+  /* THE CATEGORY NOTE IS STATED ONCE, IN THE SHEET (`proto:1327`, gap-list row 143), and the
+     scoped copy that used to live here is gone.
 
-  .manager-component-cat-note i {
-    color: var(--fab-text-subtle);
-  }
+     It was not an override anybody chose: Svelte's scoping appends a hash class, so this block
+     out-specified `.fabricate-manager .manager-component-cat-note` in `styles/fabricate.css` and
+     quietly won FIVE declarations the sheet writes to the reference — the 10px type (this said
+     0.68rem, which resolves to 10.88), the 8px top margin (this said `margin: 0`), the baseline
+     alignment, the 1.45 line height, and the per-state glyph ink (this inked every glyph subtle,
+     so the inheriting note's info glyph and the overriding note's warning glyph painted the same
+     grey). Measured: `rules-category-note.fontSize 10.88px` against the reference's 10.
+
+     Two rules for one element, with the loser being the one written to the reference, is exactly
+     the shape the cascade inventory exists to surface — so the duplicate is deleted rather than
+     out-specified again. */
 </style>

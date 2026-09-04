@@ -25076,6 +25076,16 @@
      · every raw hex maps to the nearest `--fab-*` token.
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 
+/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge, and NO
+   bottom padding, because the second row already carries its own bottom margin and the list's
+   scroller starts immediately under it. Snapped to the spacing scale, which has no 14: 12 and 20
+   are the neighbouring steps and the zero is the reference's own. Measured before this rule: a
+   flat 12px on all four sides, so the band was inset 8px too little on each side and 12px too
+   much at the foot. */
+.fabricate-manager .manager-component-toolbar {
+  padding: var(--fab-space-3) var(--fab-space-5) 0;
+}
+
 /* ── C3. THE TOOLBAR'S SECOND ROW ──────────────────────────────────────────────────────────
    `proto:1058` puts the selection register, the two VIEW controls and the count on ONE row.
    The register is a `display: contents` shim declared in `ComponentsBrowserView`'s own scoped
@@ -25108,8 +25118,23 @@
 /* ── C5. THE ROW ───────────────────────────────────────────────────────────────────────────
    `proto:1078`: gap 11 (snapped to 12), padding 10/13 (snapped to 12), radius 9, the `--fab-bg-1`
    fill and a hairline. The shipped row carried `--fab-overlay-light-03` at radius 8 — which is
-   not a rung — through the five-row join above. */
+   not a rung — through the five-row join above.
+
+   `flex-wrap: nowrap` IS THE ROW'S SHAPE, and it is the one thing the property compare could not
+   see. The base `.manager-component-row` wraps, which was right when the row was three parts; C5
+   makes it FIVE — the leading box, the medallion, the copy column, the trailing stat cluster and
+   the labelled control — and at the lab's 734px list column their content widths exceed one line,
+   so the row wrapped into THREE: the checkbox alone, then the identity grown to the full 708px,
+   then the `Recipes` stat and `Edit rules` orphaned at the LEFT of a third line. Measured, before
+   this declaration: row 132px tall against the reference's ~62, identity 708px wide inside a
+   734px row. Every per-region property in the parity spec still matched, because a padding and a
+   radius are the same whether the row is one line or three — the composite is what showed it.
+
+   Nothing else has to change to make it fit: the identity is already `flex: 1 1 auto; min-width:
+   0` with an ellipsised description, so once the line stops wrapping it shrinks to whatever the
+   stat and the control leave, which is exactly what the reference draws. */
 .fabricate-manager .manager-components-list .manager-component-row {
+  flex-wrap: nowrap;
   gap: var(--fab-space-3);
   min-height: 0;
   padding: var(--fab-space-3);
@@ -25452,7 +25477,18 @@
 
 /* `proto:1316`: the callout's one exit — a 30px control on `--fab-bg-1` behind a `border-strong`
    hairline. 30 is a live rung; the radius snaps to 7 for a control in the 26-32 band. */
-.fabricate-manager .manager-component-identity-exit {
+
+/* `.fab-manager-button` IS CHAINED, and it is load-bearing rather than tidiness. The shared
+   contract block `.fabricate-manager .manager-button.fab-manager-button` is (0,3,0) and declares
+   `min-height: 34px`, its own padding and its own type; this selector was (0,2,0), so it lost all
+   three and the exit rendered at the 34px toolbar scale in the primitive's font. Measured before
+   the chain: `rules-identity-action.height 34px` and `.fontSize 11.52px` against the reference's
+   30 and 10.5 (`proto:1316`). Chaining reaches (0,3,0) and, being later in the sheet, wins.
+   The row's own `Edit rules` control needed no chain — its selector is already (0,4,0).
+
+   Type is stated in px for the reason the sizes above it are: font sizes are not spacing-scale
+   members and are written as literals (`design-system/spec.md:216-220`). */
+.fabricate-manager .manager-button.fab-manager-button.manager-component-identity-exit {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);
   height: 30px;
@@ -25463,7 +25499,7 @@
   background: var(--fab-bg-1);
   color: var(--fab-text-secondary);
   font-weight: 600;
-  font-size: 0.66rem;
+  font-size: 10.5px;
   white-space: nowrap;
 }
 

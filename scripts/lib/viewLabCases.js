@@ -5095,19 +5095,29 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-component-edit]' },
     ],
     expectView: 'component-edit',
-    expectSelector: '[data-scoped-inherit-row="category"]',
+    // THE CATEGORY CONTROL IS ONE SELECT NOW, NOT AN `InheritRow` (issue 1371, parity round 4,
+    // rebuild-spec D4.1 / gap-list rows 132-133): the reference draws a single full-width select
+    // whose FIRST option is `Inherit from world · {category}`, with the state note directly under
+    // it — no separate toggle, no second `Category` label, no floated head control. The
+    // `[data-scoped-inherit-*]` hooks this named still exist on the WORLD ENTRY, which is why the
+    // registry's selector guard stayed green while this case could no longer reach its state.
+    expectSelector: '[data-component-edit-category]',
     expectContained: [
+      // THE INFO-TONE BRANCH, which is this case's whole subject: `inherited` is the state
+      // `sm-iron-ingot` is in, and `manager-component-edit-normal` opens a row that overrides, so
+      // it photographs the warning branch and can never show this one.
       {
         container: 'main.manager-component-edit-main',
-        target: '[data-scoped-inherit-note="category"]',
+        target: '[data-component-edit-category-note="inherited"]',
       },
+      // And the ONE identity callout the two stacked cards collapsed into (D3).
       {
         container: 'main.manager-component-edit-main',
-        target: '[data-scoped-shared-definition]',
+        target: '[data-component-edit-section="identity"]',
       },
     ],
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/InheritRow\.svelte$/],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
     // THE RULES EDITOR'S READ-ONLY WORLD TAG CARD (issue 1371, round 3), which no frame reached.
