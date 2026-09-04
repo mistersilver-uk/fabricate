@@ -11,23 +11,15 @@
    ever opened. Keep the face/weight list minimal.
 
    `font-display: swap` renders Georgia / ui-monospace immediately and swaps when
-   the face arrives, so a slow or missing font never blanks the UI. */
+   the face arrives, so a slow or missing font never blanks the UI.
 
-@font-face {
-  font-family: Spectral;
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/fonts/spectral-latin-400-normal.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: Spectral;
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("../assets/fonts/spectral-latin-500-normal.woff2") format("woff2");
-}
+   Spectral ships at 600 and 700 ONLY (issue 1499). The 400 and 500 faces were here
+   and nothing ever resolved to them: a computed-style probe over 318 of the View
+   Lab's 319 cases found 3,610 elements rendering in Spectral, every one of them at
+   600 or 700, and the browser never loaded either deleted face. Almost every serif
+   rule sets its weight explicitly; the few that inherit it take 700 from the heading
+   default. Re-adding a face means PROVING something resolves to it, not filling in
+   a ramp because a ramp looks incomplete. */
 
 @font-face {
   font-family: Spectral;
