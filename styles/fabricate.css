@@ -18216,20 +18216,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-inline-control {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 200px;
-
-  /* `.manager-field` sets `font-size: 0.82rem` and its controls INHERIT it — no rule
-     sizes a `select` directly. A control outside a `.manager-field` therefore falls back
-     to Foundry's 14px app base, which is the bleed the font gate exists to catch. State
-     it explicitly at the same size. */
-  font-size: 0.82rem;
-}
-
-/* The identity strip (issue 676): chip · copy · drop target on ONE row. It is display,
-   not a form — see the component's header note. */
+/* The identity strip (issue 676, rebuilt at 1371): ONE copy column — the name row over the
+   attribution note. It is display, not a form; see the component's header note. The chip, the
+   lock badge, the description paragraph and the 186px drop target it used to carry are gone
+   from `ComponentIdentityStrip.svelte`, and their rules went with them rather than staying on
+   to paint nothing. */
 
 /* `proto:1310`: ONE info-soft callout — the chip, the copy column, the exit — at radius 12
    (snapped to the 11 card rung) with 13/15 padding (snapped to 12/16) and a 13px gap (12).
@@ -18243,28 +18234,6 @@
   border: 1px solid var(--fab-info-border);
   border-radius: 11px;
   background: var(--fab-info-soft);
-}
-
-.fabricate-manager .manager-component-identity-chip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 60px;
-  height: 60px;
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 12px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text-muted);
-  font-size: 1.4rem;
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-component-identity-chip img {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  object-fit: cover;
 }
 
 .fabricate-manager .manager-component-identity-copy {
@@ -18314,33 +18283,6 @@
   text-decoration: underline;
 }
 
-.fabricate-manager .manager-component-identity-lock {
-  flex: 0 0 auto;
-}
-
-/* The kebab belongs at the far edge of the name row, not tucked against the lock badge
-   as though it acted on it. */
-.fabricate-manager .manager-component-identity-name-row .manager-component-overflow-trigger {
-  margin-left: auto;
-}
-
-/* Flowing prose, at the prototype's 400 13px/1.65. `text-wrap: pretty` keeps the last
-   line from stranding a single word. */
-.fabricate-manager .manager-component-identity-description {
-  margin: 0;
-
-  /* The prototype's `--text2`. Fabricate's manager palette has no second-tier text
-     token; `--fab-text-muted` is what the component browser inspector's flavour
-     text already uses for this exact content (the item's description as prose), so the
-     two surfaces render the same string the same way. */
-  color: var(--fab-text-muted);
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.65;
-  text-wrap: pretty;
-  overflow-wrap: break-word;
-}
-
 /* `proto:1314`: the attribution sentence at 11.5px/1.55 in the muted ink, 3px under the name
    row. It is prose now rather than a glyph-led hint, so the flex row and its `gap` go with the
    glyph they were spacing. */
@@ -18357,37 +18299,6 @@
   font-size: 0.56rem;
 }
 
-/* The 186px drop target sits at the RIGHT of the strip and wraps UNDER the copy rather
-   than compressing beside it: the manager runs on container queries at 1320/1120/960/680px
-   and the smoke harness photographs a stacked component surface whether or not it is
-   designed. */
-.fabricate-manager .manager-component-source-drop-target {
-  display: flex;
-  flex: 0 1 186px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1.5px dashed var(--fab-border-strong);
-  border-radius: 10px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text-muted);
-  font-size: 0.625rem;
-  font-weight: 600;
-  line-height: 1.4;
-  text-align: center;
-  transition:
-    border-color 0.12s,
-    color 0.12s,
-    background 0.12s;
-}
-
-.fabricate-manager .manager-component-source-drop-target i {
-  font-size: 1.0625rem;
-}
-
 /* The WHOLE strip is the drop target (issue 676, brief §C6). Only the small inner zone
    used to react, so a GM aiming at the strip's name — most of its area — got no
    feedback and had to hunt for the box. `dragDrop` is attached at strip level and this
@@ -18395,11 +18306,6 @@
 .fabricate-manager .manager-component-identity-strip.is-drop-active {
   border: 1.5px dashed var(--fab-accent);
   background: var(--fab-accent-soft);
-}
-
-.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
-  border-color: var(--fab-accent);
-  color: var(--fab-accent);
 }
 
 /* The custom salvage DC is the only numeric control in this block; its siblings are a
@@ -18460,28 +18366,6 @@
   flex: 0 0 auto;
 }
 
-/* The roll-budget banner above the progressive stage list. */
-.fabricate-manager .manager-component-info-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-info-border);
-  border-radius: 8px;
-  background: var(--fab-info-soft);
-  color: var(--fab-text-muted);
-  font-size: 0.66rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.fabricate-manager .manager-component-info-banner i {
-  flex: 0 0 auto;
-  color: var(--fab-info);
-  font-size: 0.7rem;
-}
-
 /* ── Tag pill run (issue 676, converted in issue 772) ─────────────────────────────
    One pill per tag in the system's vocabulary; the pill IS the control. The pill itself
    is now the shared `Chip` (`tone="tag"` carries the purple this block used to declare),
@@ -18519,22 +18403,12 @@
   opacity: 0.6;
 }
 
-/* Foundry's button reset: a custom-content `<button>` inherits core's fixed height and
-   centred content, which crops taller children and centres the label. The overflow
-   trigger is one. */
-.fabricate-manager .manager-component-overflow-trigger {
-  flex: 0 0 auto;
-  height: auto;
-  min-height: 34px;
-  justify-content: center;
-  line-height: normal;
-}
-
 /* A section micro-label inside the editor's panels (the salvage block's "Result groups",
    "Outcome routing", "DC override"). The identity strip's read-only VALUE boxes that
    used to share this family are gone: they rendered the linked item's name and
    description as inert, `opacity: .8`, input-shaped boxes, which read as a disabled
-   form. Identity is display now — see `.manager-component-identity-description`. */
+   form. Identity is display now, and the strip states it in the name row and its attribution
+   note; the boxed description that rule described is gone with the rest of the old strip. */
 .fabricate-manager .manager-component-readonly-label {
   display: inline-flex;
   align-items: center;
@@ -24060,16 +23934,6 @@
    UNSCOPED second statement of the shared rule. */
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-bulk-selected {
   background: var(--fab-surface-active);
-}
-
-/* THE MEMBERSHIP SELECT SIZES LIKE ITS SIBLING (issue 1371, round 2), and without this it did
-   not: only the shared `.manager-component-toolbar select` treatment applied, so the widest
-   option — `All world components (67)` — sized the control and pushed the filter row onto a
-   second toolbar line. `.manager-component-category-filter` beside it carries exactly this pair
-   for exactly this reason; an appended rule, editing none. */
-.fabricate-manager .manager-component-membership-filter {
-  flex: 0 0 auto;
-  max-width: 180px;
 }
 
 /* THE INHERIT NOTE'S TWO OPTIONAL TONES (issue 1371, round 2). The shipped rule paints one ink for

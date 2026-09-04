@@ -264,17 +264,18 @@ const FIXTURE = `
 
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="component-edit">
         <form class="manager-component-edit-view">
+          <!-- THE STRIP AS ComponentIdentityStrip.svelte NOW RENDERS IT (issue 1371). The chip,
+               the lock badge, the description paragraph and the 186px drop target are gone from
+               the product, and their rules with them; a fixture that kept drawing them would pin
+               CSS that paints nothing, which is the exact rot this gate exists to catch.
+               No backticks in here: this markup is a template literal. -->
           <section class="manager-component-panel manager-component-identity-strip">
-            <span class="manager-component-identity-chip"><i class="fas fa-box-open"></i></span>
             <div class="manager-component-identity-copy">
               <div class="manager-component-identity-name-row">
                 <button type="button" class="manager-component-identity-name" data-m="identity-name">Iron Ore</button>
-                <span class="manager-chip manager-component-identity-lock" data-m="identity-lock"><span>Linked Items Directory</span></span>
               </div>
-              <p class="manager-component-identity-description" data-m="identity-description">Unrefined metal.</p>
               <p class="manager-component-identity-note" data-m="identity-note"><span>Name, image &amp; description follow the linked item.</span></p>
             </div>
-            <div class="manager-component-source-drop-target" data-m="drop-target"><span>Drop a world or compendium item to replace</span></div>
           </section>
           <section class="manager-component-panel manager-component-inline-panel">
             <div class="manager-task-card-heading">
@@ -282,7 +283,7 @@ const FIXTURE = `
                 <h3 data-m="panel-title">Category</h3>
                 <p class="manager-muted" data-m="panel-sub">Groups this component in the browser.</p>
               </div>
-              <select class="manager-input manager-component-inline-control" data-m="field-select"><option>General</option></select>
+              <select class="manager-input manager-component-category-select" data-m="field-select"><option>General</option></select>
             </div>
           </section>
           <section class="manager-component-panel" data-salvage-section>
@@ -294,7 +295,6 @@ const FIXTURE = `
                 <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
               </div>
             </div>
-            <p class="manager-component-info-banner" data-m="info-banner"><span>Roll budget flows down the list</span></p>
             <div class="manager-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="manager-salvage-stage-list">
@@ -427,26 +427,45 @@ const EXPECTED = {
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
   'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
-  // 0.82rem. The Category select renders OUTSIDE a `.manager-field` (the heading row),
-  // and `.manager-field`'s 0.82rem is INHERITED — no rule sizes a select directly. This
-  // measured 14 (Foundry's app base) until `.manager-component-inline-control` stated
-  // the size itself. That is precisely the bleed this gate exists to catch, caught here.
-  'field-select': 13.12,
-  // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
-  // Name/Description fields it replaced are gone, and with them `readonly-value`.
+  // 12px, RETARGETED (issue 1371). The role used to measure a
+  // `.manager-component-inline-control` floated into the panel's heading row, and the
+  // reference gives the Category select a card of its own (`proto:1322`), so the D-parts
+  // rebuild moved it into the card body as `.manager-component-category-select` and the old
+  // class is emitted nowhere. The role follows the control rather than the retired markup:
+  // the fixture names what `ComponentEditView` renders today, and the new rule states 12px
+  // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
+  // (px, not rem: a font size is a literal — `design-system/spec.md:216-220`.)
+  'field-select': 12,
+  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form: the
+  // read-only boxed Name/Description fields it replaced are gone, and with them
+  // `readonly-value`.
+  //
+  // FOUR MORE ROLES RETIRED THE SAME WAY AT ISSUE 1371, and they are named here rather than
+  // silently dropped, because a role that leaves this map with no note reads as coverage
+  // someone chose to give up:
+  //
+  //   `identity-lock`        the lock badge; the strip states provenance in the world pill
+  //                          and the note now, and no source emits the class.
+  //   `identity-description` the description paragraph; the rebuilt strip carries the name
+  //                          row and the attribution note only.
+  //   `drop-target`          the 186px dashed source drop target; replacing a source is the
+  //                          shared `ItemDropZone` primitive's job now.
+  //   `info-banner`          the hand-rolled roll-budget strip; `proto:1374` is the shared
+  //                          `Callout`, which `ComponentEditView` renders instead.
+  //
+  // Each of the four had its rule DELETED from `styles/fabricate.css` in the same change,
+  // because nothing under `src/` emitted the class any more. Keeping the pins would have
+  // meant a fixture drawing markup the product does not render, measured against rules that
+  // paint nothing — the rot this gate exists to catch, wearing the gate's own clothes.
   // 0.94rem. `proto:1313` is `font:600 15px var(--serif)`: the D3 rebuild reads the identity
   // name off the callout, where the retired strip had sized it as a page-level heading.
   'identity-name': 15.04,
-  'identity-lock': 9.92, // 0.62rem — prototype lock badge 9px sans (was 12)
-  'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
   // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`: the note is the attribution
   // SENTENCE now, prose rather than a glyph-led hint, so it reads a rung above a micro-label.
   'identity-note': 11.52,
-  'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
-  'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
   'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
   // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
