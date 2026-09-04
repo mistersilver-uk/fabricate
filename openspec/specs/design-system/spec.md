@@ -367,6 +367,9 @@ Core clips at `.window-content` and the manager adds further clipping boundaries
 The portal target and the coordinate origin MUST be the same element, because the fault is not either choice on its own but the two disagreeing: a surface that names one root resolves nothing outside it, so the portal silently no-ops while the positioning falls back to viewport coordinates written onto a node that never moved, and the panel draws in the wrong place with byte-identical markup.
 A document-wide lookup for a root is worse rather than safer, since it finds that application wherever it is and portals the surface into a different window.
 The eligible roots are `.fabricate-manager` and `.fabricate-app`, and a root is eligible only while it is a POSITIONED element, because an absolutely positioned panel appended to a static one takes its containing block from somewhere else entirely.
+The list is TWO and stays two.
+Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the four windows joining the contract does not extend the eligible list.
+A window that needs a root picks whichever of the two matches what it IS — a GM authoring surface or a play surface — rather than minting one for itself, because each new root is another ancestor a portal resolver must know about and another family a primitive can be accidentally scoped under.
 A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 
 A primitive MUST set its own `height` and `min-height` on any button and its own width on any input, because Foundry's element rules otherwise crop or stretch it.
@@ -505,7 +508,6 @@ It toggles membership, stays open across choices and marks several options selec
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
 It has been adopted: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which is the shipped surface the unscoping and the portal-host resolver are now proved by rather than merely permitted for.
-The icon, colour, essence-source and recipe-duration pickers do NOT: their panel rules are still written under `.fabricate-manager`, so a caller outside it would render a panel with no `position: absolute` to be placed by, and unscoping each family belongs to its own change rather than to a conversion before it.
 
 #### Scenario: A converted menu renders no query field
 
@@ -745,7 +747,12 @@ Consistency across machines is the reason, so a surface MUST NOT opt back into t
 There is ONE exception, and it is structural rather than discretionary: a select inside a Foundry-owned dialog body.
 `DialogV2` cleans its content and re-serialises it through `innerHTML`, so no mounted component and no attached listener survives, its callers read their value back through `form.elements`, and its `dialog` element has no application root to portal into.
 A select there stays native, and the surrounding stylesheet gives the control a themed background, because `color-scheme` alone does not reach the popup.
-A component that ships native for a stated reason of its own outranks this requirement under the precedence order above, and two do so today.
+There is no second exception by prose.
+A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
+An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
+Measured at `aa3c4a3fe`, by that gate's own parse of the Svelte templates: 99 native `select` elements across 38 `.svelte` files — 64 in the manager outside its root, 16 in `CraftingSystemManagerRoot.svelte`, 12 in the interactables windows, 6 in the player apps and 1 in `Pagination.svelte` — plus four written into JavaScript dialog bodies.
+No file carried the marker.
+The two components long counted as the stated exceptions, `BulkEditSelect.svelte` and `InventorySystemSelector.svelte`, carry a DOCBLOCK rather than the marker and are baselined with the rest in `tests/components/design-system-known-debt.json`.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live, and is dropped where the trigger already states the value.
 
@@ -868,6 +875,8 @@ An inspector rail is OPTIONAL and several shipped editors have none; where one i
 A blocking notice is the only element permitted between the tab bar and the first card.
 An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
+`openspec/specs/ui-integration/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
+The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with identity and a single primary action, then progress, then requirements.
 The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
@@ -886,7 +895,8 @@ The row MUST name the implementation path and MUST record the caller count that 
 It MUST also name the library entry it corresponds to, unless the primitive ships with no specimen at all, in which case it carries `library: null` and the undocumented register in `tests/design-system-coverage.test.js` names it; that register is pinned by exact equality, and shortening it is the only direction the debt is meant to move.
 The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
-An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference; the library records which entries currently do so, and closing that list is tracked as a debt rather than presented as complete.
+An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference.
+The library records which entries currently do so: section 16's "Entries carried without an API" row names the twenty-five, across eight specimens, and closing that list is tracked as a debt rather than presented as complete.
 
 A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
 `tests/design-system-coverage.test.js` is the gate those prohibitions are enforced through: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.
