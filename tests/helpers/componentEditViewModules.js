@@ -50,6 +50,8 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // The identity strip's drop target + its portaled overflow menu (issue 676).
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   // `ActionMenu`'s own placement helper (issue 1477). Separate from `iconPickerPopover.js`
   // because a picker's layout DECIDES the panel width while an overflow menu's width is its

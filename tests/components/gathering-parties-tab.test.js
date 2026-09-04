@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -22,6 +23,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
@@ -523,13 +526,22 @@ describe('GatheringPartiesTab (mounted)', () => {
     // cannot be proven by mounting. This pins the ancestor list itself, which is the
     // thing that changed: without the pane class the walk falls through to the manager
     // shell and a card's picker can be laid out past the pane's right edge.
+    //
+    // The list moved to `util/overlayBounds.js` with issue 1500 — a shared component under
+    // `components/` must not name an application's own scroller — so the pin follows it, and
+    // the second half checks the picker still DEFAULTS to that walk. Either half alone would
+    // pass over a picker that had stopped using it.
+    assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-table-scroll/);
+    assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-travel-parties/);
+
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/SearchablePopover.svelte'),
       'utf8'
     );
-    const ancestorList = source.split('\n').find((line) => line.includes("'.admin-main"));
-    assert.ok(Boolean(ancestorList), 'getHorizontalBounds still walks a named ancestor list');
-    assert.match(ancestorList, /\.manager-table-scroll/);
-    assert.match(ancestorList, /\.manager-travel-parties/);
+    assert.match(
+      source,
+      /bounds = pickerScrollerBounds/,
+      'SearchablePopover no longer defaults to the shipped scroller walk'
+    );
   });
 });

@@ -38,8 +38,11 @@
  *      or hands a portal target to one that does.
  *   3. The SELECTOR EXTRACTOR is floored on the calls it finds, not on the offences. After the
  *      fix there are no offending calls at all, so a pattern that quietly stopped matching would
- *      report a clean tree. The floor is on the host lookups those files still legitimately make
- *      (`closest('.manager-main, …')` and friends), which proves the scanner is still reading.
+ *      report a clean tree. The floor is on the host lookups those files still legitimately make,
+ *      which proves the scanner is still reading. Issue 1500 took most of them out of this
+ *      population — the three `closest()` clipping walks became a `bounds` value resolved inside
+ *      `actions/anchoredPopover.js` from a selector it is handed — so the two that remain are
+ *      named individually below rather than merely counted.
  *   4. The detector is proved to fire on a synthetic offender and not to fire on a shipped
  *      selector, so a predicate rewritten to match everything or nothing reds here rather than
  *      greening the assertion below.
@@ -57,7 +60,15 @@ import { OVERLAY_HOST_ROOT_CLASSES } from '../../src/ui/svelte/util/overlayHost.
 /** The one module allowed to name an application root: the shared resolver itself. */
 const RESOLVER = 'src/ui/svelte/util/overlayHost.js';
 const RESOLVER_FUNCTION = 'resolveOverlayHost';
+/** The action itself, whose own `anchoredPopover(node, …)` signature is not an adoption of it. */
+const ANCHORED_POPOVER = 'src/ui/svelte/actions/anchoredPopover.js';
 const PORTAL_ACTION = 'actions/portal.js';
+/**
+ * The THIRD portal route (issue 1500). Five overlays no longer name `portal.js` at all: they
+ * `use:anchoredPopover`, which resolves the host and portals on their behalf. Without this the
+ * population would silently shed them and this gate would guard the two that stayed behind.
+ */
+const ANCHORED_POPOVER_ACTION = 'actions/anchoredPopover.js';
 
 const byName = (a, b) => a.localeCompare(b);
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -112,7 +123,12 @@ function applicationRootClasses() {
  */
 function portalingFiles(corpus) {
   return Object.entries(corpus)
-    .filter(([, text]) => text.includes(PORTAL_ACTION) || text.includes('portalTarget'))
+    .filter(
+      ([, text]) =>
+        text.includes(PORTAL_ACTION) ||
+        text.includes(ANCHORED_POPOVER_ACTION) ||
+        text.includes('portalTarget')
+    )
     .map(([file]) => file)
     .sort(byName);
 }
@@ -203,9 +219,10 @@ test('the portal population is the set of components that actually portal', () =
   }
 
   assert.ok(
-    files.length >= 8,
-    `only ${files.length} files were detected as portaling. Eight did when this was written; a ` +
-      'lower number means the membership test has narrowed and this gate is guarding a subset.'
+    files.length >= 9,
+    `only ${files.length} files were detected as portaling. Nine do since issue 1500 re-keyed ` +
+      'five of them onto the anchored-popover action; a lower number means the membership test ' +
+      'has narrowed and this gate is guarding a subset.'
   );
 });
 
@@ -217,11 +234,24 @@ test('the selector extractor still finds the host lookups it reads', () => {
   const files = portalingFiles(corpus);
   const lookups = files.flatMap((file) => selectorLookups(stripped[file]));
 
+  // NAMED, not merely counted. Two literal-selector lookups survive in this population after
+  // issue 1500, so a bare floor of two would be satisfied by two lookups of any kind — including
+  // two the extractor found by accident. These are the shipped pair: the biome picker's own
+  // clipping walk, which is the LAST `closest()` here and the one the clause below reads, and the
+  // icon picker's row measurement.
+  for (const anchor of ['.manager-main', '.essence-icon-picker-option']) {
+    assert.ok(
+      lookups.some((lookup) => lookup.selector === anchor),
+      `the extractor no longer finds the shipped lookup for \`${anchor}\`, so the absence ` +
+        'assertion below is holding over an empty set rather than a clean one. Found: ' +
+        lookups.map((lookup) => `${lookup.call}('${lookup.selector}')`).join(', ')
+    );
+  }
+
   assert.ok(
-    lookups.length >= 5,
+    lookups.length >= 2,
     `the extractor found only ${lookups.length} selector lookups across ${files.length} portaling ` +
-      'files. There were nine; a number this low means the pattern no longer matches the code, ' +
-      'and the absence assertion below is holding over an empty set rather than a clean one.'
+      'files. Two ship; a number this low means the pattern no longer matches the code.'
   );
 
   assert.ok(
@@ -286,8 +316,14 @@ test('every portal target is resolved through the shared resolver or handed in b
   const unresolved = [];
 
   for (const [file, text] of Object.entries(corpus)) {
-    if (file === RESOLVER) continue;
+    if (file === RESOLVER || file === ANCHORED_POPOVER) continue;
     const source = stripComments(text);
+    // The anchored-popover action resolves the host through `resolveOverlayHost` itself, so a
+    // caller that uses it is adopted BY CONSTRUCTION and has no expression to examine. Counting
+    // those uses is what keeps this adoption clause from collapsing as the callers convert.
+    for (const use of source.matchAll(/use:anchoredPopover=|anchoredPopover\(\w/g)) {
+      targets.push(`${file}: ${use[0]}`);
+    }
     for (const use of source.matchAll(/use:portal=\{([^}]*)\}/g)) {
       const expression = use[1].trim();
       targets.push(`${file}: ${expression}`);
@@ -308,9 +344,10 @@ test('every portal target is resolved through the shared resolver or handed in b
   }
 
   assert.ok(
-    targets.length >= 6,
-    `only ${targets.length} \`use:portal\` targets were found across the corpus. Seven ship; a ` +
-      'lower number means this clause is confirming adoption across a set that has gone empty.'
+    targets.length >= 7,
+    `only ${targets.length} portaled overlays were found across the corpus. Eight ship — two ` +
+      'through `use:portal` and six through the anchored-popover action; a lower number means ' +
+      'this clause is confirming adoption across a set that has gone empty.'
   );
 
   assert.deepEqual(

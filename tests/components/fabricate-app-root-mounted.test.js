@@ -69,6 +69,8 @@ const harness = createMountedComponentHarness({
     // suite's `before()` by name rather than hanging it, which is what the shared harness
     // buys over the allowlist it replaced.
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',

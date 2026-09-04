@@ -118,10 +118,17 @@
 <script>
   import { tick } from 'svelte';
   import IconButton from './IconButton.svelte';
+  import { anchoredPopover } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { portal } from '../actions/portal.js';
   import { computeActionMenuLayout } from '../util/actionMenuLayout.js';
-  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
+
+  /**
+   * The menu layout, adapted to the action's positional contract. It takes the panel's own
+   * measured box and returns host-relative geometry, so the trigger and host rects arrive
+   * unchanged and there is no `bounds` or option to forward.
+   */
+  const menuLayout = (triggerRect, panelRect, hostRect) =>
+    computeActionMenuLayout(triggerRect, panelRect, hostRect);
 
   let {
     items = [],
@@ -140,7 +147,6 @@
   let menuRoot = $state(null);
   let triggerButton = $state(null);
   let panelRoot = $state(null);
-  let panelStyle = $state('');
 
   // Which item takes focus on the next open. `-1` means the last one, which is what ArrowUp on
   // the trigger asks for; every other opening path asks for the first.
@@ -175,7 +181,6 @@
 
   function close({ restoreFocus = true } = {}) {
     open = false;
-    panelStyle = '';
     if (restoreFocus) restoreTriggerFocus();
   }
 
@@ -252,54 +257,14 @@
     }
   }
 
-  function getPanelHost() {
-    return resolveOverlayHost(menuRoot, { component: 'ActionMenu' });
-  }
-
-  function updatePosition() {
-    if (!open || !triggerButton || !panelRoot || typeof window === 'undefined') return;
-    const layout = computeActionMenuLayout(
-      triggerButton.getBoundingClientRect(),
-      panelRoot.getBoundingClientRect(),
-      overlayHostRect(getPanelHost())
-    );
-    if (!layout) {
-      panelStyle = '';
-      return;
-    }
-    panelStyle = [
-      'left: auto;',
-      `right: ${layout.right}px;`,
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`,
-    ].join(' ');
-  }
-
-  // ONE EFFECT, and it runs TWICE per opening by design. `panelRoot` is `$state`, so the first
-  // pass (panel not yet bound) does nothing and the second measures the panel's natural
-  // `max-content` box and places it. That is why nothing here reads a width from a stylesheet: the
-  // panel is rendered unpositioned for exactly one frame and then measured.
+  // Focus moves TO an item, which is the difference between a menu and a listbox and the reason
+  // this is a separate primitive rather than a prop on the picker. `anchoredPopover` owns the
+  // panel's geometry, so this effect is only about focus.
   $effect(() => {
-    if (!open || typeof window === 'undefined' || typeof document === 'undefined') {
-      panelStyle = '';
-      return;
-    }
-    if (!panelRoot) return;
-    updatePosition();
-    // Focus moves TO an item, which is the difference between a menu and a listbox and the reason
-    // this is a separate primitive rather than a prop on the picker.
+    if (!open || !panelRoot) return;
     tick().then(() => {
       if (open) focusItemAt(pendingFocusIndex);
     });
-    if (typeof window.addEventListener !== 'function') return;
-    const handleViewportChange = () => updatePosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
   });
 </script>
 
@@ -338,17 +303,20 @@
 
   {#if open}
     <!-- `fabricate-action-menu-panel` is the panel's own half of the namespace root. It is a
-         SECOND class rather than the one on the root above because `use:portal` moves this node
-         out of that root, taking its classes and losing its ancestors. -->
+         SECOND class rather than the one on the root above because `anchoredPopover` moves this
+         node out of that root, taking its classes and losing its ancestors. -->
     <div
       bind:this={panelRoot}
       class={`fabricate-action-menu-panel manager-action-menu-panel ${menuClass}`}
-      style={panelStyle}
       role="menu"
       tabindex="-1"
       data-keyboard-focus="true"
       aria-label={panelLabel}
-      use:portal={() => getPanelHost()}
+      use:anchoredPopover={{
+        component: 'ActionMenu',
+        trigger: triggerButton,
+        layout: menuLayout,
+      }}
       onclick={stop}
       onkeydown={onPanelKeydown}
     >

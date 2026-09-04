@@ -35,6 +35,8 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` portals its panel to the manager host and lays it out against
     // the trigger, so the add menu reaches these two as well (issue 1458).
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
   ],

@@ -44,6 +44,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/characterPrerequisites.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
   // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
   // render an issue's sentence from it, so both halves of the checks tree import it.

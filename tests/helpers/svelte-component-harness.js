@@ -206,7 +206,9 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
-  'src/ui/svelte/actions/portal.js'
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js'
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.

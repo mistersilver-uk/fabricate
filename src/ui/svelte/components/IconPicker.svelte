@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
@@ -11,7 +11,9 @@
     normalizeEssenceIcon,
   } from '../util/essenceIcons.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
+  import { MANAGER_SCROLLER_SELECTOR } from '../util/overlayBounds.js';
+
+  const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   let {
     value = DEFAULT_ESSENCE_ICON,
@@ -22,6 +24,10 @@
     triggerStyle = '',
     onTriggerContextMenu = null,
     onTriggerKeydown = null,
+    // The clipping boundary the popover is clamped inside, as a selector for the nearest matching
+    // ancestor. A shared component must not name an application's own scroller, so the default is
+    // a value from `util/overlayBounds.js` and a caller in another application passes its own.
+    bounds = MANAGER_SCROLLER_SELECTOR,
     onChange = () => {},
   } = $props();
 
@@ -32,8 +38,6 @@
   let triggerButton = $state(null);
   let searchInput = $state(null);
   let optionsList = $state(null);
-  let popoverStyle = $state('');
-  let optionsStyle = $state('');
 
   const iconOptions = getEssenceIconOptions();
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
@@ -109,23 +113,6 @@
     closePicker();
   }
 
-  function getPopoverHost() {
-    return resolveOverlayHost(pickerRoot, { component: 'IconPicker' });
-  }
-
-  function getPopoverHorizontalBounds(hostRect) {
-    if (!pickerRoot) return {};
-
-    const mainPanel = pickerRoot.closest('.admin-main, .manager-main, .manager-table-scroll');
-    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
-    if (!mainPanelRect) return {};
-
-    return {
-      minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16,
-    };
-  }
-
   /**
    * The row pitch and the popover chrome the whole-row flooring needs (issue 1280).
    *
@@ -135,6 +122,8 @@
    *
    * Chrome is composed from the popover's own computed box rather than by subtracting the list's
    * height, which would be circular: the list's height is what we are about to set.
+   *
+   * Re-run on EVERY measure, because `anchoredPopover` calls `layoutOptions` per pass.
    */
   function measurePopoverMetrics() {
     if (!popoverRoot || !optionsList) return {};
@@ -154,93 +143,9 @@
     return { rowPitch: rowHeight + rowGap, rowGap, chromeHeight };
   }
 
-  function updatePopoverPosition() {
-    if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
-
-    const popoverHost = getPopoverHost();
-    const hostRect = overlayHostRect(popoverHost);
-    const triggerRect = triggerButton.getBoundingClientRect();
-    const horizontalBounds = getPopoverHorizontalBounds(hostRect);
-
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: iconOnly ? 'left' : 'right',
-        minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight,
-        ...measurePopoverMetrics(),
-      }
-    );
-
-    if (!layout) {
-      popoverStyle = '';
-      optionsStyle = '';
-      return;
-    }
-
-    const verticalPosition =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-
-    popoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
-      verticalPosition,
-    ].join(' ');
-    // Null on the first pass, before any row has been laid out to measure. The list then falls
-    // back to filling the popover, exactly as it did before — one frame of the old behaviour is
-    // better than a guessed height that jumps once the real one arrives.
-    optionsStyle =
-      typeof layout.listMaxHeight === 'number' ? `max-height: ${layout.listMaxHeight}px;` : '';
-  }
-
-  function isPopoverScroll(event) {
-    const target = event?.target;
-    if (!target || !popoverRoot) return false;
-    return target === popoverRoot || popoverRoot.contains?.(target) === true;
-  }
-
   $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
-  });
-
-  $effect(() => {
-    if (!pickerOpen || typeof window === 'undefined' || typeof document === 'undefined') {
-      popoverStyle = '';
-      return;
-    }
-
-    updatePopoverPosition();
-
-    // Scroll is listened for in CAPTURE on `document`, so it also sees the options list's own
-    // scrolling — and repositioning costs two `closest()` traversals, three forced reflows and a
-    // style write per event. The popover is anchored to the trigger, and scrolling INSIDE the
-    // popover moves neither, so those events are dropped rather than coalesced: the answer they
-    // would recompute is the one already applied. Scrolling an ancestor panel does move the
-    // trigger and still repositions.
-    const handleViewportChange = (event) => {
-      if (isPopoverScroll(event)) return;
-      updatePopoverPosition();
-    };
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
   });
 </script>
 
@@ -314,10 +219,27 @@
     <div
       bind:this={popoverRoot}
       class="fabricate-icon-picker-popover essence-icon-picker-popover"
-      style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
-      use:portal={() => getPopoverHost()}
+      use:anchoredPopover={{
+        component: 'IconPicker',
+        trigger: triggerButton,
+        layout: popoverLayout,
+        layoutOptions: () => ({
+          horizontalAlign: iconOnly ? 'left' : 'right',
+          ...measurePopoverMetrics(),
+        }),
+        bounds,
+        // Read eagerly rather than behind a callback: the list binds one pass after this action
+        // first runs, and reading it here is what makes Svelte re-run the action's `update` — and
+        // therefore the measure — once it exists.
+        targets: { list: optionsList },
+        // Scroll is listened for in CAPTURE on `document`, so it also sees the options list's own
+        // scrolling. The popover is anchored to the trigger, and scrolling INSIDE the popover
+        // moves neither, so those events are dropped: the answer they would recompute is the one
+        // already applied. Scrolling an ancestor panel does move the trigger and still repositions.
+        ignoreScrollWithin: true,
+      }}
     >
       <div class="essence-icon-picker-search">
         <input
@@ -333,7 +255,6 @@
         bind:this={optionsList}
         class="essence-icon-picker-options"
         role="listbox"
-        style={optionsStyle}
         aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
       >
         {#if pinnedOption}

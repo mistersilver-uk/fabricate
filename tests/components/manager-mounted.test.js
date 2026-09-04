@@ -649,6 +649,9 @@ function compileManagerRoot() {
     // statically to find the application root its overlay is portaled into. This suite has
     // no dependency validator, so an omission HANGS it (# cancelled) rather than naming it.
     'overlayHost.js',
+    // The shared clipping boundaries the pickers default their `bounds` prop to (issue 1500).
+    // Statically imported by every picker in this tree, so an omission HANGS this suite too.
+    'overlayBounds.js',
     'componentEditor.js',
     'chanceColorScale.js',
     'dropRateTier.js',
@@ -985,7 +988,14 @@ function compileManagerRoot() {
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawPath), 'utf8'));
   }
 
-  for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {
+  for (const actionPath of [
+    'dragDrop.js',
+    'dismissOnOutsideClick.js',
+    'portal.js',
+    // The one anchored-popover action (issue 1500): every overlay in this tree now positions
+    // through it, and it imports `portal.js` above.
+    'anchoredPopover.js',
+  ]) {
     const actionDestination = join(tempRoot, `src/ui/svelte/actions/${actionPath}`);
     mkdirSync(dirname(actionDestination), { recursive: true });
     writeFileSync(

@@ -19,6 +19,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     // The rail's "How players see it" preview builds a synthetic row (pure helper) and
     // embeds the REAL player InventoryDetail, which pulls in CraftingThumb →
     // craftingImageDefaults (issue 544).

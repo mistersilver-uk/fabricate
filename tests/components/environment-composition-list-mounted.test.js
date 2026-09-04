@@ -177,6 +177,7 @@ describe('CompositionList mounted layout', () => {
       // the pure placement helper. All three are reached only through the menu, so they arrived
       // in this tree with it.
       'src/ui/svelte/actions/portal.js',
+      'src/ui/svelte/actions/anchoredPopover.js',
       'src/ui/svelte/util/overlayHost.js',
       'src/ui/svelte/util/actionMenuLayout.js',
       'src/gatheringImageDefaults.js'

@@ -51,6 +51,8 @@ const harness = createMountedComponentHarness({
     // The availability menus and `ModifierPillSelect`'s add menu are `SearchablePopover`
     // now (issue 1458), which portals its panel and lays it out against the trigger.
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',

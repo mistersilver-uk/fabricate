@@ -48,6 +48,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/actionMenuLayout.js',
     'src/ui/svelte/util/overlayHost.js',
   ],

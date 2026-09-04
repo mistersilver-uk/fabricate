@@ -11,7 +11,7 @@
  * `bounds` prop and a caller may pass its own; the defaults live here, outside both the shared
  * directory and the action, so that:
  *
- *   - `src/ui/svelte/actions/anchoredPopover.js` carries no app-specific selector at all, and
+ *   - the `anchoredPopover` action carries no app-specific selector at all, and
  *   - moving a component into `components/` does not drag a manager selector in with it.
  *
  * ── WHY THE DEFAULTS ARE HERE RATHER THAN AT EVERY CALL SITE ────────────────────────────────
