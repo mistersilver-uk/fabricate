@@ -47,7 +47,7 @@
       "library": "<Callout>",
       "status": "target",
       "evidence": "broad",
-      "why": "Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice."
+      "why": "Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice. `target` rather than `shipped` because that entry states a Svelte API for `<Notice>` alone: a specimen that names no props gives nothing to match, and issue 1505 writes Callout's."
     },
     {
       "path": "src/ui/svelte/apps/manager/Chip.svelte",
@@ -80,9 +80,9 @@
     {
       "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
       "library": "<Empty>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
-      "why": "Named at `library.html:911`. 43 callers, second only to `Chip`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because both representative frames are POPULATED states, so the dashed panel it draws appears in neither."
+      "why": "Named at `library.html:911`. 43 callers, second only to `Chip`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because both representative frames are POPULATED states, so the dashed panel it draws appears in neither. `target` rather than `shipped` because that entry states a Svelte API for `<Notice>` alone: a specimen that names no props gives nothing to match."
     },
     {
       "path": "src/ui/svelte/apps/manager/ExplainerCard.svelte",
@@ -269,9 +269,9 @@
     {
       "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
       "library": "<TintPicker>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
-      "why": "`library.html:797`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`."
+      "why": "`library.html:797`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `target` rather than `shipped` because that entry states geometry with no Svelte API section: a specimen that names no props gives nothing to match."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",

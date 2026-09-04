@@ -79,6 +79,7 @@ An exact caller list on a primitive with dozens of importers would make an unrel
 Every specimen in `openspec/specs/design-system/library.html` and every row of the shipped-member table in `scripts/lib/designSystemPrimitives.json` MUST carry a status drawn from a closed vocabulary, and a library block that specifies no primitive carries `prose` so the attribute is universal and its absence is always a defect rather than a category.
 `target` means the entry is specified and the shipped component does not yet match it, or nothing ships at all.
 `shipped` means the shipped component matches the specimen's API and geometry.
+An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
 The status is declared on the block rather than inside the heading, because the heading census pins every heading's text verbatim and a status written there would be part of the vocabulary it is describing.
