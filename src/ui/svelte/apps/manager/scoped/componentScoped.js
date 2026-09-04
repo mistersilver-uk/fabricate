@@ -65,6 +65,86 @@ export function componentMemberCount(entry) {
 }
 
 /**
+ * WHAT KIND OF THING THIS COMPONENT IS BACKED BY, as a sentence rather than as a classification.
+ *
+ * The reference writes this under the name on both the catalogue inspector and the world entry's
+ * header, and in both places it is the SOURCE — `Linked Foundry item`, `Linked Compendium entry`,
+ * `No source item` — not the category. The two say different things and only one of them is true
+ * of the record itself: a category is a value some system may or may not resolve, and the source
+ * is what the entry IS.
+ *
+ * THE COMPENDIUM BRANCH IS READ OFF THE UUID'S OWN SHAPE, because that is the only place it is
+ * recorded: `Compendium.<scope>.<pack>.Item.<id>` is a pack address and `Item.<id>` is a world
+ * one, and the projection publishes neither a `pack` field nor a source kind. A uuid this module
+ * cannot read at all is reported as an unlinked record rather than guessed at.
+ *
+ * @param {object|null} entry the projected world entry.
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+export function componentSourceLine(entry, text) {
+  const uuid = String(
+    entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || ''
+  ).trim();
+  if (!uuid || entry?.hasSourceLink !== true) {
+    return text('FABRICATE.Admin.Manager.Scoped.Component.SourceNone', 'No source item');
+  }
+  if (uuid.startsWith('Compendium.')) {
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Component.SourceCompendium',
+      'Linked Compendium entry'
+    );
+  }
+  return text('FABRICATE.Admin.Manager.Scoped.Component.SourceWorld', 'Linked Foundry item');
+}
+
+/**
+ * The alias note under the inspector's uuid: how many other addresses import will match on.
+ *
+ * Stated as a sentence in both branches rather than as `0 aliases`, because zero aliases is the
+ * NORMAL state of a healthy record and a count reads as a deficiency.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentAliasNote(entry, phrase) {
+  const aliases = Array.isArray(entry?.entity?.aliasItemUuids) ? entry.entity.aliasItemUuids : [];
+  if (aliases.length === 0) {
+    return phrase('FABRICATE.Admin.Manager.Scoped.Component.AliasNoneNote', 'No aliases recorded');
+  }
+  return phrase(
+    aliases.length === 1
+      ? 'FABRICATE.Admin.Manager.Scoped.Component.AliasNoteOne'
+      : 'FABRICATE.Admin.Manager.Scoped.Component.AliasNote',
+    aliases.length === 1 ? '{count} alias recorded' : '{count} aliases recorded',
+    { count: aliases.length }
+  );
+}
+
+/**
+ * The `Global tags` card's closing note: how far this world record reaches.
+ *
+ * `{n}` is the RULE-SET count — the number of systems that have rules for the component — because
+ * that is the set the world values are inherited by. A count over every system in the world would
+ * be a bigger number that is true of nothing.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentGlobalTagNote(entry, phrase) {
+  const members = componentMemberCount(entry);
+  return phrase(
+    members === 1
+      ? 'FABRICATE.Admin.Manager.Scoped.Component.GlobalTagNoteOne'
+      : 'FABRICATE.Admin.Manager.Scoped.Component.GlobalTagNote',
+    members === 1 ? 'Inherited by {count} rule set' : 'Inherited by all {count} rule sets',
+    { count: members }
+  );
+}
+
+/**
  * The catalogue's ONE lane filter: whether the record names a source Item.
  *
  * `hasSourceLink` answers PRESENCE and never resolution — see `componentScopeValidation.js` for

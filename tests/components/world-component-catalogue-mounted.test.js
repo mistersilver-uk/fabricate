@@ -197,10 +197,14 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.deepEqual(states.slice().sort(), ['absent', 'member'], 'the two states are both drawn');
     });
 
-    it('states its membership fraction ONCE', async () => {
-      // G.6. The roster header already reads `SYSTEM RULES n / m` and lists the systems by name;
-      // the use line restated both a line above it. What survives is the ZERO branch, which the
-      // header cannot say: `0 / 6` is a number, and "registered but unreferenced" is its meaning.
+    it('states its membership fraction ONCE, and the zero case in ONE place', async () => {
+      // The roster's own header reads `SYSTEM RULES n / m`, so a second fraction above it is a
+      // restatement — that half has held since round 2.
+      //
+      // THE ZERO CASE MOVED IN ROUND 4. It used to be a second sentence in the inspector body
+      // beside the roster's own empty state, which is the same restatement one state down: two
+      // paragraphs, one block apart, saying "no system has rules for this". The reference draws
+      // exactly one, inside the roster, and that is the one that survives.
       const target = await mount();
       await inspect(target, 'ingot');
       assert.ok(
@@ -209,9 +213,156 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
 
       await inspect(target, 'resin');
-      const use = target.querySelector('[data-world-component-use="resin"]');
-      assert.ok(Boolean(use), 'and the zero case keeps the line that says what zero means');
-      assert.match(use.textContent, /unreferenced|unused|no system/i);
+      assert.ok(
+        !target.querySelector('[data-world-component-use="resin"]'),
+        'and the zero case does not get a second sentence beside the roster empty state'
+      );
+      const empty = target.querySelector('[data-scoped-roster-empty]');
+      assert.ok(Boolean(empty), 'which is where the one surviving sentence is');
+      assert.match(empty.textContent, /unreferenced|unused|no system/i);
+    });
+  });
+
+  describe('the inspector draws the blocks the reference draws, and only those', () => {
+    async function inspected(entityId) {
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        onOpenVocabulary: () => {},
+      });
+      target.querySelector(`[data-scoped-list-inspect="${entityId}"]`).click();
+      await drain();
+      return target;
+    }
+
+    it('names the SOURCE under the name, not the category', async () => {
+      // The two say different things and only one is true of the record itself: a category is a
+      // value some system may or may not resolve, and the source is what the entry IS. The
+      // category has its own labelled row in the `Global tags` card below.
+      const target = await inspected('ingot');
+      const source = target.querySelector('[data-world-component-inspector-source]');
+      assert.ok(Boolean(source), 'the inspector draws a source line under the name');
+      assert.equal(source.textContent.trim(), 'Linked Foundry item');
+
+      const orphaned = await inspected('orphan');
+      assert.equal(
+        orphaned.querySelector('[data-world-component-inspector-source]').textContent.trim(),
+        'No source item',
+        'and the unlinked record says so rather than falling back to a category'
+      );
+    });
+
+    it('draws the Source identity inset: the address and what else import matches on', async () => {
+      const target = await inspected('ingot');
+      const card = target.querySelector('[data-world-component-source-card="ingot"]');
+      assert.ok(Boolean(card), 'the inset exists');
+      assert.equal(
+        card.querySelector('[data-world-component-inspector-uuid]').textContent.trim(),
+        'Item.ingot-source'
+      );
+      assert.equal(
+        card.querySelector('[data-world-component-alias-note]').textContent.trim(),
+        '1 alias recorded',
+        'the alias note is a SENTENCE and it pluralises; `ingot` carries exactly one'
+      );
+    });
+
+    it('and states the alias-free record as a sentence rather than as a zero', async () => {
+      // A count reads as a deficiency, and zero aliases is the normal state of a healthy record.
+      const target = await inspected('coal');
+      assert.equal(
+        target.querySelector('[data-world-component-alias-note]').textContent.trim(),
+        'No aliases recorded'
+      );
+    });
+
+    it('draws the Global tags inset: an exit, the category row, the chips and the reach', async () => {
+      const target = await inspected('coal');
+      const card = target.querySelector('[data-world-component-tag-card="coal"]');
+      assert.ok(Boolean(card), 'the inset exists');
+      assert.ok(
+        Boolean(card.querySelector('[data-world-component-vocabulary-exit]')),
+        'with the head action the reference draws at its trailing edge'
+      );
+      assert.match(
+        card.querySelector('[data-world-component-inspector-category="coal"]').textContent,
+        /Raw/,
+        'the category is a LABELLED ROW inside this card, which is why it is not the name caption'
+      );
+      const chips = [...card.querySelectorAll('[data-world-component-global-tag]')].map((chip) =>
+        chip.getAttribute('data-world-component-global-tag')
+      );
+      assert.deepEqual(chips, ['fuel', 'bulk']);
+      assert.match(
+        card.querySelector('[data-world-component-tag-note="coal"]').textContent,
+        /Inherited by 1 rule set/,
+        'and the note counts RULE SETS, not systems in the world'
+      );
+    });
+
+    it('and says so when there are no global tags, rather than drawing an empty run', async () => {
+      const target = await inspected('resin');
+      const card = target.querySelector('[data-world-component-tag-card="resin"]');
+      assert.equal(card.querySelectorAll('[data-world-component-global-tag]').length, 0);
+      assert.match(card.textContent, /No global tags/);
+      assert.match(card.textContent, /No world category/);
+    });
+
+    it('and the vocabulary exit hands the click BACK rather than navigating', async () => {
+      const opened = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        onOpenVocabulary: () => opened.push(true),
+      });
+      target.querySelector('[data-scoped-list-inspect="coal"]').click();
+      await drain();
+      target.querySelector('[data-world-component-vocabulary-exit]').click();
+      await drain();
+      assert.deepEqual(opened, [true]);
+    });
+
+    it('and withholds the exit entirely when the call site offers no route', async () => {
+      // A dead affordance is worse than no affordance, and this shell is composed by three
+      // catalogues; only one of them has a vocabulary screen to send a GM to.
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+      });
+      target.querySelector('[data-scoped-list-inspect="coal"]').click();
+      await drain();
+      assert.ok(!target.querySelector('[data-world-component-vocabulary-exit]'));
+    });
+
+    it('draws NONE of the three subject-only blocks the reference has no counterpart for', async () => {
+      // `Used by` belongs on the ENTRY's preview rail beside `Produced by`; one of the two lists,
+      // on the surface with no room for the other, is worse than both where there is room. The
+      // `World defaults` card is a differently-shaped card standing in for `Global tags`. And the
+      // standing disclosure had no counterpart at all — in the shipped frame the pinned foot
+      // CLIPPED it, and a paragraph a GM cannot finish reading is not a disclosure.
+      const target = await inspected('ingot');
+      for (const hook of [
+        '[data-world-component-required-by]',
+        '[data-world-component-disclosure]',
+        '[data-scoped-list-defaults]',
+      ]) {
+        assert.ok(!target.querySelector(hook), `${hook} is subject-only and is gone`);
+      }
+    });
+
+    it('and its one pinned action names the screen it opens', async () => {
+      const target = await inspected('ingot');
+      assert.equal(
+        target.querySelector('[data-scoped-component-open-entry]').textContent.trim(),
+        'Open catalogue entry'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-list-inspector-kicker]').textContent.trim(),
+        'Catalogue entry'
+      );
     });
   });
 

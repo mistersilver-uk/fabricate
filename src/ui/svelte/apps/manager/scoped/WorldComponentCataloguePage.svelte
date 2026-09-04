@@ -40,15 +40,14 @@
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
     authoredWorldComponentCategories,
-    componentMemberCount,
+    componentAliasNote,
+    componentGlobalTagNote,
     componentRowStats,
     componentSearchText,
     componentSorts,
     componentSourceFilters,
-    componentUseSummary,
+    componentSourceLine,
     componentWorldCategoryNote,
-    componentWorldScopeDisclosure,
-    componentWorldTagNote,
   } from './componentScoped.js';
 
   let {
@@ -62,6 +61,12 @@
     worldItems = [],
     onOpenEntry = () => {},
     onOpenSystemRules = null,
+    // THE VOCABULARY EXIT the `Global tags` card's head action routes through (issue 1371,
+    // round 4). Handed back to the owner rather than navigated here, on the same seam and for
+    // the same reason the world entry's own exit is: the gateway runs the unsaved-changes guard
+    // before it moves. `null` withholds the control, so a call site with no route offers no
+    // dead affordance.
+    onOpenVocabulary = null,
     onCreateFromItemDrop = () => {},
     // THE LIST'S LIFTED VIEW-STATE. Owned by the manager root and bound here: opening an entry
     // unmounts this page along with the shell and the frame, so a slot held locally would be
@@ -255,8 +260,10 @@
     {sectionNotes}
     inspectorKicker={text(
       'FABRICATE.Admin.Manager.Scoped.Component.InspectorKicker',
-      'Component page'
+      'Catalogue entry'
     )}
+    showWorldDefaults={false}
+    inspectorBodyPlacement="lead"
     countUnit={text('FABRICATE.Admin.Manager.Scoped.Component.CountUnit', 'components')}
     selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Component.SelectAllShort', 'All')}
     searchPlaceholder={text(
@@ -331,65 +338,108 @@
 {/snippet}
 
 <!--
-  THE INSPECTOR'S STATE LINE, which is the slot the design fills under the component's name. A
-  world catalogue has no system, so the only classification it can state truthfully is the WORLD
-  category — the value an inheriting system resolves from — and it says so rather than showing a
-  category no particular system necessarily uses.
+  THE LINE UNDER THE NAME IS THE SOURCE (issue 1371, maintainer parity round 4).
+
+  It was a category chip, on the reasoning that the world category is the only classification a
+  catalogue can state truthfully. That is true and it is not what this slot is for: the reference
+  writes `Linked Foundry item` here, and the category is drawn in the `Global tags` card below
+  with its own label. A category is a value some system may or may not resolve; the SOURCE is
+  what the entry is, and it is the one fact this screen is a catalogue OF.
 -->
 {#snippet componentInspectorCaption(entry)}
-  {#if String(entry?.defaults?.category ?? '').trim()}
-    <Chip tone="tag" data-world-component-inspector-category={entry.id}
-      >{String(entry.defaults.category).trim()}</Chip
-    >
-  {:else}
-    <span class="manager-muted" data-world-component-inspector-category={entry?.id ?? ''}
-      >{text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category')}</span
-    >
-  {/if}
+  <span
+    class="manager-world-component-source-line"
+    data-world-component-inspector-source={entry?.id ?? ''}>{componentSourceLine(entry, text)}</span
+  >
 {/snippet}
 
 {#snippet componentInspectorBody(entry)}
   <div class="manager-world-component-inspector">
     <!--
-      THE MEMBERSHIP FRACTION IS STATED ONCE (issue 1371, round 2). The roster's own header below
-      already reads `SYSTEM RULES n / m` and lists the systems by name, and this restated both a
-      line above it — `Rules in 1 of 6 systems` plus the same names again. The reference puts the
-      count in the section header and carries no second list.
-      What survives is the ZERO-MEMBER branch, which the roster header cannot say: `0 / 6` is a
-      number, and "no system uses it · registered but unreferenced" is what that number MEANS.
+      TWO INSET CARDS AND NOTHING ELSE (issue 1371, maintainer parity round 4).
+
+      What was here — a `Used by` list, a world-tag note paragraph, a zero-member sentence and the
+      standing world-scope disclosure — is gone, and each for its own reason rather than for room:
+
+      - `Used by` belongs on the ENTRY's preview rail, where the reference draws it beside
+        `Produced by`. One of the two lists on the surface that has no room for the other is worse
+        than both on the surface that does.
+      - the zero-member sentence is what the roster's own empty state says, one block below.
+      - the disclosure had no counterpart here at all, and in the shipped frame the pinned foot
+        clipped it — a paragraph a GM cannot finish reading is not a disclosure.
+
+      What replaces them is the reference's own two insets: the address the world recognises this
+      item by, and the vocabulary every rule set inherits.
     -->
-    {#if componentMemberCount(entry) === 0}
-      <p class="manager-muted manager-world-component-use" data-world-component-use={entry.id}>
-        <span class="manager-world-component-use-lead"
-          >{componentUseSummary(entry, systems, phrase).useText}</span
-        >
-        <span>{componentUseSummary(entry, systems, phrase).useDetail}</span>
+    <section class="manager-scoped-inspector-inset" data-world-component-source-card={entry.id}>
+      <p class="manager-micro-label">
+        {text('FABRICATE.Admin.Manager.Scoped.Component.SourceIdentity', 'Source identity')}
       </p>
-    {/if}
-    <p class="manager-muted manager-world-component-tags" data-world-component-tag-note={entry.id}>
-      {componentWorldTagNote(entry, phrase)}
-    </p>
-    {#if entry.requiredBy.length > 0}
-      <div class="manager-world-component-refs">
-        <p class="manager-kicker">
-          {text('FABRICATE.Admin.Manager.Scoped.Component.UsedBy', 'Used by')}
+      <p class="manager-world-component-inspector-uuid" data-world-component-inspector-uuid>
+        {String(entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || '').trim() ||
+          text('FABRICATE.Admin.Manager.Scoped.Component.SourceNone', 'No source item')}
+      </p>
+      <p class="manager-world-component-inspector-note" data-world-component-alias-note>
+        {componentAliasNote(entry, phrase)}
+      </p>
+    </section>
+
+    <section class="manager-scoped-inspector-inset" data-world-component-tag-card={entry.id}>
+      <div class="manager-world-component-inspector-head">
+        <p class="manager-micro-label">
+          {text('FABRICATE.Admin.Manager.Scoped.Component.GlobalTags', 'Global tags')}
         </p>
-        <ul class="manager-world-component-ref-list" data-world-component-required-by={entry.id}>
-          {#each entry.requiredBy.slice(0, 6) as reference (`${reference.kind}-${reference.systemId}-${reference.id}`)}
-            <li>{reference.name} <span class="manager-muted">· {reference.systemName}</span></li>
-          {/each}
-        </ul>
+        <!--
+          A BARE ACCENT-INK TEXT ACTION, which is what the reference draws: an `Edit ↗` at the
+          head's trailing edge, not a filled control. `ManagerButton role="ghost"` still paints a
+          hover fill and carries the primitive's own control height, and this is a 9px link inside
+          a 10px-tall head row — so it is plain markup carrying the manager's shared link class,
+          the same way the catalogue row's own `Rules ↗` exits are drawn.
+        -->
+        {#if onOpenVocabulary}
+          <button
+            type="button"
+            class="manager-inline-link"
+            data-world-component-vocabulary-exit
+            onclick={() => onOpenVocabulary()}
+          >
+            {text('FABRICATE.Admin.Manager.Scoped.Component.EditShort', 'Edit')}
+            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          </button>
+        {/if}
       </div>
-    {/if}
-    <!--
-      THE STANDING DISCLOSURE. It is on the catalogue and on the entry and on the system rules
-      editor, because all three draw world-scope state a GM can author and no crafting system
-      reads — and because a control that reads its own state back looks live in a way an unwritten
-      field does not.
-    -->
-    <p class="manager-muted manager-world-component-disclosure" data-world-component-disclosure>
-      {componentWorldScopeDisclosure(phrase)}
-    </p>
+      <p
+        class="manager-world-component-inspector-category"
+        data-world-component-inspector-category={entry.id}
+      >
+        <i class="fas fa-folder-open" aria-hidden="true"></i>
+        {#if String(entry?.defaults?.category ?? '').trim()}
+          <span>{String(entry.defaults.category).trim()}</span>
+        {:else}
+          <span class="is-unset"
+            >{text(
+              'FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory',
+              'No world category'
+            )}</span
+          >
+        {/if}
+      </p>
+      <div
+        class="manager-world-component-inspector-tags"
+        data-world-component-global-tags={entry.id}
+      >
+        {#each entry?.defaults?.tags ?? [] as tag (tag)}
+          <Chip tone="tag" data-world-component-global-tag={tag}>{tag}</Chip>
+        {:else}
+          <span class="manager-world-component-inspector-empty"
+            >{text('FABRICATE.Admin.Manager.Scoped.Component.NoGlobalTags', 'No global tags')}</span
+          >
+        {/each}
+      </div>
+      <p class="manager-world-component-inspector-note" data-world-component-tag-note={entry.id}>
+        {componentGlobalTagNote(entry, phrase)}
+      </p>
+    </section>
   </div>
 {/snippet}
 
@@ -402,7 +452,7 @@
 {#snippet componentInspectorFoot(entry)}
   <InspectorActionButton
     tone="primary"
-    label={text('FABRICATE.Admin.Manager.Scoped.Component.OpenEntry', 'Edit component')}
+    label={text('FABRICATE.Admin.Manager.Scoped.Component.OpenEntry', 'Open catalogue entry')}
     data-scoped-component-open-entry
     onClick={() => onOpenEntry(entry.id)}
   />
@@ -468,38 +518,89 @@
     min-width: 0;
   }
 
-  .manager-world-component-use,
-  .manager-world-component-tags,
-  .manager-world-component-disclosure {
+  /* THE INSPECTOR'S TWO INSETS (issue 1371, round 4). Each is a `--fab-bg-1` well lifted out of
+     the `--fab-bg-2` pane, hairline, radius 9 — `design-system/spec.md:218` puts a well on 9,
+     which is the reference's own value.
+
+     ITS PADDING SNAPS. The reference draws 10px block / 11px inline and the published spacing
+     scale has neither; `ui-integration/spec.md`'s "Spacing scale" clause makes the scale
+     mandatory for padding, so both land on `--fab-space-3` (12px). That is the same class of
+     recorded rung as the control-height ladder snapping 32 and 36 to 34, and it is the one kind
+     of deviation the rebuild's standing rules allow. */
+  .manager-scoped-inspector-inset {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-world-component-inspector-head {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    margin-bottom: var(--fab-space-1);
+  }
+
+  .manager-world-component-inspector-head .manager-micro-label {
     margin: 0;
-    font-size: 0.68rem;
-    line-height: 1.5;
-    overflow-wrap: break-word;
   }
 
-  .manager-world-component-use {
+  /* THE ADDRESS, in the mono face at the weight the face ships (`spec.md:230-231`). It breaks
+     inside a word because a uuid has no spaces and a 300px column has no room for one. */
+  .manager-world-component-inspector-uuid {
+    margin: 0;
+    color: var(--fab-text-2);
+    font-family: var(--fab-font-mono);
+    font-weight: 500;
+    font-size: 0.63rem;
+    line-height: 1.6;
+    word-break: break-all;
+  }
+
+  .manager-world-component-inspector-note {
+    margin: var(--fab-space-1) 0 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.59rem;
+    line-height: 1.45;
+  }
+
+  .manager-world-component-inspector-category {
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-  }
-
-  .manager-world-component-use-lead {
+    align-items: center;
+    gap: var(--fab-space-1);
+    margin: 0 0 var(--fab-space-2);
     color: var(--fab-text);
-    font-weight: 600;
+    font-size: 0.68rem;
   }
 
-  .manager-world-component-refs {
+  .manager-world-component-inspector-category i {
+    color: var(--fab-text-subtle);
+    font-size: 0.56rem;
+  }
+
+  .manager-world-component-inspector-category .is-unset {
+    color: var(--fab-text-disabled);
+  }
+
+  .manager-world-component-inspector-tags {
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
-  .manager-world-component-ref-list {
-    margin: 0;
-    padding-left: var(--fab-space-3);
-    color: var(--fab-text-muted);
-    font-size: 0.68rem;
-    line-height: 1.5;
+  .manager-world-component-inspector-empty {
+    color: var(--fab-text-disabled);
+    font-size: 0.63rem;
+  }
+
+  /* The line under the name: the SOURCE, at the reference's 10px/500 in subtle ink. */
+  .manager-world-component-source-line {
+    color: var(--fab-text-subtle);
+    font-weight: 500;
+    font-size: 0.63rem;
   }
 </style>

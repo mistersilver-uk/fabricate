@@ -92,7 +92,12 @@ const CATALOGUE_PROPS = [
   'filters',
   'hookValue',
   'icon',
+  // TWO MORE FROM ISSUE 1371's PARITY ROUND, both catalogue-only opt-outs from what shipped:
+  // `showWorldDefaults` withholds the `World defaults` card stack for a lane whose reference
+  // inspector has no such card, and `inspectorBodyPlacement` puts the lane's own blocks ABOVE
+  // the shell's two regions for a lane whose reference draws them there.
   'inspectorBody',
+  'inspectorBodyPlacement',
   'inspectorCaption',
   'inspectorFoot',
   'inspectorKicker',
@@ -125,6 +130,7 @@ const CATALOGUE_PROPS = [
   'sectionNotes',
   'sectionTitles',
   'selectAllLabel',
+  'showWorldDefaults',
   'selectedId',
   'sorts',
   'subtitle',
@@ -204,7 +210,10 @@ describe('the shells declare the pinned prop sets', () => {
       // an inspector system row that shell has no inspector to draw.
       'describeEntry',
       'extraCards',
+      // AND THE TWO PARITY OPT-OUTS (issue 1371), catalogue-only for the same reason as the
+      // rest: both are about the INSPECTOR, and the rules-list shell renders none.
       'inspectorBody',
+      'inspectorBodyPlacement',
       'inspectorCaption',
       'inspectorFoot',
       'inspectorKicker',
@@ -229,6 +238,7 @@ describe('the shells declare the pinned prop sets', () => {
       'sectionIcons',
       'sectionTitles',
       'selectAllLabel',
+      'showWorldDefaults',
       'systemRowAction',
     ]);
   });

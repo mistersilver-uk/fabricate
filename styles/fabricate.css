@@ -24088,3 +24088,53 @@
   color: var(--fab-text-disabled);
   text-align: center;
 }
+
+/* ── TWO SHARED LEAVES THE REFERENCE USES EVERYWHERE (issue 1371, parity round 4) ──────────────
+   Both are GLOBAL rather than scoped to one page, because both appear in three of the four
+   component surfaces and a scoped copy per surface is the duplication a shared sheet exists to
+   stop — and because the second lands on markup a child component owns in two of those places,
+   where a scoped rule never reaches.
+
+   `manager-micro-label` is the reference's 8px uppercase field label: the line above a uuid, a
+   category select or a tag run that says what the value below it IS. It is NOT `manager-kicker`,
+   which is a SECTION eyebrow at 9.5px with wider tracking; the two sit one above the other in the
+   same inspector, so collapsing them would make a field label and a section head the same thing.
+
+   `manager-inline-link` is the bare accent-ink text action with a trailing external-link mark.
+   `ManagerButton role="ghost"` is the nearest primitive and is not this: it carries a control
+   height and a hover fill, and every site here is a 9-10.5px link inside a head row that is
+   shorter than the primitive's smallest rung. */
+.fabricate-manager .manager-micro-label {
+  margin: 0 0 var(--fab-space-1);
+  color: var(--fab-text-subtle);
+  font-weight: 700;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fab-accent);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.59rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-inline-link:hover,
+.fabricate-manager .manager-inline-link:focus-visible {
+  color: var(--fab-accent-strong);
+  text-decoration: underline;
+}
+
+.fabricate-manager .manager-inline-link i {
+  font-size: 0.44rem;
+}

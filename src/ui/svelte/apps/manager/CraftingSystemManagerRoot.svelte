@@ -12342,6 +12342,7 @@
         {...componentScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
+        onOpenVocabulary={() => setView('world-vocabulary')}
         onCreateFromItemDrop={createWorldComponentFromItemDrop}
         worldItems={worldItemOptions}
         bind:browserState={managerBrowserState.worldComponentCatalogue}

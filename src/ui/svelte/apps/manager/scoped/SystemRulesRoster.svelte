@@ -211,11 +211,12 @@
     one object read as three unrelated ones, its pager floated against the pinned foot action
     with nothing between them, and a short roster left no boundary at all.
 
-    Its BOX is the geometry the finding names; its SURFACE is not. The design recesses the card
-    one rung below the panel and lifts each part one rung above it, and our own ramp for this
-    route puts the pane at the bottom rung already — so the recess has nowhere to go and the
-    card is drawn the way every other card in this content area is: a hairline on the pane's own
-    surface, no fill. That is the shipped ruling for this region and this does not reopen it.
+    AND ITS SURFACE IS THE RECESS AFTER ALL (issue 1371, maintainer parity round 4). Round 3 of
+    the sibling lane recorded "our ramp has nowhere to go" and drew the card with no fill. That
+    was an adaptation argument rather than a measurement: `--fab-bg-0` exists, it IS a rung below
+    the `--fab-bg-2` this inspector pane is painted in, and the reference recesses the card to it
+    while lifting each part inside to `--fab-bg-1`. Three surfaces, three tokens, all published.
+    The maintainer's parity ruling voids every "our ramp is different" exemption, and this is one.
   -->
   <div class="manager-scoped-roster-card">
     <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
@@ -375,6 +376,10 @@
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
+    /* THE RECESS. One rung below the `--fab-bg-2` pane this card sits in, which is what makes the
+       `--fab-bg-1` search well and the `--fab-bg-1` rows inside it read as lifted. See the head
+       comment for why the earlier "nowhere to go" reading is void. */
+    background: var(--fab-bg-0);
   }
 
   /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
@@ -405,6 +410,16 @@
     min-height: 28px;
   }
 
+  /* AND IT IS A WELL, not a bare input on the recess (issue 1371, round 4). The reference draws
+     the search as a lifted `--fab-bg-1` box with a hairline and a 7px radius — the same treatment
+     as the rows below it — so that the recessed card reads as a container holding two kinds of
+     lifted thing. Without a fill and a border it read as a caption floating on the card. */
+  :global(.manager-search.manager-scoped-roster-search input) {
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    background: var(--fab-bg-1);
+  }
+
   /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), which is the half of this panel a
      screenshot cannot argue about: without a floor the card collapses onto however many systems
      the search left, and the pager — the one control that says there ARE more — walks up and
@@ -429,7 +444,14 @@
     justify-content: space-between;
     /* THE DESIGN'S ROW BOX (`proto:2029`): a step of the scale down each side and a step below
        the card's own inline padding across. It was 2px vertical, which made a row shorter than
-       the 24px control it used to carry and left the name sitting hard against the border. */
+       the 24px control it used to carry and left the name sitting hard against the border.
+
+       THE REFERENCE'S INLINE VALUE IS 9px AND IT SNAPS TO 8 (issue 1371, parity round 4). The
+       published spacing scale has steps at 8 and 12 and `ui-integration/spec.md`'s "Spacing
+       scale" clause makes it mandatory for padding, margin and gap — the same shape of rule as
+       the control-height ladder that snaps the reference's 32 and 36 to 34. One pixel is the
+       whole difference and the token is the rule, so this is a recorded rung rather than a
+       parity defect. */
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
