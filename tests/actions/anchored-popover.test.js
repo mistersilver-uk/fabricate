@@ -508,10 +508,14 @@ describe('anchoredPopover', () => {
     // the browser's contract here. Without this the case would pass over the bug it exists for.
     const containsNode = panel.contains.bind(panel);
     panel.contains = (other) => {
-      if (!(other instanceof Node)) {
+      // `null` is the one non-`Node` a browser accepts, because the parameter is typed `Node?`:
+      // `node.contains(null)` returns false rather than throwing. Shimming it as a throw would
+      // make this stand-in stricter than the API it stands in for, and the case would then be
+      // red for a call the product is allowed to make.
+      if (other !== null && !(other instanceof Node)) {
         throw new TypeError("Failed to execute 'contains' on 'Node': parameter 1 is not of type 'Node'.");
       }
-      return containsNode(other);
+      return other !== null && containsNode(other);
     };
 
     let measures = 0;
