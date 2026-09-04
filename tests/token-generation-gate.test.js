@@ -216,14 +216,25 @@ const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w
  * that distinction carries seven prose mentions of an area-scoped name past the scan and stops
  * five real uses.
  *
+ * THE NAME IS ESCAPED AND BOUNDED, for the reason `AREA_COMPOUND` above is. A property name is
+ * interpolated into a pattern, so its own characters must not be read as syntax; and a name is a
+ * PREFIX of every longer name beginning with it, so without the trailing `(?![\w-])` the read and
+ * CSSOM shapes answer for the wrong property — `var(--fab-recipe-col-io)` would be reported as a
+ * use of `--fab-recipe-col`. That is a row naming a property the line it cites does not contain,
+ * which sends its reader looking for a use that is not there. The DECLARATION shape is left
+ * deliberately unbounded because `\s*:` already is the boundary: the longer name continues with a
+ * `-` where that shape requires a colon.
+ *
  * @param {string} name A whole custom-property name, e.g. `--fab-recipe-col-io`.
  * @returns {Array<{label: string, pattern: RegExp}>}
  */
 function areaUseShapes(name) {
+  const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  const ends = String.raw`(?![\w-])`;
   return [
-    { label: 'read', pattern: new RegExp(`var\\(\\s*${name}`, 'u') },
-    { label: 'declaration', pattern: new RegExp(`${name}\\s*:`, 'u') },
-    { label: 'CSSOM name', pattern: new RegExp(`['"]${name}`, 'u') },
+    { label: 'read', pattern: new RegExp(String.raw`var\(\s*${escaped}${ends}`, 'u') },
+    { label: 'declaration', pattern: new RegExp(String.raw`${escaped}\s*:`, 'u') },
+    { label: 'CSSOM name', pattern: new RegExp(`['"]${escaped}${ends}`, 'u') },
   ];
 }
 
@@ -672,6 +683,47 @@ test('no Svelte scoped style reaches an area-scoped property', () => {
       'property is undefined and the declaration silently falls back to inheritance. Read a ' +
       'foundation token, or move the rule into the global sheet under an area selector.',
   });
+});
+
+test('a use shape matches the whole property name and not a longer one starting with it', () => {
+  // BOTH POLARITIES OVER A SYNTHETIC PAIR, because no such pair exists in the corpus today — which
+  // is exactly the condition under which an unbounded pattern reads as correct. The two clauses
+  // above report `file | name` rows, and a prefix match puts a name on a row whose cited line does
+  // not hold it: the reader opens the file, searches for the property, and finds a different one.
+  const shapes = (name, text) =>
+    areaUseShapes(name)
+      .filter(({ pattern }) => pattern.test(text))
+      .map(({ label }) => label);
+
+  const shorter = '--fab-recipe-col';
+  const longer = `${shorter}-io`;
+
+  assert.deepEqual(
+    shapes(shorter, `  color: var(${longer});`),
+    [],
+    `\`var(${longer})\` is a use of ${longer} and of nothing else. A pattern with no trailing ` +
+      'boundary reports it against every name that is a prefix of it.'
+  );
+  assert.deepEqual(
+    shapes(shorter, `  el.style.setProperty('${longer}', value);`),
+    [],
+    'the CSSOM shape is anchored by a quote at one end only, so it needs the boundary at the other'
+  );
+  assert.deepEqual(
+    shapes(shorter, `  ${longer}: 4px;`),
+    [],
+    'the declaration shape is bounded by its own colon, which the longer name never reaches'
+  );
+
+  // The positives, so the boundary is narrowing the gate rather than emptying it.
+  assert.deepEqual(shapes(longer, `  color: var(${longer});`), ['read']);
+  assert.deepEqual(shapes(longer, `  ${longer}: 4px;`), ['declaration']);
+  assert.deepEqual(shapes(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
+  assert.deepEqual(
+    shapes(shorter, `  color: var(${shorter});`),
+    ['read'],
+    'the shorter name must still match its OWN use'
+  );
 });
 
 test('no module or template under src/ spells an area-scoped property into a string', () => {
