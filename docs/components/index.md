@@ -43,7 +43,10 @@ The inspector opens with a **Catalogue entry** heading, the component's name ove
 The **Source identity** card states the source item's identifying address and any aliases recorded for it.
 The **Global tags** card states the component's world category, or says there is none, then lists its world tags as chips below, or says there are none, and carries an **Edit** link to the world Tags & Categories screen.
 
-Below those two cards, a roster lists every crafting system that has rules for this component, each with a **Rules** link to open it there, and states how many systems in total have rules for it, paged if there are more than a handful.
+Below those two cards, a roster lists every crafting system in the world, not only the ones that have rules for this component, and heads itself with how many of them do, as a fraction such as **1 / 6**.
+Every row carries a **Rules** link whether or not that system has rules yet, so the roster is also how you reach a system to add this component to it, and the rows that do have rules are marked out from the rest.
+The roster pages five systems at a time.
+Where no system has rules for the component at all, the roster says so in place of the list, and explains that the component is registered in the world but unused.
 **Open catalogue entry**, pinned at the foot of the inspector, opens the component's full entry.
 
 ### Creating a component from an item
