@@ -145,7 +145,7 @@ function panel(kind) {
       '<span class="manager-vocabulary-icon is-decorative"><i class="fas fa-hashtag"></i></span>' +
       `<div class="manager-vocabulary-main"><strong>Entry ${index}</strong></div>` +
       '<span class="manager-chip">3 references</span>' +
-      '<button class="manager-icon-button"><i class="fas fa-trash"></i></button>' +
+      '<button class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>' +
       '</div></div>'
   ).join('');
   return (
@@ -174,7 +174,7 @@ function panel(kind) {
     // class without it is measuring markup `ManagerButton` may have stopped emitting —
     // `tests/manager-button-source-contract.test.js` refuses that.
     '<input type="text"></label>' +
-    '<button class="manager-button fab-manager-button">Add</button></div></form>' +
+    '<button class="fabricate-button manager-button fab-manager-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
     '<label class="manager-search"><input type="text"></label>' +
     '<span class="manager-chip">3 entries</span></div>' +

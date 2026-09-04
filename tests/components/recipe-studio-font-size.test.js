@@ -41,7 +41,7 @@ const FIXTURE = `
                BORDER moved too: .manager-header-actions .manager-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
-          <button class="manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
+          <button class="fabricate-button manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
         </div>
         <div class="manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
@@ -56,7 +56,7 @@ const FIXTURE = `
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed
                size. -->
-          <button class="manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
+          <button class="fabricate-button manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
         <!-- The FLAT (non-progressive) ingredient/result row's component picker (issue
@@ -71,7 +71,7 @@ const FIXTURE = `
           <div class="manager-recipe-option-target">
             <div class="manager-recipe-option-component">
               <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                <button class="manager-button manager-recipe-component-trigger" data-m="flat-picker">
+                <button class="fabricate-button manager-button manager-recipe-component-trigger" data-m="flat-picker">
                   <img class="manager-travel-portrait" alt="">
                   <span class="manager-travel-picker-value manager-recipe-component-name" data-m="flat-picker-name">Venom Gland</span>
                 </button>
@@ -91,7 +91,7 @@ const FIXTURE = `
             <div class="manager-recipe-option-target">
               <div class="manager-recipe-option-component">
                 <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                  <button class="manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
+                  <button class="fabricate-button manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
                     <img class="manager-travel-portrait" alt="">
                     <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
                   </button>
@@ -245,7 +245,7 @@ const FIXTURE = `
                  would have handed this box 34px/0.72rem while the shipped control had not
                  moved. That rule now names .manager-button.fab-manager-button and compiles to
                  (0,4,0), so the box is the same box it always was. -->
-            <button type="button" class="manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
           </div>
         </section>
       </div>

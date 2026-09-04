@@ -108,13 +108,13 @@ function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
   </div>
   <div class="manager-header-actions" aria-label="Actions">
     <span class="manager-chip is-warning is-action" data-downtime-chrome-status>Unsaved</span>
-    <button type="button" class="manager-button fab-manager-button is-ghost" data-action="back">
+    <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost" data-action="back">
       <i class="fas fa-arrow-left"></i><span>All factions</span>
     </button>
-    <button type="button" class="manager-button fab-manager-button is-danger" data-action="delete">
+    <button type="button" class="fabricate-button manager-button fab-manager-button is-danger" data-action="delete">
       <i class="fas fa-trash"></i><span>Delete faction</span>
     </button>
-    <button type="button" class="manager-button fab-manager-button is-primary" data-action="save">
+    <button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-action="save">
       <i class="fas fa-floppy-disk"></i><span>Save faction</span>
     </button>
   </div>
