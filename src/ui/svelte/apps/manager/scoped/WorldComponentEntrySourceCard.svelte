@@ -127,14 +127,21 @@
           >
         </ManagerButton>
         {#if onUnlinkSource}
+          <!-- `Unlink`, AND THE SENTENCE MOVES TO THE TITLE (`proto:5419-5420`). The control sits
+               in a 28px cluster beside `Copy`, where a two-word label pushes the uuid well's own
+               value column narrower for no gain: the reference labels the act and explains it on
+               hover, which is also where a GM asks. -->
           <ManagerButton
             class="manager-component-entry-mini-action"
+            title={text(
+              'FABRICATE.Admin.Manager.Scoped.Component.UnlinkItemTitle',
+              'Detach the source item from this entry'
+            )}
             data-scoped-entry-source-unlink
             onclick={() => onUnlinkSource()}
           >
             <i class="fas fa-link-slash" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Scoped.Component.UnlinkItem', 'Unlink Item')}</span
-            >
+            <span>{text('FABRICATE.Admin.Manager.Scoped.Component.UnlinkItem', 'Unlink')}</span>
           </ManagerButton>
         {/if}
       </div>

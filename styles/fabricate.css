@@ -24219,6 +24219,13 @@
   border-bottom: 1px solid var(--fab-border);
 }
 
+/* The tab's own scale on this strip (`proto:824`): 12px at 600, against the shared strip's
+   12.48px at 700. A SIZE and a weight from the layout context. */
+.fabricate-manager .manager-component-entry-column > .manager-editor-tabs .manager-editor-tab-button {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* THE SCROLLER. `padding-bottom: 40px` is the reference's own value and is a documented literal
    exemption from the spacing scale (`ui-integration`: one-off fixed dimensions in the 34-42px
    range), because it is breathing room under the last card rather than a rhythm step. */
@@ -24298,14 +24305,21 @@
    from the layout context is permitted; the family, weight and ink stay the primitive's. */
 .fabricate-manager .manager-component-entry-card-head .manager-subtitle {
   margin: 0;
-  font-size: 0.63rem;
+  font-size: 10px;
   line-height: 1.45;
+}
+
+/* The head's trailing text action at the CARD's scale. `manager-inline-link` ships at the
+   catalogue inspector's 9px; the reference draws this one at 10.5px, and a size taken from the
+   layout context is the one thing a container may state about a primitive. */
+.fabricate-manager .manager-component-entry-card-head .manager-inline-link {
+  font-size: 10.5px;
 }
 
 .fabricate-manager .manager-component-entry-note {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 0.59rem;
+  font-size: 9.5px;
   line-height: 1.45;
   overflow-wrap: break-word;
 }
@@ -24319,7 +24333,15 @@
 }
 
 /* ── A3. THE IDENTITY CARD ───────────────────────────────────────────────────────────────────
-   `proto:833-843`: a 56px chip, a copy column, and a trailing compact drop target. */
+   `proto:833-843`: a 56px chip, a copy column, and a trailing compact drop target.
+
+   ITS FILL IS `surface-soft` RATHER THAN A RAMP STEP, which is the one card on this tab that
+   differs: the reference lifts the identity card off the panel and recesses the three below it,
+   and it is also the card's DROP-TARGET face. */
+.fabricate-manager .manager-component-entry-identity {
+  background: var(--fab-surface-soft);
+}
+
 .fabricate-manager .manager-component-entry-identity-body {
   display: flex;
   align-items: flex-start;
@@ -24370,8 +24392,8 @@
 
 .fabricate-manager .manager-component-entry-identity-description {
   margin: 0;
-  color: var(--fab-text-muted);
-  font-size: 0.8rem;
+  color: var(--fab-text-secondary);
+  font-size: 13px;
   line-height: 1.65;
   text-wrap: pretty;
 }
@@ -24391,7 +24413,7 @@
 .fabricate-manager .manager-component-entry-identity-note {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 0.625rem;
+  font-size: 10px;
   line-height: 1.45;
 }
 
@@ -24400,6 +24422,13 @@
 .fabricate-manager .manager-component-entry-identity-body .manager-item-drop-zone {
   flex: 0 0 176px;
   align-self: stretch;
+}
+
+/* THE COMPACT PROMPT IS TRANSPARENT ON A DASHED HAIRLINE (`proto:842`, `:856`), where the
+   primitive's default face carries a fill. Both entry sites take it. */
+.fabricate-manager .manager-component-entry-card .manager-item-drop-zone.is-compact {
+  padding: var(--fab-space-3);
+  background: transparent;
 }
 
 /* ── A4. THE SOURCE IDENTITY CARD ────────────────────────────────────────────────────────────
@@ -24433,29 +24462,38 @@
 .fabricate-manager .manager-component-entry-uuid {
   display: block;
   min-width: 0;
-  color: var(--fab-text-muted);
+
+  /* `proto:5411` writes the uuid in `--text2` at full opacity: it is the value a GM reads
+     character by character before copying it, so it is not held back to 74%. */
+  color: var(--fab-text-secondary);
   font-family: var(--fab-font-mono);
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 500;
   word-break: break-all;
 }
 
 /* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias.
    28 IS a rung, so it is kept rather than snapped up, and radius 7 is its ladder partner. */
-.fabricate-manager .manager-component-entry-mini-action.manager-button {
+.fabricate-manager .manager-component-entry-mini-action.manager-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-2);
   border-radius: 7px;
-  font-size: 0.625rem;
+  font-size: 10px;
   font-weight: 600;
 }
 
 /* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires:
    switching a control off must take its colours from `.manager-button:disabled` and keep the
-   shape it had when enabled. */
-.fabricate-manager .manager-component-entry-mini-action.manager-button:not(:disabled) {
-  color: var(--fab-text-muted);
+   shape it had when enabled.
+
+   THE FACE IS `surface-soft` ON A HAIRLINE (`proto:5412`), not the primitive's 6%-on-12%
+   neutral, and the ink is `--fab-text-secondary` rather than the same hue at 74%. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-secondary);
 }
 
 .fabricate-manager .manager-component-entry-alias-row {
@@ -24487,7 +24525,11 @@
 .fabricate-manager .manager-component-entry-alias-field > input {
   flex: 1;
   min-width: 0;
-  height: 100%;
+
+  /* THE WELL OWNS THE HEIGHT, so the input must not take the sheet's 34px field rung inside a
+     28px band — it would push the well open from the inside. */
+  height: 26px;
+  min-height: 0;
   padding: 0;
   background: transparent;
   border: 0;
@@ -24500,7 +24542,7 @@
 /* Zero aliases is the NORMAL state of a healthy record, so it is a sentence rather than a count. */
 .fabricate-manager .manager-component-entry-alias-empty {
   color: var(--fab-text-disabled);
-  font-size: 0.625rem;
+  font-size: 10px;
 }
 
 .fabricate-manager .manager-component-entry-duplicate {
@@ -24546,7 +24588,7 @@
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
   color: var(--fab-text);
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -24568,7 +24610,7 @@
 }
 
 /* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
-.fabricate-manager .manager-component-entry-head-action.manager-button {
+.fabricate-manager .manager-component-entry-head-action.manager-button.fab-manager-button {
   flex: 0 0 auto;
   height: 30px;
   min-height: 30px;
@@ -24577,11 +24619,12 @@
   border-width: 1px;
   border-style: solid;
   border-radius: 7px;
-  font-size: 0.69rem;
+  font-size: 11px;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-component-entry-head-action.manager-button:not(:disabled) {
+.fabricate-manager
+  .manager-component-entry-head-action.manager-button.fab-manager-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border-strong);
   color: var(--fab-text);
@@ -24609,9 +24652,10 @@
 }
 
 .fabricate-manager .manager-component-entry-systems-search .manager-search input {
-  width: 150px;
+  width: 190px;
   height: 30px;
   background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
 }
 
@@ -24619,7 +24663,7 @@
   margin-left: auto;
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -24640,7 +24684,7 @@
 .fabricate-manager .manager-component-entry-system {
   display: flex;
   align-items: center;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4);
   border-bottom: 1px solid var(--fab-border);
@@ -24661,7 +24705,7 @@
   display: block;
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -24678,7 +24722,7 @@
 .fabricate-manager .manager-component-entry-system-mode {
   display: block;
   color: var(--fab-text-subtle);
-  font-size: 0.59rem;
+  font-size: 9.5px;
   font-weight: 500;
 }
 
@@ -24687,7 +24731,7 @@
   flex: 1;
   min-width: 0;
   color: var(--fab-text-muted);
-  font-size: 0.69rem;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -24704,41 +24748,43 @@
   gap: var(--fab-space-chip);
 }
 
-.fabricate-manager .manager-component-entry-system-rules.manager-button {
+.fabricate-manager .manager-component-entry-system-rules.manager-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
   border-width: 1px;
   border-style: solid;
   border-radius: 7px;
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-component-entry-system-rules.manager-button:not(:disabled) {
+.fabricate-manager
+  .manager-component-entry-system-rules.manager-button.fab-manager-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
-  color: var(--fab-text-muted);
+  color: var(--fab-text-secondary);
 }
 
 /* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3
    drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the
    reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
-.fabricate-manager .manager-component-entry-system-add.manager-button {
+.fabricate-manager .manager-component-entry-system-add.manager-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
   border-width: 1px;
   border-style: dashed;
   border-radius: 7px;
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-component-entry-system-add.manager-button:not(:disabled) {
+.fabricate-manager
+  .manager-component-entry-system-add.manager-button.fab-manager-button:not(:disabled) {
   background: transparent;
   border-color: var(--fab-border-strong);
-  color: var(--fab-text-muted);
+  color: var(--fab-text-secondary);
 }
 
 /* THE EXIT ICON: a 26px square in the row's own clothing (`proto:944`), not a labelled danger
@@ -24781,7 +24827,7 @@
 .fabricate-manager .manager-component-entry-system-empty {
   padding: var(--fab-space-3) var(--fab-space-4);
   color: var(--fab-text-disabled);
-  font-size: 0.625rem;
+  font-size: 10px;
   line-height: 1.5;
 }
 
@@ -24815,14 +24861,14 @@
   margin: 0;
   color: var(--fab-danger-text);
   font-family: var(--fab-font-serif);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .fabricate-manager .manager-component-entry-danger-note {
   margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-text-muted);
-  font-size: 0.66rem;
+  font-size: 10.5px;
   line-height: 1.5;
 }
 
@@ -24836,7 +24882,7 @@
   border-width: 1px;
   border-style: solid;
   border-radius: 9px;
-  font-size: 0.69rem;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -24859,6 +24905,23 @@
   overflow: auto;
 }
 
+/* THE SHARED RAIL LEAVES AT THIS RAIL'S SCALE. `manager-scoped-preview-scope-note` and
+   `-live` ship at the Tool rails' values; the reference draws this rail's scope note at 10px and
+   its live strip as a `--fab-bg-1` ROW rather than a bare line (`proto:1019`). Sizes and a
+   surface from the layout context, on markup the shell owns. */
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-scope-note {
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-live {
+  align-items: center;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  font-size: 10px;
+}
+
 .fabricate-manager .manager-component-entry-preview-head {
   display: flex;
   align-items: flex-start;
@@ -24874,7 +24937,7 @@
 .fabricate-manager .manager-component-entry-preview-tile-label {
   margin: 0 0 var(--fab-space-chip);
   color: var(--fab-text-subtle);
-  font-size: 0.59rem;
+  font-size: 9.5px;
   font-weight: 600;
 }
 
@@ -24935,7 +24998,7 @@
   margin: var(--fab-space-chip) 0 0;
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -24953,7 +25016,7 @@
 .fabricate-manager .manager-component-entry-preview-category {
   margin: 0;
   color: var(--fab-text-muted);
-  font-size: 0.69rem;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -24967,7 +25030,7 @@
 .fabricate-manager .manager-component-entry-preview-art {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 0.59rem;
+  font-size: 9.5px;
   line-height: 1.45;
 }
 
@@ -25732,4 +25795,90 @@
 .fabricate-manager .manager-component-rules-preview-live i {
   color: var(--fab-success-text);
   font-size: 0.69rem;
+}
+
+/* === #1371 r5a — world component entry ======================================================
+   The second parity pass over Part A, measured with `scripts/visual-parity` against
+   `artifacts/proto-markup.txt` rather than read off the frames. Every rule below closes one
+   line the `compare --screen entry` run reported, and the line it closes is cited beside it.
+   The rules that are NOT here are the ones whose remaining difference is a licensed rung, a
+   ramp step or a shared primitive this lane does not own; those are recorded on the change
+   rather than papered over locally. */
+
+/* THE ENTRY BODY HAS NO INSET (`proto:822`). The shell's `.manager-main` pads every route by
+   16px, and on this page that gutter runs BETWEEN the rail and the window: the reference makes
+   the rail the second column of a full-bleed grid, flush to the edge with only its left
+   hairline, and gives the inset to the tab strip and the panel instead — both of which already
+   carry their own. Scoped to this route by its own page hook, so no sibling route moves. */
+.fabricate-manager .manager-main[data-scoped-page='world-component-entry'] {
+  padding: 0;
+}
+
+/* ── WHAT THIS SHEET CANNOT SAY ABOUT A SVELTE-SCOPED PRIMITIVE ──────────────────────────────
+   Three parity lines on this screen are a primitive's own type and paint — `StatusPill`'s lock
+   pill (`proto:834`: 9px secondary ink, outlined, on a 2px/8px band, against the primitive's
+   9.92px filled 1px/4px `subtle`), `Chip`'s world-tag run (`proto:5401`: 11px/600 on a 5px/12px
+   band at radius 999, against 9.92px/700 on 4px/6px at radius 10) and `SegmentedControl`'s
+   filter (`proto:5457`: all three segments at 600 on a `--fab-bg-1` idle fill at radius 999).
+   NONE of them can be written in this file, at any specificity, and that is a fact about the
+   CASCADE rather than about the selectors:
+
+   `module.json` publishes exactly one stylesheet, `styles/fabricate.css`, and Foundry imports an
+   unlayered module sheet at `layer(modules)` — `tests/view-lab/cascade.css` reproduces that. A
+   Svelte component's own `<style>` block is injected by the bundler as an UNLAYERED `<style>`
+   element, and an unlayered normal declaration beats a layered one no matter how specific the
+   layered selector is. Measured, not reasoned: with the chip rule written here as `.fabricate-manager
+   .manager-component-entry-classification .manager-component-entry-chips
+   .manager-chip[data-scoped-entry-tag]` — five compound selectors against the primitive's three
+   — the chip stayed at the primitive's 9.92px, and marking the SAME declaration `!important`
+   (which reverses layer order) moved it to 11px while the non-important `font-weight` beside it
+   stayed at 700.
+
+   So the honest fix for all three is a PROP on the primitive, and the props are named in this
+   change's deviations. `!important` would work and is not taken: it wins the same argument for
+   every other caller of that primitive too, which is the opposite of what a per-site variant is
+   for. It also means the shipped
+   `.fabricate-manager [data-tool-player-preview] .fab-status-pill.is-subtle` rule above (issue
+   1373) is inert for the same reason — reported rather than deleted from a lane that does not
+   own that screen. */
+
+/* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ───────────
+   Copy and Unlink share one geometry and one surface, and the reference separates them by INK
+   alone: Unlink carries the danger edge and the danger text while it is still linked, and falls
+   back to the neutral pair once there is nothing left to unlink. This lane's card withholds the
+   control entirely in that second state, so only the danger face is declared. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
+    :disabled
+  ) {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+/* `Add alias` STATES WHETHER IT WILL DO ANYTHING (`proto:5436-5438`). With an empty field the
+   reference draws it transparent on a plain hairline in the disabled ink; with a uuid typed it
+   lifts onto `surface-soft` behind a strong edge in the full text ink. The primitive's `ghost`
+   role paints one 4%-on-12% face for both, so the control looked live before it was. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
+  background: transparent;
+  border-color: var(--fab-border);
+  color: var(--fab-text-disabled);
+}
+
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:not(
+    :disabled
+  ) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text);
+}
+
+/* A ROW WITH NO RULES IS RECESSED, NOT MERELY GREYED (`proto:5461`). The reference fills the
+   non-member row with `surface-soft` and leaves the member row transparent, so the two cohorts
+   separate at a glance on a roster where most systems are one or the other; the ink alone did
+   that work at 42% opacity on a single line of copy. */
+.fabricate-manager .manager-component-entry-system.is-outsider {
+  background: var(--fab-surface-soft);
 }

@@ -612,6 +612,27 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.ok(Boolean(target.querySelector('[data-scoped-entry-source-copy]')));
     });
 
+    it('and `Add alias` is inert until a uuid is actually typed', async () => {
+      // `proto:5436-5438` gives the control two faces and switches on the FIELD, because an
+      // enabled-looking button that commits an empty alias is a control that reports success
+      // having stored nothing. The paint follows the disabled state, so the state is the
+      // assertion: a card that dropped the guard would still look right and behave wrongly.
+      const { target } = await open('ingot');
+      const add = target.querySelector('[data-scoped-entry-alias-add]');
+      assert.ok(Boolean(add), 'the alias row offers its add control');
+      assert.ok(add.disabled, 'and it is off over an empty field');
+
+      const field = target.querySelector('[data-scoped-entry-alias-input]');
+      assert.ok(Boolean(field));
+      field.value = 'Item.second-source';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-alias-add]').disabled,
+        'and on once there is a uuid to commit'
+      );
+    });
+
     it('and withholds BOTH for a record with no source Item', async () => {
       const { target } = await open('orphan');
       assert.ok(!target.querySelector('[data-scoped-entry-source-uuid]'));
@@ -650,6 +671,25 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(
         target.querySelector('[data-scoped-entry-attribution]').textContent.trim(),
         'Name, image and description refresh from the linked item. Every system shows the same three.'
+      );
+    });
+
+    it('and the read-only card still trails a COMPACT way to re-point it', async () => {
+      // M7's fourth clause, which nothing pinned: `proto:842` ends the identity row with a
+      // prompt-only drop target, so a linked record whose three values are read-only still has a
+      // way to change what they are read FROM. `ItemDropZone`'s default form draws the linked
+      // item's art, name and uuid again — the three things this card already shows — so it is the
+      // COMPACT face or it is a third copy of the identity.
+      const { target } = await open('ingot');
+      const zone = target.querySelector('[data-item-drop-zone="component-identity"]');
+      assert.ok(Boolean(zone), 'the identity card offers a drop target');
+      assert.ok(
+        zone.classList.contains('is-compact'),
+        `it is the prompt-only face, and read "${zone.className}"`
+      );
+      assert.ok(
+        Boolean(zone.closest('[data-scoped-entry-identity-card]')),
+        'and it sits inside the identity card rather than below it'
       );
     });
 
@@ -790,6 +830,24 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.ok(
         !target.querySelector('[data-scoped-membership-hint]'),
         'and the hint paragraph beside it is gone with it'
+      );
+    });
+
+    it('and the non-member row is MARKED as one, so the cohort is addressable', async () => {
+      // `proto:5461` fills a row with no rules with `surface-soft` and leaves the member row
+      // transparent, which needs a class on the row rather than only an ink change on its copy.
+      // `orphan` is a member of `sys-forge` and NOT of `sys-alchemy`, so one mount carries both
+      // faces and the claim is a discrimination rather than a presence check — `ingot`, which
+      // every other test here mounts, is a member of both and could not tell them apart.
+      const { target } = await open('orphan');
+      assert.ok(
+        !rowOf(target, 'sys-forge').classList.contains('is-outsider'),
+        'a member row is not marked'
+      );
+      const outsider = rowOf(target, 'sys-alchemy');
+      assert.ok(
+        outsider.classList.contains('is-outsider'),
+        `and one with no rules is, but read "${outsider.className}"`
       );
     });
 

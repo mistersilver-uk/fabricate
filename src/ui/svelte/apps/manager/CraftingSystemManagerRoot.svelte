@@ -10621,7 +10621,9 @@
              empty, which is the unlinked case and the one this screen has to draw without
              inventing a picture for. -->
           <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-            <Medallion src={worldComponentEntryImage} icon="fas fa-cube" size={44} glyph={22} />
+            <!-- 42px, not the 44 the three sibling headings use: `proto:814` draws this chip at
+                 42 and an art size is its own ladder rather than the control one. -->
+            <Medallion src={worldComponentEntryImage} icon="fas fa-cube" size={42} glyph={22} />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={worldComponentEntryName}>
                 {worldComponentEntryName || viewTitle()}
