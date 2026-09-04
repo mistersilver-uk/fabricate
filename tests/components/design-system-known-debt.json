@@ -291,7 +291,18 @@
     "styles/fabricate.css | border-radius | 5px | 14",
     "styles/fabricate.css | border-radius | 8px | 73"
   ],
-  "areaScopedTokenReads": [],
+  "areaScopedStyleReads": [
+    "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | --fab-recipe-control-font | 4",
+    "src/ui/svelte/apps/manager/ImportReportModal.svelte | --fab-recipe-control-font | 1",
+    "src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte | --fab-recipe-control-font | 1"
+  ],
+  "areaScopedStringUses": [
+    "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | --fab-tool-breakage-chance-track-gradient | 1",
+    "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1",
+    "src/ui/svelte/components/ChanceSlider.svelte | --fab-chance-slider-track-gradient | 1",
+    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-color | 1",
+    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-value | 1"
+  ],
   "untranslatedNameDefaults": [],
   "unguardedEmptyNameBindings": [],
   "roleFocusTargets": [],

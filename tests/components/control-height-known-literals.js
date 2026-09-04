@@ -19,6 +19,15 @@
  * reason its own docblock gives: "counted, so that deleting one of two identical probes is not
  * silently absorbed". It costs 38 rows instead of 30.
  *
+ * ── THE GLOBAL SHEET IS ALREADY IN THIS CORPUS ─────────────────────────────────────────
+ * Recorded because it reads like a gap and is not one (issue 1497). `collectStyleCorpus` walks
+ * `['src', 'styles']`, so `styles/fabricate.css` is scanned by this ladder exactly as the Svelte
+ * scoped blocks are: SIX of the 37 rows below are sheet rows and they carry 39 of the 73
+ * occurrences — more than half the debt in one file. A proposal to "extend the corpus to the
+ * sheet" would therefore be extending it to somewhere it already reaches, and would produce no
+ * new rows while looking like an enforcement win. What the sheet does still need is a gate for
+ * the OTHER geometry ladders, and that is `tests/components/design-system-debt-ratchets.test.js`.
+ *
  * ── WHY EACH ROW CARRIES ITS RESOLVED TEXT ──────────────────────────────────────────────
  * The scan resolves `var()` to a fixed point, so it MANUFACTURES literals the source line does
  * not contain. Without the resolved text beside the raw, a future reader opens a row whose cited

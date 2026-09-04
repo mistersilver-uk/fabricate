@@ -227,21 +227,44 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 318;
 
 /**
- * A Svelte file reading an area-scoped `--fab-*` property, keyed `file | property`.
+ * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
  *
- * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`: 24 of the 140 distinct
+ * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`. 24 of the 140 distinct
  * `--fab-*` names have every one of their declaration sites inside a `.fabricate-manager`
- * compound, and 21 of those 24 carry no `--fab-manager-` prefix. Only two of them are read from a
- * Svelte file at all, at eight sites, and those eight are here.
+ * compound, and 19 of those 24 carry no `--fab-manager-` prefix — which is why that gate now
+ * computes its population instead of matching the prefix, and why these rows appeared at all.
  *
- * They are debt because a component is placed in a DIRECTORY, not in a DOM subtree: none of these
- * files can guarantee its host renders under `.fabricate-manager`, and where it does not the
- * property is undefined and the declaration falls back to inheritance without failing.
+ * All six read ONE property, `--fab-recipe-control-font`, for their control type. Every one of
+ * the three components does render inside the manager today and not one of them can prove it: a
+ * component is placed in a DIRECTORY, not in a DOM subtree, so where the host is not under
+ * `.fabricate-manager` the property is undefined and the declaration falls back to inheritance
+ * without failing.
  */
-export const KNOWN_AREA_SCOPED_READS = knownDebt('areaScopedTokenReads');
+export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
 
-/** @see KNOWN_AREA_SCOPED_READS */
-export const KNOWN_AREA_SCOPED_READ_TOTAL = 8;
+/** @see KNOWN_AREA_SCOPED_STYLE_READS */
+export const KNOWN_AREA_SCOPED_STYLE_READ_TOTAL = 6;
+
+/**
+ * An area-scoped `--fab-*` property spelled into a template or module string, keyed
+ * `file | property`.
+ *
+ * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read. Five sites, and
+ * they are two different mistakes. `WorldToolEntryPage` and `ToolBreakageTab` READ
+ * `--fab-tool-breakage-chance-track-gradient` through a component prop. `ChanceSlider` DECLARES
+ * three area-scoped names into an inline `style` attribute — and that one is invisible to every
+ * CSS clause in this repository, because the mask that isolates a `<style>` block blanks exactly
+ * the markup those declarations live in. It is also the widest version of the defect: a component
+ * under `components/` renders wherever a caller puts it.
+ *
+ * The issue predicted TWO rows here, because its audit looked only for the `var(` shape. The three
+ * `ChanceSlider` declarations are found by the shape that matches a name followed by a colon, and
+ * they are real.
+ */
+export const KNOWN_AREA_SCOPED_STRING_USES = knownDebt('areaScopedStringUses');
+
+/** @see KNOWN_AREA_SCOPED_STRING_USES */
+export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 5;
 
 /**
  * A name-bearing prop defaulting to untranslated English, keyed `file | prop | default`.
