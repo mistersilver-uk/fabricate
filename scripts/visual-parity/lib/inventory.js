@@ -337,7 +337,15 @@ export function inventoryCoverageProblems(spec) {
     if (entry?.prototype && entry.subject) {
       problems.push(
         ...locatorProblems(entry.prototype, `inventory root "${screen}" (prototype)`),
-        ...locatorProblems(entry.subject, `inventory root "${screen}" (subject)`)
+        ...locatorProblems(entry.subject, `inventory root "${screen}" (subject)`),
+        // A declared PANE is the box the card ratio is taken from, for a root that generates
+        // none of its own. It is a locator like any other, so it is checked like one.
+        ...(entry.prototypePane
+          ? locatorProblems(entry.prototypePane, `inventory pane "${screen}" (prototype)`)
+          : []),
+        ...(entry.subjectPane
+          ? locatorProblems(entry.subjectPane, `inventory pane "${screen}" (subject)`)
+          : [])
       );
       continue;
     }

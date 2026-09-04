@@ -59,7 +59,7 @@ test('an alignment group is the rule a per-region measurement cannot express', a
   await subtests.test('a group needs two regions and a known edge', () => {
     const spec = SPEC();
     spec.alignments = [
-      { name: 'lonely', screen: 'roll', edges: ['top'], regions: ['card-body'] },
+      { name: 'lonely', screen: 'roll', edges: ['bottom'], regions: ['card-body'] },
     ];
     const problems = alignmentProblems(spec);
     assert.ok(
@@ -70,6 +70,20 @@ test('an alignment group is the rule a per-region measurement cannot express', a
       problems.some((problem) => problem.includes(`not one of ${ALIGNABLE_EDGES.join(', ')}`)),
       'an unknown edge would silently assert nothing'
     );
+  });
+
+  await subtests.test('`top` is alignable and `bottom` is not, and the difference is stated', () => {
+    // Two cards drawn SIDE BY SIDE in one grid row share a top edge, and a row gap or a stray
+    // `margin-top` on one of them is an ancestor-owned inset of exactly the class this rule
+    // exists for. A shared BOTTOM edge is not the same claim: two cards in a row end at
+    // different heights because their CONTENT differs, which is a fact about the world's data.
+    assert.ok(ALIGNABLE_EDGES.includes('top'));
+    assert.ok(!ALIGNABLE_EDGES.includes('bottom'));
+    const spec = SPEC();
+    spec.alignments = [
+      { name: 'card-tops', screen: 'roll', edges: ['top'], regions: ['card-body', 'tier-body'] },
+    ];
+    assert.deepEqual(alignmentProblems(spec), []);
   });
 });
 
@@ -95,6 +109,20 @@ test('edge agreement is measured, not assumed', async (subtests) => {
     assert.equal(spread.delta, 12);
     assert.equal(spread.high, 'roll-tier-inset', 'the report names the box that moved');
     assert.equal(spread.low, 'roll-card-body', 'and the box it should have lined up with');
+  });
+
+  await subtests.test('a row gap one card does not share is reported on the top edge', () => {
+    // The vertical half of the same defect: the prototype lays a Category card and a Tags card
+    // out with level tops, and a subject that gives one of them 8px of its own margin measures
+    // every property inside both cards correctly and still draws a staggered row.
+    const edges = {
+      'rules-category-card': { left: 24, right: 520, top: 196 },
+      'rules-tags-card': { left: 536, right: 1032, top: 204 },
+    };
+    assert.deepEqual(sharedEdges(edges, ['top']), { top: false });
+    const spread = edgeSpread(edges, 'top');
+    assert.equal(spread.delta, 8);
+    assert.equal(spread.high, 'rules-tags-card', 'the report names the card that dropped');
   });
 
   await subtests.test('the tolerance is sub-pixel, an order below the smallest spacing token', () => {

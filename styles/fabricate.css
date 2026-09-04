@@ -1387,10 +1387,9 @@
   did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
   Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
   against these surfaces rather than as a missing border. Selects were themed
-  per-container instead — `.fabricate-manager .manager-field select` and
-  `.manager-component-inline-control` (both further down this file) — so a select that leaves
-  a `.manager-field` and carries only `.manager-input` reverted, exactly as the note on that
-  rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
+  per-container instead — `.fabricate-manager .manager-field select` (further down this
+  file) — so a select that leaves a `.manager-field` and carries only `.manager-input`
+  reverted, exactly as the note on that rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
   found it: both sit in a revealed input strip rather than a field wrapper, and both painted
   Foundry's default beside a correctly themed `<input>` on the same row.
 
@@ -10280,8 +10279,12 @@
    itself — `.manager-input` has no rule anywhere in this file and never has. A control
    that leaves a `.manager-field` therefore silently reverts to Foundry's unstyled native
    widget against a dark panel, and keeping `class="manager-input"` on it makes that look
-   intentional. `.manager-component-inline-control` is joined here for exactly that
-   reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
+   intentional. A control that renders outside a `.manager-field` is joined to these lists
+   for exactly that reason; the one that used to be — `.manager-component-inline-control`,
+   the Category panel's heading-row select — is emitted by no source file since the issue
+   1371 rebuild gave the Category select a card of its own, so it is gone from all three
+   lists. A retired selector kept in a list nothing emits is dead CSS the block-granular
+   dead-class gate cannot see, because the block's other selectors are live. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
    (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
@@ -10316,8 +10319,7 @@
    input in the codebase, and it always wants a transparent, unpadded control. */
 .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
-.fabricate-manager .manager-field textarea,
-.fabricate-manager .manager-component-inline-control {
+.fabricate-manager .manager-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -10329,14 +10331,12 @@
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood
    36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
 .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select,
-.fabricate-manager .manager-component-inline-control {
+.fabricate-manager .manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-field select:disabled,
-.fabricate-manager select.manager-component-inline-control:disabled {
+.fabricate-manager .manager-field select:disabled {
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;

@@ -408,12 +408,15 @@ const EXPECTED = {
   'filter-chip': 9.92, // 0.62rem — the one chip scale (was 12)
   count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
   // ── The list.
-  // `proto:1084` — the C5 rebuild writes the row name in the reference's own 13.5px/600
-  // serif. Authored as a px literal because a font size is a literal, not a scale member;
-  // this pin previously carried the drift its own comment named.
+  // `proto:1087` (`font:600 13.5px var(--serif)`) — the C5 rebuild writes the row name in the
+  // reference's own 13.5px/600 serif. Authored as a px literal because a font size is a
+  // literal, not a scale member; this pin previously carried the drift its own comment named.
+  // (The cite read `proto:1084`, which is the row's bulk-select checkbox, until issue 1371
+  // revision 8; a cite nobody can check is a pin taken on trust.)
   'row-name': 13.5,
-  // `proto:1087` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
-  // the reference's own 11px. The pin read 12.48 while its own comment named 11.
+  // `proto:1088` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
+  // the reference's own 11px. The pin read 12.48 while its own comment named 11. (The cite
+  // read `proto:1087`, which is the 13.5px serif NAME line above, until revision 8.)
   'row-description': 11,
   'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
   'row-difficulty': 9.92, // same chip family

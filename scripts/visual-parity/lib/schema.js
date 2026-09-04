@@ -41,8 +41,20 @@ export const MINIMUM_REASON_LENGTH = 40;
  */
 export const EDGE_TOLERANCE_PX = 0.5;
 
-/** The edges a group may be asserted on. Vertical rhythm is a different question. */
-export const ALIGNABLE_EDGES = Object.freeze(['left', 'right']);
+/**
+ * The edges a group may be asserted on.
+ *
+ * `top` joined `left` and `right` at issue 1371: two cards drawn SIDE BY SIDE in one grid row
+ * share a top edge, and that is the same claim about layout intent the horizontal edges make,
+ * not the vertical-rhythm question this list still excludes. It is the edge an ancestor's inset
+ * moves when the inset is a `margin-top` or a row gap, and the reference's component rules
+ * editor draws exactly that shape — a Category card beside a Tags card, tops level.
+ *
+ * `bottom` is deliberately still absent: two cards in a row legitimately end at different
+ * heights because their CONTENT differs, so a shared bottom edge is a fact about the world's
+ * data rather than about the design.
+ */
+export const ALIGNABLE_EDGES = Object.freeze(['left', 'right', 'top']);
 
 /**
  * The CLOSED locator vocabulary.

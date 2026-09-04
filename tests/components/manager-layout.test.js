@@ -4500,15 +4500,17 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // re-bordered. `:not([type='radio'])` excludes the custom resolution radios for the
   // same reason — the text-field treatment tied their own rule on specificity and, later
   // in the file, squared the dot and stretched it to fill the flex line.
-  // `.manager-component-inline-control` joins it because it renders OUTSIDE a
-  // `.manager-field` and would otherwise inherit Foundry's native control.
   // `:not([type='range'])` (issue 883) excludes the chance slider, whose 6px track and
   // coloured fill are painted BEHIND a transparent input that this rule was stretching to
   // 36px and filling opaquely.
+  // The list used to end in `.manager-component-inline-control`, a class no source file
+  // emits since the issue-1371 rebuild gave the Category select a card of its own. It was
+  // removed from all three of the sheet's lists at revision 8, and this anchor with it: a
+  // retired selector kept inside a live selector list is dead CSS the block-granular
+  // dead-class gate cannot see, and a test anchor naming it kept it alive by hand.
   const fieldInputBlock = blockFor(
     ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
-      '.fabricate-manager .manager-field select,\n' +
-      '.fabricate-manager .manager-component-inline-control'
+      '.fabricate-manager .manager-field select'
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');

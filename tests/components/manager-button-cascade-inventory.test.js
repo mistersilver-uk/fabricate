@@ -1466,6 +1466,18 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // the duplication gate counts; both stay unconverted on the standing argument above, because
   // converting a `triggerClass` site changes `SearchablePopover`'s own trigger contract rather
   // than this call site's.
+  //
+  // AND THE ARGUMENT FOR THOSE TWO IS A SHIPPED SIBLING, WHICH IS THE ONE CLASS THIS ROUND
+  // VOIDED. "The recipe bulk panel's precedent" cites neither a prototype line nor a rung: the
+  // reference draws both staging groups as an inline search with rows and a pager beneath it
+  // (`proto:590-697`), not as a popover trigger. That is a defect in the panel rather than in
+  // this pin — a debt COUNTER records what shipped, and while two triggers ship the honest
+  // count is 14 — so the count is left where the panel put it and the panel is what moves.
+  // When the bulk panel's two pickers become inline (maintainer ruling M10), both sites leave
+  // the product exactly as issue 1373's six did and THIS NUMBER GOES BACK TO 12 in the same
+  // change, with the sentence above rewritten to say the sites left rather than that they are
+  // licensed. A ratchet that stayed at 14 after the triggers were gone would be booking debt
+  // nothing owes.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
     14,

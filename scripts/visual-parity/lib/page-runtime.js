@@ -152,7 +152,7 @@ export function installParityRuntime() {
    */
   function edgesOf(el) {
     const rect = el.getBoundingClientRect();
-    return { left: rect.left, right: rect.right };
+    return { left: rect.left, right: rect.right, top: rect.top };
   }
 
   function propertiesOf(entry, propertyGroups) {
@@ -268,7 +268,7 @@ export function installParityRuntime() {
    * styled-components document whose every element is `class="sc"`, and only tag name,
    * computed style, Font Awesome icon name and short visible text cross between the two.
    */
-  function collectInventory(root, limits) {
+  function collectInventory(root, limits, pane) {
     const cards = [];
     const loose = { labels: [], glyphs: [] };
 
@@ -338,7 +338,46 @@ export function installParityRuntime() {
       return classes.filter((token) => token.startsWith('fa-') && !STYLE_TOKENS.has(token));
     };
 
-    const rootWidth = root.clientWidth || root.getBoundingClientRect().width || 1;
+    // THE WIDTH A CARD IS WIDE RELATIVE TO — resolved from the first ancestor that has a BOX,
+    // and this walk is the whole of the fix.
+    //
+    // `isCard` asks whether an element spans most of the pane, so it needs the pane's width.
+    // Reading it off the enumeration root assumes the root generates a box, and a prototype
+    // root routinely does not: every screen root in the document this pass was built for is
+    // `<div style="display:contents">`, which generates NO box at all — `clientWidth` is 0 and
+    // `getBoundingClientRect()` is 0x0. The previous line ended `|| 1`, so the prototype was
+    // measured against a ONE-PIXEL pane and the subject against its real one. That is not a
+    // rounding error, it is TWO DIFFERENT CLASSIFIERS, and it broke the pass in both
+    // directions: every bordered, rounded list ROW on the prototype cleared `>= 0.6px` and was
+    // reported as a card the subject was missing, while on the subject side the same test read
+    // `>= 707px`, so NO card in a two-column grid counted as a card and a genuinely absent
+    // narrow card could not be reported at all. The pass's decisive question — is the subject
+    // missing something — was unanswerable, and 257 findings could not be triaged.
+    //
+    // A subject root that IS a box answers on the first iteration, so nothing about the ordinary
+    // case changes; a rootless root borrows the box of an ancestor that lays its children out.
+    // Whether THAT ancestor is the right pane is a question about the document rather than about
+    // the classifier, which is what the declared pane below is for.
+    const paneWidth = (el) => {
+      for (let node = el; node; node = node.parentElement) {
+        const width = node.clientWidth || node.getBoundingClientRect().width || 0;
+        if (width > 0) return width;
+      }
+      return 0;
+    };
+    // The pane may be DECLARED, and on a `display: contents` root it usually has to be. Walking
+    // up from the prototype's screen root reaches the app shell — which includes the side rail —
+    // while the subject's root is the content area INSIDE its own rail, so the walk alone still
+    // calibrates the two sides differently (1358 against 1178 in the document this was found
+    // in). A spec that knows its prototype says which box its rootless root borrows, in the same
+    // place and the same shape as every other locator it declares, and the walk stays the
+    // default for the ordinary case of a root that simply has a box.
+    const rootWidth = paneWidth(pane ?? root);
+    // A ROOT WITH NO BOX ANYWHERE ABOVE IT IS A HARNESS FAULT, reported rather than defaulted.
+    // The retired `|| 1` was a default nobody chose, and the cheaper-looking alternative — fall
+    // through to 0 so nothing is a card — is worse, because it turns an unmeasurable screen
+    // into a green one.
+    if (rootWidth <= 0) return { unmeasurableRoot: true };
 
     // A HEADING is a heading. Two rules, because the two documents say it differently: a real
     // `h1`–`h6`, which is what the subject uses — including for a card headed by an UPPERCASE
@@ -440,13 +479,23 @@ export function installParityRuntime() {
   function inventoryOf(payload) {
     const root = locate(payload.locator, null);
     if (!root) return { missingRoot: true };
-    return collectInventory(root, payload.limits);
+    // A declared pane that resolves to nothing is a FAULT, never a silent fall-back to the
+    // walk: falling back would re-calibrate the classifier without saying so, which is the
+    // whole class of defect this argument exists to close.
+    const pane = payload.pane ? locate(payload.pane, null) : null;
+    if (payload.pane && !pane) return { missingPane: true };
+    return collectInventory(root, payload.limits, pane);
   }
+
+  // `collectInventory` is published so a Node test can enumerate a hand-built tree without a
+  // browser: the `display: contents` root above is a fact about CSS that no unit fixture in
+  // this repository would otherwise reproduce, and the classifier's calibration is the one
+  // part of this runtime whose defect was invisible in every log it produced.
 
   // Published on the page global because that is the only scope a later `page.evaluate` can
   // reach. `defineProperty` rather than assignment so a re-install replaces it cleanly.
   Object.defineProperty(globalThis, '__fabricateParity', {
-    value: { locate, measure, inventoryOf },
+    value: { locate, measure, inventoryOf, collectInventory },
     writable: true,
     configurable: true,
   });

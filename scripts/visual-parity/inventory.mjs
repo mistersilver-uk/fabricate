@@ -44,15 +44,32 @@ function flag(name) {
  * @param {object} page Playwright page.
  * @param {string|object[]} locator CSS selector or step list resolving the root.
  * @param {object} limits Classifier thresholds.
+ * @param {string|object[]|null} pane Optional locator for the box the card ratio is taken from.
  * @returns {Promise<object>} `{ cards, loose }`.
  */
-async function inventoryOf(page, locator, limits) {
+async function inventoryOf(page, locator, limits, pane = null) {
   const result = await page.evaluate(
     (payload) => globalThis.__fabricateParity.inventoryOf(payload),
-    { locator, limits }
+    { locator, limits, pane }
   );
   if (result.missingRoot) {
     throw new Error(`inventory root ${JSON.stringify(locator)} resolved to nothing`);
+  }
+  // A root with no box on it OR ON ANY ANCESTOR gives the card classifier no pane width to
+  // measure against, so every card verdict on that screen would be arbitrary. Said out loud
+  // rather than defaulted: the retired default was `|| 1`, which silently measured the
+  // prototype against a one-pixel pane and the subject against its real one.
+  if (result.missingPane) {
+    throw new Error(
+      `inventory pane ${JSON.stringify(pane)} resolved to nothing — a declared pane that does ` +
+        `not resolve would silently re-calibrate the card classifier`
+    );
+  }
+  if (result.unmeasurableRoot) {
+    throw new Error(
+      `inventory root ${JSON.stringify(locator)} generates no box, and neither does any ` +
+        `ancestor of it — there is no pane width to classify a card against`
+    );
   }
   return result;
 }
@@ -125,9 +142,19 @@ async function main() {
     for (const screen of screens) {
       const roots = spec.inventory.roots[screen];
       await spec.navigate(prototypePage, roots.measuredOn ?? screen);
-      const prototypeInventory = await inventoryOf(prototypePage, roots.prototype, limits);
+      const prototypeInventory = await inventoryOf(
+        prototypePage,
+        roots.prototype,
+        limits,
+        roots.prototypePane ?? null
+      );
       const subjectPage = await subject.show(roots.measuredOn ?? screen);
-      const subjectInventory = await inventoryOf(subjectPage, roots.subject, limits);
+      const subjectInventory = await inventoryOf(
+        subjectPage,
+        roots.subject,
+        limits,
+        roots.subjectPane ?? null
+      );
 
       for (const key of observableKeys(screen, prototypeInventory, subjectInventory)) {
         observed.add(key);
