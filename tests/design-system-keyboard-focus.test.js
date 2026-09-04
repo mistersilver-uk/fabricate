@@ -101,6 +101,17 @@ const INTERACTIVE_ROLES = new Set(['button', 'row', 'option', 'tab', 'tabpanel']
 /** A statically written `tabindex="0"`, as opposed to a roving expression. */
 const STATIC_TABINDEX_ZERO = /=\s*["']0["']/u;
 
+/**
+ * An ACTIVE opt-out: `data-keyboard-focus="false"`.
+ *
+ * `hasFocus` reads the VALUE, so this attribute is an opt-in whose `"false"` spelling means the
+ * opposite of the attribute's presence. Written once and shared by every clause because the two
+ * readings have to agree: a value-blind clause counts an opt-out as compliance, and a clause that
+ * checked the value while its neighbour did not would put the same element in the debt table under
+ * one heading and out of it under another.
+ */
+const OPTED_OUT = /=\s*["']false["']/u;
+
 /** The declaration this whole file is about. */
 const DECLARATION = 'data-keyboard-focus';
 
@@ -164,8 +175,21 @@ function focusPopulations() {
   return { negativeOne, roleZero, formlessButtons, roving };
 }
 
-/** The undeclared members of a population — the debt, as opposed to the compliant sites. */
-const undeclaredIn = (population) => population.filter((target) => target.declared === null);
+/**
+ * The undeclared members of a population — the debt, as opposed to the compliant sites.
+ *
+ * AN OPT-OUT IS UNDECLARED, NOT DECLARED, and the distinction is the whole point of reading the
+ * value. `data-keyboard-focus="false"` makes `hasFocus` return false exactly as omitting the
+ * attribute does, so an element carrying it is in precisely the state clauses (a) and (b) exist to
+ * report — while LOOKING compliant to any check that asks only whether the attribute is present.
+ * Until issue 1497's review this filter tested presence alone, so `"false"` was the one spelling
+ * that could leave a site out of the debt table by adding something to it.
+ *
+ * @param {Array<{declared: string|null}>} population
+ * @returns {Array<{declared: string|null}>} The members that do not declare themselves focused.
+ */
+const undeclaredIn = (population) =>
+  population.filter((target) => target.declared === null || OPTED_OUT.test(target.declared));
 
 describe('design system: a programmatic focus target declares itself focused to Foundry', () => {
   // (C) IS A FLOOR AND NOT A PIN, AND THAT IS A JUDGEMENT ABOUT WHAT IT MEASURES rather than
@@ -208,14 +232,39 @@ describe('design system: a programmatic focus target declares itself focused to 
     // value matters as much as its presence, so a `false` on an element that exists to receive
     // focus is a defect wearing compliance — and a presence-only assertion would pass it.
     const optedOut = focusPopulations()
-      .negativeOne.filter(
-        (target) => target.declared !== null && /=\s*["']false["']/u.test(target.declared)
-      )
+      .negativeOne.filter((target) => target.declared !== null && OPTED_OUT.test(target.declared))
       .map((target) => `${target.file} <${target.tag}>`);
     assert.deepEqual(
       optedOut,
       [],
       'a programmatic focus target must not opt OUT of being treated as focused'
+    );
+  });
+
+  it('counts an opt-out as UNDECLARED, so clauses (a) and (b) read the value too', () => {
+    // SYNTHETIC AND BOTH POLARITIES, because no element in the corpus writes the opt-out today —
+    // which is exactly the condition under which a value-blind filter goes unnoticed. Clause (c)
+    // above rejects the opt-out in its own population; this proves the shared `undeclaredIn` that
+    // (a) and (b) ratchet through makes the same reading, so the three cannot drift apart.
+    //
+    // The pins are unaffected: `"false"` appears on nothing in this tree, so the observed tallies
+    // are identical either way. This is a defect that arrives with the FIRST site to write it, and
+    // it would have arrived silently — as a row leaving the baseline, reported as debt paid down.
+    const population = [
+      { file: 'Omitted.svelte', tag: 'div', declared: null },
+      { file: 'OptedOut.svelte', tag: 'div', declared: `${DECLARATION}="false"` },
+      { file: 'SpacedOptOut.svelte', tag: 'div', declared: `${DECLARATION} = 'false'` },
+      { file: 'Declared.svelte', tag: 'div', declared: `${DECLARATION}="true"` },
+      { file: 'Bare.svelte', tag: 'div', declared: DECLARATION },
+    ];
+
+    assert.deepEqual(
+      undeclaredIn(population).map((target) => target.file),
+      ['Omitted.svelte', 'OptedOut.svelte', 'SpacedOptOut.svelte'],
+      'an element that opts OUT is in exactly the state this file reports — `hasFocus` returns ' +
+        'false for it — so it belongs in the debt with the elements that say nothing. A filter ' +
+        "testing only for the attribute's PRESENCE lets one site leave the baseline by writing " +
+        '"false", which reads as a fix and is the opposite of one.'
     );
   });
 
