@@ -11062,9 +11062,14 @@
                  not a route change at all: `proto:1046` binds `onAddFrom`, which at `proto:5545`
                  sets `modal: 'addFrom'`.
 
-                 `// r8-prim: wire size` — `proto:1046` draws this action at 38px and it ships at
-                 34. 38 IS a rung, so nothing licenses the gap; the `size` prop is lane PRIM's to
-                 publish on the shared button base this revision. -->
+                 `// r9-prim2: wire size` — `proto:1046` draws this action at 38px and it ships
+                 at 34. 38 IS a rung, so nothing licenses the gap. Revision 8's opt-in landed on
+                 `ManagerSearchField` and on a toolbar `<select>` (M12b), which is where the
+                 rung's other four sites are; `ManagerButton` has NO size prop yet, so there is
+                 nothing to pass here and a local `height: 38px` on one header action is the
+                 per-screen override the opt-in exists to prevent. The prop is lane PRIM2's to
+                 publish on the shared button base, and this is the one site waiting on it.
+                 Radius 9 is already global (M12a), so the corner is right at either height. -->
             <ManagerButton
               role="primary"
               data-component-add-from-catalogue

@@ -660,19 +660,30 @@
   >
     <div class="manager-component-filter-row">
       <!--
-        THREE CONTROLS AT 38px IN THE REFERENCE, SHIPPING AT 34 (UX F5, `proto:1053-1055`).
+        THREE CONTROLS AT 38px, WHICH IS WHAT THE REFERENCE DRAWS (UX F5, `proto:1053-1055`).
 
         38 IS a rung — the published ladder is 26 / 28 / 30 / 34 / 38 / 44, and only 32 / 36 / 40
-        are retired — so nothing licenses the gap; the search field and both selects are simply
-        one rung short. `ManagerSearchField` and the toolbar selects gain an opt-in 38px size in
-        lane PRIM this revision (M12b), and each `// r8-prim: wire size` marker below is where
-        that prop lands. They are markers rather than a local height, because a per-screen
-        override of a shared primitive is the thing the size prop exists to prevent.
+        are retired — so nothing licensed the 34 these three shipped at; they were one rung short.
+        Ruling M12b made the rung reachable on the shared primitives rather than here, and this is
+        the consuming edit: the field takes `size="38"` and each select carries `is-size-38`.
+
+        THE FIELD TAKES A PROP AND THE SELECTS TAKE A CLASS, and the asymmetry is the tree's shape
+        rather than a shortcut. `ManagerSearchField` is a component and owns its own class list;
+        the manager has no select COMPONENT, because `ManagerToolbar`'s own header records that
+        the control beside the field is three different things across eleven bars and that the bar
+        deliberately takes a slot rather than choosing between them. So the contract a caller opts
+        into for a select is the class itself.
+
+        NEITHER IS A LOCAL HEIGHT, which is the point. A per-screen `height: 38px` here would be
+        the fourth place this bar re-derives a control size, and it is precisely what the opt-in
+        exists to prevent: `.manager-toolbar select.is-size-38` is (0,3,1) and beats this bar's own
+        (0,2,1) 34px rule on specificity, so it lands wherever the class is written rather than
+        wherever the rule happens to sit in the sheet.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component
            types into this field rather than depending on where that component happens to sort. -->
-      <!-- r8-prim: wire size — `sys-toolbar-search`, `proto:1053`, 38px. -->
       <ManagerSearchField
+        size="38"
         data-component-search=""
         value={itemSearchTerm || ''}
         onInput={(next) => onSearchChange(next)}
@@ -685,9 +696,8 @@
 
       <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls
            each announce themselves in sentence case reads as a form. -->
-      <!-- r8-prim: wire size — `sys-toolbar-category-filter`, `proto:1054`, 38px. -->
       <select
-        class="manager-component-category-filter"
+        class="manager-component-category-filter is-size-38"
         data-component-category-filter
         value={ui.categoryFilter}
         onchange={(event) => setCategoryFilter(event.currentTarget.value)}
@@ -705,9 +715,8 @@
       </select>
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
-        <!-- r8-prim: wire size — `sys-toolbar-essence-filter`, `proto:1055`, 38px. -->
         <select
-          class="manager-component-essence-filter"
+          class="manager-component-essence-filter is-size-38"
           data-component-essence-filter
           value={ui.essenceFilter}
           onchange={(event) => setEssenceFilter(event.currentTarget.value)}

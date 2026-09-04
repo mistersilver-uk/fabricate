@@ -1212,3 +1212,107 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     );
   });
 });
+
+describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
+  /**
+   * The reference draws this bar's search field and both filter selects at 38px
+   * (`proto:1053-1055`) and all three shipped at 34. 38 is a published rung
+   * (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), so nothing
+   * licensed the drop; ruling M12b made the rung reachable on the shared primitives and this bar
+   * is one of the two consumers.
+   *
+   * WHAT THESE ASSERTIONS ARE FOR, given that `manager-control-rungs.test.js` already pins the
+   * RULE. That file proves the sheet paints 38px and the band's 9px corner for
+   * `.manager-search.is-size-38 input` and for a toolbar `select.is-size-38`. It cannot see
+   * whether anything reaches those rules, and the opt-in has two silent ways to miss:
+   *
+   *  - the field takes a PROP whose value is checked against a closed set, so `size="38px"` or
+   *    `size={38.0}` renders the shipped 34px control with no error at all — by design, and
+   *    invisible to a className read that only asks whether the field exists;
+   *  - the selects take the CLASS DIRECTLY, and the sheet's host for it is `.manager-toolbar
+   *    select.is-size-38`. This bar wears `manager-toolbar` only because it is a
+   *    `<ManagerToolbar>`; converted back to a bare `<div class="manager-component-toolbar">`
+   *    the class would stay in the markup, keep every `data-*` selector resolving, and paint
+   *    nothing.
+   *
+   * So each control is reached through the SHEET'S OWN SELECTOR rather than by reading a class
+   * list, and the resolved node is then asserted to be this bar's control.
+   */
+  const FIELD_SELECTOR = '.manager-search.is-size-38 input';
+  const SELECT_SELECTOR = '.manager-toolbar select.is-size-38';
+
+  function metalWithFire() {
+    return [
+      makeComponent({
+        id: 'm1',
+        name: 'Iron Ingot',
+        category: 'Metal',
+        essences: [{ id: 'fire', name: 'Fire', quantity: 1 }],
+      }),
+      makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
+    ];
+  }
+
+  it('opts the search field into the 38px rung, through the selector the sheet paints', async () => {
+    const root = await browser.mount({
+      itemCards: metalWithFire(),
+      categoryVocabulary: ['Metal', 'Herb'],
+      selectedSystemId: 'sys-1',
+    });
+
+    const field = root.querySelector(FIELD_SELECTOR);
+    assert.ok(Boolean(field), `the toolbar search resolves through \`${FIELD_SELECTOR}\``);
+    assert.ok(
+      // `:scope` here and not on the two constants above, which are the sheet's own selector
+      // text verbatim and stay that way. Without it a leading `[data-component-search]` is free
+      // to match an input inside the root whose LABEL is outside it.
+      field === root.querySelector(':scope [data-component-search] input'),
+      'and it is this bar’s own search input, not another field that happens to carry the rung'
+    );
+  });
+
+  it('opts BOTH filter selects into it, from inside the host that rule names', async () => {
+    const root = await browser.mount({
+      itemCards: metalWithFire(),
+      categoryVocabulary: ['Metal', 'Herb'],
+      selectedSystemId: 'sys-1',
+    });
+
+    const rung = [...root.querySelectorAll(SELECT_SELECTOR)];
+    assert.deepEqual(
+      rung.map((select) =>
+        select.hasAttribute('data-component-category-filter') ? 'category' : 'essence'
+      ),
+      ['category', 'essence'],
+      'the category and essence filters both reach the rung, in bar order'
+    );
+    for (const select of rung) {
+      assert.ok(
+        Boolean(select.closest('[data-component-toolbar]')),
+        'and each one is inside this bar, so the host the sheet names is this bar’s section'
+      );
+    }
+  });
+
+  it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
+    // Non-vacuity for the selector above: it is two classes and an element, and the FIRST class
+    // is the shared primitive's, not this screen's. A bar that stopped being a `<ManagerToolbar>`
+    // would take both assertions above down with it — which is the point — but it would read as
+    // a markup change with no styling consequence, so the join is named here once.
+    const root = await browser.mount({
+      itemCards: metalWithFire(),
+      categoryVocabulary: ['Metal', 'Herb'],
+      selectedSystemId: 'sys-1',
+    });
+    const bar = root.querySelector('[data-component-toolbar]');
+    assert.ok(Boolean(bar), 'the bar renders');
+    assert.ok(
+      bar.classList.contains('manager-toolbar'),
+      'the section carries the shared bar class the 38px select rule is scoped to'
+    );
+    assert.ok(
+      bar.classList.contains('manager-component-toolbar'),
+      'and its own, so the extra class is still appended rather than replacing the primitive’s'
+    );
+  });
+});
