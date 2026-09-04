@@ -6366,6 +6366,7 @@
             "BulkRemoveFrom": "Remove from",
             "BulkAddNote": "Every selected component gains rules in each chosen system, inheriting the world category.",
             "BulkRemoveNote": "Removing these components from the selected systems also rewrites every recipe in those systems that names them, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.",
+            "RemoveConsequence": "Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.",
             "BulkStaged": "Staged",
             "BulkNoSystems": "None",
             "BulkSystemCount": "{count} chosen",
@@ -6651,7 +6652,7 @@
             "Remove": "Remove",
             "RemoveConfirm": "Confirm?",
             "Removing": "Removing…",
-            "RemoveConsequence": "Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes."
+            "RemoveConsequence": "Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched."
           }
         },
         "Knowledge": {

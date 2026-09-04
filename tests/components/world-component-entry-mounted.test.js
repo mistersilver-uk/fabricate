@@ -1050,6 +1050,31 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.deepEqual(calls, [{ verb: 'removeFromSystem', args: ['ingot', 'sys-alchemy'] }]);
     });
 
+    it('and its accessible name DISCLOSES the recipe cascade the removal runs', async () => {
+      // The idle face of this control is a bare 26px exit icon with NO visible label, so its
+      // `aria-label` is the only name it has — and `removeFromSystem` for a COMPONENT is
+      // `partComponentFromSystem`, which runs the in-system delete through `deleteComponents`
+      // and disables every recipe left without a usable ingredient set or result. A sentence
+      // that names only the overrides tells a GM the safe half and not the consequential one.
+      //
+      // Read off the ROW, from the same fixture the actuation cases above use, so this cannot
+      // pass against a sentence assembled anywhere but the control the GM activates.
+      const { target } = await open('ingot');
+      const remove = rowOf(target, 'sys-alchemy').querySelector('[data-armed]');
+      const note = remove.getAttribute('aria-label');
+      assert.match(note, /Remove from this system/, 'the name still opens with the action');
+      assert.match(note, /Remove Iron Ingot from Alchemy/, 'and names this row own pair');
+      assert.match(note, /rewrites every recipe in that system that names it/);
+      assert.match(note, /disables any recipe left without a usable ingredient set or result/);
+      assert.equal(
+        /Its overrides go with it/.test(note),
+        false,
+        'the sentence that stopped at the overrides is what this pin exists to refuse'
+      );
+      // The hover title is the same sentence, because a sighted GM reads it from there.
+      assert.equal(remove.getAttribute('title'), note);
+    });
+
     it('and the member row trails `View system rules` beside the exit icon', async () => {
       // `proto:942-945` draws the two together in the row's trailing cluster. Round 3 drew
       // `Open rules` plus a 97px labelled `🗑 Remove` danger button.

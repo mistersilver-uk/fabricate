@@ -126,13 +126,21 @@
    * — and in this form the idle face has NO visible label at all, so the sentence is the only
    * name it has.
    *
+   * IT IS THE COMPONENT KEY, NOT THE SHARED MEMBERSHIP ONE. Removing a component from a system
+   * is not a membership edit: `partComponentFromSystem` runs the in-system delete through
+   * `deleteComponents`, which repairs every reference, DISABLES the recipes left without a usable
+   * ingredient set or result, cleans up salvage and reconciles alchemy. The shared key cannot
+   * carry that, because `MembershipActions` renders it for essences and tools as well and neither
+   * of their stores does any of it — so the cascade lives on a key only the component surfaces
+   * read, and this card is one of the two.
+   *
    * @param {object} row
    * @returns {string}
    */
   function removeConsequence(row) {
     return phrase(
-      'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConsequence',
-      'Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched.',
+      'FABRICATE.Admin.Manager.Scoped.Component.RemoveConsequence',
+      'Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.',
       { entity: entityName || entryId, system: row?.systemName || row?.systemId }
     );
   }

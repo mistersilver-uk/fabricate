@@ -532,3 +532,43 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     );
   });
 });
+
+// ── AN ESSENCE ROW MAY NOT BORROW THE COMPONENT'S CASCADE (issue 1371 r10, r9-cat finding 5b) ──
+//
+// `MembershipActions` is shared by all three scoped entity types, and revision 9 disclosed the
+// COMPONENT removal cascade on the shared `Scoped.Membership.RemoveConsequence` key. That made
+// this screen's Remove announce a repair `partEssenceFromSystem` does not perform: it filters
+// `essenceDefinitions` and writes, with no reference repair and no recipe disable anywhere in it.
+//
+// PINNED HERE, ON THE SCREEN, rather than only on the copy. The component half of the same rule
+// is pinned in `world-component-entry-mounted.test.js` and the descriptor split itself in
+// `scoped-entity-patterns-mounted.test.js`; what only this mount can answer is that the ESSENCE
+// entry — the shared cluster's own caller — renders the honest sentence after the split.
+
+describe('the essence entry row states what an essence removal actually does', () => {
+  afterEach(() => entryHarness.remount());
+
+  it('names the overrides and promises NO recipe repair', async () => {
+    const root = await entryHarness.mount({
+      scope: essenceScope(),
+      actions: {},
+      entityId: 'ash',
+      onBackToCatalogue: () => {},
+    });
+    // `ash` holds a record in `sys-a`, so that row renders the member branch and its armed
+    // Remove. The POSITIVE half first: a `doesNotMatch` over a row that never rendered is the
+    // vacuous shape this file's header refuses.
+    const remove = root
+      .querySelector('[data-scoped-entry-system="sys-a"]')
+      ?.querySelector('[data-arm-token]');
+    assert.ok(Boolean(remove), 'the member row rendered its armed Remove');
+    const note = remove.getAttribute('aria-label');
+    assert.match(note, /Remove Ash from Mythwright Forge/, 'the sentence names this pair');
+    assert.match(note, /Its overrides go with it; the world record and every other system are untouched\./);
+    assert.equal(
+      /recipe/.test(note),
+      false,
+      'an essence removal repairs no recipe, so no essence control may say it does'
+    );
+  });
+});

@@ -1153,29 +1153,36 @@ describe('componentScoped.js stays the import-free leaf its consumers assume', (
 });
 
 /**
- * BOTH REMOVE SENTENCES DISCLOSE THE RECIPE CASCADE (issue 1371 r9-cat, lane STORE's disclosure).
+ * EACH REMOVE SENTENCE STATES WHAT ITS OWN REMOVAL DOES (issue 1371, r9-cat then r10).
  *
- * Removing a component from a system is not a membership edit. `adminStore`'s
- * `_dropInSystemComponent` runs the in-system delete through `deleteComponents`, which repairs
- * every reference, DISABLES the recipes left without a usable ingredient set or result, cleans up
- * salvage and reconciles alchemy. Both sentences named only the overrides and then reassured the
- * GM that the world record was untouched — the safe half of the truth, told without the
- * consequential half, on the two controls that fire that cascade.
+ * Removing a COMPONENT from a system is not a membership edit. `partComponentFromSystem` runs
+ * the in-system delete through `deleteComponents`, which repairs every reference, DISABLES the
+ * recipes left without a usable ingredient set or result, cleans up salvage and reconciles
+ * alchemy. Both component sentences named only the overrides and then reassured the GM that the
+ * world record was untouched — the safe half of the truth, told without the consequential half,
+ * on the two controls that fire that cascade.
  *
- * PINNED AS COPY RATHER THAN AS A RENDER, because the two live on different screens (the bulk
- * panel's `Remove from` note and the entry's per-system row) and neither suite can see the other.
- * What can rot is the sentence, and it rots identically in both places.
+ * REVISION 9 DISCLOSED IT ON THE SHARED KEY, WHICH WAS HALF A DEFECT EACH WAY. The bulk note is
+ * the component catalogue's own and was right; `Scoped.Membership.RemoveConsequence` is rendered
+ * by `MembershipActions` for ALL THREE scoped entity types, and neither of the other two does any
+ * of it — `partEssenceFromSystem` filters `essenceDefinitions` and writes, and the tool path is
+ * the generic verb — so every essence and tool row began promising a repair its own store never
+ * performs. That is the same class of defect as the tag-merge overclaim this PR's own spec bans.
  *
- * NOTE FOR WHOEVER READS THIS NEXT: `Scoped.Membership.RemoveConsequence` has TWO consumers, not
- * one — `WorldComponentEntrySystemsCard.svelte` and the shared `MembershipActions.svelte`, which
- * the ESSENCE screens render as well. The cascade is real for components and is NOT reproduced by
- * the essence path (`_dropInSystemEssence` filters `essenceDefinitions` and writes, with no
- * reference repair and no recipe disable), so the shared key now says something of essences that
- * their own store does not do. Making it accurate needs either a scope-specific key on the entry
- * card or a scope-aware note prop on `MembershipActions`; neither file is this lane's, and the
- * collision is recorded here rather than resolved silently.
+ * SO THERE ARE TWO KEYS NOW, AND THE SPLIT IS BY ENTITY TYPE RATHER THAN BY CALLER.
+ * `Scoped.Component.RemoveConsequence` carries the cascade and is read by the component entry
+ * card and by `MembershipActions`' component branch; the shared `Scoped.Membership.…` carries
+ * the overrides-only sentence for essences and tools. `MembershipActions` selects between them
+ * from its DESCRIPTOR — the same rule that already decides whether it renders an enabled switch
+ * — so a caller cannot hand an essence row the component's sentence.
+ *
+ * PINNED AS COPY RATHER THAN AS A RENDER, because these live on screens no one suite can see at
+ * once (the bulk panel, the component entry card, the essence entry row, the catalogue inspector
+ * roster). What can rot is the sentence, and it rots identically in all of them. The RENDERED
+ * halves are pinned where they render: `world-component-entry-mounted.test.js`,
+ * `essence-world-scope-screens-mounted.test.js` and `scoped-entity-patterns-mounted.test.js`.
  */
-describe('the two remove sentences disclose what removal actually does', () => {
+describe('each remove sentence discloses what that removal actually does', () => {
   const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
   const scoped = lang.FABRICATE.Admin.Manager.Scoped;
 
@@ -1191,31 +1198,56 @@ describe('the two remove sentences disclose what removal actually does', () => {
     assert.match(note, /The world record is untouched, and no other system changes\./);
   });
 
-  it('and the per-system row says the same thing in the singular', () => {
-    const note = scoped.Membership.RemoveConsequence;
+  it('and the COMPONENT per-system row says the same thing in the singular', () => {
+    const note = scoped.Component.RemoveConsequence;
     assert.ok(typeof note === 'string' && note.length > 0, 'NON-VACUITY: the key resolves');
     for (const clause of CASCADE) assert.match(note, clause);
     assert.match(note, /\{entity\}/, 'and it still interpolates both of its own tokens');
     assert.match(note, /\{system\}/);
   });
 
-  it('neither one still stops at the overrides, which is the finding', () => {
+  it('neither component sentence still stops at the overrides, which is the finding', () => {
     // The exact spelling both carried, as a negative: a sentence that names only what is NOT
     // written is the one this pin exists to keep out.
-    for (const note of [scoped.Component.BulkRemoveNote, scoped.Membership.RemoveConsequence]) {
+    for (const note of [scoped.Component.BulkRemoveNote, scoped.Component.RemoveConsequence]) {
       assert.doesNotMatch(note, /Its overrides go with it/);
       assert.doesNotMatch(note, /loses its rules in each chosen system/);
     }
   });
 
-  it('and the shared key’s SECOND consumer is still there, so the note above is not stale', () => {
-    // The whole point of the recorded collision: if this ever stops matching, the essence
-    // overclaim is gone and the note in this block's header should go with it.
-    const shared = sourceOf(`${SCOPED_DIR}/MembershipActions.svelte`);
-    assert.match(
-      shared,
-      /FABRICATE\.Admin\.Manager\.Scoped\.Membership\.RemoveConsequence/,
-      'MembershipActions still reads the shared key, so essence rows still read this sentence'
+  it('and the SHARED key promises no recipe repair, because two of its three types do none', () => {
+    const note = scoped.Membership.RemoveConsequence;
+    assert.ok(typeof note === 'string' && note.length > 0, 'NON-VACUITY: the key resolves');
+    assert.match(note, /\{entity\}/, 'it still interpolates both of its own tokens');
+    assert.match(note, /\{system\}/);
+    assert.match(note, /Its overrides go with it/, 'it states what an essence removal DOES do');
+    assert.equal(
+      /recipe/.test(note),
+      false,
+      'this key is rendered for essences and tools, whose stores repair no recipe at all'
     );
+  });
+
+  it('and each consumer reads the key for the scope it renders', () => {
+    // The component entry card is component-only, so it names the component key and nothing
+    // else. Reading the shared key here is exactly the regression the split undoes.
+    const card = sourceOf(`${SCOPED_DIR}/WorldComponentEntrySystemsCard.svelte`);
+    assert.match(card, /FABRICATE\.Admin\.Manager\.Scoped\.Component\.RemoveConsequence/);
+    assert.equal(
+      /FABRICATE\.Admin\.Manager\.Scoped\.Membership\.RemoveConsequence/.test(card),
+      false,
+      'the component card must not fall back to the shared essence/tool sentence'
+    );
+
+    // The shared cluster reads BOTH, because it renders all three types and chooses between
+    // them from the descriptor. A copy of it that named only one key would give some scope the
+    // other scope's sentence, which is the defect in either direction.
+    const shared = sourceOf(`${SCOPED_DIR}/MembershipActions.svelte`);
+    for (const key of [
+      /FABRICATE\.Admin\.Manager\.Scoped\.Component\.RemoveConsequence/,
+      /FABRICATE\.Admin\.Manager\.Scoped\.Membership\.RemoveConsequence/,
+    ]) {
+      assert.match(shared, key);
+    }
   });
 });
