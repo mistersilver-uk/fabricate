@@ -15,33 +15,25 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
-  COMPONENT_SYSTEMS,
-  SCOPED_LIST_RAW_MODULES,
-  SCOPED_SHARED_COMPILED_MODULES,
-  WORLD_COMPONENT_SCOPE_RAW_MODULES,
-  componentCorpus,
+  componentScopeFor,
+  createComponentScopeHarness,
+  drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const harness = createMountedComponentHarness({
+const harness = createComponentScopeHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-component-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte',
-  rawModules: [
-    ...WORLD_COMPONENT_SCOPE_RAW_MODULES,
-    ...SCOPED_LIST_RAW_MODULES,
+  rawExtras: [
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
   ],
-  compiledModules: [
-    ...SCOPED_SHARED_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte',
+  compiledExtras: [
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
@@ -56,22 +48,16 @@ const harness = createMountedComponentHarness({
   ],
 });
 
-function scopeFor(overrides) {
-  return projectWorldScopeEntity({
-    entityType: 'component',
-    corpus: componentCorpus(overrides),
-    systems: COMPONENT_SYSTEMS,
-  });
-}
-
-async function drain() {
-  for (let index = 0; index < 40; index += 1) await Promise.resolve();
-}
+// SHARED WITH THE CATALOGUE SUITE, which carried both verbatim; aliased so the call sites read
+// unchanged. See `createComponentScopeHarness` for why the arrangement moved rather than the
+// manifests being pruned.
+const scopeFor = componentScopeFor;
+const drain = drainMicrotasks;
 
 /** Mount the entry on one component, with a recording action bag and the draft wires captured. */
 async function open(entityId, overrides) {
   const { calls, actions } = recordingComponentActions();
-  const reports = { dirty: [], handles: [], deletes: [], vocabulary: [] };
+  const reports = { dirty: [], handles: [], deletes: [], vocabulary: [], rules: [] };
   const target = await harness.mount({
     scope: scopeFor(overrides),
     actions,
@@ -82,6 +68,7 @@ async function open(entityId, overrides) {
     onDraftChange: (handle) => reports.handles.push(handle),
     onDeleteChange: (descriptor) => reports.deletes.push(descriptor),
     onOpenWorldVocabulary: () => reports.vocabulary.push(true),
+    onOpenSystemRules: (id, systemId) => reports.rules.push([id, systemId]),
   });
   return { target, calls, actions, reports };
 }
@@ -512,6 +499,37 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
+  describe('the attribution sentence counts MEMBERS, because the entry has no system', () => {
+    // The rendered half of the pure `entry`-surface coverage. The sibling surfaces say "shared
+    // with N OTHER systems", where "other" means "other than the system you are editing" — a
+    // referent this screen does not have. A page that reused either of those sentences reads
+    // plausibly and is wrong by one on every component.
+    it('reads "the 1 system" for a component exactly one system holds', async () => {
+      const { target } = await open('coal');
+      const note = target.querySelector('[data-scoped-entry-attribution]');
+      assert.ok(Boolean(note), 'the identity card renders its attribution sentence');
+      assert.equal(
+        note.textContent.trim(),
+        'Shared by the 1 system that has rules for this component.'
+      );
+    });
+
+    it('and states the unused case as a sentence rather than as a zero', async () => {
+      const { target } = await open('resin');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-attribution]').textContent.trim(),
+        'No system has rules for this component yet.'
+      );
+    });
+
+    it('and pluralises for the two-system record, so the branches are discriminating', async () => {
+      const { target } = await open('ingot');
+      const text = target.querySelector('[data-scoped-entry-attribution]').textContent.trim();
+      assert.equal(text, 'Shared by the 2 systems that have rules for this component.');
+      assert.ok(!text.includes('other system'), 'and never borrows the per-system sentence');
+    });
+  });
+
   describe('the world category card exits to the vocabulary screen', () => {
     // The reference draws one `World classification` card carrying `Edit world vocabulary`; this
     // screen splits that card in two, and the split dropped the exit. It is restored on the
@@ -574,6 +592,35 @@ describe('world Component entry editor (issue 1371)', () => {
       rowOf(target, 'sys-alchemy').querySelector('[data-armed]').click();
       await drain();
       assert.deepEqual(calls, [{ verb: 'removeFromSystem', args: ['ingot', 'sys-alchemy'] }]);
+    });
+
+    it('and Open rules sits in the ROW HEAD beside Remove, not on a line of its own', async () => {
+      // `proto:5455-5468` draws it as an auto-width control on the NAME line next to the remove
+      // glyph. Round 2 gave it a full-width line below the chips, where it read as the row's
+      // PRIMARY action while being its least consequential one — the destructive verb beside it
+      // is the one that needs the weight — and cost a row of height per system on a card whose
+      // length is a property of the world rather than of the component.
+      const { target } = await open('ingot');
+      const exit = rowOf(target, 'sys-forge').querySelector('[data-scoped-entry-system-rules]');
+      assert.ok(Boolean(exit), 'the member row offers its exit');
+
+      const head = exit.closest('.manager-component-entry-system-head');
+      assert.ok(Boolean(head), 'and it is INSIDE the row head rather than a sibling below it');
+      assert.ok(
+        Boolean(head.querySelector('[data-armed]')),
+        'sharing that head with Remove, which is the cluster the prototype puts it beside'
+      );
+      assert.ok(
+        !exit.classList.contains('is-full-width'),
+        'and it is sized to its content rather than stretched across the row'
+      );
+    });
+
+    it('and that exit carries the OWN row system, not the first one', async () => {
+      const { target, reports } = await open('ingot');
+      rowOf(target, 'sys-alchemy').querySelector('[data-scoped-entry-system-rules]').click();
+      await drain();
+      assert.deepEqual(reports.rules, [['ingot', 'sys-alchemy']]);
     });
 
     it('and arming one row DISARMS the other, so a stray Enter cannot delete a second', async () => {

@@ -24005,3 +24005,14 @@
 .fabricate-manager .manager-scoped-inherit-note i {
   margin-right: var(--fab-space-2xs);
 }
+
+/* THE WORLD COMPONENT ENTRY'S PER-SYSTEM `Open rules` EXIT (issue 1371, round 3).
+   It shares the row head with the system name, the mode chip and the membership cluster, and the
+   head is a flex row whose name takes the slack — so without an explicit basis the control either
+   stretches or shrinks its own label to an ellipsis on a long system name. The rule is GLOBAL
+   rather than scoped to the page because the class lands on a `ManagerButton`, and Svelte stamps a
+   scoped hash only onto elements the component itself writes. */
+.fabricate-manager .manager-component-entry-system-rules {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

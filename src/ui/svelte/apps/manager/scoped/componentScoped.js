@@ -249,11 +249,27 @@ export function componentWorldCategoryNote(entry, phrase) {
   }
   const inheriting = Number(entry?.inheritCounts?.category) || 0;
   const overriding = members - inheriting;
-  return phrase(
-    'FABRICATE.Admin.Manager.Scoped.Component.WorldCategoryNote',
-    '{inheriting} of {members} systems inherit it · {overriding} override locally.',
-    { inheriting, members, overriding }
+  // TWO CLAUSES, PLURALISED INDEPENDENTLY (issue 1371, round 3). The single composed sentence read
+  // `0 of 1 systems inherit it · 1 override locally.` on the commonest state of all — a component
+  // exactly one system has — which is wrong twice in eleven words. The clauses pluralise on
+  // DIFFERENT counts (`members` and `overriding`), so one key with one plural rule cannot be right
+  // for both, and a composed string is one a translator cannot reorder either. Same four-key shape
+  // and same reasoning as `componentTagMergeNote` two functions down.
+  const left = phrase(
+    members === 1
+      ? 'FABRICATE.Admin.Manager.Scoped.Component.WorldCategoryInheritOne'
+      : 'FABRICATE.Admin.Manager.Scoped.Component.WorldCategoryInherit',
+    members === 1 ? '{inheriting} of {members} system inherits it' : '{inheriting} of {members} systems inherit it',
+    { inheriting, members }
   );
+  const right = phrase(
+    overriding === 1
+      ? 'FABRICATE.Admin.Manager.Scoped.Component.WorldCategoryOverrideOne'
+      : 'FABRICATE.Admin.Manager.Scoped.Component.WorldCategoryOverride',
+    overriding === 1 ? '{overriding} overrides locally.' : '{overriding} override locally.',
+    { overriding }
+  );
+  return `${left} · ${right}`;
 }
 
 /**

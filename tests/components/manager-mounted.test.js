@@ -28276,7 +28276,13 @@ describe('CraftingSystemManager mounted behavior', () => {
             parseUuid: (uuid) => {
               if (typeof uuid !== 'string') return null;
               const parts = uuid.split('.');
-              if (parts.length < 2) return null;
+              //  3. A SINGLE SEGMENT IS NOT MALFORMED TO CORE. Real `parseUuid('nonsense')`
+              //     answers a well-formed result with `embedded: []` — an unresolvable primary
+              //     id is not a parse failure — so a stub that nulled it was STRICTER than core
+              //     in the direction that manufactures a refusal production does not make. That
+              //     is the same false-pass shape as (1) with the sign flipped: a stub tighter
+              //     than core proves a gate that is not there.
+              if (parts.length < 2) return { embedded: [] };
               // The pack triple — `Compendium`, scope, pack — comes off first when present.
               if (parts[0] === 'Compendium') parts.splice(0, 3);
               // Then the PRIMARY document's own `<Type>.<id>` pair.
@@ -28390,15 +28396,55 @@ describe('CraftingSystemManager mounted behavior', () => {
       it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
         // THE BRANCH THIS MEASURES IS THE NULL RETURN, not a throw. Real `parseUuid` answers
         // `null` for a malformed uuid and never throws, so the gate's `catch` is unreachable in a
-        // live client — and a gate that only caught throws would ACCEPT every one of these while
-        // this assertion stayed green against a stricter double.
+        // live client — and a gate that only caught throws would ACCEPT this while the assertion
+        // stayed green against a stricter double.
+        //
+        // `Actor.a.Item` IS SUCH A UUID and it is the only one asserted here. It has three
+        // segments: core splices the primary `<Type>.<id>` pair off the front and is left with a
+        // single trailing segment, an ODD remainder that cannot be read as `<Type>, <id>` pairs,
+        // so core answers `null` rather than half-reading it.
+        //
+        // `nonsense` USED TO BE IN THIS LOOP AND DOES NOT BELONG. Core does not null a
+        // single-segment uuid: it answers a well-formed result with `embedded: []`, because an
+        // unresolvable primary id is not a parse failure. The old stub nulled it, which made this
+        // loop assert a refusal production never makes — the mirror of the too-loose double the
+        // note above warns about, and just as capable of shipping a green test about nothing. Its
+        // real outcome is asserted below instead.
         await openComponentCatalogue([]);
 
-        for (const uuid of ['nonsense', 'Actor.a.Item']) {
-          const refused = await dropPayload({ type: 'Item', uuid });
-          assert.deepEqual(worldComponentIds(), [], `${uuid} minted nothing`);
-          assert.equal(refused.warn.length, 1, `${uuid} told the GM why`);
-        }
+        const refused = await dropPayload({ type: 'Item', uuid: 'Actor.a.Item' });
+        assert.deepEqual(worldComponentIds(), [], 'it minted nothing');
+        assert.equal(refused.warn.length, 1, 'and told the GM why');
+      });
+
+      it('and a uuid that parses but resolves to nothing is DROPPED SILENTLY, which is a gap', async () => {
+        // RECORDED RATHER THAN REPAIRED, and asserted so it is recorded in a form that cannot rot.
+        //
+        // A single-segment uuid parses (see above), passes the embedded gate correctly — nothing
+        // about it says "this belongs to an actor" — and then fails to resolve to an Item. The
+        // handler's `if (!source) return false` says nothing at all, so the GM drops something on
+        // the zone and gets no record and no message.
+        //
+        // It is NOT this lane's to fix: `resolveToolSource` is the shared resolution service the
+        // essence and tool creation paths use too, and adding a toast on its empty return changes
+        // three lanes' behaviour from one issue's diff. What this test buys is that the silence is
+        // a KNOWN state with a name: the day someone adds the message, this test fails and points
+        // at the decision rather than at a mystery.
+        await openComponentCatalogue([]);
+
+        const unresolved = await dropPayload({ type: 'Item', uuid: 'nonsense' });
+        assert.deepEqual(worldComponentIds(), [], 'nothing is minted from an unresolvable uuid');
+        assert.deepEqual(
+          unresolved.warn,
+          [],
+          'and — today — nothing is said either; see the note above before "fixing" this line'
+        );
+
+        // THE POSITIVE CONTROL ON THE FIXTURE, so the silence above is the RESOLUTION failing and
+        // not the drop zone being unreachable in this arrangement.
+        const resolved = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(worldComponentIds().length, 1);
+        assert.deepEqual(resolved.warn, []);
       });
 
       it('and refuses EVERY drop when there is no parser to ask, rather than accepting them', async () => {

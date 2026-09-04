@@ -2709,6 +2709,7 @@
           "GhostAdd": "Add",
           "GhostAddNamed": "Add {name} to this system",
           "WorldTags": {
+            "Edit": "Edit world tags",
             "Title": "World tags"
           },
           "Kicker": "Components View",
@@ -6239,6 +6240,7 @@
             "UnlinkItem": "Unlink Item",
             "SystemsCount": "{count} of {total} systems have rules",
             "OpenSystemRules": "Open rules",
+            "OpenSystemRulesAria": "Open this component in {system}",
             "PreviewLabel": "How this component reaches the world",
             "PreviewKicker": "World record",
             "PreviewRules": "World defaults",
@@ -6271,7 +6273,10 @@
             "CatNoteUnset": "No world category is set, so this system supplies its own.",
             "CatNoteInherited": "Following the world value. Change it in the catalogue entry and every inheriting system follows.",
             "CatNoteOverridden": "Overriding the world value ({category}) for {system} only.",
-            "WorldCategoryNote": "{inheriting} of {members} systems inherit it · {overriding} override locally.",
+            "WorldCategoryInherit": "{inheriting} of {members} systems inherit it",
+            "WorldCategoryInheritOne": "{inheriting} of {members} system inherits it",
+            "WorldCategoryOverride": "{overriding} override locally.",
+            "WorldCategoryOverrideOne": "{overriding} overrides locally.",
             "WorldCategoryNoneNote": "No system has rules for this yet.",
             "WorldTagsNoneNote": "No world tags. Each system relies on its own list.",
             "WorldTagsApplied": "{count} world tags applied",

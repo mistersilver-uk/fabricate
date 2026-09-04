@@ -4867,6 +4867,17 @@ test('a capture case that clicks a scoped-list row can actually reach it', async
 
   // The world component corpus as the catalogue orders it: every in-system component the
   // migration lifts, plus the fixture's world-only records, by NAME ascending.
+  //
+  // IT MODELS `name-asc`, WHICH IS THE FRAME'S RESTING SORT AND NOT A UNIVERSAL ONE. Every world
+  // component case today lands on the list at rest and none declares a sort step, so the model is
+  // exact — but a case that clicked the sort-direction toggle, chose a different sort key, or set
+  // a page size would reorder or re-slice the very page this scan reasons about, and the guard
+  // would answer about a list the capture never renders. It fails in the SAFE direction for a
+  // reversed sort (a row believed to be on page one is not, and the assertion demands a narrowing
+  // step that is harmless to add) and in the UNSAFE direction for a widened page size (a row
+  // believed to be past the fold is reachable, and the guard asks for a step the case does not
+  // need). The day a component case declares a sort, this model has to read it off the case's own
+  // steps rather than assuming the resting one.
   const byName = [
     ...new Map(
       [

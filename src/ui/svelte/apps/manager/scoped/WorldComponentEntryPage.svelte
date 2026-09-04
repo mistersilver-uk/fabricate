@@ -777,7 +777,9 @@
                     oninput={(event) => patchIdentity('description', event.currentTarget.value)}
                   ></textarea>
                 </label>
-                <p class="manager-muted manager-component-entry-note">{attribution}</p>
+                <p class="manager-muted manager-component-entry-note" data-scoped-entry-attribution>
+                  {attribution}
+                </p>
               </section>
 
               <!--
@@ -1147,6 +1149,40 @@
                             >{systemMode(row).label}</Chip
                           >
                         {/if}
+                        <!--
+                          `OPEN RULES` SITS IN THE ROW HEAD, BESIDE REMOVE (issue 1371, round 3),
+                          not on a full-width line of its own below the chips. `proto:5455-5468`
+                          draws it as an auto-width control on the NAME line next to the remove
+                          glyph, and a full-width button reads as the row's primary action when it
+                          is the row's least consequential one — the destructive verb beside it is
+                          the one that needs the weight. It also cost a whole row of height per
+                          system on a card whose length is a property of the world.
+                        -->
+                        {#if row.member === true && onOpenSystemRules}
+                          <ManagerButton
+                            class="manager-component-entry-system-rules"
+                            data-scoped-entry-system-rules={row.systemId}
+                            title={phrase(
+                              'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
+                              'Open this component in {system}',
+                              { system: row.systemName }
+                            )}
+                            aria-label={phrase(
+                              'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
+                              'Open this component in {system}',
+                              { system: row.systemName }
+                            )}
+                            onclick={() => onOpenSystemRules(entry.id, row.systemId)}
+                          >
+                            <span
+                              >{text(
+                                'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRules',
+                                'Open rules'
+                              )}</span
+                            >
+                            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                          </ManagerButton>
+                        {/if}
                         <MembershipActions
                           entityType="component"
                           entityId={entry.id}
@@ -1189,20 +1225,6 @@
                             >
                           {/each}
                         </div>
-                      {/if}
-                      {#if row.member === true && onOpenSystemRules}
-                        <ManagerButton
-                          data-scoped-entry-system-rules={row.systemId}
-                          onclick={() => onOpenSystemRules(entry.id, row.systemId)}
-                        >
-                          <span
-                            >{text(
-                              'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRules',
-                              'Open rules'
-                            )}</span
-                          >
-                          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                        </ManagerButton>
                       {/if}
                     </li>
                   {:else}

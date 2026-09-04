@@ -295,6 +295,26 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
     });
 
+    it('and it EXITS to where the list is authored, on the seam the banner already uses', async () => {
+      // A read-only card that says the list belongs elsewhere and offers no route there leaves a
+      // GM scrolled to the tags with nothing to do but scroll back up. The exit is the SAME seam
+      // the attribution banner uses — no route is minted here, and the gateway's unsaved-changes
+      // guard runs before the move, which matters because this editor buffers its identity edits.
+      const { target, opened } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+      const exit = target.querySelector('[data-component-edit-world-tags-exit]');
+      assert.ok(Boolean(exit), 'the world tag card offers its own exit');
+      exit.click();
+      await drain();
+      assert.deepEqual(
+        opened,
+        [['world-component-entry', 'coal']],
+        'the ROUTE TOKEN and the entity id, so the exit lands on this component rather than on ' +
+          'the catalogue'
+      );
+    });
+
     it('and the write path it declines to use IS available to it', async () => {
       // The read-only-ness is NOT structural: this view declares `actions`, and the call site
       // binds it to the component family — the one family carrying `setMutedTags`. So after this

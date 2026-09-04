@@ -191,6 +191,61 @@ describe('the attribution sentence is clamped at zero', () => {
       /1 other system\./
     );
   });
+
+  it('and the ENTRY surface counts members rather than OTHERS, in all three branches', () => {
+    // THE THIRD SURFACE WAS UNTESTED, and it is the one that cannot reuse either sentence above.
+    // The list and the editor are read FROM a system, so they say how many OTHER systems share
+    // the record — member count minus one, clamped. The world entry belongs to no system, so
+    // "other" has no referent there: subtracting one would tell a GM looking at a component two
+    // systems hold that it is shared by one, and would say "shared with -1" on the zero case that
+    // is the whole reason this describe exists.
+    //
+    // All three branches, because they are three different sentences rather than one with a
+    // number in it: zero is a statement about being unused, one is singular, and the plural is
+    // the only branch a naive implementation gets right.
+    const entryNote = (memberCount) =>
+      componentAttributionNote({ surface: 'entry', memberCount }, phrase);
+
+    assert.match(entryNote(0), /No system has rules for this component yet\./);
+    assert.ok(!entryNote(0).includes('0 system'), 'the zero case is a sentence, not a count');
+
+    assert.equal(entryNote(1), 'Shared by the 1 system that has rules for this component.');
+    assert.equal(entryNote(3), 'Shared by the 3 systems that have rules for this component.');
+
+    // AND IT IS NOT THE LIST SENTENCE WITH A DIFFERENT COUNT. A surface that fell through to the
+    // default branch would answer `2 other systems` for three members and read plausibly.
+    assert.ok(
+      !entryNote(3).includes('other system'),
+      'the entry has no system to be "other" than'
+    );
+  });
+});
+
+describe('the world category note pluralises BOTH of its counts', () => {
+  // The counts pluralise on DIFFERENT numbers — the left clause on the member total, the right on
+  // the override count — so a single composed sentence with one plural rule cannot be right for
+  // both. On the commonest state of all, a component exactly one system has and overrides, the
+  // composed version read `0 of 1 systems inherit it · 1 override locally.`: wrong twice.
+  const noteFor = (members, inheriting) =>
+    componentWorldCategoryNote(
+      { membershipCount: members, inheritCounts: { category: inheriting } },
+      phrase
+    );
+
+  it('says "1 system inherits" and "1 overrides" on the one-system record', () => {
+    assert.equal(noteFor(1, 0), '0 of 1 system inherits it · 1 overrides locally.');
+    assert.equal(noteFor(1, 1), '1 of 1 system inherits it · 0 override locally.');
+  });
+
+  it('and keeps the plural forms where they are right', () => {
+    // The positive control: an implementation that simply swapped in the singular strings would
+    // pass the case above and fail here.
+    assert.equal(noteFor(6, 1), '1 of 6 systems inherit it · 5 override locally.');
+  });
+
+  it('and states the unused case as a sentence rather than as a fraction of nothing', () => {
+    assert.match(noteFor(0, 0), /No system has rules for this yet\./);
+  });
 });
 
 describe('the delete note refuses while any system holds rules', () => {
@@ -242,7 +297,8 @@ describe('the world entry notes count MEMBERS only', () => {
   it('and splits the member count between inheriting and overriding', () => {
     assert.match(
       componentWorldCategoryNote({ membershipCount: 4, inheritCounts: { category: 3 } }, phrase),
-      /3 of 4 systems inherit it · 1 override locally/
+      // `1 overrides`, singular, since round 3: the two clauses pluralise on different counts.
+      /3 of 4 systems inherit it · 1 overrides locally/
     );
   });
 

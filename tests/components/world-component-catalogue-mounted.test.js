@@ -20,36 +20,29 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
   COMPONENT_SYSTEMS,
-  SCOPED_LIST_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
-  SCOPED_SHARED_COMPILED_MODULES,
-  WORLD_COMPONENT_SCOPE_RAW_MODULES,
-  componentCorpus,
+  componentScopeFor,
+  createComponentScopeHarness,
+  drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { componentBulkMembershipModes } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const harness = createMountedComponentHarness({
+const harness = createComponentScopeHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-component-catalogue-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte',
-  rawModules: [
-    ...WORLD_COMPONENT_SCOPE_RAW_MODULES,
-    ...SCOPED_LIST_RAW_MODULES,
+  rawExtras: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     // The drop zone's two leaves: the action it binds and the payload normalizer behind it.
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
   ],
-  compiledModules: [
-    ...SCOPED_SHARED_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte',
+  compiledExtras: [
     'src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
@@ -68,18 +61,10 @@ const harness = createMountedComponentHarness({
   ],
 });
 
-function scopeFor(overrides) {
-  return projectWorldScopeEntity({
-    entityType: 'component',
-    corpus: componentCorpus(overrides),
-    systems: COMPONENT_SYSTEMS,
-  });
-}
-
-/** Drain the microtask queue the sequential apply loop awaits through. */
-async function drain() {
-  for (let index = 0; index < 40; index += 1) await Promise.resolve();
-}
+// The projection wrapper and the microtask drain are SHARED with the entry suite; both suites
+// carried them verbatim. Aliased so every call site below reads unchanged.
+const scopeFor = componentScopeFor;
+const drain = drainMicrotasks;
 
 describe('world Component Catalogue (issue 1371)', () => {
   before(async () => {
@@ -241,6 +226,52 @@ describe('world Component Catalogue (issue 1371)', () => {
       }
     }
 
+    /**
+     * Mount the catalogue with a recording action bag and two rows already ticked.
+     *
+     * ONE ARRANGEMENT, NOT FIVE COPIES OF IT. Every test in this block opened with the same
+     * mount, the same recording bag and the same two ticks; only the staged instruction and the
+     * expected calls differed. SonarCloud's copy-paste detector matches by token SHAPE rather
+     * than by literal, so three bodies differing only in a mode word and a system id are
+     * duplicated lines against the quality gate. Gate aside, an arrangement restated per test is
+     * one that drifts per test, and the arrangement is the half no assertion is about.
+     *
+     * @returns {Promise<{target: HTMLElement, calls: Array<{verb: string, args: unknown[]}>}>}
+     */
+    async function selectedCatalogue() {
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions,
+      });
+      await selectTwo(target);
+      return { target, calls };
+    }
+
+    /**
+     * Stage one membership instruction and apply it: pick the mode, pick the system, press Apply.
+     *
+     * The MODE and the SYSTEM are the parameters because they are the two things the tests
+     * disagree about, and they are the two the panel can get wrong in a way no count assertion
+     * would see.
+     *
+     * @param {HTMLElement} target
+     * @param {string} mode `add` or `remove`.
+     * @param {string} systemId the crafting system to stage against.
+     * @returns {Promise<void>}
+     */
+    async function applyMembership(target, mode, systemId) {
+      target.querySelector(`[data-world-component-bulk-mode-option="${mode}"]`).click();
+      await drain();
+      target.querySelector('[data-world-component-bulk-system-trigger]').click();
+      await drain();
+      target.querySelector(`[data-popover-option="${systemId}"]`).click();
+      await drain();
+      target.querySelector('[data-world-component-bulk-apply]').click();
+      await drain();
+    }
+
     it('swaps the inspector for the panel the moment a row is ticked', async () => {
       const target = await harness.mount({
         scope: scopeFor(),
@@ -256,22 +287,8 @@ describe('world Component Catalogue (issue 1371)', () => {
     });
 
     it('forwards addToSystem once per selected component, per chosen system', async () => {
-      const { calls, actions } = recordingComponentActions();
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions,
-      });
-      await selectTwo(target);
-
-      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-system-trigger]').click();
-      await drain();
-      target.querySelector('[data-popover-option="sys-forge"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-apply]').click();
-      await drain();
+      const { target, calls } = await selectedCatalogue();
+      await applyMembership(target, 'add', 'sys-forge');
 
       assert.deepEqual(
         calls,
@@ -287,22 +304,8 @@ describe('world Component Catalogue (issue 1371)', () => {
     it('and forwards removeFromSystem when the mode says so', async () => {
       // THE OTHER DIRECTION, and it is the whole reason the verb name is recorded. Without this
       // half, a panel that forwarded `addToSystem` for both modes passes.
-      const { calls, actions } = recordingComponentActions();
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions,
-      });
-      await selectTwo(target);
-
-      target.querySelector('[data-world-component-bulk-mode-option="remove"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-system-trigger]').click();
-      await drain();
-      target.querySelector('[data-popover-option="sys-alchemy"]').click();
-      await drain();
-      target.querySelector('[data-world-component-bulk-apply]').click();
-      await drain();
+      const { target, calls } = await selectedCatalogue();
+      await applyMembership(target, 'remove', 'sys-alchemy');
 
       assert.deepEqual(
         calls.map((call) => call.verb),
@@ -314,13 +317,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     it('applies the world tag stage as a WHOLE list, computed per component', async () => {
       // `setWorldTags` REPLACES the list, so an implementation that wrote the staged tags alone
       // would silently delete every tag the GM had not ticked — and `coal` carries two.
-      const { calls, actions } = recordingComponentActions();
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions,
-      });
-      await selectTwo(target);
+      const { target, calls } = await selectedCatalogue();
 
       target.querySelector('[data-world-component-bulk-tag="fuel"]').click();
       await drain();
@@ -383,12 +380,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       // remove. `muted` and `neutral` differ only in their ink token — same border, no fill on
       // either — so "about to be taken off every selected component" and "leave alone" were the
       // same chip, on the one panel whose header says the two directions are one click apart.
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: recordingComponentActions().actions,
-      });
-      await selectTwo(target);
+      const { target } = await selectedCatalogue();
 
       const chip = () => target.querySelector('[data-world-component-bulk-tag="fuel"]');
       const unstaged = chip().className;
@@ -440,12 +432,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       // G.5 / reviewer F5. `componentBulkMembershipModes` stated both labels and both notes in the
       // model with NO consumer, while the panel spelled the same four strings inline — two
       // implementations of one meaning, and the one the delta said would be read was the dead one.
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: recordingComponentActions().actions,
-      });
-      await selectTwo(target);
+      const { target } = await selectedCatalogue();
 
       const modes = componentBulkMembershipModes((key, fallback) => fallback);
       assert.equal(modes.length, 2, 'the model states exactly the two directions');

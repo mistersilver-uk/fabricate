@@ -1212,6 +1212,29 @@
               )}
             </p>
           </div>
+          <!--
+            THE EXIT TO WHERE THIS LIST IS AUTHORED (issue 1371, round 3). This card is READ-ONLY
+            by design — the world tag list and its per-system muting belong to the world entry —
+            and round 2 left the GM told that and given no way there from the card itself. The
+            attribution banner at the top of the screen carries the same exit, but a GM who has
+            scrolled to the tags is looking at the tags.
+
+            ROUTED THROUGH THE OWNER on the existing `onOpenWorldEntry` seam, the one the banner
+            already uses: no route is minted, and the gateway's own unsaved-changes guard runs
+            before the move, which matters because this editor buffers its identity edits too.
+          -->
+          <div class="manager-task-card-heading-control">
+            <ManagerButton
+              data-component-edit-world-tags-exit
+              onclick={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, worldEntry.id)}
+            >
+              <i class="fas fa-tags" aria-hidden="true"></i>
+              <span
+                >{text('FABRICATE.Admin.Manager.Component.WorldTags.Edit', 'Edit world tags')}</span
+              >
+              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </ManagerButton>
+          </div>
         </div>
         <div class="manager-component-tag-run" data-component-edit-world-tags>
           {#each worldTags as tag (tag)}

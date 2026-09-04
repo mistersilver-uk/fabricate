@@ -5044,6 +5044,49 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/InheritRow\.svelte$/],
   }),
   managerCase({
+    // THE RULES EDITOR'S READ-ONLY WORLD TAG CARD (issue 1371, round 3), which no frame reached.
+    //
+    // A SECOND CASE rather than two more steps on the one above, for the reason the entry's own
+    // definition/tags split records: the card sits below the editor's scroll fold, and scrolling
+    // to it moves the identity strip and the inherit row — that case's whole subject — out of
+    // frame. It also needs a DIFFERENT COMPONENT: `sm-iron-ingot` carries no world tags at all, so
+    // the card does not render for it, and `sm-coal` is the one lab component with world tags AND
+    // a member muting one, which is what makes the muted/unmuted chip pair visible here.
+    id: 'manager-component-edit-world-tags',
+    label: 'Manager — Component edit world tags',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-search] input', fill: 'Coal' },
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-component-edit-section="world-tags"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '[data-component-edit-section="world-tags"]',
+    expectContained: [
+      // THE EXIT, inside the card head. A read-only card that names where its list is authored
+      // and offers no route there leaves a GM scrolled to the tags with nothing to do but scroll
+      // back up to the banner.
+      {
+        container: '[data-component-edit-section="world-tags"]',
+        target: '[data-component-edit-world-tags-exit]',
+      },
+      // And the two chip states, which are the card's whole subject: `bulk` is muted in this
+      // system and `fuel` is not, so a card painting one treatment for both fails here.
+      {
+        container: '[data-component-edit-section="world-tags"]',
+        target: '[data-component-edit-world-tag="bulk"]',
+      },
+      {
+        container: '[data-component-edit-section="world-tags"]',
+        target: '[data-component-edit-world-tags-note]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
     // THE WIDENED MEMBERSHIP COHORT (issue 1371, round 2): the ghost rows, their Add, and the
     // toolbar counting the widened set. It is the ONE route in the product to adopt a world
     // component into a crafting system, and round 1 shipped it with no frame at all.
