@@ -995,9 +995,36 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * frame, which draws no popover at all — and a regression in the pass that places every floating
  * surface in the product would have published one frame that could not contain it.
  *
- * These are the seven `SearchablePopover` open-state frames plus nothing else; `ActionMenu`'s own
- * open frame reaches the same pair through its broad-signal override, since that component IS a
- * broad-signal file.
+ * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is TEN — not the seven
+ * `SearchablePopover` frames alone. The seam is the positioning pass, so the component the panel
+ * happens to be is not the question a frame answers; whether the frame's own `expectSelector`
+ * requires a panel to be measured, placed and portaled is:
+ *
+ *   `SearchablePopover`  `manager-recipe-edit-tag-picker`, `manager-recipe-edit-ingredients-or-menu`,
+ *                        `manager-gathering-task-availability-menu`, `manager-world-parties-actor-picker`,
+ *                        `manager-world-parties-realm-override-picker`, `player-actor-picker`,
+ *                        `world-tool-entry-on-break-repair-tag-picker-empty` and
+ *                        `manager-recipes-bulk-edit-picker`
+ *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
+ *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
+ *                        row menu and whose selector names an item inside the portaled panel
+ *
+ * The last two are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That map answers a DIFFERENT
+ * question — which frames a change to `IconPicker.svelte` or `ActionMenu.svelte` publishes —
+ * whereas this array is what a change to `anchoredPopover.js` publishes, and a broad-signal entry
+ * for a component says nothing about a file that component imports. Reading the override as
+ * cover for those two frames is a category error, and it left the seam publishing seven of ten.
+ *
+ * `manager-recipes-bulk-edit-picker` takes `[...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES]`
+ * rather than gaining the seam through the shared array: four other bulk-edit frames use
+ * `RECIPE_BULK_EDIT_MATCHES` and none of them opens a panel, so putting the seam in there would
+ * publish four frames that cannot show a regression in it.
+ *
+ * TWO POSITIONED PANELS ARE IN NO FRAME AT ALL, and neither gap is this array's to close. No case
+ * opens `EssenceSourceSelector`'s panel, and no case can open the biome colour popover in
+ * `EnvironmentsBrowserView` — its trigger is a right-click, and the capture runner has no
+ * right-click verb (`scripts/view-lab-screenshots.mjs`: `press` is Enter or Space). Adding a
+ * pattern for either would be configuration that selects nothing; the frames have to exist first.
  */
 const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
@@ -1262,6 +1289,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // itself is a BROAD SIGNAL and reaches this case through
       // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
       /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+      // The positioning seam the open picker's panel is placed by (issue 1500). This is the
+      // registry's ONLY frame with an `IconPicker` panel down, and the override above cannot
+      // stand in for it: that entry routes a change to `IconPicker.svelte`, not a change to a
+      // file `IconPicker.svelte` imports.
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -3753,7 +3785,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       '.fabricate-manager .manager-travel-popover ' +
       '[data-popover-option="sm-book"] .manager-travel-option-meta',
     kinds: ['manager', 'recipes'],
-    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+    // SPREAD, not the shared array (issue 1500). This is the one bulk-edit frame that rests on an
+    // OPEN panel, so it is the one that must answer for the positioning seam; the four siblings
+    // that share `RECIPE_BULK_EDIT_MATCHES` photograph the bar, the staged list and the blocked
+    // warning, none of which a change to `anchoredPopover.js` can move.
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-pick-card',
@@ -7705,6 +7741,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      // The positioning seam (issue 1500). The selector above names an item inside the PORTALED
+      // menu panel, which is the only thing in this frame the seam can move, and this is the
+      // registry's only frame with an `ActionMenu` panel open. `ActionMenu.svelte`'s own
+      // broad-signal override routes changes to that component; it says nothing about the action
+      // the component delegates its placement to, so the seam is claimed here.
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -9022,7 +9064,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The bar this frame draws, named EXPLICITLY as of issue 1500. It used to arrive here for
       // free: it lived under `components/`, and a broad signal selects the representative pair,
       // of which this is one. Moving it to `apps/` took it out of both legs of
-      // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 594-line screen region
+      // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 506-line screen region
       // would publish only the frame that opens its picker and never the frame that draws it
       // closed — which is where its own 18 scoped rules are visible.
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
