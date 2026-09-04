@@ -408,8 +408,13 @@ const EXPECTED = {
   'filter-chip': 9.92, // 0.62rem — the one chip scale (was 12)
   count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
   // ── The list.
-  'row-name': 12.16, // 0.76rem serif — bleed fix; prototype row name 13.5px serif
-  'row-description': 12.48, // 0.78rem — prototype row description 11px sans
+  // `proto:1084` — the C5 rebuild writes the row name in the reference's own 13.5px/600
+  // serif. Authored as a px literal because a font size is a literal, not a scale member;
+  // this pin previously carried the drift its own comment named.
+  'row-name': 13.5,
+  // `proto:1087` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
+  // the reference's own 11px. The pin read 12.48 while its own comment named 11.
+  'row-description': 11,
   'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
   'row-difficulty': 9.92, // same chip family
   // ── The browser inspector (issue 676). It shares the recipe inspector's rules.
@@ -429,10 +434,14 @@ const EXPECTED = {
   'field-select': 13.12,
   // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
   // Name/Description fields it replaced are gone, and with them `readonly-value`.
-  'identity-name': 18, // 1.125rem serif — prototype identity name 18px/600. Exact.
+  // 0.94rem. `proto:1313` is `font:600 15px var(--serif)`: the D3 rebuild reads the identity
+  // name off the callout, where the retired strip had sized it as a page-level heading.
+  'identity-name': 15.04,
   'identity-lock': 9.92, // 0.62rem — prototype lock badge 9px sans (was 12)
   'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
-  'identity-note': 10, // 0.625rem — prototype premise note 10px sans. Exact.
+  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`: the note is the attribution
+  // SENTENCE now, prose rather than a glyph-led hint, so it reads a rung above a micro-label.
+  'identity-note': 11.52,
   'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
@@ -486,7 +495,10 @@ const EXPECTED = {
   'bulk-subhint': 9.92, // 0.62rem — identical to `bulk-hero-hint`
   'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
-  'bulk-essence-name': 12.16, // 0.76rem — the extracted card, shared with the editor grid
+  // 0.72rem. `proto:1348` is `font:600 11.5px var(--sans);color:var(--text2)`: the tile's
+  // subject is the numeral under it, so the name recedes a rung instead of competing.
+  // Still the extracted card, and still shared with the editor grid.
+  'bulk-essence-name': 11.52,
   'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
   'bulk-dc-copy': 9.92, // 0.62rem
   // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
