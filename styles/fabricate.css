@@ -6677,7 +6677,16 @@
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
-  font-size: var(--fab-recipe-control-font);
+
+  /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-recipe-control-font)` deliberately
+     not. That property is declared once, on `.fabricate-manager` (styles/fabricate.css:1252),
+     which makes it AREA-SCOPED — but this rule carries no `.fabricate-manager` compound (the
+     re-root sweep, issue 1502, put its root class first instead), so a shared-primitive-rooted
+     rule may not read an area-scoped custom property. The shipped precedent for the same
+     trade is `src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte:497-505`, which
+     writes the literal for the identical reason. Rendering is unchanged: the property is
+     declared as this same value everywhere it resolves. */
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
@@ -13596,8 +13605,13 @@
 
    It lives in the GLOBAL sheet rather than in `ManagerButton.svelte` because that component
    deliberately has no scoped `<style>` at all: a second source of truth for one control is
-   the exact failure the primitive exists to end, and the parity harness reads this file. */
-a.fabricate-button.manager-button {
+   the exact failure the primitive exists to end, and the parity harness reads this file.
+
+   The type selector rides inside `:is(a)` rather than leading the compound, so the
+   namespacing gate reads the family root (`.fabricate-button`) first — an identical
+   match set and specificity (0,2,1) either way, just written so the root class comes
+   first in the selector text. */
+.fabricate-button.manager-button:is(a) {
   text-decoration: none;
 }
 
