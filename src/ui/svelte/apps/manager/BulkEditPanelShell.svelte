@@ -280,9 +280,9 @@
         scrolls once the three regions stack, which is that block's decision and not this
         rule's; do NOT reach into the `@container` block from here.
 
-     A SECOND sticky rule rather than reuse of `.manager-inspector-card.is-sticky`
-     (styles/fabricate.css): that class is a bordered, rounded, TOP-anchored card SHELL,
-     and Apply is not a card. This mirrors its idiom at the opposite edge — surface fill, a
+     A SECOND sticky rule rather than reuse of the inspector card's own sticky rule: that
+     one was a bordered, rounded, TOP-anchored card SHELL, and Apply is not a card. (It had
+     no call site under `src/` and was deleted from styles/fabricate.css in issue 1498.) This mirrors its idiom at the opposite edge — surface fill, a
      hairline against the content it covers, and a shadow thrown away from the edge it is
      pinned to — without inheriting a card's border box.
 

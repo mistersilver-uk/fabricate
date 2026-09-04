@@ -113,9 +113,10 @@ export const SCANNED_SPACING_PROPERTIES = Object.freeze([
 
 /**
  * The prefix every published spacing token carries — `--fab-space-1` through `--fab-space-6`,
- * `--fab-space-2xs`, `--fab-space-chip`, and the five semantic aliases.
+ * `--fab-space-2xs` and `--fab-space-chip`. Five semantic aliases stood beside them and were
+ * deleted for having no readers anywhere in `styles/` or `src/` (issue 1499).
  *
- * A prefix rather than a list of thirteen names, because the spec's rule is about deriving from
+ * A prefix rather than a list of eight names, because the spec's rule is about deriving from
  * the SCALE and a scale that gains a step should not need this file edited to keep the gate
  * honest. The narrower reading would be the more dangerous one here: a token the list forgot
  * would resolve, its pixel value would be manufactured, and every call site of it would arrive
@@ -165,12 +166,18 @@ export function isExemptSpacingPixels(pixels) {
  * which paid five occurrences down and emptied one row entirely (`padding: 6px`). The debt was
  * paid by TOKENIZING rather than by deleting, so it is banked here rather than left as a slot
  * the next author could fill for free.
+ *
+ * It was 917 until issue 1498 deleted the 367 rule blocks in `styles/fabricate.css` that
+ * matched no element, at base `0eff5b36e`. That took four occurrences with it and emptied one
+ * row (`styles/fabricate.css | padding | 48`). None of them was tokenized: the declarations
+ * simply went, along with the rules carrying them, so the debt fell rather than being paid.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 917;
+export const KNOWN_RAW_SPACING_TOTAL = 913;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
- * chose them: 1737 under `styles/**` and 1642 in Svelte scoped blocks.
+ * chose them: 1445 under `styles/**` and 1642 in Svelte scoped blocks. The first was 1737 until
+ * issue 1498 deleted the dead rule blocks at base `0eff5b36e`.
  *
  * ILLUSTRATIVE, and named so, because nothing asserts them. They appear only inside a failure
  * message, to tell a reader how far below the expected magnitude a broken scan has fallen —
@@ -179,7 +186,7 @@ export const KNOWN_RAW_SPACING_TOTAL = 917;
  * they are not pinned: the enforced figures are the floors, which are the ones with a failure
  * mode worth stopping.
  */
-export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1737;
+export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1445;
 
 /** The Svelte half of the above. Illustrative likewise. */
 export const FLOOR_REFERENCE_SVELTE_SPACING_DECLARATIONS = 1642;

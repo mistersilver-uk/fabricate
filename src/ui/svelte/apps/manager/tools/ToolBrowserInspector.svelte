@@ -360,8 +360,8 @@
 <style>
   /* The rules stack and the pinned action, authored here rather than in
      `styles/fabricate.css` so `VIEW_RECIPES` maps a change to the Tool views alone. The
-     four-heading `.manager-tool-inspector-sections` grid this replaces is no longer
-     rendered by anything. */
+     four-heading grid this replaces was rendered by nothing, and its rules were deleted
+     from the sheet in issue 1498. */
   /* THE PANEL'S OWN HEAD, spanning the column above the medallion rather than sitting in the
      copy cell beside it.
 
