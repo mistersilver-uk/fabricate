@@ -139,6 +139,105 @@ describe('StatusPill (mounted)', () => {
       if (icon) for (const token of icon.split(' ')) assert.ok(glyph.classList.contains(token));
     });
   }
+
+  // ── THE OUTLINED EMPHASIS (issue 1371) ────────────────────────────────────────────────
+  //
+  // `emphasis` is the second axis this pill has ever had, and it is opt-in for the reason the
+  // lane that measured it could not use anything else: the reference's attribution pill
+  // (`proto:834`, `Linked Foundry item`) is a hairline-edged micro pill in the SECONDARY ink,
+  // and `subtle` — the only tone whose fill already matches — also paints the Off pill on
+  // three other screens, so re-toning it in place would move them. A parity lane proved the
+  // difference is unreachable from `styles/fabricate.css` at ANY specificity, because Foundry
+  // imports the module sheet at `layer(modules)` while this block is injected unlayered.
+  //
+  // The assertions that matter most are the two NEGATIVE ones: an absent `emphasis` must
+  // render byte-identically to what shipped, and an unrecognised one must fall back rather
+  // than emit a class nothing paints — the rule this component already states for `tone`.
+  const statusPillSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/components/StatusPill.svelte'),
+    'utf8'
+  );
+
+  it('renders no emphasis class or hook when none is asked for', async () => {
+    const root = await harnessFor('StatusPill').mount({ tone: 'subtle', label: 'Off' });
+    const pill = root.querySelector('[data-status-pill="subtle"]');
+    const authored = [...pill.classList].filter((name) => !name.startsWith('svelte-')).sort();
+    assert.deepEqual(
+      authored,
+      ['fab-status-pill', 'is-subtle'],
+      'the shipped pill is exactly its stem and its tone — a new prop that leaked a class here would repaint thirteen call sites at once'
+    );
+    assert.ok(
+      !pill.hasAttribute('data-status-pill-emphasis'),
+      'and it stamps no emphasis hook, so the default DOM is unchanged'
+    );
+  });
+
+  it('adds is-outlined and reports the resolved emphasis when asked', async () => {
+    const root = await harnessFor('StatusPill').mount({
+      tone: 'subtle',
+      emphasis: 'outlined',
+      icon: 'fas fa-lock',
+      label: 'Linked Foundry item'
+    });
+    const pill = root.querySelector('[data-status-pill="subtle"]');
+    assert.ok(pill.classList.contains('is-outlined'), 'the emphasis paints its own class');
+    assert.ok(
+      pill.classList.contains('is-subtle'),
+      'and it composes with the tone rather than replacing it'
+    );
+    assert.equal(
+      pill.getAttribute('data-status-pill-emphasis'),
+      'outlined',
+      'the hook reports the RESOLVED emphasis, so a test can watch the fallback happen'
+    );
+  });
+
+  it('FALLS BACK on an unrecognised emphasis rather than emitting a dead class', async () => {
+    const root = await harnessFor('StatusPill').mount({ tone: 'subtle', emphasis: 'ghost' });
+    const pill = root.querySelector('[data-status-pill="subtle"]');
+    assert.ok(!pill.className.includes('is-ghost'), 'a typo renders the shipped pill');
+    assert.ok(
+      !pill.hasAttribute('data-status-pill-emphasis'),
+      'and reports no emphasis at all, exactly as an unrecognised tone reports `subtle`'
+    );
+  });
+
+  it('paints every declared emphasis in the scoped style block', () => {
+    // The mirror guard. An emphasis added to the accepted set but never given a rule renders
+    // as the shipped pill while the class-emission assertion above still passes — the class is
+    // there, the treatment is not, and nothing says so.
+    const start = statusPillSource.indexOf('const EMPHASES = new Set([');
+    assert.notEqual(start, -1, 'StatusPill still declares its emphasis vocabulary as `EMPHASES`');
+    const body = statusPillSource.slice(
+      statusPillSource.indexOf('[', start),
+      statusPillSource.indexOf(']);', start)
+    );
+    const declared = [...body.matchAll(/'([\w-]+)'/g)].map(([, name]) => name);
+    assert.ok(declared.length > 0, 'at least one emphasis is declared');
+    const styleBlock = statusPillSource.slice(statusPillSource.indexOf('<style>'));
+    assert.deepEqual(
+      declared.filter((name) => !styleBlock.includes(`.fab-status-pill.is-${name}`)),
+      [],
+      'every accepted emphasis declares a treatment'
+    );
+  });
+
+  it('states the outlined pill in tokens, at the reference band', () => {
+    // `proto:834`: `padding:2px 8px; border:1px solid var(--border); font:600 9px; color:
+    // var(--text2)`, with an 8px glyph. Every one of those is a theme-root token here —
+    // `--fab-space-2xs`/`--fab-space-2` are exactly 2px and 8px, so the band costs the spacing
+    // ratchet nothing, and `--fab-text-secondary` IS the reference's `--text2`.
+    const rule = statusPillSource.slice(
+      statusPillSource.indexOf('.fab-status-pill.is-outlined {'),
+      statusPillSource.lastIndexOf('</style>')
+    );
+    assert.match(rule, /padding:\s*var\(--fab-space-2xs\) var\(--fab-space-2\)/);
+    assert.match(rule, /border-color:\s*var\(--fab-border\)/);
+    assert.match(rule, /color:\s*var\(--fab-text-secondary\)/);
+    assert.match(rule, /font-size:\s*9px/);
+    assert.match(rule, /font-size:\s*8px/, 'and the leading glyph drops to the reference 8px');
+  });
 });
 
 describe('Medallion (mounted)', () => {

@@ -105,6 +105,11 @@
     // keeps the single-list path above it untouched. A group with no rows draws its own
     // `emptyNote` rather than vanishing: an absent group and an empty one say different things,
     // and the reference writes a sentence for the empty one.
+    //
+    // `hookAttribute` NAMES THE GROUP, not its rows (issue 1371, maintainer parity round 5). It
+    // used to land on the `<ul>`, with the kicker a SIBLING before it, so no selector reached a
+    // group's label at all and a parity lane had to report both rail kickers as unmeasurable.
+    // See the wrapper in the markup below for why it generates no box.
     factGroups = [],
     // A leading line under the head block, above the first fact group: the reference's
     // `Across every system that has rules for it.` Empty renders nothing.
@@ -201,29 +206,52 @@
     THE KICKERED FACT GROUPS. Each draws its own kicker, its own rows and — when it has none —
     its own sentence, because "no recipe requires it yet" and "this rail has no `Used by` group"
     are different claims and only the first is ever true here.
+
+    THE GROUP'S OWN HOOK IS ON THIS WRAPPER, so `[hook]` means the group and `[hook] .manager-kicker`
+    reaches its label. On the `<ul>` it named the ROWS: the kicker was a sibling before it, nothing
+    could select it, and an empty group's hook and a populated one's landed on different elements.
+
+    `display: contents` IS WHY THE WRAPPER COSTS NOTHING. The rail is a column flexbox with its own
+    gap, so a wrapper that generated a box would make each group ONE flex item and collapse the
+    space between a kicker and its own rows to zero. With `display: contents` the wrapper generates
+    no box at all and both children stay direct participants in the rail's layout, so every
+    rendered pixel is what it was.
+
+    IT IS AN INLINE STYLE BECAUSE THIS COMPONENT HAS NO SCOPED BLOCK AND MUST NOT GROW ONE. The
+    class stem is a PROP — see the note at the top of this file — so a scoped selector over
+    `${classPrefix}-…` cannot be proven used and Svelte emits the unused-selector warning
+    `lint:svelte:warnings` fails on; and adding ANY `<style>` here would restamp every element in
+    this shell with a new scope class, which is a rendering change to six editors to buy one
+    declaration. The host sheet is closed to this lane by `### GM World Scoped Entity Routes`
+    requirement 7, and a `${classPrefix}-` class here would need a rule under BOTH stems.
+
+    ONE CONSEQUENCE FOR CALLERS: the rows are now a GRANDCHILD of the hook, so a selector written
+    `[hook] > li` no longer resolves and has to be `[hook] li`.
   -->
   {#each factGroups as group, index (group.kicker || index)}
-    <p class="manager-kicker">{group.kicker}</p>
-    {#if (group.rows ?? []).length > 0}
-      <ul class={`${classPrefix}-rules`} {...groupAttributes(group)}>
-        {#each group.rows as row (row.id)}
-          <li {...ruleHookAttribute ? { [ruleHookAttribute]: row.id } : {}}>
-            <IconFactRow
-              icon={row.icon}
-              title={row.title}
-              subtitle={row.subtitle}
-              titleAttr={row.titleAttr || ''}
-              badge={row.badge || ''}
-              badgeTone={row.badgeTone || 'neutral'}
-              tile={ruleTile}
-              density="rule"
-            />
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class={`${classPrefix}-fact-empty`} {...groupAttributes(group)}>{group.emptyNote}</p>
-    {/if}
+    <div style="display: contents" {...groupAttributes(group)}>
+      <p class="manager-kicker">{group.kicker}</p>
+      {#if (group.rows ?? []).length > 0}
+        <ul class={`${classPrefix}-rules`}>
+          {#each group.rows as row (row.id)}
+            <li {...ruleHookAttribute ? { [ruleHookAttribute]: row.id } : {}}>
+              <IconFactRow
+                icon={row.icon}
+                title={row.title}
+                subtitle={row.subtitle}
+                titleAttr={row.titleAttr || ''}
+                badge={row.badge || ''}
+                badgeTone={row.badgeTone || 'neutral'}
+                tile={ruleTile}
+                density="rule"
+              />
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class={`${classPrefix}-fact-empty`}>{group.emptyNote}</p>
+      {/if}
+    </div>
   {/each}
   {#if explainer}
     <ExplainerCard

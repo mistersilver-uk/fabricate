@@ -207,3 +207,112 @@ describe('1036 Chip — tone matrix characterization', () => {
     );
   });
 });
+
+/**
+ * THE DENSITY SCALE MATRIX (issue 1371).
+ *
+ * The suite above characterizes the chip's COLOUR axis. Its geometry axis had no primitive-level
+ * guard at all: `density` had grown to four values, each stating a min-height, a band, a corner
+ * and a type scale, and every one of them was pinned only through some host screen. A value added
+ * to the class builder without a rule in the style block renders as the DEFAULT chip while every
+ * class assertion still passes — the class is there, the geometry is not, and nothing says so.
+ * That is the same silent mirror `declaredTones()` above exists to close, on the other axis.
+ *
+ * `tag-run` is this revision's addition: the reference's world-tag pill (`proto:5401`,
+ * `proto:5692`, `proto:5707`) at `padding: 5px 12px; border-radius: 999px; font: 600 11px`, which
+ * is a chip that is a CONTROL a GM clicks rather than a badge they read. A parity lane measured
+ * that the shipped default — radius 10, 9.92px, weight 700, band 4x6 — cannot be corrected from
+ * `styles/fabricate.css` at any specificity, because Foundry imports the module sheet at
+ * `layer(modules)` while this block is injected unlayered.
+ */
+describe('1371 Chip — density scale matrix', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /**
+   * Every `density` value the class builder can emit, and the class each emits, read from the
+   * component's own ternaries. Restating the list here would make this file a second copy of
+   * the mirror it exists to guard.
+   *
+   * @returns {Array<[string, string]>}
+   */
+  function declaredDensities() {
+    const pairs = [...chipSource.matchAll(/density === '([a-z-]+)' \? '(is-[a-z-]+)'/g)].map(
+      ([, value, className]) => [value, className]
+    );
+    assert.ok(pairs.length >= 4, `the chip still names its densities in the builder (${pairs})`);
+    return pairs;
+  }
+
+  it('emits exactly one `is-<density>` class for every declared density', async () => {
+    for (const [density, expectedClass] of declaredDensities()) {
+      const target = await harness.mount({ density });
+      const classes = [...chipNode(target).classList].filter((name) => name.startsWith('is-'));
+      assert.deepEqual(classes, [expectedClass], `density "${density}" paints exactly ${expectedClass}`);
+      harness.remount();
+    }
+  });
+
+  it('paints every declared density in the scoped style block', () => {
+    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
+    // Whole-token match rather than `includes`, so a longer class that merely STARTS with a
+    // shorter one cannot answer for it.
+    const unpainted = declaredDensities()
+      .filter(([, className]) => !new RegExp(`\\.manager-chip\\.${className}(?![\\w-])`).test(styleBlock))
+      .map(([density]) => density);
+    assert.deepEqual(unpainted, [], 'every accepted density declares a geometry');
+  });
+
+  it('leaves the DEFAULT density bare, and drops an unrecognised one', async () => {
+    const shipped = await harness.mount({ density: 'default' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip'],
+      'the manager-wide scale adds no class at all, so 60-odd call sites are byte-identical'
+    );
+    harness.remount();
+
+    const typo = await harness.mount({ density: 'enormous' });
+    assert.deepEqual(
+      [...chipNode(typo).classList].filter((name) => name.startsWith('is-')),
+      [],
+      'a typo renders the default chip rather than a selector nothing paints'
+    );
+  });
+
+  it('composes the tag-run scale with the tag tone and the struck variant', async () => {
+    // The two call sites the reference draws: a lit world tag (tone) and a muted one a system
+    // has switched off (`struck`). Geometry and paint are separate axes on purpose — the run
+    // draws lit, unlit and struck chips side by side at ONE size.
+    const target = await harness.mount({ density: 'tag-run', tone: 'tag', struck: true });
+    const chip = chipNode(target);
+    for (const expected of ['manager-chip', 'is-tag', 'is-struck', 'is-tag-run']) {
+      assert.ok(chip.classList.contains(expected), `carries ${expected}`);
+    }
+    // `is-tag-run` must not be read as the `is-tag` TONE by anything matching on strings.
+    assert.equal(
+      [...chip.classList].filter((name) => name === 'is-tag').length,
+      1,
+      'the scale class is its own token and does not duplicate the tone'
+    );
+  });
+
+  it('states the tag-run band in tokens, at the reference values', () => {
+    // `proto:5401` draws `padding: 5px 12px; border-radius: 999px; font: 600 11px`. 5px is off
+    // the published 4px spacing scale, which `spacing-scale-ratchet.test.js` enforces as a
+    // ratchet, so the block snaps to `--fab-space-chip` (6px) — the scale's own dense optical
+    // step, and the nearer of the two neighbours once the reference's default line-height is
+    // accounted for. 12px is `--fab-space-3` exactly.
+    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
+    const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const declares = (declaration) =>
+      new RegExp(`\\.manager-chip\\.is-tag-run\\s*\\{[^}]*${escape(declaration)}`);
+    assert.match(styleBlock, declares('padding: var(--fab-space-chip) var(--fab-space-3)'));
+    assert.match(styleBlock, declares('border-radius: 999px'));
+    assert.match(styleBlock, declares('font-size: 11px'));
+    assert.match(styleBlock, declares('font-weight: 600'));
+  });
+});

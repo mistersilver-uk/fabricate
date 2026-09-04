@@ -64,9 +64,29 @@
      "Rolls dice" chip), taken from the prototype (issue 1096) — 'list', a browser ROW's
      own in-line pill, which the reference draws smaller and quieter than either
      (`proto:4872`: a ~15px stadium at 9px/600 in the secondary ink on the soft surface) —
-     or 'action', the page
+     'action', the page
      header's action cluster, where a chip stands in the same row as the Back / Delete /
-     Save buttons and has to be one of them. `styles/fabricate.css`
+     Save buttons and has to be one of them — or 'tag-run', the scale of a chip that is a
+     CONTROL a GM clicks rather than a badge they read (issue 1371). The reference draws
+     every tag chip that way, on the world Component entry (`proto:5401`) and in the rules
+     editor's world-tag and own-tag runs (`proto:5692`, `proto:5707`): `padding: 5px 12px`,
+     `border-radius: 999px`, `font: 600 11px`, a pill roughly 25px tall against the default
+     chip's 20. Two parity lanes measured that one mismatch as ~34 of the rules editor's 117
+     drift lines and 8 of the entry's — the largest single cause on either screen.
+
+     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws — a
+     `rgba(201,160,220,.16)` fill on a `rgba(201,160,220,.5)` edge — is the SHIPPED `tone="tag"`,
+     which already mixes `--fab-purple` at exactly 16% and 50%; the unlit and the switched-off
+     faces are `tone`/`struck`. Keeping the two axes apart is what lets one run draw lit, unlit
+     and struck chips at one size, which is what that run is.
+
+     THE REFERENCE'S MICRO PILL IS ALREADY HERE, and is deliberately not a second value. Both
+     lanes also asked for a `micro` scale for the `World catalogue` badge (`proto:1313`) and the
+     salvage mode pill (`proto:5721`) at `padding: 2px 8px; border-radius: 999px; font: 600 9px`
+     — which is `density="list"` above, to within one pixel of vertical padding. Adding a value
+     a pixel from a shipped one is how a primitive drifts into two scales, which is the failure
+     this component was extracted to end; `list` is the answer for both, and this note is here so
+     the next lane does not re-derive the question. `styles/fabricate.css`
      cannot state it: that sheet imports at `layer(modules)` while this component's
      `css: 'injected'` block lands UNLAYERED (svelte.config.js), and an unlayered
      declaration beats a layered one no matter how specific the layered selector is
@@ -160,6 +180,10 @@
       density === 'row' ? 'is-row' : '',
       density === 'list' ? 'is-list' : '',
       density === 'action' ? 'is-action' : '',
+      // `is-tag-run`, NOT `is-tag`: the tone of that name is already taken, and a class list is
+      // matched by whole token, so the scale and the purple tone compose on one chip without
+      // either reaching the other's rules.
+      density === 'tag-run' ? 'is-tag-run' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -493,6 +517,33 @@
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     white-space: nowrap;
+  }
+
+  /* TAG-RUN scale (issue 1371): the chip that is a CONTROL. `proto:5401` states it as
+     `padding: 5px 12px; border-radius: 999px; font: 600 11px`, and every one of those but the
+     vertical padding is written here verbatim.
+
+     THE 5px SNAPS TO `--fab-space-chip` (6px). 5 is off the published 4px spacing scale, which
+     `openspec/specs/ui-integration/spec.md` makes normative and
+     `tests/components/spacing-scale-ratchet.test.js` enforces as a ratchet — a gate, not a
+     preference — so the choice is between the scale's 4px step and its 6px dense optical step.
+     6px is the nearer of the two once the reference's line box is accounted for: it authors no
+     `line-height`, so its 11px text lays out at ~13.2px and the pill measures ~25.4px tall,
+     against 25px here and 21px at 4px. The horizontal 12px is `--fab-space-3` exactly.
+
+     NO `min-height`, unlike `is-list` above, and that is a measurement rather than an omission:
+     6 + 6 + 11 + 2 is 25px, already clear of the base rule's 20px floor, so restating the floor
+     would change nothing and would read as though it did.
+
+     SIZE ONLY. The lit purple face is `tone="tag"` and the switched-off face is `struck`; this
+     block and those two share not one property, so all three compose without an ordering
+     argument. A scale that also painted would flatten a run whose whole job is to show three
+     different states at one size. */
+  .manager-chip.is-tag-run {
+    padding: var(--fab-space-chip) var(--fab-space-3);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
   }
 
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
