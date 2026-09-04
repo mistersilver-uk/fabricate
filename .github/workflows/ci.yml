@@ -90,7 +90,12 @@ jobs:
     # title/body doesn't change the head commit, so the existing result stands.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 10, not 5: `npm ci` on a slow hosted runner can outlast the whole ceiling. On 2026-09-04
+    # this job hit it repeatedly — run 33865876591 (PR 1537) ran 11:00:22Z to 11:05:37Z and was
+    # annotated "The job has exceeded the maximum execution time of 5m0s". That reports as
+    # `cancelled`, but it is not a concurrency cancel: run 33869986088 on main did the same. A
+    # healthy run takes 1m43s, so 10 covers a slow install and still bounds a genuine hang.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -145,7 +150,10 @@ jobs:
   lint-commits:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Same 10, same cause: in run 33865872604 (PR 1536) this job ran 11:00:19Z to 11:05:36Z and
+    # died on the 5-minute ceiling, though the whole job takes ~41s when healthy. Even the
+    # lightest install-bearing job is install-bound, so this bound is a hang guard, not a budget.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
