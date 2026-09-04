@@ -17660,6 +17660,53 @@
   background: var(--fab-overlay-light-04);
 }
 
+/* THE COMPACT FORM (issue 1371, round 4): a glyph over a one-line title over a one-line note,
+   centred, with no identity block and no action cluster. The reference draws it as a small
+   trailing target beside a card that is ALREADY showing the linked item, so the default form's
+   44px art column and `max-content` action column are exactly what must not be here — see the
+   component's own note for why this is a different claim rather than a density knob.
+   Radius 9 rather than the default 10: `design-system/spec.md:218` puts a well on 9. */
+.fabricate-manager .manager-item-drop-zone.is-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-1);
+  width: auto;
+  min-height: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-radius: 9px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
+  width: auto;
+  height: auto;
+  font-size: 0.82rem;
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fab-space-2xs);
+  text-align: center;
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
+  font-size: 0.63rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
+  font-size: 0.59rem;
+  line-height: 1.45;
+  color: var(--fab-text-subtle);
+}
+
 .fabricate-manager .manager-item-drop-zone.is-drop-active {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
@@ -24015,4 +24062,29 @@
 .fabricate-manager .manager-component-entry-system-rules {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+/* THE PREVIEW RAIL'S TWO NEW REGIONS (issue 1371, round 4): the leading scope note under the
+   head block, and a fact group's empty sentence. Both are the reference's own values — a 10px
+   muted line and a dashed 10px disabled sentence — and both are global rather than scoped to the
+   rail's own `<style>`, because the class prefix is a PROP: the shell composes its class names
+   from `classPrefix`, so Svelte cannot prove a scoped selector is used and prunes it. */
+.fabricate-manager .manager-tool-preview-scope-note,
+.fabricate-manager .manager-scoped-preview-scope-note {
+  margin: 0;
+  font-size: 0.63rem;
+  line-height: 1.45;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-tool-preview-fact-empty,
+.fabricate-manager .manager-scoped-preview-fact-empty {
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-border);
+  border-radius: 9px;
+  font-size: 0.63rem;
+  line-height: 1.5;
+  color: var(--fab-text-disabled);
+  text-align: center;
 }

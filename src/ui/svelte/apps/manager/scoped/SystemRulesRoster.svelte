@@ -306,13 +306,17 @@
     line-height: 1.5;
   }
 
-  /* A MEMBER ROW IS PAINTED, and until now it was not: `data-scoped-system-state` was emitted and
-     nothing in any sheet read it, so a system that HAS rules and one that does not were
-     pixel-identical in every roster. The marker is a leading rule on the row's inline edge rather
-     than a fill, so the row's own geometry does not move and no other caller's rows shift. */
-  .manager-scoped-roster-system[data-scoped-system-state='member'] {
-    box-shadow: inset 2px 0 0 0 var(--fab-accent);
-  }
+  /* NO MEMBERSHIP MARKER ON A ROSTER ROW, and the absence is deliberate (issue 1371, round 4).
+     Round 2 added `box-shadow: inset 2px 0 0 0 var(--fab-accent)` here on the reasoning that
+     `data-scoped-system-state` was emitted and no sheet read it. The reference draws no such
+     marker: every row is `background:var(--bg1); border:1px solid var(--border); radius:7px` and
+     every row carries `Rules ↗` whichever state it is in. An attribute a sheet does not read is
+     a hook for a test, not a licence to invent a treatment.
+
+     It also could not be caught: `box-shadow` was in no property group in
+     `scripts/visual-parity/lib/schema.js`, and the row is a landmark either way, so `compare` and
+     `inventory` were both silent. The group is added in the same change, and the row regions
+     carry it, so the next invented marker reddens a run. */
 
   /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
      stays at zero.

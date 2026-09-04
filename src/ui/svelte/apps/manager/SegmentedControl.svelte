@@ -22,7 +22,9 @@
      radio ITSELF, not merely onto a class: `select()` only guards `next !== value`,
      so a dimmed-but-live segment would still fire onChange. `count` renders a trailing
      tally so a segment can say how many rows choosing it would show — omitted by every
-     existing consumer, and a non-finite value renders nothing rather than `NaN`.
+     existing consumer, and a non-finite value renders nothing rather than `NaN`. `badge`
+     (issue 1371) is that SAME tally in the mono face, for a filter the reference draws that
+     way; a caller passes `count` or `badge`, never both.
    - value: the currently selected option `value`.
    - onChange(value): called with the chosen option's `value` on selection.
    - groupName: the shared radio `name` (must be unique per rendered control).
@@ -144,6 +146,23 @@
       <span class="manager-segment-label">{text(option.labelKey, option.fallback)}</span>
       {#if Number.isFinite(option.count)}
         <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
+      {/if}
+      <!--
+        `badge` IS `count`'S MONO PRESENTATION, not a second tally (issue 1371, round 4).
+
+        The reference draws a filter segment as `label` + a numeral in the MONO face, and the
+        shipped `count` slot draws the same number in the track's sans. Rather than a second
+        element with a second meaning — which is the duplication a shared primitive exists to
+        stop — `badge` reuses the slot and changes only the face. A caller passes one or the
+        other; passing both is a caller error and renders two numerals, which is visible.
+
+        The mono face ships 400 and 500 only (`design-system/spec.md:230-231`), so the
+        reference's `font:700 …var(--mono)` numeral lands on 500.
+      -->
+      {#if option.badge !== undefined && option.badge !== null && option.badge !== ''}
+        <span class="manager-segment-count is-badge" data-segment-badge={option.badge}
+          >{option.badge}</span
+        >
       {/if}
     </label>
   {/each}
@@ -367,6 +386,19 @@
     font-weight: 600;
     font-size: 0.66rem;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* The MONO presentation. Weight 500 is the ceiling the mono face ships
+     (`design-system/spec.md:230-231`), so the reference's 700 lands here. */
+  .manager-segment-count.is-badge {
+    font-family: var(--fab-font-mono);
+    font-weight: 500;
+    font-size: 0.6rem;
+    color: var(--fab-text-subtle);
+  }
+
+  .manager-segment-input:checked ~ .manager-segment-count.is-badge {
+    color: inherit;
   }
 
   .manager-segment.is-active .manager-segment-count {

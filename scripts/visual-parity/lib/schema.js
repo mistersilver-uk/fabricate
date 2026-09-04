@@ -151,6 +151,13 @@ export const DEFAULT_PROPERTY_GROUPS = {
   // weight and transform come from the icon font's own sheet, which neither side owns and a
   // markup harness usually does not load, so recording them compares the harness to itself.
   glyph: ['color', 'fontSize'],
+  // A PAINTED MARKER THAT MOVES NO GEOMETRY. `box-shadow` was in no group at all, so an
+  // `inset 2px 0 0 0 var(--fab-accent)` rule on a roster row was invisible to `compare` — and
+  // because the row is a landmark either way, `inventory` was silent on it too. That is how an
+  // invented membership marker on the world catalogue's system roster survived four approvals
+  // (issue 1371). A shadow is the ONE way to paint a rule, a glow or a lift without changing a
+  // single measured box, which is exactly what makes it worth measuring.
+  shadow: ['boxShadow'],
   // The SCROLLER's own paint. Host chrome (Foundry's, in this repo) can leak a scrollbar
   // colour through a pane nothing ever selected a token for, and it draws as two full-height
   // rules at the pane's edges that no named region is looking at.

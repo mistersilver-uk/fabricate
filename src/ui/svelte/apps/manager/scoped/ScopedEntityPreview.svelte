@@ -83,6 +83,33 @@
     rules = [],
     ruleHookAttribute = '',
     ruleTile = false,
+    // THE HEAD BLOCK A CALLER DRAWS ITSELF (issue 1371, maintainer parity round 4).
+    //
+    // `identity` is a fixed anatomy — art, name, context, chips — and the reference's world
+    // Component rail is a different one: a 118px column holding a micro-label, an inventory TILE
+    // with a quantity badge and a status badge, and the name under it, beside a second column
+    // holding the resolved category, the effective tag chips and an art note. No arrangement of
+    // `identity` produces that, and `children` cannot either, because `children` renders at the
+    // very END of the rail, after the fact groups.
+    //
+    // A SNIPPET rather than another prop bag, because the block is markup the caller owns; the
+    // shell owns only where it sits. A caller passes `tile` or `identity`, never both.
+    tile = undefined,
+    // TWO INDEPENDENTLY KICKERED FACT GROUPS, in place of one flat `rules` list.
+    //
+    // The reference draws `USED BY` and `PRODUCED BY` as two kickered lists in one rail, each
+    // with its own empty sentence. `rulesKicker` + `rules` can express exactly one, so the second
+    // group had nowhere to go and the whole `Produced by` half of the model was invisible.
+    //
+    // `[{ kicker, rows, emptyNote, hookAttribute }]`. Empty by default, so every shipped caller
+    // keeps the single-list path above it untouched. A group with no rows draws its own
+    // `emptyNote` rather than vanishing: an absent group and an empty one say different things,
+    // and the reference writes a sentence for the empty one.
+    factGroups = [],
+    // A leading line under the head block, above the first fact group: the reference's
+    // `Across every system that has rules for it.` Empty renders nothing.
+    scopeNote = '',
+    scopeNoteHook = '',
     explainer = null,
     children,
   } = $props();
@@ -92,6 +119,17 @@
     identity?.hookAttribute ? { [identity.hookAttribute]: true } : {}
   );
   const liveAttributes = $derived(liveNoteHook ? { [liveNoteHook]: true } : {});
+  const scopeNoteAttributes = $derived(scopeNoteHook ? { [scopeNoteHook]: true } : {});
+
+  /**
+   * One fact group's own hook, so a mounted assertion can name the group it means.
+   *
+   * @param {object} group
+   * @returns {object}
+   */
+  function groupAttributes(group) {
+    return group?.hookAttribute ? { [group.hookAttribute]: true } : {};
+  }
 
   function ruleAttributes(rule) {
     return ruleHookAttribute ? { [ruleHookAttribute]: rule.id } : {};
@@ -100,6 +138,10 @@
 
 <aside class={classPrefix} {...asideAttributes} aria-label={ariaLabel}>
   <p class="manager-kicker">{kicker}</p>
+  {@render tile?.()}
+  {#if scopeNote}
+    <p class={`${classPrefix}-scope-note`} {...scopeNoteAttributes}>{scopeNote}</p>
+  {/if}
   {#if identity}
     <div class={`${classPrefix}-identity`} {...identityAttributes}>
       <img src={identity.image} alt="" />
@@ -155,6 +197,34 @@
       {/each}
     </ul>
   {/if}
+  <!--
+    THE KICKERED FACT GROUPS. Each draws its own kicker, its own rows and — when it has none —
+    its own sentence, because "no recipe requires it yet" and "this rail has no `Used by` group"
+    are different claims and only the first is ever true here.
+  -->
+  {#each factGroups as group, index (group.kicker || index)}
+    <p class="manager-kicker">{group.kicker}</p>
+    {#if (group.rows ?? []).length > 0}
+      <ul class={`${classPrefix}-rules`} {...groupAttributes(group)}>
+        {#each group.rows as row (row.id)}
+          <li {...ruleHookAttribute ? { [ruleHookAttribute]: row.id } : {}}>
+            <IconFactRow
+              icon={row.icon}
+              title={row.title}
+              subtitle={row.subtitle}
+              titleAttr={row.titleAttr || ''}
+              badge={row.badge || ''}
+              badgeTone={row.badgeTone || 'neutral'}
+              tile={ruleTile}
+              density="rule"
+            />
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class={`${classPrefix}-fact-empty`} {...groupAttributes(group)}>{group.emptyNote}</p>
+    {/if}
+  {/each}
   {#if explainer}
     <ExplainerCard
       icon={explainer.icon}

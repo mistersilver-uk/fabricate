@@ -64,6 +64,7 @@
   import-free `components/` leaf directory), which is why it lives here.
 -->
 <script>
+  import Chip from './Chip.svelte';
   let {
     icon = '',
     title = '',
@@ -74,6 +75,14 @@
     tile = false,
     density = 'default',
     tone = 'accent',
+    // A TRAILING BADGE, which is the reference's own row anatomy on the world Component entry's
+    // preview rail (issue 1371, round 4): each `Used by` / `Produced by` row ends in a chip
+    // saying WHAT the reference is — `Ingredient`, `Recipe`, `Salvage`. Without it the two
+    // groups' rows are indistinguishable from each other, which is the one thing the rail is
+    // for. Empty by default and rendered through the manager's ONE chip, so no shipped caller's
+    // markup moves and no second pill shape enters the sheet.
+    badge = '',
+    badgeTone = 'neutral',
   } = $props();
 
   // Spread so a hook is genuinely absent when unset, rather than an empty attribute a
@@ -84,6 +93,7 @@
 
 <div
   class="manager-icon-fact-row"
+  class:is-badged={Boolean(badge)}
   class:is-glyphless={!icon}
   class:is-tiled={tile}
   class:is-rule={density === 'rule'}
@@ -99,6 +109,9 @@
       <small>{subtitle}</small>
     {/if}
   </span>
+  {#if badge}
+    <Chip tone={badgeTone} data-icon-fact-badge={badge}>{badge}</Chip>
+  {/if}
 </div>
 
 <style>
@@ -126,6 +139,17 @@
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-bg-1);
+  }
+
+  /* THE BADGED ROW gains a third, content-sized column. Declared as its own rule rather than as
+     a template with an always-present `max-content` track, because an empty third track on every
+     unbadged row would still consume the grid's `gap` and shift every shipped caller's copy. */
+  .manager-icon-fact-row.is-badged {
+    grid-template-columns: 28px minmax(0, 1fr) max-content;
+  }
+
+  .manager-icon-fact-row.is-badged.is-glyphless {
+    grid-template-columns: minmax(0, 1fr) max-content;
   }
 
   /* A glyph-less row releases the column instead of holding 28px of empty space. */

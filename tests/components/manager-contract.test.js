@@ -4263,7 +4263,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   );
 
   /**
-   * The five class names `ScopedEntityPreview` renders for a given stem, derived from the
+   * The SEVEN class names `ScopedEntityPreview` renders for a given stem, derived from the
    * component's own markup rather than restated here: a list restated in this file would be a
    * third copy of the mirror it exists to guard.
    *
@@ -4312,10 +4312,14 @@ describe('world scoped-entity source contract (issue 1362)', () => {
 
     for (const stem of [defaultStem, toolStem]) {
       const classes = renderedPreviewClasses(stem);
+      // SEVEN since issue 1371's parity round: the shell gained a `-scope-note` line under the
+      // head block and a `-fact-empty` sentence for a fact group with no rows. The number is
+      // pinned rather than derived so a region ADDED without a rule is a failure here rather
+      // than a silently unstyled block on six editors.
       assert.equal(
         classes.length,
-        5,
-        `the shell renders five classes per stem; the derivation found ${classes.length}`
+        7,
+        `the shell renders seven classes per stem; the derivation found ${classes.length}`
       );
       for (const className of classes) {
         assert.ok(
