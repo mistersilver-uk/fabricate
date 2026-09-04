@@ -332,19 +332,33 @@ test('no viewport breakpoint is introduced, and user-preference queries stay exe
 
   // THE EXEMPTION, PROVED LIVE. A predicate that quietly matched everything would empty this
   // baseline wholesale, which reads like debt paid down rather than like a gate switched off.
+  //
+  // It doubles as this clause's proof that the MEDIA WALK still walks, and it is the right shape
+  // for that job in the way `ratchetBaseline.js` insists on: the three user-preference queries it
+  // counts are precisely the part of the population this gate is NOT asserting the absence of, so
+  // a broken `MEDIA_AT_RULE` reds here rather than reporting an empty tree as a clean one.
   assert.ok(
     all.length - gated.length > 0,
     'no `@media` query tests a user preference any more, so the exemption this gate grants is ' +
-      'granted to nothing and could be widened to anything without a single row moving'
+      'granted to nothing and could be widened to anything without a single row moving — or, the ' +
+      'other reading and the worse one, the at-rule scan has stopped matching anything at all'
   );
 
+  // THE FLOOR IS OVER THE CORPUS, NOT OVER THE QUERIES, and the two differ by three orders of
+  // magnitude. This tree holds EIGHT `@media` queries, five of which are the rows below, so a
+  // floor stated on that population is a floor stated on the debt: it can only be set low enough
+  // to be meaningless. At four it accepted a collector that had lost HALF of what it should see,
+  // and a corpus truncation — a lost root, a `<style>` extractor that stopped matching — would
+  // have reached this clause as VANISHED rows, which reads as debt paid down and gets banked.
+  // Floored on the rules the walk actually reads, that same truncation reds as what it is. It is
+  // the corpus and the floor gate 1 uses, because it is literally the same walk.
   assertRatchet({
     label: 'viewport `@media` breakpoints',
     baseline: KNOWN_VIEWPORT_MEDIA_QUERIES,
     pinnedTotal: KNOWN_VIEWPORT_MEDIA_TOTAL,
     observed: tallyByKey(gated, (entry) => rowKey(entry.file, entry.query)),
-    scanned: all.length,
-    floor: 4,
+    scanned: corpus().rules.length,
+    floor: 3000,
     guidance:
       'The Foundry contract binds every primitive: an application window is RESIZED BY THE USER ' +
       'and is not the viewport, so a `@media (max-width: …)` asks the wrong question and answers ' +
