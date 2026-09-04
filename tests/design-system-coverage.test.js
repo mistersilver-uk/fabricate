@@ -568,7 +568,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 31 shipped rows the library does not name.
+ * The 32 shipped rows the library does not name.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
@@ -630,6 +630,11 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
+  // `library.html` specimen names. Its row adjudicates `<SetPicker>`, the nearest entry, and
+  // records why the correspondence is not made — a vocabulary editor is not one record's
+  // membership of a set.
+  'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',

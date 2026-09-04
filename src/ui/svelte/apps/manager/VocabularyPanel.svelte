@@ -230,7 +230,12 @@
   }
 </script>
 
-<section class="manager-vocabulary-panel" aria-label={label}>
+<!-- `label || undefined` rather than `label`, the guarded spelling `IconButton` and
+     `SelectionCheckbox` ship. `label` defaults to the empty string, and an EMPTY
+     `aria-label` does not fall back to the element's content — it replaces the name with
+     nothing, so a panel rendered without one announces as an unnamed region rather than by
+     the heading inside it. Omitting the attribute is what leaves that name in place. -->
+<section class="manager-vocabulary-panel" aria-label={label || undefined}>
   <p class="manager-vocabulary-desc manager-muted">{hint}</p>
 
   <InlineVocabularyAdd
