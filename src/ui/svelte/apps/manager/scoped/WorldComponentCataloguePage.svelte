@@ -316,6 +316,20 @@
   }
 </script>
 
+<!--
+  r8-prim: THREE PRIMITIVE SEAMS THIS SCREEN CONSUMES ONCE LANE PRIM SHIPS THEM.
+
+   - wire the 38px size on `ManagerSearchField` and the toolbar selects (M12(b) / UX F5).
+     `proto:577`-`578` draws the search field and the source select at 38px, which IS a rung, and
+     the membership and sort selects and the direction toggle are the same statement one row down;
+     every one of them renders at the frame's shared 34 until the primitives take a size.
+   - wire the unbordered tinted 38px `Medallion` variant (UX F12). `proto:600` draws the row chip
+     as a tinted glyph tile with no edge at 38px; the shipped medallion is a 40px bordered
+     artwork tile on `--fab-bg-3`, which is six compare lines from one primitive decision.
+   - wire `SystemRulesRoster`'s opt-in recess and lifted search well (reviewer 7). Both were
+     restyled IN PLACE for all three catalogues and PRIM turns them into props; this screen is
+     the one that wants them on.
+-->
 <main class="manager-main" data-scoped-page="world-components" aria-label={catalogueTitle}>
   <EntityCatalogueShell
     {scope}
@@ -569,6 +583,11 @@
         class="manager-world-component-inspector-tags"
         data-world-component-global-tags={entry.id}
       >
+        <!-- r8-prim: wire the purple `emphasis` variant lane PRIM adds to `Chip` (UX F10). The
+             reference draws a world tag as a 999px pill with a purple 12% fill, a purple 35%
+             edge and PURPLE ink (`proto:757`); the shipped `tone="tag"` measures a grey-blue
+             fill, a 10px corner and cream ink, which is ten compare lines from one primitive
+             decision. It is not re-inked in place here: `tone="tag"` ships to other screens. -->
         {#each entry?.defaults?.tags ?? [] as tag (tag)}
           <Chip tone="tag" data-world-component-global-tag={tag}>{tag}</Chip>
         {:else}
