@@ -447,6 +447,24 @@ test('a block’s own status is the weakest of the names it declares', () => {
   }
 });
 
+/**
+ * The ordering itself, over inputs the corpus does not contain.
+ *
+ * `divergent` has no live instance — no block and no member row declares it — so the property above
+ * ranks it against nothing: delete that branch from {@link weakest} and every corpus block still
+ * agrees with what is left. The rule is a rule about three values, and the third is exactly the one
+ * a maintainer reaches for under pressure, so it is pinned here rather than left to a future entry
+ * to discover.
+ */
+test('the roll-up ranks all three values, including the one no entry declares today', () => {
+  assert.equal(weakest(['shipped', 'divergent']), 'divergent');
+  assert.equal(weakest(['divergent', 'target']), 'divergent');
+  assert.equal(weakest(['target', 'shipped', 'divergent']), 'divergent');
+  assert.equal(weakest(['shipped', 'target']), 'target');
+  assert.equal(weakest(['shipped', 'shipped']), 'shipped');
+  assert.equal(weakest(['shipped']), 'shipped');
+});
+
 test('every shipped-member row carries the status its specimen declares', () => {
   // The domain is the MEMBER table alone, never `MANIFEST_ROWS`. That constant also spreads
   // `NOT_A_PRIMITIVE`, whose rows record non-membership rather than a member's fidelity and carry
