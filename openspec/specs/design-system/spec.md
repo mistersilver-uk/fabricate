@@ -118,17 +118,29 @@ Choosing an existing app root, or a second ancestor picked for reach, is the sam
 
 Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
 A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
+An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .manager-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
+The boundary matters as much as the rule.
+An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
 
 How many namespace roots a primitive needs is a property of its PORTAL SHAPE rather than a count to copy.
 A component that portals a panel out of its own root needs one class on each, because those two nodes end up in different subtrees; a component that portals nothing, or whose root element IS the panel it portals, needs one.
 Where two components render one class family between them, the family's roots are the union of theirs, and a class both of them paint is written at both roots.
 
 Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+The three most-imported controls satisfy it too: `ManagerButton` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
+None of the three portals anything, so each needs one root, and each writes it on the element that already carries the family class — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
+It reads a composed class list as well as a written one, because a primitive that builds its classes in `<script>` writes no `class="…"` attribute at all and a markup-only extractor would report such a family clean while measuring nothing.
 
 A re-rooted family is a CAPABILITY until a caller outside the original application uses it, and a capability nothing exercises is a claim rather than a fact.
 `SearchablePopover` has such a caller: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which makes the player window the second application the family paints in and this requirement satisfied by a shipped surface rather than by a fixture.
 The picker is therefore held to the geometry as well as the markup — its panel is portalled onto the player window's application frame and MUST land at its trigger there — because the rendered DOM is identical whether the portal lands or not, so no DOM assertion can tell a placed panel from a misplaced one.
+
+The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
+A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
+`ManagerButton` is the only pure capability of the three: all 58 of its importers are under `src/ui/svelte/apps/manager/`, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
+`Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
+A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
@@ -137,6 +149,16 @@ Its markup cannot appear outside that area, so the ancestor is free, and unscopi
 The rule governs SELECTOR ROOTING and does not reach a bare-element baseline an area declares for itself.
 A shared primitive nonetheless MUST NOT depend on one, for the same reason it must not read an area-scoped property: `.fabricate-manager input:not([type])` themes every free-text control in the manager, and a primitive relying on it renders Foundry's default chrome everywhere else.
 Such a primitive declares that chrome on its own rule instead.
+
+The two re-rooted button families do exactly that. `.fabricate-manager button, .fabricate-manager input, .fabricate-manager select, .fabricate-manager textarea { font: inherit }` has no player-app counterpart, so a button rooted at its own class and rendered outside the manager would fall to Foundry's default button font; the families therefore declare `font: inherit` on their own shared base rule.
+WHERE it is declared is part of the requirement rather than a formatting choice: `font` is a shorthand that resets `line-height` to `normal` when it is not given one, and the same block declares `line-height: 1`, so the shorthand is written FIRST and a version written below the line-height would silently delete it in both applications.
+`box-sizing` needed nothing, because that same rule already declared it.
+
+The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
+The two area rings are bare-element selectors an area declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders outside either area — a control that is styled and unfocusable-looking, which is worse than one that is neither.
+`ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
+Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
+A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
 
 #### Scenario: A primitive is adopted by a second application
 
