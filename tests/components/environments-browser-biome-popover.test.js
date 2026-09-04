@@ -120,10 +120,10 @@ async function mountSettingsTab() {
 }
 
 // Stubs the trigger's rect (the popover-positioning math reads it) and marks the
-// mounted root as the manager shell so `getBiomeColorPopoverHost`'s
-// `.closest('.fabricate-manager')` lookup resolves. WITHOUT this the portal action
-// no-ops (see src/ui/svelte/actions/portal.js) and the popover never leaves the
-// trigger's own DOM subtree — which would silently defeat the regression this suite
+// mounted root as the manager shell so `resolveOverlayHost` — which `anchoredPopover`
+// calls on the view's behalf since issue 1500 converted this seventh hand-written copy
+// — walks up to a host. WITHOUT this the portal no-ops and the popover never leaves the
+// trigger's own DOM subtree, which would silently defeat the regression this suite
 // exists to catch, since the real bug only exists once the popover is portaled away
 // from the trigger.
 function stageManagerShell(target) {
@@ -140,10 +140,10 @@ function stageManagerShell(target) {
   return trigger;
 }
 
-// Opening the popover also runs the position-tracking effect, which registers
-// `window` resize/scroll listeners (unrelated to the dismissal bug this suite
-// covers). That effect pass is scheduled a tick after the state change, so a
-// single synchronous `flushSync()` is not enough to settle it.
+// Opening the popover also runs the effect that applies `anchoredPopover`, which portals
+// the panel and registers `window` resize / capture-`scroll` listeners (unrelated to the
+// dismissal bug this suite covers). That effect pass is scheduled a tick after the state
+// change, so a single synchronous `flushSync()` is not enough to settle it.
 async function openBiomePopover(trigger) {
   trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   flushSync();

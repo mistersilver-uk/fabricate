@@ -20,7 +20,6 @@
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     MANAGER_COLOR_TOKENS,
@@ -71,8 +70,12 @@
     onChange = () => {},
     onDismiss = () => {},
     manageDismiss = true,
-    popoverStyle = '',
-    portalTarget = null,
+    // The node the CALLER positions. This panel neither measures nor portals itself: a caller
+    // that opens it as a popover applies the shared `anchoredPopover` action to the registered
+    // node, and that action writes the node's inline `style` and moves it into the resolved
+    // host. That is why there is no `popoverStyle` and no `portalTarget` prop here — a `style`
+    // binding on this element would fight the action for the same attribute, and the portal
+    // target is the action's own answer rather than a value to hand it.
     registerPopoverNode = () => {},
   } = $props();
 
@@ -132,9 +135,7 @@
   class:is-inline={layout === 'inline'}
   data-manager-color-picker-popover
   data-manager-color-layout={layout === 'inline' ? 'inline' : undefined}
-  style={popoverStyle}
   use:dismissOnOutsideClick={{ enabled: manageDismiss, onDismiss }}
-  use:portal={portalTarget}
 >
   <span class="manager-color-preset-grid" aria-label={presetGridLabel}>
     {#if showNoColour}

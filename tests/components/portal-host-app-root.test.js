@@ -35,14 +35,19 @@
  *      `classes` arrays and the root element each one's Svelte root component renders — not from
  *      a list here. A list would rot the moment an application is added.
  *   2. The portal population is read out of the corpus: every file that imports the portal action
- *      or hands a portal target to one that does.
+ *      or the anchored-popover action, hands a portal target to one that does, or owns the
+ *      clipping selectors they pass. Read from CODE — the corpus is scanned with its comments
+ *      blanked, so prose about a portal never joins a population this gate floors.
  *   3. The SELECTOR EXTRACTOR is floored on the calls it finds, not on the offences. After the
  *      fix there are no offending calls at all, so a pattern that quietly stopped matching would
  *      report a clean tree. The floor is on the host lookups those files still legitimately make,
- *      which proves the scanner is still reading. Issue 1500 took most of them out of this
- *      population — the three `closest()` clipping walks became a `bounds` value resolved inside
- *      `actions/anchoredPopover.js` from a selector it is handed — so the two that remain are
- *      named individually below rather than merely counted.
+ *      which proves the scanner is still reading. Issue 1500 took ALL FOUR `closest()` clipping
+ *      walks out of the components: each became a `bounds` VALUE — a selector string the action
+ *      is handed and calls `closest()` with — and those values are exported constants in
+ *      `util/overlayBounds.js`. A reader that only knew how to find `.closest('…')` would
+ *      therefore have gone blind at exactly the moment the selectors moved, and the offence
+ *      clause below would have been policing an empty set. So the extractor reads BOTH shapes,
+ *      the bounds module is in the population, and the floor names one selector of each kind.
  *   4. The detector is proved to fire on a synthetic offender and not to fire on a shipped
  *      selector, so a predicate rewritten to match everything or nothing reds here rather than
  *      greening the assertion below.
@@ -64,11 +69,23 @@ const RESOLVER_FUNCTION = 'resolveOverlayHost';
 const ANCHORED_POPOVER = 'src/ui/svelte/actions/anchoredPopover.js';
 const PORTAL_ACTION = 'actions/portal.js';
 /**
- * The THIRD portal route (issue 1500). Five overlays no longer name `portal.js` at all: they
- * `use:anchoredPopover`, which resolves the host and portals on their behalf. Without this the
+ * The THIRD portal route (issue 1500). Six overlays no longer name `portal.js` at all: they
+ * reach `anchoredPopover`, which resolves the host and portals on their behalf. Without this the
  * population would silently shed them and this gate would guard the two that stayed behind.
  */
 const ANCHORED_POPOVER_ACTION = 'actions/anchoredPopover.js';
+/**
+ * The module that now HOLDS the clipping selectors (issue 1500), and the reason it is scanned.
+ *
+ * The four `closest()` walks this gate used to read inside the components are gone: a component
+ * passes `bounds`, and the shipped boundaries are string constants here. The strings are the same
+ * strings — `.manager-main` and friends — and a `.fabricate-manager` written into one of them
+ * would couple every caller of that constant to one application, which is this gate's whole
+ * subject in the spelling the refactor gave it. It is in the population by its own PATH rather
+ * than by an import, because it is the file the selectors live in.
+ */
+const OVERLAY_BOUNDS = 'src/ui/svelte/util/overlayBounds.js';
+const OVERLAY_BOUNDS_MODULE = 'util/overlayBounds.js';
 
 const byName = (a, b) => a.localeCompare(b);
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -111,22 +128,30 @@ function applicationRootClasses() {
 }
 
 /**
- * Every `src/ui` file that portals something, or hands a portal target to a file that does.
+ * Every `src/ui` file that portals something, hands a portal target to a file that does, or owns
+ * the clipping selectors those files pass.
  *
  * Membership is what makes a hard-coded root an OFFENCE rather than a legitimate lookup: the
  * manager's own root component queries `.fabricate-manager` to rescue focus into its live region,
  * which is a component naming ITS OWN root and is nobody else's business. The same string in a
  * portal host is the defect.
  *
- * @param {Record<string, string>} corpus Working-tree sources.
+ * READ FROM CODE, NOT FROM PROSE. The sources handed in have their comments blanked, so a file
+ * that merely mentions `actions/portal.js` in a docblock — `ManagerColorPopover` says why it no
+ * longer has a portal prop — does not join a population whose floor is an anti-vacuity claim
+ * about how much real code this gate is reading.
+ *
+ * @param {Record<string, string>} sources Working-tree sources with comments blanked.
  * @returns {string[]} Sorted file paths.
  */
-function portalingFiles(corpus) {
-  return Object.entries(corpus)
+function portalingFiles(sources) {
+  return Object.entries(sources)
     .filter(
-      ([, text]) =>
+      ([file, text]) =>
+        file === OVERLAY_BOUNDS ||
         text.includes(PORTAL_ACTION) ||
         text.includes(ANCHORED_POPOVER_ACTION) ||
+        text.includes(OVERLAY_BOUNDS_MODULE) ||
         text.includes('portalTarget')
     )
     .map(([file]) => file)
@@ -152,6 +177,35 @@ function selectorLookups(text) {
     match = pattern.exec(text);
   }
   return found;
+}
+
+/**
+ * Every selector string the bounds module publishes as a clipping boundary.
+ *
+ * The SECOND shape a host or boundary selector takes since issue 1500. `selectorLookups` reads a
+ * call; this reads a VALUE, because the four `closest()` calls it used to find were replaced by
+ * constants handed to the action. Both feed the same offence clause, so moving a selector out of
+ * a call and into a constant does not move it out of this gate's sight.
+ *
+ * @param {string} text Source with comments already blanked.
+ * @returns {Array<{call: string, selector: string}>}
+ */
+function boundsSelectors(text) {
+  return [...text.matchAll(/const\s+\w*SELECTOR\w*\s*=\s*(['"])([^'"]*)\1/g)].map((match) => ({
+    call: 'bounds',
+    selector: match[2],
+  }));
+}
+
+/**
+ * Every selector this file states, in whichever of the two shapes it states it.
+ *
+ * @param {string} file The file's repo-relative path.
+ * @param {string} text Source with comments already blanked.
+ * @returns {Array<{call: string, selector: string}>}
+ */
+function hostLookups(file, text) {
+  return [...selectorLookups(text), ...(file === OVERLAY_BOUNDS ? boundsSelectors(text) : [])];
 }
 
 /** The class names a selector string mentions. */
@@ -201,15 +255,19 @@ test('the application-root vocabulary is derived from the applications themselve
 });
 
 test('the portal population is the set of components that actually portal', () => {
-  const files = portalingFiles(corpus);
+  const files = portalingFiles(stripped);
 
   for (const anchor of [
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    // Reached through the `portalTarget` PROP rather than the action, which is the second route
-    // into this population and the one a membership test written around imports alone would miss.
+    // A SCREEN REGION rather than a shared component, and the seventh copy of the positioning
+    // pass — converted at issue 1500 after the other six, because nobody had thought to grep
+    // `apps/manager/` for one. It is in this population for the same reason the components are.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+    // The selectors themselves, which is the shape the clipping boundary took when it left the
+    // components. Without this file the offence clause reads no boundary selector at all.
+    'src/ui/svelte/util/overlayBounds.js',
   ]) {
     assert.ok(
       files.includes(anchor),
@@ -221,8 +279,9 @@ test('the portal population is the set of components that actually portal', () =
   assert.ok(
     files.length >= 9,
     `only ${files.length} files were detected as portaling. Nine do since issue 1500 re-keyed ` +
-      'five of them onto the anchored-popover action; a lower number means the membership test ' +
-      'has narrowed and this gate is guarding a subset.'
+      'six of them onto the anchored-popover action, moved the clipping selectors into their own ' +
+      'module and left `ManagerColorPopover` a plain panel its caller positions; a lower number ' +
+      'means the membership test has narrowed and this gate is guarding a subset.'
   );
 });
 
@@ -231,14 +290,14 @@ test('the selector extractor still finds the host lookups it reads', () => {
   // assertion here passes trivially — including one whose pattern has stopped matching anything
   // at all. What proves the scanner is alive is the lookups these files legitimately still make:
   // the horizontal-bounds walks (`closest('.admin-main, .manager-main, …')`) and friends.
-  const files = portalingFiles(corpus);
-  const lookups = files.flatMap((file) => selectorLookups(stripped[file]));
+  const files = portalingFiles(stripped);
+  const lookups = files.flatMap((file) => hostLookups(file, stripped[file]));
 
-  // NAMED, not merely counted. Two literal-selector lookups survive in this population after
-  // issue 1500, so a bare floor of two would be satisfied by two lookups of any kind — including
-  // two the extractor found by accident. These are the shipped pair: the biome picker's own
-  // clipping walk, which is the LAST `closest()` here and the one the clause below reads, and the
-  // icon picker's row measurement.
+  // NAMED, not merely counted. Four selectors survive in this population after issue 1500, so a
+  // bare floor of four would be satisfied by four of any kind — including four the extractor
+  // found by accident. These are one of each SHAPE: `.manager-main` is the biome picker's old
+  // clipping walk in the form it now takes, `MANAGER_MAIN_SELECTOR` in the bounds module, and
+  // `.essence-icon-picker-option` is the icon picker's row measurement, still a live call.
   for (const anchor of ['.manager-main', '.essence-icon-picker-option']) {
     assert.ok(
       lookups.some((lookup) => lookup.selector === anchor),
@@ -249,16 +308,23 @@ test('the selector extractor still finds the host lookups it reads', () => {
   }
 
   assert.ok(
-    lookups.length >= 2,
-    `the extractor found only ${lookups.length} selector lookups across ${files.length} portaling ` +
-      'files. Two ship; a number this low means the pattern no longer matches the code.'
+    lookups.length >= 4,
+    `the extractor found only ${lookups.length} selectors across ${files.length} portaling ` +
+      'files. Four ship; a number this low means the pattern no longer matches the code.'
   );
 
-  assert.ok(
-    lookups.some((lookup) => lookup.call === 'closest'),
-    'no `closest(...)` lookup was found in any portaling file, which is the exact call shape the ' +
-      'defect took. The extractor is not reading what it claims to.'
-  );
+  // BOTH READERS ARE ALIVE. The defect was written as `closest('.fabricate-manager')`, and the
+  // refactor turned every clipping `closest()` in this population into a constant the action
+  // calls `closest()` with — so a gate that could only read one of the two shapes would be half
+  // blind, and which half would depend on where the next author put the string.
+  for (const shape of ['querySelector', 'bounds']) {
+    assert.ok(
+      lookups.some((lookup) => lookup.call === shape),
+      `no \`${shape}\` selector was found in any portaling file. Both shapes ship — a DOM lookup ` +
+        'in a component and a boundary constant in `util/overlayBounds.js` — so the extractor is ' +
+        'not reading what it claims to.'
+    );
+  }
 });
 
 test('the application-root detector fires', () => {
@@ -287,9 +353,9 @@ test('no component hard-codes an application root as a portal host', () => {
   const roots = applicationRootClasses();
   const offenders = [];
 
-  for (const file of portalingFiles(corpus)) {
+  for (const file of portalingFiles(stripped)) {
     if (file === RESOLVER) continue;
-    for (const { call, selector } of selectorLookups(stripped[file])) {
+    for (const { call, selector } of hostLookups(file, stripped[file])) {
       const named = applicationRootsNamedBy(selector, roots);
       if (named.length > 0) offenders.push(`${file}: .${call}('${selector}') names ${named.join(', ')}`);
     }
@@ -345,8 +411,8 @@ test('every portal target is resolved through the shared resolver or handed in b
 
   assert.ok(
     targets.length >= 7,
-    `only ${targets.length} portaled overlays were found across the corpus. Eight ship — two ` +
-      'through `use:portal` and six through the anchored-popover action; a lower number means ' +
+    `only ${targets.length} portaled overlays were found across the corpus. Eight ship — one ` +
+      'through `use:portal` and seven through the anchored-popover action; a lower number means ' +
       'this clause is confirming adoption across a set that has gone empty.'
   );
 

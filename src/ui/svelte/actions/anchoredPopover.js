@@ -1,8 +1,8 @@
 /**
- * ONE anchored-popover action, and the six copies it replaces (issue 1500).
+ * ONE anchored-popover action, and the seven copies it replaces (issue 1500).
  *
  * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────────────────────
- * Six components each carried the same positioning pass, hand-written:
+ * Seven surfaces each carried the same positioning pass, hand-written:
  *
  *   function updatePopoverPosition() {
  *     if (!open || !triggerButton || typeof window === 'undefined') return;
@@ -15,10 +15,15 @@
  * plus, in every one of them, a `$effect` that called it once, added `resize` on `window` and a
  * CAPTURE-phase `scroll` on `document`, and removed both on teardown. The bodies agreed on the
  * hard parts — the host is the coordinate origin, the vertical branch writes `top: auto` when it
- * flips — and disagreed on the incidental ones, which is the shape a copy always takes: three of
+ * flips — and disagreed on the incidental ones, which is the shape a copy always takes: four of
  * them clipped with `closest()`, one walked `parentElement`, one filtered scrolls that started
  * inside the panel, one guarded `typeof window.addEventListener !== 'function'` and the others
  * did not.
+ *
+ * Six were shared components. The seventh was a screen region — the environments browser's biome
+ * colour picker — and it is the reason this header says seven rather than six: it was found by
+ * review AFTER the six converted, in the one directory nobody had thought to grep, which is the
+ * ordinary way a family like this is undercounted.
  *
  * A copy is not a defect until it drifts, and this family had already drifted in the direction
  * that matters: `src/ui/svelte/util/overlayHost.js` records six copies of the HOST lookup going
@@ -51,7 +56,7 @@ import { portal } from './portal.js';
 /**
  * The inset a clipping boundary keeps from the panel, in CSS pixels.
  *
- * 16, because that is what all six copies used and what `computeIconPickerPopoverLayout`'s own
+ * 16, because that is what all seven copies used and what `computeIconPickerPopoverLayout`'s own
  * `viewportMargin` defaults to. It is the popover family's margin rather than any one app's, so
  * it belongs here while the SELECTOR that finds the boundary does not.
  */
@@ -62,8 +67,8 @@ const BOUNDS_INSET = 16;
  *
  * The picker layout takes a HOST-RELATIVE trigger box and a `{ width, height }` viewport, while
  * the action hands its `layout` raw viewport rects plus the host's own box — the shape the menu
- * layout wants. Five of the six callers need exactly the same translation between the two, so it
- * is written once here rather than five times as an inline arrow.
+ * layout wants. Six of the seven callers need exactly the same translation between the two, so it
+ * is written once here rather than six times as an inline arrow.
  *
  * It imports nothing: the caller supplies `compute`, so this module still pulls no layout module
  * into anyone's dependency closure.
