@@ -113,9 +113,10 @@ export const SCANNED_SPACING_PROPERTIES = Object.freeze([
 
 /**
  * The prefix every published spacing token carries — `--fab-space-1` through `--fab-space-6`,
- * `--fab-space-2xs`, `--fab-space-chip`, and the five semantic aliases.
+ * `--fab-space-2xs` and `--fab-space-chip`. Five semantic aliases stood beside them and were
+ * deleted for having no readers anywhere in `styles/` or `src/` (issue 1499).
  *
- * A prefix rather than a list of thirteen names, because the spec's rule is about deriving from
+ * A prefix rather than a list of eight names, because the spec's rule is about deriving from
  * the SCALE and a scale that gains a step should not need this file edited to keep the gate
  * honest. The narrower reading would be the more dangerous one here: a token the list forgot
  * would resolve, its pixel value would be manufactured, and every call site of it would arrive
