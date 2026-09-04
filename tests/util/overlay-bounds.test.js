@@ -42,12 +42,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { repoRoot } from '../helpers/sourceScan.js';
 import {
   MANAGER_MAIN_SELECTOR,
   MANAGER_SCROLLER_SELECTOR,
   PICKER_SCROLLER_SELECTOR,
 } from '../../src/ui/svelte/util/overlayBounds.js';
+import { repoRoot } from '../helpers/sourceScan.js';
 
 /**
  * The three shipped boundaries, each with the components that are clipped by it.

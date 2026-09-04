@@ -1020,11 +1020,16 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * `RECIPE_BULK_EDIT_MATCHES` and none of them opens a panel, so putting the seam in there would
  * publish four frames that cannot show a regression in it.
  *
- * TWO POSITIONED PANELS ARE IN NO FRAME AT ALL, and neither gap is this array's to close. No case
- * opens `EssenceSourceSelector`'s panel, and no case can open the biome colour popover in
- * `EnvironmentsBrowserView` — its trigger is a right-click, and the capture runner has no
- * right-click verb (`scripts/view-lab-screenshots.mjs`: `press` is Enter or Space). Adding a
- * pattern for either would be configuration that selects nothing; the frames have to exist first.
+ * FOUR POSITIONED PANELS ARE IN NO FRAME AT ALL, and none of those gaps is this array's to close.
+ * No case opens `EssenceSourceSelector`'s panel, `ManagerColorPicker`'s popover, or
+ * `RecipeDurationEditor`'s — their triggers (`.essence-source-trigger`,
+ * `.manager-color-picker-trigger`, `[data-recipe-duration-trigger]`) appear in no case's steps,
+ * and the one colour control a case does click is the essence entry's `layout="inline"`
+ * `ManagerColorPopover`, which is neither positioned nor portaled. And no case CAN open the biome
+ * colour popover in `EnvironmentsBrowserView` — its trigger is a right-click, and the capture
+ * runner has no right-click verb (`scripts/view-lab-screenshots.mjs`: `press` is Enter or Space).
+ * Adding a pattern for any of them would be configuration that selects nothing; the frames have to
+ * exist first.
  */
 const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,

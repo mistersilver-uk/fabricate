@@ -128,11 +128,13 @@ async function mountSettingsTab() {
 // from the trigger.
 //
 // THE `.manager-main` RECT IS THE SECOND STUB, and it is what makes the panel take a
-// position at all rather than merely a parent. `bounds` is the biome picker's clipping
-// walk — `ancestorScrollerBounds('.manager-main')` — and happy-dom gives every element a
-// zero rect, so an unstubbed column is skipped as unusable and the layout falls back to
-// the host's own width, which is also zero. `computeIconPickerPopoverLayout` returns null
-// for a zero-width viewport and the action then CLEARS the style, so the panel renders
+// position at all rather than merely a parent. `bounds` here is the SELECTOR STRING
+// `MANAGER_MAIN_SELECTOR`, which the action resolves with `anchor.closest('.manager-main')`
+// (`anchoredPopover.js:185-190`) — not with `ancestorScrollerBounds`, whose skip-the-zero-
+// sized-candidate walk belongs to the callers that pass a resolver (`overlayBounds.js:65-72`).
+// happy-dom gives every element a zero rect and the string branch KEEPS it: minLeft becomes 16
+// and maxRight −16, a zero-width band that `computeIconPickerPopoverLayout` answers `null` for
+// (`iconPickerPopover.js:77-78`), and the action then CLEARS the style, so the panel renders
 // with `style=""` and a positioning regression is invisible. These numbers are a manager
 // column inset 60px from the left of a 1280px window: they are arbitrary, but they must
 // be non-degenerate for the arithmetic below to have an answer.
