@@ -47,6 +47,21 @@ const TAGS = [
   { id: 'cloth', label: 'Cloth', icon: 'fas fa-tag' },
 ];
 
+/**
+ * Four labels chosen so a typed prefix can be wrong in every way that matters (issue 1504).
+ *
+ * TWO begin with `P`, so a repeated character has somewhere to cycle to and a two-character
+ * prefix has something to refine towards; `Routed by check` carries a SPACE, which is the one
+ * printable character the trigger's own keyboard contract already spends; and no label begins
+ * with `z`, which is the no-match branch.
+ */
+const TIERS = [
+  { id: 'simple', label: 'Simple' },
+  { id: 'routed', label: 'Routed by check' },
+  { id: 'progressive', label: 'Progressive' },
+  { id: 'preview', label: 'Preview only' },
+];
+
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-keyboard-',
@@ -135,6 +150,26 @@ function search(panel, term) {
   field.dispatchEvent(new window.Event('input', { bubbles: true }));
   flushSync();
   return field;
+}
+
+/**
+ * Press a key AT A STATED CLOCK (issue 1504).
+ *
+ * The type-ahead's buffer expires after ~500ms of inactivity, and `util/listboxNavigation.js`
+ * reads that clock through `Date.now()` when its caller states none — which this component
+ * deliberately does not, so the picker has no timer to leak. Stating it here is what makes the
+ * window observable in BOTH directions: a real wait could prove the reset but never prove that a
+ * keystroke INSIDE the window extends rather than restarts, because a slow machine between two
+ * synchronous dispatches would look identical to the defect.
+ */
+function pressKeyAt(key, at) {
+  const realNow = Date.now;
+  Date.now = () => at;
+  try {
+    return pressKey(key);
+  } finally {
+    Date.now = realNow;
+  }
 }
 
 /** Type a query and then PUT THE CARET SOMEWHERE, which is the whole subject of the caret clauses. */
@@ -315,8 +350,15 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         ['Iron', 'Silver', 'Gold'],
         'the panel is still open over an entirely different list'
       );
-      assert.deepEqual(markedRows(replaced).map((row) => row.id), [], 'and nothing in it is active');
-      assert.equal(activeDescendant(replaced.querySelector('.manager-travel-popover-search input')), null);
+      assert.deepEqual(
+        markedRows(replaced).map((row) => row.id),
+        [],
+        'and nothing in it is active'
+      );
+      assert.equal(
+        activeDescendant(replaced.querySelector('.manager-travel-popover-search input')),
+        null
+      );
       harness.remount();
     });
 
@@ -570,6 +612,271 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
+  // ── THE TYPE-AHEAD (issue 1504) ───────────────────────────────────────────────────────────
+  //
+  // A native `<select>` jumps to the option a typed character names, and a GM who tabs to a page
+  // size control and types `2` today gets 25 rows. The arithmetic is proved against the pure
+  // module in `tests/util/listbox-navigation.test.js`; what only a mount can show is the WIRING,
+  // and the CLOSED trigger is the primary case because it is the branch nobody has written: the
+  // trigger had no key handling at all before issue 1503 routed keys to it.
+  describe('the type-ahead, whose primary case is a CLOSED trigger', () => {
+    /** The search-suppressed shape, focused, with the panel shut — the state a GM tabs into. */
+    async function mountClosedTrigger() {
+      chosen.length = 0;
+      await mountPicker({ options: TIERS, showSearch: false, triggerHasPopup: 'listbox' });
+      trigger().focus();
+      return trigger();
+    }
+
+    /** The label of the row the holder is currently announcing, or null. */
+    function announcedLabel(holder) {
+      const id = activeDescendant(holder);
+      if (!id) return null;
+      return harness.target
+        .querySelector(`[id="${id}"]`)
+        ?.textContent.replaceAll(/\s+/g, ' ')
+        .trim();
+    }
+
+    it('OPENS the panel with the typed match as the active option', async () => {
+      const button = await mountClosedTrigger();
+      assert.equal(button.getAttribute('aria-expanded'), 'false', 'the panel starts shut');
+
+      const typed = pressKeyAt('p', 1000);
+      await settle();
+
+      assert.ok(typed.defaultPrevented, 'the type-ahead consumed the character');
+      assert.equal(button.getAttribute('aria-expanded'), 'true', 'the panel is open');
+      assert.ok(
+        Boolean(harness.target.querySelector('.fabricate-picker-popover')),
+        'and the panel is really rendered, not merely announced as expanded'
+      );
+      assert.equal(
+        announcedLabel(button),
+        'Progressive',
+        'the WAI-ARIA select-only behaviour: the match becomes the ACTIVE option, not the value'
+      );
+      assert.deepEqual(chosen, [], 'a typed character selects NOTHING on its own');
+      harness.remount();
+    });
+
+    it('leaves a closed panel SHUT when the prefix matches nothing', async () => {
+      const button = await mountClosedTrigger();
+
+      const typed = pressKeyAt('z', 1000);
+      await settle();
+
+      assert.ok(typed.defaultPrevented, 'the key is still the listbox`s rather than the page`s');
+      assert.equal(button.getAttribute('aria-expanded'), 'false');
+      assert.ok(
+        !harness.target.querySelector('.fabricate-picker-popover'),
+        'a mistyped character is not a state change: no panel opens'
+      );
+      assert.equal(activeDescendant(button), null, 'and nothing is announced as active');
+      assert.deepEqual(chosen, []);
+      harness.remount();
+    });
+
+    it('COMMITS NOTHING when the GM dismisses the panel they typed open', async () => {
+      // THE ACTIVE OPTION IS NOT THE VALUE. Escape, an outside click and focus leaving the
+      // trigger all close through the primitive's own `close()`, which calls no `onChoose` — so
+      // a type-ahead followed by any of them leaves the value exactly as it was. A model that
+      // committed the active option on dismissal would fire `onChoose('progressive')` here.
+      const button = await mountClosedTrigger();
+      pressKeyAt('p', 1000);
+      await settle();
+      assert.equal(announcedLabel(button), 'Progressive', 'the panel is open on the match');
+
+      pressKey('Escape');
+      await settle();
+      assert.ok(
+        !harness.target.querySelector('.fabricate-picker-popover'),
+        'Escape closes the panel it typed open'
+      );
+      assert.deepEqual(chosen, [], 'and nothing was chosen on the way out');
+      assert.equal(document.activeElement, trigger(), 'focus returns to the trigger');
+
+      // The outside click, which dismisses through the same path.
+      pressKeyAt('p', 2000);
+      await settle();
+      document.body.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
+      flushSync();
+      await settle();
+      assert.ok(
+        !harness.target.querySelector('.fabricate-picker-popover'),
+        'an outside click closes it too'
+      );
+      assert.deepEqual(chosen, [], 'and still commits nothing');
+      harness.remount();
+    });
+
+    it('COMMITS on Enter, which is the only thing that moves the value', async () => {
+      const button = await mountClosedTrigger();
+      pressKeyAt('p', 1000);
+      await settle();
+      assert.equal(announcedLabel(button), 'Progressive');
+
+      pressKey('Enter');
+      await settle();
+      assert.deepEqual(
+        chosen,
+        ['progressive'],
+        'Enter is what turns an active option into a value'
+      );
+      harness.remount();
+    });
+
+    it('REFINES on a second character and CYCLES on a repeated one', async () => {
+      const button = await mountClosedTrigger();
+
+      pressKeyAt('p', 1000);
+      await settle();
+      assert.equal(announcedLabel(button), 'Progressive', '`p` reaches the first P');
+
+      pressKeyAt('r', 1200);
+      pressKeyAt('e', 1300);
+      assert.equal(
+        announcedLabel(button),
+        'Preview only',
+        '`pre` REFINES: a prefix of two different characters is a search, not a walk'
+      );
+
+      // Past the window, so the buffer starts over and the same character cycles instead.
+      pressKeyAt('p', 2000);
+      assert.equal(
+        announcedLabel(button),
+        'Progressive',
+        'a fresh `p` walks to the next P ROUND THE RING — from the last one that is the first'
+      );
+      pressKeyAt('p', 2200);
+      assert.equal(announcedLabel(button), 'Preview only', 'and on round it again');
+      assert.deepEqual(chosen, [], 'none of which chose anything');
+      harness.remount();
+    });
+
+    it('matches the rendered LABEL, case-insensitively, and skips a gated row', async () => {
+      chosen.length = 0;
+      await mountPicker({
+        options: [
+          { id: 'progressive', label: 'Progressive', disabled: true, disabledReason: 'Premium' },
+          { id: 'preview', label: 'Preview only' },
+        ],
+        showSearch: false,
+        triggerHasPopup: 'listbox',
+      });
+      const button = trigger();
+      button.focus();
+
+      pressKeyAt('P', 1000);
+      await settle();
+      assert.equal(
+        announcedLabel(button),
+        'Preview only',
+        'the capital matched, and the gated row — which would have matched first — was stepped ' +
+          'over rather than announced as a row Enter could not choose'
+      );
+      assert.equal(
+        optionRows(harness.target)[0].textContent.replaceAll(/\s+/g, ' ').trim(),
+        'Progressive Premium',
+        'the row it skipped is rendered, and states its reason beside its label'
+      );
+      harness.remount();
+    });
+
+    it('moves the ACTIVE OPTION ONLY while the panel is already open', async () => {
+      const button = await mountClosedTrigger();
+      const panel = await openPanel();
+      assert.equal(activeDescendant(button), null, 'a freshly opened panel has no cursor');
+
+      pressKeyAt('s', 1000);
+      assert.equal(announcedLabel(button), 'Simple', 'the prefix moved the cursor');
+      assert.equal(
+        document.activeElement,
+        button,
+        'and DOM focus is still on the holder, exactly as it is under the arrow keys'
+      );
+      assert.equal(
+        panel.querySelectorAll('[data-active-option="true"]').length,
+        1,
+        'exactly one row is marked'
+      );
+      assert.deepEqual(chosen, [], 'the value has not moved');
+      harness.remount();
+    });
+
+    it('does not let a prefix outlive the panel it was typed into', async () => {
+      // A GM who dismisses a panel and immediately types again is starting a new search, not
+      // continuing the one they just abandoned. The inactivity window would expire the prefix a
+      // half-second later anyway, which is exactly why this case types INSIDE it: `v` on its own
+      // names nothing, while a `pre` that survived the dismissal would make `prev` open the panel
+      // on Preview only.
+      const button = await mountClosedTrigger();
+      pressKeyAt('p', 1000);
+      pressKeyAt('r', 1050);
+      pressKeyAt('e', 1100);
+      await settle();
+      assert.equal(announcedLabel(button), 'Preview only', 'the prefix reached a row');
+
+      pressKey('Escape');
+      await settle();
+      pressKeyAt('v', 1200);
+      await settle();
+      assert.ok(
+        !harness.target.querySelector('.fabricate-picker-popover'),
+        'the panel stays shut, because the buffer went with the panel that was dismissed'
+      );
+      assert.deepEqual(chosen, []);
+      harness.remount();
+    });
+
+    it('leaves SPACE to the trigger until there is a prefix for it to continue', async () => {
+      // Space activates a focused `<button>`, which is how a keyboard user opens the panel. A
+      // type-ahead that swallowed it would take that away; one that never took it could not
+      // reach `Routed by check`.
+      const button = await mountClosedTrigger();
+
+      const bare = pressKeyAt(' ', 1000);
+      assert.ok(!bare.defaultPrevented, 'a bare Space is still the button`s own key');
+
+      pressKeyAt('r', 2000);
+      await settle();
+      assert.equal(announcedLabel(button), 'Routed by check');
+      const continued = pressKeyAt(' ', 2100);
+      assert.ok(
+        continued.defaultPrevented,
+        'inside a live prefix it is a character like any other'
+      );
+      assert.equal(announcedLabel(button), 'Routed by check', '`r ` still names the same row');
+      harness.remount();
+    });
+
+    it('is not armed at all where a query field is rendered', async () => {
+      // THE COMPATIBILITY CONTRACT. Seventeen shipped callers render a query field, and for them
+      // a printable character IS the query. The condition is `showSearch`, the same one that
+      // decides which element is the holder, so none of them can be reached by this branch.
+      chosen.length = 0;
+      await mountPicker({ options: TIERS });
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      const typed = pressKeyAt('p', 1000);
+      assert.ok(!typed.defaultPrevented, 'the character falls through to the field');
+      assert.equal(activeDescendant(holder), null, 'and moves no cursor');
+      assert.equal(document.activeElement, holder);
+      harness.remount();
+    });
+
+    it('does not read a MODIFIED character, which belongs to the shortcut it is part of', async () => {
+      const button = await mountClosedTrigger();
+      for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+        const typed = pressKey('p', { [modifier]: true });
+        assert.ok(!typed.defaultPrevented, `${modifier}+p is not a type-ahead`);
+        assert.equal(button.getAttribute('aria-expanded'), 'false', `${modifier}+p opens nothing`);
+      }
+      harness.remount();
+    });
+  });
+
   describe('the empty branch, where there is no list to point at', () => {
     it('names neither a list nor a row, because the listbox element does not render', async () => {
       await mountPicker({ options: [] });
@@ -634,7 +941,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       searchWithCaret(panel, 'o', 1);
 
       const pressed = pressKey('End');
-      assert.ok(pressed.defaultPrevented, 'there is nowhere for the caret to go, so the list has it');
+      assert.ok(
+        pressed.defaultPrevented,
+        'there is nowhere for the caret to go, so the list has it'
+      );
       assert.equal(
         activeDescendant(holder),
         optionRows(panel)[1].id,
@@ -659,7 +969,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         null,
         'and the cursor does not move either, or the key would do two things at once'
       );
-      assert.deepEqual(markedRows(panel).map((row) => row.id), []);
+      assert.deepEqual(
+        markedRows(panel).map((row) => row.id),
+        []
+      );
       harness.remount();
     });
 
@@ -670,12 +983,18 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
 
       searchWithCaret(panel, 'o', 1);
       const left = pressKey('Home');
-      assert.ok(!left.defaultPrevented, 'there is text to the caret`s left, so Home is the field`s');
+      assert.ok(
+        !left.defaultPrevented,
+        'there is text to the caret`s left, so Home is the field`s'
+      );
       assert.equal(activeDescendant(holder), null);
 
       searchWithCaret(panel, 'o', 0);
       const taken = pressKey('Home');
-      assert.ok(taken.defaultPrevented, 'at the start of the query the caret cannot move, so the list has it');
+      assert.ok(
+        taken.defaultPrevented,
+        'at the start of the query the caret cannot move, so the list has it'
+      );
       assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
       harness.remount();
     });
@@ -730,7 +1049,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       // A `<button>` has no `selectionStart` at all, so the boundary predicate is false for it by
       // construction and the five search-suppressed call sites keep exactly today's key map.
       const pressed = pressKey('End');
-      assert.ok(pressed.defaultPrevented, 'End on a trigger holder is the list`s, as it always was');
+      assert.ok(
+        pressed.defaultPrevented,
+        'End on a trigger holder is the list`s, as it always was'
+      );
       assert.equal(activeDescendant(button), rows[2].id);
       assert.ok(pressKey('Home').defaultPrevented);
       assert.equal(activeDescendant(button), rows[0].id);
@@ -784,8 +1106,15 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const holder = panel.querySelector('.manager-travel-popover-search input');
 
       searchWithCaret(panel, 'o', 0);
-      assert.ok(pressKey('ArrowLeft').defaultPrevented, 'at the start of the query the grid has it');
-      assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'ArrowLeft from the sentinel lands on the END of the flat order');
+      assert.ok(
+        pressKey('ArrowLeft').defaultPrevented,
+        'at the start of the query the grid has it'
+      );
+      assert.equal(
+        activeDescendant(holder),
+        optionRows(panel)[1].id,
+        'ArrowLeft from the sentinel lands on the END of the flat order'
+      );
 
       searchWithCaret(panel, 'o', 1);
       const kept = pressKey('ArrowLeft');

@@ -390,7 +390,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, nextActiveIndex } from '../util/listboxNavigation.js';
+  import { activeOptionId, nextActiveIndex, typeAheadCursor } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -519,6 +519,11 @@
   // cursor cannot outlive that list and the expiry must be a READ. See `optionListGeneration`
   // below for what a generation is and why the reset cannot be an `$effect`.
   let cursor = $state({ generation: '', index: -1 });
+  // THE TYPE-AHEAD'S PREFIX (issue 1504), held beside the cursor it moves and owned per instance
+  // for the same reason the cursor is: two pickers on one screen must not continue each other's
+  // prefix. `util/listboxNavigation.js` holds none of this — it returns the new buffer and this
+  // stores it — so there is nothing module-level to leak between components or between opens.
+  let typeAheadBuffer = $state(null);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let optionsList = $state(null);
@@ -576,10 +581,13 @@
   const renderedOptions = $derived(
     isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
   );
-  // WHAT THE CURSOR SKIPS (issue 1504), over the FLAT rendered order because that is the order
-  // `util/listboxNavigation.js` indexes. It is a FUNCTION rather than a derived array so the
-  // module stays off the option shape: a caller whose rows spell availability differently answers
-  // the same question here.
+  // WHAT THE CURSOR SKIPS AND WHAT THE PREFIX MATCHES (issue 1504), both over the FLAT rendered
+  // order because that is the order `util/listboxNavigation.js` indexes. The predicate is a
+  // function rather than a derived array so the module stays off the option shape, and the labels
+  // ARE an array because the match runs against the rendered label rather than the option value —
+  // at a converted page-size control the value is the number 25 and the label is what the GM sees.
+  const typeAheadLabels = $derived(renderedOptions.map((option) => String(option.label ?? '')));
+
   function optionIsDisabled(index) {
     return Boolean(renderedOptions[index]?.disabled);
   }
@@ -716,13 +724,62 @@
     return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
   }
 
+  /**
+   * THE TYPE-AHEAD, which is a native `<select>`'s answer to a printable character (issue 1504).
+   *
+   * ── WHERE IT IS ACTIVE, AND WHY THAT IS NOT A PROP ────────────────────────────────────────
+   * Only in the search-suppressed shape. With a query field rendered, a printable character IS
+   * the query and issue 1503's key map hands it over untouched; taking it for a prefix match
+   * would delete the search from every one of the 17 callers that render one. So the condition is
+   * `showSearch`, the same condition that decides which element is the holder, and every caller
+   * that renders a field behaves exactly as it did — the branch returns before reading the key.
+   *
+   * ── THE CLOSED TRIGGER IS THE PRIMARY CASE ────────────────────────────────────────────────
+   * A GM who tabs to a page-size control and types `2` expects 25 rows. Closed, the panel OPENS
+   * with the match as the ACTIVE OPTION rather than selecting silently, which is the WAI-ARIA
+   * select-only combobox behaviour: the active option is not the value, so `Enter` or a click
+   * commits and every dismissal path — Escape, an outside click, focus leaving the trigger —
+   * closes through `close()` with the value unchanged. A prefix that matches NOTHING moves no
+   * cursor and does not open a closed panel, so a mistyped character is not a state change.
+   *
+   * Ctrl, Meta and Alt are refused here rather than by the guard below, because Shift is not:
+   * Shift is how a capital letter is typed, and the match is case-insensitive anyway.
+   *
+   * @param {KeyboardEvent} event the keypress on the holder, open or closed.
+   * @returns {boolean} true when the type-ahead consumed the key.
+   */
+  function typeAheadOwnsKey(event) {
+    if (showSearch) return false;
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    const typed = typeAheadCursor(activeIndex, typeAheadLabels, event.key, {
+      buffer: typeAheadBuffer,
+      isDisabled: optionIsDisabled,
+    });
+    if (typed === null) return false;
+    event.preventDefault();
+    typeAheadBuffer = typed.buffer;
+    if (typed.index === null) return true;
+    // OPEN FIRST, then stamp. The generation the cursor is stamped with reads `open`, so a stamp
+    // taken before the panel opened would be stale by the time the list rendered and the cursor
+    // would read as the -1 sentinel in the very pass that was supposed to set it.
+    open = true;
+    cursor = { generation: optionListGeneration, index: typed.index };
+    return true;
+  }
+
   // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
   // which keys are CONSUMED, and what Enter chooses. A key the module does not own returns `null`
   // and is left entirely alone, which is what keeps every printable character going to the query
   // field. Escape is not handled here: `dismissOnOutsideClick` on the picker root takes it at the
   // document's capture phase, which is the only place that reaches the inline search shape.
   function onHolderKeydown(event) {
-    if (!open) return;
+    // A CLOSED PANEL HAS ONE KEY, and it is the type-ahead's (issue 1504). This runs only from
+    // the TRIGGER, which is the holder in the search-suppressed shape and the only element that
+    // exists while the panel is shut — a query field cannot receive a key it is not rendered for.
+    if (!open) {
+      typeAheadOwnsKey(event);
+      return;
+    }
     if (event.key === 'Enter') {
       // Enter WITHOUT an active option is a no-op rather than a choice of the first row. On a
       // trigger holder it must still be prevented from reaching the button's own click, or the
@@ -733,6 +790,10 @@
       chooseOption(active);
       return;
     }
+    // WITH THE PANEL OPEN THE PREFIX MOVES THE ACTIVE OPTION ONLY, never the value: this is the
+    // same call as the closed branch, and `open` is already true. It comes before the modifier
+    // guard because Shift is how a capital is typed.
+    if (typeAheadOwnsKey(event)) return;
     // A MODIFIED KEY IS NEVER THIS WIDGET'S. `Shift+End` selects to the end of the query,
     // `Ctrl+Home` jumps to its start, and both are the ordinary way a GM fixes a typo in a long
     // search — none of them is a cursor movement, and consuming them would take the field's
@@ -781,6 +842,10 @@
   function close({ restoreFocus = true } = {}) {
     open = false;
     search = '';
+    // A PREFIX DOES NOT SURVIVE THE PANEL (issue 1504). The inactivity window would expire it a
+    // half-second later anyway, but a GM who dismisses a panel and immediately types again is
+    // starting a new search, not continuing the one they just abandoned.
+    typeAheadBuffer = null;
     if (restoreFocus) restoreTriggerFocus();
   }
 
