@@ -24031,8 +24031,10 @@
    between rungs, and each snap is named at the declaration rather than left as a silent value:
    card radius 12 -> 11, control radius on a 26-32px control -> 7 and on a 34-38px one -> 9, the
    reference's 15px card padding -> `--fab-space-4`, its 14px stack gap and 10/11px band paddings
-   -> `--fab-space-3`, its 22px page inline padding -> `--fab-space-5`. Radius, width, height and
-   font size are NOT spacing-scale members (`spec.md:230`) and are written as literals. */
+   -> `--fab-space-3`, its 22px page inline padding -> `--fab-space-5` at first and, under
+   maintainer ruling M32 (issue 1371 r18-frame), to NONE on the tab strip and `--fab-space-3` on
+   the panel — the A0 rules below say why. Radius, width, height and font size are NOT
+   spacing-scale members (`spec.md:230`) and are written as literals. */
 
 /* ── A0. THE PAGE FRAME ──────────────────────────────────────────────────────────────────────
    TWO COLUMNS, AND THE RAIL IS THE SECOND ONE. Round 3 nested the rail inside the tab panel, so
@@ -24052,13 +24054,26 @@
   min-height: 0;
 }
 
-/* THE TAB STRIP'S OWN BAND (`proto:823`): 22px inline padding and a 22px gap, both snapped to
-   `--fab-space-5`, on a bottom hairline. `flex: 0 0 auto` is load-bearing — a flex item defaults
-   to `flex-shrink: 1`, and on a short window the strip would compress into the panel. */
+/* THE TAB STRIP'S OWN BAND (`proto:823`): a 22px gap snapped to `--fab-space-5`, on a bottom
+   hairline. `flex: 0 0 auto` is load-bearing — a flex item defaults to `flex-shrink: 1`, and on a
+   short window the strip would compress into the panel.
+
+   IT CARRIES NO INLINE INSET (issue 1371 r18-frame, maintainer ruling M32). The reference pads
+   the strip 22px each side (`proto:823`, `proto:1302`) and this rule carried that as
+   `--fab-space-5`; the maintainer's fourth live test read the result as a tab bar that "doesn't
+   span the whole central rail" — the hairline ran edge to edge (measured in the lab at 1280 and
+   1600 wide), but the tabs began 20px inside the column and nothing else marked the strip's
+   extent. The ruling outranks the reference where they touch, and the shape it holds up is the
+   catalogue's under M21 — a flush column whose toolbar begins at the column's own edge — so the
+   strip's inline padding goes and the first tab's box starts where the column starts. The tab
+   button's own `0 var(--fab-space-3)` is then the label's whole inset: the catalogue's
+   toolbar-control gutter, and the gutter the panel below gives its cards, so the tabs and the
+   cards read from one edge. Keyed on the column, so the world entry and the rules editor — one
+   frame, two consumers — move together; `component-edit-frame-rendered.test.js` and
+   `world-component-entry-frame-rendered.test.js` measure it on both. */
 .fabricate-manager .manager-component-entry-column > .manager-editor-tabs {
   flex: 0 0 auto;
   gap: var(--fab-space-5);
-  padding: 0 var(--fab-space-5);
   border-bottom: 1px solid var(--fab-border);
 }
 
@@ -24071,14 +24086,23 @@
 
 /* THE SCROLLER. `padding-bottom: 40px` is the reference's own value and is a documented literal
    exemption from the spacing scale (`ui-integration`: one-off fixed dimensions in the 34-42px
-   range), because it is breathing room under the last card rather than a rhythm step. */
+   range), because it is breathing room under the last card rather than a rhythm step.
+
+   THE CARDS' GUTTER IS THE CATALOGUE'S (issue 1371 r18-frame, maintainer ruling M32). The inline
+   inset was the reference's 22px (`proto:831`, `proto:1307`) snapped to `--fab-space-5`; under
+   the ruling — "neither does the scroll area" span the column — it is `--fab-space-3`, the gutter
+   M21's flush catalogue column gives its toolbar controls and its rows
+   (`[data-manager-view='world-components'] .manager-scoped-list-rows { padding-inline }`). The
+   gutter stays INSIDE the panel, whose box is the column's: the panel scrolls edge to edge, its
+   scrollbar at the rail's divider, and the cards breathe inside it as the catalogue's rows do
+   inside their scroller. The 16px top and the 40px foot are unchanged. */
 .fabricate-manager .manager-component-entry-panel {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
-  padding: var(--fab-space-4) var(--fab-space-5) 40px;
+  padding: var(--fab-space-4) var(--fab-space-3) 40px;
   overflow: auto;
 }
 
