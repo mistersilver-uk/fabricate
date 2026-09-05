@@ -184,8 +184,15 @@ export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 33;
  */
 export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
 
-/** @see KNOWN_OFF_TOKEN_SHADOWS */
-export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
+/**
+ * 26 → 25 with issue 1503. The picker panels' hand-written `0 16px 36px var(--fab-overlay-dark-34)`
+ * left with the block that carried it: both pickers render through `SearchablePopover` now and
+ * take the shared panel's `var(--fab-shadow-lg)`, so the caller's own panel rule is deleted
+ * rather than out-specified. Paid down by adoption, not by a sweep.
+ *
+ * @see KNOWN_OFF_TOKEN_SHADOWS
+ */
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 25;
 
 /**
  * A native `<select>` rendered by a Svelte template, keyed `file`.
@@ -257,8 +264,19 @@ export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
  */
 export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 
-/** @see KNOWN_OFF_LADDER_RADII */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 318;
+/**
+ * 318 → 317 with issue 1503, and the row that moved is `styles/fabricate.css | border-radius |
+ * 8px`, 73 → 72: the deleted picker-panel block above carried an 8px corner, and the shared panel
+ * it now takes is 10px.
+ *
+ * THE 10px ROW IS UNTOUCHED and stays owed. 10px is not on the ladder either — the shared panel's
+ * own corner is one of the fourteen occurrences that row counts — so this change moves one
+ * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
+ * is a net −1 rather than a snap, and the snap is still owed against the `10px | 14` row.
+ *
+ * @see KNOWN_OFF_LADDER_RADII
+ */
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 317;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -386,8 +404,24 @@ export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
  */
 export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 
-/** @see KNOWN_FORMLESS_BUTTONS */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 279;
+/**
+ * 279 → 276 with issue 1503, across three rows: `SearchablePopover.svelte` 3 → 2,
+ * `IconPicker.svelte` 2 → 1 and `EssenceSourceSelector.svelte` 3 → 2.
+ *
+ * ONE `<button>` accounts for all three. The pickers' option rows moved into the primitive, and
+ * the primitive's own option row now writes a literal `data-keyboard-focus="true"` — because it
+ * gained `tabindex="-1"` to carry an `aria-activedescendant` listbox, and a formless button in
+ * the tab order that does not declare itself is exactly what this ledger is for. The two
+ * pickers' remaining rows are their triggers (and the source picker's clear button), which are
+ * caller-owned markup and stay.
+ *
+ * The primitive's own TRIGGER is deliberately still counted: its attribute arrives through
+ * `{...triggerAttributes}`, which this source-level scanner cannot see, so nothing is being
+ * quietly banked that the scanner did not measure.
+ *
+ * @see KNOWN_FORMLESS_BUTTONS
+ */
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 276;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

@@ -80,7 +80,6 @@
     "src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte | .bulk-footer | inset 0 0 0 100vmax var(--fab-surface-soft) | 1",
     "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | .fab-bulk-edit-dock | 0 -2px 6px var(--fab-overlay-dark-25) | 1",
     "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte | .manager-task-stamina-card, .manager-task-nodes-card, .manager-task-dc-card | inset 0 1px 0 var(--fab-overlay-light-06) | 1",
-    "styles/fabricate.css | .fabricate-icon-picker-popover.essence-icon-picker-popover, .fabricate-source-picker-popover.essence-source-picker-popover | 0 16px 36px var(--fab-overlay-dark-34) | 1",
     "styles/fabricate.css | .fabricate-manager .manager-condition-modifier-value input | inset 0 1px 0 var(--fab-overlay-dark-18) | 1",
     "styles/fabricate.css | .fabricate-manager .manager-drop-editor-card :is(select, input:not([type=\"checkbox\"]):not([type=\"radio\"]):not([type=\"range\"])) | inset 0 1px 0 var(--fab-overlay-dark-18) | 1",
     "styles/fabricate.css | .fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control | inset 0 1px 0 var(--fab-overlay-dark-18) | 1",
@@ -290,7 +289,7 @@
     "styles/fabricate.css | border-radius | 3px | 2",
     "styles/fabricate.css | border-radius | 4px | 24",
     "styles/fabricate.css | border-radius | 5px | 14",
-    "styles/fabricate.css | border-radius | 8px | 73"
+    "styles/fabricate.css | border-radius | 8px | 72"
   ],
   "areaScopedStyleReads": [
     "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | --fab-recipe-control-font | 4",
@@ -394,7 +393,6 @@
     "src/ui/svelte/apps/manager/PartyMemberRow.svelte | 4",
     "src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte | 2",
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
-    "src/ui/svelte/components/SearchablePopover.svelte | 3",
     "src/ui/svelte/apps/manager/ToolEditView.svelte | 3",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 5",
     "src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte | 1",
@@ -427,13 +425,14 @@
     "src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte | 1",
     "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte | 2",
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | 1",
-    "src/ui/svelte/components/EssenceSourceSelector.svelte | 3",
-    "src/ui/svelte/components/IconPicker.svelte | 2",
+    "src/ui/svelte/components/EssenceSourceSelector.svelte | 2",
+    "src/ui/svelte/components/IconPicker.svelte | 1",
     "src/ui/svelte/components/ImagePathPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPopover.svelte | 2",
     "src/ui/svelte/components/ModifierPillSelect.svelte | 1",
     "src/ui/svelte/components/RowDisclosure.svelte | 1",
+    "src/ui/svelte/components/SearchablePopover.svelte | 2",
     "src/ui/svelte/components/StatusToggle.svelte | 1",
     "src/ui/svelte/components/Stepper.svelte | 2"
   ],

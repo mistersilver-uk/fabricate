@@ -1,14 +1,10 @@
 {
-  "pinnedTotal": 244,
+  "pinnedTotal": 238,
   "rows": [
     { "key": "(top level) | .fabricate-button.manager-button", "count": 2 },
     { "key": "(top level) | .fabricate-color-picker-popover .manager-color-preset", "count": 2 },
     { "key": "(top level) | .fabricate-icon-button.manager-icon-button", "count": 2 },
     { "key": "(top level) | .fabricate-icon-picker .essence-icon-picker-trigger", "count": 2 },
-    {
-      "key": "(top level) | .fabricate-icon-picker-popover .essence-icon-picker-option",
-      "count": 2
-    },
     { "key": "(top level) | .fabricate-manager .environment-stale-warning", "count": 2 },
     { "key": "(top level) | .fabricate-manager .form-group input", "count": 2 },
     { "key": "(top level) | .fabricate-manager .form-group select", "count": 2 },
@@ -187,14 +183,6 @@
     { "key": "(top level) | .fabricate-roll-prompt__modifier-value", "count": 2 },
     { "key": "(top level) | .fabricate-source-picker .essence-source-clear", "count": 2 },
     { "key": "(top level) | .fabricate-source-picker .essence-source-trigger", "count": 2 },
-    {
-      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-grid",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-option",
-      "count": 2
-    },
     {
       "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-option img",
       "count": 2
