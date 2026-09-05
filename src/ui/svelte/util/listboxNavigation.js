@@ -25,7 +25,9 @@
  * on, and a TYPED CHARACTER must jump to the option it names. Both are arithmetic over the flat
  * rendered order — the same order this module already owns — and both are inherited by every
  * select the epic converts, so a copy per call site is exactly what putting them here prevents.
- * `nextActiveIndex` gains an optional `isDisabled` predicate for the first.
+ * `nextActiveIndex` gains an optional `isDisabled` predicate; `typeAheadCursor` is the second
+ * exported mover, and it is a pure map from (buffer, key) to (buffer, index) for the reason its
+ * own note gives.
  *
  * ── THE SENTINEL ────────────────────────────────────────────────────────────────────────────
  * `-1` means NOTHING IS ACTIVE — the GM has opened a panel and not yet pressed an arrow key — and
@@ -164,6 +166,111 @@ export function nextActiveIndex(current, count, key, options = {}) {
     isDisabled,
     fallback,
   });
+}
+
+/** How long a typed prefix survives without another keystroke, in milliseconds. */
+const TYPE_AHEAD_RESET_MS = 500;
+
+/**
+ * Where a TYPED PREFIX puts the cursor, and the buffer that prefix leaves behind (issue 1504).
+ *
+ * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────────────────────
+ * A native `<select>` jumps to the option a typed character names, and every control converted
+ * onto the shared picker would silently lose that: issue 1503 routes printable keys to the query
+ * field, and a select-only combobox suppresses the query field. So the behaviour has to be built
+ * back, once, in the module the converted selects all inherit.
+ *
+ * ── WHY THE BUFFER IS A VALUE AND NOT STATE HELD HERE ───────────────────────────────────────
+ * A module-level buffer would be shared by every picker on the screen, so typing into one would
+ * continue the prefix another had started — and it could not be reset when a panel closed without
+ * a second exported function to do it. The buffer is therefore RETURNED, the caller holds it
+ * beside its own cursor, and this function stays a pure map from (buffer, key) to (buffer, index).
+ *
+ * The clock is the one exception, and it is a DEFAULT rather than a read: a caller that omits
+ * `now` gets `Date.now()`, and a test that needs the inactivity window to be observable passes
+ * its own. Requiring it would put the same `Date.now()` at every call site and make a forgotten
+ * one silently disable the reset rather than fail.
+ *
+ * ── THE RULES, STATED RATHER THAN DISCOVERED ────────────────────────────────────────────────
+ * The match is CASE-INSENSITIVE and runs against the rendered LABEL rather than the option value,
+ * because the value at a converted page-size control is the number 25 while the label is what the
+ * GM can see and is typing at. A DISABLED row is skipped, for the same reason the arrows skip it.
+ * A prefix that matches NOTHING moves no cursor and opens no panel — it returns a `null` index —
+ * while still extending the buffer, so a fourth character can rescue a mistyped third.
+ * A REPEATED single character CYCLES: `a`, `a`, `a` walks the options beginning with `a` rather
+ * than searching for `aaa`, which is the one behaviour a plain prefix match gets wrong.
+ * SPACE is a continuation and never an opening: it extends a live prefix (`Routed by check`) and
+ * is otherwise left to the trigger, whose own Space activates the button.
+ *
+ * @param {number} current The active index, or -1 for "nothing is active" — which is also what a
+ *   CLOSED panel has, and where the scan begins for the closed-trigger case.
+ * @param {string[]} labels The rendered labels, in the FLAT rendered order the cursor indexes.
+ * @param {string} key The `KeyboardEvent.key` that was pressed.
+ * @param {object} [options]
+ * @param {{text: string, at: number}} [options.buffer] What the last keystroke returned.
+ * @param {(index: number) => boolean} [options.isDisabled] Which rows the prefix must skip.
+ * @param {number} [options.now] The clock, in ms. Defaults to `Date.now()`.
+ * @param {number} [options.resetAfter] The inactivity window, in ms. Defaults to 500.
+ * @returns {{buffer: {text: string, at: number}, index: number|null}|null} The new buffer and the
+ *   row the prefix names, `index` being `null` for a prefix that matches nothing; or `null` for a
+ *   key this owns no answer for, which the caller must leave entirely alone.
+ */
+export function typeAheadCursor(current, labels, key, options = {}) {
+  // A PRINTABLE CHARACTER IS EXACTLY A ONE-CHARACTER `key`. Every navigation and editing key
+  // spells itself out — `Enter`, `Tab`, `ArrowDown`, `Backspace` — so the length test needs no
+  // list to maintain and cannot fall behind a keyboard layout it has never seen.
+  if (typeof key !== 'string' || key.length !== 1) return null;
+
+  const now = Number.isFinite(options?.now) ? options.now : Date.now();
+  const resetAfter = Number.isFinite(options?.resetAfter)
+    ? options.resetAfter
+    : TYPE_AHEAD_RESET_MS;
+  const previous = options?.buffer;
+  // THE RESET IS A READ OF THE CLOCK, not a timer. A timer would have to be cleared when the
+  // panel closed, when the component unmounted and when the options changed under it; the elapsed
+  // time answers the same question with nothing to tear down and nothing to leak.
+  const carried =
+    typeof previous?.text === 'string' &&
+    Number.isFinite(previous?.at) &&
+    now - previous.at <= resetAfter
+      ? previous.text
+      : '';
+  if (key === ' ' && carried === '') return null;
+
+  const buffer = { text: carried + key, at: now };
+  return { buffer, index: prefixMatch(buffer.text, labels, current, options?.isDisabled) };
+}
+
+/**
+ * The first ENABLED row whose label begins with the typed prefix, or `null`.
+ *
+ * WHERE THE SCAN STARTS is the whole difference between refining and cycling. A prefix of two or
+ * more DIFFERENT characters starts AT the active row, so typing `an` after `a` stays on `Anvil`
+ * rather than jumping to the next `A`. A single character — or the same one repeated — starts at
+ * the row AFTER it, which is what makes a repeated keystroke walk the matches.
+ */
+function prefixMatch(text, labels, current, isDisabled) {
+  const rows = Array.isArray(labels) ? labels.length : 0;
+  if (rows === 0) return null;
+
+  const repeated = [...text].every((character) => character === text[0]);
+  const needle = (repeated ? text[0] : text).toLowerCase();
+  const anchor = isUsableIndex(current, rows) ? current : -1;
+  const from = repeated ? anchor + 1 : Math.max(anchor, 0);
+
+  for (let scanned = 0; scanned < rows; scanned += 1) {
+    const index = ring(from + scanned, rows);
+    if (skips(isDisabled, index)) continue;
+    if (
+      String(labels[index] ?? '')
+        .trim()
+        .toLowerCase()
+        .startsWith(needle)
+    ) {
+      return index;
+    }
+  }
+  return null;
 }
 
 /**
