@@ -56,6 +56,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // The shared eyebrow (issue 1505). `RecipeItemOverviewTab` renders three of them, and
+    // the compiled editor imports that tab statically, so omitting it HANGS this suite.
+    'src/ui/svelte/components/Kicker.svelte',
     // The salvage bodies render the house chip primitive. The preview never reaches them,
     // but the compiled router imports them statically, so it is still in the graph.
     'src/ui/svelte/components/StatusPill.svelte',

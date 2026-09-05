@@ -31,6 +31,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
+    // The shared eyebrow (issue 1505). The panel's title is a `<Kicker>` inside the
+    // panel's own flex row, so omitting it HANGS this suite (# cancelled), never fails it.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',

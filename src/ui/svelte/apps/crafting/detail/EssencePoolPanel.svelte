@@ -24,6 +24,7 @@
   import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
@@ -101,7 +102,7 @@
     aria-labelledby={labelledBy ?? undefined}
     data-recipe-section="essence-pool"
   >
-    <p class="crafting-detail-section-title">{title}</p>
+    <Kicker as="p">{title}</Kicker>
 
     <div class="essence-pool-meters">
       {#each requirements as requirement (requirement.groupId ?? requirement.essenceId)}
@@ -450,16 +451,5 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--fab-space-2);
-  }
-
-  /* Matches the sibling IO section headers (the IngredientOptionSelector precedent:
-     Svelte scopes CSS per component, so the rule is redefined rather than shared). */
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>

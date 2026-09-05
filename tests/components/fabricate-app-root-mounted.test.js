@@ -236,6 +236,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // Issue 1505: the eyebrow nine crafting detail components render. A module missing from a
+    // manifest does not fail this suite; it is reported as `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/FabricateAppRoot.svelte',

@@ -22,6 +22,7 @@
   import { resolveDropUuid } from '../../../util/dropUtils.js';
   import ItemDropZone from '../ItemDropZone.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     recipeItem = null,
@@ -61,8 +62,8 @@
   aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Title', 'Overview')}
 >
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label"
-      >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</span
+    <Kicker as="span"
+      >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</Kicker
     >
     <ItemDropZone
       item={hasLink ? { name: itemName || uuid, img: itemImg } : null}
@@ -89,7 +90,7 @@
   </div>
 
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label">
+    <Kicker as="span">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Name', 'Name')}
       <span class="manager-recipe-item-label-note"
         >{text(
@@ -97,7 +98,7 @@
           '· from linked item'
         )}</span
       >
-    </span>
+    </Kicker>
     <div
       class={`manager-recipe-item-readonly is-name ${itemName ? '' : 'is-placeholder'}`}
       data-recipe-item-name
@@ -108,7 +109,7 @@
   </div>
 
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label">
+    <Kicker as="span">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Description', 'Description')}
       <span class="manager-recipe-item-label-note"
         >{text(
@@ -116,7 +117,7 @@
           '· from linked item'
         )}</span
       >
-    </span>
+    </Kicker>
     <div class="manager-recipe-item-readonly is-description" data-recipe-item-description>
       {description ||
         text(
@@ -169,14 +170,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-label {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
   }
 
   .manager-recipe-item-label-note {

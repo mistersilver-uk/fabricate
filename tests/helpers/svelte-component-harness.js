@@ -380,6 +380,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
   // HANGS every mounted crafting suite rather than failing it.
   'src/ui/svelte/components/Stepper.svelte',
+  // THE UPPERCASE MICRO-LABEL every section header in `detail/` is now (issue 1505). Nine
+  // components in that directory render it, and all nine are listed below, so omitting it
+  // HANGS every mounted crafting suite (# cancelled) rather than failing one.
+  'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',

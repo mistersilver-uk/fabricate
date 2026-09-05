@@ -430,6 +430,11 @@ function compileManagerRoot() {
   // rosters besides.
   writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');
   writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
+  // THE uppercase micro-label (issue 1505). The root reaches it through the recipe-item
+  // Overview tab's three field labels, and again through every `StatBox` label, which makes it
+  // a leaf TWO rungs down as well — reached without anything here naming a kicker. Omitting it
+  // HANGS every mounted manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/components/Kicker.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

@@ -8,6 +8,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../CraftingThumb.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let { tiers = [] } = $props();
 
@@ -15,9 +16,9 @@
 </script>
 
 <section class="crafting-tiers" data-recipe-section="outcome-tiers">
-  <p class="crafting-detail-section-title">
+  <Kicker as="p">
     {localize('FABRICATE.App.Crafting.Detail.OutcomesTitle')}
-  </p>
+  </Kicker>
   {#if rows.length > 0}
     <ul class="crafting-tier-list">
       {#each rows as tier, index (tier.id ?? tier.names?.[0] ?? index)}
@@ -155,15 +156,6 @@
     margin: 0;
     font-size: 12px;
     font-style: italic;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--fab-text-muted);
   }
 </style>
