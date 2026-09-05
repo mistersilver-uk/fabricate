@@ -22349,9 +22349,13 @@
    part of this family that satisfies the area-scope gate's `emitted` precondition from the
    component's own `class="…"` attributes.
 
-   `em` rather than a pixel figure for the tick's height, so the box IS the label's first line
-   however the rung's type size moves: the tick sits on line one of a two-line row by
-   construction rather than by two numbers that have to be kept equal. */
+   THE TICK'S HEIGHT IS 15.4px AND THE LABEL'S FIRST LINE IS 16.8px, and the 1.4px is stated
+   here rather than left as an `em` that reads as tracking something. `1.4em` resolves against
+   this block's OWN `font-size: 11px`, not against `.fabricate-select-label`'s 12px, and that
+   label is a fixed 12 that does not follow the rung either — so neither number moves with the
+   type size and the pair is not kept equal by construction. The 1.4px of tick centring is
+   imperceptible in `manager-recipes-bulk-edit-check-tier`, which is why this is written down
+   rather than repainted; a later change to either figure should close it. */
 .fabricate-select-tick {
   flex: none;
   display: inline-flex;
@@ -22387,7 +22391,13 @@
 }
 
 /* A label ABOVE a description is the louder of the two, which is the specimen's own grouped
-   row: 600 over a hint rather than 500 beside nothing. */
+   row: 600 over a hint rather than 500 beside nothing.
+
+   IT KEYS OFF "HAS A HINT", NOT OFF WHAT THE ROW MEANS, and a grouped caller will get the
+   split by accident if it reads this weight as hierarchy. In the check-tier list the hinted
+   INSTRUCTION rows land at 600 and the named tiers at 500, which happens to read as intended
+   there; a list whose hints fall on the ordinary rows instead would read the emphasis exactly
+   backwards. Give such a caller its own rule rather than authoring hints for the weight. */
 .fabricate-select-lines .fabricate-select-label {
   font-weight: 600;
 }
@@ -22402,10 +22412,15 @@
 }
 
 /* The badge and the reason both sit at the row's trailing edge, which is where the specimen
-   draws them — the badge on an available row, the reason on a gated one. */
+   draws them — the badge on an available row, the reason on a gated one. `align-self` because
+   the ROW is `flex-start` for the tick's sake (see above), and a chip on a single-line row
+   would take that alignment and hang from the row's top edge. No shipped caller passes a
+   `badge`, a `disabled` or a `disabledReason` yet, so this moves no frame; it is closed here
+   rather than left for the first caller that does. */
 .fabricate-select-badge,
 .fabricate-select-reason {
   flex: none;
+  align-self: center;
   margin-inline-start: auto;
 }
 
