@@ -65,6 +65,18 @@
      on a non-tag chip paints literally nothing — a declaration that renders as a no-op is a
      failed visual change, not a subtle one — and eight pastel fills down a dense library
      list is not what a colour pill should look like. `swatch` composes with every tone.
+   - tint: a BARE `--fab-tag-*` palette key that inks the WHOLE chip — glyph and label — in
+     that colour over the quiet surface behind the plain hairline (issue 1371 r18-colour,
+     maintainer ruling M29). It is the reference's face for a row's essence dot
+     (`proto:5502`: `background: var(--surface-soft); border: 1px solid var(--border);
+     color: e.color`), and it is what lets an essence be drawn in the colour the Essence
+     Catalogue gave it wherever it is drawn. It is validated exactly as `swatch` is and rides
+     the same `--fab-chip-color` vehicle, so the two compose on one declaration; it is NOT the
+     swatch, because a swatch says "this chip is ABOUT a colour" with a dot and a tint says
+     "this chip IS that colour" with its ink. It states colour only and is written after every
+     tone, so a tint on a toned chip wins the family; `emphasis="outlined"` still plates it and
+     `emphasis="lit"` still washes it, because a tint declares the colour those two act on.
+     A chip that does not ask for one is byte-identical to what shipped.
    - class: additional classes for a caller that also needs layout context from the
      global sheet (`manager-editor-tab-badge` positions a badge inside a tab button, for
      instance). Those rules sit at a higher specificity than this scoped block by
@@ -139,6 +151,7 @@
     struck = false,
     icon = '',
     swatch = '',
+    tint = '',
     class: extraClass = '',
     truncate = false,
     density = 'default',
@@ -151,14 +164,30 @@
   // a bare palette key can have; anything else is dropped and the dot is not rendered at
   // all, rather than emitting whatever the caller composed. Both spellings are tolerated
   // because `ManagerColorPicker` already accepts both.
-  const safeSwatch = $derived(
-    /^[a-z0-9-]+$/.test(String(swatch || '').replace(/^--fab-tag-/, ''))
-      ? String(swatch).replace(/^--fab-tag-/, '')
-      : ''
-  );
+  const safeSwatch = $derived(safePaletteKey(swatch));
+  // The tint takes the same shape and the same discipline (issue 1371 r18-colour): a bare key
+  // or nothing, never a value a caller composed.
+  const safeTint = $derived(safePaletteKey(tint));
+  // ONE declaration of the vehicle whichever of the two props set it. A swatch and a tint on
+  // one chip name one colour, so the tint's key is taken when both are given — a chip that is
+  // inked in a colour is that colour before it is about one.
+  const chipColor = $derived(safeTint || safeSwatch);
   const swatchStyle = $derived(
-    safeSwatch ? `--fab-chip-color:var(--fab-tag-${safeSwatch})` : undefined
+    chipColor ? `--fab-chip-color:var(--fab-tag-${chipColor})` : undefined
   );
+
+  /**
+   * A bare `--fab-tag-*` palette key, or '' for anything that is not one. The key is interpolated
+   * into a `style` attribute, so it is constrained to the shape a key can have; both spellings
+   * are tolerated because `ManagerColorPicker` already accepts both.
+   *
+   * @param {unknown} value
+   * @returns {string}
+   */
+  function safePaletteKey(value) {
+    const key = String(value || '').replace(/^--fab-tag-/, '');
+    return /^[a-z0-9-]+$/.test(key) ? key : '';
+  }
 
   // Colour families this component paints. Anything else a caller passes is dropped
   // rather than emitted as an unstyled `is-*` class, so a typo shows up as the default
@@ -220,6 +249,7 @@
       TONES.has(tone) ? `is-${tone}` : '',
       EMPHASES.has(emphasis) ? `is-${emphasis}` : '',
       safeSwatch ? 'has-swatch' : '',
+      safeTint ? 'has-tint' : '',
       mono ? 'is-mono' : '',
       struck ? 'is-struck' : '',
       truncate ? 'is-truncated' : '',
@@ -241,7 +271,13 @@
 <!-- Written without internal whitespace on purpose: a newline between the glyph and the
      content becomes a text node, and callers assert on the chip's exact `textContent`
      (a count badge reading ' 1' instead of '1' is a real defect, not a test artefact). -->
-<svelte:element this={tag} bind:this={element} class={classes} style={swatchStyle} {...rest}
+<svelte:element
+  this={tag}
+  bind:this={element}
+  class={classes}
+  style={swatchStyle}
+  data-chip-tint={safeTint || undefined}
+  {...rest}
   >{#if safeSwatch}<span
       class="manager-chip-swatch"
       data-chip-swatch={safeSwatch}
@@ -678,6 +714,36 @@
     background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-bg-3));
   }
 
+  /* THE TINT (issue 1371 r18-colour, maintainer ruling M29): the chip inked in ITS OWN colour.
+
+     `proto:5502` draws a row's essence dot as `background: var(--surface-soft); border: 1px solid
+     var(--border); color: e.color` — the essence's colour on the glyph AND the numeral, over the
+     quiet surface, behind the plain hairline. Three declarations, and every one of them is a
+     colour: the tint is an axis like `tone`, and a tint that resized would reintroduce the drift
+     this component was extracted to end.
+
+     IT READS `--fab-chip-color`, the vehicle the tag tone and the swatch dot already share, which
+     the root sets INLINE from the validated key. That is why this rule can be one selector rather
+     than eight: the palette arrives as a token name and the theme resolves it, so a theme swap
+     re-inks every tinted chip without this block naming a single palette entry.
+
+     WRITTEN AFTER EVERY TONE, and that is the whole of its cascade argument. Each tone is (0,2,0)
+     and so is this; a caller that pairs a tone with a tint asks for the tint, so the tint has to
+     be the later rule. `is-outlined` and the lit pair stand after it in turn, because both act ON
+     a chip's declared colour — the plate keeps this ink and edge and takes back the fill, and the
+     lit face keeps this ink and washes the fill — so a tint written after either would undo the
+     emphasis the caller also asked for.
+
+     The label keeps the palette colour as its INK, and that is a measured decision rather than a
+     stylistic one: `tests/components/essence-chip-rendered.test.js` renders this face in Chromium
+     under every theme block the sheet declares, for every tint the picker offers, and holds the
+     composited label above 4.5:1. */
+  .manager-chip.has-tint {
+    border-color: var(--fab-border);
+    color: var(--fab-chip-color);
+    background: var(--fab-surface-soft);
+  }
+
   /* THE OUTLINED EMPHASIS (issue 1371): the chip as a FLAT PLATE.
 
      `proto:1313` draws the world Component entry's `World catalogue` badge INSIDE an
@@ -735,10 +801,11 @@
      an edit — the standing rule this whole round is applying. `emphasis` is the axis that already
      says how a family arrives, so this is its second value rather than a thirteenth tone.
 
-     IT READS `--fab-chip-color`, AND IT IS SELECTED ON THE TWO CLASSES THAT DECLARE ONE. That
-     property is the vehicle the tag tone and the `swatch` dot already share, and it is the whole
-     of this emphasis's generality: a chip has to have a colour of its own before it can be lit in
-     it. Writing the precondition into the SELECTOR rather than into a `var()` fallback is the
+     IT READS `--fab-chip-color`, AND IT IS SELECTED ON THE CLASSES THAT DECLARE ONE — the tag
+     tone, the `swatch` dot and, since issue 1371 r18-colour, the `tint`. That property is the
+     vehicle the three share, and it is the whole of this emphasis's generality: a chip has to
+     have a colour of its own before it can be lit in it. Writing the precondition into the
+     SELECTOR rather than into a `var()` fallback is the
      honest form — `background: color-mix(…, var(--fab-chip-color, <something>) 16%, transparent)`
      is a mix whatever the fallback is, so a toneless lit chip would lose its fill to a 16% wash
      of it rather than keep it. Unmatched is the only genuine no-op, which is `Medallion`'s
@@ -750,7 +817,8 @@
      outright, which is correct — a plate and a wash are the two answers to one question, so the
      two emphases are alternatives rather than a composition, and no caller pairs them. */
   .manager-chip.is-tag.is-lit,
-  .manager-chip.has-swatch.is-lit {
+  .manager-chip.has-swatch.is-lit,
+  .manager-chip.has-tint.is-lit {
     color: var(--fab-chip-color);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
   }

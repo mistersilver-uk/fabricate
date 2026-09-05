@@ -149,6 +149,8 @@ function compileManagerRoot() {
   // (issue 676). They live under `components/` — NOT `component/`, which the screenshot
   // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
+  // issue 1371 r18-colour: the row and the inspector both render the tinted essence chip (M29).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceChip.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
   // The shared essence quantity card (issue 772), extracted out of the editor and rendered
   // by the browser's bulk-edit panel too. `ComponentEditView` above imports it statically,

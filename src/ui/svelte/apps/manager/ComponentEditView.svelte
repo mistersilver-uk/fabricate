@@ -657,9 +657,10 @@
       id: option.id,
       name: option.name,
       icon: option.icon,
-      // The essence's own colour, for the tile's glyph ink (issue 1371). Carried for the same
-      // reason `enabled` is: a field dropped by the clone can never reach the card.
-      color: option.color,
+      // The essence's own colour as the bare `--fab-tag-*` key the Essence Catalogue stores
+      // (issue 1371; r18-colour, M29). Carried for the same reason `enabled` is: a field
+      // dropped by the clone can never reach the card.
+      colorToken: option.colorToken,
       // Carried through the clone or the offer filter below could never see it, and every
       // disabled essence would be offered as if enabled (issue 1036).
       enabled: option.enabled !== false,
@@ -1771,7 +1772,7 @@
                     'FABRICATE.Admin.Items.Editor.IncrementEssence',
                     'Increment {name}'
                   ).replace('{name}', option.name)}
-                  color={option.color || ''}
+                  colorToken={option.colorToken || ''}
                   onChange={(quantity) => setEssenceQuantity(option.id, quantity)}
                 />
               {/each}

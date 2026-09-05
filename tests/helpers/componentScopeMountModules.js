@@ -126,6 +126,10 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
  */
 export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Chip.svelte',
+  // issue 1371 r18-colour: the tinted essence chip (M29) is rendered by the system inspector,
+  // the rules list row and the world catalogue's rows; an omission here HANGS every suite that
+  // mounts one of those trees (`# cancelled`) rather than failing it.
+  'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',

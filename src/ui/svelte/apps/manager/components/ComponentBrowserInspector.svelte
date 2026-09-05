@@ -32,6 +32,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import EssenceChip from './EssenceChip.svelte';
   import ActionMenu from '../../../components/ActionMenu.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -209,6 +210,22 @@
           </p>
         </div>
       </div>
+
+      <!-- THE ESSENCE RUN (issue 1371 r18-colour, maintainer ruling M29). The subline above counts
+           the essences and, before this revision, that count was the whole of what the inspector
+           said about them: `1 essence`, in plain text, for a fact the rules library's row draws as
+           a chip and the world bulk panel draws in colour. Each essence is now drawn under the
+           subline as the shared `EssenceChip` — its glyph, its name and its quantity, inked in the
+           colour the Essence Catalogue gave it — at the inspector's own chip scale, the one the
+           `Tags in effect` run below uses. It is gated on there BEING any: an empty run under
+           `0 essences` would say the same nothing twice. -->
+      {#if essences.length > 0}
+        <div class="manager-chip-row" data-component-essence-list>
+          {#each essences as essence (essence.id)}
+            <EssenceChip {essence} showName density="inspector" />
+          {/each}
+        </div>
+      {/if}
 
       <!-- SHARED IDENTITY. This card carries the content that used to head the LIST pane; the
            reference draws that callout on the rules editor and this card here. -->

@@ -45,6 +45,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import EssenceChip from './EssenceChip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -170,15 +171,19 @@
 
   <span class="manager-component-row-meta">
     {#if essences.length > 0}
+      <!-- The essence badges (issue 1371 r18-colour, M29): each one is the shared `EssenceChip`,
+           so the row's dots carry the colour the Essence Catalogue gave the essence — the
+           reference inks the dot's glyph and numeral in `e.color` (`proto:5502`), and this row
+           drew every one the same grey. The chip owns the glyph fallback and the
+           `{name} {quantity}` accessible name the row used to spell out here; the row keeps its
+           own sheet hook (`manager-essence-compact-chip`) and gains a per-essence one. -->
       <span class="manager-chip-row manager-component-essence-dots">
         {#each essences as essence (essence.id)}
-          <Chip
+          <EssenceChip
+            {essence}
             class="manager-essence-compact-chip"
-            icon={essence.icon || 'fas fa-mortar-pestle'}
-            title={`${essence.name || essence.id} ${essence.quantity}`}
-            aria-label={`${essence.name || essence.id} ${essence.quantity}`}
-            >{essence.quantity}</Chip
-          >
+            data-component-essence={essence.id}
+          />
         {/each}
       </span>
     {/if}

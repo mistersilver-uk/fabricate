@@ -19,14 +19,28 @@
   IDENTITY FIRST, then the stepper: the card was once a single five-column run rendering
   −, qty, +, icon, name, which put the control before the thing it counted.
 
-  The class names are the SHIPPED ones. `.manager-component-essence-card`, `-identity`,
-  `-icon` and `-name` moved out of the global sheet into this scoped block unchanged, so
-  the editor renders what it rendered before the extraction. What stayed global is the
-  PARENT grid (`.manager-component-essence-grid`), because the editor's 4-up and the bulk
-  panel's 2-up are host layout, not card identity.
+  THE TILE IS THE SHARED `Medallion` (issue 1371 r18-colour, maintainer ruling M29). The card
+  used to draw its own 22px span and take a `color` prop for the glyph's ink — a prop the editor
+  passed and nothing ever fed, because the editor's option builder is a whitelist rebuild that
+  never named the colour, so every tile painted the accent. The reference draws the tile as a
+  22px slate chip with the glyph in the essence's colour (`proto:5717`: `width: 22px; height:
+  22px; border-radius: 6px; background: var(--bg3); color: e.color`), which is exactly the
+  `variant="glyph-chip"` face the bulk panels' essence rows already draw at the same size, so
+  the card now renders that medallion rather than a second tile of its own. The colour arrives
+  as the BARE `--fab-tag-*` key the Essence Catalogue stores (`colorToken`), the same shape
+  `Medallion`'s `tint` and `Chip`'s `tint` validate; the retired `color` prop took an authored
+  CSS colour, which no projection ever produced.
+
+  The class names are the SHIPPED ones. `.manager-component-essence-card`, `-identity` and
+  `-name` moved out of the global sheet into this scoped block unchanged, so the editor
+  renders what it rendered before the extraction. What stayed global is the PARENT grid
+  (`.manager-component-essence-grid`), because the editor's 4-up and the bulk panel's 2-up are
+  host layout, not card identity.
 
   Props:
    - id / name / icon: the essence's identity. `icon` falls back to a mortar-and-pestle.
+   - colorToken: the essence's own colour as a bare `--fab-tag-*` key, or '' for the untinted
+     tile (the accent glyph the tile has always painted).
    - quantity: the current amount. Zero renders the receding `is-inactive` treatment — an
      essence the GM has not used is still the control they would use to add one.
    - disabled: disables the stepper (a saving editor, an inert panel section).
@@ -39,18 +53,14 @@
   an extraction would move the surface and its seams in one commit.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
   import Stepper from '../../../components/Stepper.svelte';
 
   let {
     id = '',
     name = '',
     icon = '',
-    // THE ESSENCE'S OWN COLOUR, inked onto the tile's glyph (issue 1371, parity round 4). The
-    // reference tints each tile by the essence it names (`proto:5717`), which is how a GM reads a
-    // four-column grid at a glance. It arrives as an authored CSS colour and is interpolated into
-    // a custom property, so an absent or empty value leaves the `var()` FALLBACK — the accent this
-    // tile has always painted — rather than emitting an invalid declaration.
-    color = '',
+    colorToken = '',
     quantity = 0,
     disabled = false,
     ariaLabel = '',
@@ -71,13 +81,15 @@
   data-component-essence-active={active}
 >
   <div class="manager-component-essence-identity">
-    <span
-      class="manager-component-essence-icon"
-      style={color ? `--fab-essence-tile-ink:${color}` : undefined}
-      aria-hidden="true"
-    >
-      <i class={icon || 'fas fa-mortar-pestle'}></i>
-    </span>
+    <!-- `size` and `glyph` are the reference's 22px tile and its 10px glyph; the variant owns the
+         absent edge and the slate fill that does not follow the tint. See the header note. -->
+    <Medallion
+      icon={icon || 'fas fa-mortar-pestle'}
+      size={22}
+      glyph={10}
+      tint={colorToken || ''}
+      variant="glyph-chip"
+    />
     <strong class="manager-component-essence-name" title={name}>{name}</strong>
   </div>
 
@@ -133,21 +145,6 @@
     gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
-  }
-
-  .manager-component-essence-icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: var(--fab-overlay-light-06);
-    /* The FALLBACK is the accent this tile painted before the tint existed, so an untinted card
-       is byte-identical to what shipped. */
-    color: var(--fab-essence-tile-ink, var(--fab-accent));
-    font-size: 0.7rem;
   }
 
   /* `proto:5717`: 11.5px/600 in the SECONDARY ink, ellipsised. The tile's subject is the
