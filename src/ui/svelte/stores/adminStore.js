@@ -1688,6 +1688,27 @@ function _essenceRecipeUsage(essenceId, recipes) {
  *   `buildWorldScopeState()` published this refresh — `{ worldScope: { component, essence, tool } }`.
  * @returns {Map<string, string>} essence id → the world's authored colour key; absent when none.
  */
+/**
+ * The essence ids the WORLD catalogue holds, off the state this refresh published (issue 1371
+ * r19-store2).
+ *
+ * The bulk panel's `Colour` axis is withheld for an essence the world corpus holds, because the
+ * M29 read overlay hides anything it writes there — the same condition `EssenceEditView` calls
+ * `scopedKnown`. The panel is a leaf with no corpus of its own, so the fact is stamped on each
+ * row here, beside the colour the same corpus supplies.
+ *
+ * @param {{worldScope?: {essence?: {entries?: Array<object>}}}|null} worldScopeState
+ * @returns {Set<string>} the world essence ids; empty when there is no world corpus.
+ */
+function _worldEssenceIds(worldScopeState) {
+  const ids = new Set();
+  for (const entry of worldScopeState?.worldScope?.essence?.entries ?? []) {
+    const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
 function _worldEssenceColourById(worldScopeState) {
   const byId = new Map();
   for (const entry of worldScopeState?.worldScope?.essence?.entries ?? []) {
@@ -4996,6 +5017,7 @@ export function createAdminStore(services) {
       const componentTagOptions = _buildComponentTagOptions(managedItems);
       const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
       const worldEssenceColourById = _worldEssenceColourById(worldScopeState);
+      const worldEssenceIds = _worldEssenceIds(worldScopeState);
 
       const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
         ? selectedSystem.essenceDefinitions
@@ -5023,6 +5045,10 @@ export function createAdminStore(services) {
           // ruling M29). See `_worldEssenceColourById`: a colour the Essence Catalogue
           // authored wins over the row's own, an unauthored one leaves the row's standing.
           colorToken: worldEssenceColourById.get(def.id) ?? def.colorToken ?? null,
+          // WHETHER THE WORLD CATALOGUE HOLDS IT (issue 1371 r19-store2). See `_worldEssenceIds`:
+          // this is what the essence bulk panel withholds its colour axis on, and it is stated
+          // here rather than derived at the panel because the panel has no corpus to ask.
+          worldDefined: worldEssenceIds.has(def.id),
           sourceComponentId,
           associatedSystemItemId: sourceComponentId || null,
           associatedItem,

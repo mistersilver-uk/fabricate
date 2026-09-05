@@ -148,3 +148,45 @@ test('M29/3: a world essence the roster does not hold, or no world store at all,
   assert.equal(fireRow(withoutStore).colorToken, 'butter');
   assert.equal(coalCardEssence(withoutStore).colorToken, 'butter');
 });
+
+// ── AND THE MARKER THE BULK PANEL GATES ITS COLOUR AXIS ON (r19-store2) ───────────────────────
+//
+// The read overlay above is what makes a system-scope colour WRITE pointless wherever the world
+// catalogue holds the essence, so the essence bulk panel withholds its `Colour` axis on exactly
+// the condition `EssenceEditView`'s `scopedKnown` uses. The panel is a leaf with no corpus of its
+// own, so the manager's refresh stamps the fact on each row.
+
+test('M29/4: an essence the WORLD corpus holds is marked worldDefined on the row and the card', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire', colorToken: 'butter' })],
+    components: [coal()],
+  });
+  const scope = makeWorldScopeStoreFake([{ id: 'fire', name: 'Fire', colorToken: 'rose' }]);
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+
+  assert.equal(fireRow(store).worldDefined, true);
+  assert.equal(
+    get(store.viewState).essenceCards.find((card) => card.id === 'fire').worldDefined,
+    true,
+    'the essence cards are what the bulk panel is handed as its selected rows'
+  );
+});
+
+test('M29/4: and one the world corpus does NOT hold, or no world store at all, is not', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire', colorToken: 'butter' })],
+    components: [coal()],
+  });
+  const scope = makeWorldScopeStoreFake([{ id: 'water', name: 'Water' }]);
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+  assert.equal(fireRow(store).worldDefined, false, 'a stranger id marks nothing');
+
+  const bare = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire', colorToken: 'butter' })],
+    components: [coal()],
+  });
+  const noStore = await openStore(bare);
+  assert.equal(fireRow(noStore).worldDefined, false, 'and no world store at all marks nothing');
+});

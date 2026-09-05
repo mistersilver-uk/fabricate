@@ -15,6 +15,20 @@
   unique to one essence or carries behaviour a whole-selection overwrite would destroy. The
   panel says so, in place, rather than leaving their absence to be inferred.
 
+  ── AND THE COLOUR AXIS IS WITHHELD FOR A WORLD-KNOWN SELECTION (issue 1371 r19-store2) ──
+  Maintainer ruling M29 draws every system-scope essence in the colour the world Essence
+  Catalogue gave it, and that overlay WINS over the in-system row wherever the world authored
+  one — which the `1.30.0` identity lift did for every essence whose donor had a colour. A
+  write on this axis therefore landed on a field the very next refresh hid: the rows snapped
+  back, the GM's edit was gone and nothing said so. The per-essence editor already withholds
+  its colour control on exactly this condition (`EssenceEditView`'s `scopedKnown`), so this is
+  that same gate at the bulk site, read off the rows' own `worldDefined` marker.
+
+  ANY world-known essence in the selection withholds it, not all: this axis writes ONE
+  instruction to the whole selection, so an axis that would be shadowed for some of them
+  cannot state a true promise about the set. The absence is stated in place, as the
+  per-essence absences above are.
+
   ── THE BULK DELETE IS ARMED, AND THAT IS A DELIBERATE DEVIATION ──────────────────
   `AGENTS.md`'s carve-out reserves the two-step arm for high-frequency destructive ROW
   actions and keeps `confirmDialog` for "any bulk or reset action". The maintainer's binding
@@ -109,6 +123,12 @@
   }
 
   const inert = $derived(applying === true || deleting === true);
+  // Whether the WORLD Essence Catalogue holds any selected essence, off the marker the manager's
+  // refresh stamps on each row. Absent on a fixture or a world with no corpus, which leaves the
+  // axis exactly as it shipped.
+  const worldOwnsColour = $derived(
+    (Array.isArray(selectedRows) ? selectedRows : []).some((row) => row?.worldDefined === true)
+  );
   const impact = $derived(describeEssenceDeleteImpact(selectedRows));
   const colourValue = $derived(bulkEssenceColourControlValue(draft));
   // The three staged colour instructions are `''` (leave unchanged), `'__none__'` (clear)
@@ -315,50 +335,63 @@
     />
   </div>
 
-  <BulkEditSection
-    label={text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}
-    subhint={stagedColourLabel}
-    subhintAttr="data-essence-bulk-colour-state"
-    subhintValue={colourValue || 'unchanged'}
-  >
-    {#snippet trailing()}
-      <Chip
-        tag="button"
-        type="button"
-        tone={colourValue === ESSENCE_BULK_COLOUR_UNCHANGED ? 'neutral' : 'warning'}
-        icon="fas fa-undo"
-        data-essence-bulk-colour-reset
-        disabled={inert || colourValue === ESSENCE_BULK_COLOUR_UNCHANGED}
-        onclick={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED))}
-        >{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</Chip
-      >
-    {/snippet}
-  </BulkEditSection>
-  <!--
+  {#if worldOwnsColour}
+    <!-- THE WITHHELD AXIS, STATED IN PLACE. See the header note: the world catalogue owns this
+         essence's colour and the read overlay would hide anything written here. -->
+    <Callout
+      tone="info"
+      text={text(
+        'FABRICATE.Admin.Manager.Essence.BulkEdit.ColourWorldNote',
+        'Colour comes from the Essence Catalogue and is shared by every system, so it is not edited here.'
+      )}
+      dataAttr="data-essence-bulk-colour-world"
+    />
+  {:else}
+    <BulkEditSection
+      label={text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}
+      subhint={stagedColourLabel}
+      subhintAttr="data-essence-bulk-colour-state"
+      subhintValue={colourValue || 'unchanged'}
+    >
+      {#snippet trailing()}
+        <Chip
+          tag="button"
+          type="button"
+          tone={colourValue === ESSENCE_BULK_COLOUR_UNCHANGED ? 'neutral' : 'warning'}
+          icon="fas fa-undo"
+          data-essence-bulk-colour-reset
+          disabled={inert || colourValue === ESSENCE_BULK_COLOUR_UNCHANGED}
+          onclick={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED))}
+          >{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</Chip
+        >
+      {/snippet}
+    </BulkEditSection>
+    <!--
     THREE instructions, never two: leave unchanged, clear to the theme accent, or a token.
     The palette is rendered INLINE (`layout="inline"`) with the No-colour cell switched on,
     which is the only route this palette has ever had back to unset — and both are gated
     props, so the environments biome popover is untouched.
   -->
-  <div class="manager-essence-bulk-colour" data-essence-bulk-colour={colourValue || 'unchanged'}>
-    <ManagerColorPopover
-      layout="inline"
-      allowNone
-      allowCustom={false}
-      manageDismiss={false}
-      colorToken={isTokenStaged ? colourValue : ''}
-      unset={!isTokenStaged}
-      noneSelected={colourValue === ESSENCE_BULK_COLOUR_NONE}
-      customColor=""
-      presetGridLabel={text(
-        'FABRICATE.Admin.Manager.Essence.Colour.Presets',
-        'Essence colour presets'
-      )}
-      noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
-      onClear={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_NONE))}
-      onChange={(next) => onDraftChange(setBulkEssenceColour(draft, next?.colorToken || ''))}
-    />
-  </div>
+    <div class="manager-essence-bulk-colour" data-essence-bulk-colour={colourValue || 'unchanged'}>
+      <ManagerColorPopover
+        layout="inline"
+        allowNone
+        allowCustom={false}
+        manageDismiss={false}
+        colorToken={isTokenStaged ? colourValue : ''}
+        unset={!isTokenStaged}
+        noneSelected={colourValue === ESSENCE_BULK_COLOUR_NONE}
+        customColor=""
+        presetGridLabel={text(
+          'FABRICATE.Admin.Manager.Essence.Colour.Presets',
+          'Essence colour presets'
+        )}
+        noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
+        onClear={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_NONE))}
+        onChange={(next) => onDraftChange(setBulkEssenceColour(draft, next?.colorToken || ''))}
+      />
+    </div>
+  {/if}
 
   <BulkEditSection label={text('FABRICATE.Admin.Manager.Essence.Status.Label', 'Status')} />
   <SegmentedControl

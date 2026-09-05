@@ -518,3 +518,51 @@ describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
     harness.remount();
   });
 });
+
+describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalogue', () => {
+  // M29 draws every system-scope essence in the colour the world Essence Catalogue gave it, and
+  // that overlay wins over the in-system row wherever the world authored one — which, since the
+  // `1.30.0` lift authored `colorToken` on the world entity for every essence whose donor had
+  // one, is almost everywhere. So this axis wrote a value the very next refresh hid: the rows
+  // snapped back and the GM's edit was gone with no message. The per-essence editor already
+  // withholds its colour control on exactly this condition (`scopedKnown`); this is that gate.
+
+  it('WITHHOLDS the colour axis when the world corpus holds the selection, and says why', async () => {
+    const root = await harness.mount(
+      props(SELECTION.map((row) => ({ ...row, worldDefined: true })))
+    );
+
+    assert.ok(!root.querySelector('[data-essence-bulk-colour]'), 'no palette');
+    assert.ok(!root.querySelector('[data-essence-bulk-colour-reset]'), 'and no axis reset');
+    const note = root.querySelector('[data-essence-bulk-colour-world]');
+    assert.ok(note, 'the absence is STATED in place rather than left to be inferred');
+    assert.ok(
+      note.textContent.includes('Essence Catalogue'),
+      'and it names where the colour is edited instead'
+    );
+    // NON-VACUITY: the two axes this panel still owns are untouched.
+    assert.ok(root.querySelector('[data-essence-bulk-icon-reset]'), 'the Icon axis stays');
+    assert.ok(root.querySelector('[data-essence-bulk-status]'), 'and the Status axis stays');
+    harness.remount();
+  });
+
+  it('keeps the axis when NO selected essence is world-known', async () => {
+    // The default path, and the other half of the pair above: an essence the world catalogue does
+    // not hold is an ordinary state, and its colour is this system's own to set.
+    const root = await harness.mount(props(SELECTION));
+
+    assert.ok(root.querySelector('[data-essence-bulk-colour]'), 'the palette is there');
+    assert.ok(!root.querySelector('[data-essence-bulk-colour-world]'), 'and no note in its place');
+    harness.remount();
+  });
+
+  it('withholds it for a MIXED selection, because the axis cannot be true of only some', async () => {
+    const root = await harness.mount(
+      props([{ ...SELECTION[0], worldDefined: true }, SELECTION[1]])
+    );
+
+    assert.ok(!root.querySelector('[data-essence-bulk-colour]'));
+    assert.ok(root.querySelector('[data-essence-bulk-colour-world]'));
+    harness.remount();
+  });
+});
