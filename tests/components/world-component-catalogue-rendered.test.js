@@ -51,6 +51,8 @@ import { before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
+// The frame's lifted view-state factory, so the paged mount below states the SHIPPED shape.
+import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
 import {
   COMPONENT_SYSTEMS,
   componentScopeFor,
@@ -270,6 +272,37 @@ function measureToolbarType() {
   }
 }
 
+/**
+ * The list column's LEAD and FOOT, measured against the column itself (issue 1371 r13-cat).
+ *
+ * M13: the drop zone takes the whole lead row now that the `+ Register item` action is gone.
+ * M19: the pager spans the column edge to edge and sits flush at its bottom, the way the system
+ * rules list draws its footer — measured in the lab before the change at 337→1143 inside a
+ * 321→1159 column, i.e. 16px short of both edges and of the bottom, because it sat inside the
+ * column's own `--fab-space-4` inset.
+ *
+ * Read off a mount whose view-state pages at TWO rows, because the frame's pager is
+ * `multiPageOnly` and the corpus is four records: at the default window there is no pager in
+ * the markup to measure at all.
+ */
+function measureListFrame() {
+  const box = (selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+    const b = element.getBoundingClientRect();
+    return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, width: b.width };
+  };
+  return {
+    column: box('.manager-scoped-list-column'),
+    lead: box('.manager-scoped-list-lead'),
+    dropZone: box('[data-item-drop-zone="component-create"]'),
+    registerAction: box('[data-scoped-list-register-item]'),
+    firstRow: box('[data-scoped-list-row]'),
+    pager: box('.manager-scoped-list-column > .manager-pagination'),
+    pagerSummary: box('[data-pagination-summary]'),
+  };
+}
+
 /** The row's leading edge order, which is the other half of the delta's own criterion. */
 function measureRowOrder() {
   const row = document.querySelector('[data-scoped-list-row="resin"]');
@@ -288,11 +321,12 @@ function measureRowOrder() {
 }
 
 describe('the catalogue’s rendered pointer targets and toolbar micro-type', () => {
-  const rendered = { markup: '', armed: false, scoped: null };
+  const rendered = { markup: '', pagedMarkup: '', armed: false, scoped: null };
   let honest = null;
   let overlaid = null;
   let rowOrder = null;
   let toolbarType = null;
+  let listFrame = null;
 
   before(async () => {
     rendered.scoped = collectScopedCss();
@@ -314,6 +348,19 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       await drainMicrotasks();
       rendered.armed = danger.getAttribute('data-armed') === 'true';
       rendered.markup = target.innerHTML;
+
+      // A SECOND MOUNT, paged at two rows, so the foot pager is in the markup (see
+      // `measureListFrame`). Nothing is ticked here: the bulk dock replaces the inspector, and
+      // this mount measures the resting column.
+      const paged = await harness.mount({
+        scope: componentScopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: [],
+        browserState: { ...createScopedListBrowserState(), pageSize: 2 },
+      });
+      await drainMicrotasks();
+      rendered.pagedMarkup = paged.innerHTML;
     } finally {
       harness.teardown();
     }
@@ -334,6 +381,10 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         { waitUntil: 'load' }
       );
       overlaid = await page.evaluate(measurePointerTargets, TARGETS);
+      await page.setContent(cataloguePage(rendered.pagedMarkup, rendered.scoped.css, ''), {
+        waitUntil: 'load',
+      });
+      listFrame = await page.evaluate(measureListFrame);
     } finally {
       await browser.close();
     }
@@ -445,6 +496,59 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       toolbarType.secondaryInk,
       'and takes the secondary ink the reference gives it — compared against the TOKEN the ' +
         'theme resolves, so a theme change moves both sides together'
+    );
+  });
+
+  it('gives the drop zone the WHOLE lead row, with no action beside it (M13)', () => {
+    const { lead, dropZone, registerAction } = listFrame;
+    assert.ok(Boolean(lead) && Boolean(dropZone), 'the lead and its zone render');
+    assert.ok(
+      !registerAction,
+      'the `+ Register item` action is gone — before M13 it stood at 1011→1155 in the lab, ' +
+        'past the lead`s own right edge at 1131'
+    );
+    assert.ok(dropZone.width > 400, 'NON-VACUITY: the zone is a real width, not a collapsed box');
+    assert.equal(
+      Math.round(dropZone.left),
+      Math.round(lead.left),
+      'the zone starts where the lead starts'
+    );
+    assert.equal(
+      Math.round(dropZone.right),
+      Math.round(lead.right),
+      'and ends where the lead ends: it takes the whole row'
+    );
+  });
+
+  it('draws the pager edge to edge and flush at the column`s bottom, as the rules list does (M19)', () => {
+    const { column, pager, firstRow, pagerSummary } = listFrame;
+    assert.ok(Boolean(pager), 'the two-row window puts a foot pager in the markup');
+    assert.ok(pager.width > 400, 'NON-VACUITY: the pager is a real width');
+    // THE ROWS SIT INSIDE THE BAND'S EDGES, which is the relationship the maintainer's frame
+    // showed inverted: the band stopped short of the rows' own inset on both sides.
+    assert.ok(
+      firstRow.left > pager.left && firstRow.right < pager.right,
+      `the rows (${firstRow.left}→${firstRow.right}) are inside the band ` +
+        `(${pager.left}→${pager.right})`
+    );
+    assert.equal(
+      Math.round(pager.left),
+      Math.round(column.left),
+      'the band starts at the column`s own left edge, not at its padding edge'
+    );
+    assert.equal(
+      Math.round(pager.right),
+      Math.round(column.right),
+      'and ends at the column`s right edge, which is the inspector`s divider'
+    );
+    assert.equal(
+      Math.round(pager.bottom),
+      Math.round(column.bottom),
+      'and sits flush at the column`s bottom, as the rules list`s footer does'
+    );
+    assert.ok(
+      pagerSummary.left > pager.left,
+      'while the summary keeps the band`s own inset, so the text does not touch the pane edge'
     );
   });
 

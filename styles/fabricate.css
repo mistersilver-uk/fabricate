@@ -26138,47 +26138,6 @@
   font-weight: 600;
 }
 
-/* ── THE `Register item` ACTION (gap-list row 1, M10) ────────────────────────────────────────
-   `proto:570` draws it 38px tall on a 9px corner in the success family with `--on-accent` ink.
-
-   THE GEOMETRY IS THE PRIMITIVE'S NOW, AND ONLY THE PAINT IS HERE (issue 1371 r10). This rule
-   used to state `height: 38px`, `min-height: 38px` and `border-radius: 9px`, because the control
-   was a `SearchablePopover` trigger rendered as a bare `<button class={triggerClass}>` and the
-   rung's own selector — `.manager-button.fab-manager-button.is-size-38` — demands a class only
-   `ManagerButton` writes. The popover has a `triggerButton` form now and this site uses it, so
-   38 arrives from that rung and 9 from the primitive's control rule, and the three declarations
-   are retired rather than restated: a second source of truth for a published value is the exact
-   failure `ManagerButton.svelte`'s own header exists to end.
-
-   What is left is what the primitive does not own: the success family, the reference's label
-   size and weight, and the one-line clamp.
-
-   IT IS STILL AUTHORED HERE, and for the unchanged reason: `SearchablePopover` renders the
-   trigger in its OWN template, so the page's scoped block carries a hash this element never
-   wears — the same mechanism the selection band's note records one block up. */
-.fabricate-manager .manager-button.manager-world-component-register-action {
-  flex: 0 0 auto;
-
-  /* `proto:570` writes the label at 12.5px/700; the shared manager button states 0.72rem, which
-     is a step smaller than the reference's own. This rule ties the primitive's control rule at
-     (0,3,0) and stands later in the sheet, so it decides. */
-  font-size: 0.78rem;
-
-  /* AND THE VERB HOLDS ONE LINE. It stands beside a drop zone that takes the column's slack, so
-     without this the two words wrap and the 38px control grows to 54px — measured in the lab. */
-  white-space: nowrap;
-  border-color: var(--fab-success-border);
-  background: var(--fab-success);
-  color: var(--fab-on-success);
-  font-weight: 700;
-}
-
-.fabricate-manager .manager-button.manager-world-component-register-action:not(:disabled):hover {
-  border-color: var(--fab-success-border);
-  background: var(--fab-success-strong);
-  color: var(--fab-on-success);
-}
-
 /* ── THE BULK PANEL'S STAGED COUNT IS A NUMERAL (gap-list row 46) ────────────────────────────
    `proto:629` writes each group's staged count in the MONO face beside its label, which is what
    distinguishes it from the sentence-shaped hints the same slot carries elsewhere in the manager.
@@ -26281,4 +26240,42 @@
    the `letterSpacing` line closes with the size and needs no declaration of its own. */
 .fabricate-manager[data-manager-view="components"] .manager-component-filter-label {
   font-size: 8.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r13-cat — the world Component catalogue's foot pager (maintainer ruling M19).
+   Appended; no rule above this block is edited by it. The two `+ Register item` rules that
+   stood in the r8-cat block above are DELETED in the same change (M13 removed the control).
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── THE PAGER IS A FULL-WIDTH BAND, AS THE SYSTEM RULES LIST DRAWS ITS OWN (M19) ────────────
+   "the pagination footer on the component browser is not full width in the world component
+   catalogue." Measured in the lab before this rule: the band ran 337→1143 inside a 321→1159
+   column, 16px short of both edges and of the bottom, because `EntityListInspectorFrame`'s
+   list column carries the pane's `--fab-space-4` inset and the pager is a flex child inside it.
+   The system Component Rules list draws its footer edge to edge and flush at the pane's bottom
+   — its `Pagination` is a child of a `.manager-main` that carries no inset — and that is the
+   example copied here: the band bleeds through the column's inset on the three edges it meets
+   and keeps its own 12px content inset, so the summary and the per-page select stay off the
+   pane edge. The rows above keep their inset and sit inside the band's edges, exactly as the
+   rules list's rows sit inside its footer.
+
+   THE FILL COMES BACK WITH THE WIDTH. The route block flattened this pager to transparent when
+   the rows were flattened; r8 gave the rows their `--fab-bg-1` fill back and left the band, so
+   a full-width transparent band would read as a hairline floating under the list rather than
+   as the rules list's footer. The wash restated here is the shared `.manager-pagination` one
+   the rules list draws, stated at the route rather than un-flattened in the older block.
+
+   `margin-block-end`, not `bottom`: the column is a flex column and the pager is its last
+   child, so a negative end margin walks it into the column's own padding-bottom. THIS ROUTE
+   ONLY: M19 names one screen, and the essence and tool catalogues keep the band they draw.
+
+   SPECIFICITY, NOT SOURCE ORDER. The route flatten and the r8-cat block are (0,3,0); this is
+   (0,4,0) through the column class, so it decides wherever it is written. The frame's own
+   `.manager-scoped-list-column > :global(.manager-pagination)` declares `flex` alone, so the
+   unlayered block it lives in contests nothing here. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .manager-pagination {
+  margin-inline: calc(-1 * var(--fab-space-4));
+  margin-block-end: calc(-1 * var(--fab-space-4));
+  background: var(--fab-overlay-light-03);
 }

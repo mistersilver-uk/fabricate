@@ -327,6 +327,22 @@
     restingHint = '',
     selectedId = $bindable(''),
     onSelect = () => {},
+    // ── THE FIRST ROW IS INSPECTED ON OPEN, WHEN A LANE ASKS (issue 1371 r13-cat, M14) ─────
+    // "the component library should auto-select the first component when it is opened." OPT-IN
+    // and OFF by default, so a frame that says nothing opens on the resting inspector it always
+    // did and the essence and tool catalogues are byte-identical. The effect below fires ONLY
+    // while nothing at all is selected: a selection the owner hands in — a deep link, a restore
+    // after a refused navigation, a remembered id — is never fought, and a row the GM chose stays
+    // chosen through a sort, a page turn or a filter that hides it (the frame keeps the id so
+    // the row comes back when the filter clears; see `inspectedEntry`). It selects the first row
+    // of the PAGE on screen, which on a remembered page is that page's first, and it does NOT
+    // focus the inspector the way `inspect()` does for a click: a selection the frame made on
+    // its own must not move the keyboard.
+    //
+    // THE ONE THING IT GIVES UP, recorded: while it is on and rows exist, an owner cannot park
+    // the list on the resting inspector by writing `''`, because that is exactly the state it
+    // fills. No caller of this opt-in does; the world Component catalogue never writes `''`.
+    autoSelectFirst = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
     // Search, membership, the lane filters, the sort pair and the page live on an object the
@@ -529,6 +545,18 @@
   // Converges in one tick: once they are equal the effect assigns nothing.
   $effect(() => {
     if (page.pageIndex !== pageIndex) ui.pageIndex = page.pageIndex;
+  });
+
+  // THE FIRST SHOWN ROW, WHEN NOTHING IS CHOSEN AND THE LANE OPTED IN (M14; see the prop note).
+  // Guarded on the prop FIRST, so an unset frame never reads a row here. `selectedId` is written
+  // through the binding exactly as `inspect()` writes it, and `onSelect` fires so an owner that
+  // reacts without binding hears it too. Converges in one pass: once written, the guard returns.
+  $effect(() => {
+    if (!autoSelectFirst || selectedId !== '') return;
+    const first = page.rows[0];
+    if (!first) return;
+    selectedId = first.id;
+    onSelect(first.id);
   });
 
   // A filter that shrinks the list must not leave a phantom id in `Apply to {N}`. Guarded on

@@ -355,11 +355,14 @@ const SHEET = 'styles/fabricate.css';
 // template rather than being flattened into a literal or deleted.
 /**
  * The one population-B site issue 1371 r10 converted onto `SearchablePopover`'s `triggerButton`
- * form. Named here so the count assertion below can re-derive it from the tree rather than
- * trusting that a population that shrank by one shrank for the right reason.
+ * form, and the site issue 1371 r13 then DELETED under maintainer ruling M13. Named here so the
+ * count assertion below can re-derive from the tree that the population shrank for the right
+ * reason — by a conversion and then a removal, never by a slide back to a hand-written token.
  */
-const POPULATION_B_CONVERTED_FILE =
+const POPULATION_B_RETIRED_SITE_FILE =
   'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte';
+/** The primitive whose trigger form that site was the first consumer of. It outlives the site. */
+const SEARCHABLE_POPOVER_FILE = 'src/ui/svelte/components/SearchablePopover.svelte';
 
 const POPULATION_C_FILE = 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 const globalRule = (selector) => `${SHEET}#${selector}`;
@@ -857,26 +860,21 @@ const REVIEWED = [
   // REMOVED at issue 1371 r10, and the removal is recorded rather than performed silently.
   //
   // The two entries were `.manager-button.manager-world-component-register-action` and its
-  // `:not(:disabled):hover`, dispositioned EXCLUDE one revision ago because the world Component
-  // catalogue`s `+ Register item` was a `SearchablePopover` `triggerClass` site — population B,
-  // never gaining `fab-manager-button`, so the rule`s 38px height and 9px corner could not be
-  // re-chained without repainting a control the sweep was not converting.
+  // `:not(:disabled):hover`, dispositioned EXCLUDE one revision earlier because the world
+  // Component catalogue`s `+ Register item` was a `SearchablePopover` `triggerClass` site —
+  // population B, never gaining `fab-manager-button`, so the rule`s 38px height and 9px corner
+  // could not be re-chained without repainting a control the sweep was not converting. r10 gave
+  // the popover a `triggerButton` form and that site used it, so the two rules kept only the
+  // site`s paint and took no disposition here at all: the instrument derived no call site for
+  // them, and EXCLUDE — whose whole content is `reaches a site, and no CONVERTING one` — could
+  // no longer be asserted of them.
   //
-  // `SearchablePopover` has a `triggerButton` form now and that site uses it, so the trigger IS
-  // the primitive: the sheet rule keeps only the site`s paint, the height and the corner come
-  // from `.manager-button.fab-manager-button.is-size-38` and the primitive`s control rule, and
-  // the call site writes no `manager-button` token at all. The instrument therefore derives no
-  // call site for either rule, so EXCLUDE — whose whole content is `reaches a site, and no
-  // CONVERTING one` — can no longer be asserted of them.
-  //
-  // They are not DEAD either: both still paint a real button on a real screen. The disposition
-  // that fits a rule reaching only buttons the tool cannot see is a `convertedReach`, and these
-  // two do not take one — `assertConvertedReach` counts `<ManagerButton` in a booked FILE, and
-  // the file that renders this one is `SearchablePopover.svelte`, which renders that tag once for
-  // every trigger of every consumer. Booking it would pin a number that moves whenever an
-  // unrelated picker converts, which is a guard that reds for the wrong reason. The cover that
-  // does hold is the catalogue`s own mounted suite, which asserts the trigger carries
-  // `fab-manager-button` and `is-size-38` and still carries the site class.
+  // AND AT ISSUE 1371 r13 THE RULES ARE GONE FROM THE SHEET. Maintainer ruling M13 removed the
+  // control itself ("Remove the `+ Register Item` button next to the drop zone … and make the
+  // drop zone full-width"), and a paint rule for a control no screen renders is a dead rule, so
+  // both were deleted rather than left to the dead-class gate. There is nothing for this
+  // register to describe; the entry stays as a record so the next reader does not go looking
+  // for two rules that were never silently dropped.
   {
     id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
@@ -1524,37 +1522,50 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // (`.manager-button.fab-manager-button.is-size-38`) demands a class only `ManagerButton`
   // writes — so a `triggerClass` string could not reach it however it was spelt. The popover now
   // takes `triggerButton={{ role, size, fullWidth }}` and renders the real primitive, and the
-  // catalogue is its first consumer: −1, to 12.
+  // catalogue became its first consumer: −1, to 12.
+  //
+  // AND AT ISSUE 1371 r13 THE SITE ITSELF LEFT THE PRODUCT (maintainer ruling M13): the
+  // catalogue's `+ Register item` was removed outright and its drop zone took the whole row.
+  // That moves NOTHING here — a converted site was already outside population B — and the
+  // primitive's `triggerButton` form stays, because a form is the primitive's and not its first
+  // consumer's; `searchable-popover-trigger-form-mounted.test.js` is its cover. What the proof
+  // below used to re-derive — "the site still renders the picker through the primitive form" —
+  // is no longer a fact about the tree, so it is REPLACED rather than left to match a control
+  // that does not exist: the count is 12 AND the page renders no popover at all AND the
+  // primitive still declares the form. A count of 12 satisfied by the page slipping back to a
+  // hand-written `manager-button` token would fail the second clause.
   //
   // THE OTHER TWELVE ARE NOT CONVERTED HERE, deliberately. Each of them carries a per-site sheet
   // rule restating a height or a corner, so converting one re-arbitrates that site's own cascade
   // and needs its own measurement; twelve at once would be twelve repaints inside a change about
   // a trigger contract. They are a named follow-up rather than a silent remainder, and this
   // number is what will move when it lands.
-  //
-  // The two rules that styled the converted site — `.manager-world-component-register-action`
-  // and its `:hover` — left the EXCLUDE register in the same change; the note there records why
-  // they take no disposition at all now.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
     12,
     'plus the 12 SearchablePopover triggerClass sites still named as debt'
   );
-  // ...AND THE ONE THAT LEFT LEFT BY CONVERTING, not by deletion. The count above is satisfied
-  // just as well by the control being removed from the product, which is the failure mode every
-  // ledger assertion in this file is written against. So the converted site is re-derived from
-  // the tree: the page still renders the picker, hands it the primitive form, and no longer
-  // hand-writes the token this instrument keys on.
-  const registerSite = readFileSync(resolve(repoRoot, POPULATION_B_CONVERTED_FILE), 'utf8');
-  assert.match(
-    registerSite,
-    /<SearchablePopover[^]*?triggerButton=\{\{ size: '38' \}\}/,
-    `${POPULATION_B_CONVERTED_FILE} should still render its register picker through the ` +
-      'primitive trigger form — a count of 12 with this gone would be a deleted control'
+  // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING, not by slipping back. The
+  // count above is satisfied just as well by a site that re-wrote the population-B token, which
+  // is the failure mode every ledger assertion in this file is written against. So the retired
+  // site is re-derived from the tree: the page renders no `SearchablePopover` at all (M13), it
+  // writes no population-B token, and the primitive still carries the trigger form the site
+  // was the first consumer of.
+  const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');
+  assert.ok(
+    !/<SearchablePopover\b/.test(retiredSite),
+    `${POPULATION_B_RETIRED_SITE_FILE} renders no popover at all since M13 — a trigger here ` +
+      'would be a 13th population-B site or a converted one, and either is a change to this count'
   );
   assert.ok(
-    !registerSite.includes('triggerClass="manager-button'),
-    `${POPULATION_B_CONVERTED_FILE} must not write the population-B token again`
+    !retiredSite.includes('triggerClass="manager-button'),
+    `${POPULATION_B_RETIRED_SITE_FILE} must not write the population-B token again`
+  );
+  assert.match(
+    readFileSync(resolve(repoRoot, SEARCHABLE_POPOVER_FILE), 'utf8'),
+    /\n\s*triggerButton = null,/,
+    `${SEARCHABLE_POPOVER_FILE} should still declare the \`triggerButton\` form: it is the ` +
+      'primitive`s, and it outlives the consumer M13 removed'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

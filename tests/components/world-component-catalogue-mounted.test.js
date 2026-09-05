@@ -24,6 +24,7 @@ import {
   COMPONENT_SYSTEMS,
   componentCorpus,
   componentScopeFor,
+  createComponentScopeHarness,
   createWorldComponentCatalogueHarness,
   drainMicrotasks,
   recordingComponentActions,
@@ -456,7 +457,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     });
   });
 
-  describe('the list opens with the surface that MAKES a component', () => {
+  describe('the list opens with the surface that MAKES a component, and nothing beside it', () => {
     async function mountLead(props = {}) {
       return harness.mount({
         scope: scopeFor(),
@@ -467,88 +468,64 @@ describe('world Component Catalogue (issue 1371)', () => {
       });
     }
 
-    // Gap-list row 1 / M10.
-    it('draws `Register item` beside the drop zone, offering only unregistered Items', async () => {
-      const target = await mountLead();
-      const action = target.querySelector('[data-scoped-list-register-item]');
-      assert.ok(Boolean(action), 'the header action is built');
-      assert.match(action.textContent, /Register item/);
-      assert.ok(
-        Boolean(target.querySelector('[data-item-drop-zone="component-create"]')),
-        'and M2\'s drop zone stands beside it rather than being replaced by it'
-      );
-
-      action.click();
-      await drain();
-      const options = [...target.querySelectorAll('[data-popover-option]')].map((option) =>
-        option.getAttribute('data-popover-option')
-      );
-      assert.deepEqual(
-        options,
-        ['Item.spare-source'],
-        'the Item already registered as `ingot` is not offered: choosing it could only report ' +
-          'that it did nothing'
-      );
-    });
-
-    // Gap-list row 1 / M10 / M12, and the reason `SearchablePopover` grew a `triggerButton`
-    // form: `proto:570` draws this control at 38px, 38 is a published rung, and the rung's own
-    // selector is `.manager-button.fab-manager-button.is-size-38` — `fab-manager-button` is
-    // written by `ManagerButton` and by nothing else. So a trigger imitating the primitive with
-    // `triggerClass="manager-button …"` could not reach the rung however it was spelt, and the
-    // sheet had to restate a height and a corner the primitive already owns.
+    // M13 (issue 1371 r13-cat), amending M10. The maintainer's own words from testing the branch:
+    // "Remove the `+ Register Item` button next to the drop zone in the component catalogue
+    // browser and make the drop zone full-width. That search popover doesn't even seem to list
+    // unregistered Foundry items, and a search by name is not the intended flow."
     //
-    // The CLASS LIST is the assertion because the class list is the mechanism. A height read off
-    // this mount would be `happy-dom`'s guess with no stylesheet attached, which is why the
-    // measured 38px lives in the parity run and the reachability lives here.
-    it('renders `Register item` through the real ManagerButton, at the 38px rung', async () => {
+    // happy-dom lays nothing out, so "full-width" is stated here as the STRUCTURE that makes it
+    // true — the zone is the lead's only child, with no flex sibling to share the row — and the
+    // measured width is the rendered suite's (`world-component-catalogue-rendered.test.js`).
+    it('draws the drop zone ALONE at the head of the list: no `Register item` beside it (M13)', async () => {
       const target = await mountLead();
-      const action = target.querySelector('[data-scoped-list-register-item]');
-      const classes = [...action.classList].filter((name) => !name.startsWith('svelte-'));
+      const lead = target.querySelector('.manager-scoped-list-lead');
+      assert.ok(Boolean(lead), 'NON-VACUITY: the frame renders the list lead this page supplies');
+      const zone = lead.querySelector('[data-item-drop-zone="component-create"]');
+      assert.ok(Boolean(zone), 'M2`s drop zone still opens the list');
+      assert.match(zone.textContent, /Drag an Item here to make it a component/);
 
       assert.ok(
-        classes.includes('fab-manager-button'),
-        'the trigger must carry the class only `ManagerButton` writes — without it the rung ' +
-          'below matches nothing and the control drops to Foundry`s own button height'
+        !target.querySelector('[data-scoped-list-register-item]'),
+        'the M10 action is gone — M13 removes it rather than restyling it'
       );
       assert.ok(
-        classes.includes('is-size-38'),
-        'and the rung itself, which is what makes 38 reachable without a per-site sheet rule'
+        !lead.querySelector('[aria-haspopup], [data-popover-option]'),
+        'and no picker of any kind stands in the lead in its place'
       );
-      assert.ok(
-        classes.includes('manager-world-component-register-action'),
-        '`triggerClass` still travels: `ManagerButton`s `class` prop APPENDS, so this site`s own ' +
-          'paint rule keeps matching'
-      );
-      assert.ok(
-        classes.includes('manager-button'),
-        'the base token comes from the primitive now rather than from the call site, so the ' +
-          'sheet rule keyed on it is unaffected by the conversion'
-      );
-
-      // AND IT IS STILL THE POPOVER'S TRIGGER. A `ManagerButton` that had stopped opening the
-      // panel would satisfy every clause above while deleting the affordance.
-      assert.equal(action.getAttribute('aria-expanded'), 'false');
-      action.click();
-      await drain();
+      const children = [...lead.children];
       assert.equal(
-        action.getAttribute('aria-expanded'),
-        'true',
-        'the primitive receives the popover`s own click and ARIA contract through the spread'
+        children.length,
+        1,
+        'the zone is the lead`s ONLY child: a second flex item is what took the row`s width'
+      );
+      assert.ok(
+        children[0] === zone,
+        'and that child is the zone itself, not a wrapper still holding a slot for the action'
       );
     });
 
-    it('hands the chosen Item to the SAME resolver a sidebar drag reaches', async () => {
+    // The one thing the picker test used to cover on the way past: a registration reaches the
+    // root's resolver with the RAW drag data, the shipped `ItemDropZone` contract. It is stated
+    // on the zone now, because the zone is the only surface that registers.
+    it('hands a dropped Item to the SAME resolver a sidebar drag reaches', async () => {
       const drops = [];
       const target = await mountLead({ onCreateFromItemDrop: (data) => drops.push(data) });
-      target.querySelector('[data-scoped-list-register-item]').click();
-      await drain();
-      target.querySelector('[data-popover-option="Item.spare-source"]').click();
+      const zone = target.querySelector('[data-item-drop-zone="component-create"]');
+      // A Foundry-style drop: with no `foundry` global the action reads
+      // `dataTransfer.getData('text/plain')`, so a JSON payload round-trips as a real drag would.
+      const event = new target.ownerDocument.defaultView.Event('drop', {
+        bubbles: true,
+        cancelable: true,
+      });
+      event.dataTransfer = {
+        getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.spare-source' }),
+      };
+      zone.dispatchEvent(event);
       await drain();
       assert.deepEqual(
         drops,
         [{ type: 'Item', uuid: 'Item.spare-source' }],
-        'a registration cannot take a second path with a second set of refusals'
+        'the page raises the raw payload and the root resolves, refuses, creates and navigates'
       );
     });
   });
@@ -2032,6 +2009,198 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(
         !chip.classList.contains('is-tag-run'),
         'and NOT the entry’s control scale, which the reference draws at 11px for a chip a GM clicks'
+      );
+    });
+  });
+  // ── M14: THE CATALOGUE OPENS WITH ITS FIRST ROW INSPECTED (issue 1371 r13-cat) ─────────────
+  // "the component library should auto-select the first component when it is opened, both in the
+  // system-rules and world screens." This is the WORLD half; the system rules list is
+  // `ComponentsBrowserView`'s. It is an opt-in on the shared shell and frame (`autoSelectFirst`,
+  // default OFF, so the essence and tool catalogues are byte-identical) and this page wires it.
+  describe('the catalogue opens with its first row inspected (M14)', () => {
+    async function mountOpen(props = {}) {
+      return harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        ...props,
+      });
+    }
+
+    function selectedRowIds(target) {
+      return [...target.querySelectorAll('[data-scoped-list-row].is-selected')].map((row) =>
+        row.getAttribute('data-scoped-list-row')
+      );
+    }
+
+    function shownRowIds(target) {
+      return [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+        row.getAttribute('data-scoped-list-row')
+      );
+    }
+
+    function typeSearch(target, value) {
+      const search = target.querySelector('[data-scoped-list-search]');
+      search.value = value;
+      search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    }
+
+    it('inspects the FIRST row in the shown order the moment it opens, with nothing else chosen', async () => {
+      const target = await mountOpen();
+      // Name ascending is the shipped sort, so `Coal` leads the corpus.
+      assert.equal(shownRowIds(target)[0], 'coal', 'NON-VACUITY: the first row on screen');
+      assert.deepEqual(selectedRowIds(target), ['coal'], 'the first shown row is the inspected one');
+      assert.equal(
+        target.querySelector('[data-scoped-list-row="coal"]').getAttribute('aria-current'),
+        'true'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-list-inspector-name]').textContent.trim(),
+        'Coal',
+        'and the inspector describes it rather than resting on `Select a component`'
+      );
+      const inspector = target.querySelector('[data-scoped-list-inspector]');
+      assert.ok(
+        !/Select a component/.test(inspector.textContent),
+        'the resting copy is not shown over a populated inspector'
+      );
+      // AND FOCUS DID NOT MOVE. A row CLICK focuses the inspector so the keyboard follows the
+      // selection; a selection the frame made on its own must not yank focus out of wherever
+      // the GM's keyboard was when the screen opened.
+      const active = target.ownerDocument.activeElement;
+      assert.ok(
+        !(active && inspector.contains(active)),
+        'the auto-selection does not focus the inspector the way a click does'
+      );
+    });
+
+    it('takes the first SHOWN row, which on a remembered page is that page`s first', async () => {
+      // The lifted view-state remembers the page; the frame must not fight it by selecting a
+      // row that is not on screen, and must not reset the page to reach the corpus's first.
+      const target = await mountOpen({
+        browserState: { ...createScopedListBrowserState(), pageSize: 2, pageIndex: 1 },
+      });
+      assert.ok(
+        !shownRowIds(target).includes('coal'),
+        'NON-VACUITY: the corpus`s first row is on the page NOT shown'
+      );
+      assert.deepEqual(
+        selectedRowIds(target),
+        ['orphan'],
+        'the first row of the page a GM is on is the one inspected'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-list-inspector-name]').textContent.trim(),
+        'Unbound Salt'
+      );
+    });
+
+    it('does NOT re-select when the shown order changes', async () => {
+      const target = await mountOpen();
+      assert.deepEqual(selectedRowIds(target), ['coal'], 'opened on the first row');
+      target.querySelector('[data-scoped-list-direction]').click();
+      await drain();
+      assert.equal(
+        shownRowIds(target)[0],
+        'resin',
+        'NON-VACUITY: the direction toggle put a different row first'
+      );
+      assert.deepEqual(
+        selectedRowIds(target),
+        ['coal'],
+        'the inspected row is the one the frame chose on open, not the new first row'
+      );
+    });
+
+    it('keeps a chosen row through a filter that hides it, so it comes back when the filter clears', async () => {
+      // The frame's own rule — a row that leaves the filtered set stops being inspected, and its
+      // id is KEPT so the selection returns with the row — is not overridden by the opt-in. A
+      // frame that re-homed the selection to the first match on every keystroke would lose the
+      // GM's own choice to the act of searching for something else.
+      const target = await mountOpen();
+      target.querySelector('[data-scoped-list-inspect="ingot"]').click();
+      await drain();
+      assert.deepEqual(selectedRowIds(target), ['ingot'], 'the GM chose `Iron Ingot`');
+
+      typeSearch(target, 'resin');
+      await drain();
+      assert.deepEqual(shownRowIds(target), ['resin'], 'NON-VACUITY: the search hid the chosen row');
+      assert.deepEqual(selectedRowIds(target), [], 'and nothing on screen is inspected in its place');
+
+      typeSearch(target, '');
+      await drain();
+      assert.deepEqual(selectedRowIds(target), ['ingot'], 'the GM`s own choice is back');
+    });
+  });
+
+  // ── THE OPT-IN AT THE SHELL, where an owner can hand a selection in (issue 1371 r13-cat) ────
+  // The page cannot be handed a remembered or deep-linked selection — its `selectedId` is its own
+  // `$state('')` — so the rule that a selection the owner supplies WINS over the first row is
+  // stated on the shell, which the page composes and which binds `selectedId` from its owner.
+  // The same mount proves the default: with the prop unset the shell opens exactly as it always
+  // did, on a resting inspector, which is what keeps the essence and tool catalogues unchanged.
+  describe('the shell`s `autoSelectFirst` yields to a selection the owner supplies', () => {
+    const shellHarness = createComponentScopeHarness({
+      repoRoot,
+      tmpPrefix: 'fabricate-world-component-catalogue-shell-',
+      componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
+      compiledExtras: [
+        'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+        'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+        'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+        'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+        'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+        'src/ui/svelte/apps/manager/Callout.svelte',
+        'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+      ],
+    });
+
+    before(() => shellHarness.setup());
+    after(() => shellHarness.teardown());
+
+    function shellProps(props = {}) {
+      return {
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        hookValue: 'world-components',
+        title: 'Component catalogue',
+        countUnit: 'components',
+        inspectorKicker: 'Catalogue entry',
+        ...props,
+      };
+    }
+
+    it('a remembered or deep-linked selection wins over the first row', async () => {
+      const target = await shellHarness.mount(
+        shellProps({ autoSelectFirst: true, selectedId: 'ingot' })
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-list-row]').getAttribute('data-scoped-list-row'),
+        'coal',
+        'NON-VACUITY: the supplied selection is not the first row'
+      );
+      assert.ok(
+        target.querySelector('[data-scoped-list-row="ingot"]').classList.contains('is-selected'),
+        'the owner`s selection is the inspected row'
+      );
+      assert.ok(
+        !target.querySelector('[data-scoped-list-row="coal"]').classList.contains('is-selected'),
+        'and the first row was NOT selected over it'
+      );
+    });
+
+    it('and with the prop unset the shell opens resting, exactly as the other catalogues do', async () => {
+      const target = await shellHarness.mount(shellProps());
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-row="coal"]')),
+        'NON-VACUITY: there are rows to select'
+      );
+      assert.equal(
+        target.querySelectorAll('[data-scoped-list-row].is-selected').length,
+        0,
+        'the default is OFF: no row is inspected on open'
       );
     });
   });

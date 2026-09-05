@@ -62,6 +62,11 @@ function sourceOf(path) {
 // the shell still tests no `scope.entityType`.
 const CATALOGUE_PROPS = [
   'actions',
+  // THE FIRST-ROW AUTO-SELECTION (issue 1371 r13-cat, maintainer ruling M14). OPT-IN and OFF by
+  // default: with it unset the frame opens on a resting inspector exactly as it always did, so
+  // the essence and tool catalogues are byte-identical; the world Component catalogue turns it
+  // on. It is the shell's because a page composes the shell and never the frame.
+  'autoSelectFirst',
   'bulk',
   // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
   // shells, so the difference clause below is unchanged: one composition, configured per scope.
@@ -225,6 +230,9 @@ describe('the shells declare the pinned prop sets', () => {
       'systemName',
     ]);
     assert.deepEqual([...catalogue].filter((name) => !rules.has(name)).sort(), [
+      // M14's opt-in is catalogue-only for the reason the rest are: the rules-list shell has no
+      // inspector to populate, and its own first-row rule is `ComponentsBrowserView`'s.
+      'autoSelectFirst',
       // The seven inspector/list copy props issue 1372 added, plus the two the split always had.
       // They are catalogue-only because the rules-list shell supplies NO `inspectorBody` and so
       // renders no inspector at all: there is nothing on that screen for a kicker, a card title or
@@ -999,6 +1007,25 @@ describe('the catalogue shell FORWARDS what it declares', () => {
       'and the roster tag is handed the value rather than a literal'
     );
     assert.match(source, /searchWell=\{rosterSearchWell\}/, 'likewise for the search well');
+  });
+
+  it('hands the frame the first-row auto-selection, OFF by default (M14)', () => {
+    const source = shell();
+    assert.match(source, /\n\s*autoSelectFirst = false,/, 'declared, and OFF by default');
+    assert.match(source, /\{autoSelectFirst\}/, 'and forwarded to the frame');
+    const frame = sourceOf(FRAME);
+    assert.match(frame, /\n\s*autoSelectFirst = false,/, 'the frame declares it OFF by default too');
+    // The effect is guarded on the prop FIRST, so an unset shell never reaches the selection
+    // write — which is the whole content of "byte-identical when off".
+    assert.match(
+      frame,
+      /\$effect\(\(\) => \{\s*\n\s*if \(!autoSelectFirst \|\| selectedId !== ''\) return;/,
+      'the frame`s effect returns before reading a row unless the prop is on and nothing is chosen'
+    );
+    assert.ok(
+      !/autoSelectFirst[\s\S]{0,600}?inspectorElement\?\.focus/.test(frame),
+      'and the auto-selection does not call the inspector focus a row CLICK calls'
+    );
   });
 
   it('hands the frame the row medallion and the lead-row rung', () => {

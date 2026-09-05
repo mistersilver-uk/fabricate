@@ -36,7 +36,6 @@
   import Chip from '../Chip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
@@ -169,30 +168,6 @@
   ]);
   const sorts = $derived(componentSorts(phrase));
 
-  // ── THE ITEMS THIS WORLD HOLDS THAT ARE NOT YET COMPONENTS ───────────────────────────────
-  // The `Register item` action's option list. It is the roster MINUS what the catalogue already
-  // holds, because offering an Item that is already a component leads only to the "already a
-  // component, so this opened it instead" notice — an action whose whole outcome is an
-  // explanation of why it did nothing.
-  const registeredSourceUuids = $derived(
-    new Set(
-      entries
-        .map((entry) =>
-          String(entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || '').trim()
-        )
-        .filter(Boolean)
-    )
-  );
-  const registerableItems = $derived(
-    (Array.isArray(worldItems) ? worldItems : [])
-      .filter((item) => item?.uuid && !registeredSourceUuids.has(String(item.uuid)))
-      .map((item) => ({
-        id: String(item.uuid),
-        dataId: String(item.uuid),
-        label: String(item.name ?? item.uuid),
-        icon: 'fas fa-cube',
-      }))
-  );
   const categoryOptions = $derived(authoredWorldComponentCategories(scope));
   // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. There is no world tag
   // roster to read: the World Vocabulary store that will publish one is PR 7's. The union of what
@@ -465,6 +440,10 @@
    - `rosterRecessed` / `rosterSearchWell` (reviewer 7): the reference's system-roster card is a
      recess with its search field LIFTED out of it. Both were restyled in place for all three
      catalogues before lane PRIM turned them into props; this screen is the one that wants them.
+   - `autoSelectFirst` (issue 1371 r13-cat, maintainer ruling M14): the catalogue opens with its
+     first shown row inspected rather than on a resting inspector. The frame's opt-in, and this
+     page's `selectedId` starts empty, which is the one state the opt-in fills; a GM's own choice
+     and the lifted page index are never fought. See the frame's prop note.
 -->
 <main class="manager-main" data-scoped-page="world-components" aria-label={catalogueTitle}>
   <EntityCatalogueShell
@@ -535,6 +514,7 @@
       'No system has rules for this component yet. It is registered in the world but unused — recipes cannot reference it anywhere.'
     )}
     membershipFilter={false}
+    autoSelectFirst
     bind:browserState
     bind:selectedId
     onSelect={(entityId) => (selectedId = entityId)}
@@ -546,96 +526,37 @@
 </main>
 
 <!--
-  THE LIST'S FIRST ELEMENT: the surface that makes a component.
+  THE LIST'S FIRST ELEMENT: the surface that makes a component, and NOTHING beside it.
 
   It is on THIS screen because a world component is a world record — it exists once and every
   system adopts the same one — and the system Component Rules list can only ever author RULES for
   a record the world already holds. The shipped system-scope zone stays where it is; this is a
   second zone at the scope that creates the record, not a move.
+
+  THE ZONE TAKES THE WHOLE ROW (issue 1371 r13-cat, maintainer ruling M13). M10 built a
+  `+ Register item` picker beside it — a `SearchablePopover` over the world Items not yet
+  registered — and the maintainer's own test of the branch removed it: "That search popover
+  doesn't even seem to list unregistered Foundry items, and a search by name is not the intended
+  flow." The zone is rendered bare here, with no flex wrapper holding a slot for a second control,
+  so it spans the list lead edge to edge; the rendered suite measures that and the mounted suite
+  pins the structure. The picker, its option list, its three lang keys and its sheet rules went
+  with it. `SearchablePopover`'s `triggerButton` form STAYS — it is the primitive's, proven by its
+  own mounted suite — and the cascade inventory records that this site left by deletion, not by
+  slipping back to a hand-written `manager-button` token.
 -->
 {#snippet componentCreateZone()}
-  <div class="manager-world-component-register">
-    <ItemDropZone
-      kind="component-create"
-      title={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.CreateDropTitle',
-        'Drag an Item here to make it a component'
-      )}
-      hint={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.CreateDropHint',
-        'Drop an Item from the Items directory or a compendium.'
-      )}
-      onDrop={onCreateFromItemDrop}
-    />
-    <!--
-      THE HEADER ACTION, BUILT BESIDE THE DROP ZONE (M10).
-
-      `proto:570` pins `+ Register item` to the header band's trailing edge; M10 rules it is built
-      beside the world-scope drop zone M2 added, which is the surface that already creates a
-      component. Both make the same record, so they stand together rather than one of them being
-      an alias for the other a screen apart.
-
-      IT IS A PICKER, NOT A BARE BUTTON, and the prototype's own handler is why: `d.onStub` does
-      nothing at all, so there is no reference behaviour to copy and a button that opens nothing
-      would be the dead affordance this file already refuses for the vocabulary exit. The roster
-      it picks from is `worldItems`, which this page holds for the drop zone's resolution, minus
-      what the catalogue already registers; choosing one composes the SAME payload a sidebar drag
-      emits and hands it to the SAME resolver, so a registration cannot take a second path with a
-      second set of refusals. `SearchablePopover` is the shipped chooser — the bulk panel's own
-      pickers are it — so no second one is built here.
-    -->
-    <!--
-      THE CONTROL TAKES ITS RUNG FROM THE PRIMITIVE (issue 1371 r10). The note here used to
-      explain why it could not: `SearchablePopover` rendered a bare `<button class={triggerClass}>`
-      with a `triggerChip` form and no `ManagerButton` form, so `is-size-38` handed to it in
-      `triggerClass` matched nothing — the rung's selector demands `fab-manager-button`, which
-      only the primitive writes — and this site restated a height and a corner the primitive
-      already owns.
-
-      That trigger form now exists, and this is its first consumer: `triggerButton={{ size: '38' }}`
-      renders the real `ManagerButton`, so `min-height: 38px` arrives from
-      `.manager-button.fab-manager-button.is-size-38` and the 9px corner from the primitive's own
-      control rule. `styles/fabricate.css` keeps only this site's PAINT — the success family, the
-      12.5px/700 label and the one-line clamp — and its `height`, `min-height` and `border-radius`
-      are retired there rather than restated here.
-
-      `triggerClass` still carries the site class: `ManagerButton`'s `class` prop APPENDS to
-      `manager-button fab-manager-button`, so the rule behind it keeps matching, and only the
-      hand-written `manager-button` token goes. This site therefore leaves population B in
-      `manager-button-cascade-inventory.test.js` (13 → 12); the other twelve `triggerClass` sites
-      are a follow-up, because converting one is a change to that site's own paint.
-    -->
-    <SearchablePopover
-      options={registerableItems}
-      pickerClass="fab-world-component-register-picker"
-      triggerButton={{ size: '38' }}
-      triggerClass="manager-world-component-register-action"
-      triggerIcon="fas fa-plus"
-      triggerLabel={text('FABRICATE.Admin.Manager.Scoped.Component.RegisterItem', 'Register item')}
-      triggerAriaLabel={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.RegisterItem',
-        'Register item'
-      )}
-      triggerData={{ 'data-scoped-list-register-item': '' }}
-      dialogAriaLabel={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.RegisterItem',
-        'Register item'
-      )}
-      searchPlaceholder={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.RegisterSearch',
-        'Search world items…'
-      )}
-      searchAriaLabel={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.RegisterSearch',
-        'Search world items…'
-      )}
-      emptyHint={text(
-        'FABRICATE.Admin.Manager.Scoped.Component.RegisterEmpty',
-        'Every Item in this world is already a component. Drop one from a compendium to add another.'
-      )}
-      onChoose={(uuid) => onCreateFromItemDrop({ type: 'Item', uuid })}
-    />
-  </div>
+  <ItemDropZone
+    kind="component-create"
+    title={text(
+      'FABRICATE.Admin.Manager.Scoped.Component.CreateDropTitle',
+      'Drag an Item here to make it a component'
+    )}
+    hint={text(
+      'FABRICATE.Admin.Manager.Scoped.Component.CreateDropHint',
+      'Drop an Item from the Items directory or a compendium.'
+    )}
+    onDrop={onCreateFromItemDrop}
+  />
 {/snippet}
 
 {#snippet componentBulkEdit(selectedIds, ctx)}
@@ -897,22 +818,6 @@
      rather than restated. The catalogue's flattened ROW state is NOT here and cannot be: those
      rows are written by the frame, so a page-scoped rule carries this page's hash and never
      matches them. That block is appended to the host sheet, as both sibling lanes did. */
-
-  /* ── THE LIST'S FIRST ELEMENT AND THE ACTION BESIDE IT (M10) ─────────────────────────────
-     The drop zone takes the slack and the action keeps its intrinsic width, so a narrow column
-     shrinks the prompt rather than ellipsising the verb. `align-items: center` puts a 38px
-     control on the zone's own centre line rather than on its first text baseline. */
-  .manager-world-component-register {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    min-width: 0;
-  }
-
-  .manager-world-component-register > :global(.manager-item-drop-zone) {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
 
   /* ── THE ROW'S TWO STAT COLUMNS (`proto:606`-`608`) ──────────────────────────────────────
      Right-aligned and 60px at minimum, so the numerals line up down the list whatever their

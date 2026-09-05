@@ -85,6 +85,8 @@
      The state an owner binds must be INITIALISED — an uninitialised `$state()` throws
      `props_invalid_value` on mount; see the frame's own note.
    - onSelect(entityId): called after the write, for an owner that reacts without binding.
+   - autoSelectFirst: inspect the first shown row on open when nothing is selected. Opt-in, off
+     by default; see the frame's prop note.
    - onOpenEntry(entityId): the row's pen, into that entity's world entry editor.
    - rowMeta / inspectorBody / bulk: the lane's three snippets.
 -->
@@ -136,6 +138,11 @@
     browserState = $bindable(null),
     selectedId = $bindable(''),
     onSelect = () => {},
+    // WHETHER THE FIRST SHOWN ROW IS INSPECTED ON OPEN (issue 1371 r13-cat, maintainer ruling
+    // M14). Threaded straight to the frame; see its own prop note for what it yields to. OPT-IN
+    // and OFF by default, so the essence and tool catalogues open on the resting inspector they
+    // always did; the world Component catalogue is the lane that turns it on.
+    autoSelectFirst = false,
     onOpenEntry = () => {},
     rowMeta = undefined,
     // Threaded straight to the frame; see its own prop notes. All three are OPT-IN and default to
@@ -312,6 +319,7 @@
     bind:browserState
     bind:selectedId
     {onSelect}
+    {autoSelectFirst}
     bind:armedToken
     inspectorBody={catalogueInspector}
   />
