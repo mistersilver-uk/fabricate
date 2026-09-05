@@ -54,6 +54,9 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const selectPath = resolve(repoRoot, 'src/ui/svelte/components/Select.svelte');
 const selectSource = readFileSync(selectPath, 'utf8');
+// The `.fabricate-select*` family lives in the GLOBAL SHEET (issue 1504), not in a scoped block
+// on the component, so the CSS half of the width-band mirror below is read from here.
+const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 /**
  * THE SENTINEL THIS SUITE AND EVERY DRIVER STEP USE, stated independently of the component.
@@ -813,8 +816,10 @@ describe('1504 Select — the select every screen renders', () => {
     it('declares one panel width band, in the props AND in the CSS that floors them', () => {
       // A MIRROR WITH A REAL REASON AND THEREFORE A REAL GUARD. `anchoredPopover` writes the
       // panel's width as an inline style computed inside `[minWidth, maxWidth]`, so the band has
-      // to be props; the sheet's own `min-width: 240px` then floors that result, so it has to be
-      // CSS as well. Two copies of three pairs is what this clause pins together.
+      // to be props; the shared box's own `min-width: 240px` then floors that result, so it has to
+      // be CSS as well. Two copies of three pairs is what this clause pins together — and since
+      // issue 1504 lifted the family into `styles/fabricate.css`, the two copies now sit in two
+      // FILES, which is the drift this clause exists to catch.
       const table = selectSource.match(/const SIZES = Object\.freeze\(\{[\s\S]*?\n {2}\}\);/)?.[0];
       assert.ok(Boolean(table), 'Select.svelte declares its rungs in one frozen table');
 
@@ -823,13 +828,13 @@ describe('1504 Select — the select every screen renders', () => {
           new RegExp(String.raw`${rung}: Object\.freeze\(\{ minWidth: (\d+), maxWidth: (\d+) \}\)`)
         );
         assert.ok(Boolean(fromTable), `${rung} has a row in the table`);
-        const fromCss = selectSource.match(
+        const fromCss = sheetSource.match(
           new RegExp(
-            String.raw`\.fabricate-select-popover-${rung}\)? \{\s*min-width: (\d+)px;` +
+            String.raw`\.fabricate-select-popover-${rung} \{\s*min-width: (\d+)px;` +
               String.raw`\s*max-width: (\d+)px;`
           )
         );
-        assert.ok(Boolean(fromCss), `${rung} has a panel rule declaring its band`);
+        assert.ok(Boolean(fromCss), `${rung} has a panel rule in the sheet declaring its band`);
         assert.deepEqual(
           [fromCss[1], fromCss[2]],
           [fromTable[1], fromTable[2]],

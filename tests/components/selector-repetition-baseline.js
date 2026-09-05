@@ -29,7 +29,7 @@
  * rather than these 121, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,072 `(at-context, selector)` keys, of which 2,951 appear exactly
+ * Unfiltered, the sheet holds 3,104 `(at-context, selector)` keys, of which 2,983 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,11 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,571 rules at that head, 121 repeated keys and 247 appearances
- * between them; five keys appear three times and none appears four or more.
+ * printed from. The sheet holds 2,602 rules at that head, 121 repeated keys and 247 appearances
+ * between them; five keys appear three times and none appears four or more. The three contextual
+ * figures moved with issue 1504's `.fabricate-select*` family — 31 new rules writing 32 new keys,
+ * every one of them a singleton, so the REPEATED figures did not move at all. Issue 1371's
+ * separately merged fix (9cca54f6) added one more rule and one more singleton key beneath both.
  *
  * A COMMIT SHA IS NOT THE ANCHOR, deliberately. An earlier draft of this docblock cited the
  * coordinator head it was first measured at; a rebase then added a rule to the sheet, the three
