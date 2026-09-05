@@ -642,6 +642,7 @@ function compileManagerRoot() {
     'foundryIconVocabulary.js',
     'foundryIconCatalogue.js',
     'iconPickerPopover.js',
+    'listboxNavigation.js',
     // `ActionMenu`'s placement helper (issue 1477). Separate from `iconPickerPopover.js` because
     // a picker's layout DECIDES the panel width and an overflow menu's width is its longest verb.
     'actionMenuLayout.js',
