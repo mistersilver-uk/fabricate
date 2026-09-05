@@ -476,7 +476,7 @@ export async function promptCheckRoll({
   const titleText = name ? escapeHtml(name) : `${escapeHtml(activityLabel)} check`;
   const headerHtml =
     `<div class="fabricate-roll-prompt__header">${iconHtml}` +
-    `<div class="fabricate-roll-prompt__titles">` +
+    `<div class="fab-stack" data-gap="2xs">` +
     `<h2 class="fabricate-roll-prompt__title">${titleText}</h2>` +
     `</div></div>`;
 
@@ -637,7 +637,7 @@ export async function promptBulkCheckRoll({ allowAdvantage, count, subjects } = 
   );
   const headerHtml =
     `<div class="fabricate-roll-prompt__header">` +
-    `<div class="fabricate-roll-prompt__titles">` +
+    `<div class="fab-stack" data-gap="2xs">` +
     `<h2 class="fabricate-roll-prompt__title">${heading}</h2>` +
     `</div></div>`;
 

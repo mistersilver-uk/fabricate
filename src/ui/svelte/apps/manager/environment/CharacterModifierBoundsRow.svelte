@@ -60,7 +60,7 @@
   ]);
 </script>
 
-<div class="manager-character-modifier-row-bounds">
+<div class="manager-character-modifier-row-bounds fab-cluster" data-gap="3">
   <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
   {#each bounds as bound (bound.key)}
     <Field as="div">

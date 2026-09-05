@@ -467,7 +467,7 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <section class="manager-tool-requirements-section">
+    <section class="manager-tool-requirements-section fab-stack" data-gap="2">
       <!-- THE SUBORDINATE ROW SURVIVES AT SYSTEM SCOPE ONLY, because that is the only scope
            whose header row is already spent on a different question. See the file header. -->
       {#if member}
@@ -622,7 +622,7 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <section class="manager-tool-requirements-section">
+    <section class="manager-tool-requirements-section fab-stack" data-gap="2">
       <!-- SAME SPLIT AS THE SECTION ABOVE, for the same reason. -->
       {#if member}
         <div class="manager-tool-setting-row">

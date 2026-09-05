@@ -455,7 +455,7 @@
   aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
 >
   {#if recipe}
-    <div class="manager-recipe-edit-view" data-recipe-editor>
+    <div class="fab-stack" data-gap="3" data-recipe-editor>
       <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
            so the tabs stay attached to the header above them. -->
       <RecipeEditorTabs
