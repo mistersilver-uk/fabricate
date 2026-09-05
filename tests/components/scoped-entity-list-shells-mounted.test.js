@@ -353,6 +353,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
     onBreak: 'On break',
     prerequisites: 'Prerequisites',
     bonus: 'Check bonus',
+    essences: 'Essence values', // issue 1371 r18 (M31)
   };
 
   for (const [entityType, sections] of Object.entries(EXPECTED)) {
