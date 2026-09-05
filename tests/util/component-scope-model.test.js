@@ -696,6 +696,9 @@ describe('the catalogue’s essence filter is the rules list’s, over the world
   it('is WITHHELD over an empty world essence catalogue', () => {
     assert.deepEqual(componentEssenceFilter({ essences: [], systems: ROSTER }, phrase), []);
     assert.deepEqual(componentEssenceFilter({ systems: ROSTER }, phrase), []);
+  });
+});
+
 // ── THE WORLD `essences` SECTION (issue 1371 r18-store, maintainer ruling M31) ────────────────
 //
 // The world component record carries an `essences` SECTION beside `category`, on the category
