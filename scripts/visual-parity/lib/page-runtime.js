@@ -272,6 +272,18 @@ export function installParityRuntime() {
     const cards = [];
     const loose = { labels: [], glyphs: [] };
 
+    // A ROOT IS A SET, and one element is the set of one. The prototype's screen root is a
+    // `display: contents` wrapper around the WHOLE screen, and the subject routinely has no
+    // single element that covers the same ground: this product draws the page header band, the
+    // content column and the inspector rail as three siblings of a body grid whose fourth child
+    // is the navigation rail the prototype's root does not contain. Enumerating the content
+    // column alone reported two dozen landmarks as "the subject draws it nowhere" about things
+    // the subject plainly draws, which is worse than not reporting them — a reader cannot tell
+    // those from the real ones. The set is DECLARED per screen, beside the pane and for the same
+    // reason: which boxes correspond is a fact about the two documents, not about the classifier.
+    const roots = Array.isArray(root) ? root : [root];
+    const rootSet = new Set(roots);
+
     // A landmark's KEY. Lower-cased, whitespace-collapsed, and every digit run replaced by
     // '#' so a count is not mistaken for copy. Leading and trailing punctuation goes because
     // the prototype separates facts with a middle dot the subject may render as a border.
@@ -372,7 +384,7 @@ export function installParityRuntime() {
     // in). A spec that knows its prototype says which box its rootless root borrows, in the same
     // place and the same shape as every other locator it declares, and the walk stays the
     // default for the ordinary case of a root that simply has a box.
-    const rootWidth = paneWidth(pane ?? root);
+    const rootWidth = paneWidth(pane ?? roots[0]);
     // A ROOT WITH NO BOX ANYWHERE ABOVE IT IS A HARNESS FAULT, reported rather than defaulted.
     // The retired `|| 1` was a default nobody chose, and the cheaper-looking alternative — fall
     // through to 0 so nothing is a card — is worse, because it turns an unmeasurable screen
@@ -439,7 +451,7 @@ export function installParityRuntime() {
       if (computed.display === 'none' || computed.visibility === 'hidden') return;
 
       const ownCard =
-        el !== root && isCard(el)
+        !rootSet.has(el) && isCard(el)
           ? { element: el, title: '', rawTitle: '', path: [], labels: [], glyphs: [] }
           : null;
       const target = ownCard ?? cardStack.at(-1) ?? null;
@@ -452,7 +464,10 @@ export function installParityRuntime() {
       if (ownCard) closeCard(ownCard, cardStack);
     };
 
-    walk(root, []);
+    // Each part is walked with an EMPTY card stack, so a card in one part never adopts the
+    // labels of another; the sort below puts every card back into document order regardless of
+    // which part it came from.
+    for (const part of roots) walk(part, []);
 
     // Document order, which the post-order walk above does not produce.
     cards.sort((left, right) => {
@@ -475,16 +490,36 @@ export function installParityRuntime() {
     };
   }
 
-  /** The inventory entry point: resolve the root by locator, then enumerate it. */
+  /**
+   * The inventory entry point: resolve the root — one locator, or a declared SET of them —
+   * and enumerate it.
+   */
   function inventoryOf(payload) {
-    const root = locate(payload.locator, null);
-    if (!root) return { missingRoot: true };
+    const parts = payload.locator?.parts ?? [payload.locator];
+    const roots = [];
+    for (const part of parts) {
+      const el = locate(part, null);
+      // A PART THAT RESOLVES TO NOTHING IS A FAULT, never a quietly shorter walk. A dropped
+      // part does not report itself: it reports every landmark under it as one the subject
+      // draws nowhere, which is the exact false report the set exists to end.
+      if (!el) return { missingRoot: true, missingPart: part };
+      roots.push(el);
+    }
+    // A PART INSIDE ANOTHER PART IS ALSO A FAULT. Nesting double-counts every landmark in the
+    // overlap and, because a card is closed once per walk, invents a second card with the same
+    // title — reported as an EXTRA CARD the subject "draws twice". Cheap to check and impossible
+    // to see in the output, so it is checked here rather than trusted to the spec's author.
+    for (const outer of roots) {
+      for (const inner of roots) {
+        if (outer !== inner && outer.contains(inner)) return { nestedRoots: true };
+      }
+    }
     // A declared pane that resolves to nothing is a FAULT, never a silent fall-back to the
     // walk: falling back would re-calibrate the classifier without saying so, which is the
     // whole class of defect this argument exists to close.
     const pane = payload.pane ? locate(payload.pane, null) : null;
     if (payload.pane && !pane) return { missingPane: true };
-    return collectInventory(root, payload.limits, pane);
+    return collectInventory(roots, payload.limits, pane);
   }
 
   // `collectInventory` is published so a Node test can enumerate a hand-built tree without a

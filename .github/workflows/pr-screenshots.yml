@@ -255,16 +255,24 @@ jobs:
             exit 1
           fi
 
-      # Run the chrome-drift suite ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns the
-      # drift test's "no cache, skip" into a failure — but only for a process that actually runs it,
-      # which is why it is set here on the test command rather than on the job. Setting it as a job
-      # env var alongside a job that never runs `npm test` reads as a safety control and is not one;
-      # this file did exactly that until review caught it.
-      - name: Verify the frame builder still transcribes this Foundry build
+      # Run the chrome-dependent suites ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns
+      # "no cache, skip" into a failure — but only for a process that actually runs them, which is
+      # why it is set here on the test command rather than on the job. Setting it as a job env var
+      # alongside a job that never runs `npm test` reads as a safety control and is not one; this
+      # file did exactly that until review caught it.
+      #
+      # BOTH suites belong here, and the second one was a skipped test everywhere until it was
+      # added (issue 1371, quality review r9 F2). `tests/view-lab-fixture-assets.test.js` walks
+      # every asset path the lab world names and asserts it resolves in the harvested chrome; the
+      # defect it exists for — a 404 fixture path that aborts a capture run and publishes ZERO
+      # frames — is precisely a CI failure mode. `ci.yml`'s `npm test` runner holds no cache, so
+      # the suite skipped there, and this job was the only one that harvests a cache and it ran the
+      # drift suite alone. The guard existed and executed nowhere.
+      - name: Verify the harvested chrome still matches, and every lab asset path resolves in it
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
-        run: node --test tests/view-lab-chrome-drift.test.js
+        run: node --test tests/view-lab-chrome-drift.test.js tests/view-lab-fixture-assets.test.js
 
       - name: Render the selected frames
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'

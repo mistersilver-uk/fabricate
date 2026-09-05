@@ -168,8 +168,9 @@ A spec is an ES module exporting:
 | `regions` | `{ name, screen, measuredOn?, groups, locator, effectiveBackground? }` per region. |
 | `alignments` | `{ name, screen, measuredOn?, edges, regions }` per edge-alignment group. |
 | `subject` | The real app: `viewport`, `root`, `open(browser)`, `navigate(page, screen)`, `locators` (region → `{ locator, effectiveBackground?, unreachable? }`), `requiredAncestors`, `chromeSweep`. |
-| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn?, prototypePane?, subjectPane? }`) and optional `limits`. |
+| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn?, prototypePane?, subjectPane? }`) and optional `limits`; a root is one locator or a declared SET. |
 | `inventoryExemptions` | Accepted structural divergences, key → reason. |
+| `tolerances` | Optional; property → `{ px, reason }`, the ONE place exact equality is relaxed. |
 
 A region declares property **groups** rather than properties, so adding a region cannot quietly record a narrower set than its siblings.
 The groups are in `lib/schema.js`; a spec may extend or replace them.
@@ -202,6 +203,80 @@ Nothing crosses that boundary as text now: `page.evaluate` is handed real functi
 5. Re-extract, then compare, then inventory.
 
 Step 1 alone makes both gates **fail** until steps 3 and 4 are done, which is the point.
+
+### A root is one locator, or a declared SET of them
+
+The two documents do not always have one element covering the same ground.
+
+A prototype screen root is routinely a `display: contents` wrapper over the whole screen — its
+header band AND its body grid — while the product draws the header band, the content column and the
+inspector rail as three siblings of a body grid that ALSO holds the navigation rail the prototype's
+root excludes.
+Neither the content column nor the body grid is the counterpart: one omits two thirds of the
+prototype's ground and the other adds a rail it never drew.
+
+So a root may be a set:
+
+```js
+subject: {
+  parts: ['header.manager-header', 'main.manager-main', 'aside.manager-inspector'],
+},
+subjectPane: 'main.manager-main',
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- Each part is a locator like any other and is checked like one.
+- **A part that resolves to nothing FAILS**, and the message names the part. A quietly shorter walk
+  does not report itself: it reports every landmark under the missing part as one the subject draws
+  nowhere, which is the exact false report the set exists to end.
+- **A part INSIDE another part FAILS.** Nesting enumerates the overlap twice and closes the same
+  card twice, so it surfaces as an EXTRA CARD the subject appears to draw twice — a finding about
+  the spec wearing the shape of a finding about the product.
+- **A set MUST declare its pane.** With no single root there is no box to take the card ratio from,
+  so the classifier would use whichever part is listed first, and a header band and a content column
+  are different widths. That is the silent re-calibration the declared pane already exists to end,
+  and the order of a list is not a decision anybody made.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The measured cost of not having this: on one screen, 24 of 38 MISSING lines said "the subject draws
+it nowhere" about landmarks — `add from catalogue`, `selected component`, `tags in effect`, `edit
+system rules` — that were plainly on screen in the composite beside the log.
+A false line is worse than a missing one, because a reader cannot tell it from a real one.
+
+### A tolerance, declared per property, reported not suppressed
+
+**A tolerance band on colours or lengths is the beginning of a gate that cannot fail**, and that
+rule stands.
+There is exactly one exception and it is a UNIT CONVERSION rather than a band on a decision: a
+prototype writes absolute pixels and a product may write `rem` against a 16px root, so `0.72rem`
+computes to `11.52px` against a reference `11.5px` and `0.53rem` to `8.496px` against `8.5px`.
+Twenty-eight such lines in one round were sub-hundredth differences no reader can see, that no edit
+can close without abandoning `rem`, and that every reviewer in turn re-derived as noise.
+
+```js
+export const tolerances = {
+  fontSize: { px: 0.15, reason: 'UNIT CONVERSION, not drift. …' },
+};
+```
+
+Four rules keep it from becoming the band the paragraph above refuses:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **There is no default.** A spec that declares none gets the exact-equality gate it had.
+- **It is capped** at `MAX_TOLERANCE_PX` (0.5px, refused at the boundary), an order below the
+  smallest step any published scale takes, so it cannot absorb a decision.
+- **It is validated like an exemption**: the property must be one some group measures, and the
+  reason must be at least 40 characters.
+- **It is REPORTED.** Absorbed lines print in their own `ROUNDING (N)` block with each measured
+  delta, so "these are unit conversion" stays a claim a reader can check rather than a silence.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Both values must be plain `px` lengths; a keyword, a colour or a multi-part value is never
+rounding, whatever the property, because there is no delta to be under a tolerance.
 
 ### Recording an exemption
 
@@ -299,6 +374,12 @@ Worked controls, all currently passing:
 | Point a subject locator at a hook nothing emits | `--assert-locators`: `matched nothing on screen "<name>"` |
 | Declare a `prototypePane` that resolves to nothing | `inventory pane … resolved to nothing` |
 | Enumerate a root with no box on it or any ancestor | `generates no box, and neither does any ancestor` |
+| Declare a root SET with no pane | `a root SET must declare its pane` |
+| Name a part no element answers | `resolved to nothing (one part of the declared root set)` |
+| Declare a part inside another part | `declares a part INSIDE another part` |
+| Declare a tolerance at or over the cap | `is at or over the 0.5px cap` |
+| Declare a tolerance on a property no group measures | `no property group measures it` |
+| Move a difference from 0.1px to 0.2px | it leaves `ROUNDING` and reports as `DRIFT` |
 | Restore a card-contract class the studio strips padding with | `alignment "<name>".left: … insets "<region>" 12.0px from "<region>"` |
 
 Two of these matter most, because each is a failure this harness was extended for.

@@ -42,7 +42,8 @@ function flag(name) {
  * Enumerate one root's landmarks in the page it is rendered in.
  *
  * @param {object} page Playwright page.
- * @param {string|object[]} locator CSS selector or step list resolving the root.
+ * @param {string|object[]|{parts: (string|object[])[]}} locator CSS selector, step list, or a
+ *   declared SET of either, resolving the root.
  * @param {object} limits Classifier thresholds.
  * @param {string|object[]|null} pane Optional locator for the box the card ratio is taken from.
  * @returns {Promise<object>} `{ cards, loose }`.
@@ -53,7 +54,19 @@ async function inventoryOf(page, locator, limits, pane = null) {
     { locator, limits, pane }
   );
   if (result.missingRoot) {
-    throw new Error(`inventory root ${JSON.stringify(locator)} resolved to nothing`);
+    const set = Boolean(locator?.parts);
+    throw new Error(
+      `inventory root ${JSON.stringify(result.missingPart ?? locator)} resolved to nothing` +
+        (set ? ' (one part of the declared root set)' : '')
+    );
+  }
+  // Two parts where one contains the other enumerate the overlap twice, which surfaces as an
+  // EXTRA CARD the subject appears to draw twice rather than as the spec error it is.
+  if (result.nestedRoots) {
+    throw new Error(
+      `inventory root ${JSON.stringify(locator)} declares a part INSIDE another part — the ` +
+        `overlap would be enumerated twice and reported as a duplicate card`
+    );
   }
   // A root with no box on it OR ON ANY ANCESTOR gives the card classifier no pane width to
   // measure against, so every card verdict on that screen would be arbitrary. Said out loud
@@ -117,6 +130,10 @@ async function main() {
   const browser = await chromium.launch();
   const failures = [];
   const extras = [];
+  // Screens the subject cannot show yet, each with a stated reason. Printed, never silent: a
+  // screen that is skipped without saying so is the coverage hole the closed screen set exists
+  // to make impossible.
+  const notes = [];
   const observed = new Set();
   let subject = null;
   try {
@@ -141,6 +158,34 @@ async function main() {
 
     for (const screen of screens) {
       const roots = spec.inventory.roots[screen];
+      // ── A SCREEN THE SUBJECT CANNOT SHOW YET, stated rather than fatal ────────────────────
+      //
+      // `subject.locators` has carried an `unreachable` reason since the beginning and
+      // `inventory.roots` did not, so a spec whose closed screen set legitimately runs ahead of
+      // the product — a route that exists as a placeholder while the PR that owes it is still
+      // open — could not complete a FULL pass at all: the first such screen threw a raw
+      // Playwright error and killed the run. That is not a cosmetic problem. The stale-exemption
+      // check below runs ONLY on a full pass, so for as long as one screen aborts the run, no
+      // exemption in the spec is ever checked for outliving its difference.
+      //
+      // The note is an ASSERTION, exactly as the locator one is: if the subject root resolves
+      // after all, the run FAILS and tells you to delete the note. An excuse that outlives its
+      // constraint is the same defect as an exemption that outlives its difference.
+      if (roots.unreachable) {
+        const rendered = await subject.page.evaluate(
+          (payload) => Boolean(globalThis.__fabricateParity.locate(payload.locator, null)),
+          { locator: roots.subject?.parts?.[0] ?? roots.subject }
+        );
+        if (rendered) {
+          failures.push(
+            `[${screen}] the inventory root is marked unreachable, but the app renders it now — ` +
+              `delete the note and let the screen be walked`
+          );
+        } else {
+          notes.push(`[${screen}] NOT WALKED: ${roots.unreachable}`);
+        }
+        if (!rendered) continue;
+      }
       await spec.navigate(prototypePage, roots.measuredOn ?? screen);
       const prototypeInventory = await inventoryOf(
         prototypePage,
@@ -195,6 +240,12 @@ async function main() {
     process.stdout.write(
       `\nEXTRAS (${extras.length}, reported not failed — a product says more than a mockup)\n` +
         `  ${extras.join('\n  ')}\n`
+    );
+  }
+  if (notes.length > 0) {
+    process.stdout.write(
+      `\nNOT WALKED (${notes.length}, each asserted — the run fails when the app renders one)\n` +
+        `  ${notes.join('\n  ')}\n`
     );
   }
   if (failures.length === 0 && stale.length === 0) {

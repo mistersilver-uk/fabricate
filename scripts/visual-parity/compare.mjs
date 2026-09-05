@@ -37,11 +37,12 @@ import { installRuntime } from './lib/page-runtime.js';
 import {
   EDGE_TOLERANCE_PX,
   MINIMUM_REASON_LENGTH,
+  classifyDifference,
   coverageProblems,
   edgeSpread,
   exemptionProblems,
   locatorProblems,
-  sameComputedValue,
+  toleranceProblems,
   validateSpec,
 } from './lib/schema.js';
 import { openLiveSubject, subjectProblems } from './lib/subject.js';
@@ -186,6 +187,7 @@ async function main() {
                 `${JSON.stringify(spec.screens)}: regenerate rather than hand-editing`,
             ]),
         ...exemptionProblems(fixture),
+        ...toleranceProblems(spec),
         ...alignmentCoverage(spec, fixture),
         ...measured
           .filter((name) => !mapped.includes(name))
@@ -258,6 +260,11 @@ async function main() {
 
   const browser = await chromium.launch();
   const drift = [];
+  // ROUNDING IS REPORTED, NOT SUPPRESSED. A declared per-property tolerance answers one thing —
+  // the two documents write the same type ramp in different UNITS — and the moment it stops
+  // printing what it absorbed it becomes a gate that quietly cannot fail. Its own block, its own
+  // count, and every line carries its measured delta.
+  const rounding = [];
   const notes = [];
   // The locator guard's three buckets. A locator belongs in exactly one of them, which is the
   // whole content of the claim: it RESOLVED somewhere, or it is a stated `unreachable`, or
@@ -330,12 +337,25 @@ async function main() {
         const exemptions = region.exemptions ?? {};
         for (const [property, expected] of Object.entries(region.properties)) {
           if (Object.hasOwn(exemptions, property)) continue;
-          if (!sameComputedValue(property, actual.properties[property], expected)) {
-            drift.push(
+          const verdict = classifyDifference(
+            property,
+            actual.properties[property],
+            expected,
+            spec.tolerances
+          );
+          if (verdict.verdict === 'same') continue;
+          if (verdict.verdict === 'rounding') {
+            rounding.push(
               `[${region.screen}] ${name}.${property}: subject ${actual.properties[property]} ` +
-                `!== prototype ${expected}`
+                `~= prototype ${expected} (${verdict.delta.toFixed(3)}px, under the ` +
+                `${verdict.px}px declared tolerance)`
             );
+            continue;
           }
+          drift.push(
+            `[${region.screen}] ${name}.${property}: subject ${actual.properties[property]} ` +
+              `!== prototype ${expected}`
+          );
         }
       }
       for (const [name, group] of Object.entries(result.alignments)) {
@@ -403,6 +423,11 @@ async function main() {
   if (failures.length > 0) process.stdout.write(`\nGATE PROBLEMS\n  ${failures.join('\n  ')}\n`);
   if (drift.length > 0)
     process.stdout.write(`\nDRIFT (${drift.length})\n  ${drift.join('\n  ')}\n`);
+  if (rounding.length > 0)
+    process.stdout.write(
+      `\nROUNDING (${rounding.length}, under a declared per-property tolerance)\n  ` +
+        `${rounding.join('\n  ')}\n`
+    );
   if (notes.length > 0)
     process.stdout.write(
       `\nNOT MEASURED (${notes.length}, each with a stated reason)\n  ${notes.join('\n  ')}\n`

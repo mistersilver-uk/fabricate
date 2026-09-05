@@ -196,3 +196,189 @@ test('the card classifier measures both documents against the same pane', async 
     assert.deepEqual(enumerate(orphan), { unmeasurableRoot: true });
   });
 });
+
+/**
+ * Enumerate through the REAL `inventoryOf` entry point, with a document that answers selectors
+ * from a map.
+ *
+ * `collectInventory` above is handed its root directly; a root SET is resolved by `inventoryOf`,
+ * which is where the three faults below are refused, so these tests have to go in through the
+ * entry point rather than around it.
+ *
+ * @param {object} payload `{ locator, pane }` exactly as `inventory.mjs` sends it.
+ * @param {object} bySelector Selector → element.
+ * @param {object} tree The whole tree, for document order.
+ * @returns {object} Whatever the runtime answers.
+ */
+function enumerateThroughEntryPoint(payload, bySelector, tree) {
+  const sequence = order(tree);
+  for (const element of sequence) {
+    element.compareDocumentPosition = (other) =>
+      sequence.indexOf(other) > sequence.indexOf(element) ? 4 : 2;
+    element.contains = (other) => order(element).includes(other);
+  }
+  const saved = {
+    document: globalThis.document,
+    getComputedStyle: globalThis.getComputedStyle,
+    Node: globalThis.Node,
+    parity: globalThis.__fabricateParity,
+  };
+  const install = (name, value) => Reflect.set(globalThis, name, value);
+  install('document', {
+    querySelector: (selector) => bySelector[selector] ?? null,
+    documentElement: tree,
+  });
+  install('getComputedStyle', (element) => element.style);
+  install('Node', { DOCUMENT_POSITION_FOLLOWING: 4, DOCUMENT_POSITION_PRECEDING: 2 });
+  try {
+    installParityRuntime();
+    return globalThis.__fabricateParity.inventoryOf({ limits: LIMITS, ...payload });
+  } finally {
+    install('document', saved.document);
+    install('getComputedStyle', saved.getComputedStyle);
+    install('Node', saved.Node);
+    install('__fabricateParity', saved.parity);
+  }
+}
+
+/**
+ * THE SHAPE THE ROOT SET EXISTS FOR, and it is this product's own.
+ *
+ * The prototype's screen root is one `display: contents` wrapper over the header band and the
+ * body grid. The subject draws the header band, the content column and the inspector as three
+ * siblings of a body grid whose fourth child is the navigation rail — which the prototype's root
+ * does NOT contain. So there is no single subject element covering the prototype's ground: the
+ * content column alone omits two thirds of it, and the body grid adds a rail the prototype never
+ * drew.
+ *
+ * Widths are this screen's real ones, rounded: header band 1398, rail 220, content column 878,
+ * inspector 300.
+ *
+ * @returns {object} `{ tree, bySelector }`.
+ */
+function shellScreen() {
+  const label = (text, width) =>
+    node({ tag: 'p', width, text, style: { borderTopStyle: 'none', borderTopWidth: '0px' } });
+  const card = (title, width) =>
+    node({
+      width,
+      children: [
+        node({ tag: 'h3', width, text: title, style: { fontWeight: '600', fontSize: '15px' } }),
+      ],
+    });
+  const header = node({ tag: 'header', width: 1398, children: [label('Add from catalogue', 200)] });
+  const rail = node({ tag: 'aside', width: 220, children: [label('Recipes', 195)] });
+  const main = node({ tag: 'main', width: 878, children: [card('Iron Ore', 830)] });
+  const inspector = node({ tag: 'aside', width: 300, children: [label('Tags in effect', 275)] });
+  const body = node({ width: 1398, children: [rail, main, inspector] });
+  const tree = node({ width: 1398, children: [header, body] });
+  return {
+    tree,
+    bySelector: {
+      'header.manager-header': header,
+      'main.manager-main': main,
+      'aside.manager-inspector': inspector,
+      'aside.manager-rail': rail,
+      '.manager-body': body,
+      '.missing': null,
+    },
+  };
+}
+
+test('an inventory root may be a declared SET of boxes', async (subtests) => {
+  await subtests.test('the set enumerates every part, and one part enumerates only its own', () => {
+    const { tree, bySelector } = shellScreen();
+    const one = enumerateThroughEntryPoint(
+      { locator: 'main.manager-main', pane: 'main.manager-main' },
+      bySelector,
+      tree
+    );
+    // THE DEFECT, stated as the fixture's own numbers: enumerating the content column alone
+    // finds neither the header band's action nor the inspector's caption, and the real run said
+    // "the subject draws it nowhere" about both while they were on screen.
+    assert.deepEqual(one.loose.labels, []);
+    assert.deepEqual(
+      one.cards.map((entry) => entry.title),
+      ['iron ore']
+    );
+
+    const set = enumerateThroughEntryPoint(
+      {
+        locator: {
+          parts: ['header.manager-header', 'main.manager-main', 'aside.manager-inspector'],
+        },
+        pane: 'main.manager-main',
+      },
+      bySelector,
+      tree
+    );
+    assert.deepEqual(set.loose.labels, ['add from catalogue', 'tags in effect']);
+    assert.deepEqual(
+      set.cards.map((entry) => entry.title),
+      ['iron ore'],
+      'the set adds landmarks, it does not re-classify them'
+    );
+    assert.ok(
+      !set.loose.labels.includes('recipes'),
+      'the navigation rail is deliberately excluded: the prototype root does not contain it'
+    );
+  });
+
+  await subtests.test('the declared pane, not the first part, sets the card floor', () => {
+    // WITHOUT THE PANE RULE this is a silent re-calibration. A set has no single root, so the
+    // classifier would take its pane from whichever part is listed FIRST: the header band and
+    // the body are 1398px wide, which puts the card floor at 839px, while the content column is
+    // 878px and puts it at 527px. The 830px row is a card at one and not at the other, so the
+    // order of a list would decide the classification. `inventoryRootProblems` refuses a set
+    // with no pane, and this proves the pane the set does declare is the one that decides.
+    const { tree, bySelector } = shellScreen();
+    const parts = ['header.manager-header', 'main.manager-main', 'aside.manager-inspector'];
+    const floorFromMain = enumerateThroughEntryPoint(
+      { locator: { parts }, pane: 'main.manager-main' },
+      bySelector,
+      tree
+    );
+    const floorFromBody = enumerateThroughEntryPoint(
+      { locator: { parts }, pane: '.manager-body' },
+      bySelector,
+      tree
+    );
+    assert.deepEqual(
+      floorFromMain.cards.map((entry) => entry.title),
+      ['iron ore'],
+      '830 clears 878 * 0.6'
+    );
+    assert.deepEqual(
+      floorFromBody.cards.map((entry) => entry.title),
+      [],
+      '830 does not clear 1398 * 0.6, and the pane is what decides'
+    );
+  });
+
+  await subtests.test('a part that resolves to nothing is a fault, not a shorter walk', () => {
+    // A DROPPED PART DOES NOT REPORT ITSELF. It reports every landmark under it as one the
+    // subject draws nowhere — the exact false report the set exists to end — so it has to fail
+    // here and name the part.
+    const { tree, bySelector } = shellScreen();
+    const result = enumerateThroughEntryPoint(
+      { locator: { parts: ['header.manager-header', '.missing'] }, pane: 'main.manager-main' },
+      bySelector,
+      tree
+    );
+    assert.equal(result.missingRoot, true);
+    assert.equal(result.missingPart, '.missing');
+  });
+
+  await subtests.test('a part INSIDE another part is a fault, not a double count', () => {
+    // Nesting enumerates the overlap twice and closes the same card twice, which surfaces as an
+    // EXTRA CARD the subject appears to draw twice — a finding about the spec wearing the shape
+    // of a finding about the product.
+    const { tree, bySelector } = shellScreen();
+    const result = enumerateThroughEntryPoint(
+      { locator: { parts: ['.manager-body', 'main.manager-main'] }, pane: 'main.manager-main' },
+      bySelector,
+      tree
+    );
+    assert.deepEqual(result, { nestedRoots: true });
+  });
+});

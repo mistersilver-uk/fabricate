@@ -18,6 +18,24 @@
  * harvested, because `npm test` must stay runnable without a Foundry licence, and
  * `VIEWLAB_REQUIRE_CHROME=1` turns that skip into a failure on a machine that is supposed to
  * have the cache.
+ *
+ * AND WHERE IT RUNS IN CI, because a skip policy without one is a test that runs NOWHERE.
+ * `ci.yml`'s `npm test` runner harvests no chrome — the cache is a licensed local artefact — so
+ * this file skips there on every run, which is one skipped test and zero assertions. The runner
+ * that DOES hold a cache is `pr-screenshots.yml`'s capture job, and this suite is named on its
+ * "Verify the harvested chrome still matches, and every lab asset path resolves in it" step,
+ * beside `view-lab-chrome-drift.test.js` and under that step's `VIEWLAB_REQUIRE_CHROME=1`. That
+ * is the only place in CI where the skip cannot be taken, and it is the same job whose capture
+ * run a missing path would abort. Moving or renaming that step without moving this file leaves
+ * the guard executing nowhere again (issue 1371, quality review r9 F2).
+ *
+ * ONE THING IT DOES NOT COVER, and it is worth knowing before trusting a green run:
+ * `resolveChromeCache` selects the NEWEST harvest (`scripts/lib/foundryChromeCache.js`), so with
+ * both declared builds on disk this asserts against 14.365 alone and a path present there but
+ * absent under the 13.351 minimum stays invisible. Two are known absent under 13.351 today —
+ * `tools/smithing/crucible-steel.webp` and `furnace-boiler-steel.webp` — and they are pre-existing
+ * rather than introduced here. Widening this to every harvested build is a separate change; the
+ * caveat is recorded so a reader does not read "0 missing" as "0 missing on both builds".
  */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
