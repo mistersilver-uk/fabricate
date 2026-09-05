@@ -1760,7 +1760,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     // overlapped it, would leave a chip present in the DOM, correct in every mounted assertion
     // and unclickable on screen. `elementFromPoint` at the chip's centre is the only check that
     // can tell those apart, and no mounted suite can make it — happy-dom lays nothing out.
-    expectCenterHit: '[data-scoped-entry-tag="fuel"]',
+    //
+    // issue 1371 r15-entry: THE CHIP IS ONE THE WORLD VOCABULARY AUTHORS. The run offers the
+    // vocabulary's tags and nothing else (maintainer ruling M18 on its last surface), and the lab
+    // world authors `ore`, `ingot` and `moss` — `fuel` is applied by `sm-coal`'s migrated default
+    // and was only ever drawn by the corpus union this ruling struck. `moss` is drawn on either
+    // side of the change, a world default carrying it as well as the vocabulary authoring it, so
+    // this hit-test resolves on both; a selector the run no longer draws aborts the whole capture.
+    expectCenterHit: '[data-scoped-entry-tag="moss"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],

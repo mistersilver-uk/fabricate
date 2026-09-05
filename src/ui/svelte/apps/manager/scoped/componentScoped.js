@@ -1167,8 +1167,10 @@ export function worldVocabularyComponentCategories(scope) {
  * offer (issue 1371 r14-cat, maintainer ruling M18 on its second surface).
  *
  * The twin of {@link worldVocabularyComponentCategories}, read from `scope.worldVocabulary.tags`
- * on the same leg for the same reason. It replaces the corpus union for the catalogue's bulk
- * inset, whose two failure modes were opposite halves of one rule: a tag applied by a migrated
+ * on the same leg for the same reason. It replaces the corpus union on both surfaces that offer
+ * world tags — the catalogue's bulk inset, and since issue 1371 r15-entry the entry's tag run,
+ * which was the union's last caller, so the union helper is gone with it. The union's two
+ * failure modes were opposite halves of one rule: a tag applied by a migrated
  * record was offered as the world's, and a tag the world had authored but no record had applied
  * yet was not offered at all — with the empty sentence then saying none was authored, a string
  * denying a reach that exists. No bucket is reserved among tags, so nothing is refused here;
@@ -1338,30 +1340,6 @@ export function componentBulkApplyLabel(
 // reason the rest of this module does — a `.svelte` file's derivations are unreachable from a
 // unit test, and every one of these has branches a mounted assertion would have to reach through
 // the DOM to see.
-
-/**
- * The world tags the corpus already carries — the union of every entry's applied world tags.
- *
- * IT IS NOT THE WORLD VOCABULARY. It predates the World Vocabulary store, when the union of what
- * was applied across the catalogue was the only list there was, and it has ONE caller left: the
- * entry's classification card offers it as toggles. That is the same reading the catalogue's
- * bulk inset left in issue 1371 r14-cat for {@link worldVocabularyComponentTags} — on a fresh
- * vocabulary with tags that no record has applied yet, this union is empty and the card says
- * none is authored. The r14-cat handoff names the entry's read as the same defect.
- *
- * @param {object|null} scope the component family's world-scope projection.
- * @returns {string[]} sorted, de-duplicated, blank-free.
- */
-export function authoredWorldComponentTags(scope) {
-  const seen = new Set();
-  for (const entry of Array.isArray(scope?.entries) ? scope.entries : []) {
-    for (const raw of Array.isArray(entry?.defaults?.tags) ? entry.defaults.tags : []) {
-      const tag = typeof raw === 'string' ? raw.trim() : '';
-      if (tag) seen.add(tag);
-    }
-  }
-  return [...seen].sort((left, right) => left.localeCompare(right));
-}
 
 /**
  * The header band's subtitle: what the record IS, then how far it reaches.

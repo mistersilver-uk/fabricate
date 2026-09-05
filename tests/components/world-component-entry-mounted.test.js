@@ -208,6 +208,18 @@ function withVocabulary(scope, vocabulary) {
   };
 }
 
+/**
+ * The two tags the corpus fixture's `coal` APPLIES, authored as a world vocabulary
+ * (issue 1371 r15-entry).
+ *
+ * Until maintainer ruling M18 reached the entry's tag run it offered the corpus union of every
+ * record's applied tags, so `coal`'s own pair was the run on every mount. The run offers the
+ * vocabulary now and nothing else, so a test that wants `fuel` and `bulk` as chips has to AUTHOR
+ * them here — the applied pair alone is what a migrated world carries, and offering it is the
+ * defect. No categories, so the picker's offer in those tests is exactly what it was.
+ */
+const CORPUS_TAGS = Object.freeze({ tags: Object.freeze(['bulk', 'fuel']) });
+
 function withUsage(scope, entityId, usage) {
   return {
     ...scope,
@@ -437,7 +449,10 @@ describe('world Component entry editor (issue 1371)', () => {
             { id: 'bespoke-items', name: 'Bespoke Items' },
             { id: 'corpses', name: 'Corpses' },
           ],
-          componentTags: [{ id: 'fuel', name: 'fuel' }],
+          // `moss` rather than `fuel` (issue 1371 r15-entry): no record applies it, so the chip
+          // assertion below can only pass through the vocabulary leg and never through the
+          // corpus union the tag run used to read.
+          componentTags: [{ id: 'moss', name: 'moss' }],
           recipeCategories: [],
         }),
         isSeeded: () => true,
@@ -448,7 +463,7 @@ describe('world Component entry editor (issue 1371)', () => {
       });
       assert.deepEqual(
         worldScope.component.worldVocabulary,
-        { categories: ['Bespoke Items', 'Corpses'], tags: ['fuel'] },
+        { categories: ['Bespoke Items', 'Corpses'], tags: ['moss'] },
         'the assembler publishes the vocabulary’s names on the component leg'
       );
       const target = await harness.mount({
@@ -463,6 +478,10 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.deepEqual(
         options.map((option) => option.textContent.trim()),
         ['No world category', 'Bespoke Items', 'Corpses']
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-tag="moss"]')),
+        'and the tag run reads the same leg: the vocabulary’s one tag, applied by no record, is offered'
       );
     });
 
@@ -504,7 +523,7 @@ describe('world Component entry editor (issue 1371)', () => {
     it('applies an unlit tag by writing the WHOLE list, not a delta', async () => {
       // `setWorldTags` replaces the array. A screen that forwarded only the tag it touched would
       // clear every other tag on the record, and the projection would agree with it.
-      const { target, calls } = await open('coal');
+      const { target, calls } = await open('coal', undefined, CORPUS_TAGS);
       const unlit = target.querySelector('[data-scoped-entry-tag="fuel"]');
       assert.ok(Boolean(unlit), 'the run offers every tag the world vocabulary holds');
 
@@ -519,7 +538,7 @@ describe('world Component entry editor (issue 1371)', () => {
 
     it('and lights an unapplied one, so the toggle runs both ways', async () => {
       // The positive control: a run wired only to removal passes the assertion above.
-      const { target, calls } = await open('ingot');
+      const { target, calls } = await open('ingot', undefined, CORPUS_TAGS);
       const chip = target.querySelector('[data-scoped-entry-tag="fuel"]');
       assert.ok(Boolean(chip), 'a record with no tags of its own still sees the vocabulary');
       chip.click();
@@ -534,10 +553,10 @@ describe('world Component entry editor (issue 1371)', () => {
       // AC-28. A `<span onclick>` passes a pointer hit-test and is unreachable by keyboard, and
       // a toggle that does not report its state is a control a screen reader cannot read back.
       //
-      // TWO RECORDS, because the fixture's tag vocabulary is `coal`'s OWN pair: on `coal` both
-      // chips are lit, and only a record that holds neither can supply the unapplied face.
-      const { target: applying } = await open('coal');
-      const { target: empty } = await open('ingot');
+      // TWO RECORDS, because the vocabulary mounted here is `coal`'s OWN applied pair: on `coal`
+      // both chips are lit, and only a record that holds neither can supply the unapplied face.
+      const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
+      const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const applied = applying.querySelector('[data-scoped-entry-tag="bulk"]');
       const unapplied = empty.querySelector('[data-scoped-entry-tag="bulk"]');
 
@@ -552,8 +571,8 @@ describe('world Component entry editor (issue 1371)', () => {
     it('and its accessible name states the DIRECTION as well as the tag', async () => {
       // A run of bare tag names says nothing out of visual context, and the two directions are
       // the same words unless the name carries the verb.
-      const { target: applying } = await open('coal');
-      const { target: empty } = await open('ingot');
+      const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
+      const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       assert.match(
         applying.querySelector('[data-scoped-entry-tag="bulk"]').getAttribute('aria-label'),
         /Remove the world tag bulk/
@@ -599,6 +618,64 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.ok(
         !/every system/.test(sentence),
         `it promises the GM no reach it cannot deliver, and read "${sentence}"`
+      );
+    });
+
+    // ── issue 1371 r15-entry ────────────────────────────────────────────────────────────────
+    it('offers ONLY the world vocabulary: a tag authored there and applied by no record yet is offered, and ACTS', async () => {
+      // MAINTAINER RULING M18 ON ITS LAST SURFACE. The run read the corpus union of every
+      // record's applied tags, so a tag minted in Tags & Categories and applied to nothing was
+      // not offered — and the card said `No world tags are authored yet` about it, a string
+      // denying a reach that exists. The run offers the vocabulary; the corpus' own `fuel` and
+      // `bulk`, applied by a migrated default and authored nowhere, are NOT offered, because
+      // those are what a migrated world carried across rather than what it authored.
+      const { target, calls } = await open('ingot', undefined, { tags: ['moss'] });
+      const chip = target.querySelector('[data-scoped-entry-tag="moss"]');
+      assert.ok(Boolean(chip), 'the vocabulary tag is offered though no record applies it');
+      assert.equal(chip.getAttribute('aria-pressed'), 'false');
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-tags-empty]'),
+        'and the card does not call a vocabulary with a tag in it empty'
+      );
+      assert.ok(
+        !target.querySelector('[data-scoped-entry-tag="fuel"]'),
+        'the corpus union is not offered: `fuel` is applied on `coal` and authored nowhere'
+      );
+
+      chip.click();
+      await drain();
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'setWorldTags'),
+        [{ verb: 'setWorldTags', args: ['ingot', ['moss']] }],
+        'and the offered chip ACTS: a click applies it by writing the whole list'
+      );
+    });
+
+    it('and the empty sentence is reached only when the vocabulary has no tags, whatever the corpus carries', async () => {
+      // The condition the sentence states, both ways. `coal` applies `fuel` and `bulk` on its
+      // migrated default: with no vocabulary the run offers nothing and says none is authored,
+      // while the note beneath still counts the pair the RECORD carries — the count reads the
+      // record, as the category trigger does, and is the one place that data stays visible.
+      // With one tag authored the sentence goes.
+      const { target: none } = await open('coal');
+      assert.equal(
+        none.querySelectorAll('[data-scoped-entry-tag]').length,
+        0,
+        'the applied-but-unauthored pair is not offered as chips'
+      );
+      assert.ok(
+        Boolean(none.querySelector('[data-scoped-entry-tags-empty]')),
+        'so the sentence is reached with no vocabulary tags'
+      );
+      assert.equal(
+        none.querySelector('[data-scoped-entry-tag-note]').textContent.trim(),
+        '2 world tags set on this record · muted in 1 system'
+      );
+
+      const { target: some } = await open('coal', undefined, { tags: ['moss'] });
+      assert.ok(
+        !some.querySelector('[data-scoped-entry-tags-empty]'),
+        'and not once the vocabulary holds one, whether or not any record applies it'
       );
     });
   });
@@ -764,7 +841,7 @@ describe('world Component entry editor (issue 1371)', () => {
    */
   describe('a pointer hit-test cannot be made in this harness, and here is the measurement', () => {
     it('reports a zero box and a null hit for a chip the tree plainly renders', async () => {
-      const { target } = await open('coal');
+      const { target } = await open('coal', undefined, CORPUS_TAGS);
       const chip = target.querySelector('[data-scoped-entry-tag="fuel"]');
       assert.ok(Boolean(chip), 'NON-VACUITY: the chip this would hit-test is really rendered');
 
@@ -1231,8 +1308,8 @@ describe('world Component entry editor (issue 1371)', () => {
       // a CONTROL, not a badge. BOTH faces, because `density` and `tone` are separate props: a
       // wiring that passed the scale only on the lit branch would draw two chip sizes in one run,
       // and the fixture's `coal` (both tags applied) cannot show the unlit face at all.
-      const { target: applying } = await open('coal');
-      const { target: empty } = await open('ingot');
+      const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
+      const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
       const unlit = empty.querySelector('[data-scoped-entry-tag="bulk"]');
       for (const chip of [lit, unlit]) {
@@ -1262,8 +1339,8 @@ describe('world Component entry editor (issue 1371)', () => {
       // `is-lit` beside `is-neutral` matches nothing. A wiring that passed the emphasis
       // unconditionally would read as correct from the lit chip alone and would be dead markup on
       // every other chip in the run.
-      const { target: applying } = await open('coal');
-      const { target: empty } = await open('ingot');
+      const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
+      const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
       const unlit = empty.querySelector('[data-scoped-entry-tag="bulk"]');
       assert.ok(

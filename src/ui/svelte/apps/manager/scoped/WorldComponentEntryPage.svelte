@@ -62,7 +62,6 @@
   import WorldComponentEntrySourceCard from './WorldComponentEntrySourceCard.svelte';
   import WorldComponentEntrySystemsCard from './WorldComponentEntrySystemsCard.svelte';
   import {
-    authoredWorldComponentTags,
     componentDeleteNote,
     componentDuplicateSourceCount,
     componentEntryHeaderSubtitle,
@@ -73,6 +72,7 @@
     componentWorldTagNote,
     offeredWorldComponentCategories,
     worldVocabularyComponentCategories,
+    worldVocabularyComponentTags,
   } from './componentScoped.js';
   import { componentScopeValidationPresentation } from '../../../../../utils/componentScopeValidation.js';
   import {
@@ -355,7 +355,13 @@
   // THE WORLD TAG VOCABULARY THE CARD TOGGLES OVER. The reference draws no add field on this card
   // (`proto:899-901`): authoring the vocabulary is behind `Edit world vocabulary ↗`, and what this
   // card does is apply and clear the tags the world already has.
-  const tagVocabulary = $derived(authoredWorldComponentTags(scope));
+  //
+  // IT IS THE VOCABULARY THE WORLD AUTHORS, NOT THE UNION OF WHAT THE CORPUS APPLIES (issue 1371
+  // r15-entry, maintainer ruling M18 on its last surface). The union offered a migrated default's
+  // tags as if the world had authored them and, over a fresh vocabulary no record had applied
+  // yet, drew the `No world tags are authored yet` sentence about a list that was not empty — a
+  // string denying a reach that exists. The names come off the leg the category picker reads.
+  const tagVocabulary = $derived(worldVocabularyComponentTags(scope));
 
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');
   const tagNote = $derived(entry ? componentWorldTagNote(entry, phrase) : '');

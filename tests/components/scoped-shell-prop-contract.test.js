@@ -1458,7 +1458,9 @@ describe('the entry’s pointer proofs survive in the capture registry', () => {
   const registry = () => sourceOf('scripts/lib/viewLabCases.js');
 
   it('carries a centre-hit on the world tag chip, which the page still emits', () => {
-    assert.match(registry(), /expectCenterHit: '\[data-scoped-entry-tag="fuel"\]'/);
+    // `moss`, not `fuel` (issue 1371 r15-entry): the run offers the vocabulary's tags alone, and
+    // `moss` is the one the lab world both authors and applies, so the hook resolves on screen.
+    assert.match(registry(), /expectCenterHit: '\[data-scoped-entry-tag="moss"\]'/);
     assert.match(
       sourceOf(`${SCOPED_DIR}/WorldComponentEntryPage.svelte`),
       /data-scoped-entry-tag=\{tag\}/,
