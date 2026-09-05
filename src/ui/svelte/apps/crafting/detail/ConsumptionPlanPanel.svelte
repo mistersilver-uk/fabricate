@@ -21,6 +21,7 @@
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
@@ -54,7 +55,7 @@
 <section class="consumption-plan" data-recipe-section="consumption-plan">
   <p class="consumption-plan-title">
     <i class="fa-solid fa-basket-shopping" aria-hidden="true"></i>
-    {localize('FABRICATE.App.Crafting.ConsumptionPlan.Title')}
+    <Kicker as="span">{localize('FABRICATE.App.Crafting.ConsumptionPlan.Title')}</Kicker>
   </p>
 
   {#if rows.length === 0}
@@ -122,16 +123,14 @@
     background: var(--fab-surface-soft);
   }
 
+  /* The caller's own flex row, kept: `library.html:879` draws the kicker as a plain span
+     inside a caller-owned row, and this one carries the leading accent glyph. Everything the
+     kicker now owns — size, weight, case, tracking and ink — is gone from here. */
   .consumption-plan-title {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
     margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 
   .consumption-plan-title i {
