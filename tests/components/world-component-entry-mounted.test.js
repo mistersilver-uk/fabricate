@@ -15,6 +15,7 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   componentCorpus,
@@ -24,7 +25,6 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -1151,15 +1151,15 @@ describe('world Component entry editor (issue 1371)', () => {
       // one that says what a drop rewrites.
       const { target } = await open('ingot');
       assert.ok(
-        !target.querySelector('[data-item-drop-zone="component-identity"]'),
+        !target.querySelector(':scope [data-item-drop-zone="component-identity"]'),
         'the identity card offers no drop target of its own'
       );
       assert.ok(
-        !target.querySelector('[data-scoped-entry-identity-card] .manager-item-drop-zone'),
+        !target.querySelector(':scope [data-scoped-entry-identity-card] .manager-item-drop-zone'),
         'and no other zone sits inside it either'
       );
       const zone = target.querySelector(
-        '[data-scoped-entry-source-card] [data-item-drop-zone="component-source"]'
+        ':scope [data-scoped-entry-source-card] [data-item-drop-zone="component-source"]'
       );
       assert.ok(Boolean(zone), 'the source card still offers the one way to re-point the link');
       assert.ok(

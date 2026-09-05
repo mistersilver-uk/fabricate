@@ -1524,6 +1524,23 @@ describe('the world Component entry header wires the borderless medallion', () =
 });
 
 /**
+ * `{ selector, body }` for every rule in a stylesheet text, comments stripped and whitespace
+ * normalised (issue 1371 r13-entry). Shared by the two sheet guards below — M15's row surface
+ * and M16's tile mirror — so the parse is written once; it is deliberately not the host-sheet
+ * describe's `rulesOf` above, which records rule INDEX for an ordering claim and no body.
+ *
+ * @param {string} css
+ * @returns {Array<{selector: string, body: string}>}
+ */
+function sheetRulesOf(css) {
+  const stripped = css.replaceAll(/\/\*[\s\S]*?\*\//g, '');
+  return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
+    selector: match[1].replaceAll(/\s+/g, ' ').trim(),
+    body: match[2].replaceAll(/\s+/g, ' ').trim(),
+  }));
+}
+
+/**
  * THE `Systems using this component` ROWS SHARE ONE SURFACE (issue 1371 r13-entry, maintainer
  * ruling M15).
  *
@@ -1543,20 +1560,11 @@ describe('the world Component entry header wires the borderless medallion', () =
 describe('the entry’s per-system rows sit on one surface, with every name in full ink', () => {
   const CSS_PATH = 'styles/fabricate.css';
 
-  /** `{ selector, body }` for every rule, comments stripped, selectors whitespace-normalised. */
-  function rulesOf(css) {
-    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
-      selector: match[1].replace(/\s+/g, ' ').trim(),
-      body: match[2].replace(/\s+/g, ' ').trim(),
-    }));
-  }
-
   const ROW = '.fabricate-manager .manager-component-entry-system';
   const NAME = '.fabricate-manager .manager-component-entry-system-name';
 
   it('declares the row’s own transparent surface and its hairline, so nothing outside the module can band it', () => {
-    const rule = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+    const rule = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
       (candidate) => candidate.selector === ROW
     );
     assert.ok(Boolean(rule), 'NON-VACUITY: the row rule is still in the sheet');
@@ -1567,7 +1575,7 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
   it('paints NO wash and re-inks NO name on the without-rules rows', () => {
     // THE MUTATION THIS KILLS: restoring `.is-outsider { background: var(--fab-surface-soft) }`
     // or `.is-outsider .manager-component-entry-system-name { color: var(--fab-text-muted) }`.
-    const outsiderRules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).filter(
+    const outsiderRules = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).filter(
       (rule) =>
         rule.selector.includes('manager-component-entry-system') &&
         rule.selector.includes('.is-outsider')
@@ -1585,7 +1593,7 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
   });
 
   it('and the system name is full ink on every row (`proto:932`)', () => {
-    const rule = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+    const rule = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
       (candidate) => candidate.selector === NAME
     );
     assert.ok(Boolean(rule), 'NON-VACUITY: the name rule is still in the sheet');
@@ -1609,15 +1617,6 @@ describe('the entry’s inventory tile mirrors the player inventory card’s art
   const CSS_PATH = 'styles/fabricate.css';
   const CARD_PATH = 'src/ui/svelte/apps/inventory/InventoryItemCard.svelte';
 
-  /** `{ selector, body }` for every rule in a stylesheet text, comments stripped. */
-  function rulesOf(css) {
-    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
-      selector: match[1].replace(/\s+/g, ' ').trim(),
-      body: match[2].replace(/\s+/g, ' ').trim(),
-    }));
-  }
-
   /** The declarations of ONE rule, as `property -> value`. */
   function declarationsOf(rules, selector) {
     const rule = rules.find((candidate) => candidate.selector === selector);
@@ -1638,8 +1637,9 @@ describe('the entry’s inventory tile mirrors the player inventory card’s art
     return svelteSource.slice(open + '<style>'.length, close);
   }
 
-  const sheet = () => rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
-  const card = () => rulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
+  const sheet = () => sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+  const card = () =>
+    sheetRulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
 
   it('fills the tile with the art exactly as `.inventory-card-art img` does', () => {
     const authority = declarationsOf(card(), '.inventory-card-art img');
