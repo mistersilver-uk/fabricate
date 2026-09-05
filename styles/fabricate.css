@@ -13510,25 +13510,35 @@
   font-weight: 400;
 }
 
-/* `font: inherit` IS FIRST, AND THE ORDER IS LOAD-BEARING (issue 1502). `font` is a shorthand,
-   so it resets `line-height` to `normal` when it is not given one — written below the
-   `line-height: 1` this block declares it would silently drop the primitive's line-height in
-   BOTH apps. First is the only safe position, and issue 1502's acceptance pins the DECLARATION
-   ORDER by CSSOM inspection as well as the computed `line-height`, so a later move reds whether
-   or not the engine expands the shorthand. Do not sort this block.
+/* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, and it is a FLOOR rather than an override (issue
+   1502). Rooted at the family root ALONE, at (0,1,0): enough to beat the UA button font in a
+   host that declares nothing, and deliberately NOT enough to beat a caller's own per-site rule
+   at (0,2,0). Written at the family's own (0,2,0) it would TIE every such rule and win on
+   source order against each one declared earlier in this sheet, which silently deleted
+   `.manager-recipe-lock`'s and `.manager-recipe-edit`'s 0.68rem. `line-height` is not left to
+   the shorthand: the base rule below declares `line-height: 1` at (0,2,0) and still wins.
 
-   It is on THIS block, the family's lowest-specificity (0,2,0) rule, and not on the (0,3,0)
-   `.fabricate-button.manager-button.fab-manager-button` above, where the `font` shorthand would
-   reset the `font-weight: 700` that the (0,2,0) rule below supplies and move every manager button.
-   The manager's own bare-element baseline (`button, input, select, textarea { font: inherit }`,
-   scoped to the manager area near the top of this file) has no `.fabricate-app` counterpart, so a
-   re-rooted button outside the manager would otherwise render Foundry's default button font
-   (`openspec/specs/design-system/spec.md`, "the rule governs SELECTOR ROOTING"). Inside the manager
-   this restates that baseline and is a no-op. `box-sizing` needs nothing: this block already
-   declares it. */
+   The same floor keeps the `font` shorthand off `font-weight`: `.fabricate-button.manager-button`
+   below supplies the manager button's 700 at (0,2,0), and a (0,1,0) baseline cannot reset it.
+
+   Why the family needs a baseline at all: the manager's own bare-element one
+   (`button, input, select, textarea { font: inherit }`, scoped to the manager area near the top
+   of this file) has no `.fabricate-app` counterpart, so a re-rooted button outside the manager
+   would otherwise render Foundry's default button font
+   (`openspec/specs/design-system/spec.md`, "the rule governs SELECTOR ROOTING"). Inside the
+   manager it restates that baseline and is a no-op. */
+.fabricate-button,
+.fabricate-icon-button {
+  font: inherit;
+}
+
+/* THE FAMILY'S SHARED BASE BLOCK: the lowest-specificity (0,2,0) rule of BOTH button families,
+   and the control contract every carrier gets for free. It declares `line-height: 1` in its own
+   right rather than leaving it to the `font` shorthand above, and it is the more specific of the
+   two, so the shorthand's line-height never reaches a control in this family. `box-sizing` needs
+   nothing either: this block already declares it. */
 .fabricate-button.manager-button,
 .fabricate-icon-button.manager-icon-button {
-  font: inherit;
   appearance: none;
   -webkit-appearance: none;
   box-sizing: border-box;

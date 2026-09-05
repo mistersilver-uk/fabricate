@@ -633,6 +633,20 @@ const REVIEWED = [
       'them; the 18 unconverted controls still take their size from it.',
   },
   {
+    id: globalRule('.fabricate-button'),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — the review-r3 fix wrote it, and EXCLUDE here is a ' +
+      'STRUCTURAL instruction rather than a population one. This is the family`s bare-element ' +
+      'type baseline, `font: inherit`, and it is deliberately rooted at the family root ALONE ' +
+      'at (0,1,0) so that it is a FLOOR: high enough to beat the user agent`s button font in a ' +
+      'host that declares nothing, and too low to beat a caller`s per-site rule at (0,2,0). ' +
+      'Chaining `fab-manager-button` onto it would raise it above exactly those rules and turn ' +
+      'the floor back into an override — which is how it deleted `.manager-recipe-lock``s and ' +
+      '`.manager-recipe-edit``s 0.68rem and rendered both glyphs 28.7% larger. Never re-chain ' +
+      'this one; `re-rooted-controls-host-independence.test.js` pins its specificity.',
+  },
+  {
     id: globalRule('.fabricate-button.manager-button'),
     disposition: 'EXCLUDE',
     why:
@@ -711,7 +725,7 @@ const REVIEWED = [
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved ' +
       'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
