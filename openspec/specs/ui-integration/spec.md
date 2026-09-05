@@ -2450,6 +2450,12 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     Toolbar row one already matches the reference, so the deviation is confined to the presentation control at its end — which `### Essences Tab` already exempts from the filter-clearing rule for the same reason: it is not a filter, and it is the only route to the grid.
     What is NOT licensed by this ruling is a grid that says less than the list: `### Essences Tab` binds the two presentations to one state vocabulary, and a divergence there is a defect however this deviation is ruled.
 
+21. **AN ESSENCE IS DRAWN IN THE COLOUR THE WORLD ESSENCE CATALOGUE GAVE IT WHEREVER IT IS DRAWN AS A CHIP OR A TILE, on world-scope and system-scope screens alike** (maintainer ruling M29 on issue 1371).
+    The system Component Rules list's row badges, the system inspector's essence run and the system rules editor's `Essence contribution` tiles carry it beside the world catalogue's bulk `Essence values` rows, through ONE shared essence chip over the manager chip's `tint` axis and the 22px glyph-chip medallion — never through a per-site restatement of glyph, colour and accessible name, which is how three sites came to draw the same essence grey.
+    The read union answers identity from the in-system row first and the world essence entry writes the world entity alone, so the manager's system-scope projection overlays the WORLD identity's colour onto the selected system's essence rows: an authored world colour wins, an unauthored one leaves the row's own colour standing, and no world store changes nothing.
+    The chip's face is the reference's essence dot — the colour on the glyph AND the numeral over the soft surface behind the plain hairline — and its label and the tile's glyph are measured for contrast in a real browser on every theme for every offered tint; the tile's face is the slate glyph chip with the colour on the glyph alone.
+    An essence with no authored colour is the untinted chip or tile, never an error.
+
 ### GM World Tool Screens
 
 The two world tool screens and the system-scope Tool Rules list share one break-mode contract, and it is stated here rather than per screen because the three surfaces disagree about the same value only if it is.
