@@ -254,7 +254,7 @@ const PRIMITIVES = Object.freeze([
     anchors: Object.freeze(['manager-icon-button']),
     composesClasses: true,
     // Measured today: 1 written, 21 family selectors, 15 owned — 4 caller-ancestor exempt, 1
-    // belongs to Pagination's own family (`:13709`, its ancestor is the primitive's OWN class,
+    // belongs to Pagination's own family (`:13792`, its ancestor is the primitive's OWN class,
     // not a caller's), 1 belongs to a caller CLASS compound
     // (`.manager-icon-button.manager-recipe-step-nav`) — 21 - 4 - 1 - 1 = 15.
     writtenFloor: 1,
@@ -281,7 +281,7 @@ const PRIMITIVES = Object.freeze([
     // Measured today: 5 written (root class aside), 17 family selectors, 6 owned — 6
     // caller-container exempt plus 4 caller-container-by-ATTRIBUTE exempt (the
     // `[data-manager-view=…]` per-view overrides — see the application-root-attribute clause
-    // below) plus 1 belonging to IconButton's own family (`:13709`) — 17 - 6 - 4 - 1 = 6.
+    // below) plus 1 belonging to IconButton's own family (`:13792`) — 17 - 6 - 4 - 1 = 6.
     writtenFloor: 4,
     familyFloor: 15,
     ownedFloor: 5,

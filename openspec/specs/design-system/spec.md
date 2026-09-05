@@ -154,7 +154,7 @@ The two re-rooted button families do exactly that. `.fabricate-manager button, .
 WHERE that rule is ROOTED is part of the requirement rather than a formatting choice, because a bare-element baseline is a FLOOR and not an override.
 It is declared at the FAMILY ROOT ALONE — high enough to beat the user agent's own button font in a host that declares nothing, and deliberately too low to beat a caller's per-site rule on a class the primitive merely passes through.
 Written at the family's own compound specificity it instead TIES every such rule and wins on source order against each one declared earlier in the sheet: that is how issue 1502's first attempt silently deleted the recipe row's `manager-recipe-lock` and `manager-recipe-edit` 0.68rem and rendered both glyphs 28.7% larger.
-The `line-height` is not left to the shorthand either. `font` resets `line-height` to `normal` when it is not given one, and the block that declares `line-height: 1` is the MORE SPECIFIC of the two, so that block is what resolves in any engine and the ordering of the two is corroboration rather than the mechanism.
+The `line-height` is not left to the shorthand either. `font` is a shorthand, so it resets line-height along with the rest — to the inherited value in the `inherit` form, to `normal` otherwise — and the block that declares `line-height: 1` is the MORE SPECIFIC of the two, so that block is what resolves in any engine and the ordering of the two is corroboration rather than the mechanism.
 `box-sizing` needed nothing, because that same block already declared it.
 
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
