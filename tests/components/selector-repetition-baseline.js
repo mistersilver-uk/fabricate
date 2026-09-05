@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 208 repeated selectors
- * rather than these 119, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
+ * rather than these 116, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 2,863 `(at-context, selector)` keys, of which 2,744 appear exactly
+ * Unfiltered, the sheet holds 2,861 `(at-context, selector)` keys, of which 2,745 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -40,7 +40,7 @@
  * MEASURED over this branch's own head, rebased onto issue 1502's final tree, by `the sheet's
  * cross-list selector repetition does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,365 rules at that head, 119 repeated keys and 244 appearances
+ * printed from. The sheet holds 2,366 rules at that head, 116 repeated keys and 238 appearances
  * between them; six keys appear three times and none appears four or more.
  *
  * A COMMIT SHA IS NOT THE ANCHOR, deliberately. An earlier draft of this docblock cited the
@@ -48,11 +48,17 @@
  * contextual figures went stale, and no gate could see it because none of them is pinned. The
  * figures a reader can check are the ones this branch's own tree produces.
  *
- * Phase A moved it from the 121 keys / 248 appearances measured at `b6ebbecc`, by exactly two
+ * Issue 1503 moved it by exactly three rows and six appearances, from the 119 keys / 244
+ * appearances the row above this one used to state:
+ * `.fabricate-icon-picker-popover .essence-icon-picker-option`,
+ * `.fabricate-source-picker-popover .essence-source-picker-grid` and
+ * `.fabricate-source-picker-popover .essence-source-picker-option` each fell to ONE appearance
+ * when the callers' panel, list and row blocks were deleted in favour of the shared primitive's.
+ * Those 119 / 244 in turn came from the 121 keys / 248 appearances measured at `b6ebbecc`, by two
  * rows and four appearances: `.fabricate-app select:focus-visible`, whose list membership went
  * when the app and manager focus pair collapsed onto `.fabricate`, and
  * `.fabricate-manager .manager-tool-on-break`, one of whose two rules was deleted when its
- * declarations were adopted by `.fab-stack`. Phase C changes no selector at all.
+ * declarations were adopted by `.fab-stack`.
  *
  * ── WHY THE ROWS ARE JSON AND NOT ARRAYS IN THIS MODULE ─────────────────────────────────
  * The reason `design-system-known-debt.js` records for its own table: SonarCloud's copy-paste
@@ -109,6 +115,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 244 across 119 rows.
+ * measured commit it is 238 across 116 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;
