@@ -1592,3 +1592,73 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
     assert.match(rule.body, /color: var\(--fab-text\);/);
   });
 });
+
+/**
+ * THE ENTRY'S `How players see it` TILE DRAWS THE ART THE WAY THE PLAYER'S INVENTORY TILE DOES
+ * (issue 1371 r13-entry, maintainer ruling M16).
+ *
+ * The rail's tile is the one region of the screen that shows a GM what a player meets, and it
+ * drew the item's icon at 64px, centred and letterboxed, inside a 118x110 box — while
+ * `InventoryItemCard.svelte`'s thumb fills a square with the art. The treatment is hand-copied
+ * from that component's scoped `<style>` into `styles/fabricate.css` (the tile is markup the
+ * rail owns, styled from the host sheet), so this is the guard the persona requires for a
+ * hand-maintained mirror: the two blocks are read from their own files and compared, and the
+ * player tile is the authority.
+ */
+describe('the entry’s inventory tile mirrors the player inventory card’s art treatment', () => {
+  const CSS_PATH = 'styles/fabricate.css';
+  const CARD_PATH = 'src/ui/svelte/apps/inventory/InventoryItemCard.svelte';
+
+  /** `{ selector, body }` for every rule in a stylesheet text, comments stripped. */
+  function rulesOf(css) {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
+      selector: match[1].replace(/\s+/g, ' ').trim(),
+      body: match[2].replace(/\s+/g, ' ').trim(),
+    }));
+  }
+
+  /** The declarations of ONE rule, as `property -> value`. */
+  function declarationsOf(rules, selector) {
+    const rule = rules.find((candidate) => candidate.selector === selector);
+    assert.ok(Boolean(rule), `NON-VACUITY: \`${selector}\` is still declared`);
+    return Object.fromEntries(
+      rule.body
+        .split(';')
+        .map((declaration) => declaration.trim())
+        .filter(Boolean)
+        .map((declaration) => declaration.split(':').map((part) => part.trim()))
+    );
+  }
+
+  function styleBlockOf(svelteSource) {
+    const open = svelteSource.indexOf('<style>');
+    const close = svelteSource.indexOf('</style>');
+    assert.ok(open !== -1 && close > open, 'NON-VACUITY: the card still carries a scoped block');
+    return svelteSource.slice(open + '<style>'.length, close);
+  }
+
+  const sheet = () => rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+  const card = () => rulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
+
+  it('fills the tile with the art exactly as `.inventory-card-art img` does', () => {
+    const authority = declarationsOf(card(), '.inventory-card-art img');
+    const mirror = declarationsOf(sheet(), '.fabricate-manager .manager-component-entry-preview-tile > img');
+    for (const property of ['display', 'width', 'height', 'object-fit']) {
+      assert.equal(
+        mirror[property],
+        authority[property],
+        `\`${property}\` on the entry tile’s art must be the player tile’s (\`${authority[property]}\`)`
+      );
+    }
+    assert.equal(authority['object-fit'], 'cover', 'and the authority is the FILLING treatment');
+  });
+
+  it('and the box is a square like `.inventory-card-thumb`, not a fixed 110px band', () => {
+    const authority = declarationsOf(card(), '.inventory-card-thumb');
+    const mirror = declarationsOf(sheet(), '.fabricate-manager .manager-component-entry-preview-tile');
+    assert.equal(mirror['aspect-ratio'], authority['aspect-ratio']);
+    assert.equal(mirror.height, undefined, 'a fixed height would fight the square the art fills');
+    assert.equal(mirror.overflow, 'hidden', 'and the corners clip the art, as the thumb’s do');
+  });
+});

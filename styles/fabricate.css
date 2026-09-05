@@ -24824,17 +24824,25 @@
 }
 
 /* THE TILE ITSELF, which round 3 did not draw at all. It is the one region of this screen that
-   shows a GM what a player meets, so it carries the art at inventory scale rather than at the
-   40px identity scale every other rail uses. */
+   shows a GM what a player meets, so it draws the art THE WAY THE PLAYER'S INVENTORY TILE DOES
+   (issue 1371 r13-entry, maintainer ruling M16): a square that fills its 118px column
+   (`proto:993` writes `width:100%;aspect-ratio:1`), with the art covering the whole box —
+   `InventoryItemCard.svelte`'s `.inventory-card-thumb` and `.inventory-card-art img` are the
+   authority and are copied declaration for declaration, which
+   `scoped-shell-prop-contract.test.js` pins. It used to be a 118x110 band with the icon at
+   64px letterboxed in the middle, which is not what a player sees. The edge is
+   `--fab-border-strong` because that is what `proto:993` draws on a lit tile; the radius is
+   the ladder's 11 against the reference's 12. The glyph branch — a record with no linked item —
+   keeps the centred glyph, so the flex centring stays. */
 .fabricate-manager .manager-component-entry-preview-tile {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 118px;
-  height: 110px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   background: var(--fab-bg-1);
-  border: 1px solid var(--fab-border);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 11px;
   color: var(--fab-accent);
   font-size: 1.75rem;
@@ -24842,9 +24850,10 @@
 }
 
 .fabricate-manager .manager-component-entry-preview-tile > img {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .fabricate-manager .manager-component-entry-preview-quantity {
