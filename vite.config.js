@@ -165,9 +165,18 @@ export default defineConfig(({ command }) => {
           // chunk paths predictable for the build-output gate.
           inlineDynamicImports: false,
           chunkFileNames: 'chunks/[name]-[hash].js',
-          // Drop developer-only console.log/debug/info calls from production
-          // output by marking them pure so dead-code elimination removes them.
-          // console.error and console.warn are retained for user-visible messages.
+          // Drop developer-only console.log/debug/info calls from production output by marking
+          // them pure so dead-code elimination removes them. console.error and console.warn are
+          // retained for user-visible messages.
+          // THE QUALIFICATION: this only strips a marked call whose RETURN VALUE IS UNUSED — a
+          // bare expression statement like the stale-entry-script write in src/main.js. A call
+          // whose value IS used survives at any level regardless of the marking, because removing
+          // it would remove the value; see src/utils/deferredEntryNotice.js's
+          // `(error) => console.error(MESSAGE, error)` reporter seam, whose value is the arrow's
+          // return. The optional-call form `console.info?.(...)` also survives even when its
+          // value is discarded, and the shipped bundle already carries an accidental survivor of
+          // exactly that shape (the `console.debug?.(...)` durable-flag summary lines in
+          // src/main.js and src/systems/CraftingSystemManager.js).
           // (Rolldown's equivalent of esbuild's `pure`; the Vite-default lib
           // minify of `{ compress: true, mangle: true, codegen: false }` is
           // preserved, with manualPureFunctions added.)
