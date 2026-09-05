@@ -193,6 +193,73 @@ test('a malformed payload is skipped rather than repaired, and never throws', ()
   assert.equal(record(noSystems, 'ingot', 'sys-old').inherit.essences, true);
 });
 
+test('a row that EXISTS but authored no essences map reads as EMPTY, so it OVERRIDES (issue 1371 r19-store2)', () => {
+  // Rule 2's own words are "absence reading as empty". The `own`-falsy branch is written for a
+  // record with NO ROW LEFT; a row that is present and simply carries no `essences` key is a
+  // system that authored none, which DIFFERS from a non-empty elected map. Unreachable from what
+  // this module writes (`_normalizeComponent` always emits an object) and reachable through the
+  // export upcast and a hand-edited payload.
+  const data = migratedWorld();
+  delete data.systems[2].components[0].essences;
+  migrateComponentEssenceSections(data);
+  assert.deepEqual(data.componentScope.defaults.ingot.essences, { fire: 2, moss: 1 });
+  const marked = record(data, 'ingot', 'sys-new');
+  assert.equal(marked.inherit.essences, false, 'a present row with no map is not a missing row');
+  assert.deepEqual(marked.essences, {}, 'and it carries the authored none it overrides with');
+
+  // THE PAIRED SPELLING, so the two ways of saying "this system authors no essences" are pinned
+  // to ONE answer and the asymmetry cannot come back unnoticed.
+  const paired = migratedWorld();
+  paired.systems[2].components[0].essences = {};
+  migrateComponentEssenceSections(paired);
+  assert.equal(record(paired, 'ingot', 'sys-new').inherit.essences, false);
+  assert.deepEqual(record(paired, 'ingot', 'sys-new').essences, {});
+});
+
+test('a hostile world is SKIPPED level by level and the good record is still decided (issue 1371 r19-store2)', () => {
+  // The payload guard was pinned; the SYSTEM and RECORD guards were not, and the record guard is
+  // the load-bearing one — without it a `null` member throws inside a startup migration.
+  const data = migratedWorld();
+  data.componentScope.membership.junkNull = null;
+  data.componentScope.membership.junkEmpty = {};
+  data.componentScope.membership.junkNoSystem = { entityId: 'ingot' };
+  // Two systems sharing an id: the FIRST wins, so the impostor's rows decide nothing.
+  data.systems.push({ id: 'sys-old', name: 'Impostor', components: [row('ingot', { ash: 9 })] });
+  // And one system listing the same component twice: the FIRST row wins.
+  data.systems[0].components.push(row('ingot', { ash: 9 }));
+
+  assert.doesNotThrow(() => migrateComponentEssenceSections(data));
+  assert.deepEqual(
+    data.componentScope.defaults.ingot.essences,
+    { fire: 2, moss: 1 },
+    'the donor is the first system with that id, and its first row for the component'
+  );
+  assert.equal(record(data, 'ingot', 'sys-old').inherit.essences, true, 'the good record decided');
+  assert.equal(record(data, 'ingot', 'sys-new').inherit.essences, false);
+  assert.deepEqual(record(data, 'ingot', 'sys-new').essences, { fire: 5 });
+  assert.equal(data.componentScope.membership.junkNull, null, 'the junk is left as it was found');
+  assert.deepEqual(data.componentScope.membership.junkEmpty, {});
+  assert.deepEqual(data.componentScope.membership.junkNoSystem, { entityId: 'ingot' });
+});
+
+test('a record whose ids carry whitespace still finds its donor and its own row (issue 1371 r19-store2)', () => {
+  // The pair is trimmed for the guard and the grouping key, and `bySystem` is keyed on the
+  // TRIMMED system id, so a raw lookup found no system: no row, no override, and the record was
+  // marked inheriting against a map it does not hold. Reachable from a GM repair macro.
+  const data = migratedWorld();
+  const key = membershipKey('ingot', 'sys-new');
+  data.componentScope.membership[key] = {
+    entityId: ' ingot ',
+    systemId: ' sys-new ',
+    inherit: { category: false },
+  };
+  migrateComponentEssenceSections(data);
+  assert.deepEqual(data.componentScope.defaults.ingot.essences, { fire: 2, moss: 1 });
+  const padded = data.componentScope.membership[key];
+  assert.equal(padded.inherit.essences, false, 'its own row is found through the trimmed id');
+  assert.deepEqual(padded.essences, { fire: 5 });
+});
+
 test('RESOLUTION IS UNCHANGED: after a real load, every system reads its own map through the union', async () => {
   const data = migratedWorld();
   migrateComponentEssenceSections(data);

@@ -30,8 +30,11 @@
  * 2. EVERY MEMBERSHIP RECORD IS MARKED against the elected map, absence reading as empty: a record
  *    whose system's own row EQUALS it is marked `inherit.essences: true`; one that differs is marked
  *    `false` and carries its own map on the record, exactly as `category` carries its own token.
- *    A record with no in-system row left has nothing to preserve and is marked inheriting, so a
- *    later re-add starts from the world map — the union draws nothing for it until then.
+ *    A PRESENT row that carries no `essences` key at all is a system that authored NONE — it reads
+ *    as the empty map and therefore OVERRIDES a non-empty elected one, which is the same answer
+ *    `essences: {}` gets. Only a record with no in-system row LEFT has nothing to preserve; that
+ *    one is marked inheriting, so a later re-add starts from the world map — the union draws
+ *    nothing for it until then.
  * 3. RESOLUTION AT MIGRATION TIME IS UNCHANGED BY CONSTRUCTION: an inheriting record equals the
  *    world map it now follows, and an overriding one answers its own in-system row.
  *
@@ -45,7 +48,16 @@
  * omitted switch "add to system" gave it, which is inheriting, which is what adding means.
  *
  * Never throws: every level is guarded, and a malformed payload, system or record is skipped rather
- * than repaired.
+ * than repaired — with one exception, stated because the sentence otherwise over-claims: an
+ * unusable `defaults` map is REPLACED with an empty one so the election has somewhere to land.
+ * Its per-entity records are not repaired, and the store's normalizer would drop the garbage on
+ * the next load in any case.
+ *
+ * Each membership record's `entityId`/`systemId` pair is TRIMMED ONCE, when the records are
+ * grouped, and every later lookup uses that trimmed pair. `bySystem` is keyed on the trimmed
+ * system id, so reading the raw field back off the record found no system at all for a padded
+ * id — no donor, no own row, and a record marked inheriting against a map its system does not
+ * hold. Fabricate's own writes trim on load; a hand-written `game.settings.set` repair does not.
  *
  * Mutated setting keys: `fabricate.componentScope` (`defaults` and `membership`).
  */
@@ -106,10 +118,13 @@ function isDecided(record) {
 export function markComponentEssenceInheritance(record, inSystemRow, worldEssences) {
   if (!isPlainObject(record) || isDecided(record)) return false;
   const inherit = isPlainObject(record.inherit) ? record.inherit : {};
-  // A record with no row left has nothing to preserve — the union draws no row for it until a
+  // A record with no row LEFT has nothing to preserve — the union draws no row for it until a
   // re-add seeds one — so it inherits, exactly as a row whose own map equals the world's does.
+  // `null` is that state and ONLY that state: a row that exists and carries no `essences` key
+  // reads as the EMPTY map (rule 2's "absence reading as empty"), which is a system that authored
+  // none rather than a system with nothing to say.
   const own = isPlainObject(inSystemRow)
-    ? normalizeComponentEssenceMap(inSystemRow.essences)
+    ? (normalizeComponentEssenceMap(inSystemRow.essences) ?? {})
     : null;
   if (own && !componentEssenceMapsEqual(own, worldEssences)) {
     inherit.essences = false;
@@ -124,16 +139,17 @@ export function markComponentEssenceInheritance(record, inSystemRow, worldEssenc
 /**
  * Elect one component's world map from the oldest system still holding a row for it.
  *
- * @param {Array<object>} records the entity's membership records.
+ * @param {Array<{record: object, systemId: string}>} members the entity's membership records, each
+ *   beside the TRIMMED system id it was grouped under.
  * @param {Map<string, {index: number, rows: Map<string, object>}>} bySystem
  * @param {string} entityId
  * @returns {Record<string, number>|undefined} the donor's normalized map, or absence when the donor
  *   authored none or no system holds a row.
  */
-function electFromDonor(records, bySystem, entityId) {
+function electFromDonor(members, bySystem, entityId) {
   let donor = null;
-  for (const record of records) {
-    const system = bySystem.get(record.systemId);
+  for (const { systemId } of members) {
+    const system = bySystem.get(systemId);
     const row = system?.rows.get(entityId);
     if (!row) continue;
     if (!donor || system.index < donor.index) donor = { index: system.index, row };
@@ -147,21 +163,22 @@ function electFromDonor(records, bySystem, entityId) {
  *
  * @param {object} scope the `componentScope` payload, in the persisted MAP shape.
  * @param {string} entityId
- * @param {Array<object>} records the entity's membership records.
+ * @param {Array<{record: object, systemId: string}>} members the entity's membership records, each
+ *   beside the TRIMMED system id it was grouped under.
  * @param {Map<string, {index: number, rows: Map<string, object>}>} bySystem
  * @returns {void}
  */
-function decideEntity(scope, entityId, records, bySystem) {
-  if (records.some(isDecided)) return;
+function decideEntity(scope, entityId, members, bySystem) {
+  if (members.some((member) => isDecided(member.record))) return;
   const existing = isPlainObject(scope.defaults?.[entityId]) ? scope.defaults[entityId] : null;
   const kept = normalizeComponentEssenceMap(existing?.essences);
-  const elected = kept ?? electFromDonor(records, bySystem, entityId);
+  const elected = kept ?? electFromDonor(members, bySystem, entityId);
   if (!kept && elected) {
     if (!isPlainObject(scope.defaults)) scope.defaults = {};
     scope.defaults[entityId] = { ...existing, id: entityId, essences: elected };
   }
-  for (const record of records) {
-    const row = bySystem.get(record.systemId)?.rows.get(entityId) ?? null;
+  for (const { record, systemId } of members) {
+    const row = bySystem.get(systemId)?.rows.get(entityId) ?? null;
     markComponentEssenceInheritance(record, row, elected);
   }
 }
@@ -185,8 +202,10 @@ export function migrateComponentEssenceSections(data) {
     const systemId = typeof record.systemId === 'string' ? record.systemId.trim() : '';
     if (!entityId || !systemId) continue;
     if (!byEntity.has(entityId)) byEntity.set(entityId, []);
-    byEntity.get(entityId).push(record);
+    // THE TRIMMED PAIR TRAVELS WITH THE RECORD. `bySystem` is keyed on the trimmed system id, so
+    // every lookup downstream must use this one rather than reading `record.systemId` back.
+    byEntity.get(entityId).push({ record, systemId });
   }
-  for (const [entityId, records] of byEntity) decideEntity(scope, entityId, records, bySystem);
+  for (const [entityId, members] of byEntity) decideEntity(scope, entityId, members, bySystem);
   return data;
 }
