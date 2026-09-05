@@ -6174,10 +6174,20 @@ export function createAdminStore(services) {
    *
    * The answer is the ORDER, not a rollback, because the two partial states are not equally bad:
    *
-   *   ROW GONE, MEMBERSHIP LEFT — inert. The read union iterates the IN-SYSTEM array and only
-   *     enriches rows it finds there, so a membership record with no row draws NOTHING. The
-   *     component is absent from the system, which is what the GM asked for; the stale record is
-   *     invisible and the next `Add to system` reuses it rather than tripping over it.
+   *   ROW GONE, MEMBERSHIP LEFT — inert, but NOT invisible (issue 1371 r17 corrects the earlier
+   *     wording). Inert to the READ UNION: it iterates the IN-SYSTEM array and only enriches rows
+   *     it finds there, so no recipe, no rules editor and no crafting surface can reach the
+   *     component through this system, which is what the GM asked for. The system rules list
+   *     draws it as an ordinary GHOST row, because the ghost cohort keys off in-system ids and
+   *     ignores membership. The WORLD screens, however, still COUNT the membership: the
+   *     projection sets `member` from the record alone, so the entry's systems card names this
+   *     system as holding the component, the catalogue's `{m}/{k} Systems` stat and its
+   *     `Has rules in {system}` filter include it, and the picker's `heldHere` reads
+   *     `member === true` and WITHHOLDS the record from this system's offer — the one place the
+   *     ghost row and the picker disagree about the same fact. It is recoverable two ways: the
+   *     ghost row's `Add to system` (`joinComponentToSystem` tolerates the `false` the
+   *     membership write answers and seeds the row), or re-issuing this removal (`holdsRecord`
+   *     is then false and only the membership half runs).
    *   MEMBERSHIP GONE, ROW LEFT — the ghost. The row resolves on, with the world layer no longer
    *     consulted, and no screen says so.
    *

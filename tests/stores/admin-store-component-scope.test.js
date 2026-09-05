@@ -750,8 +750,15 @@ test('1371: and so does one that throws AFTER it — the store cannot tell the t
 test('1371: a membership write that throws leaves only the INERT half, and still moves the screen', async () => {
   // THE SECOND HALF'S OWN WINDOW. The row is gone and the recipe cascade has already run, so there
   // is nothing to give back — re-seeding the row could not restore the rewritten recipes, and the
-  // membership record standing over a missing row is the harmless partial state: the read union
-  // iterates the IN-SYSTEM array, finds nothing, and draws nothing.
+  // membership record standing over a missing row is the RECOVERABLE partial state: the read
+  // union iterates the IN-SYSTEM array, finds nothing, and draws nothing through this system.
+  //
+  // "INERT" IS ABOUT THE READ UNION, NOT THE WORLD SCREENS (issue 1371 r17). The rules list
+  // draws the record as a ghost row; the world entry's systems card, the catalogue's system
+  // count and its `Has rules in` filter all still COUNT the membership, and the picker's
+  // `heldHere` withholds the record from this system's offer while the ghost row offers to add
+  // it — the two add surfaces disagree until the removal is re-issued or the ghost row's Add
+  // recovers the row. The docblock on `partComponentFromSystem` states the same.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness);
@@ -772,8 +779,9 @@ test('1371: a membership write that throws leaves only the INERT half, and still
   assert.deepEqual(
     Object.values(scope.payload.membership).map((record) => record.entityId),
     ['ingot'],
-    'and the membership record is the half left over — invisible to the read union, and reused ' +
-      'rather than tripped over by the next Add to system'
+    'and the membership record is the half left over — inert to the read union, drawn as a ' +
+      'ghost on the rules list, still COUNTED by the world screens until the removal is ' +
+      're-issued or the ghost row`s Add recovers the row'
   );
   assert.equal(harness.notifications.error.length, 1, 'the GM is told, once');
 });
