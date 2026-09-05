@@ -288,15 +288,16 @@
                    which is how the icon picker separates its pinned resolved row from the
                    alphabetical list. It is not chrome: chrome is subtracted from the budget the
                    floor divides, whereas this is subtracted from that budget AND added back to
-                   the list's own height, because the list's box has to contain it. It is what floors the list to a WHOLE
-                   number of rows instead of slicing the last one against the panel's bottom
-                   inset, and it is a CALLBACK rather than three numbers because the numbers are
-                   measured from the rendered box — a row's height and the popover's chrome are
-                   tokens in the stylesheet, so a caller restating them here would be a second
-                   copy free to drift. The three elements are handed over because after adoption
-                   this component owns all three of them. A caller that passes nothing is
-                   unaffected: without a `rowPitch` the layout derives no list height, and this
-                   component then registers no secondary style target at all.
+                   the list's own height, because the list's box has to contain it. It is what
+                   floors the list to a WHOLE number of rows instead of slicing the last one
+                   against the panel's bottom inset, and it is a CALLBACK rather than three
+                   numbers because the numbers are measured from the rendered box — a row's
+                   height and the popover's chrome are tokens in the stylesheet, so a caller
+                   restating them here would be a second copy free to drift. The three elements
+                   are handed over because after adoption this component owns all three of them.
+                   A caller that passes nothing is unaffected: without a `rowPitch` the layout
+                   derives no list height, and this component then registers no secondary style
+                   target at all.
     ignoreScrollWithin — drop viewport events that started INSIDE the panel (default false).
                    The panel is anchored to the trigger and scrolling within it moves neither, so
                    for a long list the re-measure recomputes the answer already applied.
