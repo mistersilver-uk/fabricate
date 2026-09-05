@@ -82,6 +82,7 @@ import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
 // mutation could break is in that module because nothing in THIS file can be executed by a unit
 // test; what stays here is the Foundry edge - the localizer, the channel and the console.
 import {
+  DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
   STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
   buildStaleEntryNotice,
   createDeferredChunkFailureReporter,
@@ -341,7 +342,11 @@ const showCraftingSystemManagerApp = () =>
 const reportManagerLoadFailure = createDeferredChunkFailureReporter({
   notify: (message, options) => ui.notifications?.error?.(message, options),
   hasNotice: (notice) => ui.notifications?.has?.(notice),
-  log: (message, error) => console.error(message, error),
+  // The console line's own text is referenced HERE and nowhere else, on purpose: `vite.config.js`
+  // marks `console.log`/`info`/`debug` pure, so Rolldown deletes such a call from every published
+  // build ALONG WITH its arguments. That is what lets a build-time assertion over `dist/main.js`
+  // pin the LEVEL of this write - which a spy in a unit test cannot, since it passes at any level.
+  log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
   localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key))
 });
 

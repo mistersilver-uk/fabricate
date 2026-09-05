@@ -40,8 +40,8 @@ function reporterHarness({ hasNotice, handle } = {}) {
   const notified = [];
   let nextId = 0;
   const report = createDeferredChunkFailureReporter({
-    log: (message, error) => {
-      logged.push({ message, error });
+    log: (...args) => {
+      logged.push(args);
     },
     notify: (message, options) => {
       notified.push({ message, options });
@@ -185,12 +185,19 @@ test('a reported failure writes exactly one console line and one un-mirrored not
   report(CHUNK_FAILURE);
 
   assert.equal(logged.length, 1, 'exactly one console write per failure');
-  assert.equal(logged[0].message, DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE);
-  assert.equal(logged[0].error, CHUNK_FAILURE, 'the console carries the underlying error');
-  // The exported literal is what pins the console LEVEL, by being asserted against the built
-  // bundle: `console.log`/`info`/`debug` are stripped from every published build, and a spy in
-  // this suite would pass at any level. So it must not be empty, or that assertion is vacuous.
-  assert.ok(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE.length > 0);
+  assert.equal(logged[0][0], CHUNK_FAILURE, 'the console carries the underlying error');
+  // THE SEAM TAKES THE ERROR ALONE, and that shape is load-bearing rather than tidy. The console
+  // line's own text is referenced by the console CALL and by nothing else, so that stripping the
+  // call (which is what happens at `console.log`/`info`/`debug` — `vite.config.js` marks them
+  // pure) removes the literal from the built bundle too. Pass it through this seam instead and it
+  // would survive in the bundle regardless of the level, and the assertion that pins the level
+  // could never fail. A spy here cannot see a level at all, which is why the level is not
+  // asserted in this suite.
+  assert.equal(logged[0].length, 1, 'the console seam receives the error and nothing else');
+  assert.ok(
+    DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE.length > 0,
+    'and the exported literal is non-empty, or the bundle assertion over it is vacuous'
+  );
 
   assert.equal(notified.length, 1);
   assert.deepEqual(

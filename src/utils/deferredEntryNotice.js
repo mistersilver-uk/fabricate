@@ -65,9 +65,13 @@ const CHUNK_LOAD_FAILURE_TEXTS = Object.freeze([
  * A `log` spy in a unit test passes at any level, so the level is pinned by asserting this
  * literal is present in the built bundle instead.
  *
- * REFERENCED ONLY BY THE CONSOLE WRITE. It is deliberately not a localization key and not part
- * of any notice: keys on this code path survive tree-shaking because the notice references them,
- * so asserting a key would pass even if the console call had been stripped.
+ * REFERENCED ONLY BY THE CONSOLE WRITE, and that is why the reporter's `log` seam takes the
+ * ERROR ALONE rather than a message and an error. It is deliberately not a localization key and
+ * not part of any notice, because a key on this code path survives tree-shaking (the notice
+ * references it) and so would pass the bundle assertion even if the console call had been
+ * stripped. Were this constant passed INTO `log` from here, it would survive for the same
+ * reason: only a literal whose sole reference is the console call itself disappears from the
+ * bundle when that call is stripped, which is the whole point of asserting it.
  */
 export const DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE =
   'Fabricate | a deferred part of the module failed to load. This browser is probably running a cached copy of an earlier version of Fabricate; reload to complete the update.';
@@ -196,7 +200,8 @@ function isNoticeLive(hasNotice, retained) {
  * @param {(message: string, options: object) => object|undefined} seams.notify
  *   The notification channel, BOUND to its receiver — `ui.notifications.error` passed as a bare
  *   function value throws on a private-field access at call time.
- * @param {(message: string, error: unknown) => void} seams.log The console seam.
+ * @param {(error: unknown) => void} seams.log The console seam. It takes the error alone and
+ *   owns the write, including {@link DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE} — see that constant.
  * @param {(key: string, data?: object) => string|undefined} seams.localize The localizer.
  * @param {((notice: object) => boolean)} [seams.hasNotice] The `ui.notifications.has` seam,
  *   likewise bound. Optional: without it every failure notifies.
@@ -205,7 +210,7 @@ function isNoticeLive(hasNotice, retained) {
 export function createDeferredChunkFailureReporter({ notify, log, localize, hasNotice }) {
   let retained = null;
   return (error) => {
-    log(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error);
+    log(error);
     if (isNoticeLive(hasNotice, retained)) return;
     retained = notify(buildDeferredChunkFailureNotice(error, localize), { console: false }) ?? null;
   };
