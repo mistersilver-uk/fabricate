@@ -1,7 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The world Component entry's player-preview rail (issue 1371, maintainer parity round 4) —
-  `proto:985-1020`.
+  The Component `How players see it` rail (issue 1371, maintainer parity round 4) —
+  `proto:985-1020` on the world entry, `proto:1467-1500` on the system rules editor.
+
+  == ONE RAIL, TWO SCREENS (issue 1371 r18-list, maintainer ruling M27) =====================
+  The reference draws the two rails from ONE template: the entry's binds `d.en.pv` and the rules
+  editor's binds `d.pr.pv`, and nothing else differs. The rules editor used to draw a rail of its
+  own — a 64px medallion in a 90px box, a sans name, iconed micro chips — and the maintainer's
+  live test found the two "using a different layout", which is exactly what a second
+  implementation of one template does over time. So this file is the rail on BOTH screens, and
+  the editor renders it in place of its own markup. `scope` is what the two screens say
+  differently: the scope sentence under the head and the aside's accessible name. Everything the
+  scope does not change is stated once, here, and cannot be restated somewhere else.
+
+  The file keeps its name. Renaming it would touch the world entry, its suites and the naming
+  gate that counts `World…` children for a change that moves no pixel, and the rail was the
+  entry's first; the header records that it is no longer ONLY the entry's.
 
   == IT IS THE GRID'S SECOND COLUMN, NOT A CHILD OF THE SCROLLER =============================
   The page places it; this file only says what is in it. Round 3 nested the rail inside the
@@ -33,20 +47,45 @@
     linked = true,
     factGroups = [],
     text = (key, fallback) => fallback,
+    // THE SCOPE THE RAIL SPEAKS FOR (issue 1371 r18-list, M27): `world` is the catalogue entry's
+    // reading — `Across every system that has rules for it.` — and `system` is the rules editor's,
+    // `What a player sees in {system}.` (`proto:1487`), naming the system through `systemLabel`.
+    // `world` by default, so the entry passes nothing and renders byte for byte what it did.
+    scope = 'world',
+    systemLabel = '',
   } = $props();
+
+  const systemScope = $derived(scope === 'system');
+  const ariaLabel = $derived(
+    systemScope
+      ? text('FABRICATE.Admin.Manager.Component.Rail.Label', 'Player preview')
+      : text(
+          'FABRICATE.Admin.Manager.Scoped.Component.PreviewLabel',
+          'How this component reaches the world'
+        )
+  );
+  // `{system}` is substituted here rather than by a caller-supplied formatter: the two screens
+  // that render this rail each carry the same four-line `replaceAll` helper, and a rail that took
+  // a third copy as a prop would be asking every caller to agree on an interpolation contract for
+  // one token.
+  const scopeNote = $derived(
+    systemScope
+      ? text(
+          'FABRICATE.Admin.Manager.Component.Rail.ScopeNote',
+          'What a player sees in {system}.'
+        ).replaceAll('{system}', String(systemLabel ?? ''))
+      : text(
+          'FABRICATE.Admin.Manager.Scoped.Component.Entry.ScopeNote',
+          'Across every system that has rules for it.'
+        )
+  );
 </script>
 
 <ScopedEntityPreview
   hookAttribute="data-scoped-entry-preview"
-  ariaLabel={text(
-    'FABRICATE.Admin.Manager.Scoped.Component.PreviewLabel',
-    'How this component reaches the world'
-  )}
+  {ariaLabel}
   kicker={text('FABRICATE.Admin.Manager.Scoped.Component.Entry.RailKicker', 'How players see it')}
-  scopeNote={text(
-    'FABRICATE.Admin.Manager.Scoped.Component.Entry.ScopeNote',
-    'Across every system that has rules for it.'
-  )}
+  {scopeNote}
   scopeNoteHook="data-scoped-entry-preview-scope-note"
   {factGroups}
   ruleHookAttribute="data-scoped-entry-preview-rule"

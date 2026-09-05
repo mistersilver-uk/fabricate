@@ -163,5 +163,10 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
+  // THE WORLD ENTRY'S OWN RAIL (issue 1371 r18-list, maintainer ruling M27). The rules editor
+  // renders the SAME `How players see it` rail the world Component entry renders, at the system
+  // scope, in place of a rail of its own — so it is a static import of `ComponentEditView` and an
+  // omission here HANGS every suite built on this list.
+  'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

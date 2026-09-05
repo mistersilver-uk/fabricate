@@ -18148,27 +18148,29 @@
 
 }
 
-/* ── D0 (issue 1371, parity round 4). `proto:1301`: the rules editor is a two-column grid —
-   the content column and a 326px `How players see it` rail, each scrolling independently. The
-   editor was one scrolling column with no rail at all (gap-list row 128).
+/* ── D0 (issue 1371, parity round 4; re-based r18-list, maintainer ruling M27). `proto:1301`:
+   the rules editor is a two-column grid — the content column and a 326px `How players see it`
+   rail, each scrolling independently. The editor was one scrolling column with no rail at all
+   (gap-list row 128).
+
+   THE TWO COLUMNS ARE THE WORLD ENTRY'S PAGE FRAME NOW, not a grid of this route's own. The
+   reference draws the entry and the editor on one frame, and the rail the editor renders since
+   M27 IS the entry's rail — painted by rules keyed on `.manager-component-entry-page`, which this
+   route's `<main>` therefore carries itself, its form and rail as the two columns. What this rule
+   keeps is the ROUTE's own job: one
+   `minmax(0, 1fr)` row, so the frame fills the pane and its rail's hairline runs the pane's
+   height. The base `.manager-main` template is `auto auto 1fr`, which sized the frame's row to
+   its content and left the rail's border ending in mid-air (the maintainer's M26 frame). The
+   narrow-container stacking is the page frame's own query, so this rule carries none.
 
    The selector gains `.manager-main` to reach (0,3,0): the route's own `.manager-main` rule is
    written EARLIER in this sheet at the same (0,2,0), so a bare
-   `.manager-component-edit-main` here would lose `display` to it. */
+   `.manager-component-edit-main` here would lose to it. */
 .fabricate-manager .manager-main.manager-component-edit-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 326px;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-}
-
-/* Under the manager's narrow container queries the rail stacks under the content rather than
-   squeezing it: 326px of a 680px window is half the editor. */
-@container (max-width: 960px) {
-  .fabricate-manager .manager-main.manager-component-edit-main {
-    grid-template-columns: minmax(0, 1fr);
-    overflow: auto;
-  }
 }
 
 /* `proto:1307`: the content column is `padding: 16px 22px 40px` with a 14px gap. The inline 22
@@ -25680,133 +25682,6 @@
   background: var(--fab-surface-soft);
   font-weight: 500;
   font-size: 0.72rem;
-}
-
-/* ── D9. THE `How players see it` RAIL (`proto:1467`) ────────────────────────────────────── */
-.fabricate-manager .manager-component-rules-preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-  min-height: 0;
-  padding: var(--fab-space-4);
-  border-left: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
-  overflow: auto;
-}
-
-.fabricate-manager .manager-component-rules-preview-head {
-  display: flex;
-  gap: var(--fab-space-3);
-  align-items: flex-start;
-  min-width: 0;
-}
-
-/* `proto:1470`: a fixed 118px tile column beside a flexible facts column. */
-.fabricate-manager .manager-component-rules-preview-tile-column {
-  flex: 0 0 118px;
-  width: 118px;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-rules-preview-caption {
-  margin: 0 0 var(--fab-space-chip);
-  color: var(--fab-text-subtle);
-  font-weight: 600;
-  font-size: 0.59rem;
-}
-
-.fabricate-manager .manager-component-rules-preview-tile {
-  position: relative;
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  justify-content: center;
-  min-height: 90px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-component-rules-preview-name {
-  margin: var(--fab-space-2) 0 0;
-  color: var(--fab-text);
-  font-weight: 600;
-  font-size: 0.69rem;
-  line-height: 1.3;
-  overflow-wrap: break-word;
-}
-
-.fabricate-manager .manager-component-rules-preview-facts {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-rules-preview-category {
-  margin: 0;
-  color: var(--fab-text-secondary);
-  font-weight: 600;
-  font-size: 0.69rem;
-}
-
-.fabricate-manager .manager-component-rules-preview-art {
-  margin: 0;
-  color: var(--fab-text-subtle);
-  font-weight: 400;
-  font-size: 0.59rem;
-  line-height: 1.45;
-}
-
-/* The shell's own regions, at this rail's stem. `manager-scoped-preview-*` declares them for the
-   default stem only, and a dynamic class cannot be reached from a scoped block. */
-.fabricate-manager .manager-component-rules-preview-scope-note {
-  margin: 0;
-  color: var(--fab-text-muted);
-  font-weight: 400;
-  font-size: 0.63rem;
-  line-height: 1.45;
-}
-
-.fabricate-manager .manager-component-rules-preview-rules {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-component-rules-preview-fact-empty {
-  margin: 0;
-  padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text-disabled);
-  font-weight: 400;
-  font-size: 0.63rem;
-  text-align: center;
-}
-
-.fabricate-manager .manager-component-rules-preview-live {
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text-muted);
-  font-weight: 400;
-  font-size: 0.63rem;
-}
-
-.fabricate-manager .manager-component-rules-preview-live i {
-  color: var(--fab-success-text);
-  font-size: 0.69rem;
 }
 
 /* ══ THE WORLD COMPONENT ENTRY, SECOND PARITY PASS (issue 1371, r5a) ═══════════════════════════

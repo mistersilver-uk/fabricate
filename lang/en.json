@@ -3167,15 +3167,11 @@
           "EditSharedIdentity": "Edit shared identity",
           "Rail": {
             "Label": "Player preview",
-            "Kicker": "How players see it",
             "ScopeNote": "What a player sees in {system}.",
-            "TileCaption": "As an inventory tile",
-            "ArtNote": "Art, name and description come from the world catalogue entry.",
             "UsedBy": "Used by",
             "ProducedBy": "Produced by",
             "NoUsedBy": "No recipe requires it yet.",
             "NoProducedBy": "Nothing produces it yet.",
-            "LiveNote": "This preview updates live as you edit.",
             "BadgeIngredient": "Ingredient",
             "BadgeRecipe": "Recipe",
             "BadgeGathering": "Gathering"

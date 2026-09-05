@@ -5633,6 +5633,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }, { selector: '[data-component-edit]' }],
     expectView: 'component-edit',
+    // THE SHARED RAIL, IN THIS FRAME (issue 1371 r18-list, maintainer ruling M27): the editor
+    // renders the world entry's `How players see it` rail at the system scope, so the frame must
+    // show the rail's scope sentence and its inventory tile beside the form — the two regions a
+    // rail of the editor's own would draw differently, and the reason the ruling was made.
+    expectContained: [
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-scope-note]',
+      },
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four `*-complications-*` and
     // `*-salvage-stage-strip` cases below, NOT here (issue 1286). This case runs on the

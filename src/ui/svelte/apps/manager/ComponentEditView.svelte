@@ -3,11 +3,9 @@
   import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import Callout from './Callout.svelte';
-  import Medallion from '../../components/Medallion.svelte';
-  import StatusPill from '../../components/StatusPill.svelte';
   import EditorTabs from './EditorTabs.svelte';
   import EditorValidationSurface from './EditorValidationSurface.svelte';
-  import ScopedEntityPreview from './scoped/ScopedEntityPreview.svelte';
+  import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
@@ -557,47 +555,39 @@
   );
 
   // ── D9 THE `How players see it` RAIL ───────────────────────────────────────────────────
-  // The same extended `ScopedEntityPreview` the world entry's rail uses; the only difference is
-  // the scope sentence, which reads `What a player sees in {system}.` rather than the entry's
-  // `Across every system that has rules for it.` (`proto:1487`).
+  // THE WORLD ENTRY'S OWN RAIL, at the system scope (issue 1371 r18-list, maintainer ruling
+  // M27): `WorldComponentEntryPreviewRail` draws the tile, the facts and the two kickered groups
+  // on both screens, and this editor supplies only what differs — the scope, and the data.
   //
   // BOTH FACT GROUPS ARE NARROWED TO THIS SYSTEM. The world projection's `requiredBy` and
   // `producedBy` are world-wide and carry the owning system on every reference; a rail on a
   // system's rules that listed another system's recipes would be a wrong list rather than a long
-  // one.
-  const railUsedBy = $derived(
-    (Array.isArray(worldEntry?.requiredBy) ? worldEntry.requiredBy : [])
+  // one. The rows take the entry rail's own shape — icon by kind, the system as the subtitle, the
+  // badge in the kind's tone — so the two screens draw one row.
+  function railRows(references, badgeFor) {
+    return (Array.isArray(references) ? references : [])
       .filter((reference) => reference?.systemId === systemId)
-      .map((reference) => ({
-        id: `used-${reference.id}`,
-        icon: reference.kind === 'gathering' ? 'fas fa-leaf' : 'fas fa-scroll',
-        title: reference.name,
-        subtitle: reference.systemName,
-        badge:
-          reference.kind === 'gathering'
-            ? text('FABRICATE.Admin.Manager.Component.Rail.BadgeGathering', 'Gathering')
-            : text('FABRICATE.Admin.Manager.Component.Rail.BadgeIngredient', 'Ingredient'),
-      }))
-  );
-  const railProducedBy = $derived(
-    (Array.isArray(worldEntry?.producedBy) ? worldEntry.producedBy : [])
-      .filter((reference) => reference?.systemId === systemId)
-      .map((reference) => ({
-        id: `made-${reference.id}`,
-        icon: reference.kind === 'gathering' ? 'fas fa-leaf' : 'fas fa-scroll',
-        title: reference.name,
-        subtitle: reference.systemName,
-        badge:
-          reference.kind === 'gathering'
-            ? text('FABRICATE.Admin.Manager.Component.Rail.BadgeGathering', 'Gathering')
-            : text('FABRICATE.Admin.Manager.Component.Rail.BadgeRecipe', 'Recipe'),
-      }))
-  );
+      .map((reference) => {
+        const gathering = reference.kind === 'gathering';
+        return {
+          id: `${reference.kind ?? 'recipe'}-${reference.id}`,
+          icon: gathering ? 'fas fa-leaf' : 'fas fa-scroll',
+          title: reference.name,
+          subtitle: reference.systemName,
+          badge: badgeFor(gathering),
+          badgeTone: gathering ? 'info' : 'neutral',
+        };
+      });
+  }
   const railFactGroups = $derived([
     {
       kicker: text('FABRICATE.Admin.Manager.Component.Rail.UsedBy', 'Used by'),
       hookAttribute: 'data-component-rail-used-by',
-      rows: railUsedBy,
+      rows: railRows(worldEntry?.requiredBy, (gathering) =>
+        gathering
+          ? text('FABRICATE.Admin.Manager.Component.Rail.BadgeGathering', 'Gathering')
+          : text('FABRICATE.Admin.Manager.Component.Rail.BadgeIngredient', 'Ingredient')
+      ),
       emptyNote: text(
         'FABRICATE.Admin.Manager.Component.Rail.NoUsedBy',
         'No recipe requires it yet.'
@@ -606,7 +596,11 @@
     {
       kicker: text('FABRICATE.Admin.Manager.Component.Rail.ProducedBy', 'Produced by'),
       hookAttribute: 'data-component-rail-produced-by',
-      rows: railProducedBy,
+      rows: railRows(worldEntry?.producedBy, (gathering) =>
+        gathering
+          ? text('FABRICATE.Admin.Manager.Component.Rail.BadgeGathering', 'Gathering')
+          : text('FABRICATE.Admin.Manager.Component.Rail.BadgeRecipe', 'Recipe')
+      ),
       emptyNote: text(
         'FABRICATE.Admin.Manager.Component.Rail.NoProducedBy',
         'Nothing produces it yet.'
@@ -1386,8 +1380,19 @@
   }
 </script>
 
+<!--
+  THE WORLD ENTRY'S PAGE FRAME (issue 1371 r18-list, maintainer ruling M27). The reference draws
+  the rules editor and the catalogue entry on ONE frame — a content column beside a 326px rail
+  with its own scroller and left hairline (`proto:1301`, `proto:986`) — and the entry's frame is
+  the one already written to it, so this route's `<main>` IS that frame rather than a second grid
+  of its own: the form and the rail are its two columns, and every rule that paints the shared
+  rail is keyed on the frame's class, which is what makes "the same rail" a fact about the pixels
+  rather than about the import. The class is named for the screen that introduced it; a neutral
+  name would be a rename across the entry, its suites and the sheet for no rendered change, and
+  is left for a follow-up.
+-->
 <main
-  class="manager-main manager-component-edit-main"
+  class="manager-main manager-component-edit-main manager-component-entry-page"
   aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}
 >
   <form id="manager-component-edit-form" class="manager-component-edit-view" onsubmit={handleSave}>
@@ -2725,107 +2730,32 @@
   </form>
 
   <!--
-    D9. THE `How players see it` RAIL (gap-list row 128, `proto:1467-1500`). The reference draws
+    D9. THE `How players see it` RAIL (gap-list row 128, `proto:1467-1500`) — THE WORLD ENTRY'S
+    OWN RAIL, at the system scope (issue 1371 r18-list, maintainer ruling M27). The reference draws
     the SAME rail here as on the world Component entry, down to the tile, the two kickered fact
     groups and the live footer; the only difference is its scope sentence, which names this
-    system rather than every system.
+    system rather than every system. The markup this editor used to draw for it is gone: two
+    drawings of one template drift, and the maintainer's live test found them drifted.
 
     It is the SECOND GRID COLUMN and a sibling of the form, never a child of it: the rail scrolls
     independently of the content column, and a preview nested inside a `<form>` would be
     submitted with it.
+
+    `linked` reads the WORLD record's source link, because that is what decides whether a player
+    sees art at all; the in-system record only mirrors the picture it inherits.
   -->
-  <ScopedEntityPreview
-    classPrefix="manager-component-rules-preview"
-    hookAttribute="data-component-rules-rail"
-    ariaLabel={text('FABRICATE.Admin.Manager.Component.Rail.Label', 'Player preview')}
-    kicker={text('FABRICATE.Admin.Manager.Component.Rail.Kicker', 'How players see it')}
-    scopeNote={format(
-      'FABRICATE.Admin.Manager.Component.Rail.ScopeNote',
-      'What a player sees in {system}.',
-      { system: systemLabel }
-    )}
-    scopeNoteHook="data-component-rail-scope"
+  <WorldComponentEntryPreviewRail
+    scope="system"
+    {systemLabel}
+    name={component?.name || ''}
+    image={component?.img || ''}
+    icon="fas fa-cube"
+    categoryLabel={categoryLabel(categoryLocked ? worldCategory : categoryDraft)}
+    tags={railTagChips}
+    linked={worldEntry?.hasSourceLink === true}
     factGroups={railFactGroups}
-    ruleTile
-  >
-    {#snippet tile()}
-      <div class="manager-component-rules-preview-head">
-        <div class="manager-component-rules-preview-tile-column">
-          <p class="manager-component-rules-preview-caption">
-            {text('FABRICATE.Admin.Manager.Component.Rail.TileCaption', 'As an inventory tile')}
-          </p>
-          <div class="manager-component-rules-preview-tile" data-component-rail-tile>
-            <Medallion
-              src={component?.img}
-              icon="fas fa-cube"
-              size={64}
-              tint={component?.color || ''}
-            />
-            {#if salvageEnabled && showSalvage}
-              <StatusPill
-                tone="info"
-                icon="fas fa-recycle"
-                label={text('FABRICATE.Admin.Manager.Component.SalvagePill', 'Salvage')}
-              />
-            {/if}
-          </div>
-          <p class="manager-component-rules-preview-name">{component?.name || '—'}</p>
-        </div>
-        <div class="manager-component-rules-preview-facts">
-          <p class="manager-component-rules-preview-category" data-component-rail-category>
-            {categoryLabel(categoryLocked ? worldCategory : categoryDraft)}
-          </p>
-          <!-- The rail's preview tags are the reference's MICRO pill in the tag tone
-               (`proto:6147`, the shared preview builder this rail renders through:
-               `padding: 2px 8px; border-radius: 999px; font: 600 9px`, purple). They are read,
-               not clicked, so they take `list` where the editor's two authoring runs above take
-               `tag-run`. No region measures this chip, so the scale is quoted from the
-               reference's own style string rather than compared — named as a gap in the
-               handoff. -->
-          <div class="manager-chip-row" data-component-rail-tags>
-            {#each railTagChips as tag (tag)}
-              <Chip tone="tag" density="list" icon="fas fa-tag">{tag}</Chip>
-            {/each}
-          </div>
-          <p class="manager-component-rules-preview-art">
-            {text(
-              'FABRICATE.Admin.Manager.Component.Rail.ArtNote',
-              'Art, name and description come from the world catalogue entry.'
-            )}
-          </p>
-        </div>
-      </div>
-    {/snippet}
-
-    <!--
-      THE LIVE FOOTER IS THE SHELL'S TRAILING SNIPPET, NOT ITS `liveNote` REGION (UX F7).
-
-      `ScopedEntityPreview` draws `liveNote` in a FIXED position — third, above the fact groups —
-      and `proto:1516` draws `{{ d.pr.pv.live }}` as the rail's LAST child, after `Produced by`.
-      Passing the prop put the strip between the scope sentence and `Used by`, so the rail read
-      `…what a player sees · this updates live · used by · produced by` where the reference reads
-      `…used by · produced by · this updates live`.
-
-      THIS IS THE SIBLING RAIL'S OWN ANSWER, applied here rather than invented:
-      `WorldComponentEntryPreviewRail` records the same fact and solves it the same way. The
-      alternative — a `liveNotePlacement` prop on the shell — would be a third arrangement for a
-      region both of its component callers want in ONE place, and the shell already publishes a
-      trailing snippet for exactly this.
-
-      IT KEEPS THE SHELL'S CLASS AND HOOK. `${classPrefix}-live` is what
-      `styles/fabricate.css` paints and what every selector naming this strip resolves through, so
-      moving the strip must not rename it: the class is restated literally here because the stem
-      is the shell's prop, not this file's.
-    -->
-    <aside class="manager-component-rules-preview-live" data-component-rail-live>
-      <i class="fas fa-circle-check" aria-hidden="true"></i><span
-        >{text(
-          'FABRICATE.Admin.Manager.Component.Rail.LiveNote',
-          'This preview updates live as you edit.'
-        )}</span
-      >
-    </aside>
-  </ScopedEntityPreview>
+    {text}
+  />
 </main>
 
 <style>

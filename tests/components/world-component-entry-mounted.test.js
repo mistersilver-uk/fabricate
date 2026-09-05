@@ -1730,6 +1730,20 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.deepEqual(kickers, ['How players see it', 'Used by', 'Produced by']);
     });
 
+    it('reads the WORLD sentence and the world label, because the entry asks the rail for no scope', async () => {
+      // THE DEFAULT-UNCHANGED PROOF (issue 1371 r18-list, maintainer ruling M27). The rail now
+      // takes a `scope` so the rules editor can render it at the system scope; the entry passes
+      // none, and these two strings are the whole of what the scope changes. The rendered-DOM
+      // dump of every shipped shape, base against head, is the byte-level half of the same claim.
+      const { target } = await open('coal');
+      const rail = target.querySelector('[data-scoped-entry-preview]');
+      assert.equal(rail.getAttribute('aria-label'), 'How this component reaches the world');
+      assert.equal(
+        rail.querySelector('[data-scoped-entry-preview-scope-note]').textContent.trim(),
+        'Across every system that has rules for it.'
+      );
+    });
+
     it('and the fact rows carry their reference and its badge when the corpus has one', async () => {
       // The positive control on the empty faces above: a rail hard-wired to its empty sentences
       // passes every assertion in the previous test.

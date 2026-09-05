@@ -615,22 +615,22 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
     });
 
-    it('the RAIL preview draws its tags at the micro scale instead, because they are read', async () => {
-      // `proto:6147`, the shared preview builder this rail renders through: `padding: 2px 8px;
-      // border-radius: 999px; font: 600 9px` in the tag tone. A preview tag is a fact, not a
-      // control, so it takes `list` where the two authoring runs above take `tag-run` — the same
-      // split the reference draws, at two scales in one screen.
+    it('the RAIL preview draws its tags as the world entry’s rail draws them, because it IS that rail (M27)', async () => {
+      // Maintainer ruling M27: the rules editor's `How players see it` must use the SAME layout as
+      // the world component editor's. The rail is now `WorldComponentEntryPreviewRail` at the
+      // system scope, so its tag run is whatever that rail draws — the entry's `tone="tag"` chip at
+      // the default density — and no longer a micro pill of this editor's own choosing.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
-      const rail = target.querySelector('[data-component-rail-tags]');
+      const rail = target.querySelector('[data-scoped-entry-preview-tags]');
       assert.ok(Boolean(rail), 'the rail renders its tag row');
       const chips = [...rail.querySelectorAll('.manager-chip')];
       assert.ok(chips.length > 0, 'with at least one chip in it, so the check below is not vacuous');
       assert.deepEqual(
-        chips.map((chip) => [chip.classList.contains('is-list'), chip.classList.contains('is-tag-run')]),
+        chips.map((chip) => [chip.classList.contains('is-tag'), chip.classList.contains('is-list')]),
         chips.map(() => [true, false]),
-        'every preview chip is the micro pill and none of them is the control scale'
+        'every preview chip is the entry rail’s tag chip and none is this editor’s former micro pill'
       );
     });
 
@@ -647,12 +647,12 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
-      const rail = target.querySelector('[data-component-rules-rail]');
+      const rail = target.querySelector('[data-scoped-entry-preview]');
       assert.ok(Boolean(rail), 'the rail renders');
-      const strip = rail.querySelector('[data-component-rail-live]');
+      const strip = rail.querySelector('[data-scoped-entry-preview-live]');
       assert.ok(Boolean(strip), 'and still draws the live-update strip');
       assert.ok(
-        strip.classList.contains('manager-component-rules-preview-live'),
+        strip.classList.contains('manager-scoped-preview-live'),
         `the strip keeps the shell's own class, which is what paints it; it carried ` +
           `"${strip.className}"`
       );
@@ -692,6 +692,109 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         calls.filter((call) => call.verb === 'setMutedTags'),
         [],
         'and it writes nothing on render'
+      );
+    });
+  });
+
+  describe('the `How players see it` rail IS the world entry’s rail, at the system scope (M27)', () => {
+    // Maintainer ruling M27, tested live at `1f5617d5`: "the 'How players see it' uses a different
+    // layout than the world component editor - it must use the same one!" The reference draws the
+    // two rails from ONE template (`proto:985-1020` and `proto:1467-1500` differ only in the data
+    // bound to them), and the driver's binding reading is that the rules editor renders the SAME
+    // preview-rail component the world entry renders, generalised to take a scope, so the two
+    // cannot diverge again. Every assertion below is on the ENTRY rail's own hooks, because there
+    // is no other rail left to name.
+    it('renders the shared rail with the system sentence, the tile, the category and the tags', async () => {
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+      const rail = target.querySelector('main.manager-component-edit-main [data-scoped-entry-preview]');
+      assert.ok(Boolean(rail), 'the editor renders the world entry’s rail');
+      assert.ok(
+        !target.querySelector('[data-component-rules-rail]'),
+        'and no rail of its own beside it — the duplicate is gone, not hidden'
+      );
+      // THE SCOPE is the one thing that reads differently: the system sentence, naming THIS
+      // system (`proto:1487`), where the entry reads `Across every system that has rules for it.`
+      assert.equal(rail.getAttribute('aria-label'), 'Player preview');
+      assert.equal(
+        rail.querySelector('[data-scoped-entry-preview-scope-note]').textContent.trim(),
+        'What a player sees in Forge.'
+      );
+      // THE ENTRY'S TILE, with the in-system record's art in it.
+      const tile = rail.querySelector('[data-scoped-entry-preview-tile]');
+      assert.ok(Boolean(tile), 'the inventory tile');
+      assert.equal(
+        tile.querySelector('img')?.getAttribute('src'),
+        'icons/commodities/metal/ingot-worn-iron.webp',
+        'drawing the component’s art'
+      );
+      assert.equal(
+        rail.querySelector('.manager-component-entry-preview-name').textContent.trim(),
+        'Coal'
+      );
+      // `coal` is linked in the corpus (`originItemUuid`), so the tile carries NO status badge and
+      // the art note is the linked sentence — the entry rail's own reading of the record.
+      assert.ok(!rail.querySelector('[data-scoped-entry-preview-status]'), 'no `No source item` badge');
+      assert.match(rail.textContent, /come from the linked item/);
+      // THE SYSTEM'S RESOLVED FACTS: `coal` overrides the world's `Raw` here, and the checked
+      // system tag joins the applied world tag in the run.
+      assert.equal(
+        rail.querySelector('[data-scoped-entry-preview-category]').textContent.trim(),
+        'Raw'
+      );
+      const tags = [...rail.querySelectorAll('[data-scoped-entry-preview-tags] .manager-chip')].map(
+        (chip) => chip.textContent.trim()
+      );
+      assert.ok(tags.includes('ore'), `the checked system tag is in the run; it read ${tags.join(', ')}`);
+      assert.ok(tags.includes('fuel'), 'and so is the unmuted world tag');
+      assert.ok(!tags.includes('bulk'), 'but not the world tag this system mutes');
+      const kickers = [...rail.querySelectorAll('.manager-kicker')].map((node) =>
+        node.textContent.trim()
+      );
+      assert.deepEqual(kickers, ['How players see it', 'Used by', 'Produced by']);
+    });
+
+    it('narrows both fact groups to THIS system, on the shared rail’s own row hook', async () => {
+      // A rail on a system's rules that listed another system's recipes would be a wrong list
+      // rather than a long one. The data is the editor's; the rows are the shared rail's.
+      const scope = scopeFor();
+      const withUsage = {
+        ...scope,
+        entries: scope.entries.map((entry) =>
+          entry.id === 'coal'
+            ? {
+                ...entry,
+                requiredBy: [
+                  { id: 'r1', name: 'Forge a Blade', kind: 'recipe', systemId: 'sys-forge', systemName: 'Forge' },
+                  { id: 'r2', name: 'Brew a Tonic', kind: 'recipe', systemId: 'sys-alchemy', systemName: 'Alchemy' },
+                ],
+                producedBy: [
+                  { id: 't1', name: 'Pan the Shallows', kind: 'gathering', systemId: 'sys-alchemy', systemName: 'Alchemy' },
+                ],
+              }
+            : entry
+        ),
+      };
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        scope: withUsage,
+        showTags: true,
+      });
+      const usedBy = target.querySelector('[data-component-rail-used-by]');
+      const rows = [...usedBy.querySelectorAll('[data-scoped-entry-preview-rule]')].map((row) =>
+        row.textContent.replace(/\s+/g, ' ').trim()
+      );
+      assert.equal(rows.length, 1, `only the Forge recipe is listed; it read ${rows.join(' | ')}`);
+      assert.match(rows[0], /Forge a Blade/);
+      assert.match(rows[0], /Ingredient/);
+      assert.ok(
+        !usedBy.textContent.includes('Brew a Tonic'),
+        'the Alchemy recipe is another system’s business'
+      );
+      assert.equal(
+        target.querySelector('[data-component-rail-produced-by] .manager-scoped-preview-fact-empty').textContent.trim(),
+        'Nothing produces it yet.',
+        'and a producer in another system leaves THIS system’s group at its empty sentence'
       );
     });
   });
