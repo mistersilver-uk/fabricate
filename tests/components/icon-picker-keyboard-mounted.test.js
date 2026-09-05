@@ -64,7 +64,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
   ],
-  compiledModules: [ICON_PICKER],
+  // The picker renders through the shared primitive, which renders `Chip` and `EmptyState`
+  // (issue 1503). Omitting any of the three does not FAIL this suite — the closure validator
+  // throws in `before()` and `node --test` reports every test here as `# cancelled`.
+  compiledModules: [
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    ICON_PICKER,
+  ],
   componentPath: ICON_PICKER,
 });
 
@@ -293,19 +301,27 @@ describe('1503 IconPicker — the listbox focus model', () => {
     typeQuery(holder, 'zzzzz');
     assert.equal(optionRows(panel).length, 0, 'nothing matched, so no rows');
     assert.ok(
-      Boolean(panel.querySelector('.essence-icon-picker-empty')),
-      'the note renders in the list the rows would have filled'
+      Boolean(panel.querySelector('.manager-travel-popover-empty')),
+      'the shared empty branch renders where the rows would have been'
     );
     assert.equal(
       holder.getAttribute('aria-activedescendant'),
       null,
       'a holder cannot name a row when there is no row to name'
     );
+    // THE LIST ELEMENT IS GONE, NOT MERELY EMPTY, since the picker was re-platformed onto the
+    // shared primitive: the empty note is a SIBLING of the `role="listbox"` box rather than a
+    // child of it, because a listbox's only valid children are its options. So the holder drops
+    // `aria-controls` too — an `aria-controls` pointing at an id that resolves to no element is a
+    // defect, and it is conditioned on exactly the predicate the list is.
+    assert.ok(
+      !panel.querySelector('[role="listbox"]'),
+      'the list is replaced by the note, not filled with it'
+    );
     assert.equal(
       holder.getAttribute('aria-controls'),
-      panel.querySelector('[role="listbox"]').id,
-      'the list ELEMENT still renders here — the note is drawn inside it — so `aria-controls` ' +
-        'still resolves to a rendered element'
+      null,
+      'and the holder controls nothing while there is no list element to control'
     );
 
     const inert = pressKey('ArrowDown');
