@@ -147,6 +147,16 @@ const FIXTURE_ALLOWLIST = Object.freeze([
     why: 'Population B: the salvage result component picker trigger.',
   }),
   Object.freeze({
+    file: 'tests/components/bulk-edit-dock-pinning.test.js',
+    classes: 'manager-button is-danger',
+    count: 1,
+    why:
+      'The IDLE half of `ArmedDangerButton` (`ArmedDangerButton.svelte` writes exactly this ' +
+      'string), held out of the conversion. The dock-pinning suite renders it as the bulk dock`s ' +
+      'delete probe so the dock`s one-line, full-width danger face is measured against a real ' +
+      'label (issue 1371, M24).',
+  }),
+  Object.freeze({
     file: 'tests/components/theme-rendered-validation.test.js',
     classes: 'manager-button is-danger is-armed',
     count: 1,
