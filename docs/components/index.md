@@ -40,7 +40,7 @@ It is the one way to create a component from this screen.
 Each row starts with a checkbox, then the component's icon and name.
 A pill beside the name states what kind of source it has, **Foundry item**, **Compendium**, or **No source item**, and a second **Broken link** pill appears when a linked world item's address no longer resolves to anything.
 Below the name, a second line shows the component's description, or says it has none.
-When the component carries essence values, a run of chips sits before the two stat columns, one per essence and none at all for a component with none, each showing its glyph and a count.
+When the component carries essence values, a run of chips sits before the two stat columns, one per essence and none at all for a component with none, each showing its glyph and a count in that essence's own colour.
 Two right-aligned columns state how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **2/6 systems**.
 A pencil control at the row's trailing edge, titled **Open catalogue entry**, opens the component's full entry directly.
 
@@ -154,7 +154,7 @@ Only a component with no linked source item takes typed **Name** and **Descripti
 
 **Save entry** holds every edit made on this screen and writes them together when you press it: the name and description on a component with no linked source item, then the world category, the world tags, the world essence values, and the aliases, in that order.
 The **Unsaved changes** marker lights while any of them is pending, so **Save entry** covers a linked component's category, tags, essence values, or aliases even though its name and description cannot be typed over.
-If Fabricate refuses one of those writes, for example because a world tag write is rejected, the rest of the sequence stops there and whatever had already been written stays written.
+If part of the save fails, the rest of the sequence stops there, whatever had already been written stays written, and Fabricate tells you which part could not be saved and, if anything had already landed, what that was.
 The linked item itself, adding or removing this component from a crafting system, and deleting the entry, take effect immediately and are not part of what **Save entry** writes.
 
 If you leave with unsaved changes, Fabricate asks whether to save, discard, or keep editing.
@@ -184,7 +184,7 @@ Choosing a category stages it, and it does not take effect until you press **Sav
 
 Click a tag pill to apply or clear that world tag on the record, which also stages it for **Save entry**.
 The pills are the world vocabulary's tags, whether or not any component applies them yet.
-A tag the record applies but the world vocabulary no longer holds is drawn too, after the vocabulary's own pills, lit and struck through.
+A tag the record applies but the world vocabulary no longer holds is drawn too, after the vocabulary's own pills, lit like any other applied tag.
 Clearing it stages its removal like the pills above, and once saved it is not offered again.
 A note beneath them states how many world tags are set on this record, and, if any are muted for a crafting system, how many.
 **Edit world vocabulary** opens the world Tags & Categories screen, where the tag list itself is authored.
@@ -251,6 +251,7 @@ A rail on the right, present on both tabs, shows the same preview a player sees:
 Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
 The rail updates live as you edit the entry.
 It is the same rail a crafting system's own Component Rules editor draws, narrowed to what that system resolves.
+On a narrow window the rail moves below the tab strip and its cards instead of standing beside them, and both keep their own scrolling.
 
 ## Component Rules
 
@@ -260,7 +261,7 @@ That is its category, its tags, its essences, its salvage setup, and, in Progres
 Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
 Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.
 The confirm button reads **Create rules**; the picker's title names the system the components are joining, and the count in its foot says how many.
-New rules start empty apart from the two inherited sections: the world category and the world essence values, both inherited until this system overrides either one.
+As the picker's own subtitle says, new rules inherit the world category and the world essence values until this system overrides them, and nothing else is copied: no tags, no salvage setup, and no difficulty.
 Fabricate adds the ticked components one at a time.
 If one cannot be added, for example because another component in this system already claims the same source item, the rest are still added, and the picker stays open with the refused rows still ticked under a sentence counting how many could not be added.
 The picker closes on its own only when every ticked component was added, or when you press **Cancel**.
@@ -366,6 +367,7 @@ Long lists are paged, and the count above the list tells you which components yo
 
 A component's category here is this system's own resolved value.
 See [Category](#category) below for how that relates to the world category.
+Its essence values, in the row's dots and in the inspector, are this system's own resolved values too, the world's while this system inherits them and its own once it overrides them, so an edit in the world Component catalogue is reflected here at once for every inheriting component.
 
 Your filters, sort, grouping, and page survive opening a component and coming back, so working through a long list does not reset your place each time.
 
@@ -385,6 +387,7 @@ These rows change this system's own tag list only.
 World tags are shown on each record and are not touched here.
 - **Essence values.** One row per essence this system defines, each with its glyph in that essence's own colour and a stepper that reads as unchanged until you step it.
 Once any row is stepped, applying writes the whole set of values shown on every selected component, so a row left at 0 strips that essence from them.
+A selected component that currently inherits its essence values from the world switches to override as part of the same commit, so the values you just staged are the ones this system resolves afterwards rather than being shadowed by the world map.
 A **Will overwrite** chip and a warning state how many of the selected components have authored values that will change.
 
 When the system resolves progressively, a **Progressive DC** group also appears for setting one difficulty on every selected component.
@@ -486,3 +489,4 @@ A rail on the right, present on both tabs, shows the same preview a player sees 
 Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
 The rail updates live as you edit, and states that art, name and description come from the world catalogue entry.
 It is the same rail the component's world entry draws, narrowed to what this system resolves.
+On a narrow window it moves below the tab strip and its cards instead of standing beside them, and both keep their own scrolling.
