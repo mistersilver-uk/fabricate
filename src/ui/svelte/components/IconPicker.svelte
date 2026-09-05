@@ -11,6 +11,7 @@
     normalizeEssenceIcon,
   } from '../util/essenceIcons.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { activeOptionId, nextActiveIndex } from '../util/listboxNavigation.js';
   import { MANAGER_SCROLLER_SELECTOR } from '../util/overlayBounds.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -31,8 +32,20 @@
     onChange = () => {},
   } = $props();
 
+  // A PER-INSTANCE PREFIX for the option `id`s (issue 1503). `aria-activedescendant` points at a
+  // DOM id, so the ids have to be unique document-wide rather than merely within one panel: two
+  // pickers open on the same screen, both numbering their rows from 0, would emit the same id and
+  // make the reference ambiguous. `$props.id()` is Svelte's own answer to exactly this.
+  const instanceId = $props.id();
+  const listId = `${instanceId}-listbox`;
+
   let pickerOpen = $state(false);
   let searchTerm = $state('');
+  // THE KEYBOARD CURSOR, and -1 is not "the first row" (issue 1503). It means the GM has opened
+  // the panel and not yet pressed an arrow key, which is a different state from "row 0 is
+  // active": no row carries the marker, and Enter is a NO-OP rather than a blind choice of
+  // whatever sits at the top of a 750-row alphabetical list. See `util/listboxNavigation.js`.
+  let activeIndex = $state(-1);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let triggerButton = $state(null);
@@ -81,9 +94,85 @@
       : filteredOptions
   );
 
+  // ── THE LISTBOX FOCUS MODEL (issue 1503) ──────────────────────────────────────────────────
+  //
+  // `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
+  // the HOLDER — and drive selection with `aria-activedescendant`. Here the holder is the query
+  // field, which is rendered for the panel's whole life, and the option rows NEVER receive DOM
+  // focus. Roving focus onto them is what the prohibition forbids, because it re-arms Foundry's
+  // canvas bindings — and there is a second, independent reason: `styles/fabricate.css` rings any
+  // focused `[tabindex]` under `.fabricate` with a 2px accent outline at a POSITIVE offset, and
+  // every row is now a `[tabindex]` element, so a row that took focus would draw a competing ring
+  // around the keyboard cursor's own inset one.
+  //
+  // THE FLAT RENDERED ORDER is what the cursor indexes and what the option `id`s are numbered
+  // over. The pinned resolved row is drawn ONCE at the top, outside the alphabetical `each`, so an
+  // index counted over `listedOptions` alone would put id 0 on the SECOND row the GM sees:
+  // `aria-activedescendant` would name one row while another drew the cursor.
+  const renderedOptions = $derived(pinnedOption ? [pinnedOption, ...listedOptions] : listedOptions);
+  // The holder announces a row only while that row EXISTS. The reset below covers every input
+  // that rebuilds the list; this bound covers the render in between, because an id resolving to
+  // no element is worse than no id at all.
+  const activeDescendantId = $derived(
+    activeIndex >= 0 && activeIndex < renderedOptions.length
+      ? activeOptionId(instanceId, activeIndex)
+      : undefined
+  );
+
+  // A CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and two independent inputs rebuild that list:
+  // opening starts a fresh pass over the vocabulary, and every query keystroke rebuilds
+  // `filteredOptions` — so index 3 names an unrelated glyph the moment either moves. Resetting to
+  // -1 rather than clamping is the point: the GM has not arrowed into the NEW list, so nothing in
+  // it is active and Enter stays a no-op until they do.
+  const optionListGeneration = $derived(`${pickerOpen ? 'open' : 'closed'}/${searchTerm}`);
+  let cursorGeneration = '';
+  $effect(() => {
+    if (cursorGeneration === optionListGeneration) return;
+    cursorGeneration = optionListGeneration;
+    activeIndex = -1;
+  });
+
+  // KEEP THE CURSOR IN VIEW. The list scrolls — seven or eight rows of hundreds — so the row the
+  // GM has arrowed to can be outside its window, and because nothing is FOCUSED the browser will
+  // not scroll to it on its own. The call is optional because happy-dom's element does not
+  // implement `scrollIntoView`, and a bare call would throw in every mounted picker suite.
+  $effect(() => {
+    if (activeIndex < 0 || !optionsList) return;
+    optionsList.querySelector?.('[data-active-option="true"]')?.scrollIntoView?.({
+      block: 'nearest',
+    });
+  });
+
+  // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
+  // which keys are CONSUMED and what Enter chooses. A key the module does not own returns `null`
+  // and is left entirely alone, which is what keeps every printable character going to the query
+  // field. Escape is not handled here: `dismissOnOutsideClick` on the picker root takes it at the
+  // document's capture phase.
+  function onHolderKeydown(event) {
+    if (event.key === 'Enter') {
+      // Enter WITHOUT an active option is a no-op rather than a choice of the first row, so it
+      // is left unprevented and reaches the field it was pressed in.
+      const active = renderedOptions[activeIndex];
+      if (!active) return;
+      event.preventDefault();
+      selectIcon(active.iconClass);
+      return;
+    }
+    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key);
+    if (next === null) return;
+    event.preventDefault();
+    activeIndex = next;
+  }
+
   function closePicker() {
     pickerOpen = false;
     searchTerm = '';
+    // FOCUS COMES BACK TO THE TRIGGER (issue 1503). The element it is on — the query field — is
+    // about to be unmounted, and an unmounted focus owner leaves `document.activeElement` on
+    // `<body>`, so the GM's next Tab restarts from the top of the sheet. The move is synchronous
+    // and needs no `tick()`: unlike `SearchablePopover`'s inline-search shape, this trigger is
+    // rendered for the component's whole life, so it is already there to receive focus.
+    triggerButton?.focus?.();
   }
 
   function togglePicker() {
@@ -157,16 +246,21 @@
   `solid` because the list offers one solid row per glyph, so the tooltip was the last place in the
   UI implying a weight choice the GM no longer makes.
 -->
-{#snippet iconOptionRow(option, selected, pinned)}
+{#snippet iconOptionRow(option, index, selected, pinned)}
   <button
     type="button"
     class="essence-icon-picker-option"
     class:selected
     class:pinned
     role="option"
+    id={activeOptionId(instanceId, index)}
+    tabindex="-1"
+    data-keyboard-focus="true"
     aria-selected={selected}
+    data-active-option={index === activeIndex ? 'true' : undefined}
     title={option.label}
     onclick={() => selectIcon(option.iconClass)}
+    onmousedown={(event) => event.preventDefault()}
   >
     <span class="essence-icon-picker-preview" aria-hidden="true">
       <i class={option.iconClass}></i>
@@ -246,12 +340,20 @@
       }}
     >
       <div class="essence-icon-picker-search">
+        <!-- The HOLDER. It keeps DOM focus for the panel's whole life and announces the row the
+             keyboard cursor is on; an `<input>` is one of the tags Foundry's `hasFocus` already
+             recognises, so unlike a trigger holder it needs no `data-keyboard-focus`. -->
         <input
           bind:this={searchInput}
           bind:value={searchTerm}
           type="text"
+          role="combobox"
+          aria-expanded={pickerOpen}
+          aria-controls={listId}
+          aria-activedescendant={activeDescendantId}
           placeholder={localize('FABRICATE.Admin.Features.Essences.SearchIconPlaceholder')}
           aria-label={localize('FABRICATE.Admin.Features.Essences.SearchIconLabel')}
+          onkeydown={onHolderKeydown}
         />
       </div>
 
@@ -259,13 +361,22 @@
         bind:this={optionsList}
         class="essence-icon-picker-options"
         role="listbox"
+        id={listId}
         aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
       >
+        <!-- `index` is the row's position in the FLAT rendered order, which is why the `each`
+             below offsets by the pinned row: the `id`s and the cursor are numbered over the
+             concatenation of the two branches, not per branch. -->
         {#if pinnedOption}
-          {@render iconOptionRow(pinnedOption, true, true)}
+          {@render iconOptionRow(pinnedOption, 0, true, true)}
         {/if}
-        {#each listedOptions as option (option.iconClass)}
-          {@render iconOptionRow(option, option.iconClass === selectedRowIconClass, false)}
+        {#each listedOptions as option, index (option.iconClass)}
+          {@render iconOptionRow(
+            option,
+            pinnedOption ? index + 1 : index,
+            option.iconClass === selectedRowIconClass,
+            false
+          )}
         {/each}
         {#if listedOptions.length === 0 && !pinnedOption}
           <p class="hint essence-icon-picker-empty">
