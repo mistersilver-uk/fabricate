@@ -4617,9 +4617,21 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
     css.includes('.fabricate-pagination .manager-pagination-page'),
     'pagination should expose a stable Page-of label for keyboard users'
   );
+  // ISSUE 1504 RETARGETED THIS ASSERTION WITH THE RULE IT WAS WATCHING. The per-page control is
+  // a shared `<Select size="inline">` now, so its height, corner, fill and type come from the
+  // `.fabricate-select*` family and the pager states only the one thing that is still its own:
+  // a WIDTH FLOOR, so `Per page 10` and `Per page 100` do not sit at two widths in a manager
+  // footer of fixed-width neighbours. That floor is the MANAGER's alone, which is why this is
+  // the one pager rule that still names an area root.
   assert.ok(
-    css.includes('.fabricate-pagination .manager-pagination-size select'),
-    'pagination should style the per-page selector inside the manager scope'
+    css.includes(
+      '.fabricate-manager .fabricate-pagination .manager-pagination-size .fabricate-select-trigger'
+    ),
+    'pagination should floor the per-page trigger inside the manager scope, and only there'
+  );
+  assert.ok(
+    !css.includes('.manager-pagination-size select'),
+    'and no rule may still paint a native per-page select: there is no longer one to paint'
   );
 });
 
@@ -7488,7 +7500,9 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       <div class="manager-travel-parties-list ${hash}">${cards}</div>
     </div>
     <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
-      <div class="fabricate-pagination manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
+      <div class="fabricate-pagination manager-pagination"><span>Showing 1-4 of 8</span>${pagerSizeControlFixture(
+        '4'
+      )}</div>
     </div>
   </div>`;
 
@@ -12335,6 +12349,42 @@ const SELECT_RUNGS = Object.freeze([
   }),
 ]);
 
+/**
+ * THE PAGER'S PER-PAGE CONTROL, exactly as `Pagination.svelte` renders it after issue 1504.
+ *
+ * It writes the primitive's ROOT element with the trigger nested INSIDE it, because that is the
+ * shape the real control has: `SearchablePopover` owns the root and `Select` reaches it through
+ * `pickerClass`. A trigger-only fixture would carry `fabricate-select-trigger` with no
+ * `fabricate-picker manager-travel-picker fabricate-select` above it — so it would measure none
+ * of the inherited picker paint, and none of the `.manager-pagination-size .fabricate-select-trigger`
+ * per-site rules that hang off the surviving wrapper class would resolve either.
+ *
+ * The `data-pagination-size` hook is on the TRIGGER, not on the wrapper: it rides across on
+ * `triggerData`, which is what keeps every capture step, mounted test and smoke step that drives
+ * this control by that hook pointing at the control rather than at a box around it.
+ *
+ * @param {string} value The rendered value on the trigger.
+ * @returns {string} The fixture markup.
+ */
+function pagerSizeControlFixture(value) {
+  return `<span class="manager-pagination-size"
+    ><span id="probe-per-page">Per page</span
+    ><div class="fabricate-picker manager-travel-picker fabricate-select"
+      ><button
+        type="button"
+        class="fabricate-select-trigger fabricate-select-trigger-inline"
+        data-pagination-size=""
+        data-select-size="inline"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-labelledby="probe-per-page"
+      ><span class="manager-travel-picker-value fabricate-select-value">${value}</span><i
+        class="fas fa-chevron-down" aria-hidden="true"></i></button
+    ></div
+  ></span>`;
+}
+
 /** One `<Select>` trigger's markup, at one rung, exactly as the component renders it. */
 function selectTriggerFixture(area, rung) {
   return `
@@ -12899,6 +12949,274 @@ test('a hovered SELECTED option row keeps the shared Select`s own fill', async (
       'and the SELECTED row keeps its own fill under the pointer, which a rule written below ' +
         '(0,3,0) would have lost to the shared row`s hover fill in the same layer'
     );
+  } finally {
+    await context.close();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE CONVERTED PAGER'S SEVEN SITES, MEASURED RATHER THAN REASONED ABOUT (issue 1504)
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Issue 1504 replaces the pager's native `<select>` with a shared `<Select size="inline">`, and
+// the six per-site fills that used to paint that select are RETARGETED onto its trigger rather
+// than deleted — five player pagers on `--fab-surface` and the journal on the same token as a
+// stated decision. Each of those blocks lives in its caller's own scoped `<style>`, so each wins
+// on TWO axes: unlayered against this sheet's `layer(modules)`, and three compiled compounds
+// against the family's (0,2,0) rung rules.
+//
+// A CLAIM ON TWO AXES IS EXACTLY THE CLAIM NOT TO REASON ABOUT. So every fill is measured here,
+// in the real cascade, with each caller's real compiled CSS appended after the sheet in the order
+// `css: 'injected'` uses — and the manager's own 64px floor is measured beside them, because it
+// is the one declaration the pager still makes about this control and it must reach the manager
+// and NOTHING else.
+const CONVERTED_PAGER_SITES = Object.freeze([
+  Object.freeze({
+    probe: 'inventory',
+    area: 'fabricate-app',
+    wrapper: 'inventory-grid-pagination',
+    component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 26,
+  }),
+  Object.freeze({
+    probe: 'recipes',
+    area: 'fabricate-app',
+    wrapper: 'crafting-browser-pagination',
+    component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 26,
+  }),
+  Object.freeze({
+    probe: 'environments',
+    area: 'fabricate-app',
+    wrapper: 'gathering-env-pagination',
+    component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 26,
+  }),
+  Object.freeze({
+    probe: 'tasks',
+    area: 'fabricate-app',
+    wrapper: 'gathering-detail-pagination',
+    component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 26,
+  }),
+  Object.freeze({
+    probe: 'events',
+    area: 'fabricate-app',
+    wrapper: 'gathering-detail-pagination',
+    component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 26,
+  }),
+  Object.freeze({
+    probe: 'journal',
+    area: 'fabricate-app',
+    wrapper: 'journal-history-body',
+    component: 'src/ui/svelte/apps/journal/HistoryList.svelte',
+    fill: 'surface',
+    floored: false,
+    declaredArrow: 28,
+  }),
+  // The manager pager states no fill of its own, so it takes the `inline` rung's `--fab-bg-2` —
+  // which is the visible move the frames carry — and it is the ONLY site with a width floor.
+  Object.freeze({
+    probe: 'manager',
+    area: 'fabricate-manager',
+    wrapper: 'manager-main',
+    component: '',
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
+  }),
+]);
+
+test('every converted pager site paints its own trigger fill, and only the manager floors it', async () => {
+  const scoped = CONVERTED_PAGER_SITES.filter((site) => site.component).map((site) => ({
+    site,
+    ...scopedComponentCss(resolve(__dirname, '../..', site.component)),
+  }));
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1000, height: 900 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    // Each site's wrapper carries its OWN component's hash, because that is what Svelte compiles:
+    // the hash lands on the caller-owned wrapper and the `:global(…)` tail stays unhashed. Getting
+    // this wrong in either direction changes the specificity the assertion is about.
+    const siteMarkup = (site, hash) => `
+      <div class="${site.area === 'fabricate-manager' ? 'fabricate' : `fabricate ${site.area}`}">
+        ${site.area === 'fabricate-manager' ? '<main class="fabricate-manager">' : ''}
+        <div class="${site.wrapper}${hash ? ` ${hash}` : ''}">
+          <div class="fabricate-pagination manager-pagination">
+            <span class="manager-pagination-summary">Showing 1-4 of 8</span>
+            <nav class="manager-pagination-nav">
+              <button
+                type="button"
+                class="fabricate-icon-button manager-icon-button"
+                data-keyboard-focus="true"
+                data-probe="arrow-${site.probe}"
+              ><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+              <span class="manager-pagination-page">Page 1 of 2</span>
+              <button
+                type="button"
+                class="fabricate-icon-button manager-icon-button"
+                data-keyboard-focus="true"
+              ><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+            </nav>
+            <span class="manager-pagination-size"
+              ><span id="caption-${site.probe}">Per page</span
+              ><div class="fabricate-picker manager-travel-picker fabricate-select"
+                ><button
+                  type="button"
+                  class="fabricate-select-trigger fabricate-select-trigger-inline"
+                  data-pagination-size=""
+                  data-probe="pager-${site.probe}"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-labelledby="caption-${site.probe}"
+                ><span class="manager-travel-picker-value fabricate-select-value">4</span><i
+                  class="fas fa-chevron-down" aria-hidden="true"></i></button
+              ></div
+            ></span>
+          </div>
+        </div>
+        ${site.area === 'fabricate-manager' ? '</main>' : ''}
+      </div>`;
+
+    const hashOf = (probe) => scoped.find(({ site }) => site.probe === probe)?.hashClass || '';
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: var(--button-size); }
+              input, select { width: 100%; }
+            }
+            @layer modules { ${css} }
+            :root { --button-size: 28px; --input-height: 2rem; font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fabricate { font-size: 14px; }
+            .fas::before { content: "x"; }
+            .probe { width: 10px; height: 10px; }
+          </style>
+          <!-- After the sheet and UNLAYERED, which is what the injected-CSS compiler option
+               does and what the two-axis win depends on. -->
+          <style>${scoped.map(({ css: block }) => block).join('\n')}</style>
+        </head>
+        <body>
+          ${CONVERTED_PAGER_SITES.map((site) => siteMarkup(site, hashOf(site.probe))).join('\n')}
+          <div class="probe" data-probe="surface" style="background: var(--fab-surface)"></div>
+          <div class="probe" data-probe="bg-2" style="background: var(--fab-bg-2)"></div>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const at = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const fill = (name) => getComputedStyle(at(name)).backgroundColor;
+      const read = (name) => {
+        const element = at(name);
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          minWidth: style.minWidth,
+          height: element.getBoundingClientRect().height,
+          radius: style.borderTopLeftRadius,
+        };
+      };
+      const probes = [
+        'inventory',
+        'recipes',
+        'environments',
+        'tasks',
+        'events',
+        'journal',
+        'manager',
+      ];
+      return {
+        tokens: { surface: fill('surface'), 'bg-2': fill('bg-2') },
+        pagers: Object.fromEntries(probes.map((probe) => [probe, read(`pager-${probe}`)])),
+        arrows: Object.fromEntries(probes.map((probe) => [probe, read(`arrow-${probe}`)])),
+      };
+    });
+
+    assert.notEqual(
+      report.tokens.surface,
+      report.tokens['bg-2'],
+      'the two fills are distinguishable in this theme at all, or nothing below is a measurement'
+    );
+
+    for (const site of CONVERTED_PAGER_SITES) {
+      const measured = report.pagers[site.probe];
+      assert.equal(
+        measured.background,
+        report.tokens[site.fill],
+        `${site.probe}: the trigger takes --fab-${site.fill}` +
+          (site.component
+            ? ', from its own scoped block, which beats the rung rule on layer AND specificity'
+            : ', the `inline` rung`s own fill, because the manager states none of its own')
+      );
+      assert.ok(
+        Math.abs(measured.height - 30) <= 1,
+        `${site.probe}: the geometry comes from the rung, not from the retargeted block ` +
+          `(measured ${measured.height.toFixed(1)}px against 30)`
+      );
+      assert.equal(
+        measured.radius,
+        '7px',
+        `${site.probe}: and so does the corner, which is the axis the pager matches its arrows on`
+      );
+      // THE PAIR, WHICH IS THE WHOLE POINT OF THE MOVE. This change takes the arrows' RADIUS
+      // and nothing else, so the bar reads as one control on the axis the specimen matches it
+      // on while every arrow keeps the box it shipped at.
+      //
+      // AND THE BOX IT SHIPPED AT IS 28px AT ALL SEVEN SITES, WHICH IS NOT WHAT THE DECLARED
+      // HEIGHTS SAY. The manager rule and the journal's declare 28; the five player blocks
+      // declare 26 — and each of them also restates `min-height: var(--button-size, 2em)` to
+      // hold Foundry core's own floor, which is 28 at the 14px app base. A floor beats a
+      // height, so a declared 26 computes 28, exactly as `Pagination.svelte`'s own issue-1502
+      // note records ("that floor is what actually sizes the five 26px arrows to 28px today").
+      // So the converted 30px trigger stands 2px above its arrows, not 4.
+      const arrow = report.arrows[site.probe];
+      assert.equal(
+        arrow.radius,
+        '7px',
+        `${site.probe}: the pager's arrows corner at the specimen's icon rung, so the field ` +
+          'and the arrows are one matched pair rather than a 7 beside a 6'
+      );
+      assert.ok(
+        Math.abs(arrow.height - 28) <= 1,
+        `${site.probe}: and its BOX is untouched (measured ${arrow.height.toFixed(1)}px against ` +
+          `the 28px core's own 2em floor gives it, over a declared ${site.declaredArrow}) — ` +
+          'the radius moved and nothing else did'
+      );
+
+      assert.equal(
+        measured.minWidth,
+        site.floored ? '64px' : '0px',
+        site.floored
+          ? 'the manager pager keeps the 64px floor the retired select rule carried, so a ' +
+              'one-digit and a three-digit value do not sit at two widths'
+          : `${site.probe}: no floor at a player site — its pager row is a nowrap single line ` +
+              'in a narrow column, and a floor is what would wrap it'
+      );
+    }
   } finally {
     await context.close();
   }

@@ -161,7 +161,14 @@
     white-space: nowrap;
   }
 
-  .journal-history-body :global(.manager-icon-button) {
+  /* NARROWED TO THE PAGER NAV BEFORE THE CORNER MOVED (issue 1504). This pair used to reach
+     EVERY icon button in the history body, which is a claim about the pager written as a claim
+     about the body. Measured at this head it is inert either way: `manager-icon-button` appears
+     nowhere else under `src/ui/svelte/apps/journal/`, and the only `<IconButton>`s inside
+     `.journal-history-body` are `Pagination`'s own two arrows — `HistoryRow` renders none. The
+     narrowing is what makes the 7px corner below a statement about a pager rather than about a
+     journal, so the next control this body grows does not silently inherit it. */
+  .journal-history-body :global(.manager-pagination-nav .manager-icon-button) {
     /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
        `font-size: var(--font-size-14)`, and the sheet newly overrides both with
        `min-height: 0` and `font: inherit`. Restated, so the chevron keeps its 14px glyph.
@@ -174,13 +181,14 @@
     width: 28px;
     height: 28px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    /* 1504: the specimen's icon rung, so this pager reads as one pair. Height untouched. */
+    border-radius: 7px;
     background: var(--fab-surface-soft);
     color: var(--fab-text);
     cursor: pointer;
   }
 
-  .journal-history-body :global(.manager-icon-button:disabled) {
+  .journal-history-body :global(.manager-pagination-nav .manager-icon-button:disabled) {
     opacity: 0.5;
     cursor: default;
   }
@@ -192,17 +200,22 @@
     gap: var(--fab-space-2);
   }
 
-  /* The per-page <select> colours are themed globally (`.fabricate-app select`), and its
-     geometry was Foundry core's until issue 1502 — the sheet's re-rooted
-     `.fabricate-pagination .manager-pagination-size select` now reaches it and would give it
-     the manager's 28px box and a 64px floor. Its own colours are the SAME four declarations
-     `.fabricate-app select` already made, so only the geometry is restated here. */
-  .journal-history-body :global(.manager-pagination-size select) {
-    /* 1502 base: Foundry core sizes every select `height: var(--input-height)` and sets
-       `line-height` to match; the sheet's `font: inherit` shorthand newly resets that
-       line-height, and its `min-width: 64px` is newly painted. */
-    height: var(--input-height, 2rem);
-    line-height: var(--input-height, 2rem);
-    min-width: auto;
+  /* THE PER-PAGE CONTROL IS A `<Select size="inline">` NOW (issue 1504), so `.fabricate-app
+     select` no longer reaches it and neither does the sheet's retired
+     `.fabricate-pagination .manager-pagination-size select` rule. Its height (30) and corner
+     (7) are the `inline` rung's, where before it took Foundry core's `--input-height` and no
+     stated height of its own.
+
+     THE FILL IS A DECISION RATHER THAN A FALL-THROUGH. The rung's own fill is `--fab-bg-2`;
+     this trigger takes `--fab-surface`, which is what the five player pagers it shares an app
+     with take. The two tokens resolve to the same hex in six of the seven theme blocks and
+     differ only in one, so today's six pager selects render as one colour and this keeps them
+     that way. The journal's own arrows are `--fab-surface-soft` and were never one skin with
+     its select, so the sibling pagers are the consistency that is available.
+
+     No `min-width`: the footer is a nowrap single line in the narrow History column, whose
+     summary absorbs every shrink, and a floor is the thing that would wrap it. */
+  .journal-history-body :global(.manager-pagination-size .fabricate-select-trigger) {
+    background: var(--fab-surface);
   }
 </style>

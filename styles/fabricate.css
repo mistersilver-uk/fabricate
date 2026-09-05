@@ -5757,14 +5757,25 @@
   white-space: nowrap;
 }
 
-.fabricate-pagination .manager-pagination-size select {
-  height: 28px;
+/* THE PER-PAGE CONTROL'S ONLY REMAINING SHEET DECLARATION (issue 1504). The `<select>` this
+   replaces was painted here at 28px / radius 6 / `--fab-bg-1` with a 64px floor; the control is
+   a shared `<Select size="inline">` now, so its height, corner, fill and type come from the
+   `.fabricate-select*` family and nothing about them is the pager's to say.
+
+   THE FLOOR IS THE ONE THING THAT IS. A `<select>` sized itself to its widest option; a
+   `<button>` hugs its current one, so `Per page  10` and `Per page  100` would sit at two
+   different widths in a manager footer whose neighbours are fixed-width. 64px is the figure the
+   retired rule carried, kept rather than re-chosen.
+
+   AND IT IS THE MANAGER'S ALONE, which is why an area root reappears in front of a family
+   issue 1502 deliberately un-rooted. The five player pagers and the journal declare no floor
+   today and their pager row is a nowrap single line in a ~300px column, where a floor is the
+   thing that would make it wrap. The selector keeps `.fabricate-pagination` so the primitive's
+   own root still gates it, and it is exempt to the area-scope gate because
+   `.manager-pagination-size` is a class `Select` does not write — the same exemption every
+   caller override of a primitive's markup takes. */
+.fabricate-manager .fabricate-pagination .manager-pagination-size .fabricate-select-trigger {
   min-width: 64px;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font: inherit;
 }
 
 .fabricate-manager .manager-table-scroll {
@@ -13939,6 +13950,16 @@
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
+
+  /* THE PAGER'S CORNER, AND ONLY THE PAGER'S (issue 1504). The family's shared base block
+     corners every icon button at 6px; the specimen's published icon rung is `.k-btn.icon` at
+     radius 7, which is also the corner the `inline` select rung this bar now holds takes. So
+     the bar's field and its two arrows read as one matched pair at the one axis the specimen
+     matches them on, and their HEIGHTS are untouched — 28 here, 26 at the five player pagers,
+     28 at the journal, 24 at the two `showPageSize={false}` inspector pagers, which inherit
+     this corner and move by it alone. The shipped control therefore has two radii, 7 inside a
+     pager and 6 everywhere else, and `library.html`'s IconButton entry records that split. */
+  border-radius: 7px;
 }
 
 .fabricate-icon-button.manager-icon-button i,
@@ -22029,7 +22050,29 @@
    gate's entry declares each one as a namespace ROOT rather than reading it as an application
    root. And no rule here reads an area-scoped custom property: the `toolbar` rung's type is
    the LITERAL `0.72rem`, because `--fab-recipe-control-font` is declared only inside the
-   `.fabricate-manager` block and would fall back to inheritance on a player surface. */
+   `.fabricate-manager` block and would fall back to inheritance on a player surface.
+
+   ── THE SIX CALL SITES THAT DELIBERATELY BEAT THIS BLOCK ─────────────────────────────────
+   Six pagers state their own trigger FILL from their own component-scoped `:global(…)` blocks
+   — `inventory/InventoryGrid`, `crafting/RecipeBrowser`, the three gathering panels and
+   `journal/HistoryList` — and each one wins on TWO independent axes, which is recorded here
+   rather than left for a later reader to find and "fix".
+
+   By cascade LAYER: this sheet is imported at `layer(modules)` while a Svelte scoped block is
+   injected into `document.head` UNLAYERED, and an unlayered author declaration beats every
+   layered one at any specificity. By SPECIFICITY: Svelte puts the component hash on the
+   caller-owned wrapper and leaves the `:global(…)` tail unhashed, so each of those blocks
+   compiles to three compounds against the (0,2,0) rung rules above.
+
+   That is the SAME mechanism reason (iii) above names as the hazard of writing a primitive in
+   a scoped block — and it is licensed here, because a pager's fill is the row's skin rather
+   than the control's appearance, and stating it where the pager is drawn is what keeps the
+   pair legible. The one shipped sheet precedent for reaching a `SearchablePopover` trigger
+   from a call site — `.fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger` above —
+   is deliberately NOT followed: its reason is that a plain scoped selector cannot reach a
+   child component's element, and these six already reach one through `:global(…)` hung off a
+   wrapper the caller itself writes. Consolidating the six fills into this sheet is issue
+   1518's, not issue 1504's. */
 
 /* THE FOUNDRY HOST RESET IS THE FIRST DECLARATIONS, and each answers a core rule rather than a
    preference. `foundry2.css` declares `button { display: flex; justify-content: center }` in
