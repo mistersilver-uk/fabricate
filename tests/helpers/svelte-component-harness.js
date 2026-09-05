@@ -202,6 +202,12 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
 // the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  // The listbox cursor's arithmetic (issue 1503). `SearchablePopover` imports it statically, so
+  // it is in the component's closure whether or not a test presses an arrow key — and a raw
+  // module missing from a manifest is INVISIBLE to
+  // `mounted-harness-primitive-allowlist.test.js`, which quantifies over compiled COMPONENTS.
+  // The only symptom is the suite throwing in `before()` (or hanging, in a hand-rolled one).
+  'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',
