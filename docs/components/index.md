@@ -155,7 +155,7 @@ Only a component with no linked source item takes typed **Name** and **Descripti
 **Save entry** holds every edit made on this screen and writes them together when you press it: the name and description on a component with no linked source item, then the world category, the world tags, the world essence values, and the aliases, in that order.
 The **Unsaved changes** marker lights while any of them is pending, so **Save entry** covers a linked component's category, tags, essence values, or aliases even though its name and description cannot be typed over.
 If Fabricate refuses one of those writes, for example because a world tag write is rejected, the rest of the sequence stops there and whatever had already been written stays written.
-The linked item itself, and adding or removing this component from a crafting system, take effect immediately and are not part of what **Save entry** writes.
+The linked item itself, adding or removing this component from a crafting system, and deleting the entry, take effect immediately and are not part of what **Save entry** writes.
 
 If you leave with unsaved changes, Fabricate asks whether to save, discard, or keep editing.
 
@@ -184,8 +184,8 @@ Choosing a category stages it, and it does not take effect until you press **Sav
 
 Click a tag pill to apply or clear that world tag on the record, which also stages it for **Save entry**.
 The pills are the world vocabulary's tags, whether or not any component applies them yet.
-A tag set on this record from before the vocabulary held it is not shown as a pill, though the note beneath still counts it.
-A tag the record applies but the world vocabulary no longer holds is drawn too, after the vocabulary's own pills, lit and struck through, and clearing it removes it for good, since it is never offered again once gone.
+A tag the record applies but the world vocabulary no longer holds is drawn too, after the vocabulary's own pills, lit and struck through.
+Clearing it stages its removal like the pills above, and once saved it is not offered again.
 A note beneath them states how many world tags are set on this record, and, if any are muted for a crafting system, how many.
 **Edit world vocabulary** opens the world Tags & Categories screen, where the tag list itself is authored.
 A new world tag cannot be minted from this card.
@@ -206,7 +206,7 @@ While the world has no essences yet, the card says so and points you to the Esse
 
 ### Systems using this component
 
-Below World classification, a card lists every crafting system.
+Below the Essence contribution card, a card lists every crafting system.
 Filter by **All**, **With rules**, or **Without**, each stating its own count, and search by name.
 Each row shows the system's name and its resolution mode, and, for a member system, a short summary of what it currently resolves.
 
@@ -260,7 +260,7 @@ That is its category, its tags, its essences, its salvage setup, and, in Progres
 Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
 Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.
 The confirm button reads **Create rules**; the picker's title names the system the components are joining, and the count in its foot says how many.
-As the picker's own subtitle says, new rules start empty, and the world category and the world essence values are inherited until this system overrides either one.
+New rules start empty apart from the two inherited sections: the world category and the world essence values, both inherited until this system overrides either one.
 Fabricate adds the ticked components one at a time.
 If one cannot be added, for example because another component in this system already claims the same source item, the rest are still added, and the picker stays open with the refused rows still ticked under a sentence counting how many could not be added.
 The picker closes on its own only when every ticked component was added, or when you press **Cancel**.
