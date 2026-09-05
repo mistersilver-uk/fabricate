@@ -2835,6 +2835,32 @@ describe('world Component Catalogue (issue 1371)', () => {
       await drain();
       assert.deepEqual(selectedRowIds(target), ['ingot'], 'the GM`s own choice is back');
     });
+
+    // ── issue 1371 r17-b ────────────────────────────────────────────────────────────────────
+    it('opens a world with NO components on the empty state, inspecting nothing (quality N2)', async () => {
+      // THE ZERO POINT. Zero rows is the state a brand-new world opens in, and it is the one
+      // branch of the opt-in effect no populated mount can enter: `page.rows[0]` is `undefined`
+      // there, and an effect that reached for its `id` would throw inside `$effect` on the
+      // first screen a GM sees. The guard is present today; this is what keeps it.
+      const target = await mountOpen({
+        scope: scopeFor({ entities: [], defaults: [], membership: [] }),
+      });
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-state="empty"]')),
+        'the empty state renders inside the frame'
+      );
+      assert.deepEqual(shownRowIds(target), [], 'NON-VACUITY: there is no row to select');
+      assert.deepEqual(selectedRowIds(target), [], 'and none is inspected');
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-inspector-state="resting"]')),
+        'the inspector rests on its own copy'
+      );
+      assert.match(
+        target.querySelector('[data-scoped-list-inspector]').textContent,
+        /Select a component/,
+        'the lane`s resting sentence, not a description of a row that does not exist'
+      );
+    });
   });
 
   // ── THE OPT-IN AT THE SHELL, where an owner can hand a selection in (issue 1371 r13-cat) ────
@@ -2892,6 +2918,27 @@ describe('world Component Catalogue (issue 1371)', () => {
         !target.querySelector('[data-scoped-list-row="coal"]').classList.contains('is-selected'),
         'and the first row was NOT selected over it'
       );
+    });
+
+    // ── issue 1371 r17-b ────────────────────────────────────────────────────────────────────
+    it('pushes NO selection to its owner over zero rows, even with `autoSelectFirst` on (quality N2)', async () => {
+      // The owner-facing half of the zero point: the shell binds `selectedId` and calls
+      // `onSelect` when the frame picks a row, so an owner that reacts without binding must not
+      // hear an id when there is no row to name.
+      const selected = [];
+      const target = await shellHarness.mount(
+        shellProps({
+          autoSelectFirst: true,
+          scope: scopeFor({ entities: [], defaults: [], membership: [] }),
+          onSelect: (id) => selected.push(id),
+        })
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-state="empty"]')),
+        'NON-VACUITY: the shell drew the empty state'
+      );
+      assert.equal(target.querySelectorAll('[data-scoped-list-row]').length, 0);
+      assert.deepEqual(selected, [], 'the owner never hears a selection there is no row for');
     });
 
     it('leaves the list column carrying the pane inset with `flushColumn` unset, exactly as the other catalogues do (M21)', async () => {

@@ -1596,6 +1596,19 @@ describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13
     assert.deepEqual(markedRowIds(root), [], 'and no row is marked');
   });
 
+  // ── issue 1371 r17-b ──────────────────────────────────────────────────────────────────────
+  it('selects nothing over ZERO rows: the guard is entered, and not even `` is pushed (quality N2)', async () => {
+    // THE ZERO POINT, and the only place the `pageIds[0] || ''` return can be entered on a real
+    // system: a fresh system holds no component, so the page's first id is `undefined` and the
+    // effect must return rather than hand the owner an empty selection — which the root would
+    // write into the inspector as "nothing", and which would re-fire on every render.
+    const { root, selected } = await mountWithRecorder({ itemCards: [] });
+    assert.deepEqual(rowIds(root), [], 'NON-VACUITY: a fresh system draws no row');
+    assert.match(root.textContent, /No components yet/, 'and draws the zero state');
+    assert.deepEqual(selected, [], 'the first-row pick has nothing to push, and pushes nothing');
+    assert.deepEqual(markedRowIds(root), [], 'and no row is marked');
+  });
+
   it('picks the first MEMBER row on the page the GM is on, not on page one', async () => {
     const shared = createComponentBrowserState();
     shared.pageSize = 2;
