@@ -311,13 +311,13 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  // 49 as of issue 1504, which added `components/Select.svelte` — the app's one select, and the
-  // first member admitted by BUILDING a library entry rather than by promoting a component that
-  // had quietly crossed the membership bar. It was 48 as of issue 1392, which promoted
-  // `apps/manager/VocabularyPanel.svelte`: the World Vocabulary screen was its second independent
-  // caller, and property (e) below reported it as a component that had crossed the bar with
-  // nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 49, 'the shipped primitive set changed size');
+  // 52 as of issue 1505, which added `components/{Kicker,Notice,StatBox}.svelte` — three more
+  // members admitted by BUILDING a library entry, and the first time three arrived together. It
+  // was 49 as of issue 1504, which added `components/Select.svelte` the same way, and 48 as of
+  // issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary screen
+  // was its second independent caller, and property (e) below reported it as a component that had
+  // crossed the bar with nobody adjudicating it.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
