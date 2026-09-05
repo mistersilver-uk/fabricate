@@ -363,7 +363,7 @@ The override almost always belongs in **global per-area CSS in `styles/fabricate
   A scoped component `<style>` only ships after the Vite bundle is rebuilt — a stale bundle silently keeps the old behavior.
 - Scoped component rules race the global stylesheet on specificity in ways that are easy to get wrong (see the specificity ladder below).
   Centralizing the override in one root-level block keeps the cascade predictable.
-- The areas are keyed by root classes — `.fabricate`, the shared module root every Fabricate application emits, carries the focus pair for the player app and the manager, while `.fabricate-admin` and the four windows issue 1520 owns still key on their own.
+- The areas are keyed by root classes — `.fabricate`, the shared module root every Fabricate application emits, carries the focus pair for the player app and the manager, while the three interactables windows and the roll-prompt dialog issue 1520 owns still key on their own.
 
 **Instance 1 — button layout.**
 Foundry's global `button` styles center content (`justify-content: center`) and pin a fixed height.
@@ -372,7 +372,7 @@ Verify in real Foundry, not just compiled source.
 
 **Instance 2 — the orange focus ring.**
 Foundry paints an orange focus ring on focusable controls.
-The module root `.fabricate` carries one **paired block** for the player app and the manager in `styles/fabricate.css`; `.fabricate-admin` and the four windows issue 1520 owns still carry their own:
+The module root `.fabricate` carries one **paired block** for the player app and the manager in `styles/fabricate.css`; the three interactables windows and the roll-prompt dialog issue 1520 owns still carry their own:
 
 ```css
 /* strip Foundry's orange ring (mouse focus) */
@@ -417,7 +417,7 @@ Keep the block at **single root-class** specificity so per-component focus rings
 | `.fabricate.fabricate-app button:focus-visible` | 0,3,1 | ❌ clobbers the per-component ring |
 
 Using the doubled root class (`.fabricate.fabricate-app …`) raises the module default to 0,3,1, which overrides component-scoped rings (e.g. gathering rows that intentionally use `outline-offset: -2px`).
-Use the single class (`.fabricate …`) — matching how `.fabricate-admin` is written — so component rings at 0,3,0 stay authoritative.
+Use the single class (`.fabricate …`) — matching how `.fabricate-interactables-manager` and the other three blocks issue 1520 owns are written — so component rings at 0,3,0 stay authoritative.
 
 **Checklist when adding/auditing a control or surface:**
 
@@ -425,7 +425,7 @@ Use the single class (`.fabricate …`) — matching how `.fabricate-admin` is w
 - Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so the module default still wins where it applies.
 A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host that has neither.
 - Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — the module block already handles it.
-Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the area default doesn't fight them.
+Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the module default doesn't fight them.
 - Custom-content button clipping? Apply the layout fix in Instance 1.
 - Verify both in real Foundry (`npm run test:foundry`) — Foundry's global cascade is not reproduced by compiled-source inspection or unit tests.
 
