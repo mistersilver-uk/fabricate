@@ -1033,6 +1033,7 @@
       data-recipe-bulk-check-tier=""
       value={checkTierValue}
       options={checkTierSelectOptions}
+      showTick={true}
       disabled={inert}
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
       onChange={(value) => setCheckTier(value)}
