@@ -129,6 +129,26 @@ const MERGE_ROWS = [
       'does, which is why both figures are published',
   },
   {
+    id: 'a nested at-context is reported outermost first',
+    css: sheet([
+      '@supports (display: grid) {',
+      '  @media (min-width: 10px) {',
+      '    .a .b {',
+      '      color: red;',
+      '    }',
+      '  }',
+      '}',
+    ]),
+    pairs: 0,
+    verdicts: [],
+    repeated: [],
+    atContexts: [['@supports (display: grid)', '@media (min-width: 10px)']],
+    because:
+      'the chain is the merge predicate’s (a) clause, and `outermost first` is the documented ' +
+      'order — reversed, every single-level corpus row and the whole sheet stay green, because ' +
+      'the sheet has no rule nested two at-rules deep',
+  },
+  {
     id: 'a selector shared between two DIFFERENT lists is out of scope (b)',
     css: sheet(block('.a .b, .c', 'color: red;'), block('.a .b, .d', 'color: blue;')),
     pairs: 0,
@@ -309,6 +329,13 @@ test('every merge rule holds on its synthetic row', () => {
         `${forced.verdict}: ${forced.reason}`,
         verdict,
         `${row.id}: the clause that refuses the pair — ${why}`
+      );
+    }
+    if (row.atContexts) {
+      assert.deepEqual(
+        rules.map((rule) => rule.atContext),
+        row.atContexts,
+        `${row.id}: the enclosing at-rule chain — ${why}`
       );
     }
     assert.deepEqual(repeatedIn(rules), row.repeated, `${row.id}: census repetition — ${why}`);
