@@ -8930,11 +8930,17 @@
   min-width: 0;
 }
 
+/* THE TRIGGER SIDE ONLY, since issue 1503. The two OPTION-ROW members left this list when the
+   pickers began rendering their panels through `SearchablePopover`: the row is the primitive's
+   element now and carries `.manager-travel-option` beside the caller's class, so the shared row
+   rule ties this one at (0,2,0) and wins on source order — which would have stripped every icon
+   and source row of its box. The row's `appearance` pair, its edge, its corner and its fill are
+   restated in each caller's own deepened (0,3,0) rule below; `color` is NOT, because the shared
+   row rule declares the same `var(--fab-text)` and a second copy would be a value this family no
+   longer owns. */
 .fabricate-icon-picker .essence-icon-picker-trigger,
-.fabricate-icon-picker-popover .essence-icon-picker-option,
 .fabricate-source-picker .essence-source-trigger,
-.fabricate-source-picker .essence-source-clear,
-.fabricate-source-picker-popover .essence-source-picker-option {
+.fabricate-source-picker .essence-source-clear {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--fab-border);
@@ -9057,55 +9063,50 @@
   background: var(--fab-success-soft);
 }
 
-.fabricate-icon-picker-popover.essence-icon-picker-popover,
-.fabricate-source-picker-popover.essence-source-picker-popover {
-  position: absolute;
-  z-index: 120;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
+/* ── WHAT THE PANEL KEEPS, ONCE THE SHARED PICKER DRAWS IT (issue 1503) ────────────────────
+   Both pickers render through `components/SearchablePopover.svelte` now, so the panel, the
+   search row, the list and every option row are the PRIMITIVE's elements. Each carries the
+   primitive's class AND the caller's, handed over through the `popoverClass` / `searchClass` /
+   `listClass` / `optionClass` props, and the two rules then TIE at (0,2,0) — at which point the
+   shared rule, which is thousands of lines further down this file, wins on source order.
 
-  /* A STATIC bound, so the popover is never laid out unbounded. Both popovers get an inline
-     `max-height` from `computeIconPickerPopoverLayout`, but that runs in an effect AFTER the first
-     paint, and the first thing the effect does is call `getBoundingClientRect()` on the trigger —
-     which forces layout of a list hundreds of rows tall. This is the same 380px that util uses as
-     its `preferredMaxHeight` ceiling, so the inline value it later writes is always <= this one and
-     nothing here can loosen it. */
-  max-height: 380px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 8px;
-  background: var(--fab-bg-3);
-  box-shadow: 0 16px 36px var(--fab-overlay-dark-34);
-  overflow: hidden;
-}
+   That tie, not a specificity defeat, is the whole mechanism. Three of the four caller blocks
+   that used to sit here are therefore GONE rather than out-specified:
 
-.fabricate-icon-picker-popover .essence-icon-picker-search input,
-.fabricate-source-picker-popover .essence-source-picker-search input {
-  width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
+     - THE PANEL BOX. The shared panel supplies every property it declared and supplies them at
+       the design's own figures: 10px corner on `--fab-bg-0` under `--fab-shadow-lg`, a 6px
+       inset, a 4px column gap, a 240-340px width band, `min(50vh, 360px)` and `z-index: 4000`.
+       The caller retained nothing, so the block is deleted whole. (`computeIconPickerPopoverLayout`
+       still writes an inline `max-height: 380px`, which out-ranks any rule here, so the measured
+       height is unchanged; only the pre-measure frame differs.)
+     - THE SEARCH FIELD. The shared field is 30px on `--fab-bg-0` with a `--fab-accent-border`
+       edge at radius 7, plus a focus ring the caller never had, and the row around it gains a
+       `display: flex; flex: 0 0 auto; min-width: 0` it had no rule for at all.
+     - THE SOURCE PICKER'S TWO-COLUMN TEMPLATE, which is now emitted by the primitive as
+       `data-picker-columns="2"` and painted from the shared rung, because the shared list rule's
+       `display: flex` would otherwise have made a caller-side `grid-template-columns` inert.
 
-.fabricate-icon-picker-popover .essence-icon-picker-options,
-.fabricate-source-picker-popover .essence-source-picker-grid {
-  display: grid;
+   What the CALLERS keep is written below at (0,3,0) — their own two namespace roots on the panel
+   compound. It cannot be written by putting `.fabricate-picker-popover` in front of a caller
+   class: from a caller's point of view that is another primitive's root, and
+   `searchable-popover-area-scope.test.js` rejects it as an application root.
+   ------------------------------------------------------------------------------------------ */
+
+/* THE ROW PITCH. The shared list is a 2px-gapped flex column; these rows carry a 28px chip and a
+   34px image tile respectively and need the 6px the pitch was designed at. It is also the pitch
+   `measureListMetrics` reads to floor the list to whole rows. */
+.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-options,
+.fabricate-source-picker-popover.essence-source-picker-popover .essence-source-picker-grid {
   gap: var(--fab-space-chip);
-  min-height: 0;
-  overflow: auto;
 }
 
-.fabricate-source-picker-popover .essence-source-picker-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.fabricate-icon-picker-popover .essence-icon-picker-option {
+/* THE ROW BOX. The shared row is a borderless, transparent 30px flex line at radius 7; these two
+   are grids with a fixed leading column and a taller floor, and they are edged and filled. The
+   `appearance` pair is not decoration either — it left the trigger-side list above with the rest
+   of this box, and carrying only one half of it leaves a UA button appearance on WebKit. */
+.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option {
+  appearance: none;
+  -webkit-appearance: none;
   display: grid;
   grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9113,17 +9114,47 @@
   min-width: 0;
   min-height: var(--fab-icon-picker-row);
   padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-06);
   text-align: left;
 }
 
 /* The pinned resolved row sits directly above the alphabetical list, as a sibling `role="option"`
    so the listbox keeps a flat option tree. The extra gap is what separates the two groups; the
-   `.selected` rule below already gives it the selected surface. */
-.fabricate-icon-picker-popover .essence-icon-picker-option.pinned {
+   current-value rule below already gives it the selected surface. Deepened with the rest of the
+   family, so it keeps out-ranking the shared row rule. */
+.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option.pinned {
   margin-bottom: var(--fab-space-2);
 }
 
-.fabricate-source-picker-popover .essence-source-picker-option {
+/* THE ROW'S PREVIEW CHIP, RE-TOKENED FOR ITS NEW GROUND (issue 1503).
+
+   `.essence-icon-picker-preview` is painted at BOTH of this picker's roots by one shared pair
+   above — once in the trigger, which stays inside the picker, and once per option row, which
+   travels with the portaled panel. Its fill is a 16% DARK overlay, which reads as a plate only
+   while there is something left to darken.
+
+   The panel's backdrop moved from the lightest background rung to the darkest, so on the ROW
+   there is not. Measured in Chromium against this sheet (`manager-layout.test.js` renders the
+   composed panel and reads the pixels back off a canvas): the chip separated from its row by 7
+   RGB steps before and by 2 after — a plate that is effectively gone.
+
+   So the popover member alone takes the token the design uses for a raised tile on a dark
+   ground, which restores the separation to 10 steps and makes the chip LIGHTER than its row
+   rather than darker, exactly as the library's own inactive grid tiles are drawn.
+
+   THE TRIGGER MEMBER IS DELIBERATELY UNTOUCHED, and that is the whole reason this is a separate
+   rule rather than an edit to the pair above. The trigger's chip sits on a caller's own surface
+   which did not move, it is in the closed-state frame of every one of this picker's importers,
+   and re-tokening it there would move all of them. */
+.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-preview {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-source-picker-popover.essence-source-picker-popover .essence-source-picker-option {
+  appearance: none;
+  -webkit-appearance: none;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9131,6 +9162,9 @@
   min-width: 0;
   min-height: 44px;
   padding: var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-06);
   text-align: left;
 }
 
@@ -9148,12 +9182,29 @@
   white-space: nowrap;
 }
 
-.fabricate-icon-picker-popover .essence-icon-picker-option.selected,
-.fabricate-source-picker-popover .essence-source-picker-option.selected,
-.fabricate-icon-picker-popover .essence-icon-picker-option:hover,
-.fabricate-source-picker-popover .essence-source-picker-option:hover,
-.fabricate-icon-picker-popover .essence-icon-picker-option:focus-visible,
-.fabricate-source-picker-popover .essence-source-picker-option:focus-visible {
+/* THE CURRENT VALUE AND THE POINTER, at (0,4,0) so they out-rank the retained row box above and
+   the shared row's own `:hover` (issue 1503).
+
+   `.selected` became `[aria-selected='true']`: the row is the primitive's element and the
+   primitive marks the current value with ARIA rather than with a class, so a rule keyed on
+   `.selected` would match nothing and the marked row would lose its fill entirely.
+
+   The `:focus-visible` members are DELETED rather than deepened. An option row never takes DOM
+   focus now — the holder is the search field, and each row suppresses `mousedown`'s default so a
+   click cannot move focus onto it — so a deepened copy would be a rule nobody could exercise.
+
+   Selected and hover paint IDENTICALLY and always have; they are one list because that is what
+   the design draws, not because the distinction was lost in a merge. The KEYBOARD CURSOR is the
+   state that is genuinely different, and it is painted by the shared primitive in a different
+   CHANNEL — an inset accent outline — so it composes over whichever of these fills is on the row
+   rather than replacing it. */
+.fabricate-icon-picker-popover.essence-icon-picker-popover
+  .essence-icon-picker-option[aria-selected='true'],
+.fabricate-source-picker-popover.essence-source-picker-popover
+  .essence-source-picker-option[aria-selected='true'],
+.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option:hover,
+.fabricate-source-picker-popover.essence-source-picker-popover
+  .essence-source-picker-option:hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
 }
@@ -21758,6 +21809,24 @@
   overflow-y: auto;
 }
 
+/* THE GRID FORM (issue 1503). `as="grid"` is a list of TILES rather than a column of lines —
+   the essence source picker draws two columns of image tiles — and the primitive emits it as
+   `data-picker-as` plus `data-picker-columns` on the list ELEMENT rather than as an inline
+   style. That is forced rather than stylistic: `anchoredPopover` writes the list's whole `style`
+   attribute with `setAttribute('style', …)` on every measure whenever a caller registers
+   `targets.list`, so an inline template would be replaced on the first pass.
+
+   ONE RUNG PER SHIPPED COLUMN COUNT, and today there is exactly one. A caller asking for a
+   count with no rung would get `display: grid` with an auto template — a single column — so a
+   new count adds a rung here, and the primitive's own docblock says so. */
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-as='grid'] {
+  display: grid;
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .fabricate-picker-popover .manager-travel-popover-empty {
   flex: 0 0 auto;
   min-width: 0;
@@ -21826,6 +21895,33 @@
 
 .fabricate-picker-popover .manager-travel-option:hover {
   background: var(--fab-surface-raised);
+}
+
+/* THE KEYBOARD CURSOR (issue 1503). DOM focus stays on the search field — or on the trigger,
+   where there is none — and the list is driven with `aria-activedescendant`, so the row the
+   arrow keys are on has no focus of its own to paint with. It carries `data-active-option`
+   instead, and this is the one rule that reads it.
+
+   AN OUTLINE, NOT A FILL, and that is the design decision rather than an implementation detail.
+   `openspec/specs/design-system/spec.md` gives interaction three FILL rungs — soft at rest,
+   raised on hover, active when pressed or selected — and a listbox that also marks a current
+   value has spent all three. The cursor is a FOURTH state and orthogonal to them: a row can be
+   the cursor AND the current value AND hovered at once. So it takes a different CHANNEL and
+   COMPOSES over whichever fill the row already carries, instead of inventing a fourth rung or
+   erasing the selected face on the very row a GM most needs to see. The specimen's own active
+   grid tile draws it exactly this way.
+
+   The offset is NEGATIVE. That draws the ring inside the row's border box, which is what tells
+   it apart from the positive-offset ring `.fabricate [tabindex]:focus-visible` paints. Rows
+   never take focus, so the two cannot collide in practice; the sign is what makes that legible.
+
+   Written at (0,4,0) — the primitive's own root DOUBLED on the panel compound, which a
+   primitive-owned rule may do because that root is its own — so it out-ranks a caller's own
+   deepened state rule. It is also later in this file than every caller's, so it would win the
+   tie on source order too. */
+.fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 /* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ────────────────────────────
