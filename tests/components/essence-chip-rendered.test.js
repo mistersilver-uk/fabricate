@@ -9,19 +9,27 @@
  * under the real sheet, for EVERY theme block the sheet declares and every tint the picker offers,
  * composites each chip's fill over the surface it stands on, and asserts the WCAG ratio:
  *
- *   - the chip's label against its composited fill clears 4.5:1 (AA for text under 18px);
+ *   - the chip's label against its composited fill clears 4.5:1 (AA for text under 18px) on an
+ *     ORDINARY row, whose `--fab-bg-1` is opaque;
+ *   - and again on a SELECTED row, whose `--fab-surface-active` is 10–12% white-ish over
+ *     `--fab-bg-2` and is therefore the LIGHTER, worse surface of the two;
  *   - the tile's glyph against `--fab-bg-3` clears 3:1 (AA for a non-text mark);
  *
- * and it proves the measurement is live before trusting it: with the tint removed the computed ink
- * is the base chip's, so a sheet that never reached the chip would fail here rather than pass.
+ * and it proves each measurement is live before trusting it: with the tint removed the computed ink
+ * is the base chip's, so a sheet that never reached the chip would fail here rather than pass, and
+ * the selected row is asserted to composite LIGHTER than the ordinary one, so the second surface
+ * cannot quietly become a second reading of the first.
  *
- * ONE PAIR IS BELOW BOTH FLOORS TODAY AND IS PINNED, NOT HIDDEN. `foundry-native`'s `mauve` is a
- * mid grey-purple — the theme derivation that `design-system/spec.md` records as inverting mauve's
- * hue by 160 degrees — and it measures 3.38:1 as a label and 2.74:1 as a glyph on that theme's
- * slate tile. That is the palette's defect and not the chip's: the same token paints the world bulk
+ * WHICH SURFACE A PIN HOLDS IS SAID, BECAUSE THE TWO DIFFER BY ABOUT A THIRD. `foundry-native`'s
+ * `mauve` is a mid grey-purple — the theme derivation that `design-system/spec.md` records as
+ * inverting mauve's hue by 160 degrees — and it measures 3.38:1 as a label on an ordinary row,
+ * 2.74:1 as a glyph on that theme's slate tile, and 1.85:1 as a label on a selected row. Nine
+ * theme/tint pairs across four themes fall under AA on the selected row; one does on the ordinary
+ * one. That is the palette's defect and not the chip's: the same tokens paint the world bulk
  * panel's essence tiles today, and the spec already records re-deriving the eight offered tints as
- * a planned migration. So the pair is held as a RATCHET at its measured value rather than waived,
- * and the day the palette moves, this file's pin moves with it and says so.
+ * a planned migration. So every short pair is held as a RATCHET at its measured value rather than
+ * waived, in the list for the surface it was measured on, and the day the palette moves those pins
+ * move with it and say so.
  */
 
 import assert from 'node:assert/strict';
@@ -57,6 +65,34 @@ const MARK_MIN_RATIO = 3;
  */
 const KNOWN_BELOW_LABEL_FLOOR = new Map([['foundry-native/mauve', 3.36]]);
 const KNOWN_BELOW_MARK_FLOOR = new Map([['foundry-native/mauve', 2.72]]);
+
+/**
+ * THE SELECTED ROW'S OWN RATCHET (issue 1371 r19-gates2, UX review round 5 F-P5).
+ *
+ * The pinned list above is the ORDINARY row's, and it is the friendlier of the two surfaces the
+ * chip stands on: `.is-selected` replaces the row's opaque `--fab-bg-1` with a 10–12% white-ish
+ * `--fab-surface-active` over `--fab-bg-2`, and a lighter surface takes roughly a third off a
+ * pastel label's ratio — the same peach chip reads 9.37:1 on a `fabricate` row and 6.34:1 on the
+ * selected one. Nine of the fifty-six pairs fall under AA there, on four of the seven themes.
+ *
+ * They are PINNED AT THEIR MEASURED VALUES rather than waived, on the same terms as the pair
+ * above: the shortfall is the palette's — `design-system/spec.md:209-212` already records
+ * re-deriving the eight offered tints as a planned migration — and not this chip's, which draws
+ * whatever token the picker offers. `foundry-native` is where it bites hardest, and that theme's
+ * tokens are the ones the spec's migration names. A pair listed here must not fall further; a pair
+ * that reaches 4.5:1 must be removed, so the list can only shrink.
+ */
+const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
+  ['foundry-native/mauve', 1.83],
+  ['foundry-native/aqua', 2.99],
+  ['ironblood-forge/mauve', 3.48],
+  ['foundry-native/lavender', 3.73],
+  ['foundry-native/rose', 4.09],
+  ['foundry-native/peach', 4.14],
+  ['ironblood-forge/rose', 4.19],
+  ['hearth-herb/aqua', 4.35],
+  ['starglass-arcana/aqua', 4.44],
+]);
 
 /**
  * Hold every pair above its floor, or — for a pinned pair — above its pinned ratchet, and report
@@ -112,14 +148,26 @@ function scopedCss() {
   }).join('\n');
 }
 
+/*
+ * THE TWO SURFACES A ROW CHIP STANDS ON, both drawn (issue 1371 r19-gates2, UX review round 5
+ * F-P5). `.probe-surface` is the ORDINARY row: `.manager-components-list .manager-component-row`
+ * declares `background: var(--fab-bg-1)`, which is opaque, so nothing behind it reaches the chip.
+ * `.probe-selected-row` is the SELECTED row, which is a different and LIGHTER surface: the
+ * `.is-selected` rule replaces that fill with `var(--fab-surface-active)`, and every theme
+ * declares that token at 10–12% alpha — so what the chip actually composites over is the
+ * translucent fill over `.manager-main`'s `var(--fab-bg-2)`, measured in the shipped list as
+ * rgb(27,40,51) under the row's own rgb(21,33,43). A lighter surface is a WORSE surface for a
+ * pastel-inked chip, so measuring only the unselected row pins the friendlier of the two.
+ */
 function page(theme, tint, chipMarkup, tileMarkup, scoped) {
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${fabricateCss}</style><style>${scoped}</style>
-    <style>html, body { margin: 0; } .probe-surface { padding: 16px; background: var(--fab-bg-1); } .probe-tile { padding: 16px; background: var(--fab-bg-3); }</style>
+    <style>html, body { margin: 0; } .probe-surface { padding: 16px; background: var(--fab-bg-1); } .probe-tile { padding: 16px; background: var(--fab-bg-3); } .probe-selected { padding: 16px; background: var(--fab-bg-2); } .probe-selected-row { padding: 16px; background: var(--fab-surface-active); }</style>
     </head><body>
       <div class="fabricate fabricate-manager" data-fabricate-theme="${theme}">
         <div class="probe-surface" data-probe-surface>${chipMarkup}</div>
         <div class="probe-tile" data-probe-tile>${tileMarkup}</div>
+        <div class="probe-selected" data-probe-selected><div class="probe-selected-row" data-probe-selected-row>${chipMarkup}</div></div>
       </div>
     </body></html>`;
 }
@@ -132,9 +180,12 @@ function readColours() {
     const parts = match[1].split(',').map((part) => parseFloat(part.trim()));
     return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
   };
-  const chip = document.querySelector('.manager-chip');
-  const glyph = chip.querySelector('i');
   const surface = document.querySelector('[data-probe-surface]');
+  const chip = surface.querySelector('.manager-chip');
+  const glyph = chip.querySelector('i');
+  const selectedRow = document.querySelector('[data-probe-selected-row]');
+  const selectedChip = selectedRow.querySelector('.manager-chip');
+  const selectedHost = document.querySelector('[data-probe-selected]');
   const tile = document.querySelector('.fab-medallion');
   const tileGlyph = tile.querySelector('i');
   const tileHost = document.querySelector('[data-probe-tile]');
@@ -143,6 +194,10 @@ function readColours() {
     chipGlyphInk: parse(getComputedStyle(glyph).color),
     chipFill: parse(getComputedStyle(chip).backgroundColor),
     surface: parse(getComputedStyle(surface).backgroundColor),
+    selectedChipInk: parse(getComputedStyle(selectedChip).color),
+    selectedChipFill: parse(getComputedStyle(selectedChip).backgroundColor),
+    selectedRowFill: parse(getComputedStyle(selectedRow).backgroundColor),
+    selectedRowHost: parse(getComputedStyle(selectedHost).backgroundColor),
     tileGlyphInk: parse(getComputedStyle(tileGlyph).color),
     tileFill: parse(getComputedStyle(tile).backgroundColor),
     tileHost: parse(getComputedStyle(tileHost).backgroundColor),
@@ -166,6 +221,20 @@ function luminance([r, g, b]) {
 function contrast(foreground, background) {
   const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
   return (light + 0.05) / (dark + 0.05);
+}
+
+/** The chip's label against its fill on an ORDINARY row: `--fab-bg-1`, which is opaque. */
+function labelRatioOnRow(sample) {
+  return contrast(sample.chipInk, composite(sample.chipFill, composite(sample.surface, [0, 0, 0])));
+}
+
+/**
+ * The same label on a SELECTED row, which is three translucent layers rather than one opaque one:
+ * the chip's fill over `--fab-surface-active` over `--fab-bg-2`, composited in that order.
+ */
+function labelRatioOnSelectedRow(sample) {
+  const row = composite(sample.selectedRowFill, composite(sample.selectedRowHost, [0, 0, 0]));
+  return contrast(sample.selectedChipInk, composite(sample.selectedChipFill, row));
 }
 
 /** @type {Map<string, object>} keyed `${theme}/${tint}`; `${theme}/` is the untinted control. */
@@ -243,13 +312,32 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     }
   });
 
+  it('CONTROL: the SELECTED row really is the lighter surface, so the pair of measurements is not one measurement twice', () => {
+    // Without this the arm below could be reading `--fab-bg-1` under another name and reporting a
+    // second green for the same fact. `--fab-surface-active` is declared per theme, so the
+    // brightening is read off each theme's own composited row rather than assumed once.
+    for (const theme of THEMES) {
+      const sample = measured.get(`${theme}/${MANAGER_COLOR_TOKEN_KEYS[0]}`);
+      const plain = luminance(composite(sample.surface, [0, 0, 0]));
+      const selected = luminance(composite(sample.selectedRowFill, composite(sample.selectedRowHost, [0, 0, 0])));
+      assert.ok(
+        selected > plain,
+        `${theme}: the selected row composited to luminance ${selected.toFixed(4)} against the ordinary row's ${plain.toFixed(4)} — the two probes are drawing the same surface`
+      );
+    }
+  });
+
   it('keeps the chip’s LABEL at AA against its composited fill on every theme and every tint', (t) => {
+    holdContrast(t, labelRatioOnRow, LABEL_MIN_RATIO, KNOWN_BELOW_LABEL_FLOOR, 'chip label');
+  });
+
+  it('and holds the SELECTED row — the lighter surface, where nine pairs are pinned short of AA', (t) => {
     holdContrast(
       t,
-      (sample) => contrast(sample.chipInk, composite(sample.chipFill, composite(sample.surface, [0, 0, 0]))),
+      labelRatioOnSelectedRow,
       LABEL_MIN_RATIO,
-      KNOWN_BELOW_LABEL_FLOOR,
-      'chip label'
+      KNOWN_BELOW_SELECTED_LABEL_FLOOR,
+      'chip label on a selected row'
     );
   });
 
