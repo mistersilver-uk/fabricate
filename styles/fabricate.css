@@ -24184,11 +24184,13 @@
 }
 
 /* ── A3. THE IDENTITY CARD ───────────────────────────────────────────────────────────────────
-   `proto:833-843`: a 56px chip, a copy column, and a trailing compact drop target.
+   `proto:833-843`: a 56px chip and a copy column. The trailing compact drop target the
+   reference draws at `proto:842` is NOT drawn (issue 1371 r13-entry, maintainer ruling M17):
+   the source card below carries the one zone, and the description runs the card's full width.
 
    ITS FILL IS `surface-soft` RATHER THAN A RAMP STEP, which is the one card on this tab that
-   differs: the reference lifts the identity card off the panel and recesses the three below it,
-   and it is also the card's DROP-TARGET face. */
+   differs: the reference lifts the identity card off the panel and recesses the three below
+   it. */
 .fabricate-manager .manager-component-entry-identity {
   background: var(--fab-surface-soft);
 }
@@ -24268,15 +24270,8 @@
   line-height: 1.45;
 }
 
-/* THE TRAILING DROP TARGET, in `ItemDropZone`'s compact form: a fixed 176px column so the copy
-   beside it keeps a stable measure whatever the component is called. */
-.fabricate-manager .manager-component-entry-identity-body .manager-item-drop-zone {
-  flex: 0 0 176px;
-  align-self: stretch;
-}
-
-/* THE COMPACT PROMPT IS TRANSPARENT ON A DASHED HAIRLINE (`proto:842`, `:856`), where the
-   primitive's default face carries a fill. Both entry sites take it. */
+/* THE COMPACT PROMPT IS TRANSPARENT ON A DASHED HAIRLINE (`proto:856`), where the primitive's
+   default face carries a fill. The source card is the one entry site that takes it (M17). */
 .fabricate-manager .manager-component-entry-card .manager-item-drop-zone.is-compact {
   padding: var(--fab-space-3);
   background: transparent;

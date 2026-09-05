@@ -6390,7 +6390,6 @@
               "HeaderSubtitle": "{source} \u00b7 rules in {members} of {total} systems",
               "Unsaved": "Unsaved changes",
               "IdentityNote": "Name, image and description refresh from the linked item. Every system shows the same three.",
-              "IdentityDropTitle": "Drop a world or compendium item to replace",
               "SourceTitle": "Source identity",
               "SourceSubtitle": "How the world recognises this item on import, so two copies never become two entries.",
               "SourceUuidLabel": "Source item uuid",

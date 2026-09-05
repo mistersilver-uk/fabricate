@@ -87,9 +87,9 @@ const sourceCardHarness = createComponentScopeHarness({
  *
  * `compact` is an opt-in this issue added to a primitive with eight other call sites, and the
  * positive arm — the entry's identity zone IS `is-compact` — is proved through the page below.
- * The negative arm is not reachable there: BOTH zones the entry renders opt in, so nothing on
- * this screen can show that a zone which does NOT ask keeps the linked art, the name and the
- * uuid. Every other opt-in this PR shipped carries that pair (`ManagerButton`, `ManagerSearchField`,
+ * The negative arm is not reachable there: the ONE zone the entry renders — the source card's,
+ * since maintainer ruling M17 removed the identity card's — opts in, so nothing on this screen
+ * can show that a zone which does NOT ask keeps the linked art, the name and the uuid. Every other opt-in this PR shipped carries that pair (`ManagerButton`, `ManagerSearchField`,
  * `Medallion`, `ScopedEntityPreview`), and it is the pair that makes "byte-identical by default"
  * a measurement rather than a claim.
  *
@@ -1024,22 +1024,28 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('and the read-only card still trails a COMPACT way to re-point it', async () => {
-      // M7's fourth clause, which nothing pinned: `proto:842` ends the identity row with a
-      // prompt-only drop target, so a linked record whose three values are read-only still has a
-      // way to change what they are read FROM. `ItemDropZone`'s default form draws the linked
-      // item's art, name and uuid again — the three things this card already shows — so it is the
-      // COMPACT face or it is a third copy of the identity.
+    it('and the identity card carries NO drop zone: the source card holds the one way to re-point it', async () => {
+      // MAINTAINER RULING M17 (issue 1371, revision 13). The read-only card used to trail a
+      // compact drop target beside the description (`proto:842`), so a linked record had TWO
+      // zones on one tab doing one thing; the ruling removes the identity card's and lets the
+      // description run the card's full width. The source card's zone stays, because it is the
+      // one that says what a drop rewrites.
       const { target } = await open('ingot');
-      const zone = target.querySelector('[data-item-drop-zone="component-identity"]');
-      assert.ok(Boolean(zone), 'the identity card offers a drop target');
       assert.ok(
-        zone.classList.contains('is-compact'),
-        `it is the prompt-only face, and read "${zone.className}"`
+        !target.querySelector('[data-item-drop-zone="component-identity"]'),
+        'the identity card offers no drop target of its own'
       );
       assert.ok(
-        Boolean(zone.closest('[data-scoped-entry-identity-card]')),
-        'and it sits inside the identity card rather than below it'
+        !target.querySelector('[data-scoped-entry-identity-card] .manager-item-drop-zone'),
+        'and no other zone sits inside it either'
+      );
+      const zone = target.querySelector(
+        '[data-scoped-entry-source-card] [data-item-drop-zone="component-source"]'
+      );
+      assert.ok(Boolean(zone), 'the source card still offers the one way to re-point the link');
+      assert.ok(
+        zone.classList.contains('is-compact'),
+        `and it is still the prompt-only face; it read "${zone.className}"`
       );
     });
 
@@ -1665,16 +1671,18 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('and the IDENTITY card carries its own replace target, wired to the same seam', async () => {
-      // `proto:842` ends the read-only identity row with a second prompt-only zone. Two zones,
-      // one seam: a page that wired the identity zone to nothing would still draw it.
+    it('and a drop on the IDENTITY card forwards nothing, because it is no target any more', async () => {
+      // MAINTAINER RULING M17 (issue 1371, revision 13). This used to prove `proto:842`'s second
+      // prompt-only zone was wired to the same seam; the ruling removes that zone, so the
+      // inverse is what stands: an Item dropped on the identity card reaches the shell through
+      // NO handler, and the source card's zone above is the one drop that re-points the link.
       const { target, reports } = await open('ingot');
-      dispatchDrop(target.querySelector('[data-item-drop-zone="component-identity"]'), {
+      dispatchDrop(target.querySelector('[data-scoped-entry-identity-card]'), {
         type: 'Item',
         uuid: 'Item.from-identity',
       });
       await drain();
-      assert.deepEqual(reports.shell, [['drop', 'Item.from-identity']]);
+      assert.deepEqual(reports.shell, [], 'nothing on the identity card accepts a drop');
     });
   });
 

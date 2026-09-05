@@ -52,7 +52,6 @@
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
@@ -583,6 +582,13 @@
               THE IDENTITY CARD. For a LINKED record the three values are the linked Item's and
               are drawn as values under a lock pill; the editable pair survives only where there
               is no Item to refresh from.
+
+              IT CARRIES NO DROP ZONE (issue 1371 r13-entry, maintainer ruling M17). `proto:842`
+              trails the copy column with a compact `Drop a world or compendium item to replace`
+              target, and the source card below draws a second zone that does the same thing —
+              two affordances on one tab for one write. The ruling removes this card's and lets
+              the description run the card's full width; the source card's zone is the one way
+              to re-point the link, and it is the one that says what a drop rewrites.
             -->
             <InspectorCard
               class="manager-component-entry-card manager-component-entry-identity"
@@ -685,16 +691,6 @@
                     )}
                   </p>
                 </div>
-                <ItemDropZone
-                  compact
-                  kind="component-identity"
-                  emptyIcon="fas fa-right-left"
-                  title={text(
-                    'FABRICATE.Admin.Manager.Scoped.Component.Entry.IdentityDropTitle',
-                    'Drop a world or compendium item to replace'
-                  )}
-                  onDrop={onSourceDrop}
-                />
               </div>
             </InspectorCard>
 
