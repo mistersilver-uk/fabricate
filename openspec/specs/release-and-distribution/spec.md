@@ -446,13 +446,13 @@ Concurrent publishes to one channel MUST NOT interleave, and a manifest write MU
 
 ### Requirement: Archive completeness
 
-Every target's published archive MUST contain every module file the module's entry script references, including a code-split chunk whose name carries a content hash.
+Every target's published archive MUST contain every module file reachable from the module's entry script, directly or through another such file, including a code-split chunk whose name carries a content hash.
 Completeness MUST be proved mechanically against the produced archive itself before publication, on every path that produces one, rather than against the build directory the archive was made from.
 The proof MUST fail when the entry script cannot be located in the archive, and MUST fail when it can be located but yields no chunk references at all, because a proof that cannot distinguish a complete archive from an unread one reports success forever.
 
 #### Scenario: an archive is missing a referenced chunk
 
-- **WHEN** an archive is produced whose entry script references a chunk the archive does not contain
+- **WHEN** an archive is produced whose entry script's reference chain reaches a chunk the archive does not contain
 - **THEN** the producing command fails and publishes nothing
 
 #### Scenario: a build produces no archive
