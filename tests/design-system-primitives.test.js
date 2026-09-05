@@ -306,7 +306,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1371 r17-b: `apps/manager/BulkStagingInset.svelte` was promoted from the
   // unregistered-shared register, where r16-cat recorded it at its second caller, to a member
   // row with a `library.html` specimen.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 48, 'the shipped primitive set changed size');
+  // 49 as of issue 1371 r18-colour: `apps/manager/components/EssenceChip.svelte`, the tinted
+  // essence chip maintainer ruling M29 asked for, registered at its second caller with its
+  // `library.html` specimen beside the icon chip's.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 49, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

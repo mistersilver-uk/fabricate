@@ -124,27 +124,28 @@ test('the library has the exact structure the parser assumes', () => {
   // properties below read as if it were a database, and each moves only when someone edits that
   // file — at which point the edit should be accepted deliberately rather than absorbed.
   // 51 as of issue 1371 r17-b: the `<BulkStagingInset>` entry beside `<BulkEditPanel>`'s.
-  assert.equal(library.blockCount, 51, 'spec-head block count');
+  // 52 as of issue 1371 r18-colour: the `<EssenceChip>` entry beside the icon chip's (M29).
+  assert.equal(library.blockCount, 52, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    51,
+    52,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 59, 'distinct primitive names');
+  assert.equal(library.names.length, 60, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    59,
+    60,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 31, 'naming blocks');
+  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 32, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan. If the parser were ever
   // widened to the whole file these two would collapse to 69 and 0, and every set comparison below
   // would quietly start counting the ruled-out register as part of the vocabulary.
-  assert.equal(library.fileWideNames.length, 70, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 71, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
