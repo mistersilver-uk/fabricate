@@ -230,6 +230,17 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
         'renders no button of its own in that shape, and the prop rides the spread — so it ' +
         'would silently override the name the snippet writes rather than naming anything.'
     );
+    // THE TWIN, for the quieter of the two overriding props. `triggerTitle` reaches the caller's
+    // own button by the same route — non-empty, it rides the spread and lands on the element the
+    // snippet wrote its own `title` on — and it is the tooltip rather than the accessible name,
+    // so nothing reports it: the button still has a name, still renders, and the GM simply reads
+    // a different sentence on hover. Neither shipped picker passes it, which is what makes this a
+    // guard for the NEXT snippet caller rather than a fix.
+    assert.ok(
+      !site.attribute('triggerTitle'),
+      `${site.file} passes BOTH a \`trigger\` snippet and \`triggerTitle\`. The prop rides the ` +
+        'spread, so it would override the tooltip the snippet writes rather than adding one.'
+    );
   }
 
   // THE READER DISCRIMINATES. A label on an element that is NOT the spread target names some
@@ -349,6 +360,42 @@ test('a popover announcing a listbox does not render a search field', () => {
       'promises a control the GM never gets. Either pass `showSearch={false}`, which is the ' +
       'shape the four converted menus have, or drop `triggerHasPopup` and take the truthful ' +
       `\`dialog\` default:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+test('a popover that renders no search field announces a listbox', () => {
+  // THE CONVERSE OF THE CLAUSE ABOVE, and it is a separate test rather than a second loop in it
+  // because it quantifies over a different population: that one reads the sites that DECLARE
+  // `triggerHasPopup`, this one reads the sites that suppress the search field. Checking only the
+  // first direction is what let one site ship the contradiction — `RecipeIngredientGroupCard`'s
+  // row-level `or…` menu passed `showSearch={false}` and no `triggerHasPopup`, so it took the
+  // `dialog` default while rendering the primitive's bare-listbox shape, and under the focus
+  // model its trigger announces `aria-haspopup="dialog"` beside `role="combobox"` and an
+  // `aria-controls` naming a `role="listbox"`. The other four search-suppressed sites all
+  // declare it, so the odd one out was invisible to every reader that looked at the four.
+  const suppressed = popover.callSites.filter(
+    (site) => site.attribute('showSearch') === 'showSearch={false}'
+  );
+  // A floor rather than a count, and above zero: at zero this clause quantifies over nothing and
+  // reports clean. Five sites suppress the field as issue 1503 lands.
+  assert.ok(
+    suppressed.length >= 5,
+    `only ${suppressed.length} call sites suppress the search field, so this clause is vacuous`
+  );
+
+  const offenders = suppressed
+    .filter((site) => site.attribute('triggerHasPopup') !== 'triggerHasPopup="listbox"')
+    .map((site) => `${site.file}: ${site.attribute('triggerHasPopup') ?? 'no triggerHasPopup'}`);
+
+  assert.deepEqual(
+    offenders.sort((left, right) => left.localeCompare(right)),
+    [],
+    '`aria-haspopup` states what activating the trigger OPENS, and with `showSearch={false}` ' +
+      'this primitive opens a bare list of choices with no query field in it. The `dialog` ' +
+      'default is truthful only for the searchable shape, so a suppressed-search site that ' +
+      'takes it promises assistive technology a panel the GM never gets — while the same ' +
+      'trigger already carries `role="combobox"` and an `aria-controls` naming a ' +
+      `\`role="listbox"\`:\n  ${offenders.join('\n  ')}`
   );
 });
 
