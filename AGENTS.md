@@ -610,11 +610,11 @@ Two recurring instances:
   - **Layout.** Foundry's global `button` styles center their content (`justify-content: center`) and pin a fixed height.
 A Svelte component rendering a `<button>` with custom content (icon+label triggers, portrait+name option rows) must set `justify-content: flex-start`, `height: auto`, and a `min-height` explicitly, or content centers and taller children (portraits) clip.
 Test layout in real Foundry, not just compiled source.
-  - **Focus ring.** Foundry paints an orange focus ring that must be overridden per app-area (`.fabricate-admin`, `.fabricate-manager`, `.fabricate-app`) with a paired block in `styles/fabricate.css`: strip the ring on `:focus`, repaint the accent ring on `:focus-visible`.
+  - **Focus ring.** Foundry paints an orange focus ring that the module root `.fabricate` strips and repaints once for the whole module, in a paired block in `styles/fabricate.css`: strip on `:focus`, repaint the accent ring on `:focus-visible` (issue 1501).
 Handle `:focus-visible` explicitly — a button lands in that state after a sibling/panel re-render (e.g. a tab-panel swap on click), so a `:focus:not(:focus-visible)` rule alone leaves the orange ring in the "clicked-away" state.
-Keep these blocks at **single area-class** specificity (`.fabricate-app …`, i.e. 0,2,1) so per-component focus rings (scoped Svelte, 0,3,0) still win; doubling the class (`.fabricate.fabricate-app …`, 0,3,1) silently clobbers them.
-Do not add scoped focus CSS in components — it duplicates the area block and needs a Svelte rebuild, whereas `styles/fabricate.css` is served directly.
-New top-level app surfaces need their own focus block; a partial rule reads as "handled" but isn't.
+Keep it at **single root-class** specificity (`.fabricate button:focus-visible`, i.e. 0,2,1) so per-component focus rings (scoped Svelte, 0,3,0) still win; doubling the class (`.fabricate.fabricate-app …`, 0,3,1) silently clobbers them.
+Do not add scoped focus CSS in components — it duplicates the module block and needs a Svelte rebuild, whereas `styles/fabricate.css` is served directly.
+A new top-level app surface inherits that paired block automatically; write a per-area block only where a surface deliberately needs a different treatment, and say why.
 See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
 - Preserve `flags.core.sourceId` when embedded items must map back to a world item.
 - Fabricate runs configured macros through `MacroExecutor.run(uuid, payload)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
