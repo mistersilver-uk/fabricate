@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 238,
+  "pinnedTotal": 234,
   "rows": [
     { "key": "(top level) | .fabricate-button.manager-button", "count": 2 },
     { "key": "(top level) | .fabricate-color-picker-popover .manager-color-preset", "count": 2 },
@@ -106,11 +106,6 @@
     { "key": "(top level) | .fabricate-manager .manager-recipe-step-mode-card", "count": 2 },
     { "key": "(top level) | .fabricate-manager .manager-recipe-tool-row", "count": 2 },
     { "key": "(top level) | .fabricate-manager .manager-recipe-toolbar select", "count": 2 },
-    {
-      "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar .manager-search input",
-      "count": 2
-    },
-    { "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar select", "count": 2 },
     { "key": "(top level) | .fabricate-manager .manager-section-header", "count": 2 },
     { "key": "(top level) | .fabricate-manager .manager-system-description", "count": 2 },
     { "key": "(top level) | .fabricate-manager .manager-system-identity", "count": 2 },

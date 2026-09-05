@@ -5767,14 +5767,30 @@
    different widths in a manager footer whose neighbours are fixed-width. 64px is the figure the
    retired rule carried, kept rather than re-chosen.
 
-   AND IT IS THE MANAGER'S ALONE, which is why an area root reappears in front of a family
-   issue 1502 deliberately un-rooted. The five player pagers and the journal declare no floor
-   today and their pager row is a nowrap single line in a ~300px column, where a floor is the
-   thing that would make it wrap. The selector keeps `.fabricate-pagination` so the primitive's
-   own root still gates it, and it is exempt to the area-scope gate because
-   `.manager-pagination-size` is a class `Select` does not write — the same exemption every
-   caller override of a primitive's markup takes. */
-.fabricate-manager .fabricate-pagination .manager-pagination-size .fabricate-select-trigger {
+   AND IT IS THE MANAGER'S ALONE — STATED AS A REFUSAL AT THE OTHER SIX SITES RATHER THAN AS AN
+   AREA ROOT HERE, and that shape is forced rather than chosen. `.fabricate-manager
+   .fabricate-pagination .manager-pagination-size .fabricate-select-trigger` was written first
+   and `searchable-popover-area-scope.test.js` reds on it: `.manager-pagination-size` is a class
+   `Pagination` writes, so the rule is one that primitive OWNS, and putting an application root
+   in front of an owned rule is the exact regression that gate exists for. The obvious escape,
+   `.fabricate-manager .fabricate-select-trigger`, is foreclosed for the same reason against
+   `Select`'s own entry.
+
+   So the floor is rooted at the primitive, where it belongs, and the six pagers that refuse it
+   say so in their own blocks — `inventory/InventoryGrid`, `crafting/RecipeBrowser`, the three
+   gathering panels and `journal/HistoryList`, each of which is a nowrap single line in a narrow
+   column where a floor is the thing that would wrap it. That is not a workaround: it is the
+   same shape those six blocks already used to refuse this rule's predecessor, which floored the
+   native `<select>` at the same 64px.
+
+   AND THE CONTROL IS NAMED BY ITS OWN HOOK RATHER THAN BY `Select`'s CLASS, for the same gate.
+   `.fabricate-select-trigger` is a `fabricate-`-prefixed class that is not in `Pagination`'s
+   own roots, so that gate reads it as a SECOND application root and reds on it too — it cannot
+   tell one primitive's namespace from an application's. `data-pagination-size` is the hook
+   `Pagination` itself puts on this control through `triggerData`, so this says "the pager's own
+   per-page control" without naming another family at all. The six caller blocks address the
+   class directly, because a component-scoped block is not read by that gate. */
+.fabricate-pagination .manager-pagination-size [data-pagination-size] {
   min-width: 64px;
 }
 
@@ -9709,26 +9725,55 @@
    The grouping therefore lives where it can win: `BulkSelectionToolbar`'s own scoped block, behind
    a `trailingActions` prop defaulted off so the three studios are byte-identical. */
 
-/* The control type scale. See reason 2 in the block header. */
-.fabricate-manager .manager-scoped-list-toolbar .manager-search input,
-.fabricate-manager .manager-scoped-list-toolbar select {
+/* The control type scale. See reason 2 in the block header. The `<select>` leg left this rule
+   with issue 1504 — see the narrowed block below. */
+.fabricate-manager .manager-scoped-list-toolbar .manager-search input {
+  border-radius: 9px;
   font-size: var(--fab-recipe-control-font);
 }
 
-.fabricate-manager .manager-scoped-list-toolbar .manager-search input {
-  border-radius: 9px;
-}
+/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED (issue 1504) ────────────────────────
+   These declarations used to reach every scoped-catalogue toolbar select. Issue 1504 converts
+   the two `EntityListInspectorFrame` controls — the lane filter and the sort key — to shared
+   `<Select>`s, so it would be easy to read the rules as dead. They are not.
 
-/* skin census (issue 1523): pinned by
-   tests/components/world-vocabulary-control-row-cascade.test.js (fixture markup rendered
-   against this sheet, `:159`, queried at `:295`). */
-.fabricate-manager .manager-scoped-list-toolbar select {
+   A SECOND COMPONENT WRITES THE ANCESTOR CLASS. `WorldVocabularyPage.svelte` renders
+   `<ManagerToolbar class="manager-scoped-list-toolbar">` around a native
+   `<select data-wvocab-sort>` that this change does NOT convert, and that select takes its
+   ENTIRE skin from here — its own scoped block repairs width only. Deleting these early would
+   drop three shipped sort selects to Foundry's own treatment beside a 34px direction button,
+   with every suite green. So they are retargeted onto the one remaining native carrier by its
+   route attribute, and issues 1510/1520 delete them when that select converts.
+
+   THE NARROWED FORM KEEPS A `.fabricate-manager` COMPOUND, for two independent reasons. It
+   reads `--fab-recipe-control-font`, which is declared once inside the `.fabricate-manager`
+   block and is therefore area-scoped, so `tests/token-generation-gate.test.js` requires every
+   member of a reading rule's selector list to carry that compound. And
+   `tests/styles-namespacing.test.js` requires every selector in this page-global sheet to begin
+   `.fabricate`, so the bare `[data-scoped-page='world-vocabulary'] …` form is not available
+   even to the geometry half.
+
+   THE TWO RULES ARE ONE RULE NOW, because the narrowing gives them the same selector and
+   stylelint's `no-duplicate-selectors` forbids stating it twice.
+
+   skin census (issue 1523): pinned by
+   `tests/components/world-vocabulary-control-row-cascade.test.js`, which since issue 1504
+   measures this select's computed height, corner, fill and type directly — the row-height
+   clause in that suite is a WRAP guard the direction button's own `min-height: 34px` keeps
+   green whatever happens here, so it could never have been the proof. The CI-armed half is a
+   sheet-text clause in `manager-layout.test.js`, because that suite skips itself whole without
+   a harvested Foundry chrome. */
+.fabricate-manager
+  [data-scoped-page='world-vocabulary']
+  .manager-toolbar.manager-scoped-list-toolbar
+  select {
   height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
+  font-size: var(--fab-recipe-control-font);
   cursor: pointer;
 }
 

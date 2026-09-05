@@ -4621,13 +4621,14 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
   // a shared `<Select size="inline">` now, so its height, corner, fill and type come from the
   // `.fabricate-select*` family and the pager states only the one thing that is still its own:
   // a WIDTH FLOOR, so `Per page 10` and `Per page 100` do not sit at two widths in a manager
-  // footer of fixed-width neighbours. That floor is the MANAGER's alone, which is why this is
-  // the one pager rule that still names an area root.
+  // footer of fixed-width neighbours. It is stated at the primitive's own root, and names the
+  // control by `Pagination`'s own hook rather than by `Select`'s class: the area-scope gate
+  // reads BOTH an area root and another primitive's `fabricate-` namespace as application
+  // roots in front of a class `Pagination` writes. The six pagers that do not want the floor
+  // refuse it in their own blocks, which is measured below.
   assert.ok(
-    css.includes(
-      '.fabricate-manager .fabricate-pagination .manager-pagination-size .fabricate-select-trigger'
-    ),
-    'pagination should floor the per-page trigger inside the manager scope, and only there'
+    css.includes('.fabricate-pagination .manager-pagination-size [data-pagination-size]'),
+    'pagination should floor its own per-page control from the primitive`s own root'
   );
   assert.ok(
     !css.includes('.manager-pagination-size select'),
@@ -7500,9 +7501,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       <div class="manager-travel-parties-list ${hash}">${cards}</div>
     </div>
     <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
-      <div class="fabricate-pagination manager-pagination"><span>Showing 1-4 of 8</span>${pagerSizeControlFixture(
-        '4'
-      )}</div>
+      ${pagerBarFixture({ probe: 'parties' })}
     </div>
   </div>`;
 
@@ -12366,23 +12365,42 @@ const SELECT_RUNGS = Object.freeze([
  * @param {string} value The rendered value on the trigger.
  * @returns {string} The fixture markup.
  */
-function pagerSizeControlFixture(value) {
-  return `<span class="manager-pagination-size"
-    ><span id="probe-per-page">Per page</span
-    ><div class="fabricate-picker manager-travel-picker fabricate-select"
-      ><button
+function pagerBarFixture({ probe, value = '4', arrows = false }) {
+  const arrow = (side, marked) => `<button
         type="button"
-        class="fabricate-select-trigger fabricate-select-trigger-inline"
-        data-pagination-size=""
-        data-select-size="inline"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded="false"
-        aria-labelledby="probe-per-page"
-      ><span class="manager-travel-picker-value fabricate-select-value">${value}</span><i
-        class="fas fa-chevron-down" aria-hidden="true"></i></button
-    ></div
-  ></span>`;
+        class="fabricate-icon-button manager-icon-button"
+        data-keyboard-focus="true"
+        ${marked ? `data-probe="arrow-${probe}"` : ''}
+      ><i class="fas fa-chevron-${side}" aria-hidden="true"></i></button>`;
+  return `<div class="fabricate-pagination manager-pagination">
+    <span class="manager-pagination-summary">Showing 1-4 of 8</span>
+    ${
+      arrows
+        ? `<nav class="manager-pagination-nav">
+      ${arrow('left', true)}
+      <span class="manager-pagination-page">Page 1 of 2</span>
+      ${arrow('right', false)}
+    </nav>`
+        : ''
+    }
+    <span class="manager-pagination-size"
+      ><span id="caption-${probe}">Per page</span
+      ><div class="fabricate-picker manager-travel-picker fabricate-select"
+        ><button
+          type="button"
+          class="fabricate-select-trigger fabricate-select-trigger-inline"
+          data-pagination-size=""
+          data-select-size="inline"
+          data-probe="pager-${probe}"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-labelledby="caption-${probe}"
+        ><span class="manager-travel-picker-value fabricate-select-value">${value}</span><i
+          class="fas fa-chevron-down" aria-hidden="true"></i></button
+      ></div
+    ></span>
+  </div>`;
 }
 
 /** One `<Select>` trigger's markup, at one rung, exactly as the component renders it. */
@@ -12508,11 +12526,20 @@ test('the shared Select paints identically in both areas, and beats the paint it
                   selectPanelFixture('manager', 'toolbar', { ticked: false }),
                 ].join('\n')
               )}
-              <div class="manager-toolbar manager-scoped-list-toolbar">
-                <div class="manager-search"><input type="text" data-probe="shipped-search"></div>
-                <select data-probe="shipped-select"><option>Name</option></select>
-                <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
-                  ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
+              <!-- THE ROUTE ATTRIBUTE IS ON THE HOST BECAUSE THE SHIPPED SELECT MOVED WITH
+                   IT (issue 1504). Converting this toolbar's two controls left one native
+                   carrier, the world-vocabulary sort select, so the geometry and type rules are
+                   NARROWED onto that route rather than deleted — and this is where a shipped
+                   scoped-list-toolbar select still takes its skin. The search field and the
+                   direction toggle are unaffected by the narrowing and are measured in the same
+                   row. -->
+              <div data-scoped-page="world-vocabulary">
+                <div class="manager-toolbar manager-scoped-list-toolbar">
+                  <div class="manager-search"><input type="text" data-probe="shipped-search"></div>
+                  <select data-probe="shipped-select"><option>Name</option></select>
+                  <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
+                    ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
+                </div>
               </div>
             </main>
           </div>`)}
@@ -13058,39 +13085,7 @@ test('every converted pager site paints its own trigger fill, and only the manag
       <div class="${site.area === 'fabricate-manager' ? 'fabricate' : `fabricate ${site.area}`}">
         ${site.area === 'fabricate-manager' ? '<main class="fabricate-manager">' : ''}
         <div class="${site.wrapper}${hash ? ` ${hash}` : ''}">
-          <div class="fabricate-pagination manager-pagination">
-            <span class="manager-pagination-summary">Showing 1-4 of 8</span>
-            <nav class="manager-pagination-nav">
-              <button
-                type="button"
-                class="fabricate-icon-button manager-icon-button"
-                data-keyboard-focus="true"
-                data-probe="arrow-${site.probe}"
-              ><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
-              <span class="manager-pagination-page">Page 1 of 2</span>
-              <button
-                type="button"
-                class="fabricate-icon-button manager-icon-button"
-                data-keyboard-focus="true"
-              ><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
-            </nav>
-            <span class="manager-pagination-size"
-              ><span id="caption-${site.probe}">Per page</span
-              ><div class="fabricate-picker manager-travel-picker fabricate-select"
-                ><button
-                  type="button"
-                  class="fabricate-select-trigger fabricate-select-trigger-inline"
-                  data-pagination-size=""
-                  data-probe="pager-${site.probe}"
-                  role="combobox"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  aria-labelledby="caption-${site.probe}"
-                ><span class="manager-travel-picker-value fabricate-select-value">4</span><i
-                  class="fas fa-chevron-down" aria-hidden="true"></i></button
-              ></div
-            ></span>
-          </div>
+          ${pagerBarFixture({ probe: site.probe, arrows: true })}
         </div>
         ${site.area === 'fabricate-manager' ? '</main>' : ''}
       </div>`;
@@ -13219,5 +13214,54 @@ test('every converted pager site paints its own trigger fill, and only the manag
     }
   } finally {
     await context.close();
+  }
+});
+
+test('the stranded toolbar select rules are narrowed onto their last native carrier', () => {
+  // ── THE CI-ARMED HALF OF A DOES-NOT-MOVE CLAIM (issue 1504) ──────────────────────────────
+  // Converting the scoped-catalogue toolbar's lane filter and sort key strands the two sheet
+  // rules that painted a `.manager-scoped-list-toolbar select`. They are NARROWED onto the one
+  // route that still renders one — the world-vocabulary sort select — rather than deleted,
+  // because that select takes its ENTIRE skin from them.
+  //
+  // The numeric proof is a computed-style clause in
+  // `world-vocabulary-control-row-cascade.test.js`, and it CANNOT RUN IN CI: that suite skips
+  // itself whole unless a harvested Foundry chrome resolves, `.foundry-chrome/` is gitignored,
+  // and no workflow harvests it before `npm test`. So the same claim is asserted here, in a
+  // suite that never skips. Deleting either narrowed rule reds in CI as well as on a
+  // developer's machine.
+  //
+  // It reads the rule's SELECTOR PRELUDE rather than a substring of the file, because the
+  // formatter breaks a four-compound selector across four lines: a substring assertion would
+  // pass or fail on whitespace and would stop reading the moment prettier reflowed it.
+  // Comments out first, and not as tidiness: this sheet's prose quotes the very selector under
+  // test — the block header above these rules explains why `.fabricate-manager
+  // .manager-scoped-list-toolbar select` has to out-rank core — so a reader that kept comments
+  // would report the documentation as an unnarrowed rule.
+  const declarations = css.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+  const preludes = declarations
+    .split('}')
+    .map((chunk) => (chunk.includes('{') ? chunk.slice(0, chunk.indexOf('{')) : ''))
+    .filter((prelude) => prelude.includes('.manager-scoped-list-toolbar'))
+    .map((prelude) => prelude.replaceAll(/\s+/g, ' ').trim());
+
+  const withSelect = preludes.filter((prelude) => /\bselect\b/.test(prelude));
+  assert.ok(
+    withSelect.length > 0,
+    'a rule naming a scoped-list-toolbar select must still exist, or this clause holds over ' +
+      'nothing and the narrowing could have been a deletion'
+  );
+  for (const prelude of withSelect) {
+    assert.ok(
+      prelude.includes("[data-scoped-page='world-vocabulary']"),
+      'every surviving scoped-list-toolbar select rule names the one route that still renders ' +
+        `one, and \`${prelude}\` does not — an unnarrowed rule paints every catalogue toolbar, ` +
+        'none of which has a native select in it any more'
+    );
+    assert.ok(
+      prelude.startsWith('.fabricate-manager'),
+      'and it keeps a .fabricate-manager compound: the type half reads an area-scoped property ' +
+        `and this sheet is page-global, so \`${prelude}\` would red two other gates without it`
+    );
   }
 });

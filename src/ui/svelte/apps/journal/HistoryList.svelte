@@ -217,5 +217,9 @@
      summary absorbs every shrink, and a floor is the thing that would wrap it. */
   .journal-history-body :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
+    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
+       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
+       is the thing that would wrap it. */
+    min-width: 0;
   }
 </style>

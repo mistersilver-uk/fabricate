@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
- * rather than these 116, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 203 repeated selectors
+ * rather than these 114, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 2,893 `(at-context, selector)` keys, of which 2,777 appear exactly
+ * Unfiltered, the sheet holds 2,893 `(at-context, selector)` keys, of which 2,779 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -40,10 +40,18 @@
  * MEASURED over this branch's own head, rebased onto issue 1502's final tree, by `the sheet's
  * cross-list selector repetition does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,397 rules at that head, 116 repeated keys and 238 appearances
- * between them; six keys appear three times and none appears four or more. The three contextual
- * figures moved with issue 1504's `.fabricate-select*` family — 31 new rules writing 32 new keys,
- * every one of them a singleton, so the REPEATED figures did not move at all.
+ * printed from. The sheet holds 2,396 rules at that head, 114 repeated keys and 234 appearances
+ * between them; six keys appear three times and none appears four or more.
+ *
+ * ISSUE 1504 MOVED FIVE OF THESE SIX FIGURES, through two different edits. The
+ * `.fabricate-select*` family arrived — 31 new rules writing 32 new keys, every one a
+ * singleton, so it moved the contextual figures and left the repeated ones alone. Then the two
+ * scoped-catalogue toolbar select rules were NARROWED onto the one route that still renders a
+ * native select there, which SPLIT the type rule's two-member list: its `input` leg merges into
+ * a rule that already existed, and its `select` leg merges with the geometry rule under the
+ * narrowed selector. Two rows therefore VANISH and the appearance total drops by four, while the
+ * key total is unchanged and the singleton count rises by two: a list being split rather than a
+ * defect being counted.
  *
  * A COMMIT SHA IS NOT THE ANCHOR, deliberately. An earlier draft of this docblock cited the
  * coordinator head it was first measured at; a rebase then added a rule to the sheet, the three
@@ -117,6 +125,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 238 across 116 rows.
+ * measured commit it is 234 across 114 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

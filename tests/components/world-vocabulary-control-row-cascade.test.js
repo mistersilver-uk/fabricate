@@ -288,6 +288,87 @@ test('every sort select is a control rather than a full-width bar, on a COLD ope
   }
 });
 
+test('the sort select keeps its whole shipped skin after the toolbar rules narrow', { skip }, async () => {
+  // ── THE NUMERIC HALF OF A DOES-NOT-MOVE CLAIM (issue 1504) ─────────────────────────────
+  // Issue 1504 converts the scoped-catalogue toolbar's lane filter and sort key to shared
+  // `<Select>`s, which strands the two sheet rules that painted a `.manager-scoped-list-toolbar
+  // select`. They are NARROWED onto this route rather than deleted, because THIS page still
+  // renders a native `<select data-wvocab-sort>` and takes its entire skin from them — its own
+  // scoped block repairs width only.
+  //
+  // NOTHING IN THIS SUITE COULD HAVE CAUGHT THE DELETION. The row-height clause below is a WRAP
+  // guard, and its height is pinned by the direction button's own `height: 34px` /
+  // `min-height: 34px` whatever the select does; the width clause above is repaired by this
+  // page's own scoped block. A narrowing that stopped matching would drop all three sort selects
+  // to Foundry's own select treatment beside a 34px button with both of them green. So the skin
+  // is measured directly: height, corner, fill and type size, on the select itself.
+  //
+  // The fixture needs no change — it already carries the area root and the route attribute — and
+  // that is the point: the narrowing is written so it still matches this page and nothing else.
+  const { tab, close } = await open(1280);
+  try {
+    const measured = await tab.evaluate((kinds) => {
+      const selects = kinds.map((kind) => {
+        const element = globalThis.document.querySelector(`[data-wvocab-sort="${kind}"]`);
+        const style = globalThis.getComputedStyle(element);
+        return {
+          kind,
+          height: element.getBoundingClientRect().height,
+          radius: style.borderTopLeftRadius,
+          background: style.backgroundColor,
+          fontSize: style.fontSize,
+        };
+      });
+      // The token is read from a probe inserted BESIDE the select rather than at the body, so it
+      // resolves under the same theme root the select does. A body-level probe reads the default
+      // palette and the comparison becomes a claim about two different scopes.
+      const host = globalThis.document.querySelector(`[data-wvocab-sort="${kinds[0]}"]`)
+        .parentElement;
+      const probe = globalThis.document.createElement('div');
+      probe.style.background = 'var(--fab-bg-0)';
+      host.append(probe);
+      const expectedFill = globalThis.getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { expectedFill, selects };
+    }, KINDS);
+
+    for (const select of measured.selects) {
+      assert.ok(
+        Math.abs(select.height - 34) <= 1,
+        `${select.kind}'s sort select is ${select.height.toFixed(1)}px tall against the ` +
+          'documented 34px control line — the narrowed geometry rule is what supplies it, and ' +
+          'core gives a bare select its own height'
+      );
+      assert.equal(
+        select.radius,
+        '9px',
+        `${select.kind}: the row's 9px corner, from the same narrowed rule`
+      );
+      // AND THE FILL IS THIS PAGE'S OWN, WHICH IS WORTH MEASURING FOR THE OPPOSITE REASON.
+      // The narrowed sheet rule declares `--fab-bg-1`, the shipped control rung. On THIS route
+      // it never lands: the page's own scoped block puts every control in a panel one ramp rung
+      // BELOW it, at `--fab-bg-0`, and an unlayered scoped declaration beats a layered one at
+      // any specificity. So the fill is not the narrowing's proof — the height, the corner and
+      // the type size are — and this clause pins the page's override so a later reader cannot
+      // mistake the sheet's declaration for what renders.
+      assert.equal(
+        select.background,
+        measured.expectedFill,
+        `${select.kind}: the page's own --fab-bg-0 override, one rung below its panel, rather ` +
+          'than the --fab-bg-1 the narrowed sheet rule declares beneath it'
+      );
+      assert.equal(
+        select.fontSize,
+        '11.52px',
+        `${select.kind}: the manager control-font scale, from the narrowed TYPE rule — which is ` +
+          'the half that must keep a .fabricate-manager compound in every member of its list'
+      );
+    }
+  } finally {
+    await close();
+  }
+});
+
 test('every control row stays one line high, flattened rather than a lit band', { skip }, async () => {
   const { tab, close } = await open(1280);
   try {
