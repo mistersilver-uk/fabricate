@@ -38,7 +38,7 @@ It identifies the bytes, as distinct from the cohort that receives them.
 - **change provenance** — evidence that a commit reaching the release or prerelease line is attributable to a specific reviewed change, as distinct from **build provenance**, which is the recorded identity of a build.
 - **resolution** — the content chosen where the two lines a forward-port combines cannot be combined automatically.
 - **entry script** — the module's unhashed bootstrap file, fetched by a URL that does not change between versions, whose code performs the dynamic imports that fetch the module's other files.
-- **chunk** — a code-split file an entry script requests by name; a chunk's name MAY carry a content hash that changes across versions.
+- **chunk** — a code-split file an entry script or another chunk requests by name; a chunk's name MAY carry a content hash that changes across versions.
 
 A release artefact exists, and is not publicly obtainable, from the moment its version is minted.
 It becomes publicly obtainable only at release promotion.
@@ -449,6 +449,7 @@ Concurrent publishes to one channel MUST NOT interleave, and a manifest write MU
 Every target's published archive MUST contain every module file reachable from the module's entry script, directly or through another such file, including a code-split chunk whose name carries a content hash.
 Completeness MUST be proved mechanically against the produced archive itself before publication, on every path that produces one, rather than against the build directory the archive was made from.
 The proof MUST fail when the entry script cannot be located in the archive, and MUST fail when it can be located but yields no chunk references at all, because a proof that cannot distinguish a complete archive from an unread one reports success forever.
+The version whose archive the proof looks for and the version of any other archive present in the build directory are derived independently, so the proof MUST refuse, rather than report that no archive was produced, when the archive it expected is absent from the build directory but the build directory holds an archive for a different version: reporting the skip in that case would silently pass over a check on an archive that is present.
 
 #### Scenario: an archive is missing a referenced chunk
 
@@ -460,6 +461,11 @@ The proof MUST fail when the entry script cannot be located in the archive, and 
 - **WHEN** a build produces no archive
 - **THEN** the completeness proof reports that it did not run rather than reporting success
 - **AND** the build itself still succeeds
+
+#### Scenario: an archive exists only under another version's name
+
+- **WHEN** the archive expected for the version being proved is absent from the build directory, but the build directory holds an archive for a different version
+- **THEN** the producing command fails rather than reporting that no archive was produced
 
 ### Requirement: One build per publish
 
