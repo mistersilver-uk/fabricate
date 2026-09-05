@@ -501,18 +501,20 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the four shared bulk
-    // primitives, the shared selection primitive and both pure models all republish the
-    // frame. The primitives are the sharp case (issue 1010): they live directly under
-    // `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
-    // and are only reachable because they are enumerated by name.
+    // The browser view, any file in the browser's own directory, the three shared bulk
+    // primitives, the staging inset, the shared selection primitive and both pure models all
+    // republish the frame. The primitives are the sharp case (issue 1010): they live directly
+    // under `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
+    // and are only reachable because they are enumerated by name. `BulkEditSelect` LEFT this
+    // list for issue 1371 r16-list (M23): the Component Studio draws its category as the inline
+    // `BulkStagingInset` now, so the select is the Recipe Studio's alone — asserted below.
     for (const file of [
       'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
       'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-      'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+      'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
       'src/utils/componentBulkEditModel.js',
       'src/utils/bulkSelectionModel.js',
@@ -522,6 +524,19 @@ describe('UI PR screenshot evidence', () => {
         `${file} must republish the bulk-edit frame`,
       );
     }
+
+    const selectViews = mapChangedFilesToViews(['src/ui/svelte/apps/manager/BulkEditSelect.svelte']).map(
+      view => view.id,
+    );
+    assert.ok(
+      selectViews.includes('manager-recipes-bulk-edit'),
+      'the Recipe Studio still renders the select, so a change to it republishes the recipe frame',
+    );
+    assert.equal(
+      selectViews.includes('manager-components-bulk-edit'),
+      false,
+      'and no longer the component one, which draws no select since issue 1371 r16-list',
+    );
 
     // The narrow model triggers must NOT drag in the whole components-browser set — and in
     // particular neither model is a Tool Studio or theme change. The per-studio staging model

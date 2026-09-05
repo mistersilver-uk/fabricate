@@ -15896,6 +15896,7 @@
           {#if componentBulkSelectionCount > 0}
             <ComponentBulkEditPanel
               count={componentBulkSelectionCount}
+              systemName={selectedSystem?.name || ''}
               categoryOptions={componentBulkCategoryOptions}
               tags={selectedSystem?.itemTags || []}
               showEssences={selectedSystem?.features?.essences === true}

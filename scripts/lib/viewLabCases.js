@@ -5348,14 +5348,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     // The STAGED face. `data-component-select` sits on a visually hidden input, so the click
     // target is its wrapping `<label>`; two rows, because a one-row selection reads as an
-    // accident. Then the three axes the smoke stages: a category, the tag tri-state at BOTH its
+    // accident. Then the three axes the smoke stages: a category — an inline inset ROW since
+    // issue 1371 r16-list (M23), so a click rather than a select — the tag tri-state at BOTH its
     // non-default faces (one click = add, two = remove), and one essence increment, which is what
     // arms the destructive-overwrite warning.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
-      { selector: '[data-component-bulk-category]', select: 'Refined' },
+      { selector: '[data-component-bulk-category-option="Refined"]' },
       { selector: '[data-bulk-tag="ore"]' },
       { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-bulk-tag="ingot"]' },
@@ -5374,18 +5375,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete idle',
     reaches: 'beyond',
     smokeLabels: [],
-    // The UNARMED face of the set delete (issue 1129), and the frame that actually
-    // photographs the impact statement.
+    // The UNARMED face of the set remove (issue 1129; the reference's `Remove N components from
+    // {system}…` leg in the shell's dock since issue 1371 r16-list, M23), and the frame that
+    // photographs its consequence note.
     //
-    // The bulk-edit cases above do NOT photograph it "for free". The delete card sits below
-    // the panel shell and below the sticky Apply dock, which puts it under the rail's fold at
-    // the registry's 1280x820 position — measured on the published
-    // `manager-components-bulk-edit-unstaged` frame, where the rail ends at the essence grid
-    // and the card is simply absent. The armed case only shows it because CLICKING the button
-    // scrolls it into view, and that frame shows the armed state by definition.
-    //
-    // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
-    // containers, so without it the card is out of frame while every assertion still passes.
+    // The bulk-edit cases above do NOT photograph the note "for free": the leg sits in the
+    // pinned dock under the primary, and the note's counted recipe sentences are what this frame
+    // exists for. The `scroll` step is kept so the dock is in frame whatever the rail's fold.
     //
     // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
     // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
@@ -5398,7 +5394,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
-      { selector: '[data-component-bulk-delete-card]', scroll: true },
+      { selector: '[data-component-bulk-remove]', scroll: true },
     ],
     expectView: 'components',
     // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
@@ -5419,10 +5415,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete armed',
     reaches: 'beyond',
     smokeLabels: [],
-    // The ARMED half of the set delete (issue 1129), the twin of
-    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
-    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
-    // written.
+    // The ARMED half of the set remove (issue 1129; in the dock since issue 1371 r16-list), the
+    // twin of `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame
+    // shows `Confirm — remove N from {system}` over the note it is a confirmation OF, with
+    // nothing written.
     //
     // Two frames rather than one because the two states are the point: the idle sibling
     // directly above shows the impact statement rendered BEFORE arming, and this one shows

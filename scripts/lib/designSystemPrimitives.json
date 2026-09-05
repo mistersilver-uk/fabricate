@@ -29,13 +29,6 @@
       "why": "A section inside the bulk panel (3 callers, issue 1010). `library.html:1058` specifies the PANEL, not its internal sectioning. Targeted for the same reason as its shell."
     },
     {
-      "path": "src/ui/svelte/apps/manager/BulkEditSelect.svelte",
-      "library": null,
-      "status": "target",
-      "evidence": "targeted",
-      "why": "The bulk panel's leave-unchanged select (2 callers, issue 1010). `library.html:646` specifies `<Select>` as one shell shared with text, number and search, and records the leave-unchanged clear state on `<TintPicker>` rather than on the field shell. Targeted for the same reason as its shell."
-    },
-    {
       "path": "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte",
       "library": "<SelectionBar>",
       "status": "target",
@@ -180,7 +173,7 @@
       "library": null,
       "status": "target",
       "evidence": "targeted",
-      "why": "The vocabulary EDITOR panel: the add form, the search field, the entry count, the row list and its two empty states, which the row's own delete confirm is armed from. TWO callers, and the second is what put it over the bar rather than anything about the component changing \u2014 `src/ui/svelte/apps/manager/TagsCategoriesView.svelte`, the tabbed system-scope screen, and `src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte`, the world screen issue 1392 added, which mounts it three times against three different world vocabularies. Independent is worth stating rather than assuming here: the two are different SCREENS at different scopes, each passing a different vocabulary, a different row attribute and a different cascade sentence, so a change made for one is a change the other has to survive. It is the register asking the question once rather than never: the component shipped at one caller, crossed the bar the day the second screen landed, and the gate that reported it is the closed-vocabulary register. `library: null`, and the nearest entry rules itself out on the same sentence that makes it near. `<SetPicker>` (`library.html:1366`) is \"editing membership of a set too large to render inline\" \u2014 one RECORD's tags \u2014 and this edits the vocabulary those tags are drawn FROM, a world-level list with no record in the frame at all; it also renders every entry, which is what that entry says it never does. No other entry names a vocabulary editor, so this is the ordinary undocumented kind rather than an adjudicated divergence. Its own add field is `InlineVocabularyAdd.svelte`, a member already, and `library: null` there for the same reason. Targeted: `manager-tags-categories-normal` and `world-vocabulary` both claim this path in `sourceMatches`, so a change here publishes the system-scope tab AND the world screen. No `BROAD_SIGNAL_CASE_OVERRIDES` entry is owed: an override is consulted only for a BROAD signal."
+      "why": "The vocabulary EDITOR panel: the add form, the search field, the entry count, the row list and its two empty states, which the row's own delete confirm is armed from. TWO callers, and the second is what put it over the bar rather than anything about the component changing — `src/ui/svelte/apps/manager/TagsCategoriesView.svelte`, the tabbed system-scope screen, and `src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte`, the world screen issue 1392 added, which mounts it three times against three different world vocabularies. Independent is worth stating rather than assuming here: the two are different SCREENS at different scopes, each passing a different vocabulary, a different row attribute and a different cascade sentence, so a change made for one is a change the other has to survive. It is the register asking the question once rather than never: the component shipped at one caller, crossed the bar the day the second screen landed, and the gate that reported it is the closed-vocabulary register. `library: null`, and the nearest entry rules itself out on the same sentence that makes it near. `<SetPicker>` (`library.html:1366`) is \"editing membership of a set too large to render inline\" — one RECORD's tags — and this edits the vocabulary those tags are drawn FROM, a world-level list with no record in the frame at all; it also renders every entry, which is what that entry says it never does. No other entry names a vocabulary editor, so this is the ordinary undocumented kind rather than an adjudicated divergence. Its own add field is `InlineVocabularyAdd.svelte`, a member already, and `library: null` there for the same reason. Targeted: `manager-tags-categories-normal` and `world-vocabulary` both claim this path in `sourceMatches`, so a change here publishes the system-scope tab AND the world screen. No `BROAD_SIGNAL_CASE_OVERRIDES` entry is owed: an override is consulted only for a BROAD signal."
     },
     {
       "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
@@ -432,6 +425,15 @@
         "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte"
       ],
       "why": "DEMOTED at issue 1373, not adjudicated against anything. It cleared the two-caller bar on the Tool check bonus and `WorldModifiersTab`; the bonus stopped authoring a raw expression when the maintainer ruled that a Tool takes its modifiers FROM the world library rather than by typing one, so the picker became `ModifierLibraryRow` and this input lost that caller. The behaviour the original entry credits - cursor insertion and an actor resolver - is unchanged and still unowned elsewhere, so this is a membership fact about caller count, not a judgement that it stopped being well built. Its `sigil` branch has no caller either, since `WorldModifiersTab` passes `sigil={false}`; removing that branch is owed as its own change. One caller: `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte`."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/BulkEditSelect.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte`, since issue 1371 r16-list. The bulk panel's leave-unchanged select had two (issue 1010) until maintainer ruling M23 rebuilt the system Component Rules bulk panel's category axis as the reference's inline staging inset — a search well over rows carrying `n/N` counts — so the Component Studio stopped rendering a select there. It is still the Recipe Studio's category and check-tier control, and `library.html:646` still specifies `<Select>` as one shell shared with text, number and search; it re-enters the set at a second caller, which is a decision for the change that adds one rather than a row this file can keep true today."
     }
   ],
   "ruledOut": [

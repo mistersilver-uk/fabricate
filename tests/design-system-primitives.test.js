@@ -300,8 +300,11 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World
   // Vocabulary screen is its second independent caller, and property (e) below reported it
   // as a component that had crossed the membership bar with nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 48, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
+  // 47 / 12 as of issue 1371 r16-list: `apps/manager/BulkEditSelect.svelte` moved from the member
+  // table to `notAPrimitive` when maintainer ruling M23 rebuilt the system Component Rules bulk
+  // panel's category axis as an inline inset and left the Recipe Studio as its one caller.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -767,10 +770,12 @@ test('the two studio recipes share one bulk-surface pattern, and it names only t
 
   const sharedPattern = new RegExp(shared[0]);
   const claimed = RENDER_FILES.filter((file) => sharedPattern.test(file));
+  // Four since issue 1371 r16-list: `BulkEditSelect` is the Recipe Studio's alone and is routed
+  // to the recipe frames by its own pattern rather than by the shared one.
   assert.equal(
     claimed.length,
-    5,
-    `expected the five shared bulk surfaces, got ${JSON.stringify(claimed)}`
+    4,
+    `expected the four shared bulk surfaces, got ${JSON.stringify(claimed)}`
   );
 
   const targetedPaths = new Set(primitivePathsByEvidence('targeted'));

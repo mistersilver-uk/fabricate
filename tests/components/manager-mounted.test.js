@@ -158,6 +158,9 @@ function compileManagerRoot() {
   // The bulk edit panel that REPLACES the single-component inspector in the rail
   // (issue 772). The root imports it statically, so omitting it HANGS every mounted manager
   // test as `# cancelled` for the same reason as the card above.
+  // The system bulk panel's three staging insets render through this one component (issue 1371
+  // r16-list, M23); omitting it HANGS the suite as `# cancelled` rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BulkStagingInset.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
   // The four shared bulk-edit primitives (issue 1010). They sit directly under
   // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because every module
@@ -9325,8 +9328,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
+  // The remove leg sits in the shell's dock since issue 1371 r16-list (M23): the reference's
+  // `Remove N components from {system}…`, not a delete card below the shell.
   function componentDeleteButton() {
-    return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
+    return target.querySelector('[data-component-bulk-remove] .manager-button.is-danger');
   }
 
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
@@ -9348,7 +9353,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
     assert.match(
-      target.querySelector('[data-component-bulk-impact-row="recipes"]').textContent,
+      target.querySelector('[data-component-bulk-remove-note]').textContent,
       /2 recipes will be rewritten/,
       'the impact the store computed reaches the panel'
     );
@@ -9479,7 +9484,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
     assert.ok(
-      Boolean(target.querySelector('[data-component-bulk-delete-card]')),
+      Boolean(target.querySelector('[data-component-bulk-remove]')),
       'and the selection survives, so the GM can see what did not happen and retry'
     );
     assert.equal(
@@ -9524,9 +9529,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     target.querySelector('[data-bulk-tag="herb"]').click();
     flushSync();
-    const categorySelect = target.querySelector('[data-component-bulk-category]');
-    categorySelect.value = 'Reagent';
-    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    // The category is an inline inset ROW since issue 1371 r16-list (M23), not a select.
+    target.querySelector('[data-component-bulk-category-option="Reagent"]').click();
     flushSync();
 
     target.querySelector('[data-component-bulk-apply]').click();
@@ -25867,9 +25871,15 @@ describe('CraftingSystemManager mounted behavior', () => {
         toolbarClear: 'data-component-clear-selection',
         panelClear: 'data-component-bulk-clear',
         panel: 'data-component-bulk-panel',
-        deleteCard: 'data-component-bulk-delete-card',
+        // The remove leg's hook and a category ROW (issue 1371 r16-list, M23): the component
+        // studio's category is an inline inset, so its stage is a click rather than a select.
+        deleteCard: 'data-component-bulk-remove',
         apply: 'data-component-bulk-apply',
-        stage: () => stageFirstCategory('data-component-bulk-category'),
+        stage: () => {
+          const row = target.querySelector('[data-component-bulk-category-option]');
+          assert.ok(Boolean(row), 'the category inset offers no row, so nothing can be staged through it');
+          row.click();
+        },
         applyResultOption: 'applyComponentBulkEditResult',
         applied: 'Applied bulk changes to 2 components.',
         appliedNone: 'No components needed changing.',

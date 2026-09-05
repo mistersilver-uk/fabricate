@@ -9978,9 +9978,11 @@ async function main() {
           stepName: 'components-bulk-edit',
           label: 'manager-components-bulk-edit',
           stage: async (bulkPanel) => {
-            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
-            // category is staged whatever vocabulary this world has authored.
-            await bulkPanel.locator('[data-component-bulk-category]').first().selectOption({ index: 1 });
+            // The category is an inline inset ROW since issue 1371 r16-list (M23): the first row
+            // stages a category whatever vocabulary this world has authored.
+            await bulkPanel.locator('[data-component-bulk-category-option]').first().click();
+            await bulkPanel.locator('[data-component-bulk-option-state="on"]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
 
             // The tag chips cycle none → add → remove → none, so one click stages an
             // addition and two stage a removal. Both tri-states are in the frame because
@@ -9997,8 +9999,9 @@ async function main() {
                 .first().waitFor({ state: 'visible', timeout: 5_000 });
             }
 
-            // One essence increment, which also arms the essence axis (its staged chip
-            // flips to "Will overwrite" and the destructive-overwrite warning resolves).
+            // One essence increment on an inset ROW (issue 1371 r16-list, M24), which also arms
+            // the essence axis (its staged chip flips to "Will overwrite", every row reads the
+            // number it will be written, and the destructive-overwrite warning resolves).
             await bulkPanel.locator('[data-component-bulk-essences] [data-component-edit-essence] [data-stepper-increment]')
               .first().click();
             await bulkPanel.locator('[data-component-bulk-essences] [data-component-essence-active="true"]')
@@ -10024,8 +10027,9 @@ async function main() {
             }
             await bulkPanel.locator('[data-component-bulk-essences-staged="false"]')
               .first().waitFor({ state: 'visible', timeout: 5_000 });
-            // The essence cards render in BOTH states, so this frame still carries the
-            // six-card grid — what differs is the chip above it and the inert Apply.
+            // The essence inset renders in BOTH states, so this frame still carries its rows
+            // — reading `—` while unstaged — and what differs is the chip above it and the
+            // inert Apply (issue 1371 r16-list, M24).
             await bulkPanel.locator('[data-component-bulk-essences]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
           },

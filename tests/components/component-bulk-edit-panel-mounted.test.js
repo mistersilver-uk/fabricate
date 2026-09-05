@@ -1,28 +1,29 @@
 /**
- * The component browser's BULK EDIT panel (issue 772).
+ * The system Component Rules list's BULK EDIT panel (issue 772; rebuilt to the reference and the
+ * world panel's anatomy for issue 1371 r16-list under maintainer rulings M23 and M24).
  *
- * The panel is where a destructive multi-component write becomes legible BEFORE it
- * happens, so what is tested here is the staging semantics, not the pixels: the tri-state
- * tag cycle, the Apply enablement rule (including the removal-only draft that an earlier
- * design would have left inert), the conditional overwrite warning, the staged-axis chip
- * that arms and disarms an axis without touching the selection, and the two section
- * visibility gates across a system progressive on EACH axis in turn plus the none case.
+ * The panel is where a destructive multi-component write becomes legible BEFORE it happens, so
+ * what is tested here is the staging semantics and the anatomy the maintainer ruled on, not the
+ * pixels: the three inline insets (category, tags, essence values) and what each row does when it
+ * is clicked; the `n/N` count a row states; the search well and pager on each; the foot that names
+ * the staged axes; the remove leg in the dock that states its consequence and refuses per record;
+ * and the essence axis's whole-map semantics made visible as `—` until staged.
  *
- * The panel does NOT own the draft — the manager root does, because the panel is unmounted
- * the moment the selection empties. So these tests drive it the way the root does: hand it
- * a draft, take the NEW draft back through `onDraftChange`, and re-render with it.
- *
- * That round-trip is the point. Every helper in `componentBulkEditModel.js` is IMMUTABLE,
- * so a panel that called `cycleBulkTag(draft, tag)` without reassigning would compile, run,
- * and silently do nothing — the control would simply look dead. Asserting on the rendered
- * chip state after the round-trip is what catches that.
+ * The panel does NOT own the draft — the manager root does, because the panel is unmounted the
+ * moment the selection empties. So these tests drive it the way the root does: hand it a draft,
+ * take the NEW draft back through `onDraftChange`, and re-render with it. Every helper in
+ * `componentBulkEditModel.js` is IMMUTABLE, so a panel that called a helper without reassigning
+ * would compile, run, and silently do nothing; asserting on the rendered state after the round-trip
+ * is what catches that. Every control's assertion below ACTS on the control: a control that merely
+ * exists proves nothing (review r9, quality F1).
  */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createComponentBulkDraft } from '../../src/utils/componentBulkEditModel.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -32,87 +33,121 @@ const panel = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
+    // The remove leg's focus/announce ordering rule (issue 1157), ported from `BulkDeleteCard`.
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/componentCategories.js',
-    // The pure selection + staging model. Omitting it throws loudly in this shared
-    // harness — the hand-rolled suites are the ones that hang instead.
+    // The pure selection + staging model, and the inset pager and `n/N` counts beside it.
     'src/utils/componentBulkEditModel.js',
-    // Its shared leaf (issue 1010): the four selection helpers now live here and
-    // `componentBulkEditModel.js` re-exports them under their original names, so this is a
-    // STATIC import of that module and belongs in every closure that names it.
+    // Its shared leaf (issue 1010): a STATIC import of that module.
     'src/utils/bulkSelectionModel.js',
-    // The add-new essence offer projection (issue 1036). A STATIC import of the mounted
-    // tree, so the harness closure validator throws without it.
+    // The add-new essence offer projection (issue 1036).
     'src/utils/essenceValidation.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    // The shared bulk-edit chrome (issue 1010). The panel now renders its header, hero,
-    // section headings, staged select and Apply through these three, so they are STATIC
-    // imports of the component under test and belong in its closure.
-    // THE manager's labelled push-button (issue 1118). `BulkEditPanelShell` renders its
-    // Apply through the primitive, so it is a STATIC import of this tree; omitting it HANGS
-    // this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-    'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    // The set delete's arm/confirm control (issue 1129) and the shared card that now renders
-    // it (issue 1132). Both are STATIC imports of the component under test; omitting either
-    // HANGS this suite as `# cancelled` rather than failing it.
+    // The three insets (issue 1371 r16-list) and the dock's danger control. Both are STATIC
+    // imports of the component under test; omitting either HANGS this suite as `# cancelled`.
+    'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
-    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
-    'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
+    'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 });
 
 const ESSENCES = [
   { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-  { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' }
+  { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
 ];
+
+const SYSTEM = 'Mythwright Forge';
+
+function impactOf(overrides = {}) {
+  return {
+    deletable: 3,
+    deletableIds: ['c1', 'c2', 'c3'],
+    recipesRewritten: 0,
+    recipesDisabled: 0,
+    ...overrides,
+  };
+}
 
 /**
  * Mount the panel the way the manager root drives it: the caller owns the draft, and every
- * `onDraftChange` REPLACES it and re-renders. Returns the live draft accessor so a test can
- * assert on what was actually staged as well as on what is rendered.
+ * `onDraftChange` REPLACES it and re-renders. Returns the live draft accessor so a test can assert
+ * on what was actually staged as well as on what is rendered.
  */
 async function mountPanel(props = {}) {
-  const state = { draft: props.draft || createComponentBulkDraft(), applies: 0, clears: 0 };
+  const state = {
+    draft: props.draft || createComponentBulkDraft(),
+    applies: 0,
+    clears: 0,
+    armed: 0,
+    disarmed: 0,
+    deleted: [],
+  };
   const root = await panel.mount({
     count: 3,
+    systemName: SYSTEM,
     categoryOptions: [{ name: 'Metal', count: 2 }, { name: 'general', count: 1 }],
     tags: ['metal', 'rune'],
     essenceDefinitions: ESSENCES,
     showEssences: true,
     selectedCards: [],
+    deleteImpact: impactOf(),
     ...props,
     draft: state.draft,
     onDraftChange: async (next) => {
       state.draft = next;
       await panel.setProps({ draft: next });
     },
-    onApply: () => { state.applies += 1; },
-    onClearSelection: () => { state.clears += 1; }
+    onApply: () => {
+      state.applies += 1;
+    },
+    onClearSelection: () => {
+      state.clears += 1;
+    },
+    onArmDelete: () => {
+      state.armed += 1;
+    },
+    onDisarmDelete: () => {
+      state.disarmed += 1;
+    },
+    onDelete: (ids) => {
+      state.deleted.push(ids);
+    },
   });
   return { root, state };
 }
 
-function tagChip(root, tag) {
-  return root.querySelector(`[data-bulk-tag="${tag}"]`);
+const tagRow = (root, tag) => root.querySelector(`[data-bulk-tag="${tag}"]`);
+const tagState = (root, tag) => tagRow(root, tag).getAttribute('data-bulk-tag-state');
+const categoryRow = (root, name) =>
+  root.querySelector(`[data-component-bulk-category-option="${name}"]`);
+const essenceRow = (root, id) => root.querySelector(`[data-component-edit-essence="${id}"]`);
+const essenceInput = (root, id) => essenceRow(root, id).querySelector('[data-stepper-input]');
+const applyButton = (root) => root.querySelector('[data-component-bulk-apply]');
+const removeButton = (root) =>
+  root.querySelector(':scope [data-component-bulk-remove] [data-arm-token="delete-components"]');
+const removeNote = (root) => root.querySelector('[data-component-bulk-remove-note]');
+const announce = (root) => root.querySelector('[data-component-bulk-delete-announce]');
+const inset = (root, id) => root.querySelector(`[data-bulk-inset="${id}"]`);
+const rangeOf = (root, id) =>
+  root.querySelector(`[data-bulk-inset-range="${id}"]`).textContent.trim();
+
+function click(node) {
+  node.click();
+  flushSync();
 }
 
-function tagState(root, tag) {
-  return tagChip(root, tag).getAttribute('data-bulk-tag-state');
-}
-
-function applyButton(root) {
-  return root.querySelector('[data-component-bulk-apply]');
+function type(input, value) {
+  input.value = value;
+  input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+  flushSync();
 }
 
 before(async () => {
@@ -125,615 +160,505 @@ afterEach(() => {
   panel.remount();
 });
 
-describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
-  it('cycles a chip leave -> add -> remove -> leave and is never both', async () => {
-    const { root, state } = await mountPanel();
-
-    assert.equal(tagState(root, 'metal'), 'none', 'a fresh draft stages nothing');
-
-    tagChip(root, 'metal').click();
-    flushSync();
-    assert.equal(tagState(root, 'metal'), 'add');
-    assert.deepEqual(state.draft.tagAdd, ['metal']);
-    assert.deepEqual(state.draft.tagRemove, []);
-
-    tagChip(root, 'metal').click();
-    flushSync();
-    assert.equal(tagState(root, 'metal'), 'remove');
-    assert.deepEqual(state.draft.tagAdd, [], 'a tag is never simultaneously add and remove');
-    assert.deepEqual(state.draft.tagRemove, ['metal']);
-
-    tagChip(root, 'metal').click();
-    flushSync();
-    assert.equal(tagState(root, 'metal'), 'none');
-    assert.deepEqual(state.draft.tagRemove, []);
-
-    assert.equal(tagState(root, 'rune'), 'none', 'the other tags are untouched throughout');
-  });
-
-  it('renders each chip as a real focusable button', async () => {
+describe('ComponentBulkEditPanel anatomy (issue 1371 r16-list, M23)', () => {
+  it('draws the reference’s head, hero and three inline insets, and none of the shipped departures', async () => {
     const { root } = await mountPanel();
-    const chip = tagChip(root, 'metal');
 
-    assert.equal(chip.tagName, 'BUTTON', 'a span could not be reached by keyboard');
-    assert.equal(chip.getAttribute('type'), 'button', 'and an untyped button would submit');
-    // ANCHORED, exactly as the Recipe Studio's book-chip twin is. Unanchored, the previous
-    // action-first name ("Leave metal unchanged") satisfied this too, so the one property
-    // the assertion exists for — that the name OPENS with the visible label — was the one
-    // thing it could not see. The em-dash form is what carries a lowercase tag vocabulary
-    // (`ore`, `ingot`) without opening a sentence on a lowercase word.
-    assert.match(
-      chip.getAttribute('aria-label'),
-      /^metal — leave unchanged\.$/,
-      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
-        + 'aria-pressed cannot describe three states'
-    );
-  });
-
-  // The run is ONE axis, so it is exposed as one control rather than as a stray sequence of
-  // buttons, and the hint above it states all THREE stops of the cycle. Both facts are
-  // shared verbatim with the Recipe Studio's book run — see its twin case. The spec forbids
-  // the two studios diverging here, so the two cases assert the same two things.
-  it('exposes the chip run as a named group above an honest three-state hint', async () => {
-    const { root } = await mountPanel();
-    const run = root.querySelector('[data-component-bulk-tags]');
-
-    assert.equal(run.getAttribute('role'), 'group');
     assert.equal(
-      run.getAttribute('aria-label'),
-      'Tags',
-      'the group name is the section heading a sighted GM reads, not a second string'
+      root.querySelector('[data-component-bulk-clear]').textContent.trim(),
+      'Clear',
+      'the head action is the reference’s `Clear` (`proto:1107`), not `Clear selection`'
     );
+    assert.match(root.querySelector('[data-component-bulk-count]').textContent, /3 components selected/);
     assert.match(
-      root.textContent,
-      /click to add · again to remove · again to leave unchanged/,
-      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
-        + 'it discoverable only by clicking and watching'
+      root.querySelector('.fab-bulk-edit-hero-hint').textContent,
+      /Staged changes are written to Mythwright Forge only\./,
+      'the hero names the system the write lands in (`proto:5559`)'
+    );
+    assert.ok(
+      Boolean(root.querySelector('[data-component-bulk-per-component-note]')),
+      'the standing note says what cannot be bulk-edited (`proto:1110`)'
+    );
+    for (const id of ['category', 'tags', 'essences']) {
+      const card = inset(root, id);
+      assert.ok(Boolean(card), `${id} is drawn as an INLINE inset`);
+      assert.ok(Boolean(card.querySelector(`[data-bulk-inset-search="${id}"]`)), `${id} carries a search well`);
+      assert.ok(Boolean(card.querySelector(`[data-bulk-inset-range="${id}"]`)), `${id} carries a pager`);
+    }
+    assert.ok(!root.querySelector('[data-component-bulk-category]'), 'the `Leave unchanged` select is gone');
+    assert.ok(!root.querySelector('[data-component-bulk-delete-card]'), 'the delete CARD is gone');
+    assert.ok(!root.querySelector('.manager-component-bulk-essence-grid'), 'and so is the essence card grid');
+  });
+
+  it('puts the remove leg INSIDE the shell’s dock, under the primary (`proto:1269`-`1272`)', async () => {
+    const { root } = await mountPanel();
+    const dock = root.querySelector(':scope [data-component-bulk-panel] .fab-bulk-edit-dock');
+    assert.ok(Boolean(dock), 'the shell renders its dock');
+    const leg = dock.querySelector('[data-component-bulk-remove]');
+    assert.ok(Boolean(leg), 'the remove leg is a child of the dock, not a sibling card below the shell');
+    assert.ok(
+      dock.querySelector('[data-component-bulk-apply]').compareDocumentPosition(leg) &
+        globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
+      'and it follows the primary'
     );
   });
 
-  it('says the system defines no tags rather than rendering an empty run', async () => {
-    const { root } = await mountPanel({ tags: [] });
-    assert.ok(Boolean(root.querySelector('[data-component-bulk-tags-empty]')));
-  });
-});
-
-describe('ComponentBulkEditPanel apply enablement (issue 772)', () => {
-  it('is inert with nothing staged and live the moment any axis is staged', async () => {
+  it('names the foot idle until something is staged, and names the staged axes after', async () => {
     const { root, state } = await mountPanel();
-
+    assert.equal(applyButton(root).textContent.trim(), 'Stage a change to apply to 3 components');
     assert.equal(applyButton(root).disabled, true, 'a no-op Apply would report success and write nothing');
-    assert.match(applyButton(root).textContent, /3/, 'and it names the exact blast radius');
 
-    root.querySelector('[data-component-bulk-category]').value = 'Metal';
-    root.querySelector('[data-component-bulk-category]').dispatchEvent(
-      new globalThis.Event('change', { bubbles: true })
-    );
-    flushSync();
-
+    click(categoryRow(root, 'Metal'));
+    assert.equal(applyButton(root).textContent.trim(), 'Apply category to 3 components');
     assert.equal(applyButton(root).disabled, false);
-    assert.equal(state.draft.category, 'Metal');
 
-    applyButton(root).click();
-    flushSync();
+    click(tagRow(root, 'metal'));
+    assert.equal(applyButton(root).textContent.trim(), 'Apply category + tags to 3 components');
+
+    click(root.querySelector('[data-component-bulk-essences-staged]'));
+    assert.equal(
+      applyButton(root).textContent.trim(),
+      'Edit 3 components',
+      'three axes no longer fit a rail, so the reference says `Edit N components` (`proto:5551`)'
+    );
+
+    click(applyButton(root));
     assert.equal(state.applies, 1);
   });
 
-  it('is live for a REMOVAL-ONLY draft', async () => {
-    const { root } = await mountPanel();
-
-    // Straight to `remove`: two clicks, never resting on `add`.
-    tagChip(root, 'metal').click();
-    flushSync();
-    tagChip(root, 'metal').click();
-    flushSync();
-
-    assert.equal(tagState(root, 'metal'), 'remove');
-    assert.equal(
-      applyButton(root).disabled,
-      false,
-      'a removal-only edit is a real edit the chip run can stage on its own'
-    );
-  });
-
-  it('names one component in the singular', async () => {
-    const { root } = await mountPanel({ count: 1 });
-    assert.match(applyButton(root).textContent, /Apply to 1 component/);
-    assert.match(
-      root.querySelector('[data-component-bulk-count]').textContent,
-      /1 component selected/,
-      'never "1 components selected"'
-    );
+  it('says everything in the singular for one component', async () => {
+    const { root } = await mountPanel({ count: 1, deleteImpact: impactOf({ deletable: 1, deletableIds: ['c1'] }) });
+    assert.equal(applyButton(root).textContent.trim(), 'Stage a change to apply to 1 component');
+    assert.match(root.querySelector('[data-component-bulk-count]').textContent, /1 component selected/);
+    assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Remove 1 component from Mythwright Forge…');
   });
 
   it('clears the selection without applying anything', async () => {
     const { root, state } = await mountPanel();
-    root.querySelector('[data-component-bulk-clear]').click();
-    flushSync();
+    click(root.querySelector('[data-component-bulk-clear]'));
     assert.equal(state.clears, 1);
     assert.equal(state.applies, 0);
   });
 });
 
-describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
-  // Issue 1036, criteria 2 and 18. This panel's staged map is a WHOLE-MAP replacement, so
-  // its grid is simultaneously the add-new offer AND the only place a staged value can be
-  // edited back down. Both halves are asserted, each with its negative control.
-  it('1036/18: the essence grid withholds a DISABLED essence from the offer', async () => {
-    const { root } = await mountPanel({
-      essenceDefinitions: [
-        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
-      ]
-    });
+describe('ComponentBulkEditPanel category inset (issue 1371 r16-list)', () => {
+  it('stages a category on click as a RADIO, un-stages it on a second click, and clears from the head', async () => {
+    const { root, state } = await mountPanel();
+    const hint = () => root.querySelector(':scope .fab-bulk-edit-label-row .fab-bulk-edit-hint').textContent.trim();
+    assert.equal(hint(), 'Unchanged');
+    assert.equal(categoryRow(root, 'Metal').getAttribute('data-component-bulk-option-state'), 'off');
 
-    assert.ok(
-      Boolean(root.querySelector('[data-component-edit-essence="earth"]')),
-      'negative control: the ENABLED essence IS offered, so the grid is not simply empty'
+    click(categoryRow(root, 'Metal'));
+    assert.equal(state.draft.category, 'Metal');
+    assert.equal(categoryRow(root, 'Metal').getAttribute('data-component-bulk-option-state'), 'on');
+    assert.equal(categoryRow(root, 'Metal').getAttribute('aria-pressed'), 'true');
+    assert.equal(hint(), 'Metal', 'the head states the staged value (`proto:5562`)');
+    assert.match(
+      root.querySelector('[data-component-bulk-category-note]').textContent,
+      /Written as a Mythwright Forge value on all 3\. Their world classification is untouched\./
     );
-    assert.ok(
-      !root.querySelector('[data-component-edit-essence="fire"]'),
-      'the disabled essence is withheld from the offer'
-    );
+
+    click(categoryRow(root, 'general'));
+    assert.equal(state.draft.category, 'general', 'one category is written — picking another replaces it');
+    assert.equal(categoryRow(root, 'Metal').getAttribute('data-component-bulk-option-state'), 'off');
+
+    click(categoryRow(root, 'general'));
+    assert.equal(state.draft.category, '', 'clicking the chosen row leaves the category unchanged (`proto:5575`)');
+    assert.match(root.querySelector('[data-component-bulk-category-note]').textContent, /Pick one to set it here/);
+
+    click(categoryRow(root, 'Metal'));
+    click(root.querySelector('[data-component-bulk-clear-category]'));
+    assert.equal(state.draft.category, '', 'the head’s Clear un-stages the axis');
+    assert.ok(!root.querySelector('[data-component-bulk-clear-category]'), 'and Clear is gone with it');
   });
 
-  it('1036/2: a disabled essence carrying a STAGED quantity stays visible and clearable', async () => {
-    const draft = createComponentBulkDraft();
-    const { root, state } = await mountPanel({
-      draft: { ...draft, essencesStaged: true, essences: { fire: 3 } },
-      essenceDefinitions: [
-        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
-      ]
-    });
-
-    const staged = root.querySelector('[data-component-edit-essence="fire"]');
-    assert.ok(Boolean(staged), 'a staged disabled essence is still rendered');
-
-    staged.querySelector('[data-stepper-decrement]').click();
-    flushSync();
-    assert.equal(state.draft.essences.fire, 2, 'and is still editable back down');
-  });
-
-  it('1036/18: the essenceDefinitions PROP stays unfiltered — the warning count reads it', async () => {
-    // The prop boundary. `countComponentsChangingEssences` compares the staged map against
-    // every AUTHORED value on the selected rows, so a filtered prop would silently stop
-    // counting a carrier of a disabled essence and the destructive-overwrite warning would
-    // under-report exactly the rows most at risk.
+  it('states `n/N` — how many of the SELECTED already carry the row’s category — and sorts by label', async () => {
     const { root } = await mountPanel({
-      draft: { ...createComponentBulkDraft(), essencesStaged: true, essences: { earth: 1 } },
-      essenceDefinitions: [
-        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
+      selectedCards: [
+        { id: 'a', category: 'Metal' },
+        { id: 'b', category: 'Metal' },
+        { id: 'c', category: 'general' },
       ],
-      selectedCards: [{ id: 'a', essences: [{ id: 'fire', quantity: 3 }] }]
     });
-
-    const warning = root.querySelector('[data-component-bulk-essence-warning]');
-    assert.ok(
-      Boolean(warning),
-      'the carrier of the DISABLED essence is still counted in the overwrite warning'
+    assert.equal(categoryRow(root, 'Metal').querySelector('.fab-bulk-inset-meta').textContent.trim(), '2/3');
+    assert.equal(categoryRow(root, 'general').querySelector('.fab-bulk-inset-meta').textContent.trim(), '1/3');
+    assert.deepEqual(
+      [...inset(root, 'category').querySelectorAll('[data-component-bulk-category-option]')].map((row) =>
+        row.getAttribute('data-component-bulk-category-option')
+      ),
+      ['general', 'Metal'],
+      'General sorts before Metal (`proto:5510`)'
     );
-    assert.equal(warning.getAttribute('data-component-bulk-essence-warning'), '1');
   });
 
-  it('arms the essence axis DIRECTLY, because Stepper emits nothing at the zero boundary', async () => {
+  it('offers NO `Inherit from world` row, because the bulk write has no verb for it', async () => {
+    const { root } = await mountPanel();
+    assert.doesNotMatch(inset(root, 'category').textContent, /inherit/i);
+  });
+});
+
+describe('ComponentBulkEditPanel tag inset (issue 1371 r16-list)', () => {
+  it('cycles a row leave -> add -> remove -> leave and is never both', async () => {
+    const { root, state } = await mountPanel();
+    assert.equal(tagState(root, 'metal'), 'none', 'a fresh draft stages nothing');
+
+    click(tagRow(root, 'metal'));
+    assert.equal(tagState(root, 'metal'), 'add');
+    assert.deepEqual(state.draft.tagAdd, ['metal']);
+    assert.ok(tagRow(root, 'metal').classList.contains('is-staged'));
+
+    click(tagRow(root, 'metal'));
+    assert.equal(tagState(root, 'metal'), 'remove');
+    assert.deepEqual(state.draft.tagAdd, [], 'a tag is never simultaneously add and remove');
+    assert.deepEqual(state.draft.tagRemove, ['metal']);
+    assert.ok(tagRow(root, 'metal').classList.contains('is-removing'), 'a removal is painted in the danger family');
+
+    click(tagRow(root, 'metal'));
+    assert.equal(tagState(root, 'metal'), 'none');
+    assert.deepEqual(state.draft.tagRemove, []);
+    assert.equal(tagState(root, 'rune'), 'none', 'the other tags are untouched throughout');
+  });
+
+  it('paints the staged run above the inset, cycles from a chip too, and clears from the head', async () => {
+    const { root, state } = await mountPanel();
+    assert.ok(!root.querySelector('[data-component-bulk-tags]'), 'no run while nothing is staged');
+
+    click(tagRow(root, 'metal'));
+    click(tagRow(root, 'rune'));
+    click(tagRow(root, 'rune'));
+    const run = root.querySelector('[data-component-bulk-tags]');
+    assert.ok(Boolean(run), 'the run appears (`proto:1146`)');
+    assert.equal(run.getAttribute('role'), 'group');
+    assert.equal(run.querySelector('[data-component-bulk-tag-chip="metal"]').getAttribute('data-component-bulk-tag-chip-state'), 'add');
+    assert.equal(run.querySelector('[data-component-bulk-tag-chip="rune"]').getAttribute('data-component-bulk-tag-chip-state'), 'remove');
+    assert.ok(
+      [...root.querySelectorAll('.fab-bulk-edit-hint')].some((node) => node.textContent.trim() === '+1 −1'),
+      'the head counts both directions (`proto:5579`)'
+    );
+
+    click(run.querySelector('[data-component-bulk-tag-chip="metal"]'));
+    assert.equal(tagState(root, 'metal'), 'remove', 'a chip cycles the tag onward');
+
+    click(root.querySelector('[data-component-bulk-clear-tags]'));
+    assert.deepEqual([state.draft.tagAdd, state.draft.tagRemove], [[], []]);
+    assert.ok(!root.querySelector('[data-component-bulk-tags]'), 'and the run is gone');
+  });
+
+  it('is live for a REMOVAL-ONLY draft', async () => {
+    const { root } = await mountPanel();
+    click(tagRow(root, 'metal'));
+    click(tagRow(root, 'metal'));
+    assert.equal(tagState(root, 'metal'), 'remove');
+    assert.equal(applyButton(root).disabled, false, 'a removal-only edit is a real edit');
+    assert.equal(applyButton(root).textContent.trim(), 'Apply tags to 3 components');
+  });
+
+  it('renders each row as a real focusable button whose name OPENS with the visible label', async () => {
+    const { root } = await mountPanel();
+    const row = tagRow(root, 'metal');
+    assert.equal(row.tagName, 'BUTTON');
+    assert.equal(row.getAttribute('type'), 'button');
+    assert.equal(row.getAttribute('data-keyboard-focus'), 'true', 'a formless button must declare itself to Foundry');
+    assert.match(row.getAttribute('aria-label'), /^metal — leave unchanged\.$/);
+  });
+
+  it('states `n/N` for how many of the SELECTED already carry the tag', async () => {
+    const { root } = await mountPanel({
+      selectedCards: [{ id: 'a', tags: ['metal'] }, { id: 'b', tags: ['metal', 'rune'] }, { id: 'c', tags: [] }],
+    });
+    assert.equal(tagRow(root, 'metal').querySelector('.fab-bulk-inset-meta').textContent.trim(), '2/3');
+    assert.equal(tagRow(root, 'rune').querySelector('.fab-bulk-inset-meta').textContent.trim(), '1/3');
+  });
+
+  it('says which system defines no tags rather than drawing an empty inset', async () => {
+    const { root } = await mountPanel({ tags: [] });
+    const empty = root.querySelector('[data-component-bulk-tags-empty]');
+    assert.ok(Boolean(empty));
+    assert.equal(empty.textContent.trim(), 'Mythwright Forge defines no component tags.');
+    assert.ok(!inset(root, 'tags'), 'no inset over nothing');
+  });
+
+  it('states the TRUE half of the tag story under the inset, and never the unconsumed merge', async () => {
+    // `ui-integration/spec.md` `### GM World Component Screens` requirement 1: no surface may
+    // assert that world tags merge into a system while the union does not consume that merge.
+    const { root } = await mountPanel();
+    const note = root.querySelector('[data-component-bulk-tags-note]');
+    assert.equal(
+      note.textContent.trim(),
+      "World tags are shown on each record; this system's own list is what these rows change."
+    );
+    assert.doesNotMatch(root.textContent, /merge/i);
+  });
+});
+
+describe('ComponentBulkEditPanel search and pager (issue 1371 r16-list)', () => {
+  const SEVEN = ['ash', 'bone', 'coal', 'dust', 'ember', 'flux', 'grit'];
+
+  it('windows five rows, pages, and states the range (`proto:1155`)', async () => {
+    const { root } = await mountPanel({ tags: SEVEN });
+    const rows = () => [...inset(root, 'tags').querySelectorAll('[data-bulk-tag]')].map((r) => r.getAttribute('data-bulk-tag'));
+    assert.deepEqual(rows(), ['ash', 'bone', 'coal', 'dust', 'ember']);
+    assert.equal(rangeOf(root, 'tags'), 'Showing 1-5 of 7');
+    assert.equal(root.querySelector('[data-bulk-inset-prev="tags"]').disabled, true);
+
+    click(root.querySelector('[data-bulk-inset-next="tags"]'));
+    assert.deepEqual(rows(), ['flux', 'grit']);
+    assert.equal(rangeOf(root, 'tags'), 'Showing 6-7 of 7');
+    assert.equal(root.querySelector('[data-bulk-inset-next="tags"]').disabled, true);
+    assert.match(inset(root, 'tags').querySelector(':scope .fab-bulk-inset-page-label').textContent, /Page 2 of 2/);
+  });
+
+  it('searches inside an inset without touching what is staged, and says when nothing matches', async () => {
+    const { root, state } = await mountPanel({ tags: SEVEN });
+    click(tagRow(root, 'ash'));
+    type(root.querySelector('[data-bulk-inset-search="tags"]'), 'em');
+    assert.deepEqual(
+      [...inset(root, 'tags').querySelectorAll('[data-bulk-tag]')].map((r) => r.getAttribute('data-bulk-tag')),
+      ['ember']
+    );
+    assert.equal(rangeOf(root, 'tags'), 'Showing 1-1 of 1');
+    assert.deepEqual(state.draft.tagAdd, ['ash'], 'a search is the inset’s VIEW, not its instruction');
+
+    type(root.querySelector('[data-bulk-inset-search="tags"]'), 'zzz');
+    const empty = root.querySelector('[data-bulk-inset-empty="tags"]');
+    assert.ok(Boolean(empty));
+    assert.equal(empty.textContent.trim(), 'No tag matches that search.');
+    assert.equal(rangeOf(root, 'tags'), 'Showing 0-0 of 0');
+  });
+
+  it('searches the essence inset by name', async () => {
+    const { root } = await mountPanel();
+    type(root.querySelector('[data-bulk-inset-search="essences"]'), 'ear');
+    assert.ok(Boolean(essenceRow(root, 'earth')));
+    assert.ok(!essenceRow(root, 'fire'));
+  });
+});
+
+describe('ComponentBulkEditPanel essence inset (issue 1371 r16-list, M24)', () => {
+  it('draws one row per essence with the glyph, the `n/N` count and a stepper, sorted by name', async () => {
+    const { root } = await mountPanel({
+      selectedCards: [{ id: 'a', essences: [{ id: 'fire', quantity: 2 }] }, { id: 'b', essences: [] }, { id: 'c', essences: [] }],
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll(':scope [data-component-bulk-essences] [data-component-edit-essence]')].map((r) =>
+        r.getAttribute('data-component-edit-essence')
+      ),
+      ['earth', 'fire'],
+      'sorted as the reference sorts (`proto:5520`)'
+    );
+    const fire = essenceRow(root, 'fire');
+    assert.ok(Boolean(fire.querySelector(':scope .fab-component-bulk-essence-glyph i.fa-fire')), 'the glyph medallion');
+    assert.equal(fire.querySelector('.fab-bulk-inset-meta').textContent.trim(), '1/3');
+    assert.ok(Boolean(fire.querySelector('[data-stepper-decrement]')) && Boolean(fire.querySelector('[data-stepper-increment]')), 'the `− +` pair');
+  });
+
+  it('reads `—` on every row while the axis is UNSTAGED, and every row’s number once it is', async () => {
+    // The write REPLACES the whole map when the axis is staged, so a row that read `—` beside a
+    // staged neighbour would be saying "unchanged" about a value the write strips to 0.
+    const { root, state } = await mountPanel();
+    assert.equal(essenceInput(root, 'fire').value, '', 'unstaged: nothing is written, so no number');
+    assert.equal(essenceInput(root, 'fire').getAttribute('placeholder'), '—');
+    assert.equal(essenceInput(root, 'earth').value, '');
+
+    click(essenceRow(root, 'fire').querySelector('[data-stepper-increment]'));
+    assert.equal(state.draft.essences.fire, 1);
+    assert.equal(state.draft.essencesStaged, true, 'stepping an unstaged row up STAGES the axis');
+    assert.equal(essenceInput(root, 'fire').value, '1');
+    assert.equal(essenceInput(root, 'earth').value, '0', 'the neighbour now says what the write will do to it');
+    assert.equal(essenceRow(root, 'fire').getAttribute('data-component-essence-active'), 'true');
+    assert.equal(essenceRow(root, 'earth').getAttribute('data-component-essence-active'), 'false');
+    assert.match(
+      [...root.querySelectorAll('.fab-bulk-edit-hint')].map((n) => n.textContent.trim()).join('|'),
+      /1 set/,
+      'the head counts the values set'
+    );
+    assert.equal(applyButton(root).textContent.trim(), 'Apply essences to 3 components');
+  });
+
+  it('arms the essence axis DIRECTLY from the chip, because Stepper emits nothing at the zero boundary', async () => {
     const { root, state } = await mountPanel();
     const chip = root.querySelector('[data-component-bulk-essences-staged]');
-
-    assert.equal(chip.tagName, 'BUTTON', 'the only route to a destructive axis must be operable');
-    assert.equal(chip.getAttribute('type'), 'button');
+    assert.equal(chip.tagName, 'BUTTON');
     assert.equal(chip.getAttribute('data-component-bulk-essences-staged'), 'false');
     assert.equal(applyButton(root).disabled, true);
 
-    chip.click();
-    flushSync();
-
+    click(chip);
     assert.equal(state.draft.essencesStaged, true, 'a fresh, all-zero draft can stage "clear everything"');
-    assert.equal(
-      root.querySelector('[data-component-bulk-essences-staged]').getAttribute('data-component-bulk-essences-staged'),
-      'true'
-    );
+    assert.equal(essenceInput(root, 'fire').value, '0', 'and every row now reads the 0 it will be written');
     assert.equal(applyButton(root).disabled, false, 'an all-zero staged map is a REAL edit');
+
+    click(root.querySelector('[data-component-bulk-essences-staged]'));
+    assert.equal(state.draft.essencesStaged, false, 'the same chip disarms');
+    assert.equal(essenceInput(root, 'fire').value, '', 'and the rows read `—` again');
+    assert.equal(state.clears, 0, 'without touching the selection');
   });
 
-  it('leaves a bumped-then-zeroed essence axis staged, and visibly so', async () => {
+  it('leaves a bumped-then-zeroed axis staged, and visibly so', async () => {
     const { root, state } = await mountPanel();
-
-    const fireStepper = root.querySelector('[data-component-edit-essence="fire"]');
-    fireStepper.querySelector('[data-stepper-increment]').click();
-    flushSync();
-    assert.equal(state.draft.essences.fire, 1);
-    assert.equal(state.draft.essencesStaged, true);
-
-    root
-      .querySelector('[data-component-edit-essence="fire"] [data-stepper-decrement]')
-      .click();
-    flushSync();
-
+    click(essenceRow(root, 'fire').querySelector('[data-stepper-increment]'));
+    click(essenceRow(root, 'fire').querySelector('[data-stepper-decrement]'));
     assert.equal(state.draft.essences.fire, 0, 'back to zero');
-    assert.equal(
-      state.draft.essencesStaged,
-      true,
-      'and STILL staged — this is the wipe the prototype rendered as pixel-identical to untouched'
-    );
-    assert.equal(
-      root.querySelector('[data-component-bulk-essences-staged]').getAttribute('data-component-bulk-essences-staged'),
-      'true',
-      'the panel says so'
-    );
+    assert.equal(state.draft.essencesStaged, true, 'and STILL staged — this is the wipe');
+    assert.equal(root.querySelector('[data-component-bulk-essences-staged]').getAttribute('data-component-bulk-essences-staged'), 'true');
   });
 
-  it('disarms an axis from the same chip without touching the selection', async () => {
-    const { root, state } = await mountPanel();
+  it('1036/18: withholds a DISABLED essence from the offer unless it carries a staged quantity', async () => {
+    const definitions = [
+      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true },
+    ];
+    const { root } = await mountPanel({ essenceDefinitions: definitions });
+    assert.ok(Boolean(essenceRow(root, 'earth')), 'negative control: the ENABLED essence IS offered');
+    assert.ok(!essenceRow(root, 'fire'), 'the disabled essence is withheld');
 
-    root.querySelector('[data-component-bulk-essences-staged]').click();
-    flushSync();
-    root.querySelector('[data-component-bulk-essences-staged]').click();
-    flushSync();
-
-    assert.equal(state.draft.essencesStaged, false, 'the axis is back to leave-unchanged');
-    assert.equal(state.clears, 0, 'and the selection was never cleared');
-    assert.equal(applyButton(root).disabled, true);
+    panel.remount();
+    const staged = await mountPanel({
+      draft: { ...createComponentBulkDraft(), essencesStaged: true, essences: { fire: 3 } },
+      essenceDefinitions: definitions,
+    });
+    assert.ok(Boolean(essenceRow(staged.root, 'fire')), 'a staged disabled essence is still rendered');
+    click(essenceRow(staged.root, 'fire').querySelector('[data-stepper-decrement]'));
+    assert.equal(staged.state.draft.essences.fire, 2, 'and is still editable back down');
   });
 
-  it('seeds a zero DC when the progressive axis is armed, so it is never a silent clear', async () => {
-    const { root, state } = await mountPanel({ showProgressiveDifficulty: true });
-
-    root.querySelector('[data-component-bulk-difficulty-staged]').click();
-    flushSync();
-
-    assert.equal(state.draft.difficultyStaged, true);
-    assert.equal(state.draft.difficulty, 0, '0 CLEARS the value on every selected component');
-    assert.equal(root.querySelector('[data-component-bulk-difficulty]').value, '0', 'and the panel shows it');
-
-    root.querySelector('[data-component-bulk-difficulty]').value = '14';
-    root.querySelector('[data-component-bulk-difficulty]').dispatchEvent(
-      new globalThis.Event('input', { bubbles: true })
-    );
-    flushSync();
-    assert.equal(state.draft.difficulty, 14);
-  });
-});
-
-describe('ComponentBulkEditPanel overwrite legibility (issue 772)', () => {
-  const authored = [
-    { id: 'a', essences: [{ id: 'fire', quantity: 3 }] },
-    { id: 'b', essences: [] }
-  ];
-
-  it('states the permanent overwrite hint whether or not the axis is staged', async () => {
-    const { root } = await mountPanel();
-    assert.match(root.textContent, /overwrites the essence values on every selected component/);
-  });
-
-  it('warns only when the staged map would in fact change an AUTHORED value', async () => {
+  it('states the permanent overwrite hint and warns only when an AUTHORED value would change', async () => {
+    const authored = [{ id: 'a', essences: [{ id: 'fire', quantity: 3 }] }, { id: 'b', essences: [] }];
     const { root, state } = await mountPanel({ selectedCards: authored });
+    assert.match(root.textContent, /overwrites the essence values on every selected component/);
 
-    // Staged but matching the authored value: nothing is destroyed, so no hazard strip.
-    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-input]').value = '3';
-    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-input]').dispatchEvent(
-      new globalThis.Event('input', { bubbles: true })
-    );
-    flushSync();
+    type(essenceInput(root, 'fire'), '3');
     assert.equal(state.draft.essences.fire, 3);
-    assert.ok(
-      !root.querySelector('[data-component-bulk-essence-warning]'),
-      'a no-change overwrite is not a hazard'
-    );
+    assert.ok(!root.querySelector('[data-component-bulk-essence-warning]'), 'a no-change overwrite is not a hazard');
 
-    // An INCREASE destroys the authored 3 as surely as a clear would.
-    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-increment]').click();
-    flushSync();
-
+    click(essenceRow(root, 'fire').querySelector('[data-stepper-increment]'));
     const warning = root.querySelector('[data-component-bulk-essence-warning]');
     assert.ok(Boolean(warning), 'overwriting a hand-tuned value is exactly what the warning is for');
-    assert.match(warning.textContent, /1 of the selected components/, 'and it names the count');
+    assert.match(warning.textContent, /1 of the selected components/);
   });
 
-  it('shows no warning while the axis is unstaged, however different the values', async () => {
-    const { root } = await mountPanel({ selectedCards: authored });
-
-    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-increment]').click();
-    flushSync();
-    root.querySelector('[data-component-bulk-essences-staged]').click();
-    flushSync();
-
-    assert.ok(
-      !root.querySelector('[data-component-bulk-essence-warning]'),
-      'an unstaged axis is never sent, so it can destroy nothing'
-    );
+  it('hides the whole essence group when the system does not enable essences', async () => {
+    const { root } = await mountPanel({ showEssences: false });
+    assert.ok(!inset(root, 'essences'));
+    assert.ok(!root.querySelector('[data-component-bulk-essences-staged]'));
   });
 });
 
-describe('ComponentBulkEditPanel section visibility (issue 772)', () => {
-  it('hides the essences section when the system does not enable essences', async () => {
-    const { root } = await mountPanel({ showEssences: false });
-    assert.ok(!root.querySelector('[data-component-bulk-essences]'));
-    assert.ok(!root.querySelector('[data-component-bulk-essences-staged]'));
+describe('ComponentBulkEditPanel progressive DC (issue 772)', () => {
+  it('seeds a zero DC when the axis is armed, so it is never a silent clear', async () => {
+    const { root, state } = await mountPanel({ showProgressiveDifficulty: true });
+    click(root.querySelector('[data-component-bulk-difficulty-staged]'));
+    assert.equal(state.draft.difficultyStaged, true);
+    assert.equal(state.draft.difficulty, 0);
+    assert.equal(root.querySelector('[data-component-bulk-difficulty]').value, '0');
+    type(root.querySelector('[data-component-bulk-difficulty]'), '14');
+    assert.equal(state.draft.difficulty, 14);
+    assert.equal(applyButton(root).textContent.trim(), 'Apply DC to 3 components');
   });
 
-  // The caller supplies ONE predicate that is already the OR of crafting, salvage and
-  // gathering resolution modes, so the panel's contract is simply that it obeys it — which
-  // is what makes a salvage-only-progressive system show the section at all.
   for (const shown of [true, false]) {
-    it(`${shown ? 'shows' : 'hides'} the progressive DC section when the axis predicate is ${shown}`, async () => {
+    it(`${shown ? 'shows' : 'hides'} the section when the axis predicate is ${shown}`, async () => {
       const { root } = await mountPanel({ showProgressiveDifficulty: shown });
-      assert.equal(
-        Boolean(root.querySelector('[data-component-bulk-difficulty]')),
-        shown,
-        'the bulk panel, the editor control and the row badge read ONE predicate'
-      );
+      assert.equal(Boolean(root.querySelector('[data-component-bulk-difficulty]')), shown);
     });
   }
 });
 
-// ── The armed set delete (issue 1129) ────────────────────────────────────────────────
+// ── The remove leg (issue 1129's set delete, moved into the dock for issue 1371 r16-list) ────
 //
 // The panel does NOT compute the impact — it is handed one, because "how many recipes will be
-// disabled" depends on the whole selection against real recipe bodies (see
-// `adminStore.describeComponentDelete`). So these tests feed an impact literal and pin what
-// the GM is SHOWN and what the two clicks DO. The arithmetic itself is pinned in
-// `tests/component-delete-impact.test.js`.
-
-function deleteCard(root) {
-  return root.querySelector('[data-component-bulk-delete-card]');
-}
-
-function deleteButton(root) {
-  return deleteCard(root).querySelector('.manager-button.is-danger');
-}
-
-function impactRow(root, row) {
-  return deleteCard(root).querySelector(`[data-component-bulk-impact-row="${row}"]`);
-}
-
-function impactText(root, row) {
-  return impactRow(root, row).textContent.trim();
-}
-
-function impactOf(overrides = {}) {
-  return {
-    deletable: 3,
-    deletableIds: ['c1', 'c2', 'c3'],
-    recipesRewritten: 2,
-    recipesDisabled: 1,
-    ...overrides
-  };
-}
-
-/** Mount with the delete wiring the root supplies, recording what the confirm hands back. */
-async function mountWithDelete(props = {}) {
-  const calls = { armed: 0, disarmed: 0, deleted: [] };
-  const mounted = await mountPanel({
-    deleteImpact: impactOf(),
-    ...props,
-    onArmDelete: () => { calls.armed += 1; },
-    onDisarmDelete: () => { calls.disarmed += 1; },
-    onDelete: (ids) => { calls.deleted.push(ids); }
-  });
-  return { ...mounted, calls };
-}
-
-describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
-  it('states the impact BEFORE the action is armed', async () => {
-    const { root } = await mountWithDelete();
-
-    assert.ok(deleteCard(root), 'the delete card renders with the panel');
+// disabled" depends on the whole selection against real recipe bodies. These tests feed an impact
+// literal and pin what the GM is SHOWN and what the two clicks DO.
+describe('ComponentBulkEditPanel remove leg (issue 1371 r16-list)', () => {
+  it('states the consequence BEFORE it is armed, counted, and gates each recipe sentence on its count', async () => {
+    const { root } = await mountPanel({ deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 1 }) });
+    assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Remove 3 components from Mythwright Forge…');
+    assert.equal(removeButton(root).getAttribute('data-armed'), 'false');
     assert.equal(
-      deleteButton(root).getAttribute('data-armed'),
-      'false',
-      'the control starts unarmed'
+      removeNote(root).textContent.trim(),
+      'Removing them drops their rules in Mythwright Forge only. Their catalogue entries and every other system are untouched. ' +
+        '2 recipes will be rewritten. 1 of those recipes is enabled today and will be disabled.'
     );
-    // LITERAL, whole-row equality rather than "contains a number". A row asserted with
-    // `/2 recipes/` keeps passing after the sentence around the number changes meaning — and
-    // this card's whole job is the sentence, not the digit.
-    assert.equal(impactText(root, 'components'), '3 components will be deleted.');
-    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
+    assert.equal(removeNote(root).getAttribute('data-component-bulk-remove-note'), 'proceed');
+    assert.ok(Boolean(removeButton(root).querySelector('i.fa-arrow-right-from-bracket')), 'the reference’s glyph (`proto:1271`)');
+  });
+
+  it('omits a ZERO recipe sentence rather than stating "0 recipes"', async () => {
+    const { root } = await mountPanel();
     assert.equal(
-      impactText(root, 'disabled'),
-      '1 of those recipes is enabled today and will be disabled.'
+      removeNote(root).textContent.trim(),
+      'Removing them drops their rules in Mythwright Forge only. Their catalogue entries and every other system are untouched.'
     );
+    assert.doesNotMatch(removeNote(root).textContent, /\b0 /);
   });
 
-  it('omits a ZERO row rather than stating "0 recipes will be rewritten"', async () => {
-    // The commonest selection there is: components no recipe names. Two noughts under one
-    // real fact is noise, and it buries the number the button acts on.
-    const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ recipesRewritten: 0, recipesDisabled: 0 })
-    });
-
-    assert.equal(
-      impactText(root, 'components'),
-      '3 components will be deleted.',
-      'the components row is unconditional — the card must still state what the button does'
-    );
-    assert.ok(!impactRow(root, 'recipes'), 'no zero rewrite row');
-    assert.ok(!impactRow(root, 'disabled'), 'no zero disable row');
-    assert.ok(
-      !deleteCard(root).textContent.includes('0 '),
-      'and no stray zero anywhere in the card'
-    );
+  it('never says the reference’s broken-ingredient sentence, which this store does not perform', async () => {
+    const { root } = await mountPanel({ deleteImpact: impactOf({ recipesRewritten: 4 }) });
+    assert.doesNotMatch(root.textContent, /broken ingredient/i);
+    assert.match(removeNote(root).textContent, /4 recipes will be rewritten\./);
   });
 
-  it('keeps the rewrite row when only the DISABLE count is zero', async () => {
-    // The two rows are gated independently: rewriting recipes without disabling any is the
-    // ordinary outcome, and gating them together would hide it.
-    const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 0 })
-    });
-
-    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
-    assert.ok(!impactRow(root, 'disabled'), 'but nothing is disabled, so nothing says so');
-  });
-
-  it('associates the impact list with the button, and announces the arm', async () => {
-    // Proximity is not association: without `aria-describedby` a screen-reader user arriving
-    // at the control hears its name and nothing about the consequence, unless they happened
-    // to read the list on the way past.
-    const { root } = await mountWithDelete();
-    const described = deleteButton(root).getAttribute('aria-describedby');
-
+  it('associates the note with the control and announces the arm and the cancellation', async () => {
+    const { root } = await mountPanel({ deleteImpact: impactOf({ recipesRewritten: 2 }) });
+    const described = removeButton(root).getAttribute('aria-describedby');
     assert.ok(described, 'the button names a description');
-    const list = deleteCard(root).querySelector(`#${described}`);
-    assert.ok(Boolean(list), 'and it resolves to an element inside the card');
-    assert.equal(list.getAttribute('data-component-bulk-impact'), '');
-
-    const live = deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
-    assert.ok(Boolean(live), 'the armed state has a live region');
-    assert.equal(live.getAttribute('aria-live'), 'polite');
-    assert.equal(live.textContent.trim(), '', 'which says nothing while the control is idle');
-  });
-
-  it('announces the consequence when the owner arms it, and the CANCELLATION on disarm', async () => {
-    const { root } = await mountWithDelete();
-    const live = () => deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
+    assert.ok(Boolean(root.querySelector(`#${described}[data-component-bulk-remove-note]`)), 'and it is the note');
+    assert.equal(announce(root).getAttribute('aria-live'), 'polite');
+    assert.equal(announce(root).textContent.trim(), '', 'silent while idle');
 
     await panel.setProps({ deleteArmed: true });
     flushSync();
-    assert.match(live().textContent, /3 component\(s\)/, 'it names what confirming would do');
-    assert.match(live().textContent, /again/i, 'and that a SECOND activation is the delete');
+    assert.match(announce(root).textContent, /3 component\(s\) from Mythwright Forge/);
+    assert.match(announce(root).textContent, /again/i);
 
-    // Escape and click-away both disarm while the button still HOLDS FOCUS and change its
-    // accessible name under it — which is the whole reason this region exists. Emptying it
-    // announced nothing, so the one gesture that CANCELS a destructive action was the only
-    // one that said nothing at all (issue 1132, review round). The text still changes, so a
-    // re-arm is still announced.
     await panel.setProps({ deleteArmed: false });
     flushSync();
-    assert.equal(live().textContent.trim(), 'Delete cancelled. Nothing was deleted.');
-
-    await panel.setProps({ deleteArmed: true });
-    flushSync();
-    assert.match(live().textContent, /again/i, 'and a RE-arm still announces');
+    assert.equal(announce(root).textContent.trim(), 'Remove cancelled. Nothing was removed.');
   });
 
   it('gives the ARMED control a name containing its visible label (WCAG 2.5.3)', async () => {
-    // A speech-input user says what they can read. "Confirm deleting 3 component(s)…" does
-    // not contain "Confirm delete", so the armed half of a destructive two-step control could
-    // not be activated by voice.
-    const { root } = await mountWithDelete({ deleteArmed: true });
-    const button = deleteButton(root);
+    const { root } = await mountPanel({ deleteArmed: true });
+    const button = removeButton(root);
     const visible = button.querySelector('span').textContent.trim();
-
-    assert.equal(visible, 'Confirm delete');
-    assert.ok(
-      button.getAttribute('aria-label').startsWith(visible),
-      `"${button.getAttribute('aria-label')}" must open with "${visible}"`
-    );
-    assert.match(button.getAttribute('aria-label'), /3 component\(s\) and 2 recipe\(s\)/);
-    // It ENDS with the irreversibility, like its recipe sibling — the only one of the three
-    // that stated it. This panel carries no standing hint, so the armed accessible name is
-    // the only place a screen-reader user is told a component delete is permanent; essence
-    // remains the one outlier, deliberately left alone (issue 1132, review round 2).
-    assert.match(button.getAttribute('aria-label'), /cannot be undone/i);
-  });
-
-  it('reports three numbers that are three different questions', async () => {
-    // Deleting 5 components, rewriting 2 recipes, disabling 1 of those two: no number is
-    // derivable from another, and the disabled count is a SUBSET of the rewritten count.
-    const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ deletable: 5, recipesRewritten: 2, recipesDisabled: 1 })
-    });
-
-    assert.match(impactText(root, 'components'), /5 components/);
-    assert.match(impactText(root, 'recipes'), /2 recipes/);
-    assert.match(impactText(root, 'disabled'), /^1 of those recipes/);
-  });
-
-  it('RECOMPUTES when the selection changes', async () => {
-    const { root } = await mountWithDelete();
-    assert.match(impactText(root, 'recipes'), /2 recipes will be rewritten/);
-
-    await panel.setProps({
-      deleteImpact: impactOf({ deletable: 1, deletableIds: ['c1'], recipesRewritten: 7, recipesDisabled: 0 })
-    });
-    flushSync();
-
-    assert.match(impactText(root, 'components'), /1 component will be deleted/);
-    assert.match(impactText(root, 'recipes'), /7 recipes will be rewritten/);
+    assert.equal(visible, 'Confirm — remove 3 from Mythwright Forge');
+    assert.ok(button.getAttribute('aria-label').startsWith(visible));
+    assert.match(button.getAttribute('aria-label'), /drops their rules in Mythwright Forge only/);
   });
 
   it('takes TWO clicks, and the first writes nothing', async () => {
-    const { root, calls } = await mountWithDelete();
+    const { root, state } = await mountPanel();
+    click(removeButton(root));
+    assert.equal(state.armed, 1, 'the first click ARMS');
+    assert.deepEqual(state.deleted, [], 'and writes NOTHING');
 
-    deleteButton(root).click();
-    flushSync();
-    assert.equal(calls.armed, 1, 'the first click ARMS');
-    assert.equal(calls.deleted.length, 0, 'the first click writes NOTHING');
-
-    // The owner holds the armed token, so re-render with it set the way the root would.
     await panel.setProps({ deleteArmed: true });
     flushSync();
-    assert.equal(deleteButton(root).getAttribute('data-armed'), 'true');
-
-    deleteButton(root).click();
-    flushSync();
-    assert.deepEqual(calls.deleted, [['c1', 'c2', 'c3']], 'the second click deletes the SELECTION');
+    assert.equal(removeButton(root).getAttribute('data-armed'), 'true');
+    click(removeButton(root));
+    assert.deepEqual(state.deleted, [['c1', 'c2', 'c3']], 'the second click removes the store’s deletable set');
   });
 
-  it('hands the confirm the impact ids rather than re-deriving them', async () => {
-    const { root, calls } = await mountWithDelete({
-      deleteImpact: impactOf({ deletable: 2, deletableIds: ['only-a', 'only-b'] }),
-      deleteArmed: true
+  it('REFUSES per record: a selection this system holds none of arms to `Cannot remove` and writes nothing', async () => {
+    const { root, state } = await mountPanel({
+      deleteImpact: impactOf({ deletable: 0, deletableIds: [] }),
     });
+    assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Remove from Mythwright Forge…', 'uncounted where nothing can go');
+    assert.equal(removeButton(root).disabled, false, 'a disabled button would leave the GM no explanation');
+    assert.equal(removeNote(root).getAttribute('data-component-bulk-remove-note'), 'refused');
+    assert.match(removeNote(root).textContent, /nothing to remove here/);
 
-    deleteButton(root).click();
+    await panel.setProps({ deleteArmed: true });
     flushSync();
-    assert.deepEqual(calls.deleted, [['only-a', 'only-b']]);
+    assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Cannot remove');
+    click(removeButton(root));
+    assert.deepEqual(state.deleted, [], 'the confirm writes nothing');
+    assert.equal(state.disarmed, 1, 'and drops the arm instead');
   });
 
-  it('states every number in the singular, not a bare plural after "1"', async () => {
-    const { root } = await mountWithDelete({
-      deleteImpact: impactOf({
-        deletable: 1,
-        deletableIds: ['c1'],
-        recipesRewritten: 1,
-        recipesDisabled: 1
-      })
-    });
-
-    assert.match(impactText(root, 'components'), /^1 component will be deleted\./);
-    assert.match(impactText(root, 'recipes'), /^1 recipe will be rewritten\./);
-    assert.ok(
-      !impactText(root, 'components').includes('1 components'),
-      'never "1 components"'
-    );
-    assert.ok(!impactText(root, 'recipes').includes('1 recipes'), 'never "1 recipes"');
-    assert.match(deleteButton(root).textContent, /Delete 1 component(?!s)/);
-  });
-
-  it('is disabled when nothing is deletable, and while a delete is in flight', async () => {
-    const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 })
-    });
-    assert.equal(deleteButton(root).disabled, true, 'nothing to delete');
-
-    await panel.setProps({ deleteImpact: impactOf(), deleting: true });
+  it('is inert while an apply is in flight, and shows its busy face while removing', async () => {
+    const { root } = await mountPanel({ applying: true });
+    assert.equal(removeButton(root).disabled, true, 'a staged apply and a remove must not race');
+    await panel.setProps({ applying: false, deleting: true });
     flushSync();
-    assert.equal(deleteButton(root).disabled, true, 'inert rather than double-writing');
-  });
-
-  it('is a real button rather than a dialog trigger', async () => {
-    // The carve-out that lets this arm INSTEAD of raising a confirmDialog is paired with the
-    // impact statement above; if the control ever became a dialog trigger the pairing would
-    // be silently pointless.
-    const { root } = await mountWithDelete();
-    const button = deleteButton(root);
-
-    assert.equal(button.tagName, 'BUTTON');
-    assert.equal(button.getAttribute('type'), 'button');
-    assert.equal(button.getAttribute('data-arm-token'), 'delete-components');
-    assert.ok(button.getAttribute('aria-label'), 'it carries the consequence sentence');
-  });
-
-  it('sits BELOW the panel shell, not inside its Apply card', async () => {
-    // A destructive action inside the shell would read as a second way of applying the
-    // staged edit.
-    const { root } = await mountWithDelete();
-    const shell = root.querySelector('[data-component-bulk-panel]');
-
-    assert.ok(shell, 'the shell renders');
-    assert.ok(!shell.contains(deleteCard(root)), 'the delete card is a sibling of the shell');
+    assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Removing…');
   });
 });

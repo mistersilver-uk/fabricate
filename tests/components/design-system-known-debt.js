@@ -428,4 +428,7 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 278;
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
 /** @see KNOWN_UNREGISTERED_SHARED_COMPONENTS */
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;
+// 49 -> 48 (issue 1371 r16-list): `EssenceQuantityCard` dropped to ONE importer when maintainer
+// ruling M23 rebuilt the system Component Rules bulk panel's essence axis as the reference's inset
+// rows — the card renders in the component editor's grid alone now, so it no longer clears the bar.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
