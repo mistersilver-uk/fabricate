@@ -126,6 +126,115 @@ describe('listbox navigation: the cursor arithmetic', () => {
     });
   });
 
+  // ── THE DISABLED AXIS (issue 1504) ────────────────────────────────────────────────────────
+  //
+  // A converted `<select>` can gate an option — a premium tier, a mode this world cannot reach —
+  // and a cursor that lands on one announces a row whose Enter does nothing. The predicate is an
+  // INDEX predicate rather than the option array so the arithmetic stays off the option shape;
+  // these cases are the arithmetic, and the mounted suite proves the wiring that supplies it.
+  describe('nextActiveIndex with an `isDisabled` predicate', () => {
+    /** Rows 1 and 2 of a four-row list are gated, so a skip has to cross more than one. */
+    const gated = (...indexes) => {
+      const set = new Set(indexes);
+      return (index) => set.has(index);
+    };
+
+    it('steps OVER a gated row rather than landing on it', () => {
+      assert.equal(nextActiveIndex(0, 4, 'ArrowDown', { isDisabled: gated(1, 2) }), 3);
+      assert.equal(nextActiveIndex(3, 4, 'ArrowUp', { isDisabled: gated(1, 2) }), 0);
+    });
+
+    it('keeps the ring closed while it skips, so the last enabled row wraps to the first', () => {
+      assert.equal(nextActiveIndex(3, 4, 'ArrowDown', { isDisabled: gated(0) }), 1);
+      assert.equal(nextActiveIndex(1, 4, 'ArrowUp', { isDisabled: gated(0) }), 3);
+    });
+
+    it('enters the list at the outermost ENABLED row from the sentinel', () => {
+      assert.equal(nextActiveIndex(-1, 4, 'ArrowDown', { isDisabled: gated(0) }), 1);
+      assert.equal(nextActiveIndex(-1, 4, 'ArrowUp', { isDisabled: gated(3) }), 2);
+    });
+
+    it('reaches the nearest ENABLED end with Home and End', () => {
+      // EDGE (a). Home landing on a gated first option would announce a row the GM cannot choose
+      // and leave Enter a no-op they have no way to explain, so both keys scan INWARD.
+      assert.equal(nextActiveIndex(2, 4, 'Home', { isDisabled: gated(0, 1) }), 2);
+      assert.equal(nextActiveIndex(1, 4, 'End', { isDisabled: gated(2, 3) }), 1);
+      assert.equal(nextActiveIndex(-1, 4, 'Home', { isDisabled: gated(0) }), 1);
+      assert.equal(nextActiveIndex(-1, 4, 'End', { isDisabled: gated(3) }), 2);
+    });
+
+    it('terminates and holds the cursor still when EVERY option is gated', () => {
+      // EDGE (b). The scan is bounded by the row count rather than by "until it comes back
+      // round", because a ring with nothing enabled is exactly the case those two differ on: the
+      // first terminates, the second spins forever and hangs the window on one keypress.
+      const none = () => true;
+      for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+        assert.equal(nextActiveIndex(2, 4, key, { isDisabled: none }), 2, `${key} from a row`);
+        assert.equal(nextActiveIndex(-1, 4, key, { isDisabled: none }), -1, `${key} from nothing`);
+      }
+    });
+
+    it('reads an out-of-range cursor as the sentinel when nothing is enabled to move to', () => {
+      // A caller that swapped `options` under an open panel can leave the index past the end.
+      // Returning it unchanged would have the holder announce an id that resolves to no element.
+      assert.equal(nextActiveIndex(9, 3, 'ArrowDown', { isDisabled: () => true }), -1);
+    });
+
+    it('seeds at the first ENABLED option when the selected value is itself gated', () => {
+      // EDGE (c). This is the idiom a caller opening on a value uses: `Home` from the selected
+      // row is "the first row the GM could actually choose", and it is the same answer from the
+      // sentinel, so a seed does not need to know whether a value was found.
+      const isDisabled = gated(0, 1);
+      assert.equal(nextActiveIndex(1, 4, 'Home', { isDisabled }), 2);
+      assert.equal(nextActiveIndex(-1, 4, 'Home', { isDisabled }), 2);
+      assert.equal(nextActiveIndex(0, 4, 'ArrowDown', { isDisabled }), 2);
+    });
+
+    it('walks the FLAT order when it skips in a grid, so a gated column strands nothing', () => {
+      // The press is `columns` wide; the skip scan is one cell. A scan that kept stepping by
+      // `columns` would only ever visit one column of the ring, so a grid whose first column was
+      // gated would leave every enabled tile beside it unreachable.
+      assert.equal(nextActiveIndex(0, 6, 'ArrowDown', { columns: 3, isDisabled: gated(3) }), 4);
+      assert.equal(nextActiveIndex(4, 6, 'ArrowUp', { columns: 3, isDisabled: gated(1) }), 0);
+    });
+
+    it('is TODAY`S ARITHMETIC for every caller that passes no predicate', () => {
+      // The compatibility contract in one case: absent `disabled` means absent predicate means
+      // the pre-1504 numbers, with no skip scan run at all. A predicate that gates nothing must
+      // agree with it, or the axis is not free after all.
+      const never = () => false;
+      for (const [current, key] of [
+        [-1, 'ArrowDown'],
+        [-1, 'ArrowUp'],
+        [0, 'ArrowDown'],
+        [3, 'ArrowDown'],
+        [0, 'ArrowUp'],
+        [2, 'Home'],
+        [2, 'End'],
+        [9, 'ArrowDown'],
+      ]) {
+        const bare = nextActiveIndex(current, 4, key);
+        assert.equal(nextActiveIndex(current, 4, key, {}), bare, `${key} from ${current}`);
+        assert.equal(
+          nextActiveIndex(current, 4, key, { isDisabled: undefined }),
+          bare,
+          `${key} from ${current} with an undefined predicate`
+        );
+        assert.equal(
+          nextActiveIndex(current, 4, key, { isDisabled: never }),
+          bare,
+          `${key} from ${current} with a predicate that gates nothing`
+        );
+      }
+    });
+
+    it('still returns null for a key it does not own, whatever is gated', () => {
+      assert.equal(nextActiveIndex(1, 4, 'a', { isDisabled: () => true }), null);
+      assert.equal(nextActiveIndex(1, 4, 'ArrowLeft', { isDisabled: () => true }), null);
+      assert.equal(nextActiveIndex(-1, 0, 'ArrowDown', { isDisabled: () => false }), null);
+    });
+  });
+
   describe('activeOptionId', () => {
     it('names a row by its position in the flat rendered order', () => {
       assert.equal(activeOptionId('c7', 0), 'c7-option-0');
