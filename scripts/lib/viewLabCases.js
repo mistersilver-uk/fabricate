@@ -5182,6 +5182,46 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // issue 1371 r18-colour — THE ROW BADGES IN THE ESSENCE'S OWN COLOUR (maintainer ruling M29).
+    // `manager-components-normal` opens on the list's first group, `Finished Goods`, whose rows
+    // carry no essence, so that frame cannot show what this revision changed: each essence badge
+    // and the inspector's essence run now draw in the colour the Essence Catalogue gave the
+    // essence. The essence filter's `Carries any essence` predicate brings the carrying rows to
+    // the top, and the containment names a TINTED chip — `data-chip-tint` is stamped only when a
+    // colour reached the chip — so a regression to grey badges fails the capture rather than
+    // publishing a frame that quietly shows it.
+    id: 'manager-components-essence-chips',
+    label: 'Manager — Components essence chips',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-essence-filter]', select: '__any' },
+      // OPEN A CARRYING ROW, through its identity button rather than through the chip: the list
+      // opens on its first drawn row before the filter narrows it (M14), and that row may carry
+      // nothing, so the inspector's run below is only drawn once a tinted row is the selection.
+      { selector: '.manager-component-row:has([data-chip-tint]) .manager-component-identity' },
+    ],
+    expectView: 'components',
+    expectSelector: '.manager-component-row [data-essence-chip][data-chip-tint]',
+    expectContained: [
+      {
+        container: '.manager-table-scroll',
+        target: '.manager-component-row [data-essence-chip][data-chip-tint]',
+      },
+      {
+        container: 'aside.manager-inspector',
+        target: '[data-component-essence-list] [data-essence-chip][data-chip-tint]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceChip\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/ComponentBrowserInspector\.svelte$/,
+    ],
+  }),
+  managerCase({
     // THE INHERITING RULES EDITOR (issue 1371, round 2), and it is the ONLY state that renders the
     // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1
     // shipped as a unit-tested constant no frame could contain. `manager-component-edit-normal`
