@@ -475,8 +475,10 @@
   const tagVocabulary = $derived(worldVocabularyComponentTags(scope));
   // THE APPLIED-BUT-UNAUTHORED TAGS (issue 1371 r18-entry, maintainer ruling M33, closing D-CJ):
   // the STAGED list minus the vocabulary. A migrated record can apply a tag the world never
-  // authored; the run draws each one after the vocabulary's chips as a lit, STRUCK, clearable chip,
-  // and once cleared it is gone — nothing the world has not authored can be added back.
+  // authored; the run draws each one after the vocabulary's chips as a lit, clearable chip whose
+  // ACCESSIBLE NAME says it is not in the vocabulary, and once cleared it is gone — nothing the
+  // world has not authored can be added back. NOT struck: see the run's own note in the markup
+  // below, which states why that mark was withdrawn (issue 1371 r19-entry2, r20-entry3).
   const unauthoredTags = $derived(worldTags.filter((tag) => !tagVocabulary.includes(tag)));
 
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');

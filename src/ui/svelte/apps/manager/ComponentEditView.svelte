@@ -1870,7 +1870,7 @@
                   {format(
                     'FABRICATE.Admin.Manager.Component.EssencesEdit.Hint',
                     'Keyed to the {count} essences {system} uses. A system that drops an essence drops these values with it.',
-                    { count: essenceDraft.length, system: systemLabel }
+                    { count: offeredEssences.length, system: systemLabel }
                   )}
                 </p>
               </div>
@@ -1902,7 +1902,16 @@
               <i class={essenceNote.icon} aria-hidden="true"></i>
               <span>{essenceNote.text}</span>
             </p>
-            {#if essenceDraft.length > 0}
+            <!-- THE COUNT AND THE GUARD READ THE ARRAY THE GRID DRAWS (issue 1371 r20-entry3, UX
+               review round 6 finding 1). Both were `essenceDraft` — the system's WHOLE roster —
+               while the tiles below come from `offeredEssences`, issue 1036's enabled-plus-carried
+               subset. So the card said `Keyed to the 6 essences …` over five tiles on every
+               component that does not carry a disabled essence, and was right on the ones that do:
+               a number a GM checks once, finds correct, and has no reason to distrust later. The
+               guard reading the other array also made the `No essences are defined …` empty state
+               unreachable — a roster whose every essence is disabled rendered an EMPTY grid with no
+               sentence at all. -->
+            {#if offeredEssences.length > 0}
               <div class="manager-component-essence-grid">
                 {#each offeredEssences as option (option.id)}
                   <!-- The card is the shared `EssenceQuantityCard` (issue 772). It was

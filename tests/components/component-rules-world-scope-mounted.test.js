@@ -1004,4 +1004,79 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
     });
   });
+
+
+  // ── THE ESSENCE CARD COUNTS WHAT IT DRAWS (issue 1371 r20-entry3, UX review round 6 finding 1) ──
+  //
+  // The card's subtitle read `essenceDraft.length` — the system's WHOLE roster — while the grid
+  // below drew `offeredEssences`, issue 1036's enabled-plus-carried subset. So on every component
+  // that does not carry a disabled essence the card said `Keyed to the 6 essences …` over five
+  // tiles, and was CORRECT on the ones that do: a GM who checks the number once, finds it right,
+  // and has no reason to distrust it later. The same split made the empty state unreachable — a
+  // roster whose every essence is disabled rendered an empty grid and no sentence at all.
+  //
+  // Both halves are read off ONE render here, which is what makes them a comparison rather than
+  // two independent claims that could each be satisfied by a different arrangement.
+  describe('the essence card’s subtitle counts the tiles it actually draws (UX round 6 F1)', () => {
+    const essenceSection = (target) => target.querySelector('[data-component-edit-section="essences"]');
+    const subtitle = (target) =>
+      essenceSection(target).querySelector('.manager-component-rules-card-sub').textContent.trim();
+    const tiles = (target) =>
+      [...essenceSection(target).querySelectorAll('[data-component-edit-essence]')].map((tile) =>
+        tile.getAttribute('data-component-edit-essence')
+      );
+
+    /** A roster whose third essence is DISABLED, which is the lab world's own headline state. */
+    const roster = (aetherQuantity) => [
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember', quantity: 0, enabled: true },
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: '', quantity: 0, enabled: true },
+      { id: 'aether', name: 'Aether', icon: 'fas fa-wind', colorToken: '', quantity: aetherQuantity, enabled: false },
+    ];
+
+    it('states the OFFERED count over the offered tiles on a component that does not carry the disabled essence', async () => {
+      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
+        showEssences: true,
+        essenceOptions: roster(0),
+      });
+      // NON-VACUITY FIRST: the roster really does hold a third essence the grid withholds, so the
+      // numbers below are two different arrays rather than one array read twice.
+      assert.deepEqual(tiles(target), ['flame', 'earth'], 'the grid withholds the disabled essence');
+      assert.match(
+        subtitle(target),
+        /Keyed to the 2 essences/,
+        `the card counted the whole roster over the tiles it draws; it read "${subtitle(target)}"`
+      );
+    });
+
+    it('counts the disabled essence once the component CARRIES it, because then the grid draws it', async () => {
+      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
+        showEssences: true,
+        essenceOptions: roster(3),
+      });
+      assert.deepEqual(tiles(target), ['flame', 'earth', 'aether'], 'a carried disabled essence is drawn');
+      assert.match(subtitle(target), /Keyed to the 3 essences/);
+    });
+
+    it('reaches the empty state when EVERY essence is disabled and none is carried', async () => {
+      // Unreachable before r20: the guard tested `essenceDraft.length` and the loop walked
+      // `offeredEssences`, so this arrangement rendered an EMPTY grid with no sentence in it.
+      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
+        showEssences: true,
+        essenceOptions: [
+          { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: '', quantity: 0, enabled: false },
+          { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: '', quantity: 0, enabled: false },
+        ],
+      });
+      assert.deepEqual(tiles(target), [], 'nothing is offered');
+      assert.ok(
+        !essenceSection(target).querySelector('.manager-component-essence-grid'),
+        'an empty grid was drawn instead of the empty state'
+      );
+      assert.match(
+        essenceSection(target).textContent,
+        /No essences are defined for this system yet\./,
+        'the card said nothing at all about a roster it can offer nothing from'
+      );
+    });
+  });
 });
