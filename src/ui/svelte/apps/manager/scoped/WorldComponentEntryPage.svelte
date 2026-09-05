@@ -1064,12 +1064,24 @@
                     {/each}
                     <!--
                       THE APPLIED-BUT-UNAUTHORED TAGS (M33), after the vocabulary's chips. Lit,
-                      because the record applies them (`tone="tag" emphasis="lit"`, pressed);
-                      STRUCK, because the shared chip's struck face is the reference's own
-                      reading for "a value that is switched off in the vocabulary" and is the one
-                      face this run does not already use for another meaning; and the accessible
-                      name says why. Clearing one stages its removal (M34); it is drawn from the
-                      staged list, so a cleared tag leaves the run and is never re-offered.
+                      because the record applies them (`tone="tag" emphasis="lit"`, pressed), and
+                      the ACCESSIBLE NAME is what says they are not in the vocabulary — which is
+                      what M33 asks for and all of it: "lit and clearable". Clearing one stages
+                      its removal (M34); it is drawn from the staged list, so a cleared tag leaves
+                      the run and is never re-offered.
+
+                      NOT `struck` (issue 1371 r19-entry2). Revision 18 drew this chip struck, and
+                      `struck` is a SHIPPED MEANING owned by another screen: `Chip.svelte` defines
+                      it as a value switched off in the scope being read, and the rules editor's
+                      world-tag group draws exactly this record's `fuel` struck for the opposite
+                      reason — MUTED in this system, i.e. not applying. So one tag was struck on
+                      one screen and unstruck on the next with the mark carrying the opposite
+                      claim each time, and the note under this run — `3 world tags set on this
+                      record · muted in 1 system` — read as though the struck pair were the muted
+                      one. A second, non-colliding VISIBLE mark is defensible and was considered:
+                      it needs a named opt-in on `Chip` and its specimen in the design-system
+                      library, which is not this lane's to write, so it is reported rather than
+                      half-shipped.
                     -->
                     {#each unauthoredTags as tag (tag)}
                       <Chip
@@ -1078,7 +1090,6 @@
                         density="tag-run"
                         tone="tag"
                         emphasis="lit"
-                        struck
                         data-scoped-entry-tag={tag}
                         data-scoped-entry-tag-unauthored=""
                         aria-pressed="true"

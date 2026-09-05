@@ -874,10 +874,16 @@ describe('world Component entry editor (issue 1371)', () => {
   // A migrated record can apply a tag the world vocabulary never authored (`coal`'s `fuel` and
   // `bulk`). Under M18 the run offered the vocabulary alone, so those tags were invisible on the
   // one screen that could clear them and only the note counted them. M33: they are drawn on the
-  // run AFTER the vocabulary's chips as lit, STRUCK, clearable chips whose accessible name says
-  // they are not in the vocabulary; clearing one is staged under M34; once cleared it is never
-  // re-offered, because nothing the world has not authored can be added.
-  describe('an applied-but-unauthored world tag is drawn lit, struck and clearable (M33)', () => {
+  // run AFTER the vocabulary's chips as lit, clearable chips whose ACCESSIBLE NAME says they are
+  // not in the vocabulary; clearing one is staged under M34; once cleared it is never re-offered,
+  // because nothing the world has not authored can be added.
+  //
+  // AND THEY ARE NOT STRUCK (issue 1371 r19-entry2). Revision 18 struck them, and `struck` is the
+  // mark `ComponentEditView`'s world-tag group already draws for a world tag MUTED in this system
+  // — the opposite claim, on the same records, one screen away. `is-struck` is therefore asserted
+  // FALSE here rather than dropped from the reading: an assertion that stops looking is how a mark
+  // comes back.
+  describe('an applied-but-unauthored world tag is drawn lit and clearable, and NOT struck (M33)', () => {
     const MOSS = Object.freeze({ tags: ['moss'] });
     const run = (target) =>
       [...target.querySelectorAll('[data-scoped-entry-tag]')].map((chip) => ({
@@ -889,16 +895,16 @@ describe('world Component entry editor (issue 1371)', () => {
         label: chip.getAttribute('aria-label'),
       }));
 
-    it('draws it AFTER the vocabulary’s chips, lit and struck, pressed, with the qualified accessible name', async () => {
+    it('draws it AFTER the vocabulary’s chips, lit and pressed but NOT struck, with the qualified accessible name', async () => {
       const { target } = await open('coal', undefined, MOSS);
       assert.deepEqual(
         run(target).map(({ tag, unauthored, pressed, struck, lit }) => [tag, unauthored, pressed, struck, lit]),
         [
           ['moss', false, 'false', false, false],
-          ['fuel', true, 'true', true, true],
-          ['bulk', true, 'true', true, true],
+          ['fuel', true, 'true', false, true],
+          ['bulk', true, 'true', false, true],
         ],
-        'vocabulary first (unlit, not struck — the NEGATIVE control), then the record’s unauthored pair, lit and struck'
+        'vocabulary first (unlit — the NEGATIVE control), then the record’s unauthored pair, lit and unstruck: the accessible name carries "not in the world vocabulary", the mark the rules editor uses for MUTED does not'
       );
       const fuel = run(target).find((chip) => chip.tag === 'fuel');
       assert.equal(fuel.label, 'Remove the world tag fuel (not in the world vocabulary)');
@@ -909,16 +915,17 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('a vocabulary tag the record applies is lit but NOT struck — struck means "not in the vocabulary", nothing else', async () => {
+    it('an authored chip and an unauthored one differ ONLY in the accessible name and the hook — no chip on this run is struck', async () => {
       const { target } = await open('coal', {
         defaults: [{ id: 'coal', category: 'Raw', tags: ['moss', 'fuel'] }],
       }, MOSS);
       assert.deepEqual(
-        run(target).map(({ tag, pressed, struck, unauthored }) => [tag, pressed, struck, unauthored]),
+        run(target).map(({ tag, pressed, struck, unauthored, lit }) => [tag, pressed, struck, unauthored, lit]),
         [
-          ['moss', 'true', false, false],
-          ['fuel', 'true', true, true],
-        ]
+          ['moss', 'true', false, false, true],
+          ['fuel', 'true', false, true, true],
+        ],
+        'both are applied, both are lit, neither is struck — this run no longer speaks the muted mark at all'
       );
       assert.match(
         run(target).find((chip) => chip.tag === 'moss').label,
@@ -1125,8 +1132,8 @@ describe('world Component entry editor (issue 1371)', () => {
       // record, as the category trigger does, and is the one place that data stays visible.
       // With one tag authored the sentence goes.
       const { target: none } = await open('coal');
-      // M33 (issue 1371 r18-entry): the applied-but-unauthored pair IS drawn — lit, struck and
-      // clearable — but it is not OFFERED: no vocabulary chip exists, so the sentence still stands.
+      // M33 (issue 1371 r18-entry): the applied-but-unauthored pair IS drawn — lit and clearable —
+      // but it is not OFFERED: no vocabulary chip exists, so the sentence still stands.
       assert.deepEqual(
         [...none.querySelectorAll('[data-scoped-entry-tag]')].map((chip) => [
           chip.getAttribute('data-scoped-entry-tag'),

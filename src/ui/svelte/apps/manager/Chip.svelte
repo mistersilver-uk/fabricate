@@ -55,8 +55,14 @@
      section's `Salvage · n/a` — and striking those through would say they had been switched
      off by a GM. `rebuild-spec.md` D4.2 names this the `muted` variant; the prop is spelled
      `struck` only because the tone of that name is taken.
-     Callers: the rules editor's world-tag group and the world Component entry's own world-tag
-     run, which the reference paints identically.
+     ONE SHIPPING CALLER, and the docblock names it because the prop's meaning is only as
+     stable as the set of screens that wear it: `ComponentEditView`'s world-tag group, as
+     `struck={worldMutedTags.includes(tag)}` — a world tag MUTED in the system being read. The
+     world Component entry's own world-tag run was a second caller for one revision, on the
+     opposite meaning ("applied, but not in the world vocabulary"), on the same records, one
+     screen apart; it was withdrawn rather than left to make the mark say two things (issue 1371
+     r19-entry2). A caller that wants a mark for something OTHER than "switched off here" needs
+     its own named prop and its own specimen, not this one.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
    - swatch: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …) rendering a leading
      COLOUR DOT (issue 1036). The colour pill is a variant of the one chip rather than a
