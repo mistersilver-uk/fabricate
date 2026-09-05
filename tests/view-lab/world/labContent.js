@@ -4181,7 +4181,31 @@ export function buildLabContent() {
         },
       ],
       defaults: {
-        'sm-iron-ingot': { id: 'sm-iron-ingot', category: 'Refined' },
+        // ── (v) AN INHERITED ESSENCE MAP THAT DIFFERS FROM THE SYSTEM'S OWN ROW ────────────
+        // Issue 1371 r20-store3, reviewer round 6 finding 9. The world `essences` section is
+        // authored for almost every lab component and inherited by 66 pairs — but the `1.32.0`
+        // pass ELECTS each world map from the donor system's own row and only marks a system
+        // inheriting when the two are EQUAL, so in a freshly migrated world the resolved map and
+        // the persisted row are identical by construction and the r19 overlay changes no pixel.
+        // A frame of it therefore proved nothing: it was equally consistent with the list still
+        // drawing `getItems`.
+        //
+        // `air: 1` is the divergence, and it is the smallest one that reaches no arithmetic: the
+        // system's own row is `{earth: 2, fire: 1}`, so `manager-component-edit-inheriting` (which
+        // opens THIS component for exactly its inheriting state) and every rules-list row for it
+        // now draw a third essence the persisted row does not carry. No smithing recipe demands
+        // `air` — the system's essence demands are `fire`, `earth`, `water`, `aether` and `mote` —
+        // so no recipe's craftability moves. `water` would have moved `sm-r-tidebound`'s.
+        //
+        // The membership record below PRE-DECIDES `inherit.essences`, which is what makes the
+        // divergence survive: `markComponentEssenceInheritance` leaves a record that already
+        // carries a boolean alone, and would otherwise mark this pair OVERRIDING on the very
+        // inequality this seed exists to create.
+        'sm-iron-ingot': {
+          id: 'sm-iron-ingot',
+          category: 'Refined',
+          essences: { earth: 2, fire: 1, air: 1 },
+        },
         // `moss` IS APPLIED HERE TOO (issue 1371 r17, UX F-N2). Under M18 the entry's tag run is
         // the world VOCABULARY (`ingot` / `moss` / `ore`), and `fuel` / `bulk` sit outside it — so
         // with those two alone no chip on the lab entry was LIT, and the parity region for a lit
@@ -4200,7 +4224,10 @@ export function buildLabContent() {
         [`sm-iron-ingot|${LAB_SYSTEM_IDS.SMITHING}`]: {
           entityId: 'sm-iron-ingot',
           systemId: LAB_SYSTEM_IDS.SMITHING,
-          inherit: { category: true },
+          // `essences: true` is stated rather than left to the `1.32.0` pass — see the default
+          // above: the pass decides an undecided record by EQUALITY, and this pair is seeded
+          // unequal on purpose.
+          inherit: { category: true, essences: true },
         },
         [`sm-coal|${LAB_SYSTEM_IDS.SMITHING}`]: {
           entityId: 'sm-coal',
