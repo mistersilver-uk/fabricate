@@ -878,7 +878,9 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
 
     // The identity half is still identity-FIRST, with the essence's own icon.
     assert.equal(fire.querySelector('.manager-component-essence-name').textContent, 'Fire');
-    assert.ok(fire.querySelector('.manager-component-essence-icon i.fa-fire'));
+    // issue 1371 r18-colour (M29): the tile is the shared glyph-chip `Medallion`, so the glyph sits
+    // inside it rather than inside the card's retired own span.
+    assert.ok(fire.querySelector('[data-medallion="glyph"] i.fa-fire'));
 
     harness.remount();
   });
