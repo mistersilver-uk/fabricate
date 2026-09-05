@@ -1058,11 +1058,26 @@ const MODULE_FOCUS_PAIR = Object.freeze([
     half: 'the Foundry-core focus reset',
     compound: RESET_COMPOUND,
     declarations: { outline: 'none', 'box-shadow': 'none' },
+    areaRoots: [
+      '.fabricate-interactable-browser-app',
+      '.fabricate-interactable-config-app',
+      '.fabricate-interactables-manager',
+      '.fabricate-roll-prompt-dialog',
+    ],
   },
   {
     half: 'its paired :focus-visible ring',
     compound: RING_COMPOUND,
     declarations: { outline: '2px solid var(--fab-accent)', 'outline-offset': '2px' },
+    // THREE, NOT FOUR, AND THE MISSING ONE IS NOT AN OVERSIGHT. The roll-prompt dialog writes its
+    // ring as `button, input` in one block and `select` alone in another — neither list is one of
+    // `RESET_SHAPES`, so this recogniser does not see either as a copy of the pair. Its RESET half
+    // is a published shape and is listed above. Issue 1520 owns all four blocks.
+    areaRoots: [
+      '.fabricate-interactable-browser-app',
+      '.fabricate-interactable-config-app',
+      '.fabricate-interactables-manager',
+    ],
   },
 ]);
 
@@ -1250,6 +1265,28 @@ test('each half of the module focus pair is declared exactly once, at the module
         "Foundry core's orange ring for mouse focus and the ring repaints the Fabricate accent " +
         'for keyboard focus, so a half that declares more or less than its side of that contract ' +
         'leaves one of the two states unstyled or double-styled.'
+    );
+  }
+});
+
+test('no area root writes a copy of either half of the module focus pair', () => {
+  // GATE 1 PINS THE RESET ROOTS AND NOTHING PINNED THE RING ROOTS. A byte-identical
+  // `.fabricate-manager …:focus-visible` block is exactly the duplication issue 1501 removed; it
+  // is a singleton under gate 8's `count >= 2` filter, gate 1 reads bare `:focus` and never sees
+  // it, and the clause above counts only `.fabricate`-rooted blocks — so without this clause it
+  // lands green. The two halves have DIFFERENT expected lists, derived from the tree rather than
+  // assumed equal; see the note on the ring half.
+  for (const { half, compound, areaRoots } of MODULE_FOCUS_PAIR) {
+    const roots = sheetRules()
+      .map((rule) => focusPairRoot(rule.selector, compound))
+      .filter((root) => root !== null && root !== MODULE_ROOT);
+    assert.deepEqual(
+      [...new Set(roots)].sort(byCodePoint),
+      areaRoots,
+      `${half} must be written once at the module root. These area roots are issue 1520's and ` +
+        'issue 1501 left them in place; any other root is a per-area copy of a pair the module ' +
+        'already writes, reaching the same elements at the same rank, so which one paints is ' +
+        'decided by source order rather than by anything a reader of either block can see.'
     );
   }
 });
