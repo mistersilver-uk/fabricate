@@ -1653,7 +1653,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         rows: ['none', ...SEVEN],
         stage: async (target) => {
           target
-            .querySelector('[data-bulk-inset="category"] [data-world-component-bulk-option="alloy"]')
+            .querySelector(':scope [data-bulk-inset="category"] [data-world-component-bulk-option="alloy"]')
             .click();
           await drain();
         },
@@ -1682,7 +1682,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         rows: SEVEN,
         stage: async (target) => {
           target
-            .querySelector('[data-world-component-bulk-essence="alloy"] [data-stepper-increment]')
+            .querySelector(':scope [data-world-component-bulk-essence="alloy"] [data-stepper-increment]')
             .click();
           await drain();
         },
@@ -1768,7 +1768,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         if (inset.id === 'systems') {
           // A row on page two ACTS: the sixth system can be staged at all only through the pager.
           target
-            .querySelector('[data-bulk-inset="systems"] [data-world-component-bulk-option="fuel"]')
+            .querySelector(':scope [data-bulk-inset="systems"] [data-world-component-bulk-option="fuel"]')
             .click();
           await drain();
           assert.equal(sectionHint(target, 'Systems'), '2 chosen', 'the sixth system is staged from page two');
@@ -2479,7 +2479,7 @@ describe('world Component Catalogue (issue 1371)', () => {
           'the alchemy write drops `earth`, which that system does not hold; `sys-glass` is not written'
         );
         assert.ok(
-          !writes.some((call) => call.args[0] === 'sys-glass'),
+          writes.every((call) => call.args[0] !== 'sys-glass'),
           'NON-VACUITY, stated on its own: the system with rules and no roster is skipped'
         );
       });
@@ -2930,7 +2930,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         shellProps({
           autoSelectFirst: true,
           scope: scopeFor({ entities: [], defaults: [], membership: [] }),
-          onSelect: (id) => selected.push(id),
+          onSelect: (id) => {
+            selected.push(id);
+          },
         })
       );
       assert.ok(
