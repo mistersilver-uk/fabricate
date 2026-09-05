@@ -847,6 +847,49 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(reports.dirty.at(-1), true, 'the edit is still in front of the GM');
     });
 
+    // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THE SCREEN SAYS SO (issue 1371 r19-entry2) ──────
+    // The case above is the `false` refusal. A refusal that reaches Foundry's socket layer is a
+    // REJECTION: it posts Foundry's own raw sentence and then rejects, so before this revision
+    // `save()` rejected rather than answering `false` — the route-exit guard's
+    // `(await handle.save()) !== false` rejected with it, the header's `onclick={() => onSave()}`
+    // dropped it unhandled, and the GM's only signal was Foundry's message with no idea which of
+    // the four sections it was about or which had already landed durably.
+    it('a REJECTING write answers false too, and puts a second, different sentence in front of the GM naming the section and what had landed', async () => {
+      const notified = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { error: (message) => notified.push(message) } };
+      try {
+        const { target, calls, reports, actions } = await open('ingot', undefined, VOCAB, {
+          worldEssences: ESSENCES,
+        });
+        await stageAll(target);
+        actions.setWorldTags = async () => {
+          throw new Error('The requested Setting update was refused');
+        };
+        assert.equal(
+          await reports.handles.filter(Boolean).at(-1).save(),
+          false,
+          'the Save RESOLVES false — the route-exit guard declines the exit rather than rejecting'
+        );
+        await drain();
+        assert.deepEqual(
+          calls.map((call) => call.verb),
+          ['updateWorldDefaultSection'],
+          'the category landed durably; the essences and the aliases were never attempted'
+        );
+        assert.deepEqual(
+          notified,
+          [
+            'Saving the world tags did not complete; the world category had already been saved. The requested Setting update was refused',
+          ],
+          'ONE sentence, naming the section that refused and the one that had landed, with Foundry’s reason after it — not an echo of Foundry’s own toast'
+        );
+        assert.equal(reports.dirty.at(-1), true, 'the edit is still in front of the GM');
+      } finally {
+        globalThis.ui = previousUi;
+      }
+    });
+
     it('a staged pick that equals the record is NOT an edit, and the picker previews the staged value everywhere the screen reads it', async () => {
       const { target, reports } = await open('coal', undefined, VOCAB);
       target.querySelector('[data-scoped-entry-category-input]').click();

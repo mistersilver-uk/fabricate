@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  SCOPED_ENTRY_IDENTITY_STEP,
   confirmScopedEntryExit,
   finishScopedEntryExit,
   flushScopedEntryDraft,
@@ -306,6 +307,91 @@ describe('flushing a draft through the world-scope write family', () => {
     });
     assert.equal(landed, false);
     assert.deepEqual(actions.calls, [], 'the essence write after the refused tag write never ran');
+  });
+
+  // ── A FOUNDRY-REFUSED WRITE REJECTS; IT DOES NOT ANSWER `false` (issue 1371 r19-entry2) ──────
+  // These verbs end in `game.settings.set` on a WORLD setting, and Foundry's socket layer posts
+  // its own error toast and then REJECTS. Everything here tested `=== false` and nothing caught,
+  // so a real refusal left this function as a rejected promise: the route-exit guard's
+  // `(await handle.save()) !== false` rejected instead of declining the exit, and the header's
+  // `onclick={() => onSave()}` dropped it unhandled. Under M34 that is four writes as one
+  // sequence, so it also matters WHICH of them had already landed.
+  it('a REJECTING write answers false, stops the sequence, and reports the step and what had landed', async () => {
+    const actions = actionsOf();
+    const refusals = [];
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: {
+        identity: null,
+        sections: [
+          { section: 'category', value: 'Raw' },
+          { section: 'tags', value: ['fuel'] },
+          { section: 'essences', value: { flame: 2 } },
+          { section: 'aliases', value: ['Item.a'] },
+        ],
+      },
+      actions,
+      writers: {
+        tags: async () => {
+          throw new Error('The requested Setting update was refused');
+        },
+      },
+      onRefused: (refusal) => refusals.push(refusal),
+    });
+    assert.equal(landed, false, 'the promise RESOLVES false rather than rejecting');
+    assert.deepEqual(
+      actions.calls,
+      [['updateWorldDefaultSection', 'coal', 'category', 'Raw']],
+      'the sequence stopped where it refused: essences and aliases were never attempted'
+    );
+    assert.equal(refusals.length, 1, 'reported once');
+    assert.equal(refusals[0].step, 'tags', 'and it names the section that refused');
+    assert.deepEqual(
+      refusals[0].landed,
+      ['category'],
+      'and the section that HAD landed durably before it, which is the half Foundry’s own toast cannot say'
+    );
+    assert.equal(refusals[0].error.message, 'The requested Setting update was refused');
+  });
+
+  it('names the IDENTITY patch as the step when that is what rejected, and reports nothing landed', async () => {
+    const actions = actionsOf({
+      updateEntity: async () => {
+        throw new Error('refused');
+      },
+    });
+    const refusals = [];
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: { name: 'Coal' }, sections: [{ section: 'category', value: 'Raw' }] },
+      actions,
+      onRefused: (refusal) => refusals.push(refusal),
+    });
+    assert.equal(landed, false);
+    assert.equal(refusals[0].step, SCOPED_ENTRY_IDENTITY_STEP);
+    assert.deepEqual(refusals[0].landed, [], 'nothing had landed, so the sentence says so');
+    assert.deepEqual(
+      actions.calls.map(([name]) => name),
+      ['updateEntity'],
+      'no section was attempted after the identity patch refused'
+    );
+  });
+
+  it('does NOT report a `false` refusal, because the verb that answered it has already said so', async () => {
+    // The two sentences would otherwise stack: a verb that declines a write reports its own
+    // refusal, and Foundry toasts a rejected one. This callback is for the second case only.
+    const actions = actionsOf({ updateWorldDefaultSection: async () => false });
+    const refusals = [];
+    assert.equal(
+      await flushScopedEntryDraft({
+        entityId: 'coal',
+        writes: { identity: null, sections: [{ section: 'category', value: 'Raw' }] },
+        actions,
+        onRefused: (refusal) => refusals.push(refusal),
+      }),
+      false
+    );
+    assert.deepEqual(refusals, []);
   });
 
   it('refuses an empty entity id rather than writing against nothing', async () => {

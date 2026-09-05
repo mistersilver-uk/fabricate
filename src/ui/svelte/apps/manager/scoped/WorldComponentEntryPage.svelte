@@ -47,7 +47,7 @@
   system, on a migrated world the refusal is the NORMAL state rather than an edge case.
 -->
 <script>
-  import { localize, notifyWarn } from '../../../util/foundryBridge.js';
+  import { localize, notifyError, notifyWarn } from '../../../util/foundryBridge.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
@@ -81,6 +81,7 @@
   import { componentScopeValidationPresentation } from '../../../../../utils/componentScopeValidation.js';
   import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import {
+    SCOPED_ENTRY_IDENTITY_STEP,
     flushScopedEntryDraft,
     scopedEntryBaseline,
     scopedEntryDirty,
@@ -260,8 +261,80 @@
   }
 
   /**
-   * Flush the buffered edit. Answers `false` when a write refused, which is what the route-exit
-   * guard gates navigation on.
+   * WHAT EACH STEP OF THE SAVE SEQUENCE IS CALLED WHEN A REFUSAL HAS TO NAME IT (issue 1371
+   * r19-entry2).
+   *
+   * Keyed on the step names {@link flushScopedEntryDraft} reports — the four `DRAFT_SECTIONS`
+   * and the identity patch's own constant — rather than on a second spelling of them, so a
+   * section renamed there cannot leave this map answering for a step that no longer exists.
+   *
+   * The values are LOCALIZED FRAGMENTS, not sentences, because the sentence they land in is one
+   * of two whole sentences below and a translation must be free to inflect the fragment for it.
+   *
+   * @type {Readonly<Record<string, [string, string]>>}
+   */
+  const SAVE_STEP_NAMES = Object.freeze({
+    [SCOPED_ENTRY_IDENTITY_STEP]: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionIdentity',
+      'the name, art and description',
+    ],
+    category: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionCategory',
+      'the world category',
+    ],
+    tags: ['FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionTags', 'the world tags'],
+    essences: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionEssences',
+      'the world essence values',
+    ],
+    aliases: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionAliases',
+      'the import aliases',
+    ],
+  });
+
+  /**
+   * The sentence a REFUSED save puts in front of the GM, and it is a second, different statement
+   * rather than an echo of Foundry's.
+   *
+   * Foundry toasts a refused world-setting write's own `error.message` verbatim before it rejects,
+   * so a catch that re-posted that message would put one sentence on screen twice. This one says
+   * what Foundry's cannot: WHICH of the four staged sections the sequence stopped at, and — the
+   * half that matters under M34 — which of them had already landed durably, because the store
+   * publishes its cache before awaiting the write and every open manager surface shows all four
+   * as saved until a reload. Same shape as `adminStore`'s membership failure sentences: localized,
+   * with an English floor that cannot be a raw key, and the reason carried as `{error}` so a
+   * translation can state it too.
+   *
+   * @param {{step: string, error: unknown, landed: string[]}} refusal
+   * @returns {void}
+   */
+  function reportRefusedSave({ step, error, landed }) {
+    const named = (name) => {
+      const [key, fallback] = SAVE_STEP_NAMES[name] ?? [];
+      return key ? text(key, fallback) : name;
+    };
+    const data = {
+      section: named(step),
+      landed: landed.map(named).join(', '),
+      error: error?.message ? String(error.message) : '',
+    };
+    notifyError(
+      phrase(
+        landed.length > 0
+          ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionFailedAfter'
+          : 'FABRICATE.Admin.Manager.Scoped.Component.Entry.SaveSectionFailed',
+        landed.length > 0
+          ? 'Saving {section} did not complete; {landed} had already been saved. {error}'
+          : 'Saving {section} did not complete. {error}',
+        data
+      ).trim()
+    );
+  }
+
+  /**
+   * Flush the buffered edit. Answers `false` when a write refused OR rejected, which is what the
+   * route-exit guard gates navigation on.
    *
    * @returns {Promise<boolean>}
    */
@@ -273,6 +346,7 @@
       writes: scopedEntryWrites(pending, baseline),
       actions,
       writers: DRAFT_WRITERS,
+      onRefused: reportRefusedSave,
     });
     if (landed) flushed = pending;
     return landed;

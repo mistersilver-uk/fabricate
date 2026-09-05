@@ -213,6 +213,15 @@ export function scopedEntryDirty(draft, persisted) {
 }
 
 /**
+ * The name {@link flushScopedEntryDraft} reports for the identity patch, which is a step of the
+ * sequence but not a SECTION. Exported so a caller's own label map is keyed on this literal rather
+ * than on a second spelling of it.
+ *
+ * @type {string}
+ */
+export const SCOPED_ENTRY_IDENTITY_STEP = 'identity';
+
+/**
  * Flush a draft through one entity type's world-scope write family.
  *
  * The identity patch lands FIRST and the sections after it, in the order the scope descriptor
@@ -228,25 +237,63 @@ export function scopedEntryDirty(draft, persisted) {
  * {@link scopedEntryBaseline}); the writer is handed the action family, the entity id and the
  * staged value, and answers `false` to refuse exactly as the family's own verbs do.
  *
+ * ── A REFUSED WRITE IS NOT ALWAYS A `false`: A FOUNDRY-REFUSED ONE REJECTS ─────────────────────
+ * These verbs end in `game.settings.set` on a WORLD setting, which awaits `SocketInterface`'s
+ * dispatch; a server refusal posts Foundry's own `ui.notifications.error(error.message)` and then
+ * REJECTS. Testing `=== false` alone therefore let a real refusal out of this function as a
+ * rejected promise: the route-exit guard's `(await handle.save()) !== false` rejected rather than
+ * declining the exit, the header's `onclick={() => onSave()}` dropped it as an unhandled
+ * rejection, and the GM's only signal was Foundry's raw sentence. That mattered more under M34
+ * than it used to: the four sections land as ONE SEQUENCE, so a rejection at write *k* leaves
+ * `1..k-1` durably landed while the draft stays dirty — and the store publishes its cache BEFORE
+ * awaiting the write, so every open manager surface shows all four as saved until a reload.
+ *
+ * So the whole sequence is caught, the answer is the `false` this function's contract already
+ * promises, and the caller is told WHICH step refused and WHICH had already landed through
+ * `onRefused`. The sentence itself is the caller's, because it is localized and this module has
+ * no localizer — the same division `adminStore`'s membership verbs make, where the store catches
+ * and a named message function says it.
+ *
  * @param {object} options
  * @param {string} options.entityId
  * @param {{identity: Record<string, unknown>|null, sections: Array<{section: string, value: unknown}>}} options.writes
  * @param {object|null} options.actions the entity type's world-scope action family.
  * @param {Record<string, (actions: object|null, entityId: string, value: unknown) => unknown>} [options.writers]
+ * @param {(refusal: {step: string, error: unknown, landed: string[]}) => void} [options.onRefused]
+ *   Called ONCE, with the step that threw and the steps that had already landed, when a write
+ *   REJECTS. Not called for a `false`: a verb that answers `false` has declined the write itself
+ *   and has already said so its own way, and a second sentence over that one is an echo.
  * @returns {Promise<boolean>} whether every write landed.
  */
-export async function flushScopedEntryDraft({ entityId, writes, actions, writers = {} }) {
+export async function flushScopedEntryDraft({
+  entityId,
+  writes,
+  actions,
+  writers = {},
+  onRefused,
+}) {
   if (!entityId) return false;
-  if (writes.identity !== null) {
-    const patched = await actions?.updateEntity?.(entityId, writes.identity);
-    if (patched === false) return false;
-  }
-  for (const { section, value } of writes.sections) {
-    const write = writers?.[section];
-    const written = write
-      ? await write(actions, entityId, value)
-      : await actions?.updateWorldDefaultSection?.(entityId, section, value);
-    if (written === false) return false;
+  const landed = [];
+  let step = SCOPED_ENTRY_IDENTITY_STEP;
+  try {
+    if (writes.identity !== null) {
+      const patched = await actions?.updateEntity?.(entityId, writes.identity);
+      if (patched === false) return false;
+      landed.push(step);
+    }
+    for (const { section, value } of writes.sections) {
+      step = section;
+      const write = writers?.[section];
+      const written = write
+        ? await write(actions, entityId, value)
+        : await actions?.updateWorldDefaultSection?.(entityId, section, value);
+      if (written === false) return false;
+      landed.push(section);
+    }
+  } catch (error) {
+    console.error('Fabricate | A scoped entry save was refused:', error);
+    onRefused?.({ step, error, landed });
+    return false;
   }
   return true;
 }
