@@ -95,7 +95,41 @@ describe('BulkEditPanelShell renders the shipped chrome when it is asked for not
   });
 });
 
-describe('BulkEditPanelShell takes its three per-site parameters (issue 1371)', () => {
+describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => {
+  it('bleeds the dock to a --fab-space-4 container only when asked (dockBleed, M24)', async () => {
+    // The dock's three negative bleeds are written as the SAME token as the container's padding
+    // so the two cannot drift — and that token is `--fab-space-3`, the shared `.manager-inspector`
+    // rail's. `EntityListInspectorFrame`'s inspector column pads `--fab-space-4`, so inside it the
+    // dock stopped 4px short of each edge and its bottom (issue 1371 r16-cat, maintainer ruling
+    // M24: "a padding/whitespace around the bulk edit panel that prevents the button panel from
+    // being full-width"). `dockBleed="space-4"` restates all five declarations at that token.
+    const plain = await shell.mount({ ...BASE });
+    assert.ok(
+      !plain.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
+      'unset, the dock is the shipped one — the three studios in the shared rail do not move'
+    );
+    shell.remount();
+    const wide = await shell.mount({ ...BASE, dockBleed: 'space-4' });
+    assert.ok(
+      wide.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
+      'asked for, the dock wears the class its wider bleed is painted from'
+    );
+    // AND THE CLASS HAS A RULE BEHIND IT, in the scoped block for the reason the `has-foot`
+    // pin below records: a sheet rule for these five properties would match and be discarded.
+    const source = readFileSync(resolve(repoRoot, SHELL_PATH), 'utf8');
+    const rule = /\.fab-bulk-edit-dock\.is-bleed-space-4\s*\{([^}]*)\}/.exec(source);
+    assert.ok(rule, 'nothing paints the class the dock emits for the wider bleed');
+    for (const declaration of [
+      /bottom:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
+      /margin-inline:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
+      /margin-bottom:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
+      /padding-inline:\s*var\(--fab-space-4\)/,
+      /padding-bottom:\s*var\(--fab-space-4\)/,
+    ]) {
+      assert.match(rule[1], declaration, 'all five of the dock`s container-bound declarations move together');
+    }
+  });
+
   it('renders the caller Clear label over the shipped phrase', async () => {
     // `proto:626` reads `Clear` where this panel reads `Clear selection` — the action sits under
     // a `BULK EDIT` eyebrow in a rail showing nothing but the selection, so `selection` is the

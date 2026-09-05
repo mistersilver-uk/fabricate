@@ -37,12 +37,13 @@
      this panel, so a caller emits its labels, controls and hints as siblings rather than
      wrapping them — the panel's uniform `gap` is the section rhythm.
 
-  ── THREE PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47) ───
+  ── FOUR PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47; r16-cat
+  ruling M24) ───
 
-  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with three
+  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with four
   differences, and each is a PARAMETER here rather than a fork or an in-place restyle — the
   standing rule for a shared primitive that must behave differently at a second site. All
-  three default to exactly what ships, so the Component, Recipe and Essence Studios render
+  four default to exactly what ships, so the Component, Recipe and Essence Studios render
   byte-identically across this change.
 
    - clearLabel: the header action's label, ALREADY LOCALIZED. `proto:626` reads `Clear`
@@ -79,6 +80,16 @@
      there makes the dock taller, which eats into the scrollport the panel above it scrolls
      in — that is the same trade `bulk-edit-dock-pinning.test.js` already bounds for a
      sibling delete card, and the two are alternatives rather than a stack.
+   - dockBleed: WHICH SPACING TOKEN THE DOCK BLEEDS BY (issue 1371 r16-cat, maintainer ruling
+     M24). The dock's three negative bleeds and its two compensating insets are written as the
+     SAME token as its container's padding so the two cannot drift — and that token is
+     `--fab-space-3`, the shared `.manager-inspector` rail's. `EntityListInspectorFrame`'s
+     inspector column pads `--fab-space-4`, so inside it the shipped dock stopped 4px short of
+     each edge and of the bottom, and the panel's scroller clipped it there: "a padding/
+     whitespace around the bulk edit panel that prevents the button panel from being
+     full-width". `'space-4'` restates all five declarations at that token; `''` — the
+     default — is the shipped rail's. Named for the token rather than for a consumer, because
+     what it states is a fact about the box the dock sits in, not about who put it there.
 -->
 <script>
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -99,6 +110,10 @@
     // A snippet rendered inside the dock, UNDER Apply — the reference's destructive action and
     // its consequence note (`proto:791-796`). Absent by default.
     dockFoot = undefined,
+    // The spacing token the dock bleeds by: `''` (the shipped `--fab-space-3`, the shared
+    // rail's inset) or `'space-4'` (the scoped list frame's inspector column). See the props
+    // block above.
+    dockBleed = '',
     panelAttr = 'data-component-bulk-panel',
     clearAttr = 'data-component-bulk-clear',
     countAttr = 'data-component-bulk-count',
@@ -158,7 +173,11 @@
 
   {@render children?.()}
 
-  <div class="fab-bulk-edit-dock" class:has-foot={Boolean(dockFoot)}>
+  <div
+    class="fab-bulk-edit-dock"
+    class:has-foot={Boolean(dockFoot)}
+    class:is-bleed-space-4={dockBleed === 'space-4'}
+  >
     <ManagerButton
       class="fab-bulk-edit-apply"
       {...applyHook}
@@ -418,6 +437,18 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+  }
+
+  /* THE WIDER BLEED, FOR A CONTAINER THAT PADS `--fab-space-4` (issue 1371 r16-cat, M24). All
+     five container-bound declarations of the base rule, restated at the wider token and nothing
+     else: the sticky construction, the hairline, the fill and the shadow are the base rule's.
+     Gated on `dockBleed` so the three studios in the shared rail are byte-identical. */
+  .fab-bulk-edit-dock.is-bleed-space-4 {
+    bottom: calc(-1 * var(--fab-space-4));
+    margin-inline: calc(-1 * var(--fab-space-4));
+    margin-bottom: calc(-1 * var(--fab-space-4));
+    padding-inline: var(--fab-space-4);
+    padding-bottom: var(--fab-space-4);
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an

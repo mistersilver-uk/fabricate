@@ -2002,6 +2002,105 @@ describe('world Component Catalogue (issue 1371)', () => {
         assert.deepEqual(insetRows(target, 'tags'), ['moss', 'ore']);
       });
     });
+
+    // ── THE PANEL'S GEOMETRY IS THE REFERENCE'S (issue 1371 r16-cat, maintainer ruling M24) ──
+    // "incorrect sizing/geometry as compared to the prototype. Ensure the rows and chips in the
+    // bulk editor are the correct dimensions and the buttons and spacing are too. I also see a
+    // padding/whitespace around the bulk edit panel that prevents the button panel from being
+    // full-width." The DIMENSIONS are measured in Chromium by the rendered suite; what happy-dom
+    // can see is which FACE each control wears and where the dock's bleed is asked for, and
+    // every face below is a shipped primitive's opt-in rather than a hand-rolled box.
+    describe('the panel wears the reference`s faces and asks for the pane-wide dock (M24)', () => {
+      it('paints the direction track in the ACCENT tone: the chosen direction filled, the idle one bare', async () => {
+        const { target } = await selectedCatalogue();
+        const track = target.querySelector('[data-world-component-bulk-mode]');
+        assert.ok(Boolean(track), 'NON-VACUITY: the track renders');
+        assert.ok(
+          track.classList.contains('is-accent'),
+          '`proto:605-609` fills the chosen segment `--accent` and leaves the idle one unfilled, which is `tone="accent"`'
+        );
+      });
+
+      it('draws each SYSTEM row with the reference`s check box, and the category rows with their glyph', async () => {
+        const { target } = await selectedCatalogue();
+        const systemRows = [
+          ...target.querySelectorAll(
+            '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+          ),
+        ];
+        assert.ok(systemRows.length > 1, 'NON-VACUITY: the systems inset has rows');
+        for (const row of systemRows) {
+          assert.ok(
+            Boolean(row.querySelector('.fab-bulk-component-inset-box')),
+            '`proto:5273` draws a 15px box at the row`s leading edge, not a glyph'
+          );
+          assert.ok(
+            !row.querySelector('.fab-bulk-component-inset-box').classList.contains('is-on'),
+            'and an unstaged row`s box is empty'
+          );
+        }
+        // THE BOX ACTS WITH THE ROW: staging the system lights it.
+        target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
+        await drain();
+        systemRows[0].click();
+        await drain();
+        assert.ok(
+          systemRows[0].querySelector('.fab-bulk-component-inset-box').classList.contains('is-on'),
+          'a staged row`s box is filled and carries the check'
+        );
+        assert.ok(
+          Boolean(systemRows[0].querySelector('.fab-bulk-component-inset-box i.fa-check')),
+          'with the check glyph inside it'
+        );
+        const categoryRow = target.querySelector(
+          '[data-world-component-bulk-inset="category"] [data-world-component-bulk-option]'
+        );
+        assert.ok(
+          !categoryRow.querySelector('.fab-bulk-component-inset-box') &&
+            Boolean(categoryRow.querySelector('i')),
+          'the category rows keep the reference`s circle glyph (`proto:5296`); only the systems rows are boxes'
+        );
+      });
+
+      it('stages tag chips at Chip`s INSPECTOR density, the reference`s 4px 9px pill', async () => {
+        const target = await harness.mount({
+          scope: scopeFor({}, { categories: [], tags: ['fuel'] }),
+          systems: COMPONENT_SYSTEMS,
+          actions: recordingComponentActions().actions,
+        });
+        await selectTwo(target);
+        stageTag(target, 'fuel');
+        await drain();
+        const chip = target.querySelector('[data-world-component-bulk-tag-chip="fuel"]');
+        assert.ok(Boolean(chip), 'NON-VACUITY: the staged run drew the chip');
+        assert.ok(
+          chip.classList.contains('is-inspector'),
+          '`proto:5313` draws the staged chip `padding:4px 9px; font:600 10px`, which is the inspector density'
+        );
+      });
+
+      it('asks the shell for the pane-wide dock bleed and the frame for the flush bulk scroller, while the panel is on screen', async () => {
+        const { target } = await selectedCatalogue();
+        const scroller = target.querySelector('.manager-scoped-list-inspector-scroll');
+        assert.ok(
+          scroller.classList.contains('is-flush-bulk'),
+          'the bulk scroller takes the inspector column`s inset while the panel shows'
+        );
+        assert.ok(
+          target.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
+          'and the shell`s dock bleeds by the column`s own `--fab-space-4`'
+        );
+        // AND BOTH GO WITH THE SELECTION: clearing it returns the column to the resting inspector.
+        target.querySelector('[data-world-component-bulk-clear]').click();
+        await drain();
+        assert.ok(
+          !target
+            .querySelector('.manager-scoped-list-inspector-scroll')
+            .classList.contains('is-flush-bulk'),
+          'the resting and inspected columns keep their own inset'
+        );
+      });
+    });
   });
 
   /**
@@ -2353,6 +2452,16 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(
         !column.classList.contains('is-flush'),
         'the default is OFF: the essence and tool catalogues keep the inset they always had'
+      );
+    });
+
+    it('leaves the inspector column`s inset alone with `flushBulkDock` unset (M24)', async () => {
+      const target = await shellHarness.mount(shellProps({ selectedId: 'coal' }));
+      const scroller = target.querySelector('.manager-scoped-list-inspector-scroll');
+      assert.ok(Boolean(scroller), 'NON-VACUITY: an inspected row puts the column on screen');
+      assert.ok(
+        !scroller.classList.contains('is-flush-bulk'),
+        'the default is OFF: the essence and tool catalogues keep the column they always had'
       );
     });
 

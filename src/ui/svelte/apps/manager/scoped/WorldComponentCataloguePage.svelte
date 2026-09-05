@@ -513,6 +513,7 @@
     membershipFilter={false}
     autoSelectFirst
     flushColumn
+    flushBulkDock
     bind:browserState
     bind:selectedId
     onSelect={(entityId) => (selectedId = entityId)}

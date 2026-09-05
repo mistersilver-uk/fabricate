@@ -52,6 +52,21 @@
   `BulkEditSection` owns each axis label row; `SegmentedControl` owns the direction track;
   `ArmedDangerButton` owns the two-step delete; `Chip` owns the staged tag run.
 
+  ── THE GEOMETRY IS THE REFERENCE'S, ON THE PUBLISHED RUNGS (issue 1371 r16-cat, M24) ────────
+  "incorrect sizing/geometry as compared to the prototype. Ensure the rows and chips in the bulk
+  editor are the correct dimensions and the buttons and spacing are too." Measured in Chromium on
+  both documents before a value was written: the reference's SYSTEM row (`proto:5273`) is a 33px
+  row — `7px 9px` around a 15px check box, radius 8 — and its category and tag rows (`proto:5296`,
+  `proto:5330`) are 27px, `6px 9px` around 10.5px sans type on a 7px corner; this panel drew all
+  three at 24px with a 9px glyph where the box is. So: system rows on the 30 rung with a 16px box,
+  category and tag rows on the 28 rung, the box's radius 5 on the ladder's 6, the row corners on
+  7 (the 26-32px band; the reference's 8 is on no rung). The staged chip is `Chip`'s inspector
+  density (`proto:5313`, `4px 9px` on a 999 corner); the direction track is `SegmentedControl`'s
+  accent tone (`proto:5155`, the chosen segment filled, the idle one bare); the inset pager pads
+  `6px 8px` around 22px buttons (`proto:5200`); the dock's delete takes the entry's own 34px /
+  radius 9 / 11px rule from the sheet; and the dock bleeds by `space-4` so it spans the frame's
+  inspector column (`proto:791`, with the frame's `flushBulkDock` handing the scroller the inset).
+
   Props:
    - count: how many rows are ticked. Pre-counted by the frame; the panel only words it.
    - systems: `{id, name}[]`, the crafting-system roster.
@@ -404,11 +419,13 @@
     page: systemPageView,
     onPage: (next) => (systemPage = next),
     onChoose: (id) => toggleSystem(id),
+    // THE ROW'S LEADING EDGE IS A CHECK BOX, NOT A GLYPH (`proto:5273`, M24): the staged state
+    // fills it, so `icon` is not part of this descriptor.
+    box: true,
     rows: systemPageView.rows.map((item) => ({
       id: item.id,
       name: item.name,
       state: stagedSystemIds.includes(item.id) ? 'on' : 'off',
-      icon: stagedSystemIds.includes(item.id) ? 'fas fa-square-check' : 'far fa-square',
       meta: stagedSystemIds.includes(item.id) ? stagedLabel : '',
     })),
   });
@@ -582,6 +599,7 @@
   clearAttr="data-world-component-bulk-clear"
   countAttr="data-world-component-bulk-count"
   applyAttr="data-world-component-bulk-apply"
+  dockBleed="space-4"
   {onClearSelection}
   onApply={applyStaged}
   dockFoot={onDelete ? componentBulkDanger : undefined}
@@ -607,6 +625,7 @@
   />
   <SegmentedControl
     fill={true}
+    tone="accent"
     options={modeSegments}
     value={mode}
     groupName="world-component-bulk-mode"
@@ -674,6 +693,7 @@
         <Chip
           tag="button"
           type="button"
+          density="inspector"
           tone={tagTone(tag)}
           icon={tagGlyph(tag)}
           data-world-component-bulk-tag-chip={tag}
@@ -813,7 +833,11 @@
   rows cycle three states and the system rows toggle, and neither is expressible as a link.
 -->
 {#snippet stagingInset(inset)}
-  <div class="fab-bulk-component-inset" data-world-component-bulk-inset={inset.id}>
+  <div
+    class="fab-bulk-component-inset"
+    class:has-box={Boolean(inset.box)}
+    data-world-component-bulk-inset={inset.id}
+  >
     <div class="fab-bulk-component-inset-search">
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
       <input
@@ -832,6 +856,7 @@
           type="button"
           class="fab-bulk-component-inset-row"
           class:is-staged={row.state !== 'off'}
+          class:has-box={Boolean(inset.box)}
           data-keyboard-focus="true"
           data-world-component-bulk-option={row.id}
           data-world-component-bulk-option-state={row.state}
@@ -839,7 +864,19 @@
           disabled={inert || inset.disabled}
           onclick={() => inset.onChoose(row.id)}
         >
-          <i class={row.icon} aria-hidden="true"></i>
+          {#if inset.box}
+            <!-- DECORATIVE: the row is the control and `aria-pressed` states the value; the box
+                 paints it where the reference paints it (`proto:5273`). -->
+            <span
+              class="fab-bulk-component-inset-box"
+              class:is-on={row.state !== 'off'}
+              aria-hidden="true"
+            >
+              {#if row.state !== 'off'}<i class="fas fa-check"></i>{/if}
+            </span>
+          {:else}
+            <i class={row.icon} aria-hidden="true"></i>
+          {/if}
           <span class="fab-bulk-component-inset-name">{row.name}</span>
           {#if row.meta}
             <span class="fab-bulk-component-inset-meta">{row.meta}</span>
@@ -989,15 +1026,25 @@
 
   /* THE WINDOW IS A FIXED HEIGHT, which is the whole reason the reference draws a pager on it:
      a list that grew and shrank with its search would move the two groups below it on every
-     keystroke. Five rows plus their gaps is the reference's own 181px. */
+     keystroke. Five rows plus their four gaps, at each inset's own row rung (M24): 5 x 28 + 4 x 4
+     for the category and tag insets (the reference's 151), 5 x 30 + 16 for the systems inset
+     (its 181). */
   .fab-bulk-component-inset-rows {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-1);
-    min-height: 170px;
+    min-height: 156px;
     align-content: flex-start;
   }
 
+  .fab-bulk-component-inset.has-box .fab-bulk-component-inset-rows {
+    min-height: 166px;
+  }
+
+  /* A ROW IS A CONTROL ON THE LADDER (M24): 28px for a category or tag row (`proto:5296`'s 27),
+     30px for a system row (`proto:5273`'s 33, whose extra is the check box it carries), both on
+     the 26-32px band's 7px corner. Fixed rather than padded, so the rung holds whatever the
+     host's button line-height does. */
   .fab-bulk-component-inset-row {
     appearance: none;
     display: flex;
@@ -1005,18 +1052,44 @@
     align-items: center;
     width: 100%;
     min-width: 0;
-    height: auto;
-    min-height: 0;
+    height: 28px;
+    min-height: 28px;
     margin: 0;
-    padding: var(--fab-space-1) var(--fab-space-2);
+    padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);
     color: var(--fab-text);
     font-family: inherit;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     text-align: left;
     cursor: pointer;
+  }
+
+  .fab-bulk-component-inset-row.has-box {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  /* THE SYSTEM ROW'S CHECK BOX (`proto:5273`): a 15px square on a 5px corner, filled `--accent`
+     with a 7.5px check when the row is staged. 16px and 6px here — the ladder puts a control at
+     or under 24px on 6, and 16 centres a 30px row on the 4px scale where 15 cannot. */
+  .fab-bulk-component-inset-box {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 6px;
+    color: var(--fab-on-accent);
+    font-size: 0.5rem;
+  }
+
+  .fab-bulk-component-inset-box.is-on {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent);
   }
 
   .fab-bulk-component-inset-row:hover:not(:disabled) {
@@ -1044,23 +1117,31 @@
     font-size: 0.56rem;
   }
 
+  /* The system row's name is the reference's 11px/600 SERIF (`proto:5274`); a category or tag
+     row's is its 10.5px/600 SANS (`proto:5296`), inherited from the row. */
   .fab-bulk-component-inset-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    font-family: var(--fab-font-serif);
+    font-family: inherit;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .fab-bulk-component-inset-row.has-box .fab-bulk-component-inset-name {
+    font-family: var(--fab-font-serif);
+    font-size: 0.68rem;
+  }
+
+  /* The trailing fact is a NUMERAL in the reference (`proto:5279`, `font:600 9px var(--mono)`),
+     not a tracked uppercase label; the mono face ships 400 and 500 only. */
   .fab-bulk-component-inset-meta {
     flex: 0 0 auto;
     color: var(--fab-text-subtle);
+    font-family: var(--fab-font-mono);
     font-size: 0.56rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
+    font-weight: 500;
   }
 
   .fab-bulk-component-inset-empty {
@@ -1077,7 +1158,8 @@
     gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
-    padding: var(--fab-space-1) var(--fab-space-2);
+    /* `proto:5200` pads `6px 8px`, which the dense unit and the 8px step state exactly (M24). */
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     /* 7, NOT THE REFERENCE'S 8. `design-system/spec.md:218` gives a 26-32px control 7 and puts
        nothing on 8 at all, and `design-system-debt-ratchets` refuses a new off-ladder radius —
@@ -1100,13 +1182,14 @@
     margin-left: auto;
   }
 
+  /* `proto:5200`'s `pageBtn` is a 22px square on a 6px corner (M24). */
   .fab-bulk-component-inset-page {
     appearance: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     min-height: 0;
     margin: 0;
     padding: 0;

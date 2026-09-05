@@ -75,6 +75,12 @@ const CATALOGUE_PROPS = [
   // Component Rules list's. It is the shell's because a page composes the shell and never the
   // frame.
   'flushColumn',
+  // THE BULK DOCK TO THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24). OPT-IN and
+  // OFF by default: with it unset the inspector column pads itself and the bulk panel's scroller
+  // clips the shell's dock at that inset, exactly as it always did; the world Component catalogue
+  // turns it on, the column hands its inset to the bulk scroller, and the shell's `space-4` bleed
+  // reaches the column's edges. Catalogue-only for the reason `flushColumn` is.
+  'flushBulkDock',
   // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
   // shells, so the difference clause below is unchanged: one composition, configured per scope.
   'browserState',
@@ -256,6 +262,7 @@ describe('the shells declare the pinned prop sets', () => {
       'extraCards',
       // M21's opt-in is catalogue-only for the reason M14's is: the rules-list shell's column is
       // `ComponentsBrowserView`'s own `.manager-main`, which already runs edge to edge.
+      'flushBulkDock',
       'flushColumn',
       // AND THE TWO PARITY OPT-OUTS (issue 1371), catalogue-only for the same reason as the
       // rest: both are about the INSPECTOR, and the rules-list shell renders none.
@@ -1055,6 +1062,34 @@ describe('the catalogue shell FORWARDS what it declares', () => {
       frame,
       /\.manager-scoped-list-column\.is-flush \{\s*padding: 0;\s*\}/,
       'and the flush column drops the pane inset and nothing else'
+    );
+  });
+
+  it('hands the frame the flush bulk dock, OFF by default (M24)', () => {
+    const source = shell();
+    assert.match(source, /\n\s*flushBulkDock = false,/, 'declared, and OFF by default');
+    assert.match(source, /\{flushBulkDock\}/, 'and forwarded to the frame');
+    const frame = sourceOf(FRAME);
+    assert.match(frame, /\n\s*flushBulkDock = false,/, 'the frame declares it OFF by default too');
+    // The class rides the BULK branch's scroller — rendered only while the opted-in panel is on
+    // screen — and the aside's own inset is lifted by a same-template `:has()`, so a resting or
+    // inspected column is untouched even on the catalogue that opts in, and the aside's
+    // serialized attributes are byte-identical at default props (a `class:` directive on the
+    // aside itself reorders them).
+    assert.match(
+      frame,
+      /\{#if bulk && selection\.count > 0\}[\s\S]{0,900}?<div class="manager-scoped-list-inspector-scroll" class:is-flush-bulk=\{flushBulkDock\}>/,
+      'the bulk scroller wears `is-flush-bulk` from the prop and nothing else'
+    );
+    assert.match(
+      frame,
+      /\.manager-scoped-list-inspector:has\(> \.manager-scoped-list-inspector-scroll\.is-flush-bulk\) \{\s*padding: 0;\s*\}/,
+      'the column hands its inset away while that scroller is its child…'
+    );
+    assert.match(
+      frame,
+      /\.manager-scoped-list-inspector-scroll\.is-flush-bulk \{\s*padding: var\(--fab-space-4\);\s*\}/,
+      '…to the bulk scroller, so the panel content stays where it was and the dock can bleed past it'
     );
   });
 

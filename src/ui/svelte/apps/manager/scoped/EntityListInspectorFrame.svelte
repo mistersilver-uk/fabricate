@@ -357,6 +357,19 @@
     // OPT-IN and OFF by default. The essence and tool catalogues keep the inset they shipped
     // with; the ruling names the Component catalogue and that lane is the one that turns it on.
     flushColumn = false,
+    // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
+    // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
+    // from being full-width." The inspector column below pads `--fab-space-4` and the bulk
+    // panel renders inside a `-scroll` child that owns the `overflow-y` — so `BulkEditPanelShell`'s
+    // sticky dock, whose negative bleeds are sized for the shared rail's `--fab-space-3`, was
+    // CLIPPED at the scroller's edge and stopped 16px short of the column's on every side. With
+    // this ON, and only while the bulk panel is on screen, the column hands its inset to the
+    // bulk scroller: the panel's content sits exactly where it did, the scroller's padding box
+    // is now the column's, and a dock asked to bleed by `space-4` (the shell's `dockBleed`) lands
+    // on the column's divider and its right edge — `proto:791`'s full-width foot.
+    //
+    // OPT-IN and OFF by default; the resting and inspected columns are untouched even when on.
+    flushBulkDock = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
     // Search, membership, the lane filters, the sort pair and the page live on an object the
@@ -1448,7 +1461,12 @@
         aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
       >
         {#if bulk && selection.count > 0}
-          <div class="manager-scoped-list-inspector-scroll">
+          <!-- THE CLASS IS ON THE SCROLLER, NOT THE ASIDE (M24). A `class:` directive on the aside
+               moves its `class` attribute behind the static ones at render time, which changes the
+               serialized markup of every catalogue at default props; on this element — which is
+               rendered only inside the bulk branch and carries nothing but a class — it changes
+               nothing, and the aside's own inset is lifted by the same-template `:has()` below. -->
+          <div class="manager-scoped-list-inspector-scroll" class:is-flush-bulk={flushBulkDock}>
             {@render bulk([...selectedIds], rowContext(null))}
           </div>
         {:else if inspectedEntry}
@@ -2090,6 +2108,20 @@
     padding: var(--fab-space-4);
     border-left: 1px solid var(--fab-border);
     background: var(--fab-bg-1);
+  }
+
+  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`). Two rules and
+     one value moved between them, so the content does not shift by a pixel: what changes is
+     which box the shell's sticky dock can bleed into. Overflow clips to the PADDING box, so a
+     dock bled into the scroller's own padding is painted where a dock bled past a padding-less
+     scroller was cut off. Both elements are in this template, so the compiler keeps the
+     `:has()` (`ShoppingList.svelte` records the boundary it would prune across). */
+  .manager-scoped-list-inspector:has(> .manager-scoped-list-inspector-scroll.is-flush-bulk) {
+    padding: 0;
+  }
+
+  .manager-scoped-list-inspector-scroll.is-flush-bulk {
+    padding: var(--fab-space-4);
   }
 
   .manager-scoped-list-inspector-scroll {

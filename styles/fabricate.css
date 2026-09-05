@@ -26277,3 +26277,36 @@
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .manager-pagination {
   background: var(--fab-overlay-light-03);
 }
+
+/* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG (M24) ───────────────────────────────────────
+   `proto:5340` draws the world bulk panel's delete `height:34px; border-radius:8px; font:700 11px`
+   on a `--danger-soft` fill inside a `--danger-border` hairline. `ArmedDangerButton` renders a bare
+   `.manager-button.is-danger`, which the sheet leaves at the host button's 6px corner and 14px type
+   — measured in the lab at radius 6 and 14px against a 34px height. The world Component ENTRY's
+   danger card already corrected the identical control to the ladder (`.manager-component-entry-
+   danger-body .manager-button.is-danger`, above: 34px, radius 9 for the 34-38px band, 11px/700),
+   and that is the example copied here rather than a second reading of the same reference — the
+   one difference is the fill, which the reference draws soft where the entry's card, sitting on a
+   danger hairline of its own, draws it transparent.
+
+   SCOPED TO THE DOCK'S DANGER LEG by the class the panel already writes on it, because
+   `.manager-button.is-danger` is every armed delete in the manager. A CLASS and not the leg's
+   `data-world-component-bulk-danger` hook: `manager-layout.test.js` renders every ancestor
+   compound of a manager-button rule to prove the disabled paint wins in it, and it can build a
+   div for a class where it cannot for an attribute. */
+.fabricate-manager .fab-bulk-component-danger .manager-button.is-danger {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fabricate-manager .fab-bulk-component-danger .manager-button.is-danger:not(:disabled):not(.is-armed) {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}

@@ -309,6 +309,59 @@ function measureListFrame() {
   };
 }
 
+/**
+ * The bulk panel's geometry against the inspector column (issue 1371 r16-cat, maintainer ruling
+ * M24), read off the honest mount, which has the panel on screen with a direction, a system and a
+ * tag staged. Every number here is the prototype's (`proto:590-697`, `proto:5271-5340`,
+ * `proto:791-796`) or the design-system rung it snaps to.
+ */
+function measureBulkGeometry() {
+  const box = (selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+    const b = element.getBoundingClientRect();
+    const s = getComputedStyle(element);
+    return {
+      left: b.left,
+      right: b.right,
+      top: b.top,
+      bottom: b.bottom,
+      width: b.width,
+      height: b.height,
+      radius: s.borderTopLeftRadius,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+      borderLeft: Number.parseFloat(s.borderLeftWidth),
+      paddingLeft: s.paddingLeft,
+      background: s.backgroundColor,
+    };
+  };
+  return {
+    aside: box('.manager-scoped-list-inspector'),
+    scroller: box('.manager-scoped-list-inspector-scroll'),
+    dock: box('.fab-bulk-edit-dock'),
+    apply: box('[data-world-component-bulk-apply]'),
+    danger: box('[data-world-component-bulk-danger] button'),
+    segmentActive: box('[data-world-component-bulk-mode] .manager-segment.is-active'),
+    segmentIdle: box('[data-world-component-bulk-mode] .manager-segment:not(.is-active)'),
+    systemRow: box(
+      '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+    ),
+    systemBox: box('[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-box'),
+    categoryRow: box(
+      '[data-world-component-bulk-inset="category"] [data-world-component-bulk-option]'
+    ),
+    tagRow: box('[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option]'),
+    tagChip: box('[data-world-component-bulk-tag-chip]'),
+    insetPager: box(
+      '[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-pager'
+    ),
+    pagerButton: box(
+      '[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-page'
+    ),
+  };
+}
+
 /** The row's leading edge order, which is the other half of the delta's own criterion. */
 function measureRowOrder() {
   const row = document.querySelector('[data-scoped-list-row="resin"]');
@@ -333,6 +386,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   let rowOrder = null;
   let toolbarType = null;
   let listFrame = null;
+  let bulkGeometry = null;
 
   before(async () => {
     rendered.scoped = collectScopedCss();
@@ -340,7 +394,9 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     await harness.setup();
     try {
       const target = await harness.mount({
-        scope: componentScopeFor(),
+        // ONE VOCABULARY TAG, so the tag inset draws a row and a staged chip can be measured
+        // (M24). `buildWorldScopeState` attaches this leg; the projection helper alone does not.
+        scope: { ...componentScopeFor(), worldVocabulary: { categories: [], tags: ['fuel'] } },
         systems: COMPONENT_SYSTEMS,
         // `resin` is the one record NO system holds, so the bulk delete plan frees it and the
         // dock's danger leg arms for real rather than branching to `Cannot delete`.
@@ -348,6 +404,23 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         worldItems: [{ uuid: 'Item.resin-source', name: 'Wildwood Resin', description: 'Tapped.' }],
       });
       target.querySelector('[data-scoped-list-select="resin"]').click();
+      await drainMicrotasks();
+      // STAGE ONE OF EVERYTHING THE GEOMETRY PASS MEASURES, before arming the delete — the danger
+      // control disarms on blur, so it goes last: a direction (the ACTIVE segment's fill), a
+      // system (a lit box) and a tag (a staged chip).
+      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
+      await drainMicrotasks();
+      target
+        .querySelector(
+          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+        )
+        .click();
+      await drainMicrotasks();
+      target
+        .querySelector(
+          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
+        )
+        .click();
       await drainMicrotasks();
       const danger = target.querySelector(':scope [data-world-component-bulk-danger] button');
       danger.click();
@@ -382,6 +455,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       honest = await page.evaluate(measurePointerTargets, TARGETS);
       rowOrder = await page.evaluate(measureRowOrder);
       toolbarType = await page.evaluate(measureToolbarType);
+      bulkGeometry = await page.evaluate(measureBulkGeometry);
       await page.setContent(
         cataloguePage(rendered.markup, rendered.scoped.css, OVERLAY_CONTROL),
         { waitUntil: 'load' }
@@ -573,6 +647,103 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       pagerSummary.left > pager.left,
       'while the summary keeps the band`s own inset, so the text does not touch the pane edge'
     );
+  });
+
+  it('spans the bulk dock across the inspector column, with Apply and the delete the width of the panel (M24)', () => {
+    const { aside, scroller, dock, apply, danger } = bulkGeometry;
+    assert.ok(Boolean(dock) && Boolean(aside), 'NON-VACUITY: the panel and its dock render');
+    assert.ok(dock.width > 250, 'NON-VACUITY: the dock is a real width');
+    // THE DOCK BAND IS THE INSPECTOR'S WHOLE WIDTH, inside its divider hairline. Before M24 the
+    // scroller clipped the shell's `--fab-space-3` bleed inside the column's `--fab-space-4`
+    // inset, so the band (and both buttons) stopped 16px short of each edge.
+    assert.equal(
+      Math.round(dock.left),
+      Math.round(aside.left + aside.borderLeft),
+      'the band starts at the inspector`s divider'
+    );
+    assert.equal(Math.round(dock.right), Math.round(aside.right), 'and ends at its right edge');
+    assert.equal(
+      Math.round(scroller.right),
+      Math.round(aside.right),
+      'because the bulk scroller — not the column — now carries the inset the dock bleeds through'
+    );
+    // AND THE BUTTONS ARE THE PANEL'S WIDTH: the dock's own inset is the pane's 16px on each side,
+    // `proto:791`'s `padding: 13px 17px` on the 4px scale.
+    for (const [name, control] of [
+      ['Apply', apply],
+      ['delete', danger],
+    ]) {
+      assert.equal(
+        Math.round(control.left),
+        Math.round(dock.left) + 16,
+        `${name} starts one pane inset inside the band`
+      );
+      assert.equal(
+        Math.round(control.right),
+        Math.round(dock.right) - 16,
+        `and ${name} ends one pane inset before the band\`s right edge`
+      );
+    }
+  });
+
+  it('draws the rows, the chips, the direction track and the buttons at the reference`s dimensions (M24)', () => {
+    const {
+      systemRow,
+      systemBox,
+      categoryRow,
+      tagRow,
+      tagChip,
+      segmentActive,
+      segmentIdle,
+      danger,
+      apply,
+      insetPager,
+      pagerButton,
+    } = bulkGeometry;
+    // SYSTEM ROWS: `proto:5273` pads `7px 9px` around a 15px box, a 33px row — the 30 rung, with
+    // a 16px box so the row centres on the 4px scale.
+    assert.equal(Math.round(systemRow.height), 30, 'a system row is on the 30px rung');
+    assert.ok(Boolean(systemBox), 'and carries the reference`s box');
+    assert.equal(Math.round(systemBox.width), 16, 'the box is 16px wide');
+    assert.equal(Math.round(systemBox.height), 16, 'and 16px tall');
+    // CATEGORY AND TAG ROWS: `proto:5296` / `proto:5330` pad `6px 9px` around 10.5px type, a
+    // 27px row — the 28 rung.
+    assert.equal(Math.round(categoryRow.height), 28, 'a category row is on the 28px rung');
+    assert.equal(Math.round(tagRow.height), 28, 'and so is a tag row');
+    // THE STAGED CHIP: `proto:5313` pads `4px 9px` on a 999 corner — Chip's inspector density.
+    assert.ok(Boolean(tagChip), 'NON-VACUITY: a chip is staged');
+    assert.equal(tagChip.paddingLeft, '8px', 'the chip takes the 8px inset (9 on the 4px scale)');
+    assert.equal(tagChip.radius, '999px', 'on the stadium corner');
+    // THE DIRECTION TRACK: `proto:5155` draws 28px segments on a 7px corner, the chosen one
+    // FILLED and the idle one bare. The segment's height is its `6px` insets around the label's
+    // line box, so it is a font metric rather than a stated rung: 28.4px on the lab's real host
+    // face, 26-27 on this harness's Arial. The 26-32px band is what the corner is read against,
+    // and the band is what is asserted.
+    assert.ok(
+      segmentActive.height >= 26 && segmentActive.height <= 29,
+      `a segment sits in the 26-32px band (measured ${segmentActive.height})`
+    );
+    assert.equal(segmentActive.radius, '7px', 'on the 26-32px band`s corner');
+    assert.notEqual(
+      segmentActive.background,
+      segmentIdle.background,
+      'the chosen direction is filled and the idle one is not'
+    );
+    assert.equal(
+      segmentIdle.background,
+      'rgba(0, 0, 0, 0)',
+      'the idle direction paints nothing, as `modeStyle(false)` does'
+    );
+    // THE DOCK'S TWO BUTTONS: `proto:791` foot 36px → the 38 rung the shared Apply already takes;
+    // `proto:5340` delete `height:34px; border-radius:8px; font:700 11px` → 34, radius 9, 11px.
+    assert.equal(Math.round(apply.height), 38, 'Apply is on the 38px rung');
+    assert.equal(Math.round(danger.height), 34, 'the delete is on the 34px rung');
+    assert.equal(danger.radius, '9px', 'on the 34-38px band`s corner, not the host button`s 6');
+    assert.equal(danger.fontSize, '11px', 'at the reference`s 11px…');
+    assert.equal(danger.fontWeight, '700', '…and weight 700');
+    // THE INSET PAGER: `proto:5200` pads `6px 8px` around 22px buttons — 36px.
+    assert.equal(Math.round(pagerButton.width), 22, 'a pager button is 22px');
+    assert.equal(Math.round(insetPager.height), 36, 'so the pager is the reference`s 36px');
   });
 
   it('and reports a MISS on every one of them under a transparent overlay', () => {

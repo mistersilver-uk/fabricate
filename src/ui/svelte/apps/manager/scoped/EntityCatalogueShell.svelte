@@ -148,6 +148,10 @@
     // default, so the essence and tool catalogues keep the pane inset they always carried; the
     // world Component catalogue is the lane that turns it on.
     flushColumn = false,
+    // WHETHER THE BULK PANEL'S DOCK REACHES THE INSPECTOR COLUMN'S EDGES (issue 1371 r16-cat,
+    // maintainer ruling M24). Threaded straight to the frame; see its own prop note. OPT-IN and
+    // OFF by default, so the tool catalogue's bulk panel keeps the column it shipped in.
+    flushBulkDock = false,
     onOpenEntry = () => {},
     rowMeta = undefined,
     // Threaded straight to the frame; see its own prop notes. All three are OPT-IN and default to
@@ -326,6 +330,7 @@
     {onSelect}
     {autoSelectFirst}
     {flushColumn}
+    {flushBulkDock}
     bind:armedToken
     inspectorBody={catalogueInspector}
   />
