@@ -70,6 +70,7 @@
  * transient report for the acceptance suite and for the editors of PRs 6a-c.
  */
 
+import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
 import { electWorldDefault } from './worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
@@ -94,7 +95,12 @@ export const SCOPE_PAYLOAD_KEYS = Object.freeze({
   tools: 'toolScope',
 });
 
-/** The membership `inherit` map each entity type is created with — every section OVERRIDDEN. */
+/**
+ * The membership `inherit` map each entity type is created with — every section OVERRIDDEN.
+ *
+ * Component `essences` is deliberately NOT here: its switch is decided by EQUALITY with the
+ * elected world map, in step 3b below, through the `1.32.0` pass's own rule.
+ */
 const OVERRIDING_INHERIT = Object.freeze({
   components: Object.freeze({ category: false }),
   essences: Object.freeze({ effectSource: false, macro: false }),
@@ -663,6 +669,20 @@ export function migrateWorldScopeEntities(data) {
       if (record) payload.defaults[entity.id] = record;
       for (const section of refusedSections) {
         refusedDefaultSections.push({ entityType, entityId: entity.id, section });
+      }
+      // THE `essences` SWITCH IS DECIDED BY EQUALITY, NOT WRITTEN OFF (issue 1371 r18-store,
+      // M31): each live member's record is marked inheriting where its own map equals the
+      // elected one and overriding — carrying its own map — where it does not. This is the
+      // `1.32.0` pass's rule applied here, so a world reaching both passes in one run and a
+      // world that ran `1.30.0` long ago converge on the same corpus.
+      if (entityType === 'components') {
+        for (const member of liveMembers) {
+          markComponentEssenceInheritance(
+            payload.membership[membershipKeyOf(entity.id, member.systemId)],
+            recordFor(member.systemId) ?? null,
+            record?.essences
+          );
+        }
       }
     }
   }

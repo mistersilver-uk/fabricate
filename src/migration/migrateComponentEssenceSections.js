@@ -66,10 +66,10 @@ import { isPlainObject } from './migrationHelpers.js';
  */
 function componentsBySystem(systems) {
   const bySystem = new Map();
-  (Array.isArray(systems) ? systems : []).forEach((system, index) => {
-    if (!isPlainObject(system)) return;
+  for (const [index, system] of (Array.isArray(systems) ? systems : []).entries()) {
+    if (!isPlainObject(system)) continue;
     const systemId = typeof system.id === 'string' ? system.id.trim() : '';
-    if (!systemId || bySystem.has(systemId)) return;
+    if (!systemId || bySystem.has(systemId)) continue;
     const rows = new Map();
     for (const component of Array.isArray(system.components) ? system.components : []) {
       if (!isPlainObject(component)) continue;
@@ -77,7 +77,7 @@ function componentsBySystem(systems) {
       if (componentId && !rows.has(componentId)) rows.set(componentId, component);
     }
     bySystem.set(systemId, { index, rows });
-  });
+  }
   return bySystem;
 }
 
@@ -106,17 +106,16 @@ function isDecided(record) {
 export function markComponentEssenceInheritance(record, inSystemRow, worldEssences) {
   if (!isPlainObject(record) || isDecided(record)) return false;
   const inherit = isPlainObject(record.inherit) ? record.inherit : {};
-  if (!isPlainObject(inSystemRow)) {
-    // Nothing to preserve: the union draws no row for this record until a re-add seeds one.
-    inherit.essences = true;
+  // A record with no row left has nothing to preserve — the union draws no row for it until a
+  // re-add seeds one — so it inherits, exactly as a row whose own map equals the world's does.
+  const own = isPlainObject(inSystemRow)
+    ? normalizeComponentEssenceMap(inSystemRow.essences)
+    : null;
+  if (own && !componentEssenceMapsEqual(own, worldEssences)) {
+    inherit.essences = false;
+    record.essences = own;
   } else {
-    const own = normalizeComponentEssenceMap(inSystemRow.essences) ?? {};
-    if (componentEssenceMapsEqual(own, worldEssences)) {
-      inherit.essences = true;
-    } else {
-      inherit.essences = false;
-      record.essences = own;
-    }
+    inherit.essences = true;
   }
   record.inherit = inherit;
   return true;
@@ -159,7 +158,7 @@ function decideEntity(scope, entityId, records, bySystem) {
   const elected = kept ?? electFromDonor(records, bySystem, entityId);
   if (!kept && elected) {
     if (!isPlainObject(scope.defaults)) scope.defaults = {};
-    scope.defaults[entityId] = { ...(existing ?? {}), id: entityId, essences: elected };
+    scope.defaults[entityId] = { ...existing, id: entityId, essences: elected };
   }
   for (const record of records) {
     const row = bySystem.get(record.systemId)?.rows.get(entityId) ?? null;

@@ -26,6 +26,7 @@ import {
   buildWorldCharacterLibraries,
   stripSystemCharacterLibraries,
 } from './migrateCharacterLibrariesToWorldScope.js';
+import { migrateComponentEssenceSections } from './migrateComponentEssenceSections.js';
 import {
   buildWorldCurrencyConfig,
   stripSystemCurrencyConfig,
@@ -549,6 +550,18 @@ function deriveWorldScopeEntitySlices(migrated) {
     recipes: Array.isArray(migrated.recipes) ? migrated.recipes : [],
     gatheringConfig: systemId ? { systems: { [systemId]: gatheringSlice } } : { systems: {} },
     ...input,
+  });
+
+  // STEP 3b - the `1.32.0` essence election over the same one-system corpus (issue 1371
+  // r18-store, M31), SHARED with the world-side pass rather than reimplemented. A bundle exported
+  // between `1.30.0` and `1.32.0` already carries component membership records, which the
+  // `1.30.0` transform's per-pair guard leaves untouched — so without this step they would reach
+  // the destination with NO `inherit.essences` switch and follow whatever world map the
+  // destination has elected, whatever the bundled system authored. The pass is idempotent per
+  // entity, so a bundle from a `1.32.0` world passes through unchanged.
+  migrateComponentEssenceSections({
+    systems: [system],
+    componentScope: result?.[SCOPE_PAYLOAD_KEYS.components],
   });
 
   let droppedToolBreakage = null;
