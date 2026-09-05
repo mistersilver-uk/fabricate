@@ -1412,3 +1412,67 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
   });
 });
 
+/**
+ * THE ENTRY HEADER'S IDENTITY CHIP IS BORDERLESS (issue 1371 r11-entry, UX F-B).
+ *
+ * The reference draws the world Component entry's header chip at `proto:5375` — 42px, radius 10,
+ * a flat slate fill, and NO `border` declaration at all, so it computes `border-style: none`. The
+ * shipped `Medallion` carries a hairline, and the parity run reads that single difference as
+ * three lines on a 42px tile at the top of the screen.
+ *
+ * `Medallion`'s own variant is pinned where the primitive lives — `recipe-studio-primitives.test.js`
+ * mounts it and asserts both the emitted class and the two declarations. What NOTHING pinned is
+ * the CONSUMER, and a consumer is exactly what F12 found missing after the variant shipped: the
+ * primitive existed, was proved, and was wired at one of the three sites it was built for. So the
+ * wiring is pinned at the two sites that take it, by their own route hooks, and the entry header
+ * block in `CraftingSystemManagerRoot.svelte` is the one this lane owns.
+ *
+ * A SOURCE ASSERTION, because the manager root is a 16,000-line shell whose header band is
+ * reachable only by booting the whole application; the rendered consequence is measured by the
+ * parity oracle instead, and by the `world-component-entry-*` frames.
+ */
+describe('the world Component entry header wires the borderless medallion', () => {
+  const ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+
+  /**
+   * One `<Medallion …/>` call, sliced from the branch that carries a route hook.
+   *
+   * @param {string} source the shell's own text.
+   * @param {string} hook the branch's `data-*` heading attribute.
+   * @returns {string}
+   */
+  function medallionUnder(source, hook) {
+    const branch = source.indexOf(hook);
+    assert.ok(branch !== -1, `NON-VACUITY: the shell still draws a \`${hook}\` heading`);
+    const open = source.indexOf('<Medallion', branch);
+    assert.ok(open !== -1, `and that heading still renders a Medallion`);
+    return source.slice(open, source.indexOf('/>', open));
+  }
+
+  it('passes `variant="glyph-chip"` on the entry heading, keeping its own size and glyph', () => {
+    const call = medallionUnder(sourceOf(ROOT), 'data-world-component-entry-heading');
+    assert.match(call, /variant="glyph-chip"/, `the header chip asks for the borderless face`);
+    assert.match(call, /size=\{42\}/, 'and keeps `proto:5375`’s 42px, which the variant does not own');
+    assert.match(call, /glyph=\{22\}/);
+    assert.match(call, /src=\{worldComponentEntryImage\}/, 'and still draws the linked art');
+  });
+
+  it('and the three SIBLING headings do not, so the opt-in is a real per-site decision', () => {
+    // The positive control. `Medallion`'s variant is `''` by default and three other heading
+    // branches in the same shell render it; a variant that had become implicit, or a lane that
+    // wired it by editing the primitive instead of the call site, passes the clause above and
+    // fails here.
+    const source = sourceOf(ROOT);
+    for (const hook of [
+      'data-world-essence-entry-heading',
+      'data-essence-edit-heading',
+      'data-world-tool-entry-heading',
+    ]) {
+      assert.equal(
+        /variant=/.test(medallionUnder(source, hook)),
+        false,
+        `\`${hook}\` takes the shipped tile, and this change must not have moved it`
+      );
+    }
+  });
+});

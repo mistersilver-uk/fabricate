@@ -10659,8 +10659,25 @@
              inventing a picture for. -->
           <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
             <!-- 42px, not the 44 the three sibling headings use: `proto:814` draws this chip at
-                 42 and an art size is its own ladder rather than the control one. -->
-            <Medallion src={worldComponentEntryImage} icon="fas fa-cube" size={42} glyph={22} />
+                 42 and an art size is its own ladder rather than the control one.
+
+                 `variant="glyph-chip"` FOR THE ABSENT EDGE (issue 1371 r11-entry, UX F-B). The
+                 reference's chip here is `proto:5375` — 42px, radius 10, a slate fill and NO
+                 `border` declaration at all — so it computes `border-style: none`, while the
+                 shipped tile carries the primitive's hairline. On a 42px tile at the top of the
+                 screen that edge is plainly visible, and the parity run reads it as three lines
+                 (`borderTopWidth`, `borderTopStyle`, `borderTopColor`). The variant is the one
+                 thing `size`, `glyph` and `tint` cannot say; it is the same opt-in the world
+                 catalogue's row chip already takes, and it moves no medallion that does not ask.
+                 `borderTopLeftRadius 9 !== 10` survives on purpose: 10 is on no published rung
+                 and 9 is the 34-38px band's corner (D-C). -->
+            <Medallion
+              src={worldComponentEntryImage}
+              icon="fas fa-cube"
+              size={42}
+              glyph={22}
+              variant="glyph-chip"
+            />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={worldComponentEntryName}>
                 {worldComponentEntryName || viewTitle()}
