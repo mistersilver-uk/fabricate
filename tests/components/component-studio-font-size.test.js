@@ -193,7 +193,31 @@ const FIXTURE = `
             </div>
           </div>
           <p class="fab-bulk-edit-label" data-m="bulk-label">Category</p>
-          <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
+          <!--
+            THE BULK EDIT AXIS, no longer a native select (issue 1504). What is written here is
+            the converted control's own markup: Select's picker ROOT with the trigger nested
+            inside it, because the root is where .fabricate-select lands and the three rungs are
+            declared as .fabricate-select .fabricate-select-trigger-RUNG. A trigger-only fixture
+            would match none of them and would measure the 14px Foundry app base instead — and
+            searchable-popover-area-scope.test.js's mirrored pairs are what hold this shape,
+            since they pair the family's root and panel anchors with the INHERITED
+            fabricate-picker / manager-travel-picker classes that must ride beside them.
+
+            The pinned number below moved with the markup, from the manager control-text scale
+            to the shared form rung's own 12.5px. (No backticks in here: this fixture is a
+            JavaScript template literal.)
+          -->
+          <div class="fabricate-picker manager-travel-picker fabricate-select fab-bulk-edit-select">
+            <button
+              type="button"
+              class="fabricate-select-trigger fabricate-select-trigger-form"
+              data-m="bulk-select"
+              role="combobox"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-label="Category"
+            ><span class="manager-travel-picker-value fabricate-select-value">Leave unchanged</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+          </div>
           <div class="fab-bulk-edit-label-row">
             <p class="fab-bulk-edit-label">Tags</p>
             <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove · again to leave unchanged</span>
@@ -352,7 +376,10 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // `BulkEditSelect.svelte` is NOT here any more (issue 1504): it has no `<style>` block at
+  // all now, and `scopedComponentCss` refuses a component that emits none rather than pairing
+  // the fixture with an empty string. Its control's whole appearance is the `.fabricate-select*`
+  // family in `styles/fabricate.css`, which this page already loads.
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
@@ -484,7 +511,13 @@ const EXPECTED = {
   // hint and matches the hero's own hint. It used to share `bulk-hint`, which made that
   // sentence the SMALLEST text in the panel.
   'bulk-subhint': 9.92, // 0.62rem — identical to `bulk-hero-hint`
-  'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
+  // 12.5px, the shared `<Select>` `form` rung, and a REAL change (issue 1504). It was 11.52 —
+  // the manager control-text scale the retired native `<select>` took from its own scoped block.
+  // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
+  // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
+  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
+  // only under `.fabricate-manager`.
+  'bulk-select': 12.5,
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
   'bulk-essence-name': 12.16, // 0.76rem — the extracted card, shared with the editor grid
   'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
