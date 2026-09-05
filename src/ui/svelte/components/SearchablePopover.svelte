@@ -750,6 +750,11 @@
    */
   function typeAheadOwnsKey(event) {
     if (showSearch) return false;
+    // THE REFUSAL `toggle()` MAKES IS THIS BRANCH'S TOO. `triggerAriaDisabled` keeps the trigger
+    // focusable precisely so a capped control stays reachable — `ModifierPillSelect` at its pick
+    // cap is the site — so it is a button that HAS focus and refuses to open. Opening it from a
+    // typed character would be the one route around a refusal that is stated everywhere else.
+    if (disabled || triggerAriaDisabled) return false;
     if (event.ctrlKey || event.metaKey || event.altKey) return false;
     const typed = typeAheadCursor(activeIndex, typeAheadLabels, event.key, {
       buffer: typeAheadBuffer,

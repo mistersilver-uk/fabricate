@@ -850,6 +850,31 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       harness.remount();
     });
 
+    it('refuses to open a trigger that `triggerAriaDisabled` has already refused', async () => {
+      // `triggerAriaDisabled` keeps the trigger FOCUSABLE precisely so a capped control stays
+      // reachable, so it is a button that has focus and refuses to open — which makes a typed
+      // character the one route around a refusal that is stated everywhere else.
+      chosen.length = 0;
+      await mountPicker({
+        options: TIERS,
+        showSearch: false,
+        triggerHasPopup: 'listbox',
+        triggerAriaDisabled: true,
+      });
+      const button = trigger();
+      button.focus();
+
+      const typed = pressKeyAt('p', 1000);
+      await settle();
+      assert.ok(!typed.defaultPrevented, 'the key is not the listbox`s on a refusing trigger');
+      assert.equal(button.getAttribute('aria-expanded'), 'false');
+      assert.ok(
+        !harness.target.querySelector('.fabricate-picker-popover'),
+        'and no panel opens, exactly as a click on it opens none'
+      );
+      harness.remount();
+    });
+
     it('is not armed at all where a query field is rendered', async () => {
       // THE COMPATIBILITY CONTRACT. Seventeen shipped callers render a query field, and for them
       // a printable character IS the query. The condition is `showSearch`, the same one that
