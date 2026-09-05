@@ -18,6 +18,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
+    // The figure box and the eyebrow it COMPOSES (issue 1505). The three stat tiles are
+    // `<StatBox>`es and each renders a `<Kicker>` as its label, so `Kicker` is a leaf two
+    // rungs down that nothing here names — and omitting either HANGS this suite
+    // (# cancelled), which is how the assertions below would go quiet rather than fail.
+    'src/ui/svelte/components/StatBox.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
