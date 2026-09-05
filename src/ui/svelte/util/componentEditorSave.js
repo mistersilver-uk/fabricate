@@ -68,6 +68,11 @@ export function overrideAwareComponentWrite({ getCraftingSystemManager, getCompo
     getCraftingSystemManager,
     setEssenceInheritance: (componentId, systemId, inherit) =>
       worldScope.component.setSectionInherited(componentId, systemId, 'essences', inherit),
+    // The other half of a rollback (issue 1371 r21-store4): the flip SEEDS the record's own
+    // `essences` block, so the compensation has to remove the one it seeded. Same family, same
+    // reason the flag write is minted from it rather than restated here.
+    clearEssenceOverride: (componentId, systemId) =>
+      worldScope.component.updateMembershipSection(componentId, systemId, 'essences', undefined),
   });
   return async (systemId, componentId, updates, { baseline } = {}) => {
     const { staged, flipped } = await override.updatesFor(systemId, componentId, updates, {
@@ -91,10 +96,13 @@ export function overrideAwareComponentWrite({ getCraftingSystemManager, getCompo
  * An EMPTY update set writes nothing and answers `true`: a draft that authored nothing is not a
  * failure, and this is the behaviour the app shipped (`if (Object.keys(updates).length > 0)`).
  *
- * `carriedEssences` and `baseline` come from `buildComponentEditorState`, not from the rendered
- * draft: the editor root emits the rows it drew, and both of these are facts about the SEED that
- * no row carries. Passing them here rather than through the component keeps the editor's own
- * contract as it was.
+ * `carriedEssences` and `baselineEssences` are facts about the SEED that no rendered row carries,
+ * so THE DRAFT'S OWN COPIES WIN (issue 1371 r21-store4, the Foundry integrator's round-7 finding
+ * 2). A root that emits them emits the values it DREW; the `context` values are re-derived from
+ * the record at save time, which is a different state the moment a replicated world-scope edit
+ * lands while the window is open. They stay as the fallback for a caller whose draft carries
+ * neither, and `??` rather than `||` so an authored `{}` — "this component carries no essences" —
+ * is preferred rather than falling through as if it were absent.
  *
  * @param {object} draft the editor's draft, in `buildComponentEditorUpdates`' contract.
  * @param {{systemId: string, componentId: string, carriedEssences?: object, baseline?: unknown,
@@ -111,5 +119,6 @@ export async function saveComponentEditorDraft(
     carriedEssences: draft?.carriedEssences ?? carriedEssences,
   });
   if (Object.keys(updates).length === 0) return true;
-  return (await writeComponent(systemId, componentId, updates, { baseline })) !== false;
+  const seeded = draft?.baselineEssences ?? baseline;
+  return (await writeComponent(systemId, componentId, updates, { baseline: seeded })) !== false;
 }

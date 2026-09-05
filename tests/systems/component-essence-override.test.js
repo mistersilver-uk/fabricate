@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createComponentEssenceOverride } from '../../src/systems/componentEssenceOverride.js';
+import { setSectionInheritance } from '../../src/systems/scopedDefinitions.js';
 
 /**
  * The rule over one `(ingot, sys1)` pair, with every seam recorded.
@@ -128,7 +129,7 @@ test('1371 r20: a read union that THROWS declines the exemption rather than esca
     essences: { fire: 2 },
   });
   assert.deepEqual(staged, { essences: { fire: 2 } });
-  assert.deepEqual(flipped, ['ingot']);
+  assert.deepEqual(flipped, [{ componentId: 'ingot', seeded: true }]);
   assert.deepEqual(switchWrites, [['ingot', 'sys1', false]]);
 });
 
@@ -213,7 +214,7 @@ test('1371 r20: a staged map that DIFFERS from the stated baseline is a real ove
     { baseline: { iron: 3 } }
   );
   assert.deepEqual(staged, { essences: { iron: 4 } });
-  assert.deepEqual(flipped, ['ingot']);
+  assert.deepEqual(flipped, [{ componentId: 'ingot', seeded: true }]);
   assert.deepEqual(switchWrites, [['ingot', 'sys1', false]]);
 });
 
@@ -262,7 +263,10 @@ test('1371 r20: rollback puts every flipped switch back ON', async () => {
   };
   const { override, switchWrites } = makeOverride({ corpus });
   const cohort = await override.cohortFor('sys1', ['ingot', 'coal'], { essences: { fire: 4 } });
-  assert.deepEqual(cohort.flipped, ['ingot', 'coal']);
+  assert.deepEqual(cohort.flipped, [
+    { componentId: 'ingot', seeded: true },
+    { componentId: 'coal', seeded: true },
+  ]);
   await override.rollback('sys1', cohort.flipped);
   assert.deepEqual(switchWrites, [
     ['ingot', 'sys1', false],
@@ -280,4 +284,151 @@ test('1371 r20: a rollback whose own write is refused reports nothing and throws
   });
   await override.rollback('sys1', ['ingot']);
   assert.deepEqual(switchWrites, [['ingot', 'sys1', true]]);
+});
+
+// ---------------------------------------------------------------------------
+// Reviewer round 7, finding 3 — the union's OTHER guard
+// ---------------------------------------------------------------------------
+
+test('1371 r21: a component absent from the world ROSTER is not shadowed, whatever else reads', async () => {
+  // `unionScopedDefinitions` needs BOTH halves — `if (!membership || !entity) { push; continue; }`
+  // — so a row whose id is not in `corpus.entities` is passed through untouched and neither the
+  // world default nor the switch is consulted for it. `shadowedIn` mirrored the `defaults` guard
+  // and not this one, so it reported such a pair shadowed and spent a durable
+  // `inherit.essences: false` write on a pair whose write was never masked.
+  const corpus = {
+    entities: [],
+    defaults: [{ id: 'ingot', essences: { fire: 2 } }],
+    membership: [{ entityId: 'ingot', systemId: 'sys1' }],
+  };
+  const { override, switchWrites } = makeOverride({ corpus });
+
+  const cohort = await override.cohortFor('sys1', ['ingot'], { essences: { fire: 4 } });
+  assert.deepEqual(cohort.writable, ['ingot'], 'the write is what it always was');
+  assert.deepEqual(cohort.flipped, []);
+  const { staged } = await override.updatesFor('sys1', 'ingot', { essences: { fire: 4 } });
+  assert.deepEqual(staged, { essences: { fire: 4 } }, 'and the single save is unchanged too');
+  assert.deepEqual(switchWrites, [], 'nothing masks the write, so nothing had to move');
+});
+
+// ---------------------------------------------------------------------------
+// Foundry integrator round 7, finding 1 — the rollback restores the RECORD
+// ---------------------------------------------------------------------------
+
+/**
+ * The rule over a LIVE membership record, moved by the real `setSectionInheritance`.
+ *
+ * The other fixtures record the switch writes and stop there, which is exactly how a switch-only
+ * rollback read as a restoration: the flip has a SECOND effect on the record — it seeds the
+ * record's own `essences` block from the world map — and only the shipped decision function
+ * performs it. So this fixture drives that function rather than a stand-in, and the case below
+ * asserts against the record itself.
+ *
+ * @param {object} [options]
+ * @param {object} [options.record] the membership record's pre-state.
+ * @param {object} [options.worldDefault]
+ * @param {boolean} [options.clearRefuses] whether the block-clearing write refuses.
+ * @returns {{override: object, recordNow: () => object, clears: string[]}}
+ */
+function makeRecordBackedOverride({
+  record = { entityId: 'ingot', systemId: 'sys1', inherit: {} },
+  worldDefault = { id: 'ingot', essences: { fire: 3 } },
+  clearRefuses = false,
+} = {}) {
+  let current = structuredClone(record);
+  const clears = [];
+  const override = createComponentEssenceOverride({
+    readComponentScope: () => ({
+      entities: [{ id: 'ingot' }],
+      defaults: [worldDefault],
+      membership: [current],
+    }),
+    readResolvedEssences: () => worldDefault.essences,
+    setEssenceInheritance: async (_componentId, _systemId, inherit) => {
+      current = setSectionInheritance(current, 'essences', inherit, worldDefault);
+      return true;
+    },
+    clearEssenceOverride: async (componentId, systemId) => {
+      clears.push([componentId, systemId]);
+      if (clearRefuses) return false;
+      const next = { ...current };
+      delete next.essences;
+      current = next;
+      return true;
+    },
+  });
+  return { override, recordNow: () => current, clears };
+}
+
+test('1371 r21: a rollback restores the RECORD, not just the switch it moved', async () => {
+  // Measured before the fix: PRE `{entityId, systemId, inherit: {}}`, POST
+  // `{…, inherit: {essences: true}, essences: {fire: 3}}`. The switch half is benign —
+  // `isSectionInherited` reads `!== false`, so key-absent and `true` are indistinguishable — but
+  // the seeded block is a RETAINED DORMANT OVERRIDE, and `setSectionInherited` does not re-seed
+  // over one. So the GM's next genuine flip-off starts from the map as it stood at the FAILED
+  // save: `{fire: 3}` where the world has since said `{fire: 3, water: 4}`, with no message.
+  const { override, recordNow, clears } = makeRecordBackedOverride();
+  const before = structuredClone(recordNow());
+
+  const { flipped } = await override.updatesFor('sys1', 'ingot', { essences: { fire: 9 } });
+  assert.deepEqual(flipped, [{ componentId: 'ingot', seeded: true }], 'the flip SEEDED the block');
+  assert.deepEqual(
+    recordNow().essences,
+    { fire: 3 },
+    'which is the state the value write then failed over'
+  );
+
+  await override.rollback('sys1', flipped);
+  assert.deepEqual(clears, [['ingot', 'sys1']], 'the seeded half is undone through its own seam');
+  assert.ok(
+    !Object.hasOwn(recordNow(), 'essences'),
+    'so no dormant override is left where the pre-state had none'
+  );
+  assert.deepEqual(
+    { ...recordNow(), inherit: {} },
+    before,
+    'and every other field is exactly as it was'
+  );
+  assert.equal(
+    recordNow().inherit.essences !== false,
+    true,
+    'the switch reads as inheriting again, which is what the pre-state meant'
+  );
+});
+
+test('1371 r21: a flip over an EXISTING dormant override clears nothing on rollback', async () => {
+  // `setSectionInheritance` RESTORES a retained block rather than re-seeding, so the flip did not
+  // put this one there and a rollback that removed it would destroy an override the GM authored.
+  const { override, recordNow, clears } = makeRecordBackedOverride({
+    record: { entityId: 'ingot', systemId: 'sys1', inherit: {}, essences: { iron: 7 } },
+  });
+  const before = structuredClone(recordNow());
+
+  const { flipped } = await override.updatesFor('sys1', 'ingot', { essences: { fire: 9 } });
+  assert.deepEqual(flipped, [{ componentId: 'ingot', seeded: false }], 'nothing was seeded');
+
+  await override.rollback('sys1', flipped);
+  assert.deepEqual(clears, [], 'so the clearing seam is never reached');
+  assert.deepEqual(recordNow().essences, before.essences, 'and the GM’s own block survives');
+});
+
+test('1371 r21: a rollback whose CLEARING write is refused reports nothing and throws nothing', async () => {
+  // Best effort on both halves, for the reason the switch half is: the caller is already reporting
+  // a failure, and a compensation that throws over the top of it replaces the real report.
+  const { override, recordNow, clears } = makeRecordBackedOverride({ clearRefuses: true });
+  const { flipped } = await override.updatesFor('sys1', 'ingot', { essences: { fire: 9 } });
+  await override.rollback('sys1', flipped);
+  assert.deepEqual(clears, [['ingot', 'sys1']], 'it was attempted exactly once');
+  assert.deepEqual(recordNow().essences, { fire: 3 }, 'and the residue is left, not thrown over');
+});
+
+test('1371 r21: a rollback given BARE IDS restores the switch alone', async () => {
+  // The tolerated shape, for a caller that holds no pre-state. It cannot un-seed, because nothing
+  // told it whether the flip seeded — which is why the verbs report the fact rather than leaving
+  // it to be re-derived from a record that now carries a block either way.
+  const { override, recordNow, clears } = makeRecordBackedOverride();
+  await override.updatesFor('sys1', 'ingot', { essences: { fire: 9 } });
+  await override.rollback('sys1', ['ingot']);
+  assert.deepEqual(clears, []);
+  assert.equal(recordNow().inherit.essences, true, 'the switch is back');
 });

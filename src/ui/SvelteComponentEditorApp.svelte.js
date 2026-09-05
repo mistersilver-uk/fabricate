@@ -98,8 +98,12 @@ export class SvelteComponentEditorApp extends SvelteApplicationMixin(
    * app with `get(selectedSystemId)`), but a store that had moved on would otherwise land the
    * write on the wrong system, which is worse than not using it.
    *
-   * OTHERWISE the rule is applied here, over the same shared unit, so an editor opened from an
-   * item sheet cannot write a map the read union shadows.
+   * OTHERWISE the rule is applied here, over the same shared unit, so a caller with no manager
+   * store to borrow cannot write a map the read union shadows. (Earlier revisions said "an editor
+   * opened from an item sheet"; there is no such path — this class's only constructor call is a
+   * manager service nothing consumes. It is wired because it is a live writer the moment anything
+   * opens it, which is the reading `componentEditorSave.js` and `componentEssenceOverride.js`
+   * carry.)
    *
    * @returns {(systemId: string, componentId: string, updates: object) => Promise<unknown>}
    * @private
@@ -136,12 +140,21 @@ export class SvelteComponentEditorApp extends SvelteApplicationMixin(
       // A REFUSAL is reported and the window stays open, exactly as a throw is: the GM's edit has
       // not landed either way, and closing over it would hide that.
       //
-      // The seed's two facts travel with the save (issue 1371 r20-store3): `carriedEssences` is
-      // what this system's roster does not define and the write must not drop, and
-      // `baselineEssences` is the map an UNTOUCHED save of these rows produces, which is what the
-      // override rule compares the staged map against. Both are re-derived from the record as it
-      // is NOW rather than from the props this window rendered with, so a concurrent world edit
-      // widens neither.
+      // ── THE SEED'S TWO FACTS COME FROM THE RENDER, NOT FROM THE RECORD AS IT IS NOW ─────────
+      // (issue 1371 r21-store4, the Foundry integrator's round-7 finding 2.) `carriedEssences` is
+      // what this system's roster does not define and the write must not drop; `baselineEssences`
+      // is the map an UNTOUCHED save of THESE ROWS produces, which is what the override rule
+      // compares the staged map against. Both are facts about the rows the GM is looking at, so
+      // `ComponentEditorRoot` emits them with the draft and they are preferred over anything
+      // re-derived here.
+      //
+      // An earlier revision of this comment claimed re-deriving them at save time meant "a
+      // concurrent world edit widens neither". It does the opposite: this window registers no
+      // hooks, so a replicated `componentScope` write that lands while it is open moves the
+      // baseline out from under the rendered rows, and an untouched save then DIFFERS from it —
+      // which the rule correctly reads as an authored override, flips the switch, and pins the
+      // pair to the stale map. The values below stay as the fallback for a draft from an older
+      // root that emits neither.
       const seed = buildComponentEditorState(system, item);
       const saved = await saveComponentEditorDraft(draft, {
         systemId: this._systemId,

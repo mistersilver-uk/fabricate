@@ -83,6 +83,7 @@ import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
 import {
   corpusDelta,
   patchCorpusInPlace,
@@ -6790,14 +6791,110 @@ export class CraftingSystemManager {
   }
 
   /**
+   * MAKE THE ESSENCE DELETE AN OVERRIDE before it strips (issue 1371 r21-store4, the reviewer's
+   * round-7 finding 1).
+   *
+   * ── THE DEFECT THIS CLOSES ───────────────────────────────────────────────────────────────
+   * The delete's cascade strips the essence from `system.components` — the PERSISTED in-system
+   * rows. Since the `1.32.0` election a component's `essences` are a WORLD SECTION that every
+   * system INHERITS unless it overrides, and `unionScopedDefinitions` overwrites an inheriting
+   * row's map wholesale with the world one. So on the modal post-upgrade world the strip changed
+   * nothing anybody resolves: the dialog said the essence would be removed from N components, and
+   * after the write every one of them still answered it, still drew a chip for the now-nameless
+   * id, and had no editor row that could clear it.
+   *
+   * ── THE ANSWER IS THIS REVISION'S OWN RULE, NOT A SECOND ONE ─────────────────────────────
+   * A system-scope essence write is an OVERRIDE, and a delete is a write. So each affected pair
+   * that INHERITS is flipped to override FIRST, and then the strip lands on the row that system
+   * now resolves. The world map is untouched, which is the point: every OTHER system keeps the
+   * essence exactly as the GM left it, because this delete is scoped to one system.
+   *
+   * WHICH PAIRS ARE SHADOWED IS NOT DECIDED HERE. This method knows the cascade's REACH — the
+   * rows whose RESOLVED map carries a deleted id — and hands that set to the seam; the seam is
+   * `componentEssenceOverride`'s cohort unit, which owns "is a write on this pair shadowed", and
+   * answers which pairs may now take the write. A second copy of that decision, in a file with no
+   * route to a world setting, is exactly the drift that unit exists to prevent.
+   *
+   * ── AND THE ROW IS SEEDED FROM WHAT THE PAIR RESOLVED ────────────────────────────────────
+   * Flipping alone would be a second data loss. An inheriting pair's own row is DORMANT: for a
+   * component adopted after the migration it is empty, and for one whose world map has since
+   * gained an essence it is stale. Overriding onto it would silently drop every OTHER essence the
+   * GM can see — deleting `fire` would take `earth` with it. So a flipped pair's row is first set
+   * to the map it RESOLVED, and the caller's strip then removes the deleted ids from that. The
+   * resolved map is read BEFORE the flip, because the flip changes what the pair resolves.
+   *
+   * NO SEAM MEANS NO FLIP, and that is the honest degradation: a caller that cannot write world
+   * scope gets exactly the cascade this method performed before.
+   *
+   * A pair whose flag write is REFUSED still inherits, so the strip cannot reach it and the
+   * essence survives there. That is logged rather than thrown: the rest of the delete is correct
+   * and blocking it would leave a definition the GM asked to remove in place over one refused
+   * setting write. The set is returned as well, so a surface that wants to state it can.
+   *
+   * @param {object} system the system being edited, mutated in place.
+   * @param {string[]} essenceIds the ids being deleted.
+   * @param {(systemId: string, componentIds: string[]) => Promise<string[]>} [overrideInheritedEssences]
+   *   Flip each shadowed pair among these components to OVERRIDE, and answer the ids that may now
+   *   take a system-scope essence write.
+   * @returns {Promise<{overridden: string[], unreachable: string[]}>} the components whose rows
+   *   were seeded and may now be stripped, and the affected ones that still inherit.
+   * @private
+   */
+  async _overrideInheritedEssencesBeforeStrip(system, essenceIds, overrideInheritedEssences) {
+    if (typeof overrideInheritedEssences !== 'function') {
+      return { overridden: [], unreachable: [] };
+    }
+    const deleted = new Set(essenceIds.map(String));
+    const resolved = resolvedComponentEssencesById(this, system.id);
+    if (!resolved) return { overridden: [], unreachable: [] };
+
+    const affected = new Map();
+    for (const component of system.components || []) {
+      const id = String(component?.id ?? '');
+      const map = resolved.get(id);
+      if (!map || typeof map !== 'object') continue;
+      if (Object.keys(map).every((essenceId) => !deleted.has(essenceId))) continue;
+      affected.set(id, map);
+    }
+    if (affected.size === 0) return { overridden: [], unreachable: [] };
+
+    const writable = new Set(await overrideInheritedEssences(system.id, [...affected.keys()]));
+    const overridden = [];
+    for (const component of system.components || []) {
+      const id = String(component?.id ?? '');
+      if (!writable.has(id) || !affected.has(id)) continue;
+      component.essences = { ...affected.get(id) };
+      overridden.push(id);
+    }
+    const unreachable = [...affected.keys()].filter((id) => !writable.has(id));
+    if (unreachable.length > 0) {
+      console.error(
+        'Fabricate | component essence override refused, so the essence delete cannot reach',
+        unreachable,
+        'in system',
+        system.id
+      );
+    }
+    return { overridden, unreachable };
+  }
+
+  /**
    * Delete an essence definition and strip it from any recipe ingredient sets that reference it.
    * Only referencing recipes are re-saved, and a single summary notification is emitted (mirrors
    * {@link deleteItem}). Recipes left with no usable ingredient sets or results are disabled.
+   *
+   * `overrideInheritedEssences` is how the component half of the cascade reaches a pair that
+   * INHERITS its essence map from the world record — see
+   * {@link _overrideInheritedEssencesBeforeStrip}. It is supplied by the caller, because the flag
+   * it writes is a world-scope setting and this manager holds no write path to one.
+   *
    * @param {string} systemId
    * @param {string} essenceId
+   * @param {{overrideInheritedEssences?: (systemId: string, componentIds: string[]) =>
+   *   Promise<string[]>}} [options]
    * @returns {Promise<boolean>} true if an essence definition was removed
    */
-  async deleteEssence(systemId, essenceId) {
+  async deleteEssence(systemId, essenceId, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essence');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
@@ -6805,6 +6902,14 @@ export class CraftingSystemManager {
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const removed = definitions.find((def) => def.id === essenceId);
     if (!removed) return false;
+
+    // BEFORE the definitions move, because the seam reads what the pair RESOLVES and the read
+    // union is derived from this system's record.
+    await this._overrideInheritedEssencesBeforeStrip(
+      system,
+      [essenceId],
+      overrideInheritedEssences
+    );
 
     system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
     system.essences = system.essenceDefinitions.map((def) => def.id);
@@ -6959,10 +7064,13 @@ export class CraftingSystemManager {
    *
    * @param {string} systemId
    * @param {Iterable<string>} essenceIds
+   * @param {{overrideInheritedEssences?: (systemId: string, componentIds: string[]) =>
+   *   Promise<string[]>}} [options] the singular's own component-cascade seam, for the same
+   *   reason and with the same contract — see {@link _overrideInheritedEssencesBeforeStrip}.
    * @returns {Promise<{deleted: number, essenceIds: string[], recipesUpdated: number,
    *   recipesDisabled: number}>}
    */
-  async deleteEssences(systemId, essenceIds) {
+  async deleteEssences(systemId, essenceIds, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essences');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
@@ -6976,6 +7084,11 @@ export class CraftingSystemManager {
 
     const removedIds = removed.map((def) => String(def.id));
     const removedIdSet = new Set(removedIds);
+
+    // ONE cohort for the whole set, before the definitions move — the singular's reason, and the
+    // batching reason this method exists for: a component carrying two deleted essences must not
+    // be flipped twice.
+    await this._overrideInheritedEssencesBeforeStrip(system, removedIds, overrideInheritedEssences);
 
     system.essenceDefinitions = definitions.filter(
       (def) => !removedIdSet.has(String(def?.id ?? ''))

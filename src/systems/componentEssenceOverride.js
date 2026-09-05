@@ -67,7 +67,7 @@
  * essence-less remainder to the refused ones, and a cohort staging `category` alongside `essences`
  * no longer loses its category change to an unrelated setting refusal.
  *
- * ## AND A FLIP THAT OUTLIVES ITS VALUE WRITE IS ROLLED BACK (finding 5)
+ * ## AND A FLIP THAT OUTLIVES ITS VALUE WRITE IS ROLLED BACK TO ITS PRE-STATE (finding 5)
  *
  * The flip is a durable, replicated world-setting write that lands BEFORE the values. If the value
  * write then throws, the GM is told the save failed while the pair is left overriding with its
@@ -75,6 +75,13 @@
  * FLIPPED, and {@link ComponentEssenceOverride.rollback} puts them back — the precedent is
  * `adminStore`'s `joinComponentToSystem`, which removes the membership record its own call wrote
  * when the second half refuses.
+ *
+ * WHAT IT PUTS BACK IS THE RECORD, NOT THE FIELD (Foundry integrator, round 7). Moving the switch
+ * OFF has a SECOND effect — it seeds the record's own `essences` block from the world map — and
+ * moving it back ON does not undo that half, so a switch-only rollback leaves a retained dormant
+ * override the pre-state did not have and the GM's next genuine flip-off silently starts from the
+ * stale map. Each flip therefore carries the one pre-state fact that cannot be re-derived
+ * afterwards, and the rollback undoes both halves. See {@link ComponentEssenceOverride.rollback}.
  */
 
 import { componentEssenceMapsEqual } from './componentScope.js';
@@ -91,15 +98,29 @@ import { findWorldDefault, isSectionInherited } from './scopedDefinitions.js';
  * @property {(componentId: string, systemId: string, inherit: boolean) => Promise<unknown>}
  *   setEssenceInheritance Move one pair's `essences` switch. Answering `false` — or rejecting — is
  *   a refusal.
+ * @property {(componentId: string, systemId: string) => Promise<unknown>} clearEssenceOverride
+ *   REMOVE one pair's own `essences` block from its membership record, leaving the rest of the
+ *   record alone. Used only by {@link ComponentEssenceOverride.rollback}, to undo the block the
+ *   flip itself seeded; a caller that supplies none can restore the switch and nothing else.
+ */
+
+/**
+ * A switch this rule moved, with the ONE fact its pre-state cannot be recovered from afterwards.
+ *
+ * @typedef {object} ComponentEssenceFlip
+ * @property {string} componentId
+ * @property {boolean} seeded whether moving the switch OFF also SEEDED the record's own `essences`
+ *   block, i.e. whether the record carried none before this call.
  */
 
 /**
  * @typedef {object} ComponentEssenceOverride
  * @property {(systemId: string, componentIds: string[], edit: object) =>
- *   Promise<{writable: string[], refused: string[], flipped: string[]}>} cohortFor
+ *   Promise<{writable: string[], refused: string[], flipped: ComponentEssenceFlip[]}>} cohortFor
  * @property {(systemId: string, componentId: string, updates: object,
- *   options?: {baseline?: unknown}) => Promise<{staged: object|null, flipped: string[]}>} updatesFor
- * @property {(systemId: string, componentIds: string[]) => Promise<void>} rollback
+ *   options?: {baseline?: unknown}) =>
+ *   Promise<{staged: object|null, flipped: ComponentEssenceFlip[]}>} updatesFor
+ * @property {(systemId: string, flipped: ComponentEssenceFlip[]) => Promise<void>} rollback
  */
 
 /**
@@ -112,22 +133,32 @@ export function createComponentEssenceOverride({
   readComponentScope,
   readResolvedEssences,
   setEssenceInheritance,
+  clearEssenceOverride,
 }) {
   /**
    * The components whose `essences` section this system INHERITS FROM AN AUTHORED WORLD MAP, so a
-   * value write here would be shadowed by that map until the switch moves.
+   * value write here would be shadowed by that map until the switch moves — each mapped to
+   * WHETHER THE FLIP WOULD SEED the record's own block (see {@link ComponentEssenceOverride.rollback}).
    *
-   * THREE CONDITIONS, and each drops a pair the flip must not touch. A pair with NO membership
+   * FOUR CONDITIONS, and each drops a pair the flip must not touch. A pair with NO membership
    * record is absent: nothing shadows a component the world corpus does not hold for this system.
-   * A pair whose switch is already OFF is absent: it overrides already. And a pair whose world
-   * record never AUTHORED the section is absent, because `applyInheritedSections` skips an
-   * `undefined` value and the system therefore already resolves its own row — see the header.
+   * A pair whose id is absent from the world ROSTER is absent for the same reason one level up:
+   * `unionScopedDefinitions` passes such a row through untouched (`if (!membership || !entity)`),
+   * so neither the world default nor the switch is consulted for it at all and nothing is masking
+   * the write. A pair whose switch is already OFF is absent: it overrides already. And a pair
+   * whose world record never AUTHORED the section is absent, because `applyInheritedSections`
+   * skips an `undefined` value and the system therefore already resolves its own row.
+   *
+   * The union requires BOTH the membership record and the roster entry, so mirroring only one of
+   * the two guards spends a durable `inherit.essences: false` write on a pair whose write was
+   * never masked — the same over-eager flip the authored-section guard closed for the other half.
    *
    * @param {string} systemId
-   * @returns {Set<string>}
+   * @returns {Map<string, boolean>} component id → whether the record carries NO `essences` block
+   *   of its own today, which is exactly when moving its switch OFF seeds one from the world map.
    */
   function shadowedIn(systemId) {
-    const shadowed = new Set();
+    const shadowed = new Map();
     let corpus;
     try {
       corpus = readComponentScope?.();
@@ -136,11 +167,17 @@ export function createComponentEssenceOverride({
     }
     const memberships = Array.isArray(corpus?.membership) ? corpus.membership : [];
     const defaults = Array.isArray(corpus?.defaults) ? corpus.defaults : [];
+    const roster = new Set(
+      (Array.isArray(corpus?.entities) ? corpus.entities : []).map((entity) =>
+        String(entity?.id ?? '').trim()
+      )
+    );
     for (const record of memberships) {
       if (record?.systemId !== systemId) continue;
+      if (!roster.has(String(record?.entityId ?? '').trim())) continue;
       if (!isSectionInherited(record, 'essences')) continue;
       if (findWorldDefault(defaults, record.entityId)?.essences === undefined) continue;
-      shadowed.add(record.entityId);
+      shadowed.set(record.entityId, record.essences === undefined);
     }
     return shadowed;
   }
@@ -177,6 +214,24 @@ export function createComponentEssenceOverride({
     }
   }
 
+  /**
+   * Remove ONE pair's own `essences` block — the OTHER half of a flip, undone.
+   *
+   * Swallows a refusal for {@link ComponentEssenceOverride.rollback}'s reason: the caller is
+   * already reporting a failure and nothing here may throw over the top of it.
+   *
+   * @param {string} componentId
+   * @param {string} systemId
+   * @returns {Promise<void>}
+   */
+  async function clearOverride(componentId, systemId) {
+    try {
+      await clearEssenceOverride?.(componentId, systemId);
+    } catch (error) {
+      console.error('Fabricate | Failed to clear a seeded component essence override:', error);
+    }
+  }
+
   return {
     /**
      * The subset of a set-apply cohort a staged `essences` axis may be written to, having flipped
@@ -194,9 +249,9 @@ export function createComponentEssenceOverride({
      * @param {string} systemId
      * @param {string[]} componentIds
      * @param {object} edit the staged axes.
-     * @returns {Promise<{writable: string[], refused: string[], flipped: string[]}>} the pairs the
-     *   whole edit may be written to, the pairs whose flag write was refused, and the pairs whose
-     *   switch this call actually moved.
+     * @returns {Promise<{writable: string[], refused: string[], flipped: ComponentEssenceFlip[]}>}
+     *   the pairs the whole edit may be written to, the pairs whose flag write was refused, and
+     *   the switches this call actually moved, each with the pre-state fact `rollback` needs.
      */
     async cohortFor(systemId, componentIds, edit) {
       const ids = Array.isArray(componentIds) ? componentIds : [];
@@ -213,7 +268,7 @@ export function createComponentEssenceOverride({
           writable.push(id);
         } else if (await moveSwitch(id, systemId, false)) {
           writable.push(id);
-          flipped.push(id);
+          flipped.push({ componentId: id, seeded: shadowed.get(id) === true });
         } else {
           refused.push(id);
         }
@@ -238,11 +293,12 @@ export function createComponentEssenceOverride({
      * @param {object} updates
      * @param {{baseline?: unknown}} [options] `baseline` is the essence map the caller's editor was
      *   SEEDED from. Omit it only when the editor is seeded from the read union.
-     * @returns {Promise<{staged: object|null, flipped: string[]}>}
+     * @returns {Promise<{staged: object|null, flipped: ComponentEssenceFlip[]}>}
      */
     async updatesFor(systemId, componentId, updates, { baseline } = {}) {
       if (!Object.hasOwn(updates ?? {}, 'essences')) return { staged: updates, flipped: [] };
-      if (!shadowedIn(systemId).has(componentId)) return { staged: updates, flipped: [] };
+      const shadowed = shadowedIn(systemId);
+      if (!shadowed.has(componentId)) return { staged: updates, flipped: [] };
       const seed = baseline === undefined ? resolvedEssences(systemId, componentId) : baseline;
       if (componentEssenceMapsEqual(updates.essences, seed)) {
         const next = { ...updates };
@@ -250,23 +306,48 @@ export function createComponentEssenceOverride({
         return { staged: next, flipped: [] };
       }
       if (!(await moveSwitch(componentId, systemId, false))) return { staged: null, flipped: [] };
-      return { staged: updates, flipped: [componentId] };
+      return {
+        staged: updates,
+        flipped: [{ componentId, seeded: shadowed.get(componentId) === true }],
+      };
     },
 
     /**
-     * Put back every switch a failed write flipped.
+     * Put every pair a failed write flipped back TO ITS PRE-STATE — both halves of the flip.
      *
-     * Best effort by construction: `moveSwitch` already swallows a refusal, and a rollback that
-     * cannot land leaves the pair exactly where the un-rolled-back write would have. The caller is
-     * reporting a failure either way, so nothing here may throw over the top of it.
+     * THE SWITCH IS NOT THE WHOLE WRITE, and restoring only the switch is the defect this
+     * signature exists to prevent (Foundry integrator, round 7). `setSectionInheritance` SEEDS the
+     * membership record's own `essences` block from the world map when the switch goes OFF and a
+     * record carried none; flipping the switch back ON returns before that branch and leaves the
+     * seeded block standing as a RETAINED DORMANT OVERRIDE. Nothing resolves it — so the state
+     * reads as repaired — but the GM's next genuine flip-off sees `retained === true`, does not
+     * re-seed, and the system silently starts from the map as it stood at the FAILED save rather
+     * than as the world has it now. Measured: `{fire: 3}` where the world says `{fire: 3, water: 4}`.
+     *
+     * So a flip that seeded is undone by `clearEssenceOverride` as well, and the pre-state fact
+     * travels with the flip rather than being re-derived here: by the time a rollback runs, the
+     * record carries a block either way and the corpus can no longer tell which one put it there.
+     *
+     * Best effort by construction: both writes swallow a refusal, and a rollback that cannot land
+     * leaves the pair exactly where the un-rolled-back write would have. The caller is reporting a
+     * failure either way, so nothing here may throw over the top of it.
+     *
+     * THE SWITCH GOES BACK FIRST. Between the two writes the pair is overriding with a block it
+     * did not author, which resolves to the same map it is being restored to; the other order
+     * leaves it overriding with NOTHING, and while `resolveScopedDefinition` reads that as "not an
+     * override" and falls back anyway, it is a state no GM action produces.
      *
      * @param {string} systemId
-     * @param {string[]} componentIds the `flipped` list one of the verbs above answered.
+     * @param {ComponentEssenceFlip[]} flipped the `flipped` list one of the verbs above answered.
+     *   A bare id is tolerated and restores the switch alone, for a caller that has no pre-state.
      * @returns {Promise<void>}
      */
-    async rollback(systemId, componentIds) {
-      for (const id of Array.isArray(componentIds) ? componentIds : []) {
-        await moveSwitch(id, systemId, true);
+    async rollback(systemId, flipped) {
+      for (const flip of Array.isArray(flipped) ? flipped : []) {
+        const componentId = typeof flip === 'string' ? flip : flip?.componentId;
+        if (!componentId) continue;
+        await moveSwitch(componentId, systemId, true);
+        if (flip?.seeded === true) await clearOverride(componentId, systemId);
       }
     },
   };
@@ -285,26 +366,29 @@ export function createComponentEssenceOverride({
  * projection, the essence usage counts and the delete-impact dialog read — see that module for why
  * one accessor rather than a read per consumer (reviewer round 6).
  *
- * `setEssenceInheritance` stays the caller's own, because the flag write is the one seam the two
- * genuinely differ on: the store hands over its composed family verb, and a caller with no store
- * mints a world-scope family of its own. Keeping the write path out of this module is what lets it
- * stay a pure rule with no route to a setting.
+ * The two WRITES stay the caller's own, because they are the seams the two entry points genuinely
+ * differ on: the store hands over its composed family verbs, and a caller with no store mints a
+ * world-scope family of its own. Keeping the write path out of this module is what lets it stay a
+ * pure rule with no route to a setting.
  *
  * @param {{getComponentScopeStore: () => object|null,
  *   getCraftingSystemManager: () => object|null,
  *   setEssenceInheritance: (componentId: string, systemId: string, inherit: boolean) =>
- *     Promise<unknown>}} wiring
+ *     Promise<unknown>,
+ *   clearEssenceOverride?: (componentId: string, systemId: string) => Promise<unknown>}} wiring
  * @returns {ComponentEssenceOverride}
  */
 export function componentEssenceOverrideOn({
   getComponentScopeStore,
   getCraftingSystemManager,
   setEssenceInheritance,
+  clearEssenceOverride,
 }) {
   return createComponentEssenceOverride({
     readComponentScope: () => getComponentScopeStore?.()?.corpus?.(),
     readResolvedEssences: (systemId, componentId) =>
       resolvedComponentEssencesFor(getCraftingSystemManager?.(), systemId, componentId),
     setEssenceInheritance,
+    clearEssenceOverride,
   });
 }

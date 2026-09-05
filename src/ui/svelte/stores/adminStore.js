@@ -6030,15 +6030,28 @@ export function createAdminStore(services) {
   //
   // WIRED FROM WHAT THIS STORE ALREADY HOLDS. The corpus read is the published one, as
   // `_worldComponentEntities` reads the roster; the resolved map is the read union the row
-  // projection draws from; and the flag write is the UNWRAPPED family verb, because every caller
-  // here already refreshes once for the whole write and the wrapped one would re-project per
-  // component. The verb takes the switch's TARGET rather than always writing `false`, because the
-  // rule rolls a flip back when the value write it preceded then fails.
+  // projection draws from; and both writes are the UNWRAPPED family verbs, because every caller
+  // here already refreshes once for the whole write and the wrapped ones would re-project per
+  // component. The flag verb takes the switch's TARGET rather than always writing `false`, because
+  // the rule rolls a flip back when the value write it preceded then fails.
+  //
+  // AND THE ROLLBACK NEEDS BOTH VERBS (issue 1371 r21-store4, Foundry integrator round 7): moving
+  // the switch off SEEDS the record's own `essences` block, so putting the switch back is only
+  // half a restore. `updateMembershipSection(..., undefined)` is the other half — `attachAuthored
+  // Sections` copies a section across only when it is not `undefined`, so writing `undefined`
+  // removes the key rather than storing an empty override.
   const _componentEssenceOverride = componentEssenceOverrideOn({
     getComponentScopeStore: () => services.getComponentScopeStore?.() ?? null,
     getCraftingSystemManager: () => services.getCraftingSystemManager?.() ?? null,
     setEssenceInheritance: (componentId, systemId, inherit) =>
       worldScopeFamilies.component.setSectionInherited(componentId, systemId, 'essences', inherit),
+    clearEssenceOverride: (componentId, systemId) =>
+      worldScopeFamilies.component.updateMembershipSection(
+        componentId,
+        systemId,
+        'essences',
+        undefined
+      ),
   });
 
   /**
@@ -6150,17 +6163,17 @@ export function createAdminStore(services) {
    * and every system whose switch is on follows it. A write made HERE lands on a system's own row,
    * which is what that system resolves only while it OVERRIDES the section — on an inheriting
    * system a staged `essences` axis IS an override, and every shadowed pair in the cohort has its
- * switch flipped before the values land (`systems/componentEssenceOverride.js`). This sentence used
- * to end "the world map shadows it until the rules editor flips the switch"; twenty-six lines
- * below, this verb flips it itself.
- *
- * ── AND ITS OVERRIDE ARM IS DEFENCE FOR A ROUTE NO SCREEN DRIVES (quality round 6, R5) ─────
- * `bulkEditRules` has no production caller: M31 superseded M25's route, so the world catalogue's
- * essence group writes the world SECTION instead. The arm is KEPT — this verb writes the same rows
- * through the same primitive as the Studio's own bulk edit, so it must not be able to take a
- * different view of what an essence write means the day something calls it again — and it is
- * driven directly by a store case rather than left as the one of the four sites a reader cannot
- * tell is live.
+   * switch flipped before the values land (`systems/componentEssenceOverride.js`). This sentence
+   * used to end "the world map shadows it until the rules editor flips the switch"; a few lines
+   * below, this verb flips it itself.
+   *
+   * ── AND ITS OVERRIDE ARM IS DEFENCE FOR A ROUTE NO SCREEN DRIVES (quality round 6, R5) ─────
+   * `bulkEditRules` has no production caller: M31 superseded M25's route, so the world catalogue's
+   * essence group writes the world SECTION instead. The arm is KEPT — this verb writes the same
+   * rows through the same primitive as the Studio's own bulk edit, so it must not be able to take
+   * a different view of what an essence write means the day something calls it again — and it is
+   * driven directly by a store case rather than left as the one of the four sites a reader cannot
+   * tell is live.
    *
    * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
    * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
@@ -6228,6 +6241,16 @@ export function createAdminStore(services) {
    * whose axes are empty once `essences` is removed, is dropped — so the ordinary path (nothing
    * refused) costs exactly one persist, as it did.
    *
+   * ── THE REFUSED PASS RUNS FIRST, AND THE ORDER IS THE INVARIANT (issue 1371 r21-store4) ────
+   * The caller compensates a throw by rolling every FLIPPED switch back, and its comment states
+   * the precondition that makes that repair correct: the values did not land. `flipped` is a
+   * subset of `writable`, so running the writable pass first broke exactly that — pass one lands
+   * the flipped pairs' essence maps, pass two throws, and the catch puts those pairs back under
+   * the world map with their authored values already on disk and no surface reporting it. That is
+   * the inverse of the repair. Writing the REFUSED pairs first restores the invariant by
+   * construction: nothing a rollback would undo has been persisted until the last pass, so a
+   * throw anywhere always precedes the flipped pairs' values.
+   *
    * @param {object} systemManager
    * @param {string} systemId
    * @param {{writable: string[], refused: string[], edit: object}} cohorts
@@ -6238,8 +6261,8 @@ export function createAdminStore(services) {
     const withoutEssences = { ...edit };
     delete withoutEssences.essences;
     const passes = [
-      { ids: writable, axes: edit },
       { ids: refused, axes: withoutEssences },
+      { ids: writable, axes: edit },
     ].filter((pass) => pass.ids.length > 0 && Object.keys(pass.axes).length > 0);
     if (passes.length === 0) return null;
 
@@ -6251,6 +6274,69 @@ export function createAdminStore(services) {
       if (Array.isArray(result?.componentIds)) componentIds.push(...result.componentIds);
     }
     return { updated, componentIds };
+  }
+
+  /**
+   * Republish AFTER a component write that has already landed (issue 1371 r21-store4, the Foundry
+   * integrator's round-7 finding 3).
+   *
+   * THE COMPENSATED REGION IS THE WRITE, NOT THE REPUBLISH. A component write that flipped an
+   * `essences` switch first is compensated by rolling that switch back, and the repair is correct
+   * only while "the values did not land" is true. `refresh()` runs after they landed, so a throw
+   * there must NOT reach that catch: doing so re-shadows a map the GM authored and is durably on
+   * disk, and tells them the write failed. `bulkEditComponentRules` already had this shape, with
+   * its republish out in `_republishingFamily`; this is the same seam for the two verbs that
+   * refresh themselves.
+   *
+   * IT REPORTS NOTHING TO THE GM, deliberately. The write succeeded, so an error toast would be
+   * false; what failed is the projection rebuild, which the next publish repairs and which the GM
+   * can do nothing about. It is logged with the store's own `Fabricate |` idiom.
+   *
+   * @param {string} what the write that landed, for the log line.
+   * @returns {Promise<void>}
+   */
+  async function _republishAfterWrite(what) {
+    try {
+      await refresh();
+    } catch (error) {
+      console.error(`Fabricate | Failed to republish after ${what}:`, error);
+    }
+  }
+
+  /**
+   * THE ESSENCE DELETE'S COMPONENT CASCADE IS AN OVERRIDE TOO (issue 1371 r21-store4, the
+   * reviewer's round-7 finding 1).
+   *
+   * `CraftingSystemManager.deleteEssence(s)` strips the essence from the PERSISTED in-system rows,
+   * and the dialog above states that strip as the impact the GM consents to. For a pair that
+   * INHERITS its map from the world record, stripping the dormant row changes nothing the system
+   * resolves — so the consent statement was true of the write and false of the outcome. The manager
+   * decides the cascade's REACH and calls back here for the pairs it cannot flip itself, because
+   * the flag is a world-scope setting write and the manager holds no path to one.
+   *
+   * The compensation is the same one every other essence-override caller uses: the flips are
+   * captured, and a delete that throws puts them back before the failure is reported.
+   *
+   * @param {string} systemId
+   * @returns {{seam: {overrideInheritedEssences: (systemId: string, componentIds: string[]) =>
+   *   Promise<string[]>}, rollback: () => Promise<void>}}
+   */
+  function _essenceDeleteCascade(systemId) {
+    let flipped = [];
+    return {
+      seam: {
+        overrideInheritedEssences: async (system, componentIds) => {
+          // `{essences: {}}` names the axis so the cohort unit engages; the VALUES are the
+          // manager's, written onto the rows it is about to strip.
+          const cohort = await _componentEssenceOverride.cohortFor(system, componentIds, {
+            essences: {},
+          });
+          flipped = cohort.flipped;
+          return cohort.writable;
+        },
+      },
+      rollback: () => _componentEssenceOverride.rollback(systemId, flipped),
+    };
   }
 
   /**
@@ -8777,8 +8863,14 @@ export function createAdminStore(services) {
     });
     if (!confirmed) return false;
 
-    await systemManager.deleteEssence(sysId, essenceId);
-    await refresh();
+    const cascade = _essenceDeleteCascade(sysId);
+    try {
+      await systemManager.deleteEssence(sysId, essenceId, cascade.seam);
+    } catch (error) {
+      await cascade.rollback();
+      throw error;
+    }
+    await _republishAfterWrite('an essence delete');
     return true;
   }
 
@@ -8810,22 +8902,26 @@ export function createAdminStore(services) {
     const resolved = existing.filter((def) => requested.has(String(def?.id ?? '')));
     if (resolved.length === 0) return empty;
 
+    const cascade = _essenceDeleteCascade(sysId);
+    let result;
     try {
-      const result = await systemManager.deleteEssences(
+      result = await systemManager.deleteEssences(
         sysId,
-        resolved.map((def) => String(def.id))
+        resolved.map((def) => String(def.id)),
+        cascade.seam
       );
-      await refresh();
-      return {
-        deleted: Number(result?.deleted) || 0,
-        recipesUpdated: Number(result?.recipesUpdated) || 0,
-        recipesDisabled: Number(result?.recipesDisabled) || 0,
-      };
     } catch (error) {
+      await cascade.rollback();
       console.error('Fabricate | Failed to delete essences:', error);
       services.notify?.error?.(error?.message || 'Failed to delete essences');
       return empty;
     }
+    await _republishAfterWrite('an essence bulk delete');
+    return {
+      deleted: Number(result?.deleted) || 0,
+      recipesUpdated: Number(result?.recipesUpdated) || 0,
+      recipesDisabled: Number(result?.recipesDisabled) || 0,
+    };
   }
 
   /**
@@ -11421,8 +11517,6 @@ export function createAdminStore(services) {
 
     try {
       await systemManager.updateItem(sysId, itemId, staged);
-      await refresh();
-      return true;
     } catch (error) {
       // The switch this call flipped goes back (round 6, finding 5): the values did not land, so
       // leaving the pair overriding with its dormant map would silently take it out of every later
@@ -11432,6 +11526,14 @@ export function createAdminStore(services) {
       services.notify?.error?.(error?.message || 'Failed to update component');
       return false;
     }
+    // AND THE REPUBLISH IS OUTSIDE IT (issue 1371 r21-store4, Foundry integrator round 7). The
+    // catch above compensates on the stated precondition "the values did not land", and `refresh()`
+    // is precisely where that precondition is FALSE: it is a large projection walk over Foundry
+    // documents, not a settings write, so a throw there used to roll the switch back over an
+    // override that is durably on disk — re-shadowing the map the GM just authored and reporting
+    // the update as failed. The write landed; that is what this answers.
+    await _republishAfterWrite('a component update');
+    return true;
   }
 
   /**
@@ -11486,21 +11588,19 @@ export function createAdminStore(services) {
       edit
     );
 
+    let result;
     try {
-      const result = await _writeComponentCohorts(systemManager, sysId, {
-        writable,
-        refused,
-        edit,
-      });
-      if (!result) return null;
-      await refresh();
-      return { ...result, refused: refused.length };
+      result = await _writeComponentCohorts(systemManager, sysId, { writable, refused, edit });
     } catch (error) {
       await _componentEssenceOverride.rollback(sysId, flipped);
       console.error('Fabricate | Failed to apply component bulk edit:', error);
       services.notify?.error?.(error?.message || 'Failed to apply component bulk edit');
       return null;
     }
+    if (!result) return null;
+    // The republish is outside the compensated region, for `updateComponent`'s reason.
+    await _republishAfterWrite('a component bulk edit');
+    return { ...result, refused: refused.length };
   }
 
   /**
