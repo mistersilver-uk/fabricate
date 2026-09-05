@@ -656,7 +656,7 @@ CraftingSystem = {
     An earlier form of this requirement attributed the shed of all eight keys to the migration; that was aspirational on both counts, and it is corrected here and in the `## Scoped Entity Definitions` banner together, because both carried the identical attribution.
     `components` PERMANENTLY retains `essences`, `difficulty`, `complications`, `salvage` and `id`; `tools` permanently retains `componentId`, `label`, `requirement`, `prerequisites`, `bonus`, `checkBreakable` and `id`.
     `id` is in both lists because it is the JOIN KEY the read union merges on, and a retained-field list omitting it describes an unjoinable record.
-    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` alone") and `### Tool scope` requirement 1, whose OPENING sentence ("There are FIVE tool world-default sections, FOUR of them inherited", amended at `1.31.0` by its own requirement 1a) is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
+    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` and `essences`", the second added by its own requirement 2a at `1.32.0`) and `### Tool scope` requirement 1, whose OPENING sentence ("There are FIVE tool world-default sections, FOUR of them inherited", amended at `1.31.0` by its own requirement 1a) is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
     That is the genuine distinction from `COMPONENT_SECTIONS`, which is a mutable constant a later PR can edit; it is not the membership allowlist either, since the entity roster preserves every authored field verbatim.
 
     **`essenceDefinitions` IS retirable in full, and the SECTION COUNT is not why.**
@@ -1271,7 +1271,8 @@ Represent one curated item entry available to recipes and salvage operations.
 The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `name`, `img`, `description` and the source link — to a WORLD COMPONENT, and its `category` and `tags` onto a per-system membership record.
 Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here.
 The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
-This record PERMANENTLY retains `id`, `essences`, `difficulty`, `complications` and the whole `salvage` block: they have no destination in the scope model at all, and moving them would need an explicit amendment to `## Scoped Entity Definitions` `### Component scope` requirement 1.
+This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whole `salvage` block: they have no destination in the scope model at all, and moving them would need an explicit amendment to `## Scoped Entity Definitions` `### Component scope` requirement 1.
+`essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
 Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
@@ -1288,7 +1289,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     originItemUuid: string | null,
     category: string, // default "general"; single-valued grouping axis drawn from CraftingSystem.componentCategories
     tags: string[],
-  essences: { [essenceId: string]: number },
+  essences: { [essenceId: string]: number }, // this system's OWN map; a system whose membership record inherits the
+                                            // `essences` section resolves the WORLD default's map instead (### Component scope 2a)
   difficulty?: number, // only used in progressive mode
 
   // GM-authored progressive complications (issue 1286). TOP-LEVEL, beside `difficulty`,
@@ -2050,9 +2052,9 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The rest of `src/ui/**` is unchanged and stays outside.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
-> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
+> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections at `1.30.0` and a seventh — the component `essences` map — since `1.32.0`; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
 > The first of the five is the every-live-member precondition on `category`, `breakage` and `onBreak` — the three sections a membership record cannot express an empty override for — and `### Component scope` and `### Tool scope` each state it for their own.
-> Every membership record is nevertheless created fully OVERRIDING, so NO section resolves through the world layer at migration time and resolved behaviour is unchanged — a world default matters only for a system added later, or an override a GM clears later.
+> Every membership record is nevertheless created fully OVERRIDING — except the `essences` switch, which is decided by EQUALITY with the elected map and so changes nothing either — so NO section resolves to a value the system did not already have at migration time and resolved behaviour is unchanged; a world default matters only for a system added later, or an override a GM clears later.
 >
 > **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
 > The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
@@ -2116,7 +2118,9 @@ WorldEssence = {
 // Layer 2 - the world defaults. The behaviour every system inherits until it overrides a section.
 WorldDefaults = {
   id: string,                      // the world entity id
-  [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
+  [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default.
+                                   // A component's are `category` and `essences` (a map essenceId -> quantity;
+                                   // `{}` is an authored "none", a non-object is absence).
   enabled?: boolean,               // TOOLS ONLY - the world MASTER SWITCH; absent means enabled
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
   // `repairRequirements` on a tool. Both are ABSENT when unauthored.
@@ -2377,7 +2381,13 @@ It is also declined outright whenever any member system left the section unautho
 **The WORLD `tags` are left UNAUTHORED, and for a DIFFERENT reason** that must not be conflated with the one above: requirement 3's tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once whoever the donor is.
 That hazard is independent of which system authored the list, which is why no donor rule can rescue it; requirement 3 therefore binds the world catalogue EDITOR rather than the migration.
 
-1. The component sections are `category` alone.
+**The WORLD `essences` map IS written too, since `1.32.0`** (issue 1371 r18-store, maintainer ruling M31), elected from the OLDEST system still holding rules for the component as that system's own normalized map; an EMPTY donor map elects nothing, on the same absence-preserving rule.
+Unlike `category`, whose membership switches the migration writes uniformly OFF, each membership record's `essences` switch is decided by EQUALITY: a system whose own map equals the elected one is marked inheriting, one that differs is marked overriding and carries its own map, and one with no in-system row left inherits — so resolution at migration time is unchanged by construction rather than by fixture.
+The `1.30.0` pass applies the same rule to the records it writes, so a fresh world and a long-migrated one converge; `destructive-changes-and-migrations/spec.md` -> Component Essence Sections states the pass.
+
+1. The component sections are `category` and `essences`, with **two independent inherit switches** — `category` since `1.30.0`, `essences` since `1.32.0` (issue 1371 r18-store, maintainer ruling M31).
+   The second section was added because the world catalogue's essence values were being written into per-system rules that no world screen reads, so a GM's world edit persisted nowhere visible; the world record now carries the values, and every system that has rules for the component follows them unless it overrides.
+   A membership record's `inherit` map therefore carries those two and nothing else.
 2. **`category` departs from the plain pattern on its INHERITING branch**: the world category wins IF AUTHORED, and otherwise the local value falls through.
    "Authored" is ABSENCE, not truthiness, and specifically not the `general` default `## Component` requirement 13 gives `Component.category`.
    The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
@@ -2390,6 +2400,16 @@ That hazard is independent of which system authored the list, which is why no do
    **The prohibition binds a THIRD writer as of issue 1371: the world catalogue's own category PICKER**, which is a GM-facing control and therefore the enforcement point — the store writes a section value opaquely and the normalizer coerces SHAPE rather than reserved-token membership, so no layer below the picker can refuse the bucket.
    The picker refuses by the SHIPPED CASE-INSENSITIVE PREDICATE and never by string equality: `General` and ` GENERAL ` are the same category downstream, so a `!== 'general'` implementation lets both through, the resolver treats either as authored, and every inheriting system resets on the next read.
    **Since issue 1372 that failure is REACHABLE AT READ TIME rather than latent.** Under the retired blanket form of `## Scoped Entity Definitions` requirement 15 clause 1 an inheriting section resolved from the in-system record anyway, so a world `general` was inert; clause 1a makes it apply.
+
+   2a.
+   **`essences` IS A PLAIN-PATTERN SECTION** (issue 1371 r18-store, maintainer ruling M31): a map `essenceId -> quantity` over the WORLD essence catalogue's ids, with no helper of its own on either branch.
+   Its SHAPE rule is stated once at the normalizer, on requirement 11's shape-rule clause, and binds both records: ids are trimmed, only POSITIVE finite quantities are kept, and a non-object normalizes to ABSENCE.
+   **AN EMPTY MAP IS A VALUE, NOT ABSENCE.** `{}` is an authored "this component carries no essences", which an inheriting system takes whole rather than keeping its own — the reading `### Essence scope` gives `effectSource: {}` — and only a non-object is the world saying nothing, under which an inheriting system keeps its own map.
+   The section is spelled over the shipped in-system `Component.essences` map, so the read union's writer for it is an assignment of a COPY of the world map onto the merged row, and an OVERRIDING system resolves its own in-system row — the membership record's stored block is the dormant copy `## Scoped Entity Definitions` requirement 15 describes, exactly as it is for `category`.
+   A world map is NOT narrowed to the ids a given system holds: which of the world catalogue's essences a system holds is that system's own concern at read time, and its readers already ignore an id it does not hold.
+   **THE WRITERS ARE THE GENERIC SECTION VERBS AND NO NEW ONE**: the world Component entry's essence editor and the world catalogue's bulk `Essence values` group write the world map through `updateWorldDefaultSection`, replacing it whole, and the system rules editor's inherit choice flips the switch through `setSectionInherited`, seeding the record's dormant block from the world map when it goes off.
+   The per-system rules write the world panel used before this section existed (`bulkEditRules`, maintainer ruling M25) is kept for system-scope surfaces and is SUPERSEDED as the world panel's route: a write it makes on a system whose switch is on is shadowed by the world map until the rules editor flips the switch.
+   The projection publishes, per entry, the world map as `defaults.essences` and `inheritCounts.essences`, and per system row `inherited.essences` and `resolvedEssences` — the map that system resolves, a read fact named so that no world editor writes it back.
 3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
    There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
    The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
