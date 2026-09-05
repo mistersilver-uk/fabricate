@@ -34,6 +34,15 @@
  * census reports `.a .b` twice and the merge predicate reports no candidate at all. That is the
  * shape almost all of the real sheet's repetition takes, so a reader who conflates the two figures
  * concludes there are 119 merges waiting to be done.
+ *
+ * ── WHY THE NINE "SANDWICH" ROWS ARE A TABLE, NOT NINE FIXTURES ─────────────────────────
+ * Nine of the rows below (criterion (c), the property and specificity admission gates, `!important`
+ * and comment stripping) are the identical three-rule shape — a `.a .b` declaration, one
+ * intervening rule, and a second `.a .b` declaration — with only the intervening rule and, for the
+ * longhand/shorthand pair, which side states which form, actually varying. Writing that shape out
+ * nine times is what a token-based duplication detector reads as nine copies of the same fixture
+ * once string literals are normalised; `sandwichRow` below assembles the shape ONCE, and each row
+ * in `SANDWICH_TABLE` states only the piece that makes it a different test.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -102,16 +111,135 @@ const block = (selector, ...declarations) => [
 const sheet = (...blocks) => blocks.flat().join('\n');
 
 /**
- * One synthetic stylesheet per row, with the verdict the predicate must reach on it.
- *
- * `pairs` is how many rule pairs satisfy (a) and (b) — the only pairs a merge could act on.
- * `verdicts` is one `"<verdict>: <reason>"` string per pair, in order, asserted WHOLE: the reason
- * carries the blocking property as the author wrote it and the line it was written on, and both
- * are what a reader checks the finding against. `repeated` is what the CENSUS says about the same
- * corpus, keyed `(at-context, selector)`, which is a different question and often a different
- * answer.
+ * Assembles the "sandwich" shape ONCE: a `.a .b` declaration, one intervening rule, and a second
+ * `.a .b` declaration. `firstDecl`/`lastDecl` default to the plain property test's colours; the
+ * longhand/shorthand pair is the only row that has to override them, because there the PAIR's own
+ * property is what is under test rather than the intervening rule's.
  */
-const MERGE_ROWS = [
+function sandwichRow({
+  id,
+  firstDecl = 'background-color: red;',
+  middleSelector,
+  middleDecls,
+  lastDecl = 'background-color: green;',
+  verdicts,
+  because,
+}) {
+  return {
+    id,
+    css: sheet(
+      block('.a .b', firstDecl),
+      block(middleSelector, ...middleDecls),
+      block('.a .b', lastDecl)
+    ),
+    pairs: 1,
+    verdicts,
+    repeated: ['.a .b x2'],
+    because,
+  };
+}
+
+/** The nine rows criterion (c) and the admission gates need, as only the varying piece of each. */
+const SANDWICH_TABLE = [
+  {
+    id: 'an intervening SHORTHAND blocks a pair declaring the LONGHAND (c)',
+    middleSelector: '.a .c .d',
+    middleDecls: ['background: blue;'],
+    verdicts: ['BLOCKED: BLOCKED BY background @5'],
+    because:
+      '`background` sets `background-color`, so a `property === property` implementation reports ' +
+      'this pair as mergeable and moves a declaration past a rule that overrides it',
+  },
+  {
+    id: 'an intervening LONGHAND blocks a pair declaring the SHORTHAND (c)',
+    firstDecl: 'background: red;',
+    lastDecl: 'background: green;',
+    middleSelector: '.a .c .d',
+    middleDecls: ['background-color: blue;'],
+    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
+    because:
+      'the reverse direction, and it is a separate row because an implementation that expanded ' +
+      'only ONE side of the comparison passes the row above and fails this one',
+  },
+  {
+    id: 'an intervening rule declaring an unrelated property does not block',
+    middleSelector: '.a .c .d',
+    middleDecls: ['color: blue;'],
+    verdicts: ["MERGED: merged at R2's position, line 7"],
+    because:
+      'the control for the two rows above: the same shape, the same shared `.a` token, and only ' +
+      'the property changed — so their BLOCKED verdicts are earned by the property test rather ' +
+      'than by anything else about the corpus',
+  },
+  {
+    id: 'an intervening rule that ties on specificity blocks even sharing no token',
+    middleSelector: '.x .y',
+    middleDecls: ['background-color: blue;'],
+    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
+    because:
+      'equal specificity is the ONE case in which source order decides the winner, so a rule that ' +
+      'shares no class, type, id or attribute with the pair can still flip it — `.a .b` and ' +
+      '`.x .y` both match `<div class="a x"><div class="b y">`',
+  },
+  {
+    id: 'an intervening rule below the pair on specificity does not block',
+    middleSelector: '.x',
+    middleDecls: ['background-color: blue;'],
+    verdicts: ["MERGED: merged at R2's position, line 7"],
+    because:
+      'the control for the row above: a rule that loses on specificity loses in BOTH orders, so ' +
+      'moving a declaration past it cannot change paint',
+  },
+  {
+    id: 'an intervening !important blocks unconditionally, from outside every admission gate',
+    middleSelector: '#z',
+    middleDecls: ['background-color: blue !important;'],
+    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
+    because:
+      '`#z` shares no token with the pair and is ABOVE it on specificity, so neither admission ' +
+      'clause reaches it — an implementation that gated `!important` on admission, or on the ' +
+      'band, calls this pair mergeable',
+  },
+  {
+    id: 'the same rule without !important does not block',
+    middleSelector: '#z',
+    middleDecls: ['background-color: blue;'],
+    verdicts: ["MERGED: merged at R2's position, line 7"],
+    because:
+      'the control for the row above, differing from it by the word `!important` alone. Without ' +
+      'it the row above could be passing because `#z` was admitted for some other reason',
+  },
+  {
+    id: 'a COMMENTED-OUT declaration is not a blocker',
+    middleSelector: '.a .c .d',
+    middleDecls: ['color: blue;', '/* border-color: red;', '   background-color: blue; */'],
+    verdicts: ["MERGED: merged at R2's position, line 9"],
+    because:
+      '`ruleBlocks` returns offsets into the ORIGINAL text and no body at all, so a caller that ' +
+      'slices its own declaration text without `stripCssComments` reads this comment as a live ' +
+      'declaration and reports a false BLOCKED — a silently deferred adoption rather than a ' +
+      'failure anyone sees. The comment holds TWO declarations deliberately: a declaration ' +
+      'scanner splits at `;`, so a single commented declaration still carries its `/*` into the ' +
+      'property name and is rejected as malformed whether or not comments were stripped, and a ' +
+      'one-line comment would leave this row unable to fail',
+  },
+  {
+    id: 'the same declarations uncommented do block',
+    middleSelector: '.a .c .d',
+    middleDecls: ['color: blue;', 'border-color: red;', 'background-color: blue;'],
+    verdicts: ['BLOCKED: BLOCKED BY background-color @7'],
+    because:
+      'the control for the row above: the identical corpus with the comment delimiters removed, ' +
+      'so that row’s MERGED cannot be an artefact of a corpus nothing could block',
+  },
+];
+
+/**
+ * The four rows that are NOT the sandwich shape — a bare pair, a split at-context, a nested
+ * at-rule chain, and a selector shared between two different lists — each exercised once because
+ * each is a different shape, not a variant of another row in this table.
+ */
+const OTHER_ROWS = [
   {
     id: 'a pair with nothing between it merges at R2’s position',
     css: sheet(block('.a .b', 'color: red;'), block('.a .b', 'background-color: blue;')),
@@ -171,141 +299,19 @@ const MERGE_ROWS = [
       'to lift one member out moves that member through the cascade and manufactures the ' +
       'duplicate list `no-duplicate-selectors` rejects, so it is not a merge at all',
   },
-  {
-    id: 'an intervening SHORTHAND blocks a pair declaring the LONGHAND (c)',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.a .c .d', 'background: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ['BLOCKED: BLOCKED BY background @5'],
-    repeated: ['.a .b x2'],
-    because:
-      '`background` sets `background-color`, so a `property === property` implementation reports ' +
-      'this pair as mergeable and moves a declaration past a rule that overrides it',
-  },
-  {
-    id: 'an intervening LONGHAND blocks a pair declaring the SHORTHAND (c)',
-    css: sheet(
-      block('.a .b', 'background: red;'),
-      block('.a .c .d', 'background-color: blue;'),
-      block('.a .b', 'background: green;')
-    ),
-    pairs: 1,
-    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
-    repeated: ['.a .b x2'],
-    because:
-      'the reverse direction, and it is a separate row because an implementation that expanded ' +
-      'only ONE side of the comparison passes the row above and fails this one',
-  },
-  {
-    id: 'an intervening rule declaring an unrelated property does not block',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.a .c .d', 'color: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ["MERGED: merged at R2's position, line 7"],
-    repeated: ['.a .b x2'],
-    because:
-      'the control for the two rows above: the same shape, the same shared `.a` token, and only ' +
-      'the property changed — so their BLOCKED verdicts are earned by the property test rather ' +
-      'than by anything else about the corpus',
-  },
-  {
-    id: 'an intervening rule that ties on specificity blocks even sharing no token',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.x .y', 'background-color: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
-    repeated: ['.a .b x2'],
-    because:
-      'equal specificity is the ONE case in which source order decides the winner, so a rule that ' +
-      'shares no class, type, id or attribute with the pair can still flip it — `.a .b` and ' +
-      '`.x .y` both match `<div class="a x"><div class="b y">`',
-  },
-  {
-    id: 'an intervening rule below the pair on specificity does not block',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.x', 'background-color: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ["MERGED: merged at R2's position, line 7"],
-    repeated: ['.a .b x2'],
-    because:
-      'the control for the row above: a rule that loses on specificity loses in BOTH orders, so ' +
-      'moving a declaration past it cannot change paint',
-  },
-  {
-    id: 'an intervening !important blocks unconditionally, from outside every admission gate',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('#z', 'background-color: blue !important;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ['BLOCKED: BLOCKED BY background-color @5'],
-    repeated: ['.a .b x2'],
-    because:
-      '`#z` shares no token with the pair and is ABOVE it on specificity, so neither admission ' +
-      'clause reaches it — an implementation that gated `!important` on admission, or on the ' +
-      'band, calls this pair mergeable',
-  },
-  {
-    id: 'the same rule without !important does not block',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('#z', 'background-color: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ["MERGED: merged at R2's position, line 7"],
-    repeated: ['.a .b x2'],
-    because:
-      'the control for the row above, differing from it by the word `!important` alone. Without ' +
-      'it the row above could be passing because `#z` was admitted for some other reason',
-  },
-  {
-    id: 'a COMMENTED-OUT declaration is not a blocker',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.a .c .d', 'color: blue;', '/* border-color: red;', '   background-color: blue; */'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ["MERGED: merged at R2's position, line 9"],
-    repeated: ['.a .b x2'],
-    because:
-      '`ruleBlocks` returns offsets into the ORIGINAL text and no body at all, so a caller that ' +
-      'slices its own declaration text without `stripCssComments` reads this comment as a live ' +
-      'declaration and reports a false BLOCKED — a silently deferred adoption rather than a ' +
-      'failure anyone sees. The comment holds TWO declarations deliberately: a declaration ' +
-      'scanner splits at `;`, so a single commented declaration still carries its `/*` into the ' +
-      'property name and is rejected as malformed whether or not comments were stripped, and a ' +
-      'one-line comment would leave this row unable to fail',
-  },
-  {
-    id: 'the same declarations uncommented do block',
-    css: sheet(
-      block('.a .b', 'background-color: red;'),
-      block('.a .c .d', 'color: blue;', 'border-color: red;', 'background-color: blue;'),
-      block('.a .b', 'background-color: green;')
-    ),
-    pairs: 1,
-    verdicts: ['BLOCKED: BLOCKED BY background-color @7'],
-    repeated: ['.a .b x2'],
-    because:
-      'the control for the row above: the identical corpus with the comment delimiters removed, ' +
-      'so that row’s MERGED cannot be an artefact of a corpus nothing could block',
-  },
 ];
+
+/**
+ * One synthetic stylesheet per row, with the verdict the predicate must reach on it.
+ *
+ * `pairs` is how many rule pairs satisfy (a) and (b) — the only pairs a merge could act on.
+ * `verdicts` is one `"<verdict>: <reason>"` string per pair, in order, asserted WHOLE: the reason
+ * carries the blocking property as the author wrote it and the line it was written on, and both
+ * are what a reader checks the finding against. `repeated` is what the CENSUS says about the same
+ * corpus, keyed `(at-context, selector)`, which is a different question and often a different
+ * answer.
+ */
+const MERGE_ROWS = [...OTHER_ROWS, ...SANDWICH_TABLE.map(sandwichRow)];
 
 /** Every repeated selector of one corpus, as `"<selector> x<appearances>"`, in first-line order. */
 function repeatedIn(rules, options = {}) {
@@ -376,6 +382,17 @@ test('the table is alive, so the loop above cannot pass by iterating nothing', (
 });
 
 /**
+ * The donor and the utility that bracket every scoped-walk corpus below; only the intervening rule
+ * (the thing each test actually varies) differs between `SCOPED_CSS`, `OUT_OF_BAND_CSS`,
+ * `MULTI_MEMBER_CSS` and `MULTI_MEMBER_STRANGER_CSS`.
+ */
+const DONOR = block('.fabricate-manager .panel .card .donor', 'overflow: hidden;');
+const UTILITY = block('.fabricate .fab-truncate', 'overflow: hidden;');
+
+/** One scoped-walk corpus: the donor, the given intervening rule, then the utility. */
+const bandedSheet = (middle) => sheet(DONOR, middle, UTILITY);
+
+/**
  * The corpus criterion 5's two walks disagree about.
  *
  * `.intruder` is (0,3,0) — inside the closed band between the donor's (0,4,0) and the utility's
@@ -384,18 +401,10 @@ test('the table is alive, so the loop above cannot pass by iterating nothing', (
  * lines that clause is what makes the census walk useless for an adoption: the shared ancestor is
  * the manager root, and the whole manager sheet is a blocker.
  */
-const SCOPED_CSS = sheet(
-  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
-  block('.fabricate-manager .panel .intruder', 'overflow: visible;'),
-  block('.fabricate .fab-truncate', 'overflow: hidden;')
-);
+const SCOPED_CSS = bandedSheet(block('.fabricate-manager .panel .intruder', 'overflow: visible;'));
 
 /** The same corpus with the intervening rule moved BELOW the band and given a matchable subject. */
-const OUT_OF_BAND_CSS = sheet(
-  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
-  block('.fabricate-manager > *', 'overflow: visible;'),
-  block('.fabricate .fab-truncate', 'overflow: hidden;')
-);
+const OUT_OF_BAND_CSS = bandedSheet(block('.fabricate-manager > *', 'overflow: visible;'));
 
 /**
  * The same corpus with a MULTI-MEMBER intervening rule, one member in the band and one above it.
@@ -405,23 +414,19 @@ const OUT_OF_BAND_CSS = sheet(
  * (0,5,0), ABOVE the band's high endpoint. A walk that bands the rule on its highest member reads
  * the pair as (0,5,0), skips it, and clears an adoption a live rule overrides.
  */
-const MULTI_MEMBER_CSS = sheet(
-  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
+const MULTI_MEMBER_CSS = bandedSheet(
   block(
     '.fabricate-manager .donor, .fabricate-manager .panel .card .other.is-open',
     'overflow: visible;'
-  ),
-  block('.fabricate .fab-truncate', 'overflow: hidden;')
+  )
 );
 
 /** The control: the same two-member shape with the IN-BAND member's subject changed to a stranger. */
-const MULTI_MEMBER_STRANGER_CSS = sheet(
-  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
+const MULTI_MEMBER_STRANGER_CSS = bandedSheet(
   block(
     '.fabricate-manager .stranger, .fabricate-manager .panel .card .other.is-open',
     'overflow: visible;'
-  ),
-  block('.fabricate .fab-truncate', 'overflow: hidden;')
+  )
 );
 
 /**
