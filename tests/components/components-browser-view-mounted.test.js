@@ -15,10 +15,16 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
+// a portaled panel rather than a `change` on a native `<select>`.
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -26,6 +32,8 @@ const browser = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-components-browser-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -51,6 +59,12 @@ const browser = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
@@ -162,10 +176,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
 
     browser.remount();
     const paged = await browser.mount({ itemCards: manyGeneral(26) });
-    const size = paged.querySelector('[data-pagination-size]');
-    size.value = '25';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(paged, '[data-pagination-size]', 25);
     paged.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -296,10 +307,7 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     });
 
     // Shrink the page to 10 so Metal (12) must span two pages.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
 
     // Page 1: the whole Herb bucket, then the first slice of Metal — NOT an interleaved
     // Herb/Metal/general alphabetical slice, which is what the pre-801 order produced.
@@ -469,10 +477,7 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
     );
 
     // POSITIVE CONTROL, same fixture, same spy: turning the page is what asks for the rest.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '25';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 25);
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 

@@ -182,7 +182,31 @@ const FIXTURE = `
             </div>
           </div>
           <p class="fab-bulk-edit-label" data-m="bulk-label">Category</p>
-          <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
+          <!--
+            THE BULK EDIT AXIS, no longer a native select (issue 1504). What is written here is
+            the converted control's own markup: Select's picker ROOT with the trigger nested
+            inside it, because the root is where .fabricate-select lands and the three rungs are
+            declared as .fabricate-select .fabricate-select-trigger-RUNG. A trigger-only fixture
+            would match none of them and would measure the 14px Foundry app base instead — and
+            searchable-popover-area-scope.test.js's mirrored pairs are what hold this shape,
+            since they pair the family's root and panel anchors with the INHERITED
+            fabricate-picker / manager-travel-picker classes that must ride beside them.
+
+            The pinned number below moved with the markup, from the manager control-text scale
+            to the shared form rung's own 12.5px. (No backticks in here: this fixture is a
+            JavaScript template literal.)
+          -->
+          <div class="fabricate-picker manager-travel-picker fabricate-select fab-bulk-edit-select">
+            <button
+              type="button"
+              class="fabricate-select-trigger fabricate-select-trigger-form"
+              data-m="bulk-select"
+              role="combobox"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-label="Category"
+            ><span class="manager-travel-picker-value fabricate-select-value">Leave unchanged</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+          </div>
           <p class="fab-bulk-edit-subhint" data-m="bulk-subhint">Enabling is gated by the activation check, so a refused recipe is left switched off.</p>
           <!-- Both segmented axes are full-width tracks under a full-width select. -->
           <div class="manager-segmented is-fill" role="radiogroup" aria-label="Status">
@@ -275,7 +299,10 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // `BulkEditSelect.svelte` is NOT here any more (issue 1504): it has no `<style>` block at
+  // all now, and `scopedComponentCss` refuses a component that emits none rather than pairing
+  // the fixture with an empty string. Its control's whole appearance is the `.fabricate-select*`
+  // family in `styles/fabricate.css`, which this page already loads.
   // The recipe panel's own block, which exists only because of the book axis (issue 1010):
   // its pick card and staged list are surfaces no shared primitive supplies. Every other
   // axis it renders still comes from the chrome above.
@@ -374,12 +401,30 @@ const EXPECTED = {
   'bulk-label': 9.28, // 0.58rem — the section micro-label
   'bulk-hint': 9.28, // 0.58rem — the INLINE aside, on its label's baseline
   'bulk-subhint': 9.92, // 0.62rem — a STANDING SENTENCE, a step up from the inline hint
-  'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
+  // 12.5px, the shared `<Select>` `form` rung, and a REAL change (issue 1504). It was 11.52 —
+  // the manager control-text scale the retired native `<select>` took from its own scoped block.
+  // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
+  // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
+  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
+  // only under `.fabricate-manager`.
+  'bulk-select': 12.5,
   // ── The two roles the recipe panel adds to that chrome. Both are shipped primitives the
   // Component Studio's panel does not render, so neither has a committed number there.
-  // The segment reads at the SAME control-text scale as the select it sits under, which is
-  // the point of a full-width track: the axis reads as one control, not two registers.
-  'bulk-segment-label': 11.52, // 0.72rem — inherits `.manager-segment`
+  //
+  // THE SEGMENTS STAY AT 11.52, AND THE EQUALITY THAT JUSTIFIED THEM IS NOW A DIVERGENCE
+  // (issue 1504). This comment used to read "the segment reads at the SAME control-text scale
+  // as the select it sits under, which is the point of a full-width track: the axis reads as
+  // one control, not two registers" — and that reason is spent, because the select above it
+  // moved and these did not. The divergence is deliberate rather than a leftover: the staged
+  // axis is now a FORM control drawn by a shared primitive whose form rung states its own type,
+  // while `SegmentedControl.svelte` writes an independent `font-size: 0.72rem` on the manager's
+  // control-text scale and `RecipeBulkEditPanel.svelte` renders two of these tracks directly
+  // beneath the converted select. Equalising them would mean either dragging the shared rung
+  // down to one caller's neighbour or re-typing a primitive nine other surfaces render. Issue
+  // 1523 is the child that may collapse the rung and re-flatten the pair; until it does, the
+  // ORDERING is asserted below rather than only described here, so a later edit cannot quietly
+  // put them back on one number and call it tidying.
+  'bulk-segment-label': 11.52, // 0.72rem — SegmentedControl's own, not the select's
   'bulk-callout': 11.2, // 0.7rem — the shared standing-statement strip
   // ── The book axis's search-and-pick control (issue 1010), which replaced the tri-state
   // chip run this gate used to pin at the one chip scale. Three surfaces, three registers,
@@ -450,6 +495,25 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
       'the flat and progressive component pickers share a rule, so they share a size'
     );
     assert.notEqual(measured['flat-picker'], 14, 'the flat component picker must not bleed to the Foundry base');
+
+    // The bulk panel's staged select and the segmented track beneath it are DELIBERATELY
+    // UNEQUAL (issue 1504), which is the opposite polarity of the pair above and is written in
+    // the same shape for that reason. Both roles are already constant-pinned in `EXPECTED` and
+    // checked by the loop, so a move of either number already reds; what this adds is the
+    // ORDER and its reason. Before this change the two were equal, and the comment beside
+    // `bulk-segment-label` justified the segment's number BY that equality — so re-flattening
+    // them is exactly the edit a later author would make while believing they were restoring an
+    // invariant. This is what tells them they are not.
+    assert.ok(
+      measured['bulk-select'] > measured['bulk-segment-label'],
+      'the staged select must read LARGER than the segmented track beneath it: the select is a ' +
+        "shared <Select> on the form rung's own 12.5px, while the segments keep " +
+        'SegmentedControl’s independent 0.72rem on the manager control-text scale. Equal ' +
+        'numbers here mean one of the two was dragged onto the other — see the note beside ' +
+        '`bulk-segment-label`, and issue 1523, which owns collapsing the rung if it is to be ' +
+        `collapsed. Measured: select ${measured['bulk-select']}px, segment ` +
+        `${measured['bulk-segment-label']}px.`
+    );
   } finally {
     await browser.close();
   }

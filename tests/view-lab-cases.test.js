@@ -2111,8 +2111,10 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The eleven frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame).
+// The thirteen frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, and the
+// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
+// PLAYER window, which is a second application root for the seam to clamp against).
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2132,11 +2134,13 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-availability-menu',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
+  'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-system-edit-lists',
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',
+  'player-inventory-page-size',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 

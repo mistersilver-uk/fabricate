@@ -179,16 +179,19 @@ function identifierPins(selector) {
   return pins;
 }
 
-// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, on a forward-looking rather
-// than a current-state ground. Today the attribute has one producer, `SearchablePopover.svelte`,
-// which stamps it only for an option carrying a `dataId`, and exactly one caller supplies one —
-// `RecipeBulkEditPanel.svelte`, with `dataId: book.id` — so its whole value space is recipe book ids.
-// The Travel tab's region-override and move-to-party pickers are `SearchablePopover` consumers that
-// do not stamp `dataId` yet, and the component's own contract names them as the intended adopters:
-// an option needs an identity handle because "without one the only handle is the display label,
-// which is localized and therefore not a selector". When they adopt it the same attribute will also
-// carry region ids and actor ids, and a source set defined from recipe book ids alone would then
-// falsely reject the picker cases that legitimately name those (issue #1021).
+// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, and the widening it was
+// left out FOR has since happened. The attribute has one producer, `SearchablePopover.svelte`,
+// which stamps it for any option carrying a `dataId`; when this note was written one caller
+// supplied one — `RecipeBulkEditPanel.svelte`, with `dataId: book.id` — so its whole value space
+// was recipe book ids, and the component's own contract already named the Travel tab's pickers as
+// the intended adopters: an option needs an identity handle because "without one the only handle is
+// the display label, which is localized and therefore not a selector".
+//
+// Issue 1504 widened it much further than that. `Select` stamps EVERY row, so the attribute now
+// carries page sizes, recipe and component categories, scoped-list sort keys and check-tier ids
+// beside the book ids — none of them a lab-world record, several not identifiers at all.
+// A source set defined from recipe book ids would by now falsely reject a dozen legitimate steps
+// across eleven cases, which is exactly what the absence is here to prevent (issue #1021).
 //
 // Twenty of the twenty-five `expectSelector`-bearing cases key on an attribute IDENTITY_SOURCES does
 // not recognise — `data-bulk-book-state`, `data-essence-view`, `data-inventory-bulk-panel`,

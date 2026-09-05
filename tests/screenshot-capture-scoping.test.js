@@ -1033,6 +1033,155 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   );
 });
 
+// ── The converted one-of-N controls (issue 1504) ──────────────────────────────────────────
+//
+// `locator.selectOption()` is Playwright's `<select>`-ONLY API. It does not degrade on any other
+// element: it throws. So the day a control stopped drawing the operating system's drop-down and
+// started drawing the app's own option list, every driver that reached it this way broke — and
+// the only thing that would have said so is a twenty-minute manual run against real Foundry,
+// which is the same blind spot the Checks-hook guard below exists for.
+//
+// The replacement is two clicks, the trigger then the row, and the row is addressed FROM THE
+// PAGE because `SearchablePopover` portals its panel to the nearest application root. That is
+// the part a later reader will want to "tidy" into a panel-scoped locator, which matches nothing
+// and fails as a 30-second actionability timeout rather than as a missing option — so the panel
+// class is checked against the product too.
+const CONVERTED_SELECT_HOOKS = Object.freeze([
+  'data-pagination-size',
+  'data-scoped-list-sort',
+  'data-scoped-list-filter',
+  'data-recipe-bulk-category',
+  'data-recipe-bulk-check-tier',
+  'data-component-bulk-category',
+]);
+
+test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+  const offenders = [];
+  let calls = 0;
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
+      calls += 1;
+      // The locator chain that reaches the call, which may be spread over several lines. A
+      // window rather than a line, because the harness's own idiom wraps a long chain.
+      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!chain.includes(hook)) continue;
+        offenders.push(`${producer.path}: \`${hook}\` is driven by .selectOption()`);
+      }
+    }
+  }
+  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — four capture steps and
+  // several smoke assertions drive genuinely native selects that issues 1510 and 1511 own — or
+  // this scan is reading a corpus with nothing in it to judge. And at least one converted hook
+  // must still be named by a producer, or the ban holds over an empty intersection.
+  assert.ok(
+    calls > 0,
+    'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
+      'If the last native select has converted, delete this clause rather than leaving it green.'
+  );
+  const driven = CONVERTED_SELECT_HOOKS.filter((hook) =>
+    CAPTURE_PRODUCERS.some((producer) => producer.source.includes(hook))
+  );
+  assert.ok(
+    driven.length >= 3,
+    `only ${driven.length} converted select hooks are named by a capture producer, against a ` +
+      'floor of 3. A lower number means the hooks were renamed and this ban now names controls ' +
+      'nothing drives.'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these capture steps drive an app-drawn option list with Playwright’s `<select>`-only API, ' +
+      'which throws on a `<button role="combobox">`. Click the trigger, then click the row by ' +
+      'its `[data-popover-option="…"]` identity handle — and address the row from the PAGE, ' +
+      'because the panel is portaled out of the trigger’s container:\n  ' + offenders.join('\n  ')
+  );
+});
+
+// THE REGISTRY DOES NOT CALL `.selectOption(`, SO THE BAN ABOVE CANNOT SEE ITS HALF. A View Lab
+// step names the verb as DATA — `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs`
+// is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
+// spelling of every converted step is a line the ban above reads and passes over, and reverting
+// one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
+// this PR's own screenshot evidence — not as a red unit test. Twelve steps converted here and
+// issues 1510/1511 will convert more, so the surface this covers is growing rather than closing.
+test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
+  const registry = CAPTURE_PRODUCERS.find(
+    ({ path }) => path === 'scripts/lib/viewLabCases.js'
+  ).source;
+  // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
+  // which is how every one of these steps is authored. Reading the pair together is what lets the
+  // clause tell WHICH control a native verb was aimed at.
+  const steps = [
+    ...registry.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g),
+  ];
+  const offenders = [];
+  for (const match of steps) {
+    const selector = match[2];
+    for (const hook of CONVERTED_SELECT_HOOKS) {
+      if (!selector.includes(hook)) continue;
+      offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
+    }
+  }
+  // NON-VACUITY, the same floor the ban above keeps: four `select:` steps survive on genuinely
+  // native selects (the recipe category filter, the world currency strategy twice, and the tool
+  // catalogue's sort), which issues 1510 and 1511 own. At zero the clause quantifies over nothing.
+  assert.ok(
+    steps.length >= 4,
+    `only ${steps.length} \`select:\` steps remain in the registry, against a floor of 4. If the ` +
+      'last native select has converted, delete this clause rather than leaving it green.'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these View Lab steps drive an app-drawn option list with the registry’s native `select:` ' +
+      'verb, which `scripts/view-lab-screenshots.mjs` turns into Playwright’s `<select>`-only ' +
+      '`selectOption` — and that throws on a `<button role="combobox">`. Use ' +
+      '`chooseSelectOption(selector, value)`, which clicks the trigger and then the row by its ' +
+      '`[data-popover-option="…"]` handle:\n  ' + offenders.join('\n  ')
+  );
+});
+
+test('the option list a capture producer clicks is rooted where the portal puts it', () => {
+  const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
+  const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
+  // Name-level, like the Checks guard below: the VALUES are option identities that vary per
+  // world, and the names are what a rename would take away.
+  assert.ok(
+    primitive.includes('fabricate-select-popover'),
+    '`Select.svelte` no longer writes `fabricate-select-popover`, so every capture step that ' +
+      'clicks an option row is addressing a panel class the product does not emit'
+  );
+  assert.ok(
+    popover.includes('data-popover-option'),
+    '`SearchablePopover.svelte` no longer writes `data-popover-option`, so the identity handle ' +
+      'every converted driver clicks by is on no row at all'
+  );
+
+  // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above. The registry legitimately
+  // writes the panel with an ancestor in front of it — `player-inventory-page-size`'s
+  // `expectSelector` asserts `.fabricate-app > .fabricate-select-popover…`, which is the
+  // portal TARGET being proved rather than a click being scoped. The harness has no such
+  // shape: every mention of the panel there is a click target, and a click target with a
+  // container in front of it is the failure this whole rewrite exists to avoid.
+  const roots = [...HARNESS.matchAll(/(\w+)\.locator\(\s*['"`]\.fabricate-select-popover/g)];
+  assert.ok(
+    roots.length > 0,
+    'scripts/foundry-test-run.mjs names no option panel at all, so either the converted controls ' +
+      'are driven some other way or the rewritten steps have gone missing'
+  );
+  for (const [, receiver] of roots) {
+    assert.equal(
+      receiver,
+      'page',
+      `scripts/foundry-test-run.mjs roots the option panel on \`${receiver}\` rather than on the ` +
+        'page. `SearchablePopover` portals the panel to the nearest application root, so it is ' +
+        'NOT inside the trigger’s container: a container-scoped locator matches nothing and ' +
+        'fails as a 30-second actionability timeout rather than as a missing option.'
+    );
+  }
+});
+
 // ── The Checks Studio's navigation hooks (issue 1096) ─────────────────────────────────────
 //
 // Issue 1096 replaced the four `data-checks-tab-button` ACTIVITY TABS with four rail routes and

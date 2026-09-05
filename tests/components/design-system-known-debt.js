@@ -216,17 +216,29 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 25;
  * control today — `showSearch={false}` with `triggerHasPopup="listbox"` is the bare-list shape, and
  * four call sites already render it that way.
  *
- * It is banked on the maintainer's decision, for CONVERGENCE. The control is the same one as the
- * sort key select in `scoped/EntityListInspectorFrame.svelte`, the row above — one of that file's
- * two, the other being a lane filter — which this page's own header records it duplicates
- * deliberately. Converting one of a duplicated pair leaves the manager asking for a sort key two
- * different ways a screen apart. Issue 1504 builds `<Select>` and converts that frame, and issue
- * 1510 sweeps the manager's call sites onto it; both rows leave together there.
+ * It was banked on the maintainer's decision, for CONVERGENCE. The control is the same one as the
+ * sort key select in `scoped/EntityListInspectorFrame.svelte` — one of that file's two, the other
+ * being a lane filter — which this page's own header records it duplicates deliberately.
+ * Converting one of a duplicated pair leaves the manager asking for a sort key two different ways
+ * a screen apart. Issue 1504 built `<Select>` and converted that frame; issue 1510 sweeps the
+ * manager's remaining call sites onto it, and `WorldVocabularyPage.svelte | 1` leaves there.
+ *
+ * 100 → 96 with issue 1504, and the rows fell in fours: `components/Pagination.svelte | 1`,
+ * `apps/manager/BulkEditSelect.svelte | 1` and `apps/manager/scoped/EntityListInspectorFrame.svelte
+ * | 2` are DELETED because all four elements now render `components/Select.svelte`, the app's own
+ * option list. The file count falls 39 → 36 with them. Paid down by conversion, not by a marker
+ * and not by a sweep: no `<!-- native select: … -->` comment was added, and every remaining row is
+ * still owed.
+ *
+ * Note which row did NOT move. `scoped/WorldVocabularyPage.svelte | 1` STAYS — that page's sort
+ * key is a separate element on a separate screen, and it is issue 1510's to convert. The pair the
+ * paragraph above calls duplicated is now asked two different ways, deliberately and briefly,
+ * which is the cost the convergence argument accepted rather than a defect this table hides.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 100;
+export const KNOWN_NATIVE_SELECT_TOTAL = 96;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.
@@ -270,13 +282,19 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * it now takes is 10px.
  *
  * THE 10px ROW IS UNTOUCHED and stays owed. 10px is not on the ladder either — the shared panel's
- * own corner is one of the fourteen occurrences that row counts — so this change moves one
+ * own corner is one of the fourteen occurrences that row counts — so that change moved one
  * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
  * is a net −1 rather than a snap, and the snap is still owed against the `10px | 14` row.
  *
+ * 317 → 316 with issue 1504, and this one IS a snap. `apps/manager/BulkEditSelect.svelte |
+ * border-radius | 8px | 1` is deleted: the component's whole scoped block went with its native
+ * `<select>`, and the control it became takes the shared select's `form` rung, whose corner is the
+ * ladder's 9. So the row leaves because a control moved onto a rung, which is the one way this
+ * number is meant to fall. The key count falls 140 → 139 with it.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 317;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 316;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

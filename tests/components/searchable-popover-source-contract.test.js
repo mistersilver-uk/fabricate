@@ -32,11 +32,19 @@
  *
  *  - Every call site names BOTH surfaces. `triggerAriaLabel` or a visible `triggerLabel` names
  *    the button; `dialogAriaLabel` names the portaled `role="dialog"` AND the `role="listbox"`
- *    inside it, because the primitive passes that one string to both. A site that forgets it
- *    renders an unnamed dialog containing an unnamed listbox, which is invisible in a frame,
- *    is not a compiler error and is not an ESLint rule. One shipped site was exactly that —
- *    `ComponentIdentityStrip`'s source-actions overflow menu — and this clause is what found
- *    it.
+ *    inside it, because the primitive passes that one string to both, and
+ *    `dialogAriaLabelledBy` names the same pair by POINTER for a site that has a caption
+ *    rather than a string (issue 1504). A site that passes neither renders an unnamed dialog
+ *    containing an unnamed listbox, which is invisible in a frame, is not a compiler error and
+ *    is not an ESLint rule. One shipped site was exactly that — `ComponentIdentityStrip`'s
+ *    source-actions overflow menu — and this clause is what found it.
+ *
+ *    A SOURCE READ CANNOT FINISH THIS JOB once a PRIMITIVE composes the primitive. This clause
+ *    reads the call site's text, so `Select`'s `dialogAriaLabel={label || ariaLabel}` is present
+ *    and non-empty here while resolving to `''` at runtime for every one of ITS callers that
+ *    names the control by a caption. The runtime half is
+ *    `tests/components/select-mounted.test.js`'s "names the open panel and its listbox under
+ *    both naming shapes", which asserts the rendered attributes.
  *  - `triggerHasPopup="listbox"` implies `showSearch={false}`. The capability exists because
  *    the ten hand-rolled popovers this primitive absorbs disagreed on what the trigger
  *    announces, and the disagreement tracked what each of them actually opened: a panel with a
@@ -301,13 +309,17 @@ test('every popover names its trigger and the panel that opens', () => {
       site.attribute('triggerLabel') ??
       snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
-    // The PANEL is named only by `dialogAriaLabel`, which the primitive passes to BOTH the
-    // portaled `role="dialog"` and the `role="listbox"` inside it. Present AND non-empty:
-    // `dialogAriaLabel=""` satisfies a presence check and names nothing, and an empty
-    // `aria-label` attribute on a dialog is worse than omitting it, because it suppresses the
-    // element's other naming routes while contributing none of its own.
-    const panelName = site.attribute('dialogAriaLabel');
-    if (!panelName || /^dialogAriaLabel=(""|'')$/.test(panelName)) {
+    // The PANEL is named by `dialogAriaLabel` or by `dialogAriaLabelledBy`, either of which the
+    // primitive passes to BOTH the portaled `role="dialog"` and the `role="listbox"` inside it.
+    // TWO ROUTES rather than one because a caller that renders a caption holds a POINTER and has
+    // no string to pass; resolving one to `''` is the defect, not choosing the other. Present
+    // AND non-empty on whichever route is taken: an empty value satisfies a presence check and
+    // names nothing, and an empty `aria-label` on a dialog is worse than omitting it, because it
+    // suppresses the element's other naming routes while contributing none of its own.
+    const panelName = ['dialogAriaLabel', 'dialogAriaLabelledBy']
+      .map((prop) => site.attribute(prop))
+      .find((written) => written && !/=(""|'')$/.test(written));
+    if (!panelName) {
       unnamed.push(`${site.file}: the popover panel has no accessible name`);
     }
   }
@@ -316,10 +328,11 @@ test('every popover names its trigger and the panel that opens', () => {
     unnamed.sort((left, right) => left.localeCompare(right)),
     [],
     'a `<SearchablePopover>` renders a portaled `role="dialog"` containing a `role="listbox"`, ' +
-      'and it names both from `dialogAriaLabel` alone. Without it a GM using a screen reader ' +
+      'and it names both from `dialogAriaLabel`, or from `dialogAriaLabelledBy` where the ' +
+      'caller has a caption rather than a string. With neither, a GM using a screen reader ' +
       'is told a dialog opened and is not told what it is for, then lands in a list with no ' +
       'name either. Nothing else reports this: it is invisible in a frame, it is not a ' +
-      'compiler error and no lint rule covers it. `ComponentIdentityStrip``s source-actions ' +
+      "compiler error and no lint rule covers it. `ComponentIdentityStrip`'s source-actions " +
       `menu shipped in exactly that state:\n  ${unnamed.join('\n  ')}`
   );
 });

@@ -11,7 +11,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
 import {
@@ -31,6 +34,8 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/config/flags.js',
     'src/config/hooks.js',
     'src/config/stackQuantityPathPresets.js',
@@ -223,6 +228,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Stepper.svelte',

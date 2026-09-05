@@ -1214,6 +1214,68 @@ function selectRecipeRowsByName(...names) {
 }
 
 /**
+ * Issue 1504 — choose an option from a shared `<Select>`, the way a GM does.
+ *
+ * `locator.selectOption` is Playwright's `<select>`-only API: it throws on any other element,
+ * so every one of these call sites broke the moment its control stopped drawing the operating
+ * system's drop-down. The replacement is the two clicks a GM actually performs — the trigger,
+ * then the row — and it is the same idiom `scripts/lib/viewLabCases.js` uses for a converted
+ * picker.
+ *
+ * THE PANEL IS ADDRESSED FROM THE PAGE, NEVER FROM THE TRIGGER'S CONTAINER, and that is the one
+ * thing a reader must not "tidy". `SearchablePopover` portals its panel to the nearest
+ * `.fabricate-manager` / `.fabricate-app` root, so it leaves the trigger's subtree entirely: a
+ * `bulkPanel.locator('[role="option"]')` — the obvious narrowing — matches nothing at all and
+ * fails as a 30s actionability timeout rather than as a missing option. `.fabricate-select-popover`
+ * is the primitive's own panel class, which is specific enough to never match another picker's
+ * rows while still being reachable from wherever the portal put it.
+ *
+ * Two ways to name the row, because the call sites need both. `value` addresses it by the option's
+ * own identity handle, `[data-popover-option="…"]`, which every rendered row carries — the
+ * empty-string sentinel included, as `__unchanged__`. `index` is POSITIONAL over the rendered
+ * rows and exists for the two bulk-edit axes whose real options are world vocabulary this smoke
+ * does not author: index 1 is the first row after the `Leave unchanged` sentinel, whatever the
+ * world has named it.
+ *
+ * @param {import('playwright').Page} page The page, which is where the portaled panel lives.
+ * @param {import('playwright').Locator} trigger The control's own trigger, by its `data-*` hook.
+ * @param {{value?: string, index?: number}} option The row to choose.
+ */
+async function chooseSelectOption(page, trigger, option) {
+  // NAMING NEITHER ROW IS A CALLER'S DEFECT, and it is refused here rather than carried into
+  // Playwright. `option.index` of `undefined` fails the positional bounds check below (every
+  // comparison with `undefined` is false), so the call fell through to `rows.nth(undefined)` and
+  // surfaced as a Playwright type error whose text says nothing about the step that wrote it.
+  if (option.value === undefined && !Number.isInteger(option.index)) {
+    throw new Error(
+      'chooseSelectOption was given neither a `value` nor an integer `index`, so it names no row. '
+      + 'Address the row by its own `data-popover-option` handle, or positionally by index.'
+    );
+  }
+  await trigger.waitFor({ state: 'visible', timeout: 5_000 });
+  await trigger.click();
+  // `.first()` is safe though it is not bound to this trigger the way `select-control.js` is:
+  // the click above fires `dismissOnOutsideClick`, so any other panel is already shut.
+  const panel = page.locator('.fabricate-select-popover').first();
+  await panel.waitFor({ state: 'visible', timeout: 5_000 });
+  if (option.value !== undefined) {
+    const row = panel.locator(`[data-popover-option="${option.value}"]`).first();
+    await row.waitFor({ state: 'visible', timeout: 5_000 });
+    await row.click();
+    return;
+  }
+  const rows = panel.locator('[role="option"]');
+  const count = await rows.count();
+  if (count <= option.index) {
+    throw new Error(
+      `The option list rendered ${count} row(s); index ${option.index} was asked for. A positional `
+      + 'choice here means the world authored no vocabulary for this axis, not that the control broke.'
+    );
+  }
+  await rows.nth(option.index).click();
+}
+
+/**
  * Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value.
  *
  * The LABEL is the click target, never the radio inside it. `SegmentedControl.svelte` renders a
@@ -1356,7 +1418,7 @@ async function captureGroupedContinuationFrame(page, results, options) {
     handle = await seed();
     await openBrowser();
     const size = page.locator('.fabricate-manager [data-pagination-size]').first();
-    await size.selectOption('10');
+    await chooseSelectOption(page, size, { value: '10' });
     await settle();
     await page.locator('.fabricate-manager [data-pagination-next]').first().click();
     await settle();
@@ -1369,7 +1431,17 @@ async function captureGroupedContinuationFrame(page, results, options) {
   } finally {
     const sizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
     if (await sizeReset.count() > 0) {
-      await sizeReset.selectOption('25').catch(() => {});
+      // NARROWED, not removed (issue 1504). The bare `.catch(() => {})` this replaces swallowed
+      // EVERY failure of the reset, so a page size left at 10 would silently re-page every
+      // following frame in the section. It cannot simply be dropped either: this runs in a
+      // `finally`, where throwing would mask the capture error that brought us here. So the
+      // failure is REPORTED and the walk continues, which is the same bargain the bulk-edit
+      // teardown below strikes for the same reason.
+      try {
+        await chooseSelectOption(page, sizeReset, { value: '25' });
+      } catch (error) {
+        process.stderr.write(`${failMessage}: the page size was not reset to 25: ${error.message}\n`);
+      }
       await settleAfterReset();
     }
     if (handle && hasSeed(handle)) {
@@ -5696,6 +5768,11 @@ async function assertToolLibraryPagination(page, {
     const pagination = element.querySelector('[data-tool-browser-pagination]');
     const summary = pagination?.querySelector('[data-pagination-summary]');
     const nav = pagination?.querySelector('.manager-pagination-nav');
+    // Still resolves after issue 1504 converted this control, and deliberately unchanged: the
+    // page-size hook rides across onto the `<Select>` TRIGGER through `triggerData`, so this
+    // reads a `<button role="combobox">` where it used to read a `<select>`. Nothing here cares
+    // — it is a rect and a document-order comparison — but the element is no longer what its
+    // name suggests, which is worth one sentence rather than a surprise.
     const size = pagination?.querySelector('[data-pagination-size]');
     const rect = (node) => {
       const value = node?.getBoundingClientRect();
@@ -9395,8 +9472,14 @@ async function main() {
           selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
           stage: async (bulkPanel) => {
             // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
-            // category is staged whatever vocabulary this world has authored.
-            await bulkPanel.locator('[data-recipe-bulk-category]').first().selectOption({ index: 1 });
+            // category is staged whatever vocabulary this world has authored. Rooted on the
+            // PAGE, not on `bulkPanel`: the option list is portaled out of the panel (issue
+            // 1504), so a panel-scoped row locator matches nothing.
+            await chooseSelectOption(
+              page,
+              bulkPanel.locator('[data-recipe-bulk-category]').first(),
+              { index: 1 },
+            );
             await clickSegment(bulkPanel, 'data-recipe-bulk-lock-option', 'lock');
 
             // Apply must be live with two axes staged — but it is never clicked: this
@@ -9980,8 +10063,14 @@ async function main() {
           label: 'manager-components-bulk-edit',
           stage: async (bulkPanel) => {
             // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
-            // category is staged whatever vocabulary this world has authored.
-            await bulkPanel.locator('[data-component-bulk-category]').first().selectOption({ index: 1 });
+            // category is staged whatever vocabulary this world has authored. Rooted on the
+            // PAGE, not on `bulkPanel`: the option list is portaled out of the panel (issue
+            // 1504), so a panel-scoped row locator matches nothing.
+            await chooseSelectOption(
+              page,
+              bulkPanel.locator('[data-component-bulk-category]').first(),
+              { index: 1 },
+            );
 
             // The tag chips cycle none → add → remove → none, so one click stages an
             // addition and two stage a removal. Both tri-states are in the frame because

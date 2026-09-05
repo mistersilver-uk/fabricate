@@ -151,6 +151,7 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
+  import Select from '../../../components/Select.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -683,6 +684,34 @@
     ...laneSorts.map((descriptor) => ({ id: descriptor.id, label: descriptor.label })),
   ]);
 
+  /**
+   * The sort keys as the shared select's option shape (issue 1504).
+   *
+   * `Select` keys on `option.value` where this component's sort descriptors key on `id`, so the
+   * mapping is done once here rather than at the call site: the `<Select>` in the toolbar takes
+   * `sortKey` as its value, and `onChange` hands back the same `id` `changeSortKey` already took.
+   */
+  const sortSelectOptions = $derived(
+    sortOptions.map((option) => ({ value: option.id, label: option.label }))
+  );
+
+  /**
+   * One lane filter's options in the shared select's shape (issue 1504).
+   *
+   * A function rather than a derivation because the toolbar renders one `<Select>` per lane
+   * filter and each needs its own list; the descriptors already carry `{value, label}`, so this
+   * only guards the absent-options case the markup used to guard inline with `?? []`.
+   *
+   * @param {{options?: Array<{value: string, label: string}>}} filter One lane-filter descriptor.
+   * @returns {Array<{value: string, label: string}>} Its options, never undefined.
+   */
+  function laneFilterOptions(filter) {
+    return (filter?.options ?? []).map((option) => ({
+      value: option.value,
+      label: option.label,
+    }));
+  }
+
   const directionLabel = $derived(
     sortDirection === 'asc'
       ? text('FABRICATE.Admin.Manager.Scoped.List.SortAsc', 'Asc')
@@ -837,32 +866,45 @@
               />
             {/if}
 
+            <!--
+              THE APP'S OWN LIST, AT THIS ROW'S OWN RUNG (issue 1504). Both controls were native
+              `<select>`s, so their option lists were drawn by the operating system: no theme, no
+              tick beside the live value, and a popup that differs per platform. They are shared
+              `<Select>`s now, and they keep the TICK because each list is a set of close cousins
+              — one facet's values, or the sort keys — whose trigger shows only the chosen one.
+
+              `size="toolbar"` rather than the published `inline` rung, because this control line
+              is a documented 34px / radius 9 band: the search field beside it, the direction
+              toggle whose own comment records that its metrics are copied from these selects,
+              and the compact segmented control are all sized to it. Dropping two of the five to
+              30 would break the row to adopt a rung; issue 1523 may collapse it properly.
+
+              Each trigger keeps the `data-*` hook it had, through `triggerData`, so every
+              capture step, mounted test and smoke step that drives these controls still
+              addresses the control rather than a box around it.
+            -->
             {#each laneFilters as filter (filter.id)}
-              <select
+              <Select
+                size="toolbar"
                 value={filterValues[filter.id] ?? 'all'}
-                data-scoped-list-filter={filter.id}
-                aria-label={filter.label}
-                onchange={(event) => changeFilter(filter.id, event.currentTarget.value)}
-              >
-                {#each filter.options ?? [] as option (option.value)}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
-              </select>
+                options={laneFilterOptions(filter)}
+                ariaLabel={filter.label}
+                triggerData={{ 'data-scoped-list-filter': filter.id }}
+                onChange={(next) => changeFilter(filter.id, next)}
+              />
             {/each}
 
             <span class="manager-scoped-list-sort-label" id="scoped-list-sort-label">
               {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
             </span>
-            <select
+            <Select
+              size="toolbar"
               value={sortKey}
-              data-scoped-list-sort
-              aria-labelledby="scoped-list-sort-label"
-              onchange={(event) => changeSortKey(event.currentTarget.value)}
-            >
-              {#each sortOptions as option (option.id)}
-                <option value={option.id}>{option.label}</option>
-              {/each}
-            </select>
+              options={sortSelectOptions}
+              ariaLabelledBy="scoped-list-sort-label"
+              triggerData={{ 'data-scoped-list-sort': '' }}
+              onChange={(next) => changeSortKey(next)}
+            />
 
             <!-- The direction is a TOGGLE that states its current position, not a second select.
                  `aria-pressed` carries the same fact to a screen reader, and the control goes
@@ -1506,22 +1548,24 @@
      Svelte compiles this to two classes plus the element, which outranks the global
      `.fabricate-manager .manager-scoped-list-toolbar select`, and core's rule is layered.
   */
-  /* WRAPPED WHOLE in one `:global()`, and the shape is load-bearing rather than stylistic.
-     `:global(ancestor) select` looks like the smaller change and is not: it leaves `select` as
-     the ONLY scoped compound, so Svelte stops writing the hash as `:where(.svelte-…)` — which
-     contributes nothing — and writes a bare `.svelte-…` instead. Measured on this exact rule:
-     the scoped form emitted `.manager-scoped-list-toolbar.svelte-… select:where(.svelte-…)` at
-     (0,2,1), and the ancestor-only repair emits `… select.svelte-…` at (0,3,1). That is a
-     silent cascade change smuggled in as a repair. Wrapping the whole selector emits
-     `.manager-toolbar.manager-scoped-list-toolbar select` at (0,2,1), unchanged — which is what
-     keeps this rule tied with, and ordered after, the global rule the comment above names.
-     Reach is unchanged in practice: `manager-scoped-list-toolbar` is written by this component
-     alone, which `tests/components/manager-filter-bar-source-contract.test.js` enforces. */
-  :global(.manager-toolbar.manager-scoped-list-toolbar select) {
-    flex: 0 1 auto;
-    width: auto;
-    min-width: 0;
-  }
+  /* ── THE WIDTH RULE IS DELETED, MEASURED RATHER THAN RETARGETED (issue 1504) ─────────────
+     It repaired `select { width: 100% }`, and this toolbar holds no `<select>` any more: both
+     controls are shared `<Select>`s, whose flex item is a `<div>` picker root wrapping a
+     `<button>`. Core's rule reaches neither, and all three of the declarations it carried are
+     already what those elements do — `flex: 0 1 auto` is the initial value for a flex item,
+     `width: auto` is a div's and a button's own, and `min-width: 0` is declared by
+     `.fabricate-picker.manager-travel-picker` and again by `.fabricate-select-trigger`.
+     Retargeting it onto the trigger would restate three defaults; a dead rule kept "just in
+     case" is exactly the debt this programme exists to remove.
+
+     AND NOTHING ELSE DEPENDED ON IT, which is the half worth measuring rather than assuming.
+     The comment this replaces said `manager-scoped-list-toolbar` is "written by this component
+     alone, which `manager-filter-bar-source-contract.test.js` enforces"; both halves were
+     stale. `WorldVocabularyPage.svelte` writes it too, around a `<select>` this change does not
+     convert — and that page carries its own width repair, for the reason its own comment
+     records: this rule is injected only when THIS component renders, so the vocabulary screen's
+     layout depended on which route the GM opened first. And that source-contract suite does not
+     mention the class at all. */
 
   /* ── TWO RULES USED TO LIVE HERE, AND BOTH WENT WITH THE FLATTENING (issue 1373, round 4) ───
      `.manager-scoped-list-filter-row.is-selection { display: contents }` removed the register's

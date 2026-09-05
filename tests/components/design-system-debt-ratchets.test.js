@@ -764,6 +764,46 @@ test('an unmarked native <select> is debt, and the marker comment is what exempt
   );
 });
 
+test('a converted select did not pay its ratchet with a marker', () => {
+  // THE THIRD POLARITY (issue 1504), and the one the two clauses above cannot express.
+  //
+  // The pin fell 100 -> 96 because three shared primitives stopped rendering a native `<select>`.
+  // A marker on any of those files would have moved the SAME number the SAME way while the OS
+  // drop-down went on shipping — the debt paid by exemption rather than by conversion, with a
+  // green gate over it. Neither the ratchet nor the marker's own both-polarity proof above can
+  // see that: the ratchet counts UNMARKED elements, so a marked one is simply absent, and the
+  // proof above runs on synthetic fixtures rather than on the corpus.
+  //
+  // So the converted files are named and their marker COUNT is pinned at zero. Named rather than
+  // derived, because the property is about these four files specifically: they are the ones whose
+  // rows this change deleted, and a file that later regains a `<select>` legitimately — under a
+  // marker, with a reason — is a decision someone must take deliberately by editing this list.
+  const CONVERTED = [
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+    'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  ];
+  const sources = collectWorkingTreeSources(['src'], ['.svelte']);
+  for (const file of CONVERTED) {
+    const source = sources[file];
+    assert.ok(
+      typeof source === 'string',
+      `${file} is not in the source walk, so this clause is checking nothing. Either the file ` +
+        'moved — retarget this list — or the walk has stopped reading `.svelte`.'
+    );
+    assert.equal(
+      (source.match(new RegExp(NATIVE_SELECT_MARKER, 'gu')) ?? []).length,
+      0,
+      `${file} carries a \`<!-- native select: … -->\` marker. Issue 1504 lowered the native ` +
+        'select pin by converting this file to the app’s own option list; a marker here would ' +
+        'have lowered the same pin by the same amount while the operating system’s drop-down ' +
+        'went on shipping, which is the one way that ratchet can be paid without the defect ' +
+        'being fixed.'
+    );
+  }
+});
+
 test('no new native <select> is rendered by a Svelte template', () => {
   const templates = parsedTemplates();
   const unmarked = nativeSelects(templates).filter((element) => !element.marked);
@@ -1484,8 +1524,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,861 `(at-context, selector)`
-  // keys under this very keying, of which 2,745 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,894 `(at-context, selector)`
+  // keys under this very keying, of which 2,780 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

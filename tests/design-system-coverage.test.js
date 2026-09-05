@@ -242,7 +242,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 33 library entries with no shipped implementation.
+ * The 32 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -254,7 +254,7 @@ const SPECIFIED_ONLY = [
   'ChoiceGroup', 'DataTable', 'InfoStrip', 'Kicker',
   'ListRow', 'LogList', 'Menu', 'Meter', 'NavSidebar',
   'Notice', 'PageHeader', 'PickerRow', 'Rail',
-  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'Select',
+  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search',
   'SetPicker', 'SortableList', 'StageBars', 'StatBox', 'TierTrack',
   'ValidationList', 'ValidationSummary', 'ViewToggle', 'Well', 'XrefList',
 ];

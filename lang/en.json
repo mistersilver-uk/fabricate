@@ -1752,8 +1752,7 @@
           "PageOf": "Page {page} of {total}",
           "Previous": "Previous page",
           "Next": "Next page",
-          "PerPage": "Per page",
-          "PerPageLabel": "Rows per page"
+          "PerPage": "Per page"
         },
         "Create": "Create",
         "CreateSystem": "Create system",
@@ -2508,6 +2507,10 @@
             "BlockedWarningAll": "None of the {count} selected recipes can be enabled yet — they will all stay off.",
             "BlockedWarningOne": "The selected recipe can't be enabled yet and will stay off.",
             "CheckTierHint": "The DC these recipes roll against — not the check's outcome tiers.",
+            "CheckTierGroupInstructions": "Instructions",
+            "CheckTierGroupTiers": "Authored tiers",
+            "CheckTierUnchangedHint": "Every selected recipe keeps the tier it has.",
+            "CheckTierDefaultHint": "Clears every selected recipe to the system's default DC.",
             "CheckTierProgressive": "This system resolves progressively — difficulty lives on each result component, not on the recipe, so there is no recipe-level check tier to bulk edit.",
             "CheckTierDynamic": "This system's crafting check resolves its DC dynamically at craft time, so recipes carry no tier to select.",
             "CheckTierFixed": "This system's routed check uses fixed outcome tiers, so a recipe's difficulty comes from its minimum success tier rather than a check tier.",

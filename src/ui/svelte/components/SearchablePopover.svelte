@@ -16,7 +16,7 @@
 
   Props:
     options      — [{ id, label, icon?, img?, meta?, trailing?, trailingIcon?,
-                   addMarker?, dataId?, data?,
+                   addMarker?, dataId?, data?, disabled?, disabledReason?,
                    group? }] (consumer builds the full list, including any leading
                    "special" option such as Auto).
                    `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
@@ -51,6 +51,24 @@
                    `trailingIcon` marks an option that IS the current value with a
                    glyph rather than a word — the travel-actor picker checks the
                    linked actor, and `trailing` renders a Chip, which is a label.
+                   `disabled` gates the row (issue 1504): it renders
+                   `aria-disabled="true"`, refuses its own click, and the keyboard
+                   cursor steps OVER it rather than landing on it. It is
+                   `aria-disabled` rather than a native `disabled` attribute
+                   because an option is not a control the GM tabs to — the rows are
+                   already `tabindex="-1"` and the HOLDER owns focus — so the only
+                   thing `disabled` would add is removing the row from the
+                   accessibility tree, which is exactly where its reason has to be
+                   announced from. `openspec/specs/design-system/library.html:661`
+                   is the requirement in one line: opacity alone is not a reason.
+                   `disabledReason` is that reason, rendered as the row's trailing
+                   badge and therefore inside the button and inside its accessible
+                   name, so a screen-reader user is told WHY as well as THAT. It is
+                   rendered only for a gated row, because a reason for being
+                   unavailable on an available row is a lie; and only in this
+                   component's OWN row content — a caller supplying an `option`
+                   snippet draws the whole row, this badge included, which is the
+                   same rule that snippet's own note states.
     optionGroups — OPTIONAL [{ id, label }]. When non-empty the options are bucketed
                    by `option.group` and each bucket renders under its own heading as
                    an ARIA `role="group"` with that label. This exists because a menu
@@ -313,6 +331,33 @@
     popoverClass — optional extra class on the portaled popover element (the
                    pickerClass lands on the trigger's root, which the portaled
                    popover escapes, so a popover-scoped style needs its own hook)
+    triggerAriaLabelledBy — OPTIONAL id (or id list) of the element or elements that NAME the
+                   trigger, emitted as `aria-labelledby` beside `aria-label` (issue 1504). It is
+                   a second prop rather than a spelling of `triggerAriaLabel` because the two are
+                   different facts and `aria-labelledby` WINS over `aria-label` wherever both are
+                   present: a label is a string this component is handed, while a labelledby is a
+                   POINTER at a caption the GM can already see. A labelled field is the case it
+                   exists for — a `<Field>`'s kicker caption above the control is the control's
+                   name, and duplicating that text into an `aria-label` makes the name a second
+                   copy free to drift from the caption beside it.
+
+                   Omitted entirely when empty, so every caller that passes nothing renders the
+                   trigger it renders today. It rides `triggerAttributes`, so a `trigger` snippet
+                   caller receives it through the same spread as the rest of the contract.
+    dialogAriaLabelledBy — OPTIONAL id (or id list) of the element or elements that NAME the
+                   PANEL, emitted as `aria-labelledby` on BOTH the portaled `role="dialog"` and
+                   the `role="listbox"` inside it, exactly where `dialogAriaLabel` would have
+                   written a string (issue 1504). It exists because a caller whose control is
+                   named by a caption it already renders has no string to pass: it holds a
+                   POINTER, and `dialogAriaLabel` cannot take one. Such a caller used to resolve
+                   its name to `''` here and open an unnamed dialog wrapping an unnamed list.
+
+                   The two are mutually exclusive on the wire rather than additive: where both
+                   are passed the labelledby is emitted and the label is OMITTED, because
+                   `aria-labelledby` wins in the accessibility tree and an `aria-label` beside it
+                   would be dead text free to drift from the caption it duplicates. One derived
+                   value feeds both elements, so the dialog and its listbox cannot take different
+                   names.
     *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` feeds
                    `EmptyState`'s `title` slot (its `<h3>`) HERE, so it must stay short:
                    the panel renders it as ONE quiet line (`EmptyState note`, issue 1373),
@@ -359,7 +404,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, nextActiveIndex } from '../util/listboxNavigation.js';
+  import { activeOptionId, nextActiveIndex, typeAheadCursor } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -435,7 +480,9 @@
     triggerHasPopup = 'dialog',
     triggerAriaDisabled = false,
     triggerAriaLabel = '',
+    triggerAriaLabelledBy = '',
     dialogAriaLabel = '',
+    dialogAriaLabelledBy = '',
     searchPlaceholder = '',
     searchAriaLabel = '',
     emptyHint = '',
@@ -487,6 +534,11 @@
   // cursor cannot outlive that list and the expiry must be a READ. See `optionListGeneration`
   // below for what a generation is and why the reset cannot be an `$effect`.
   let cursor = $state({ generation: '', index: -1 });
+  // THE TYPE-AHEAD'S PREFIX (issue 1504), held beside the cursor it moves and owned per instance
+  // for the same reason the cursor is: two pickers on one screen must not continue each other's
+  // prefix. `util/listboxNavigation.js` holds none of this — it returns the new buffer and this
+  // stores it — so there is nothing module-level to leak between components or between opens.
+  let typeAheadBuffer = $state(null);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let optionsList = $state(null);
@@ -544,6 +596,17 @@
   const renderedOptions = $derived(
     isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
   );
+  // WHAT THE CURSOR SKIPS AND WHAT THE PREFIX MATCHES (issue 1504), both over the FLAT rendered
+  // order because that is the order `util/listboxNavigation.js` indexes. The predicate is a
+  // function rather than a derived array so the module stays off the option shape, and the labels
+  // ARE an array because the match runs against the rendered label rather than the option value —
+  // at a converted page-size control the value is the number 25 and the label is what the GM sees.
+  const typeAheadLabels = $derived(renderedOptions.map((option) => String(option.label ?? '')));
+
+  function optionIsDisabled(index) {
+    return Boolean(renderedOptions[index]?.disabled);
+  }
+
   const filteredCount = $derived(
     String(filteredCountTemplate)
       .replace('{matched}', String(filteredOptions.length))
@@ -676,13 +739,126 @@
     return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
   }
 
+  /**
+   * THE TYPE-AHEAD, which is a native `<select>`'s answer to a printable character (issue 1504).
+   *
+   * ── WHERE IT IS ACTIVE, AND WHY THAT IS NOT A PROP ────────────────────────────────────────
+   * Only in the search-suppressed shape. With a query field rendered, a printable character IS
+   * the query and issue 1503's key map hands it over untouched; taking it for a prefix match
+   * would delete the search from every one of the 17 callers that render one. So the condition is
+   * `showSearch`, the same condition that decides which element is the holder, and every caller
+   * that renders a field behaves exactly as it did — the branch returns before reading the key.
+   *
+   * ── THE CLOSED TRIGGER IS THE PRIMARY CASE ────────────────────────────────────────────────
+   * A GM who tabs to a page-size control and types `2` expects 25 rows. Closed, the panel OPENS
+   * with the match as the ACTIVE OPTION rather than selecting silently, which is the WAI-ARIA
+   * select-only combobox behaviour: the active option is not the value, so `Enter` or a click
+   * commits and every dismissal path — Escape, an outside click, focus leaving the trigger —
+   * closes through `close()` with the value unchanged. A prefix that matches NOTHING moves no
+   * cursor and does not open a closed panel, so a mistyped character is not a state change.
+   *
+   * Ctrl, Meta and Alt are refused here rather than by the guard below, because Shift is not:
+   * Shift is how a capital letter is typed, and the match is case-insensitive anyway.
+   *
+   * @param {KeyboardEvent} event the keypress on the holder, open or closed.
+   * @returns {boolean} true when the type-ahead consumed the key.
+   */
+  function typeAheadOwnsKey(event) {
+    if (showSearch) return false;
+    // THE REFUSAL `toggle()` MAKES IS THIS BRANCH'S TOO. `triggerAriaDisabled` keeps the trigger
+    // focusable precisely so a capped control stays reachable — `ModifierPillSelect` at its pick
+    // cap is the site — so it is a button that HAS focus and refuses to open. Opening it from a
+    // typed character would be the one route around a refusal that is stated everywhere else.
+    if (disabled || triggerAriaDisabled) return false;
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    const typed = typeAheadCursor(activeIndex, typeAheadLabels, event.key, {
+      buffer: typeAheadBuffer,
+      isDisabled: optionIsDisabled,
+    });
+    if (typed === null) return false;
+    event.preventDefault();
+    typeAheadBuffer = typed.buffer;
+    if (typed.index === null) return true;
+    // OPEN FIRST, then stamp. The generation the cursor is stamped with reads `open`, so a stamp
+    // taken before the panel opened would be stale by the time the list rendered and the cursor
+    // would read as the -1 sentinel in the very pass that was supposed to set it.
+    open = true;
+    cursor = { generation: optionListGeneration, index: typed.index };
+    return true;
+  }
+
+  /** The four keys that OPEN a closed select-only combobox and land the cursor somewhere. */
+  const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
+
+  /**
+   * THE OPENING KEYS OF A CLOSED TRIGGER, which a native `<select>` answered and this did not.
+   *
+   * ── WHAT WAS MISSING ──────────────────────────────────────────────────────────────────────
+   * Issue 1504's closed branch specified the type-ahead half only, and `typeAheadCursor` refuses
+   * anything that is not a printable character — so on a focused, closed trigger `ArrowDown`,
+   * `ArrowUp`, `Home`, `End` and `Alt+ArrowDown` did nothing AND were not consumed, leaving the
+   * browser's own scroll to run. The `<select>` each converted site replaced answered `ArrowDown`
+   * by changing its value. This is the WAI-ARIA select-only combobox's version of that: the keys
+   * OPEN the panel and move an ACTIVE OPTION, so the value is still only committed by `Enter` or
+   * a click and every dismissal path leaves it untouched.
+   *
+   * ── WHY THE CURSOR IS SEEDED HERE AND NOT LEFT AT THE SENTINEL ────────────────────────────
+   * A click or `Enter` opens with NO active row on purpose (issue 1503): the GM has said "show me
+   * the list", not "move me through it". A GM who presses `ArrowDown` has said the second thing,
+   * so the key that opened the panel also names where the cursor lands — `nextActiveIndex` from
+   * the `-1` sentinel answers all four, skipping a gated row at either end, so no arithmetic is
+   * added and `util/listboxNavigation.js` is untouched. `Alt+ArrowDown` is the exception the
+   * pattern names: it opens the panel WITHOUT moving anything, which is how a keyboard user looks
+   * at the options without disturbing the value's neighbourhood.
+   *
+   * `Ctrl`, `Meta` and `Shift` are refused outright, and `Alt` is refused everywhere except that
+   * one pairing — the same rule the open branch's modifier guard states, and for the same reason:
+   * a modified press is the platform's or the caller's, never this widget's.
+   *
+   * @param {KeyboardEvent} event the keypress on a CLOSED trigger holder.
+   * @returns {boolean} true when the key opened the panel and was consumed.
+   */
+  function openingKeyOwns(event) {
+    if (showSearch) return false;
+    // The refusal `toggle()` and the type-ahead both make. A `triggerAriaDisabled` trigger is
+    // focusable precisely so a capped control stays reachable, so it is a button that HAS focus
+    // and refuses to open; an opening key must not be the one route around that.
+    if (disabled || triggerAriaDisabled) return false;
+    if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const altOpen = event.altKey && event.key === 'ArrowDown';
+    if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return false;
+    event.preventDefault();
+    // OPEN FIRST, then stamp — the same ordering the type-ahead states: the generation reads
+    // `open`, so a stamp taken before the panel opened would be stale in the very pass that was
+    // supposed to set it.
+    open = true;
+    if (altOpen) return true;
+    const landing = nextActiveIndex(-1, renderedOptions.length, event.key, {
+      columns: gridColumns,
+      isDisabled: optionIsDisabled,
+    });
+    // `null` is an empty or wholly gated list: the panel still opens, on its own empty branch or
+    // with nothing to arrow to, and the cursor stays at the sentinel rather than naming a row.
+    if (landing !== null) cursor = { generation: optionListGeneration, index: landing };
+    return true;
+  }
+
   // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
   // which keys are CONSUMED, and what Enter chooses. A key the module does not own returns `null`
   // and is left entirely alone, which is what keeps every printable character going to the query
   // field. Escape is not handled here: `dismissOnOutsideClick` on the picker root takes it at the
   // document's capture phase, which is the only place that reaches the inline search shape.
   function onHolderKeydown(event) {
-    if (!open) return;
+    // A CLOSED PANEL HAS TWO KEY FAMILIES, and both are issue 1504's: the keys that OPEN it, and
+    // the type-ahead. This runs only from the TRIGGER, which is the holder in the search-
+    // suppressed shape and the only element that exists while the panel is shut — a query field
+    // cannot receive a key it is not rendered for. The opening keys are asked first because they
+    // are exact key names while the type-ahead reads any printable character.
+    if (!open) {
+      if (openingKeyOwns(event)) return;
+      typeAheadOwnsKey(event);
+      return;
+    }
     if (event.key === 'Enter') {
       // Enter WITHOUT an active option is a no-op rather than a choice of the first row. On a
       // trigger holder it must still be prevented from reaching the button's own click, or the
@@ -690,9 +866,13 @@
       const active = renderedOptions[activeIndex];
       if (!active) return;
       event.preventDefault();
-      choose(active.id);
+      chooseOption(active);
       return;
     }
+    // WITH THE PANEL OPEN THE PREFIX MOVES THE ACTIVE OPTION ONLY, never the value: this is the
+    // same call as the closed branch, and `open` is already true. It comes before the modifier
+    // guard because Shift is how a capital is typed.
+    if (typeAheadOwnsKey(event)) return;
     // A MODIFIED KEY IS NEVER THIS WIDGET'S. `Shift+End` selects to the end of the query,
     // `Ctrl+Home` jumps to its start, and both are the ordinary way a GM fixes a typo in a long
     // search — none of them is a cursor movement, and consuming them would take the field's
@@ -705,8 +885,14 @@
     // picker instead of confirming the row the GM had arrowed to.
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (caretOwnsKey(event)) return;
+    // THE PREDICATE IS PASSED UNCONDITIONALLY, and that IS the compatibility contract rather
+    // than a widening of it: a predicate that gates nothing returns the same number as no
+    // predicate at all, which `tests/util/listbox-navigation.test.js` pins directly against a
+    // bare call. Branching on "does this list hold a gated row" would be a second code path for
+    // the arithmetic to differ on, bought with nothing.
     const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
       columns: gridColumns,
+      isDisabled: optionIsDisabled,
     });
     if (next === null) return;
     event.preventDefault();
@@ -735,6 +921,10 @@
   function close({ restoreFocus = true } = {}) {
     open = false;
     search = '';
+    // A PREFIX DOES NOT SURVIVE THE PANEL (issue 1504). The inactivity window would expire it a
+    // half-second later anyway, but a GM who dismisses a panel and immediately types again is
+    // starting a new search, not continuing the one they just abandoned.
+    typeAheadBuffer = null;
     if (restoreFocus) restoreTriggerFocus();
   }
 
@@ -778,6 +968,23 @@
   function choose(id) {
     onChoose(id);
     close();
+  }
+
+  /**
+   * Choose an option, unless it is gated (issue 1504).
+   *
+   * `aria-disabled` is advisory to the browser exactly as it is on the trigger: it neither blocks
+   * the click nor removes the row from the pointer's reach, so the refusal has to be stated. Both
+   * routes to a choice go through here — the row's own click and the Enter that confirms the
+   * keyboard cursor — because the cursor's skip scan is not a guarantee: a caller can gate the
+   * row the cursor is already sitting on, and the arrows would then have nothing to do with the
+   * next Enter.
+   *
+   * @param {{id: string, disabled?: boolean}} option The row the GM acted on.
+   */
+  function chooseOption(option) {
+    if (option?.disabled) return;
+    choose(option.id);
   }
 
   function stop(event) {
@@ -825,6 +1032,17 @@
     triggerOnKeydown?.(event);
   }
 
+  // THE PANEL'S NAME, resolved ONCE for the two elements that carry it. The portaled
+  // `role="dialog"` and the `role="listbox"` inside it take the same name, so resolving the
+  // string-versus-pointer choice here rather than at each element is what stops them naming
+  // themselves differently. A labelledby SUPPRESSES the label rather than joining it: both
+  // present would leave an `aria-label` the accessibility tree never reads, free to drift from
+  // the caption the pointer names.
+  const dialogNameAttribute = $derived(
+    dialogAriaLabelledBy ? undefined : dialogAriaLabel || undefined
+  );
+  const dialogNamedBy = $derived(dialogAriaLabelledBy || undefined);
+
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
   // duplication gate counts and a place for the two shapes to drift apart.
   const triggerAttributes = $derived({
@@ -837,6 +1055,11 @@
     'data-recipe-add': triggerAddMarker || undefined,
     title: triggerTitle || undefined,
     'aria-label': triggerAriaLabel || undefined,
+    // BESIDE the label rather than instead of it, and omitted when empty so the attribute is
+    // absent rather than pointing at no element. Where a caller passes both, `aria-labelledby`
+    // is the one the accessibility tree uses — which is the point: the visible caption wins over
+    // a string, and a caller that has a caption should be naming the control with it.
+    'aria-labelledby': triggerAriaLabelledBy || undefined,
     // THE TRIGGER IS THE HOLDER when no query field is rendered (`spec.md`'s own case for the
     // search-suppressed shape): `role="combobox"` plus the activedescendant pair, and
     // `data-keyboard-focus="true"` because a `<button>` outside a `<form>` answers Foundry's
@@ -996,7 +1219,8 @@
       role="dialog"
       tabindex="-1"
       data-keyboard-focus="true"
-      aria-label={dialogAriaLabel || undefined}
+      aria-label={dialogNameAttribute}
+      aria-labelledby={dialogNamedBy}
       use:anchoredPopover={{
         component: 'SearchablePopover',
         // In `inlineSearchTrigger` mode the trigger button is UNMOUNTED while open (the search
@@ -1058,11 +1282,12 @@
           tabindex="-1"
           data-keyboard-focus="true"
           aria-selected={option.id === value}
+          aria-disabled={option.disabled ? 'true' : undefined}
           data-active-option={index === activeIndex ? 'true' : undefined}
           data-recipe-add={option.addMarker || undefined}
           data-popover-option={option.dataId || undefined}
           title={option.label}
-          onclick={() => choose(option.id)}
+          onclick={() => chooseOption(option)}
           onmousedown={(event) => event.preventDefault()}
         >
           {#if optionContent}
@@ -1095,6 +1320,17 @@
                 class={`manager-travel-option-marker ${option.trailingIcon}`}
                 aria-hidden="true"
               ></i>{/if}
+            <!-- WHY THE REASON IS A CHIP AND NOT A SECOND LABEL SPAN (issue 1504). The design
+                 draws a gated row as dimmed text with a trailing badge, and this component
+                 already draws exactly that badge for `option.trailing`, through the primitive
+                 that owns it — `Chip`'s `disabled` tone IS the "unavailable" family. A second
+                 hand-rolled span would be a copy of a shipped treatment. It renders LAST so it
+                 sits at the row's trailing edge, and inside the button so the reason is part of
+                 the row's accessible name rather than a tooltip a keyboard user never reaches. -->
+            {#if option.disabled && option.disabledReason}<Chip
+                tone="disabled"
+                data-popover-option-reason="">{option.disabledReason}</Chip
+              >{/if}
           {/if}
         </button>
       {/snippet}
@@ -1147,7 +1383,8 @@
           class={`manager-travel-popover-options ${listClass}`}
           role="listbox"
           id={listId}
-          aria-label={dialogAriaLabel || undefined}
+          aria-label={dialogNameAttribute}
+          aria-labelledby={dialogNamedBy}
           data-picker-as={as}
           data-picker-columns={isGrid ? String(gridColumns) : undefined}
         >

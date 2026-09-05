@@ -13,15 +13,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks
+// on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
+// harness's own mount target, which is why every lookup is rooted there.
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const RECIPE_RAW_MODULES = [
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
@@ -51,6 +60,12 @@ const RECIPE_PRIMITIVES = [
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+  // composes. A module missing from a manifest does not fail this suite — it is reported as
+  // `# cancelled`, never `# fail`.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
@@ -213,10 +228,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(renderedRows(), 12, 'the default page holds all twelve');
     assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
     assert.equal(countText(), '10 of 12 recipes', 'ten rows below it, twelve in the category');
@@ -245,10 +257,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     });
     const countText = () => root.querySelector('.fab-group-count').textContent.trim();
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -300,10 +309,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
     });
 
     // Shrink the page to 10 so general (12) must span two pages.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
 
     // Page 1: the whole alchemy bucket, then the first slice of general — not an
     // interleaved alphabetical slice of all three categories.
@@ -603,10 +609,7 @@ describe('RecipesBrowserView result count', () => {
     assert.equal(count.textContent.trim(), '1–12 of 12');
     assert.equal(count.classList.contains('manager-chip'), false, 'the count is not a chip to press');
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
     assert.equal(root.querySelector('[data-recipe-count]').textContent.trim(), '1–10 of 12');
 
     root.querySelector('[data-pagination-next]').click();

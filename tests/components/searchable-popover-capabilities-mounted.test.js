@@ -696,6 +696,196 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
+  // ── A GATED OPTION, AND THE REASON IT STATES (issue 1504) ─────────────────────────────────
+  //
+  // `openspec/specs/design-system/library.html:661` states the requirement in one line: opacity
+  // alone is not a reason. Before this, a snippet-drawn "disabled" row still selected on click,
+  // which is a lie in the DOM as well as on the screen — the row announced itself as selectable
+  // and behaved as selectable, and the only thing marking it unavailable was its colour.
+  describe('a gated option', () => {
+    /** Three rows with the middle one gated, so a skip has to cross it in both directions. */
+    const GATED = [
+      { id: 'anvil', label: 'Anvil' },
+      { id: 'beaker', label: 'Beaker', disabled: true, disabledReason: 'Premium' },
+      { id: 'coin', label: 'Coin' },
+    ];
+
+    it('announces itself as disabled and states WHY inside the row', async () => {
+      await mountPicker({ options: GATED });
+      const open = await openPanel();
+      const rows = optionRows(open);
+
+      assert.deepEqual(
+        rows.map((row) => row.getAttribute('aria-disabled')),
+        [null, 'true', null],
+        'the gated row alone is announced as disabled, and it is `aria-disabled` rather than a ' +
+          'native `disabled` — which would take the row out of the accessibility tree that its ' +
+          'reason has to be announced from'
+      );
+      assert.equal(
+        rows[1].querySelector('[data-popover-option-reason]')?.textContent,
+        'Premium',
+        'the reason is rendered'
+      );
+      assert.ok(
+        rows[1].contains(rows[1].querySelector('[data-popover-option-reason]')),
+        'and it is INSIDE the row button, so it is part of the accessible name rather than a ' +
+          'tooltip a keyboard user never reaches'
+      );
+      assert.equal(
+        rows[1].getAttribute('tabindex'),
+        '-1',
+        'a gated row is still out of the tab order, exactly like every other row'
+      );
+      harness.remount();
+    });
+
+    it('refuses its own click, and leaves the panel open on it', async () => {
+      chosen.length = 0;
+      await mountPicker({ options: GATED });
+      const open = await openPanel();
+      const rows = optionRows(open);
+
+      rows[1].click();
+      flushSync();
+      await settle();
+      assert.deepEqual(chosen, [], 'the gated row chose nothing');
+      assert.ok(
+        Boolean(panel()),
+        'and the panel is still open, because a refused click is not a dismissal either'
+      );
+
+      rows[2].click();
+      flushSync();
+      await settle();
+      assert.deepEqual(chosen, ['coin'], 'while an enabled row beside it still chooses');
+      harness.remount();
+    });
+
+    it('is stepped OVER by the arrow keys and by Home and End', async () => {
+      await mountPicker({ options: GATED });
+      const open = await openPanel();
+      const holder = holderOf(open);
+      const rows = optionRows(open);
+
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), rows[0].id);
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), rows[2].id, 'the gated row is not a cursor position');
+      pressKey('ArrowUp');
+      assert.equal(activeDescendant(holder), rows[0].id, 'and it is not one upwards either');
+
+      await mountPicker({
+        options: [
+          { id: 'anvil', label: 'Anvil', disabled: true },
+          { id: 'beaker', label: 'Beaker' },
+          { id: 'coin', label: 'Coin', disabled: true },
+        ],
+      });
+      const gatedEnds = await openPanel();
+      const ends = optionRows(gatedEnds);
+      pressKey('Home');
+      assert.equal(
+        activeDescendant(holderOf(gatedEnds)),
+        ends[1].id,
+        'Home reaches the first ENABLED row'
+      );
+      pressKey('End');
+      assert.equal(activeDescendant(holderOf(gatedEnds)), ends[1].id, 'and End the last one');
+      harness.remount();
+    });
+
+    it('refuses the Enter that would confirm it, without letting the key escape', async () => {
+      // The cursor's skip scan is not a guarantee: a caller can gate the row the cursor is
+      // already sitting on. So the refusal is stated at the choice rather than trusted to the
+      // arithmetic that usually keeps the cursor away from it.
+      chosen.length = 0;
+      await mountPicker({ options: [{ id: 'beaker', label: 'Beaker', disabled: true }] });
+      const open = await openPanel();
+      const holder = holderOf(open);
+
+      pressKey('ArrowDown');
+      assert.equal(
+        activeDescendant(holder),
+        null,
+        'with the only row gated there is nowhere for the cursor to go'
+      );
+
+      const confirmed = pressKey('Enter');
+      assert.deepEqual(chosen, [], 'and Enter chooses nothing');
+      assert.ok(!confirmed.defaultPrevented, 'an Enter with no cursor is left entirely alone');
+      harness.remount();
+    });
+
+    it('states no reason for a row that is not gated', async () => {
+      // A reason for being unavailable on an available row is a lie, so the badge is bound to the
+      // state rather than to the presence of the string.
+      await mountPicker({
+        options: [{ id: 'anvil', label: 'Anvil', disabledReason: 'Premium' }],
+      });
+      const open = await openPanel();
+      assert.ok(
+        !open.querySelector('[data-popover-option-reason]'),
+        'the badge belongs to the gated state, not to the string'
+      );
+      harness.remount();
+    });
+
+    it('leaves the whole row to an `option` snippet, badge included', async () => {
+      // The snippet's own rule: it is the row's ONLY content. A reason appended after a caller's
+      // content would retarget every suite that reads its row label with `span:last-child`.
+      await mountPicker({ options: GATED, useOptionSnippet: true });
+      const open = await openPanel();
+      const rows = optionRows(open);
+
+      assert.equal(
+        rows[1].getAttribute('aria-disabled'),
+        'true',
+        'the ROW element is still this component`s, so the gating is unchanged'
+      );
+      assert.ok(
+        !open.querySelector('[data-popover-option-reason]'),
+        'but the CONTENT is the caller`s alone, and the badge is content'
+      );
+      harness.remount();
+    });
+  });
+
+  // ── `triggerAriaLabelledBy` (issue 1504) ──────────────────────────────────────────────────
+  describe('`triggerAriaLabelledBy`', () => {
+    it('lands as `aria-labelledby` beside `aria-label`, and is absent when nothing is passed', async () => {
+      await mountPicker({ triggerAriaLabelledBy: 'field-caption', triggerAriaLabel: 'Resolution' });
+      assert.equal(trigger().getAttribute('aria-labelledby'), 'field-caption');
+      assert.equal(
+        trigger().getAttribute('aria-label'),
+        'Resolution',
+        'the two coexist: a labelledby POINTS at a caption the GM can see, and the tree prefers ' +
+          'it, which is the whole reason a labelled field passes one'
+      );
+
+      await mountPicker({ triggerAriaLabel: 'Resolution' });
+      assert.ok(
+        !trigger().hasAttribute('aria-labelledby'),
+        'a caller that passes nothing renders the trigger it renders today, with the attribute ' +
+          'ABSENT rather than pointing at no element'
+      );
+      harness.remount();
+    });
+
+    it('reaches a `trigger` snippet`s own button through the same spread as the rest', async () => {
+      await mountPicker({ useTriggerSnippet: true, triggerAriaLabelledBy: 'field-caption' });
+      const button = trigger();
+      assert.ok(button.classList.contains('caller-trigger'), 'the caller drew this button');
+      assert.equal(
+        button.getAttribute('aria-labelledby'),
+        'field-caption',
+        'the prop rides `triggerAttributes`, so it is part of the contract a snippet caller ' +
+          'spreads rather than something only the primitive`s own button can have'
+      );
+      harness.remount();
+    });
+  });
+
   describe('`triggerOnKeydown`', () => {
     it('runs AFTER the primitive’s own handler, so a caller cannot delete the focus model', async () => {
       const seen = [];

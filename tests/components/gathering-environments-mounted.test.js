@@ -8,6 +8,11 @@ import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
+// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
+// there cannot go missing here.
+import { SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -62,6 +67,13 @@ function makeServices(result, { reject = false } = {}) {
 
 async function mountView(services) {
   target = document.createElement('div');
+  // THE MOUNT TARGET IS THE PLAYER APPLICATION ROOT (issue 1504, decision YY). `GatheringView`
+  // renders a `Pagination`, whose page-size control is a shared `<Select>`; a picker resolves
+  // its portal host by walking up to the nearest Fabricate application root, and the only root
+  // this view has in production is `fabricate-app`. Mounted into a bare `<div>` the panel lands
+  // on `<body>`, out of reach of every `target.querySelector` in this file — which is a fixture
+  // asserting against a portal that FAILED, not a product regression.
+  target.className = 'fabricate-app';
   document.body.appendChild(target);
   mounted = mount(GatheringView, { target, props: { services } });
   flushSync();
@@ -145,6 +157,20 @@ describe('GatheringView mounted behavior', () => {
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+      const rawDestination = join(tempRoot, rawModule);
+      mkdirSync(dirname(rawDestination), { recursive: true });
+      writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
+    }
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
@@ -797,15 +823,15 @@ describe('GatheringView mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-pagination-page]').textContent.includes('2'), 'on page 2 before resizing');
 
-    const sizeSelect = target.querySelector('[data-pagination-size]');
-    // 9 must be a real selectable option from [6, 9, 12].
+    // 9 must be a real offered option from [6, 9, 12] — read off the OPEN panel now that the
+    // control draws its own list (issue 1504), and `chooseSelectOption` refuses a value the
+    // control does not offer rather than staging an empty string the way a native `<select>`
+    // silently did.
     assert.ok(
-      Array.from(sizeSelect.options).some(option => option.value === '9'),
+      selectOptionValues(target, '[data-pagination-size]').includes('9'),
       '9 is a selectable per-page option'
     );
-    sizeSelect.value = '9';
-    sizeSelect.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(target, '[data-pagination-size]', 9);
 
     assert.equal(
       target.querySelectorAll('[data-environment-id]').length,

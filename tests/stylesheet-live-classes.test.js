@@ -151,6 +151,72 @@ const SOURCE_ROWS = [
     reportsDynamic: true,
   },
   {
+    id: 'class prop passed as a quoted attribute',
+    file: 'src/ui/svelte/apps/Chi.svelte',
+    source: '<Picker triggerClass="chi-trigger chi-trigger-${size}" />',
+    exact: ['chi-trigger'],
+    live: ['chi-trigger-alpha'],
+    unresolved: ['chi-trigger-'],
+    because: 'a shared primitive takes its classes as PROPS, so a caller family classes reach'
+      + ' the DOM through the primitive, and the prop is the only place they are written. Read as'
+      + ' ordinary attribute the value would be one flat string and the rung suffix would be lost',
+  },
+  {
+    id: 'class prop passed as a braced template',
+    file: 'src/ui/svelte/apps/Psi.svelte',
+    source: '<Picker pickerClass={`psi-picker psi-picker-${rung}`} />',
+    exact: ['psi-picker'],
+    live: ['psi-picker-form'],
+    unresolved: ['psi-picker-'],
+    because: 'the braced form is where every real call site writes a class prop, and its value is a'
+      + ' TEMPLATE literal — invisible to the quoted-string sweep, so without the class-prop rule'
+      + ' even the static half is not live',
+  },
+  {
+    id: 'class prop passed by Svelte shorthand',
+    file: 'src/ui/svelte/apps/Omega.svelte',
+    source: [
+      '<script>',
+      '  const rowClass = $derived(`omega-row omega-row-${tone}`);',
+      '</script>',
+      '<Picker {rowClass} />',
+    ].join('\n'),
+    exact: ['omega-row'],
+    live: ['omega-row-warm'],
+    unresolved: ['omega-row-'],
+    because: 'the shorthand names the binding rather than the value, so the prop is resolved out of'
+      + ' the file own definitions — a $derived template included',
+  },
+  {
+    id: 'a *Class binding outside markup is not a class prop',
+    file: 'src/ui/svelte/util/koppaNavigation.js',
+    source: [
+      "const koppaSuffix = 'alpha';",
+      "const koppaProbeClass = 'koppa-probe-${koppaSuffix}';",
+    ].join('\n'),
+    exact: ['koppa-probe-'],
+    dead: ['koppa-probe-alpha'],
+    because: 'the class-prop rule is keyed on the attribute name AND on the markup region, because'
+      + ' a name ending in Class is an ordinary JavaScript identifier too. This module holds no'
+      + ' markup and hands the value to nothing, so it writes no class onto any element and the'
+      + ' hole beside its static half must not resolve into one',
+  },
+  {
+    id: 'a template literal that is not a class prop stays dead',
+    file: 'src/ui/svelte/apps/Digamma.svelte',
+    source: [
+      '<script>',
+      '  const label = `digamma-heading digamma-heading-${title}`;',
+      '</script>',
+      '<button class="digamma-live" title={`digamma-tooltip ${title}`}>{label}</button>',
+    ].join('\n'),
+    exact: ['digamma-live'],
+    dead: ['digamma-heading', 'digamma-heading-x', 'digamma-tooltip'],
+    because: 'the class-prop rule is keyed on the ATTRIBUTE NAME ending in Class, not on the value'
+      + ' being a template. Widening the literal sweep to backticks instead would make every'
+      + ' identifier run in every template under src/ live, which is what keeps a dead rule alive',
+  },
+  {
     id: 'dynamic state class does not widen every state class',
     file: 'src/ui/svelte/apps/Omicron.svelte',
     source: '<span class={`omicron-pill is-${tone}`}></span>',
@@ -195,7 +261,7 @@ test('every liveness rule holds on its synthetic row', () => {
 });
 
 test('the corpus is alive, so the loop above cannot pass by iterating nothing', () => {
-  assert.ok(SOURCE_ROWS.length >= 13, 'the synthetic corpus lost rows');
+  assert.ok(SOURCE_ROWS.length >= 14, 'the synthetic corpus lost rows');
   const covered = SOURCE_ROWS.filter((row) => (row.exact ?? row.live ?? row.dead ?? []).length > 0);
   assert.equal(covered.length, SOURCE_ROWS.length, 'a row asserts nothing at all');
 });

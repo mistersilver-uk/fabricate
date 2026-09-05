@@ -23,16 +23,21 @@
   seven Pagination rules (the bar, `-summary`, `-nav`, `-page`, `-size`, `-size select`, and
   the 28px arrow box) and five IconButton rules (the shared base block plus the `font:
   inherit` issue 1502 adds to it, `:disabled`, `:hover`, the 34px box, and the glyph rule).
+  SIX of the seven Pagination rules remain: `-size select` retired with issue 1504's
+  conversion, and the arrow box GAINED `border-radius: 7px` so the bar's field and its arrows
+  read as one matched pair.
 
   It also declares its own focus PAIR for the BUTTONS it contains: a `:focus` strip and a
-  `:focus-visible` repaint at `fabricate.css:5616` and `:5634`. Buttons only, deliberately —
+  `:focus-visible` repaint at `fabricate.css:5710` and `:5728`. Buttons only, deliberately —
   the sheet comment above those rules says why an `:is(button, select)` form would delete the
   player app's inset select ring.
 
-  Issue 1502 preserves the frame; it does not adopt the primitive's paint. Issues 1503 and
-  1504 are where that adoption is decided, with their own visual review. (Written without a
-  leading hash: `tests/components/theme-colour-contract.test.js` reads a four-digit issue
-  number behind one as an `#RGBA` colour literal.)
+  Issue 1502 preserved the frame without adopting the primitive's paint. Issue 1504 is where
+  the per-page control's adoption happened: it is a shared `<Select size="inline">` now, so
+  the bar holds no native `<select>` at all, the sheet's own `.manager-pagination-size select`
+  rule is deleted, and each caller's `:global(… select)` block is retargeted onto the trigger.
+  (Written without a leading hash: `tests/components/theme-colour-contract.test.js` reads a
+  four-digit issue number behind one as an `#RGBA` colour literal.)
 
   Each caller's own `:global` block is injected UNLAYERED while `styles/fabricate.css` is
   imported at `layer(modules)`, so every property a caller already declares still wins at
@@ -57,9 +62,9 @@
     -page                   | min-width, text-align,         | min-w,   | text-align
                             | font-weight                    | weight   |
     -size                   | (empty)                        | —        | —
-    -size select            | min-width, font-* + line-height| min-w,   | font-family/-size/
-                            |                                | l-height | -style/-variant/
-                            |                                |          | -weight/-stretch
+    -size select            | RETIRED by issue 1504. The control is a `<Select>`, and each
+                            | caller's block now carries a per-site `background` and nothing
+                            | else — the geometry comes from the `inline` rung.
     .manager-icon-button    | appearance, -webkit-appearance,| min-h,   | the rest
                             | box-sizing, gap, min-width,    | font-size|
                             | min-height, line-height,       |          |
@@ -70,7 +75,7 @@
 
   `journal/HistoryList` adds `padding-right/-bottom/-left` and `border-top-*` on the bar
   (it declared only `padding-top` and no rule), and `height` on the select (it declared no
-  select rule at all) — all three restated. Its arrow also newly takes `flex: 0 0 28px`
+  select rule at all) — all three restated; the select entry retired with issue 1504. Its arrow also newly takes `flex: 0 0 28px`
   from the 28px box rule, adopted: its nav is `flex: 0 0 auto` inside a `nowrap` row whose
   summary absorbs every shrink, so the arrows are never compressed and a `flex-basis` of
   28px is the width they already had.
@@ -84,12 +89,13 @@
   is the one that is restated, because it releases core's 2em floor and that floor is what
   actually sizes the five 26px arrows to 28px today. `padding` and `line-height` cannot move
   a glyph that `justify-content`/`align-items: center` keeps centred in a fixed box. `appearance` cannot act where the caller already declares border,
-  radius, background and colour. `box-sizing`, the select's font longhands and the glyph
-  rule are the same value the base already computed.
+  radius, background and colour. `box-sizing` and the glyph rule are the same value the base
+  already computed.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import IconButton from './IconButton.svelte';
+  import Select from './Select.svelte';
 
   let {
     totalCount = 0,
@@ -175,6 +181,34 @@
     const next = Number(value);
     if (Number.isFinite(next) && next > 0 && next !== pageSize) onPageSizeChange(next);
   }
+
+  /**
+   * THE PER-PAGE CONTROL'S ACCESSIBLE NAME IS THE VISIBLE CAPTION ITSELF (issue 1504).
+   *
+   * The `<select>` this replaced read `aria-label="Rows per page"` beside a visible `Per page`,
+   * which fails WCAG 2.5.3 on the reading that matters for speech input: a user says what they
+   * can see, and the name has to BEGIN with it. Two fixes were available — retype the label, or
+   * point at the caption — and pointing at it is the one the two strings cannot drift apart
+   * under, because there is only one string. So the caption span takes a per-instance id and the
+   * trigger takes `aria-labelledby`; the `Rows per page` key retires with the `<select>`.
+   *
+   * `$props.id()` rather than a module counter: two pagers on one screen (an inspector's and the
+   * list's behind it) must not point their triggers at the same caption.
+   */
+  const instanceId = $props.id();
+  const captionId = `${instanceId}-per-page`;
+
+  /**
+   * The page sizes as the shared select's option shape.
+   *
+   * The values stay NUMBERS — `Select` stringifies them for the primitive's own option identity
+   * and hands the caller's typed value back to `onChange` — so `changePageSize`'s `Number()`
+   * coercion has nothing to do and is kept only because `onPageSizeChange` is a caller's
+   * contract rather than this component's.
+   */
+  const sizeOptions = $derived(
+    pageSizeOptions.map((option) => ({ value: option, label: String(option) }))
+  );
 </script>
 
 {#if showPagination}
@@ -217,19 +251,24 @@
       </nav>
     {/if}
     {#if showPageSize}
-      <label class="manager-pagination-size">
-        <span>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
-        <select
+      <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1504). The control is a
+           `<button>` now, and a `<label>` names no button by containment while it DOES forward
+           its clicks to one — which would toggle the panel open and straight shut again. The
+           class survives unchanged: it is what the five player pagers' and the journal's own
+           per-site trigger fills hang off, and what the manager's 64px floor is stated
+           through. -->
+      <span class="manager-pagination-size">
+        <span id={captionId}>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
+        <Select
+          size="inline"
+          showTick={false}
           value={pageSize}
-          data-pagination-size
-          aria-label={text('FABRICATE.Admin.Manager.Pagination.PerPageLabel', 'Rows per page')}
-          onchange={(event) => changePageSize(event.currentTarget.value)}
-        >
-          {#each pageSizeOptions as option (option)}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
-      </label>
+          options={sizeOptions}
+          ariaLabelledBy={captionId}
+          triggerData={{ 'data-pagination-size': '' }}
+          onChange={changePageSize}
+        />
+      </span>
     {/if}
   </section>
 {/if}

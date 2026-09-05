@@ -222,6 +222,9 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 // test references one source of truth — a component referencing a `.svelte`/`.js`
 // missing from the allowlist does not fail, it HANGS (reported as `# cancelled`).
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`,
+  // spread from the roster above rather than copied so the two cannot drift.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/essenceIcons.js',
@@ -357,6 +360,16 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // THE APP'S ONE SELECT and the two components it composes (issue 1504). They reach this
+  // PLAYER-app list through `Pagination`, whose page-size control is a `<Select>` now, so they
+  // are transitive dependencies of the pager rather than new controls on a crafting screen —
+  // the same route `IconButton` below arrives by. Omitting one HANGS every mounted crafting
+  // suite (# cancelled) rather than failing it.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  // `Chip` is listed further down with the complication band that also renders it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
   // The manager's icon-only push-button (issue 1422). It reaches this PLAYER-app list by two
   // independent routes, which is why it sits beside `Pagination` rather than under any one
   // screen: `Pagination` renders its two arrows, and `ProgressiveStageList` renders

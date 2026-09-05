@@ -27,12 +27,21 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks
+// on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
+// harness's own mount target, which is why every lookup is rooted there.
+import { chooseSelectOption, openSelectPanel } from '../helpers/select-control.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
@@ -70,6 +79,12 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+  // composes. A module missing from a manifest does not fail this suite — it is reported as
+  // `# cancelled`, never `# fail`.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -1060,9 +1075,11 @@ describe('the shells own the list state machine', () => {
     assert.ok(!armToken(), 'a filter change left the control armed');
 
     await arm();
-    const sort = root.querySelector('[data-scoped-list-sort]');
-    sort.value = 'name-desc';
-    sort.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    // `systems`, not the `name-desc` this asked for before issue 1504. A native `<select>` set
+    // to a value it does not offer falls back to the empty string and still fires `change`, so
+    // this step used to disarm the control by staging a sort key that does not exist. The
+    // converted control offers what it offers, and `systems` is the real second key.
+    chooseSelectOption(root, '[data-scoped-list-sort]', 'systems');
     await catalogueHarness.setProps({});
     assert.ok(!armToken(), 'a sort change left the control armed');
 
@@ -1411,9 +1428,7 @@ describe('a PAGE change disarms too, which the other four cases do not reach', (
     assert.equal(armed(root), false, 'a page change left the control armed');
 
     await arm();
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '50';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    chooseSelectOption(root, '[data-pagination-size]', '50');
     await catalogueHarness.setProps({});
     assert.equal(armed(root), false, 'a page-size change left the control armed');
   });
@@ -1459,6 +1474,130 @@ describe('QE PROBE: the route-exit guard case the spec names', () => {
       'the guard could not put the selection back: `selectedId` is bindable and the click ' +
         'writes it, so the owner holds `component-1` after the click and this restore is a ' +
         'genuine change rather than a no-op'
+    );
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE LANE FILTER'S FIRST GATE (issue 1504)
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// `data-scoped-list-filter` occurs exactly once in the whole repository — on the control
+// `EntityListInspectorFrame` renders per lane-filter descriptor — and until this change it
+// appeared in NO registry step, NO test and NO smoke step. So the frame's most configurable
+// control had no coverage at all, and issue 1504 converts it: a native `<select>` whose
+// `onchange` forwarded the raw event value becomes a shared `<Select>` whose `onChange` receives
+// the option's own value.
+//
+// That is a seam worth a gate rather than a diff review. Deleting the `onChange` forward leaves
+// a control that opens, marks a row and filters nothing, with every other assertion in this file
+// green — the frame keeps rendering, the trigger keeps its hook, and only the ROW SET is wrong.
+describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
+  before(catalogueHarness.setup);
+  after(catalogueHarness.teardown);
+  afterEach(catalogueHarness.remount);
+
+  /**
+   * One lane filter over a field the fixture rotates, so a value really partitions the corpus.
+   *
+   * `matches` is the descriptor's own predicate, exactly as `scopedEntityListModel.project`
+   * calls it, and `'all'` is inert by that model's own rule rather than by anything here.
+   */
+  const HALF_FILTER = Object.freeze({
+    id: 'half',
+    label: 'Half',
+    options: [
+      { value: 'all', label: 'Either half' },
+      { value: 'first', label: 'First half' },
+      { value: 'second', label: 'Second half' },
+    ],
+    // Keyed on the entry's ID rather than on a display field, because the projection is what
+    // hands these predicates their entries and an id is the one thing it is guaranteed to carry.
+    matches: (entry, value) =>
+      value === 'first' ? entry.id !== 'essence-2' : entry.id === 'essence-2',
+  });
+
+  const PARITY_FILTER = Object.freeze({
+    id: 'parity',
+    label: 'Parity',
+    options: [
+      { value: 'all', label: 'Either parity' },
+      { value: 'even', label: 'Even' },
+      { value: 'odd', label: 'Odd' },
+    ],
+    matches: (entry, value) =>
+      value === 'even' ? entry.id !== 'essence-1' : entry.id === 'essence-1',
+  });
+
+  const laneScope = () => scopeOf('essence', { count: 3 });
+
+  const rowIds = (root) =>
+    [...root.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+      row.getAttribute('data-scoped-list-row')
+    );
+
+  it('filters the row set from the app`s own option list, per lane', async () => {
+    const root = await catalogueHarness.mount(
+      catalogueProps('essence', { scope: laneScope(), filters: [HALF_FILTER] })
+    );
+
+    assert.deepEqual(rowIds(root), ['essence-0', 'essence-1', 'essence-2'], 'the whole corpus');
+
+    chooseSelectOption(root, '[data-scoped-list-filter="half"]', 'second');
+    await catalogueHarness.setProps({});
+    assert.deepEqual(
+      rowIds(root),
+      ['essence-2'],
+      'choosing a lane value narrowed the list, so the control`s onChange reached the model'
+    );
+
+    // AND `all` IS INERT BY THE MODEL'S RULE, not by an absence of a click: the row set comes
+    // back whole rather than staying narrowed or emptying.
+    chooseSelectOption(root, '[data-scoped-list-filter="half"]', 'all');
+    await catalogueHarness.setProps({});
+    assert.deepEqual(rowIds(root), ['essence-0', 'essence-1', 'essence-2'], 'and released it');
+  });
+
+  it('stamps the lane`s own id on every lane control, so N lanes are N addressable filters', async () => {
+    const root = await catalogueHarness.mount(
+      catalogueProps('essence', { scope: laneScope(), filters: [HALF_FILTER, PARITY_FILTER] })
+    );
+
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-scoped-list-filter]')].map((control) =>
+        control.getAttribute('data-scoped-list-filter')
+      ),
+      ['half', 'parity'],
+      'the hook carries the DESCRIPTOR`s id, in declaration order — one control per lane, each ' +
+        'addressable on its own, which is what a capture step and a smoke step need'
+    );
+
+    // The two are independent axes rather than one control rendered twice: narrowing on the
+    // second must not disturb the first, and the intersection is what a GM gets.
+    chooseSelectOption(root, '[data-scoped-list-filter="half"]', 'first');
+    await catalogueHarness.setProps({});
+    chooseSelectOption(root, '[data-scoped-list-filter="parity"]', 'even');
+    await catalogueHarness.setProps({});
+    assert.deepEqual(rowIds(root), ['essence-0'], 'both axes applied, not just the last');
+  });
+
+  it('keeps the tick, because a lane`s values are close cousins the trigger shows one of', async () => {
+    // The judgement is the LIST's rather than the component's (`design-system/spec.md`): each
+    // lane's options are the values of ONE facet, the trigger shows only the chosen one, and a
+    // reader confirming which is live is exactly what the tick is earned for. The pager's page
+    // size drops it for the opposite reason, and both polarities ship in this change.
+    const root = await catalogueHarness.mount(
+      catalogueProps('essence', { scope: laneScope(), filters: [HALF_FILTER] })
+    );
+    const panel = openSelectPanel(root, '[data-scoped-list-filter="half"]');
+    assert.ok(
+      panel.className.split(/\s+/).includes('fabricate-select-popover-ticked'),
+      'the lane filter keeps its tick column'
+    );
+    assert.equal(
+      panel.querySelectorAll('.fabricate-select-tick').length,
+      3,
+      'on EVERY row rather than only the live one, so the label column does not go ragged'
     );
   });
 });

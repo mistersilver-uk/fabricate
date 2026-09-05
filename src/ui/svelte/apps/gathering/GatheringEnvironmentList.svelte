@@ -440,17 +440,17 @@
     white-space: nowrap;
   }
 
-  .gathering-env-pagination :global(.manager-pagination-size select) {
-    /* 1502 base: the sheet newly paints `min-width: 64px`, and its `font: inherit`
-       shorthand newly resets `line-height`, which Foundry core sets to `--input-height`
-       on every select. */
-    min-width: auto;
-    line-height: var(--input-height, 2rem);
-    height: 26px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
+  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
+     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
+     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
+     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
+     sheet's family note records how this block still beats the family for it. */
+  .gathering-env-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
-    color: var(--fab-text);
+    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
+       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
+       is the thing that would wrap it. */
+    min-width: 0;
   }
 
   .gathering-env-pagination :global(.manager-icon-button) {
@@ -467,7 +467,7 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;
