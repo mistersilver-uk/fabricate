@@ -1670,9 +1670,10 @@ async function assertRecipeRowsHittable(page, label) {
  *    mounted test cannot see the regression because happy-dom computes no cascade.
  *  - **The two chevrons stay adjacent.** Foundry's `.app button` margin, if it leaks past
  *    the reset, spaces them apart and can push them off the row.
- *  - **The live region is INVISIBLE.** `.sr-only` was `.fabricate-manager`-scoped only, so
- *    the region — copied from the GM pattern — would paint as visible text under the list
- *    until a `.fabricate-app .sr-only` block existed. Only meaningful once the region
+ *  - **The live region is INVISIBLE.** The visually-hidden utility was `.fabricate-manager`-
+ *    scoped only, so the region — copied from the GM pattern — would paint as visible text
+ *    under the list until the player app was covered too. It is now one `.fabricate
+ *    .visually-hidden` rule reaching both (issue 1501). Only meaningful once the region
  *    HAS text, which is why the caller announces a move first.
  *  - **Thresholds ascend.** Budget is spent top-down, so a row reached at a LOWER value
  *    than the row above it is impossible. This is the carried-threshold defect, visible
@@ -1759,7 +1760,7 @@ async function assertProgressiveStageListSound(page, label, { expectAnnouncement
     }
     if (report.region.width > 2 || report.region.height > 2) {
       throw new Error(
-        `${label}: the live region is VISIBLE (${report.region.width}x${report.region.height}) — the .fabricate-app .sr-only block is missing or overridden. Text: "${report.region.text}"`
+        `${label}: the live region is VISIBLE (${report.region.width}x${report.region.height}) — the .fabricate .visually-hidden block is missing or overridden. Text: "${report.region.text}"`
       );
     }
   }
@@ -13051,8 +13052,8 @@ async function main() {
           // ── Progressive player stage list (issue 651) ─────────────────────
           // The change's main new player surface. Four frames plus programmatic
           // assertions that cannot be made anywhere else: happy-dom computes no
-          // cascade, so the Foundry `.app button` reset and the `.fabricate-app
-          // .sr-only` block are only observable against real CSS.
+          // cascade, so the Foundry `.app button` reset and the `.fabricate
+          // .visually-hidden` block are only observable against real CSS.
           try {
             const recipeSearch = appShell.locator('.crafting-browser-search input').first();
             const selectRecipeByName = async (name) => {
@@ -13076,7 +13077,7 @@ async function main() {
             // BOTH vacuous at rest — the region is empty until a move announces, and the
             // builder's authored thresholds ascend by construction — so those checks only
             // bite once a move has happened. This frame is what would catch a regression
-            // of the carried-threshold defect or a missing .fabricate-app .sr-only block.
+            // of the carried-threshold defect or a missing .fabricate .visually-hidden block.
             const moveDown = appShell.locator('[data-progressive-stage-move-down]').first();
             await moveDown.click({ timeout: 5_000 });
             await page.waitForTimeout(250);

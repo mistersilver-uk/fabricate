@@ -9560,7 +9560,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                           </button>
                         </div>
                         <label class="manager-field">
-                          <span class="sr-only">Preview against record</span>
+                          <span class="visually-hidden">Preview against record</span>
                           <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
                         </label>
                         <label class="manager-field">
