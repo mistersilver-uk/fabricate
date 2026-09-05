@@ -414,6 +414,13 @@
     bottom: calc(-1 * var(--fab-space-3));
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
+    /* THE DOCK'S OWN TOP INSET (issue 1371 r16-cat, maintainer ruling M24): `proto:791` and
+       `proto:1270` pad the foot `13px 17px`, and the primary action sat 4px under the hairline
+       here — Apply's own `margin-top`, which the dock inherited from the rail's bottom slot. The
+       reference's 13 is `--fab-space-3` on the scale, stated on the dock so every consumer's foot
+       breathes the same, and Apply's margin goes with it. Whole-manager: the three studios' docks
+       gain the same 8px above Apply. */
+    padding-top: var(--fab-space-3);
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
@@ -437,6 +444,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+  }
+
+  /* THE FOOT'S CHILDREN MAY SHRINK TO THE RAIL (issue 1371 r16-cat, M24). A flex item's automatic
+     minimum is its min-content width, and a foot whose delete label is one `nowrap` line has a
+     min-content width of that whole line — so without this the column WIDENED past the rail to fit
+     it instead of letting the label ellipsise (measured: a 299px dock holding a 492px button). The
+     rule is on the dock's contract rather than on a consumer's wrapper because the snippet's root is
+     the consumer's markup, and every consumer needs the same answer. `:global`, since that root
+     carries the consumer's scope hash and never this one's. */
+  .fab-bulk-edit-dock.has-foot > :global(*) {
+    min-width: 0;
   }
 
   /* THE WIDER BLEED, FOR A CONTAINER THAT PADS `--fab-space-4` (issue 1371 r16-cat, M24). All
@@ -493,7 +511,8 @@
     width: 100%;
     height: auto;
     min-height: 38px;
-    margin-top: var(--fab-space-1);
+    /* The 4px it carried moved onto the dock as its `padding-top` (M24). */
+    margin-top: 0;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;

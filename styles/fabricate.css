@@ -26278,23 +26278,35 @@
   background: var(--fab-overlay-light-03);
 }
 
-/* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG (M24) ───────────────────────────────────────
-   `proto:5340` draws the world bulk panel's delete `height:34px; border-radius:8px; font:700 11px`
-   on a `--danger-soft` fill inside a `--danger-border` hairline. `ArmedDangerButton` renders a bare
+/* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG, ON EVERY BULK PANEL (M24) ─────────────────
+   `proto:5340` (the world panel) and `proto:5638` (the system panel) draw the dock's destructive
+   action `height:34px; border-radius:8px; font:700 11px` on a `--danger-soft` fill inside a
+   `--danger-border` hairline, as ONE 11px line. `ArmedDangerButton` renders a bare
    `.manager-button.is-danger`, which the sheet leaves at the host button's 6px corner and 14px type
-   — measured in the lab at radius 6 and 14px against a 34px height. The world Component ENTRY's
-   danger card already corrected the identical control to the ladder (`.manager-component-entry-
-   danger-body .manager-button.is-danger`, above: 34px, radius 9 for the 34-38px band, 11px/700),
-   and that is the example copied here rather than a second reading of the same reference — the
-   one difference is the fill, which the reference draws soft where the entry's card, sitting on a
-   danger hairline of its own, draws it transparent.
+   — measured in the lab at radius 6 and 14px against a 34px height, and at 14px the system panel's
+   `Remove 2 components from The Herbalist's Compendium…` wrapped to two lines. The world Component
+   ENTRY's danger card already corrected the identical control to the ladder
+   (`.manager-component-entry-danger-body .manager-button.is-danger`, above: 34px, radius 9 for the
+   34-38px band, 11px/700), and that is the example copied here rather than a second reading of the
+   same reference — the one difference is the fill, which the reference draws soft where the entry's
+   card, sitting on a danger hairline of its own, draws it transparent.
 
-   SCOPED TO THE DOCK'S DANGER LEG by the class the panel already writes on it, because
-   `.manager-button.is-danger` is every armed delete in the manager. A CLASS and not the leg's
-   `data-world-component-bulk-danger` hook: `manager-layout.test.js` renders every ancestor
-   compound of a manager-button rule to prove the disabled paint wins in it, and it can build a
-   div for a class where it cannot for an attribute. */
-.fabricate-manager .fab-bulk-component-danger .manager-button.is-danger {
+   SCOPED TO THE SHELL'S DOCK, `.fab-bulk-edit-dock`, because `.manager-button.is-danger` is every
+   armed delete in the manager and the dock is where both bulk panels pin theirs — so the two panels
+   cannot differ here. A CLASS and not a panel's hook: `manager-layout.test.js` renders every
+   ancestor compound of a manager-button rule to prove the disabled paint wins in it, and it can
+   build a div for a class where it cannot for an attribute. */
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: center;
+
+  /* FULL WIDTH, as both prototypes' `delStyle` is (a `display:flex` child of the foot column). The
+     host's button base sizes it to its content otherwise, which is how a one-line label would run
+     past the rail rather than ellipsise inside it. */
+  width: 100%;
+  max-width: 100%;
   height: 34px;
   min-height: 34px;
   padding: 0 var(--fab-space-3);
@@ -26305,7 +26317,17 @@
   font-weight: 700;
 }
 
-.fabricate-manager .fab-bulk-component-danger .manager-button.is-danger:not(:disabled):not(.is-armed) {
+/* ONE LINE, as the reference draws it: a label longer than the rail ellipsises rather than wrapping
+   the 34px control into a 48px one. The armed label carries the same sentence in the accessible
+   name, so nothing a GM needs is lost to the ellipsis. */
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger:not(:disabled):not(.is-armed) {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
