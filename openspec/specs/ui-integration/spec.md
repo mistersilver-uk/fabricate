@@ -2538,6 +2538,9 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     **THE WORLD COMPONENT CATALOGUE'S OWN ROW CHIPS ARE ON IT TOO**, which closes the last site (revision 19).
     Requirement 2's M30 run shipped for one revision as a bare manager chip restating the glyph, the count and the accessible name by hand and dropping the one part of the mapping no site restates — so the newest chip site M29's own words reach (`the component catalogue`) was the single surface a universal rule did not hold of.
     A hand-rolled restatement of a shared primitive is what loses the colour, which is why the rule is written as "through ONE shared essence chip" rather than as a list of tinted sites: the enumeration is what goes stale, and it went stale in the revision that wrote it.
+    **AND THE ORDER OF A CHIP RUN IS PART OF THAT ONE MODEL, NOT A PER-SITE CHOICE** (issue 1371 r21-store4).
+    Every run is the WORLD essence catalogue's order over the map the site states, and an essence the roster does not list draws no chip anywhere — so the same component reads the same way on its rules-list row, in its inspector and on its catalogue row.
+    The system rules row built its own run from the map's own key order and was the last site outside the model, which is how one component printed `Earth · Fire · Air` on the list beside `Air · Earth · Fire` on the rail.
 
 ### GM World Tool Screens
 

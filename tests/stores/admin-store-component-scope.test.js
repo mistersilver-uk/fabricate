@@ -1841,3 +1841,36 @@ test('1371 r21: the store forwards a STATED baseline to the rule, and it decides
   );
   assert.equal(membershipRecord(scope).inherit.essences, false, 'and the switch moves for it');
 });
+
+test('1371 r21: a row’s essence chips are the WORLD catalogue’s order, not the map’s', async () => {
+  // UX designer round 7. The row projection hand-built its chip model by walking the map's own
+  // keys, while the rail beside it read the shared `componentEssenceChips` — so one component
+  // printed its essences in two different orders on two surfaces of the same screen. It also drew
+  // a chip for an id the roster does not list: a count under a fallback glyph with no name, which
+  // is exactly what a deleted essence leaves behind.
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      { id: 'earth', name: 'Earth' },
+      { id: 'fire', name: 'Fire' },
+      { id: 'air', name: 'Air' },
+    ],
+    // Authored out of roster order, and carrying one id the roster does not define.
+    components: [
+      { id: 'ingot', name: 'Iron Ingot', essences: { air: 1, earth: 2, ghost: 5, fire: 3 } },
+    ],
+  });
+  const { store } = await openStore(harness, [LINKED]);
+  await store.refresh();
+
+  const [card] = get(store.viewState).itemCards;
+  assert.deepEqual(
+    card.essences.map((essence) => essence.id),
+    ['earth', 'fire', 'air'],
+    'the roster’s order, which is what every other surface draws'
+  );
+  assert.deepEqual(
+    card.essences.map((essence) => essence.quantity),
+    [2, 3, 1],
+    'each with its own count'
+  );
+});

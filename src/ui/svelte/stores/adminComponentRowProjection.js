@@ -43,6 +43,7 @@ import {
   plainTextDescription as _plainTextDescription,
   descriptionTextCandidate as _descriptionTextCandidate,
 } from '../../../utils/plainTextDescription.js';
+import { componentEssenceChips } from '../apps/manager/scoped/componentScoped.js';
 
 function _buildSalvageSummary(item, salvageEnabled) {
   if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
@@ -289,16 +290,16 @@ function _createItemCard(item, systemId, options) {
     description: storedDescription,
     hasDescription: storedDescription.length > 0,
     tags: showTags ? item.tags || [] : [],
+    // ONE CHIP MODEL, IN THE ROSTER'S ORDER (issue 1371 r21-store4, the UX designer's round-7
+    // note). This used to walk `Object.entries(essenceMap)`, so the run's order was the order the
+    // MAP's keys happened to be authored in — the same component drew `Earth · Fire · Air` on the
+    // list and `Air · Earth · Fire` on the rail beside it, because the rail already read the
+    // shared unit. `componentEssenceChips` owns the whole model: the catalogue's order, the
+    // roster's name / glyph / `--fab-tag-*` colour key, positive quantities only, and no chip at
+    // all for an id the roster does not list — which is the id a deleted essence leaves behind,
+    // and a chip reading `3` under a fallback glyph and no name states a count of nothing.
     essences: showEssences
-      ? Object.entries(essenceMap || {}).map(([id, quantity]) => ({
-          id,
-          name: essenceDefinitionById.get(id)?.name || id,
-          icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
-          // The essence's colour as the bare `--fab-tag-*` key (issue 1371 r18-colour, M29),
-          // '' when unauthored — what the row's chips and the inspector's run draw it in.
-          colorToken: essenceDefinitionById.get(id)?.colorToken || '',
-          quantity,
-        }))
+      ? componentEssenceChips(essenceMap, [...essenceDefinitionById.values()])
       : [],
     registeredItemUuidDisplay,
     hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
