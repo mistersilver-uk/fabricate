@@ -550,6 +550,24 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       assert.deepEqual(chosen, ['metal']);
       harness.remount();
     });
+
+    it('answers a MODIFIED Enter too, which is the one key the modifier rule excepts', async () => {
+      chosen.length = 0;
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox' });
+      trigger().focus();
+      const panel = await openPanel();
+
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(trigger()), optionRows(panel)[0].id);
+      const acted = pressKey('Enter', { shiftKey: true });
+      assert.ok(
+        acted.defaultPrevented,
+        'the general modifier rule is answered AFTER Enter for exactly this reason: a declined ' +
+          "Shift+Enter reaches the button's own activation and shuts the panel"
+      );
+      assert.deepEqual(chosen, ['metal'], 'so it confirms the row the GM had arrowed to');
+      harness.remount();
+    });
   });
 
   describe('the empty branch, where there is no list to point at', () => {

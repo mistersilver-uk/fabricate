@@ -294,6 +294,14 @@ test('the whole-row flooring counts every box the sheet puts between the rows', 
     'utf8'
   );
   const measure = source.slice(source.indexOf('function measurePopoverMetrics'));
+
+  const suffix = marginRules[0][0].match(/\.essence-icon-picker-option([^{\s]*)/)[1];
+  assert.ok(
+    measure.includes(`.essence-icon-picker-option${suffix}`),
+    'the component must measure the row the SHEET puts the margin on: this clause found it on ' +
+      `\`.essence-icon-picker-option${suffix}\`, and a callback querying a different suffix ` +
+      'hands over `listExtra: 0` while the list still renders the margin'
+  );
   const chromeSum = measure.match(/const chromeHeight =[\s\S]*?;/);
   assert.ok(chromeSum, '`measurePopoverMetrics` still composes a `chromeHeight`');
   assert.ok(
