@@ -138,7 +138,10 @@ export function rawSitesIn(source, filename, classPattern) {
 /**
  * @typedef {object} AdoptionCallSite
  * @property {string} file repo-relative path of the component rendering the primitive
+ * @property {import('svelte/compiler').AST.Component} node the call site's own AST node
  * @property {(name: string) => string|null} attribute the attribute's verbatim source, or null
+ * @property {(name: string) => string|null} snippetSource the verbatim source of a named snippet
+ *   child, or null when the site passes no snippet of that name
  * @property {string[]} valueless names of attributes written with no value at all
  */
 
@@ -198,6 +201,19 @@ export function definePrimitiveAdoptionContract(spec) {
       );
       callSites.push({
         file,
+        // THE NODE ITSELF, AND ITS SNIPPET CHILDREN (issue 1503). A caller that hands the
+        // primitive a `trigger` snippet renders its own button, so everything a naming clause
+        // needs — the `aria-label`, the element the primitive's attributes are spread onto — is
+        // INSIDE the snippet and reachable only from the component node. Keeping only the
+        // attributes discarded it, and a clause written against attributes alone would have to
+        // accept the snippet's mere presence as a name, which is not a name.
+        node,
+        snippetSource: (name) => {
+          const snippet = (node.fragment?.nodes ?? []).find(
+            (child) => child.type === 'SnippetBlock' && child.expression?.name === name
+          );
+          return snippet ? source.slice(snippet.start, snippet.end) : null;
+        },
         attribute: (name) => {
           const found = attributes.find((attribute) => attribute.name === name);
           return found ? source.slice(found.start, found.end) : null;
