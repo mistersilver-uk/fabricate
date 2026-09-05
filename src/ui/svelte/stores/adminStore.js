@@ -1659,6 +1659,41 @@ function _essenceRecipeUsage(essenceId, recipes) {
   return { count: ids.length, ids };
 }
 
+/**
+ * The WORLD identity's colour per essence id, for the selected system's rows to draw (issue
+ * 1371 r18-colour, maintainer ruling M29).
+ *
+ * WHY THE PROJECTION HAS TO SAY THIS AT ALL. The world essence entry writes `colorToken` onto
+ * the world entity alone; every in-system row carries the explicit `colorToken: null` the
+ * normalizer emits for an unauthored colour; and the read union answers identity from the
+ * in-system row FIRST (`## CraftingSystem` requirement 36, `scopedDefinitionStore.js`). So the
+ * colour a GM sets in the Essence Catalogue was, by construction, the one colour no system
+ * screen could ever draw — the maintainer's live world showed it on the world bulk panel, which
+ * reads the world entity, and nowhere else. `_seedInSystemEssence` copies the world colour onto
+ * a row at join time and nothing refreshes it, so a row joined before the recolour is stale in
+ * exactly the same way.
+ *
+ * THIS IS A READ OVERLAY ON THE MANAGER'S PROJECTION, NOT A CHANGE TO THE UNION. The union's
+ * in-system-first rule protects a GM's own edits from being reverted by a stale world copy, and
+ * for name, icon and description that is the right call. Colour is the one identity field the
+ * ruling names as the world's: a world-authored colour wins here, an UNAUTHORED one (`null`,
+ * `''`, or no world store at all) leaves the row's own colour standing, so a system whose
+ * essence was coloured in its own editor keeps that colour until the catalogue says otherwise.
+ *
+ * @param {{worldScope?: {essence?: {entries?: Array<object>}}}|null} worldScopeState The state
+ *   `buildWorldScopeState()` published this refresh — `{ worldScope: { component, essence, tool } }`.
+ * @returns {Map<string, string>} essence id → the world's authored colour key; absent when none.
+ */
+function _worldEssenceColourById(worldScopeState) {
+  const byId = new Map();
+  for (const entry of worldScopeState?.worldScope?.essence?.entries ?? []) {
+    const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+    const colour = entry?.entity?.colorToken;
+    if (id && typeof colour === 'string' && colour.trim()) byId.set(id, colour.trim());
+  }
+  return byId;
+}
+
 function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions, recipes = []) {
   const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
   return essenceDefinitions.map((def) => {
@@ -4956,6 +4991,7 @@ export function createAdminStore(services) {
       const managedItemOptions = _buildManagedItemOptions(managedItems);
       const componentTagOptions = _buildComponentTagOptions(managedItems);
       const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
+      const worldEssenceColourById = _worldEssenceColourById(worldScopeState);
 
       const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
         ? selectedSystem.essenceDefinitions
@@ -4979,6 +5015,10 @@ export function createAdminStore(services) {
           // convention once, at the boundary.
           enabled: def.enabled !== false,
           propertyMacroUuid: def.propertyMacroUuid || null,
+          // THE DRAWN COLOUR FOLLOWS THE WORLD IDENTITY (issue 1371 r18-colour, maintainer
+          // ruling M29). See `_worldEssenceColourById`: a colour the Essence Catalogue
+          // authored wins over the row's own, an unauthored one leaves the row's standing.
+          colorToken: worldEssenceColourById.get(def.id) ?? def.colorToken ?? null,
           sourceComponentId,
           associatedSystemItemId: sourceComponentId || null,
           associatedItem,

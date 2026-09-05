@@ -184,6 +184,9 @@ export function itemCardSignature(item, showTags, showEssences, showSalvage, ess
       id,
       essenceDefinitionById.get(id)?.name || id,
       essenceDefinitionById.get(id)?.icon,
+      // The colour is part of the resolution too (issue 1371 r18-colour, M29): a recoloured
+      // essence would otherwise serve a stale card until an unrelated field moved.
+      essenceDefinitionById.get(id)?.colorToken,
     ]);
   return _stableStringify({
     item,
@@ -273,6 +276,9 @@ function _createItemCard(item, systemId, options) {
           id,
           name: essenceDefinitionById.get(id)?.name || id,
           icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+          // The essence's colour as the bare `--fab-tag-*` key (issue 1371 r18-colour, M29),
+          // '' when unauthored — what the row's chips and the inspector's run draw it in.
+          colorToken: essenceDefinitionById.get(id)?.colorToken || '',
           quantity,
         }))
       : [],

@@ -51,6 +51,11 @@ export function buildEditableEssenceOptions(essenceDefinitions = [], currentEsse
       // Default-true, matching the persisted convention: a definition predating the field
       // is enabled, and only an explicit `false` disables.
       enabled: def.enabled !== false,
+      // The essence's colour as the bare `--fab-tag-*` key it is stored under (issue 1371
+      // r18-colour, M29). The card took a colour prop for years that this whitelist never
+      // named, so every tile painted the accent; '' rather than null, because the card
+      // interpolates the key into a custom property and an empty key is "no tint".
+      colorToken: typeof def.colorToken === 'string' ? def.colorToken : '',
       quantity: clampComponentEssenceQuantity(quantities[def.id])
     }))
     .sort(compareComponentEditorEssenceOptions);
