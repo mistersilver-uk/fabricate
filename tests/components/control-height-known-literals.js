@@ -98,8 +98,14 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * matched no element, at base `0eff5b36e`: seven of these declarations were inside them. That
  * is not a rung being reached, it is a control that was never rendered going away, which is
  * the other honest way this number falls.
+ *
+ * It was 73 until issue 1504 converted the manager's bulk-edit axis. `BulkEditSelect.svelte |
+ * height | 32` is deleted: the component's whole scoped block went with its native `<select>`,
+ * and the control it became takes the shared select's `form` rung, which is the ladder's 38. So
+ * this is the first kind of fall again — a control moved onto a rung — and the same conversion
+ * takes the same file's 8px corner off the radius ledger in the same commit.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 73;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 72;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -144,7 +150,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/journal/HistoryRow.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
-  'src/ui/svelte/apps/manager/BulkEditSelect.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte | min-height | 36 | 1 | 36px => 36px',
