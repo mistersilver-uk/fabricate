@@ -59,11 +59,20 @@ const CHUNK_LOAD_FAILURE_TEXTS = Object.freeze([
 /**
  * The module's OWN console line for a failed deferred load, at `console.error`.
  *
- * THE LEVEL IS NOT A FREE CHOICE. `vite.config.js` marks `console.log`, `console.debug` and
- * `console.info` as pure, so Rolldown deletes those calls from every published build — measured
- * on a real `dist/main.js`, zero `console.log`/`console.info` calls against 95 `console.error`.
- * A `log` spy in a unit test passes at any level, so the level is pinned by asserting this
- * literal is present in the built bundle instead.
+ * THE LEVEL IS NOT A FREE CHOICE, and it is pinned in `tests/release-build.test.js` by matching
+ * the built bundle's `console.error(<binding>)` CALL — a `log` spy in a unit test passes at any
+ * level, so only the artefact can hold that line.
+ *
+ * IT IS NOT PINNED BY THIS LITERAL'S PRESENCE, and an earlier version of this comment claimed
+ * otherwise. `vite.config.js` does declare `console.log`, `console.debug` and `console.info`
+ * pure, but `manualPureFunctions` lets Rolldown drop such a call only when its RETURN VALUE IS
+ * UNUSED — and this constant's only write is `src/main.js`'s concise-arrow `log` seam,
+ * `(error) => console.error(MESSAGE, error)`, whose value IS the arrow's return value. So the
+ * call survives DCE at every level, the literal reaches the bundle either way, and an `includes`
+ * check over it proves the reporter wiring survived tree-shaking and nothing about the level.
+ * Measured by rebuilding at `console.info`: the sentence was still in `dist/main.js`.
+ * Contrast {@link STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE}, whose write is a bare statement and does
+ * strip.
  *
  * REFERENCED ONLY BY THE CONSOLE WRITE, and that is why the reporter's `log` seam takes the
  * ERROR ALONE rather than a message and an error. It is deliberately not a localization key and
@@ -76,7 +85,17 @@ const CHUNK_LOAD_FAILURE_TEXTS = Object.freeze([
 export const DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE =
   'Fabricate | a deferred part of the module failed to load. This browser is probably running a cached copy of an earlier version of Fabricate; reload to complete the update.';
 
-/** The module's own console line for a detected stale entry script, at `console.warn`. */
+/**
+ * The module's own console line for a detected stale entry script, at `console.warn`.
+ *
+ * HERE A LEVEL REGRESSION REALLY DOES STRIP THE WRITE, unlike
+ * {@link DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE}. `src/main.js` writes this one as an expression
+ * STATEMENT whose value is discarded, so the `console.log`/`console.debug`/`console.info` purity
+ * declared in `vite.config.js` lets Rolldown delete the call — and with it this literal's only
+ * reference, so the sentence leaves the bundle entirely. Measured by rebuilding at
+ * `console.log`. `tests/release-build.test.js` therefore asserts both that this reaches
+ * `dist/main.js` and that it is written at `console.warn`.
+ */
 export const STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE =
   'Fabricate | this browser is running a cached entry script from an earlier version of Fabricate; reload to complete the update.';
 
@@ -158,11 +177,22 @@ export function buildStaleEntryNotice(versions, localize) {
 /**
  * Is the notice this reporter last raised still on screen?
  *
- * CAPABILITY-CHECKED IN THREE STEPS, each of which is a real shape. `Notifications#has` THROWS
- * unless it is passed something with `id > 0`; a test stub (and the View Lab's shim) returns
- * `undefined` from `warn`/`error` and defines no `has` at all; and a queued notice has no id
- * until it is drained. Any of those has to read as "not live" rather than as an exception on the
- * recovery path.
+ * CAPABILITY-CHECKED IN THREE RUNGS, each catching a DIFFERENT real shape. An earlier version of
+ * this comment misattributed them, so they are named one at a time; any of them has to read as
+ * "not live" rather than as an exception on the recovery path.
+ *
+ *  1. `typeof hasNotice !== 'function'` is the OMITTED SEAM — the parameter is optional and the
+ *     unit suite exercises a reporter built without it. It is never the production shape:
+ *     `src/main.js` passes an arrow, `(notice) => ui.notifications?.has?.(notice)`, which is a
+ *     function whether or not the host defines `has`.
+ *  2. `retained?.id > 0` is the UNUSABLE HANDLE — `Notifications#has` THROWS unless passed
+ *     something with `id > 0`, and the View Lab's shim returns `undefined` from `warn`/`error`.
+ *     It is NOT about a notice sitting in the queue: `notify` assigns `id: this.#id++` BEFORE
+ *     pushing, and `has` searches the queue ahead of the active set (V14.367
+ *     `client/applications/ui/notifications.mjs`), so a queued notice carries an id and correctly
+ *     reads as live — which is the behaviour this reporter wants.
+ *  3. `Boolean(...)`, and the `catch`, are the HOST WITHOUT `has` — which is how a production
+ *     degradation actually arrives, since the optional call in rung 1's arrow yields `undefined`.
  *
  * @param {((notice: object) => boolean)|undefined} hasNotice The `ui.notifications.has` seam.
  * @param {object|null} retained The handle the last `notify` returned.
@@ -192,9 +222,11 @@ function isNoticeLive(hasNotice, retained) {
  * for a bug report while the user sees one notice.
  *
  * `{ console: false }` IS MANDATORY on the notify call. Core mirrors every notification to the
- * console from inside its own queue drain, so without it each failure writes two console lines —
- * and the mirror is skipped entirely for a notice queued behind the cap, so it cannot be relied
- * on to carry the error either.
+ * console from inside its own queue drain, so without it each failure writes two console lines.
+ * Nor can that mirror carry the error INSTEAD of this module's own line: for a notice queued
+ * behind the five-notice cap the mirror is deferred until the notice drains (`#fetch` is
+ * re-entered from `#remove`), and lost outright if `clear()`, a removal while queued, or an
+ * unload beats it — so it cannot be relied on to carry the error at failure time.
  *
  * @param {object} seams
  * @param {(message: string, options: object) => object|undefined} seams.notify

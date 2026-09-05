@@ -186,12 +186,15 @@ test('a reported failure writes exactly one console line and one un-mirrored not
 
   assert.equal(logged.length, 1, 'exactly one console write per failure');
   assert.equal(logged[0][0], CHUNK_FAILURE, 'the console carries the underlying error');
-  // THE SEAM TAKES THE ERROR ALONE, and that shape is load-bearing rather than tidy. The console
-  // line's own text is referenced by the console CALL and by nothing else, so that stripping the
-  // call (which is what happens at `console.log`/`info`/`debug` — `vite.config.js` marks them
-  // pure) removes the literal from the built bundle too. Pass it through this seam instead and it
-  // would survive in the bundle regardless of the level, and the assertion that pins the level
-  // could never fail. A spy here cannot see a level at all, which is why the level is not
+  // THE SEAM TAKES THE ERROR ALONE, and that shape is load-bearing rather than tidy: it leaves
+  // the console line's own text referenced by the console CALL and by nothing else, which is what
+  // lets `tests/release-build.test.js` find that call in the built bundle and pin its LEVEL.
+  // WHAT THAT ASSERTION DOES NOT REST ON is the literal's mere presence, and an earlier version of
+  // this comment had it backwards. `vite.config.js` does declare `console.log`/`info`/`debug`
+  // pure, but Rolldown may drop such a call only when its RETURN VALUE IS UNUSED — and `src/main.js`
+  // writes this one from a concise arrow that returns it, so a level regression here leaves both
+  // the call and the literal in `dist/main.js`. (The stale-entry write IS a statement, and does
+  // strip.) Either way a spy here cannot see a level at all, which is why the level is not
   // asserted in this suite.
   assert.equal(logged[0].length, 1, 'the console seam receives the error and nothing else');
   assert.ok(
@@ -232,8 +235,11 @@ test('a hasNotice-less, id-less or throwing probe never throws and always notifi
   withoutProbe.report(CHUNK_FAILURE);
   assert.equal(withoutProbe.notified.length, 2, 'no probe means no suppression');
 
-  // The View Lab's shim returns `undefined` from `warn`/`error`, and a queued notice has no id
-  // until it drains. `Notifications#has` THROWS on either, so the probe must never be reached.
+  // The View Lab's shim returns `undefined` from `warn`/`error`, and `Notifications#has` THROWS on
+  // that — and on any handle without `id > 0` — so the probe must never be reached with one. NOT
+  // because a queued notice lacks an id: `notify` assigns `id: this.#id++` before pushing, and
+  // `has` searches the queue ahead of the active set, so a queued notice reads as live, which is
+  // the behaviour this reporter wants.
   const idless = reporterHarness({ hasNotice: () => true, handle: () => undefined });
   const nullHandle = reporterHarness({ hasNotice: () => true, handle: () => null });
   const zeroId = reporterHarness({ hasNotice: () => true, handle: () => ({ id: 0 }) });

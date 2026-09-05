@@ -342,10 +342,13 @@ const showCraftingSystemManagerApp = () =>
 const reportManagerLoadFailure = createDeferredChunkFailureReporter({
   notify: (message, options) => ui.notifications?.error?.(message, options),
   hasNotice: (notice) => ui.notifications?.has?.(notice),
-  // The console line's own text is referenced HERE and nowhere else, on purpose: `vite.config.js`
-  // marks `console.log`/`info`/`debug` pure, so Rolldown deletes such a call from every published
-  // build ALONG WITH its arguments. That is what lets a build-time assertion over `dist/main.js`
-  // pin the LEVEL of this write - which a spy in a unit test cannot, since it passes at any level.
+  // `console.error`, pinned by `tests/release-build.test.js` matching THIS CALL in the built
+  // bundle - a spy in a unit test passes at any level, so only the artefact can hold that line.
+  // NOT pinned by the literal reaching the bundle: `vite.config.js` declares
+  // `console.log`/`info`/`debug` pure, but Rolldown may drop such a call only when its RETURN
+  // VALUE IS UNUSED, and this concise arrow returns it - so a level regression here would leave
+  // both the call and its argument in `dist/main.js`. Measured, after an earlier comment here
+  // claimed the opposite. The stale-entry write below IS a statement, and does strip.
   log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
   localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key))
 });
@@ -382,9 +385,12 @@ function reportStaleEntryScript() {
   // `warn`, not `error`: a baked-versus-installed divergence in the smoke's install path must not
   // redden the smoke through core's own console mirror. `{ console: false }` because core mirrors
   // every notification from inside its queue drain, so without it this writes two console lines -
-  // and the mirror is skipped entirely for a notice queued behind the cap, so it cannot be relied
-  // on to carry the detail either. Hence Fabricate's own line, at `console.warn` because
-  // `vite.config.js` marks `console.log`/`info`/`debug` pure and strips them from every build.
+  // and that mirror cannot carry the detail INSTEAD: for a notice queued behind the five-notice
+  // cap it is deferred until the notice drains (`#fetch` is re-entered from `#remove`), and lost
+  // outright if `clear()`, a removal while queued, or an unload beats it. Hence Fabricate's own
+  // line - and at `console.warn` because this write is an expression STATEMENT, so the
+  // `console.log`/`info`/`debug` purity `vite.config.js` declares really would let Rolldown delete
+  // it and its literal from every published build. `tests/release-build.test.js` asserts both.
   console.warn(STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE, { buildVersion, installedVersion });
   ui.notifications?.warn?.(message, { console: false });
 }
