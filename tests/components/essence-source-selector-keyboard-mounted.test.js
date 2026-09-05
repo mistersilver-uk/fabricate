@@ -118,18 +118,32 @@ const chosen = [];
  * of `styles/fabricate.css`, and a mirror rots silently. Reading the sheet here and measuring the
  * cursor's real step against it is what makes a future re-tile of the panel fail this suite
  * instead of quietly transposing the arrow keys.
+ *
+ * RETARGETED at issue 1503, and the move is the point rather than an inconvenience. This caller
+ * used to own a `grid-template-columns` of its own; the shared list rule's `display: flex` ties
+ * it and wins on source order, so the template would have been INERT. The primitive emits
+ * `data-picker-columns` on the list instead and the SHARED sheet carries one rung per shipped
+ * count — so the mirror is now between the count this caller passes and the rung that paints it,
+ * which is exactly the pair that can drift. A count with no rung renders one column while the key
+ * map steps by two, and that is what this reads for.
  */
 function sheetGridColumns() {
   const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-  const rule = sheet.match(
-    /\.fabricate-source-picker-popover \.essence-source-picker-grid \{([^}]*)\}/g
+  const rungs = [
+    ...sheet.matchAll(
+      /\.fabricate-picker-popover \.manager-travel-popover-options\[data-picker-columns='(\d+)'\] \{([^}]*)\}/g
+    ),
+  ];
+  assert.ok(rungs.length > 0, 'the sheet still carries a column rung for the shared grid form');
+  const rung = rungs.find((match) => /grid-template-columns:\s*repeat\(\d+,/.test(match[2]));
+  assert.ok(rung, 'and one of its rungs declares a repeated column template');
+  assert.equal(
+    Number(rung[1]),
+    Number(rung[2].match(/grid-template-columns:\s*repeat\((\d+),/)[1]),
+    'a rung must paint the count it is keyed on, or the list renders a different grid from the ' +
+      'one the key map steps by'
   );
-  assert.ok(rule, 'the sheet still has a rule for the source picker grid');
-  const template = rule
-    .map((block) => block.match(/grid-template-columns:\s*repeat\((\d+),/))
-    .find(Boolean);
-  assert.ok(template, 'and one of its blocks declares a repeated column template');
-  return Number(template[1]);
+  return Number(rung[1]);
 }
 
 /**
