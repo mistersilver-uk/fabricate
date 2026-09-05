@@ -745,6 +745,28 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
 ]);
 
 /**
+ * The subset of `FIXTURE_ALLOWLIST` that is ROOT-LESS, which is the only subset these two clauses
+ * can be asked about.
+ *
+ * `FIXTURE_ALLOWLIST` is the ledger of fixtures that model a deliberately UNCONVERTED control, and
+ * since issue 1502 most of those fixtures DO carry their family root: a population-B trigger
+ * without `fabricate-button` matches no rule in the sheet, so the fixtures that measure geometry
+ * gained it. Those entries are irrelevant here — they are never offenders — and only the entries
+ * still writing a family class with no root of any primitive can register a hit. Derived once at
+ * module level because both clauses need the same subset, and two copies of one filter is the
+ * duplication `tests/helpers/primitiveSourceContract.js` exists to have stopped repeating.
+ *
+ * @type {ReadonlyArray<import('../helpers/managerButtonFixtureAllowlist.js').ManagerButtonFixtureExemption>}
+ */
+const ROOT_LESS_FIXTURE_EXEMPTIONS = Object.freeze(
+  FIXTURE_ALLOWLIST.filter((entry) =>
+    PRIMITIVES.every((primitive) =>
+      primitive.roots.every((root) => !entry.classes.split(/\s+/).includes(root))
+    )
+  )
+);
+
+/**
  * Every element in a hand-written markup string, with the class names of its ancestors.
  *
  * A fixture is a STRING, so this is a tag scanner rather than a parser: it walks `<tag …>` and
@@ -811,9 +833,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     Object.entries(sources).map(([file, text]) => [file, stripComments(text)])
   );
   const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
-  const rootExemptions = FIXTURE_ALLOWLIST.filter(
-    (entry) => PRIMITIVES.every((p) => p.roots.every((r) => !entry.classes.split(/\s+/).includes(r)))
-  );
   const exemptHits = new Map();
   const allowlistHits = new Map();
   const offenders = [];
@@ -827,7 +846,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
           if (!classes.includes(anchor)) continue;
           attributes += 1;
           if (classes.includes(root)) continue;
-          const allowlisted = rootExemptions.find(
+          const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
             (entry) => entry.file === file && entry.classes === value
           );
           if (allowlisted) {
@@ -873,13 +892,13 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     );
   }
 
-  // The ManagerButton unconverted-probe exemptions are a SEPARATE, larger ledger, imported
-  // so they skip the allowlist check (lines 826–828); only the root-less entries are expected to
-  // register hits.
-  // rather than hand-listed twice (issue 1502) — cross-checked here by both TOTAL and per-entry
-  // count, so a fixture that drifts from its recorded `classes` string is as loud as one removed
-  // outright.
-  const expectedAllowlistAttributeCount = rootExemptions.reduce((total, entry) => total + entry.count, 0);
+  // The ManagerButton unconverted-probe exemptions are a SEPARATE, larger ledger, imported from
+  // `managerButtonFixtureAllowlist.js` rather than hand-listed a second time here (issue 1502),
+  // and narrowed by `ROOT_LESS_FIXTURE_EXEMPTIONS` to the entries that can actually register a
+  // hit — the rest carry a family root and are never offenders. Cross-checked by both TOTAL and
+  // per-entry count, so a fixture that drifts from its recorded `classes` string is as loud as
+  // one removed outright.
+  const expectedAllowlistAttributeCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
   const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
   assert.equal(
     totalAllowlistHits,
@@ -889,7 +908,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
       'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
       'without updating the ledger.'
   );
-  for (const entry of rootExemptions) {
+  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
     const hits = allowlistHits.get(entry) ?? 0;
     assert.equal(
       hits,
@@ -923,9 +942,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
   const exempt = new Set(
     DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
   );
-  const rootExemptions = FIXTURE_ALLOWLIST.filter(
-    (entry) => PRIMITIVES.every((p) => p.roots.every((r) => !entry.classes.split(/\s+/).includes(r)))
-  );
   const exemptHits = new Map();
   const allowlistHits = new Map();
   const offenders = [];
@@ -939,7 +955,7 @@ test('every fixture element in a picker’s family sits under one of its namespa
         if (copied.length === 0) continue;
         elements += 1;
         if (element.ancestry.some((cls) => primitive.roots.includes(cls))) continue;
-        const allowlisted = rootExemptions.find(
+        const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
           (entry) => entry.file === file && entry.classes === element.classes.join(' ')
         );
         if (allowlisted) {
@@ -985,17 +1001,33 @@ test('every fixture element in a picker’s family sits under one of its namespa
     );
   }
 
-  const expectedAllowlistElementCount = rootExemptions.reduce((total, entry) => total + entry.count, 0);
+  const expectedAllowlistElementCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
+  // The SPLIT ITSELF, guarded rather than narrated: most of `FIXTURE_ALLOWLIST` carries a family
+  // root since issue 1502 and only the root-less remainder can be an offender here, so this gate
+  // is expected to hold over a STRICT subset, by entry and by attribute alike. A filter that
+  // stopped narrowing — a renamed root, a rewritten predicate — would make the two counts equal
+  // and silently re-widen the ledger back to the whole allowlist, with every clause below still
+  // green, which is why both totals are imported and compared rather than assumed.
+  assert.ok(
+    ROOT_LESS_FIXTURE_EXEMPTIONS.length < FIXTURE_ALLOWLIST.length &&
+      expectedAllowlistElementCount < FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
+    `the root-less subset is ${ROOT_LESS_FIXTURE_EXEMPTIONS.length} of ` +
+      `${FIXTURE_ALLOWLIST.length} entries and ${expectedAllowlistElementCount} of ` +
+      `${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} attributes, which is not a strict subset: the ` +
+      'root-carrying population-B entries issue 1502 introduced have stopped being filtered ' +
+      'out, so this clause is holding over the whole allowlist rather than the part of it that ' +
+      'can register a hit'
+  );
   const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
   assert.equal(
     totalAllowlistHits,
     expectedAllowlistElementCount,
-    `this gate matched ${totalAllowlistHits} of the ${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} ` +
+    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistElementCount} ` +
       '`FIXTURE_ALLOWLIST` elements recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
       'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
       'without updating the ledger.'
   );
-  for (const entry of rootExemptions) {
+  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
     const hits = allowlistHits.get(entry) ?? 0;
     assert.equal(
       hits,
