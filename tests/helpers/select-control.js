@@ -1,18 +1,18 @@
 /*
  * DRIVING A CONVERTED `<Select>` FROM A MOUNTED SUITE (issue 1504).
  *
- * Thirteen mounted suites drove the manager's page-size, category, check-tier and sort controls
+ * Ten mounted suites drove the manager's page-size, category, check-tier and sort controls
  * as native `<select>`s: set `.value`, dispatch `change`, read `querySelectorAll('option')`.
  * Every one of those three moves is gone. The control is a `<button>` that opens a portaled
  * panel of `[role="option"]` rows, so choosing a value is TWO clicks and reading the offered
  * values means opening the panel first.
  *
- * IT IS ONE HELPER RATHER THAN THIRTEEN COPIES for two reasons. The mechanical one: the panel
+ * IT IS ONE HELPER RATHER THAN TEN COPIES for two reasons. The mechanical one: the panel
  * is PORTALED to the nearest Fabricate application root, which in a mounted suite is the
  * harness's own mount target — so the row is NOT a descendant of the trigger's container, and a
  * suite that reached for it through the trigger's own subtree would find nothing. That is a fact
  * about the primitive, worth stating once. The other is that near-identical blocks repeated
- * across thirteen files are what the duplication gate exists to catch.
+ * across ten files are what the duplication gate exists to catch.
  *
  * `root` is always the harness's mount target — the element `createMountedComponentHarness`
  * gives `rootClass` to. A suite whose production host is the player window must declare
@@ -45,6 +45,19 @@ export function openSelectPanel(root, triggerSelector) {
     Boolean(panel),
     `${triggerSelector} opened no panel. The panel is portaled to the nearest application root, ` +
       'so a suite whose production host is not the manager must pass `rootClass`'
+  );
+  // AND IT IS THIS TRIGGER'S PANEL. The lookup above is by CLASS over the whole portal host, so
+  // it returns the first `<Select>` panel in the root rather than the one just opened — correct
+  // today only because one panel can be open at a time, and silently wrong the moment a case
+  // leaves an earlier select open. The combobox's own `aria-controls` is the binding the
+  // primitive already publishes, so the pairing is asserted rather than assumed, and a miss
+  // reports as a mismatched id instead of as an option this panel does not offer.
+  const list = panel.querySelector('[role="listbox"]');
+  assert.ok(Boolean(list), `${triggerSelector} opened a panel that renders no option list`);
+  assert.equal(
+    trigger.getAttribute('aria-controls'),
+    list.id,
+    `${triggerSelector} did not open the panel found: the trigger drives another list`
   );
   return panel;
 }
