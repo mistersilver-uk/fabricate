@@ -137,8 +137,10 @@ const PRIMITIVES = Object.freeze([
       'manager-travel-option',
       'manager-travel-portrait',
     ]),
-    // Measured today (issue 1503): 21 written, 35 family selectors, 27 owned, 8 caller overrides.
-    // Thirty rules were re-rooted by issue 1464. The markup writes 19 raw `class="…"` attributes
+    // Measured today (issue 1503): 21 written, 38 family selectors, 30 owned, 8 caller overrides.
+    // Thirty rules were re-rooted by issue 1464; three more selectors arrived with issue 1503 —
+    // the `[data-picker-as='grid']` display rung, its `[data-picker-columns='2']` template and
+    // the keyboard cursor's outline. The markup writes 19 raw `class="…"` attributes
     // and 8 `` class={`…`} `` templates — 27 values, 21 distinct `manager-travel-*` names — and
     // this entry DECLARES NO `classProps`: it reads its family entirely out of those attributes,
     // because it is the component the other two PASS class props to rather than one that passes
@@ -164,18 +166,26 @@ const PRIMITIVES = Object.freeze([
       'essence-icon-picker-trigger',
       'essence-icon-picker-option',
     ]),
-    // Measured today (issue 1503): 9 written, 29 family selectors, 14 owned. Fifteen are caller
+    // Measured today (issue 1503): 9 written, 26 family selectors, 12 owned. Fourteen are caller
     // overrides — the vocabulary tile, the two condition chips and the essence icon actions all
     // re-shape the trigger from their own markup. `written` was 10 before the picker rendered
     // through `SearchablePopover`; `essence-icon-picker-empty` retired with the caller's own
     // empty branch.
     //
+    // THE FAMILY SHRANK BY THREE AND THE FLOORS FOLLOW IT DOWN, which is a population that got
+    // smaller rather than a reader that stopped finding one: the caller's own panel block and
+    // its own search-field block are DELETED (the shared primitive supplies both, whole), and
+    // the six-member state list lost its two `:focus-visible` members — an option row never
+    // takes DOM focus now — against one new caller-rooted chip override. These floors exist to
+    // red when the extractor goes quiet, so they are re-set under the measured counts by the
+    // same margin they carried before rather than left where a deletion would trip them.
+    //
     // ONLY SIX of this component's class values are now raw `class="…"` attributes (it was 12):
     // the picker root, the panel, the search row, the list and every option row belong to the
     // PRIMITIVE's elements and arrive there through the class props below.
     writtenFloor: 8,
-    familyFloor: 24,
-    ownedFloor: 12,
+    familyFloor: 22,
+    ownedFloor: 10,
     classProps: CLASS_PROPS,
     classPropsOwner: SEARCHABLE_POPOVER,
     mirrored: Object.freeze([
@@ -197,14 +207,19 @@ const PRIMITIVES = Object.freeze([
       'essence-source-trigger',
       'essence-source-picker-option',
     ]),
-    // Measured today (issue 1503): 11 written, 26 family selectors, 20 owned, 6 caller overrides.
+    // Measured today (issue 1503): 11 written, 21 family selectors, 16 owned, 5 caller overrides.
     // `written` was 12 before the picker rendered through `SearchablePopover`;
-    // `essence-source-picker-empty` retired with the caller's own empty branch. Nine raw
+    // `essence-source-picker-empty` retired with the caller's own empty branch. The family lost
+    // FIVE selectors and the floors follow it down for the reason the `IconPicker` entry states
+    // above, plus one more that is this picker's alone: its two-column `grid-template-columns`
+    // rule is gone, because the shared list rule's `display: flex` would have made a caller-side
+    // template inert — the primitive emits `data-picker-columns` and the shared sheet paints it.
+    // Nine raw
     // `class="…"` attributes are left and all nine are trigger-side; neither namespace root is in
     // one any more, so both arrive through the class props below.
     writtenFloor: 10,
-    familyFloor: 22,
-    ownedFloor: 17,
+    familyFloor: 18,
+    ownedFloor: 13,
     classProps: CLASS_PROPS,
     classPropsOwner: SEARCHABLE_POPOVER,
     mirrored: Object.freeze([
