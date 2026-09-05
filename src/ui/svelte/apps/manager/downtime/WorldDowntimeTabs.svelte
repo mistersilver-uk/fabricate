@@ -19,8 +19,8 @@
 
   // Which tab's tooltip is showing. The tooltips are emitted OUTSIDE the tablist (see the
   // note there), so `:focus-within` on a shared wrapper can no longer drive them and the
-  // association is carried explicitly. Unlike the player rail's sr-only tooltips, these are
-  // visible on hover and focus, so the parenting fix could not be markup-only here.
+  // association is carried explicitly. Unlike the player rail's visually-hidden tooltips,
+  // these are visible on hover and focus, so the parenting fix could not be markup-only here.
   let describedTabId = $state(null);
 
   function describe(tabId) {
@@ -106,8 +106,8 @@
        Position is unchanged too — these were ALREADY laid out against the card, which is the
        `position: relative` ancestor, not against the tab they belong to. What the move does
        break is `:focus-within` on the old per-tab wrapper, because these tooltips are VISIBLE
-       on hover and focus rather than sr-only like the player rail's. That association is now
-       carried explicitly by `describedTabId`. -->
+       on hover and focus rather than visually hidden like the player rail's. That association
+       is now carried explicitly by `describedTabId`. -->
   {#each tabs as tab (tab.id)}
     <span
       id={`world-downtime-tooltip-${tab.id}`}

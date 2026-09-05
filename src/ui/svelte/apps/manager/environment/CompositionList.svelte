@@ -433,7 +433,7 @@
             </div>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
-                <!-- A `<div>`, not the `<label>` wrapping an `.sr-only` caption it was: see
+                <!-- A `<div>`, not the `<label>` wrapping a `.visually-hidden` caption it was: see
                      the NAMING contract in `Stepper.svelte`. The commit moment moves from
                      `change` to `input`, matching every other stepper; the persisted value
                      is identical. -->
