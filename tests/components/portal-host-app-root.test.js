@@ -580,10 +580,17 @@ test('every portal target is resolved through the shared resolver or handed in b
     }
   }
 
+  // SIX SHIP as of issue 1503, down from eight, and the floor follows the population rather than
+  // pinning a number the tree no longer has. `IconPicker` and `EssenceSourceSelector` each drove
+  // the anchored-popover action against a panel of their own; both now render THROUGH
+  // `SearchablePopover`, which portals one panel for all three. That is two fewer overlays
+  // deciding for themselves where they live — the direction this clause exists to encourage —
+  // rather than two adoptions lost, and it is invisible from either picker's own lane because
+  // each removes only one.
   assert.ok(
-    targets.length >= 7,
-    `only ${targets.length} portaled overlays were found across the corpus. Eight ship — one ` +
-      'through `use:portal` and seven through the anchored-popover action; a lower number means ' +
+    targets.length >= 5,
+    `only ${targets.length} portaled overlays were found across the corpus. Six ship — one ` +
+      'through `use:portal` and five through the anchored-popover action; a lower number means ' +
       'this clause is confirming adoption across a set that has gone empty.'
   );
 
