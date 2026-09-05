@@ -292,9 +292,16 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * ladder's 9. So the row leaves because a control moved onto a rung, which is the one way this
  * number is meant to fall. The key count falls 140 → 139 with it.
  *
+ * 316 → 315 with issue 1505, and it is the same kind of snap. `apps/crafting/ShoppingList.svelte
+ * | border-radius | 8px` falls 2 → 1: the three summary cards became `<StatBox>`es, whose corner
+ * is the specimen's — and the ladder's — 9. The file's other 8px is an unrelated rule and stays,
+ * so the KEY count is unchanged at 139. The manager's converted stat tiles move NO row in either
+ * direction: they read `var(--fab-books-panel-radius)`, which resolves to a compliant 6px and
+ * therefore never had one.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 316;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 315;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

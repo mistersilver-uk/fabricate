@@ -171,8 +171,16 @@ export function isExemptSpacingPixels(pixels) {
  * matched no element, at base `0eff5b36e`. That took four occurrences with it and emptied one
  * row (`styles/fabricate.css | padding | 48`). None of them was tokenized: the declarations
  * simply went, along with the rules carrying them, so the debt fell rather than being paid.
+ *
+ * It was 913 until issue 1505 converted the Shopping list's three summary cards to the shared
+ * `<StatBox>`. Two occurrences went with the scoped block: the card's `gap: 2px` between the
+ * figure and its label, which the specimen's centred box does not have at all and which the
+ * row `…/ShoppingList.svelte | gap | 2` counted alone, so that row is DELETED; and the value
+ * line's `gap: 6px`, which the primitive re-states as `var(--fab-space-chip)` — the published
+ * 6px token — so `| gap | 6` falls 2 to 1 against the file's other, unconverted occurrence.
+ * The first is a deletion and the second is a tokenization, and neither leaves a slot open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 913;
+export const KNOWN_RAW_SPACING_TOTAL = 911;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

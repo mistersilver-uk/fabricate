@@ -435,6 +435,9 @@ function compileManagerRoot() {
   // a leaf TWO rungs down as well — reached without anything here naming a kicker. Omitting it
   // HANGS every mounted manager test as `# cancelled` rather than failing one.
   writeCompiledSvelte('src/ui/svelte/components/Kicker.svelte');
+  // THE at-a-glance figure (issue 1505), reached through `ItemPageInspector`'s three stat
+  // tiles. Same failure mode.
+  writeCompiledSvelte('src/ui/svelte/components/StatBox.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

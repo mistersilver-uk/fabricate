@@ -239,6 +239,9 @@ const harness = createMountedComponentHarness({
     // Issue 1505: the eyebrow nine crafting detail components render. A module missing from a
     // manifest does not fail this suite; it is reported as `# cancelled`, never `# fail`.
     'src/ui/svelte/components/Kicker.svelte',
+    // Issue 1505: the figure box the Shopping list's three summary cards are. It composes the
+    // `Kicker` above, so it reaches that entry on a second, invisible route.
+    'src/ui/svelte/components/StatBox.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/FabricateAppRoot.svelte',
