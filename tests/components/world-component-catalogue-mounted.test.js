@@ -20,6 +20,10 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// THE REAL VOCABULARY STORE (issue 1371 r16-cat, maintainer ruling M20): the store the Tags &
+// Categories screen writes through, fed exactly what the View Lab world persists, so the offer is
+// proven against the data shape a live world carries and not against this suite's wrapper.
+import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
 import {
   COMPONENT_SYSTEMS,
   componentCorpus,
@@ -35,15 +39,10 @@ import {
   componentBulkMembershipModes,
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-// THE REAL VOCABULARY STORE AND THE LAB WORLD'S PERSISTED SHAPE (issue 1371 r16-cat, maintainer
-// ruling M20): the store the Tags & Categories screen writes through, fed exactly what the View
-// Lab world persists, so the offer is proven against the data shape a live world carries and not
-// against this suite's `{tags: […]}` wrapper.
-import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
-import { buildLabContent } from '../view-lab/world/labContent.js';
 // The frame's own lifted view-state factory, so the page-size case below states the SHIPPED
 // shape and changes with it rather than hand-rolling a second one.
 import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -2084,7 +2083,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         const { target } = await selectedCatalogue();
         const systemRows = [
           ...target.querySelectorAll(
-            '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
+            ':scope [data-bulk-inset="systems"] [data-world-component-bulk-option]'
           ),
         ];
         assert.ok(systemRows.length > 1, 'NON-VACUITY: the systems inset has rows');
@@ -2108,11 +2107,11 @@ describe('world Component Catalogue (issue 1371)', () => {
           'a staged row`s box is filled and carries the check'
         );
         assert.ok(
-          Boolean(systemRows[0].querySelector('.fab-bulk-inset-box i.fa-check')),
+          Boolean(systemRows[0].querySelector(':scope .fab-bulk-inset-box i.fa-check')),
           'with the check glyph inside it'
         );
         const categoryRow = target.querySelector(
-          '[data-bulk-inset="category"] [data-world-component-bulk-option]'
+          ':scope [data-bulk-inset="category"] [data-world-component-bulk-option]'
         );
         assert.ok(
           !categoryRow.querySelector('.fab-bulk-inset-box') &&
@@ -2200,19 +2199,21 @@ describe('world Component Catalogue (issue 1371)', () => {
         return { target, calls };
       }
       const row = (target, id) =>
-        target.querySelector(`[data-world-component-bulk-essence="${id}"]`);
+        target.querySelector(`:scope [data-world-component-bulk-essence="${id}"]`);
       const stateOf = (target, id) =>
         row(target, id).getAttribute('data-world-component-bulk-essence-state');
       // The shared `Stepper` is the control: its `<input>` reads the staged number, and `—` (its
       // placeholder) with an EMPTY value while the row is unchanged.
       const valueOf = (target, id) => {
-        const input = target.querySelector(`[data-world-component-bulk-essence-input="${id}"]`);
+        const input = target.querySelector(
+          `:scope [data-world-component-bulk-essence-input="${id}"]`
+        );
         return input.value === '' ? input.getAttribute('placeholder') : input.value;
       };
       const chip = (target, id) =>
-        target.querySelector(`[data-world-component-bulk-essence-chip="${id}"]`);
+        target.querySelector(`:scope [data-world-component-bulk-essence-chip="${id}"]`);
       async function press(target, selector) {
-        target.querySelector(selector).click();
+        target.querySelector(`:scope ${selector}`).click();
         await drain();
       }
       const inc = (target, id) =>
@@ -2305,7 +2306,11 @@ describe('world Component Catalogue (issue 1371)', () => {
         await press(target, '[data-world-component-bulk-apply]');
         const writes = calls.filter((call) => call.verb === 'bulkEditRules');
         assert.deepEqual(
-          writes.map((call) => [call.args[0], [...call.args[1]].sort(), call.args[2]]),
+          writes.map((call) => [
+            call.args[0],
+            [...call.args[1]].sort((left, right) => left.localeCompare(right)),
+            call.args[2],
+          ]),
           [
             // Both forge components end on the same map — coal`s `flame: 2` becomes 3, ingot`s empty
             // map gains it, and the strip of `earth` removes nothing either carried — so ONE write.

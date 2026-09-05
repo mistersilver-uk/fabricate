@@ -411,22 +411,18 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       // STAGE ONE OF EVERYTHING THE GEOMETRY PASS MEASURES, before arming the delete — the danger
       // control disarms on blur, so it goes last: a direction (the ACTIVE segment's fill), a
       // system (a lit box) and a tag (a staged chip).
-      target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
+      target.querySelector(':scope [data-world-component-bulk-mode-option="add"]').click();
       await drainMicrotasks();
       target
-        .querySelector(
-          '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
-        )
+        .querySelector(':scope [data-bulk-inset="systems"] [data-world-component-bulk-option]')
         .click();
       await drainMicrotasks();
       target
-        .querySelector(
-          '[data-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
-        )
+        .querySelector(':scope [data-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]')
         .click();
       await drainMicrotasks();
       target
-        .querySelector('[data-world-component-bulk-essence="flame"] [data-stepper-increment]')
+        .querySelector(':scope [data-world-component-bulk-essence="flame"] [data-stepper-increment]')
         .click();
       await drainMicrotasks();
       const danger = target.querySelector(':scope [data-world-component-bulk-danger] button');
