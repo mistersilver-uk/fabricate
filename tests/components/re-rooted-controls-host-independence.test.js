@@ -54,9 +54,9 @@
  *     family's own (0,2,0) shared base block it tied every such rule and won on source order
  *     against each one declared earlier in the sheet, which is how it deleted
  *     `.manager-recipe-lock`'s and `.manager-recipe-edit`'s 0.68rem and made both glyphs 28.7%
- *     larger. `font` is also a shorthand that resets `line-height` to `normal` when it is not
- *     given one, and the shared base block declares `line-height: 1`; being BOTH more specific
- *     and later, that block is what resolves. A computed value can show the consequence only in
+ *     larger. `font` is a shorthand, so it resets `line-height` along with the rest — to the
+ *     inherited value in the `inherit` form — and the shared base block declares `line-height: 1`;
+ *     being MORE SPECIFIC and later, that block is what resolves. A computed value can show the consequence only in
  *     an engine that expands the shorthand and only for the properties the fixture happens to
  *     measure; reading the two rules' rooting and order shows the CAUSE, in any engine. The
  *     caller-override half is measured as well, on the two classes the regression moved.
@@ -508,8 +508,8 @@ test('the values the comparison holds over are the ones the family declares, not
     assert.equal(
       Number.parseFloat(style['line-height']),
       Number.parseFloat(style['font-size']),
-      `${control} must compute line-height 1; the \`font: inherit\` baseline resets ` +
-        'line-height to `normal` wherever it outranks the `line-height: 1` declaration'
+      `${control} must compute line-height 1; \`font: inherit\` is a shorthand that resets ` +
+        'line-height along with the rest — to the inherited value — and the `line-height: 1` declaration is MORE SPECIFIC, so that block is what resolves'
     );
   }
 
@@ -742,8 +742,9 @@ test('a caller`s per-site font rule still beats the family`s baseline', async ()
       `\`.fabricate-manager .${passThrough}\` must still declare \`font-size: ${CALLER_FONT_SIZE}\`, ` +
         `or the ${id} measurement below holds over a value nothing states`
     );
-    assert.ok(
-      recipesBrowserSource.includes(passThrough),
+    assert.match(
+      recipesBrowserSource,
+      new RegExp(String.raw`${passThrough}(?![\w-])`),
       `RecipesBrowserView must still pass \`${passThrough}\` through to IconButton, or this ` +
         'probe measures markup the product no longer renders'
     );
