@@ -18297,27 +18297,20 @@
 
 /* `proto:1314`: the attribution sentence at 11.5px/1.55 in the muted ink, 3px under the name
    row. It is prose now rather than a glyph-led hint, so the flex row and its `gap` go with the
-   glyph they were spacing. */
+   glyph they were spacing.
+
+   AND SO, AT LAST, DOES THE GLYPH'S OWN RULE (r11, reviewer finding 7). A
+   `.manager-component-identity-note i` rule outlived the glyph here, as
+   `.manager-component-identity-strip.is-drop-active` outlived the drop target below it —
+   `ComponentIdentityStrip` renders both branches as bare `<p>` prose and attaches no `dragDrop`.
+   Neither was visible to `styles-dead-classes`: that gate reads CLASSES, and every class in both
+   selectors is live somewhere, so a compound that can never match reads as two live tokens. */
 .fabricate-manager .manager-component-identity-note {
   margin: var(--fab-space-1) 0 0;
   color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 400;
   line-height: 1.55;
-}
-
-.fabricate-manager .manager-component-identity-note i {
-  flex: 0 0 auto;
-  font-size: 0.56rem;
-}
-
-/* The WHOLE strip is the drop target (issue 676, brief §C6). Only the small inner zone
-   used to react, so a GM aiming at the strip's name — most of its area — got no
-   feedback and had to hunt for the box. `dragDrop` is attached at strip level and this
-   is its `activeClass`. */
-.fabricate-manager .manager-component-identity-strip.is-drop-active {
-  border: 1.5px dashed var(--fab-accent);
-  background: var(--fab-accent-soft);
 }
 
 /* The custom salvage DC is the only numeric control in this block; its siblings are a
@@ -26220,4 +26213,64 @@
    wherever in the sheet it is written. */
 .fabricate-manager .manager-button.fab-manager-button.is-size-38 {
   min-height: 38px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K).
+   Appended; no rule above this block is edited by it, and every selector below is scoped to
+   `[data-manager-view="components"]`, which is this one route. The rules these override are
+   shared with the Recipe Studio and the Essence library, and neither of those is drawn by this
+   reference at all — an unscoped edit would re-type two studios nobody measured.
+
+   WHAT THE FINDING IS. Twenty `compare` lines, each one internally inconsistent with a sibling
+   control in the SAME toolbar that is already right — which is what makes them per-site drift
+   rather than the systematic rem-ramp the classification puts the residual `11.52px` cluster in.
+   Twelve of them are this screen's, and every one is a TOKEN or a WEIGHT: not a rung, not the
+   spacing scale, not the background ramp.
+
+   THE CATALOGUE ALREADY CLOSED ITS HALF and this copies that answer rather than inventing a
+   second one: `[data-manager-view='world-components'] .manager-scoped-list-toolbar select` sets
+   `--fab-text-secondary` at weight 500 for exactly the same reference declaration.
+   `--fab-text-secondary` IS the reference's `--text2` at the same value; the sibling
+   `--fab-text-muted` this bar reads is that colour at 74% alpha, which is why the run reported a
+   translucent ink against a solid one rather than a different hue.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the
+   sort key) all ink their select `var(--text2)` at weight 500. The shared scoped rule inks them
+   `--fab-text` at the inherited 400, so the filters read at the weight and colour of the row
+   NAMES below them rather than as quiet chrome.
+
+   THE FILL IS DELIBERATELY NOT HERE. An opaque select is library-forced and pinned by
+   `manager-layout.test.js`; the `backgroundColor` line on these three regions is that recorded
+   deviation and not this one. */
+.fabricate-manager[data-manager-view="components"] .manager-component-toolbar select {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* And the two FILTER selects at the reference's own 12px. The sort select is deliberately absent:
+   the reference draws IT at 11.5px (`proto:1066`) against the shipped 11.52px, a fiftieth of a
+   pixel, which belongs to the rounding class rather than to this finding. Absolute px rather than a rem
+   step for the reason the count one block up gives — these are the reference's own numbers, and
+   the rem ramp has no step between 11.52 and 12.16. */
+.fabricate-manager[data-manager-view="components"] .manager-component-category-filter,
+.fabricate-manager[data-manager-view="components"] .manager-component-essence-filter {
+  font-size: 12px;
+}
+
+/* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. The weight is already
+   600 from the shared sort-direction rule; the ink and the size are this screen's drift.
+   (0,5,0) against that rule's (0,4,0), so it decides by specificity rather than by source order. */
+.fabricate-manager[data-manager-view="components"]
+  .manager-button.fab-manager-button.manager-component-sort-direction {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+}
+
+/* `proto:1062`: the two micro-labels on the second row at 8.5px. The shared label rule draws
+   8.8px, and the 0.08em tracking it already carries resolves against the element's OWN size, so
+   the `letterSpacing` line closes with the size and needs no declaration of its own. */
+.fabricate-manager[data-manager-view="components"] .manager-component-filter-label {
+  font-size: 8.5px;
 }

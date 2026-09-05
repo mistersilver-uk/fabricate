@@ -318,7 +318,12 @@ const FIXTURE = `
               </ul>
             </div>
             <div class="manager-component-tag-run">
-              <button type="button" class="manager-chip is-tag" data-m="tag-toggle"><i class="fas fa-tag"></i>Brass<i class="fas fa-circle-check"></i></button>
+              <!-- The label alone: the own-tag run dropped its leading tag glyph and its
+                   trailing state circle at issue 1371 r11 (UX F-F), because proto:1337 draws the
+                   label and carries the selection in the chip's fill. This fixture is a COPY of
+                   the component's markup, so it keeps passing whatever the component emits; it
+                   is re-cut here so the copy does not go on describing a chip nobody renders. -->
+              <button type="button" class="manager-chip is-tag" data-m="tag-toggle">Brass</button>
             </div>
           </section>
           <input type="text" data-m="bleed-baseline" value="bare">
@@ -391,15 +396,24 @@ const EXPECTED = {
   // over. The old map pinned the drift and its own comments admitted it
   // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
   search: 11.52, // 0.72rem — prototype search input 12.5px sans
-  'filter-label': 8.8, // 0.55rem — prototype toolbar micro-label 8.5px @ .08em (was 12.48)
+  // `proto:1062` — the toolbar micro-label at 8.5px, which is now the SHIPPED value rather than
+  // the target this pin's own comment used to name (issue 1371 r11, UX finding F-K). The 0.08em
+  // tracking is unchanged and resolves against this size, so the reference's 0.68px comes with
+  // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
+  // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
+  'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
   // 0.72rem. These were 14 — Foundry's app base bleeding through — because the Component
   // Studio's own bleed patch covers `.manager-search input` and `.manager-toolbar
   // .manager-button` but NOT `select`, and the browser's selects had no font-size rule
   // at all. Joining `.manager-component-toolbar select` to the recipe rule closed it.
-  'filter-select': 11.52, // prototype filter/sort select 11.5px sans — near-exact
-  'sort-select': 11.52,
-  'essence-select': 11.52,
-  'toolbar-button': 11.52, // 0.72rem — the sort-direction toggle at the compact scale
+  // The two FILTER selects moved to the reference's own 12px at issue 1371 r11 (F-K); the SORT
+  // select did not, because the reference draws that one at 11.5px (`proto:1066`) against the
+  // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
+  // bar with two pinned sizes is the reference's own arrangement, not an oversight.
+  'filter-select': 12, // proto:1054 — the category filter (was 11.52)
+  'sort-select': 11.52, // proto:1066 draws 11.5; the residual is 0.02px
+  'essence-select': 12, // proto:1056 — the essence filter (was 11.52)
+  'toolbar-button': 11, // proto:1067 — the sort-direction toggle at `600 11px` (was 11.52)
   // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
   // the deliberate change, not drift: the compact Tool Studio scale is now the only chip
   // scale, so these five roles are re-pinned to it rather than being relaxed or dropped.

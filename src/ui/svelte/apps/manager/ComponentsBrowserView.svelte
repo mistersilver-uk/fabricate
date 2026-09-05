@@ -1007,4 +1007,27 @@
   :global(.manager-component-selection-inline) {
     display: contents;
   }
+
+  /* `proto:1060` inks `Select all` `var(--text2)` — the solid secondary — where the shared
+     register draws it at `--fab-text-muted`, which is that same colour at 74% alpha. One token
+     (UX F-K).
+
+     IT CANNOT BE WRITTEN IN `styles/fabricate.css`, and that is a cascade fact rather than a
+     preference: `BulkSelectionToolbar` states this ink in its own scoped block, which Svelte
+     injects UNLAYERED, while the sheet is imported at `layer(modules)` — so an unlayered rule
+     beats every layered one whatever its specificity, and a sheet-authored override would be
+     emitted, match, and silently lose. Written here it is unlayered too, so specificity decides,
+     and the leading `.fabricate-manager` puts this at (0,3,0) against the primitive's (0,2,0).
+
+     AND IT IS SCOPED TO THIS REGISTER, not to the class. `.fab-bulk-selection-all` is drawn by
+     the Recipe Studio and the Essence library as well, and this reference draws neither of them.
+     `.manager-component-selection-inline` is the `rowClass` THIS screen passes, so the selector
+     cannot reach a register the finding was not measured on.
+
+     `:global()` for the reason the shim above gives: every element in the selector is rendered by
+     that component and never by this template, so a scoped selector would compile to a rule that
+     matches nothing. */
+  :global(.fabricate-manager .manager-component-selection-inline .fab-bulk-selection-all) {
+    color: var(--fab-text-secondary);
+  }
 </style>
