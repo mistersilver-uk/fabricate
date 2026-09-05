@@ -646,6 +646,30 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // that could contain it.
     'manager-essences-source-picker',
   ]),
+  // THE APP'S OWN SELECT (issue 1504), whose panel is drawn by the primitive above and whose whole
+  // subject — the option list — exists only while it is OPEN. Neither representative frame holds
+  // one: `manager-components-normal` is a browse list and `fabricate-app-shell` is the player
+  // shell, and each draws its pager's per-page trigger CLOSED, where the conversion is a button
+  // with a chevron.
+  //
+  // TWO entries, because `showTick` is a CONFIGURATION and no one frame holds both of its values.
+  // `manager-recipes-bulk-edit-check-tier` is the ticked, grouped, hinted list — the densest
+  // composition any caller reaches — and `player-inventory-page-size` is the tickless narrow one,
+  // in the PLAYER window, which is a different portal host with its own per-site trigger rules. A
+  // change to the tick gutter, to the group heading's inset or to the panel band is invisible in
+  // whichever of the two it is not in.
+  //
+  // ADDITIVE, like every entry here: `selectRenderFileCases` still adds the representative pair,
+  // which is what keeps the trigger's own CLOSED treatment — the form nine pagers draw — in the
+  // published set.
+  //
+  // ROUTED ONLY HERE. `selectRenderFileCases` skips a broad-signal file BEFORE it reads any case's
+  // patterns, so a `sourceMatches` naming this path selects nothing and reds
+  // `tests/design-system-primitives.test.js`'s shadowed-baseline clause instead.
+  'src/ui/svelte/components/Select.svelte': Object.freeze([
+    'manager-recipes-bulk-edit-check-tier',
+    'player-inventory-page-size',
+  ]),
   // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
   // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
   // and the shared two-column template in place of a caller rule. Neither representative frame can
