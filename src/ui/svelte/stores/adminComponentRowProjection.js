@@ -180,14 +180,19 @@ function _stableStringify(value) {
 export function itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
   const essenceResolution = Object.keys(item?.essences || {})
     .sort((a, b) => a.localeCompare(b))
-    .map((id) => [
-      id,
-      essenceDefinitionById.get(id)?.name || id,
-      essenceDefinitionById.get(id)?.icon,
-      // The colour is part of the resolution too (issue 1371 r18-colour, M29): a recoloured
-      // essence would otherwise serve a stale card until an unrelated field moved.
-      essenceDefinitionById.get(id)?.colorToken,
-    ]);
+    .map((id) => {
+      // ONE catalogue read per essence, not one per field (issue 1371 r18-colour): the scale guard
+      // in `admin-browser-page-scope-guards.test.js` counts these reads as the signature's cost.
+      const definition = essenceDefinitionById.get(id);
+      return [
+        id,
+        definition?.name || id,
+        definition?.icon,
+        // The colour is part of the resolution too (M29): a recoloured essence would otherwise
+        // serve a stale card until an unrelated field moved.
+        definition?.colorToken,
+      ];
+    });
   return _stableStringify({
     item,
     showTags,
