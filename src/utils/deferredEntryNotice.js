@@ -81,6 +81,8 @@ const CHUNK_LOAD_FAILURE_TEXTS = Object.freeze([
  * stripped. Were this constant passed INTO `log` from here, it would survive for the same
  * reason: only a literal whose sole reference is the console call itself disappears from the
  * bundle when that call is stripped, which is the whole point of asserting it.
+ *
+ * @type {string}
  */
 export const DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE =
   'Fabricate | a deferred part of the module failed to load. This browser is probably running a cached copy of an earlier version of Fabricate; reload to complete the update.';
@@ -95,6 +97,8 @@ export const DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE =
  * reference, so the sentence leaves the bundle entirely. Measured by rebuilding at
  * `console.log`. `tests/release-build.test.js` therefore asserts both that this reaches
  * `dist/main.js` and that it is written at `console.warn`.
+ *
+ * @type {string}
  */
 export const STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE =
   'Fabricate | this browser is running a cached entry script from an earlier version of Fabricate; reload to complete the update.';
