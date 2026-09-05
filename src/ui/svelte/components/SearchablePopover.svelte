@@ -344,6 +344,20 @@
                    Omitted entirely when empty, so every caller that passes nothing renders the
                    trigger it renders today. It rides `triggerAttributes`, so a `trigger` snippet
                    caller receives it through the same spread as the rest of the contract.
+    dialogAriaLabelledBy — OPTIONAL id (or id list) of the element or elements that NAME the
+                   PANEL, emitted as `aria-labelledby` on BOTH the portaled `role="dialog"` and
+                   the `role="listbox"` inside it, exactly where `dialogAriaLabel` would have
+                   written a string (issue 1504). It exists because a caller whose control is
+                   named by a caption it already renders has no string to pass: it holds a
+                   POINTER, and `dialogAriaLabel` cannot take one. Such a caller used to resolve
+                   its name to `''` here and open an unnamed dialog wrapping an unnamed list.
+
+                   The two are mutually exclusive on the wire rather than additive: where both
+                   are passed the labelledby is emitted and the label is OMITTED, because
+                   `aria-labelledby` wins in the accessibility tree and an `aria-label` beside it
+                   would be dead text free to drift from the caption it duplicates. One derived
+                   value feeds both elements, so the dialog and its listbox cannot take different
+                   names.
     *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` feeds
                    `EmptyState`'s `title` slot (its `<h3>`) HERE, so it must stay short:
                    the panel renders it as ONE quiet line (`EmptyState note`, issue 1373),
@@ -468,6 +482,7 @@
     triggerAriaLabel = '',
     triggerAriaLabelledBy = '',
     dialogAriaLabel = '',
+    dialogAriaLabelledBy = '',
     searchPlaceholder = '',
     searchAriaLabel = '',
     emptyHint = '',
@@ -958,6 +973,17 @@
     triggerOnKeydown?.(event);
   }
 
+  // THE PANEL'S NAME, resolved ONCE for the two elements that carry it. The portaled
+  // `role="dialog"` and the `role="listbox"` inside it take the same name, so resolving the
+  // string-versus-pointer choice here rather than at each element is what stops them naming
+  // themselves differently. A labelledby SUPPRESSES the label rather than joining it: both
+  // present would leave an `aria-label` the accessibility tree never reads, free to drift from
+  // the caption the pointer names.
+  const dialogNameAttribute = $derived(
+    dialogAriaLabelledBy ? undefined : dialogAriaLabel || undefined
+  );
+  const dialogNamedBy = $derived(dialogAriaLabelledBy || undefined);
+
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
   // duplication gate counts and a place for the two shapes to drift apart.
   const triggerAttributes = $derived({
@@ -1134,7 +1160,8 @@
       role="dialog"
       tabindex="-1"
       data-keyboard-focus="true"
-      aria-label={dialogAriaLabel || undefined}
+      aria-label={dialogNameAttribute}
+      aria-labelledby={dialogNamedBy}
       use:anchoredPopover={{
         component: 'SearchablePopover',
         // In `inlineSearchTrigger` mode the trigger button is UNMOUNTED while open (the search
@@ -1297,7 +1324,8 @@
           class={`manager-travel-popover-options ${listClass}`}
           role="listbox"
           id={listId}
-          aria-label={dialogAriaLabel || undefined}
+          aria-label={dialogNameAttribute}
+          aria-labelledby={dialogNamedBy}
           data-picker-as={as}
           data-picker-columns={isGrid ? String(gridColumns) : undefined}
         >

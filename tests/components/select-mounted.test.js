@@ -404,6 +404,67 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
+    /**
+     * THE PANEL IS A SECOND NAMED SURFACE, and the source-reading gate structurally cannot see it.
+     *
+     * `searchable-popover-source-contract.test.js` reads the call site's SOURCE TEXT for a
+     * non-empty `dialogAriaLabel`, so `dialogAriaLabel={label || ariaLabel}` satisfies it while
+     * resolving to `''` at runtime for every caller that names its control by a caption instead
+     * of a string — which is nine pagers and the scoped catalogue's sort key. That is the hole a
+     * composing primitive opens one indirection down, and only a RUN can close it: the assertion
+     * has to be on the rendered attribute, under both shapes a caller may name the control with.
+     *
+     * The pointer's target is put on `<body>` rather than on the mount target, because `mount()`
+     * builds a fresh target for every call and the second shape must find the same caption.
+     */
+    it('names the open panel and its listbox under both naming shapes', async () => {
+      const caption = document.createElement('span');
+      caption.id = 'select-panel-name-probe';
+      caption.textContent = 'Sort by';
+      document.body.append(caption);
+
+      try {
+        await mountSelect({ ariaLabel: 'Resolution' });
+        const named = await openPanel();
+        assert.equal(named.getAttribute('role'), 'dialog', 'the portaled panel is the dialog');
+        assert.equal(
+          named.getAttribute('aria-label'),
+          'Resolution',
+          'a string name reaches the dialog, or a GM is told a dialog opened and not what for'
+        );
+        assert.equal(
+          named.querySelector('[role="listbox"]').getAttribute('aria-label'),
+          'Resolution',
+          'and the list inside it, which is where the GM lands'
+        );
+        harness.remount();
+
+        await mountSelect({ ariaLabel: '', ariaLabelledBy: caption.id });
+        const pointed = await openPanel();
+        const surfaces = [
+          ['dialog', pointed],
+          ['listbox', pointed.querySelector('[role="listbox"]')],
+        ];
+        for (const [what, element] of surfaces) {
+          const pointsAt = element.getAttribute('aria-labelledby');
+          assert.equal(pointsAt, caption.id, `the ${what} is named by the caller's own caption`);
+          assert.ok(
+            !element.getAttribute('aria-label'),
+            `and no aria-label beside it on the ${what}: a labelledby WINS, so a string there ` +
+              'would be dead text free to drift from the caption'
+          );
+          assert.ok(
+            (document.querySelector(`[id="${pointsAt}"]`)?.textContent ?? '').trim().length > 0,
+            `and the ${what}'s pointer resolves to an element that actually says something`
+          );
+        }
+      } finally {
+        caption.remove();
+      }
+
+      harness.remount();
+    });
+
     it('an error replaces the hint rather than stacking under it', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies here.', error: 'Pick a mode.' });
       const field = harness.target.querySelector('label.manager-field');
