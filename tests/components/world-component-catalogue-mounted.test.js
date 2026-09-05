@@ -3155,6 +3155,30 @@ describe('world Component Catalogue (issue 1371)', () => {
         chips[1].querySelector('i')?.classList.contains('fa-mortar-pestle'),
         'and the rules row’s fallback glyph where the essence has none'
       );
+      // AND IT IS THE SHARED `EssenceChip`, NOT A HAND-ROLLED ONE (issue 1371 r19-entry2, M29).
+      // The hook it stamps is the difference: this run shipped for one revision as a bare `Chip`
+      // restating the glyph, the count and the accessible name and dropping the COLOUR, which is
+      // the one part of the mapping no site restates. Both facts are read, because a chip carrying
+      // the primitive's hook while losing the tint is exactly the regression the swap was for.
+      assert.equal(
+        chips[0].getAttribute('data-essence-chip'),
+        'flame',
+        'the shared essence chip’s own hook, so the mapping is stated once'
+      );
+      assert.equal(
+        chips[0].getAttribute('data-chip-tint'),
+        'ember',
+        'and it carries the roster’s colour token through to the chip'
+      );
+      assert.match(
+        chips[0].getAttribute('style') ?? '',
+        /--fab-chip-color:\s*var\(--fab-tag-ember\)/,
+        'on the primitive’s own vehicle rather than a colour this screen composed'
+      );
+      assert.ok(
+        !chips[1].hasAttribute('data-chip-tint'),
+        'and an essence with no authored colour is the UNTINTED chip, never an error'
+      );
     });
 
     it('reads the WORLD essence section when a record carries one, over the id-and-name roster the root hands the page (M31)', async () => {

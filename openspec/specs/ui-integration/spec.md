@@ -2515,9 +2515,9 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     The read union answers identity from the in-system row first and the world essence entry writes the world entity alone, so the manager's system-scope projection overlays the WORLD identity's colour onto the selected system's essence rows: an authored world colour wins, an unauthored one leaves the row's own colour standing, and no world store changes nothing.
     The chip's face is the reference's essence dot — the colour on the glyph AND the numeral over the soft surface behind the plain hairline — and its label and the tile's glyph are measured for contrast in a real browser on every theme for every offered tint; the tile's face is the slate glyph chip with the colour on the glyph alone.
     An essence with no authored colour is the untinted chip or tile, never an error.
-    **ONE SITE IS NOT YET TINTED, AND IT IS RECORDED AS A KNOWN GAP BECAUSE THE RULE ABOVE IS STATED AS A UNIVERSAL.**
-    The world Component catalogue's ROW essence chips — requirement 2's M30 run, built in the same revision by a different lane — still render through the bare manager chip with no tint, and the page carries the swap note the two lanes agreed on rather than the shared essence chip.
-    That is the one chip on the four component screens M29's own words reach (`the component catalogue`) which does not yet obey this requirement, so the gap is named here rather than left for a reader to discover from a frame.
+    **THE WORLD COMPONENT CATALOGUE'S OWN ROW CHIPS ARE ON IT TOO**, which closes the last site (revision 19).
+    Requirement 2's M30 run shipped for one revision as a bare manager chip restating the glyph, the count and the accessible name by hand and dropping the one part of the mapping no site restates — so the newest chip site M29's own words reach (`the component catalogue`) was the single surface a universal rule did not hold of.
+    A hand-rolled restatement of a shared primitive is what loses the colour, which is why the rule is written as "through ONE shared essence chip" rather than as a list of tinted sites: the enumeration is what goes stale, and it went stale in the revision that wrote it.
 
 ### GM World Tool Screens
 

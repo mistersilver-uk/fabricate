@@ -43,6 +43,7 @@
 <script>
   import { localize, notifyError } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import EssenceChip from '../components/EssenceChip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -833,32 +834,34 @@
   The rules library's row draws its essences as compact count chips ahead of its `Recipes` stat
   (`components/ComponentRow.svelte`), and the maintainer wants the world row to show the same
   thing. The prototype's catalogue row draws none (`proto:602`-`613`), so this run is a ruled
-  extra, and it copies the rules row's chip exactly — `Chip` in the `manager-essence-compact-chip`
-  face, the glyph, the count, and `{name} {quantity}` as the title and the accessible name — so a
-  GM reads one chip on both screens.
+  extra, and it wears the rules row's chip exactly — the SHARED `EssenceChip` in the
+  `manager-essence-compact-chip` face — so a GM reads one chip on both screens.
 
   IT RENDERS THROUGH THE FRAME'S OPT-IN `rowMeta` SNIPPET, which under `rowSecondLine:
   'description'` lands in the trailing meta column BEFORE `rowTrailing`'s stat columns — the rules
   row's own order, `[essence dots] [Recipes stat] [action]` — and outside the identity button.
   The snippet is absent by default, so the essence and tool catalogues are byte-identical.
 
-  r18-colour: swap for the essence chip. Lane COLOUR's tinted essence-chip primitive (M29) is the
-  face this run should wear; each chip already carries the roster's `colorToken` for it. Until
-  the contract lands the run renders through `Chip` exactly as the rules row's does.
+  IT IS `EssenceChip`, NOT A HAND-ROLLED `Chip` (issue 1371 r19-entry2, maintainer ruling M29).
+  This run shipped for one revision as a bare `Chip` restating the mapping by hand — the glyph
+  fallback, `{name} {quantity}` as both the title and the accessible name, the count — and
+  dropping the one part of it nobody restates: the COLOUR. That left the newest chip site M29's
+  own words name (`the component catalogue`) as the single surface not obeying `ui-integration`
+  requirement 21's "wherever it is drawn as a chip", while the chip model already carried the
+  roster's `colorToken` for it. The primitive exists to end exactly that restatement, so the
+  swap is the whole of this run: `essence` is the chip model `componentRowEssenceChips` already
+  publishes, in the shape `EssenceChip` reads.
 -->
 {#snippet componentRowEssences(entry)}
   {@const chips = componentRowEssenceChips(entry, { systems, essences: worldEssences })}
   {#if chips.length > 0}
     <span class="manager-world-component-row-essences" data-world-component-row-essences={entry.id}>
       {#each chips as chip (chip.id)}
-        <!-- r18-colour: swap for the essence chip -->
-        <Chip
+        <EssenceChip
+          essence={chip}
           class="manager-essence-compact-chip"
-          icon={chip.icon}
-          title={`${chip.name} ${chip.quantity}`}
-          aria-label={`${chip.name} ${chip.quantity}`}
-          data-world-component-row-essence={chip.id}>{chip.quantity}</Chip
-        >
+          data-world-component-row-essence={chip.id}
+        />
       {/each}
     </span>
   {/if}

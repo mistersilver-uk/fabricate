@@ -453,6 +453,18 @@ function measureRowOrder() {
   const stats = row.querySelector('[data-world-component-row-meta="resin"]');
   const chipless = document.querySelector('[data-scoped-list-row="coal"]');
   const rect = (element) => (element ? element.getBoundingClientRect() : null);
+  // THE TOKENS RESOLVED IN THIS PAGE'S OWN CASCADE (issue 1371 r19-entry2). A hex literal
+  // compared against a computed `rgb()` is a conversion this file would have to do by hand and
+  // could get wrong in one direction only; a bare probe inside the same themed root asks the
+  // browser instead, and it is what makes the tint assertion a comparison of two measurements.
+  const inkOf = (value) => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    (row.parentElement ?? document.body).append(probe);
+    const ink = getComputedStyle(probe).color;
+    probe.remove();
+    return ink;
+  };
   return {
     rowHeight: box.height,
     rowLeft: box.left,
@@ -463,6 +475,11 @@ function measureRowOrder() {
     essenceRun: rect(run),
     essenceChip: rect(chip),
     essenceChipRadius: chip ? getComputedStyle(chip).borderTopLeftRadius : null,
+    essenceChipTint: chip ? chip.getAttribute('data-chip-tint') : null,
+    essenceChipInk: chip ? getComputedStyle(chip).color : null,
+    essenceChipGlyphInk: chip ? getComputedStyle(chip.querySelector('i')).color : null,
+    emberInk: inkOf('var(--fab-tag-ember)'),
+    plainInk: inkOf('var(--fab-text)'),
     stats: rect(stats),
     chiplessRowHeight: chipless ? chipless.getBoundingClientRect().height : null,
   };
@@ -764,6 +781,33 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.ok(
       Number.parseFloat(rowOrder.essenceChipRadius) >= rowOrder.essenceChip.height / 2,
       `a pill, as every manager chip is (${rowOrder.essenceChipRadius} on ${rowOrder.essenceChip.height}px)`
+    );
+  });
+
+  it('inks the row’s essence chip in the colour the world Essence Catalogue gave it (M29)', () => {
+    // THE ONE SITE M29's own words name (`the component catalogue`) that shipped untinted. The run
+    // was a hand-rolled `Chip` restating the glyph, the count and the accessible name, and dropping
+    // the colour — while requirement 21 states the rule as a universal ("wherever it is drawn as a
+    // chip"). It is `EssenceChip` now, and the fixture's `flame` carries `colorToken: 'ember'`.
+    //
+    // MEASURED AGAINST THE TOKEN, not against a hex this file spells: both sides are read out of
+    // the same themed root, so a re-derived palette moves them together and this pin keeps
+    // asserting the RELATION rather than a colour that used to be right.
+    assert.equal(rowOrder.essenceChipTint, 'ember', 'the chip declares the roster’s own token');
+    assert.notEqual(
+      rowOrder.emberInk,
+      rowOrder.plainInk,
+      'NON-VACUITY: the tint and the default chip ink are different colours in this theme, so the two assertions below can fail'
+    );
+    assert.equal(
+      rowOrder.essenceChipInk,
+      rowOrder.emberInk,
+      `the label takes the essence's colour (${rowOrder.essenceChipInk} against ${rowOrder.emberInk})`
+    );
+    assert.equal(
+      rowOrder.essenceChipGlyphInk,
+      rowOrder.emberInk,
+      'and so does the glyph — the reference draws the whole chip in the essence’s colour'
     );
   });
 
