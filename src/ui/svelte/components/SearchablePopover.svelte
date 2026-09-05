@@ -115,11 +115,18 @@
                    the difference is real, and absorbing it is what lets the four listbox
                    sites convert without their screen-reader announcement changing.
 
-                   Pass `'listbox'` only with `showSearch={false}`. With the search field
-                   rendered, the panel genuinely IS a dialog containing a listbox, and
-                   announcing a bare listbox would promise a control the panel does not
-                   present. `tests/components/searchable-popover-trigger-contract.test.js`
-                   refuses that combination at the source rather than trusting this note.
+                   Pass `'listbox'` only with `showSearch={false}`, and pass it WHENEVER
+                   `showSearch={false}`. The two directions are one rule read from either
+                   end. With the search field rendered the panel genuinely IS a dialog
+                   containing a listbox, so announcing a bare listbox promises a control
+                   the panel does not present; without one the panel IS a bare listbox,
+                   so the `dialog` default announces a panel the GM never gets — which is
+                   what the recipe row-level "or..." menu shipped, alone among the
+                   search-suppressed sites. Both directions are refused at the source by
+                   `tests/components/searchable-popover-source-contract.test.js` rather
+                   than trusted to this note — "a popover announcing a listbox does not
+                   render a search field" holds the first and "a popover that renders no
+                   search field announces a listbox" holds the second.
     triggerAriaDisabled — render the trigger with `aria-disabled="true"` and refuse to
                    open, while leaving it ENABLED and focusable (default false, issue
                    1458). Not a synonym for `disabled`, and the difference is a defect
@@ -195,10 +202,13 @@
                    and focus would return to whatever button the root happened to hold first. The
                    key is a symbol, so neither half of the omission rule touches it.
 
-                   A caller supplying a `trigger` snippet names the button IN the snippet and
-                   does NOT pass `triggerAriaLabel`; passing both is a conflict the spread-last
-                   rule resolves in favour of `triggerAriaLabel`, because it arrives through the
-                   spread. `triggerClass` becomes a declared NO-OP with a `trigger` snippet: it
+                   A caller supplying a `trigger` snippet names AND titles the button IN the
+                   snippet and does NOT pass `triggerAriaLabel` or `triggerTitle`; passing either
+                   is a conflict the spread-last rule resolves in favour of the prop, because it
+                   arrives through the spread. `triggerTitle` is the quieter of the two — it
+                   would replace a tooltip rather than a name — and both are refused at the
+                   source by `tests/components/searchable-popover-source-contract.test.js`.
+                   `triggerClass` becomes a declared NO-OP with a `trigger` snippet: it
                    is a pass-through to this component's own button, which is then not rendered
                    at all, and `inlineSearchTrigger` still wins over BOTH while the panel is
                    open, exactly as it wins over `triggerChip` — the two shapes contradict each
