@@ -227,6 +227,7 @@ function catalogueProps(entityType, overrides = {}) {
       onBreak: 'Falls back to nothing happens.',
       prerequisites: 'Falls back to anyone may use it.',
       bonus: 'Falls back to no check bonus.',
+      essences: 'Falls back to no essence values.', // issue 1371 r18 (M31)
     },
     inspectorBody: markerSnippet('data-lane-inspector-body'),
     ...overrides,
@@ -254,6 +255,7 @@ function rulesProps(entityType, overrides = {}) {
       onBreak: 'Falls back to nothing happens.',
       prerequisites: 'Falls back to anyone may use it.',
       bonus: 'Falls back to no check bonus.',
+      essences: 'Falls back to no essence values.', // issue 1371 r18 (M31)
     },
     ...overrides,
   };
