@@ -862,9 +862,16 @@ Elects each world component's `essences` map and marks every existing component 
    An EMPTY donor map elects NOTHING, on the absence-preserving rule `category` follows: the world saying nothing is not the world saying "none".
    A world default already carrying a map is kept and never re-elected.
    No constraint applies: the map carries no reference, and `{}` is a storable override, so the section is not fallback-exposed.
+   A malformed payload, system or record is SKIPPED rather than repaired, with one stated exception: an unusable `defaults` map is REPLACED with an empty one, because the election needs somewhere to land; the per-entity records inside it are not repaired.
 3. **EVERY MEMBERSHIP RECORD IS MARKED BY EQUALITY**, absence reading as empty: a record whose system's own row equals the elected map is marked `inherit.essences: true`; one that differs is marked `false` and carries its own map on the record, exactly as `category` carries its own token.
    A record with no in-system row left has nothing to preserve and is marked inheriting, so a later re-add starts from the world map — the read union draws nothing for it until then.
+   **THE TWO ABSENCES ARE DIFFERENT AND THE PASS MUST NOT CONFLATE THEM**, which is stated because the first implementation did.
+   "No row LEFT" is the branch above; a row that EXISTS and carries no `essences` key is a system that authored NONE, so it reads as the empty map and therefore OVERRIDES a non-empty elected map rather than following it.
+   Conflating them handed such a system another system's values, which is the one thing this rule exists to prevent, and it is unreachable from the module's own writes — the normalizer always emits the key — while reachable through the export upcast, a third-party bundle and a hand-edited payload, which is exactly the corpus this pass is written to survive.
    Resolution at migration time is therefore unchanged BY CONSTRUCTION: an inheriting record equals the world map it now follows, and an overriding one answers its own in-system row.
+   **THE PAIR IS NORMALIZED ONCE, AT THE GROUPING, AND READ BACK FROM NOWHERE ELSE.**
+   Both ids are trimmed where the records are grouped and the trimmed pair is what every later lookup uses, because a donor looked up by an untrimmed id finds nothing — and the failure is silent and wrong rather than skipped: no map is elected and every record is marked inheriting.
+   A padded id is unreachable from the module's own writes, which trim on load, and reachable from a GM repair macro that writes the setting by hand.
 4. **IDEMPOTENT PER ENTITY.**
    An entity ANY of whose records already carries a boolean `inherit.essences` has been decided — by this pass, by `1.30.0`, or by a GM — and is left alone, world map and records both.
    The guard is per entity rather than per record because the election is per entity: re-electing a map an earlier run declined, from a donor whose row has since changed, would move every system that run marked inheriting.
