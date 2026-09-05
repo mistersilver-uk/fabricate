@@ -495,6 +495,7 @@ Four of those keys are THE CARET'S FIRST wherever the holder is a text field, an
 A MODIFIED keypress is never this widget's, whichever key it is: with `Shift`, `Ctrl`, `Alt` or `Meta` held the holder consumes nothing and the arrows do not move the cursor either.
 `Enter` is the one exception, answered before the modifier test, because on a TRIGGER holder an `Enter` the widget declines reaches the button's own activation and shuts the panel rather than confirming anything.
 Nothing becomes unreachable, because every cursor movement is still one further keypress away — the behaviour of every editable combobox — and a TRIGGER holder has no caret, so the search-suppressed shape keeps the whole map at every caret position.
+From a CLOSED trigger holder, `ArrowDown`, `ArrowUp`, `Home` and `End` open the panel with the cursor on the row they name, and `Alt+ArrowDown` opens it with no cursor — the select-only combobox's opening keys; a text-field holder keeps the caret's keys when closed.
 The options list is floored to a WHOLE number of rows against the panel's own ceiling, and the leftover pixels stay as panel slack rather than as a sliced last row: a half-drawn row hard against the panel's bottom inset reads as a rendering fault rather than as "more below".
 The figures are MEASURED from the rendered box by the caller, because a row's height and the panel's chrome are stylesheet values; a caller that measures nothing keeps the fill behaviour.
 A typeahead COMBOBOX and a multi-select CHECKLIST are not this widget and are adjudicated as non-members below.

@@ -94,6 +94,20 @@ const PAGE_SIZES = [
   { value: 50, label: '50' },
 ];
 
+/**
+ * A list GATED AT BOTH ENDS, which is what makes an opening key's landing a real measurement.
+ *
+ * `nextActiveIndex` scans INWARD from the end a key names, so with the outermost rows enabled
+ * every one of the four opening keys would land where a naive `0` / `count - 1` also lands and
+ * the skip would be unfalsifiable.
+ */
+const GATED_ENDS = [
+  { value: 'archived', label: 'Archived', disabled: true, disabledReason: 'Archived' },
+  { value: 'simple', label: 'Simple' },
+  { value: 'routed', label: 'Routed by check' },
+  { value: 'retired', label: 'Retired', disabled: true, disabledReason: 'Retired' },
+];
+
 /** Four flat rows, two of them beginning with `P`, so a repeated character has somewhere to go. */
 const MODES = [
   { value: 'simple', label: 'Simple' },
@@ -700,6 +714,89 @@ describe('1504 Select — the select every screen renders', () => {
         'Simple',
         'so the first arrow enters at the first ENABLED row, skipping the gated current value'
       );
+      harness.remount();
+    });
+  });
+
+  describe('the opening keys, which a closed trigger owes the select it replaces', () => {
+    /** The state a GM tabs into: the search-suppressed shape, focused, panel shut. */
+    async function closedTrigger(props = {}) {
+      await mountSelect({ options: GATED_ENDS, ...props });
+      const button = trigger();
+      button.focus();
+      assert.equal(button.getAttribute('aria-expanded'), 'false', 'the panel starts shut');
+      return button;
+    }
+
+    // WHERE EACH KEY LANDS, from the -1 sentinel and past a gated end. ArrowUp and End agree by
+    // construction — both scan inward from the last row — and are asserted separately anyway,
+    // because they reach that answer through different branches of `nextActiveIndex`.
+    for (const [key, landing] of [
+      ['ArrowDown', 'Simple'],
+      ['Home', 'Simple'],
+      ['ArrowUp', 'Routed by check'],
+      ['End', 'Routed by check'],
+    ]) {
+      it(`opens on ${key} with the cursor on the first enabled row it names`, async () => {
+        const button = await closedTrigger();
+
+        const pressed = pressKey(key);
+        await settle();
+
+        assert.ok(pressed.defaultPrevented, `${key} is consumed, not left to scroll the page`);
+        assert.equal(button.getAttribute('aria-expanded'), 'true');
+        assert.ok(Boolean(panel()), 'and the panel is really rendered, not merely announced');
+        assert.equal(
+          announcedLabel(),
+          landing,
+          `${key} enters the list at its own end, skipping the gated row there`
+        );
+        assert.deepEqual(changed, [], 'an opening key moves an ACTIVE OPTION and never the value');
+        harness.remount();
+      });
+    }
+
+    it('opens on Alt+ArrowDown with NO cursor, which is the pattern`s own exception', async () => {
+      const button = await closedTrigger();
+
+      const pressed = pressKey('ArrowDown', { altKey: true });
+      await settle();
+
+      assert.ok(pressed.defaultPrevented, 'the pairing is the widget`s');
+      assert.equal(button.getAttribute('aria-expanded'), 'true', 'the panel opens');
+      assert.equal(
+        activeDescendant(),
+        null,
+        'Alt+ArrowDown says "show me the list" rather than "move me through it", so it opens on ' +
+          'the same -1 sentinel a click and Enter open on'
+      );
+      harness.remount();
+    });
+
+    it('refuses Shift+ArrowDown, leaving the key to the page', async () => {
+      const button = await closedTrigger();
+
+      const pressed = pressKey('ArrowDown', { shiftKey: true });
+      await settle();
+
+      assert.ok(!pressed.defaultPrevented, 'a modified press is the platform`s, never this one`s');
+      assert.equal(button.getAttribute('aria-expanded'), 'false');
+      assert.ok(!panel(), 'and nothing opened');
+      harness.remount();
+    });
+
+    it('refuses every opening key on a readonly trigger', async () => {
+      // `readonly` maps to the primitive's `triggerAriaDisabled`, which is a control that TAKES
+      // focus and refuses to open — so it is the one refusal a keyboard can actually reach, and
+      // an opening key must not be the route around it.
+      const button = await closedTrigger({ readonly: true });
+
+      const pressed = pressKey('ArrowDown');
+      await settle();
+
+      assert.ok(!pressed.defaultPrevented, 'the key is not consumed by a control that refuses');
+      assert.equal(button.getAttribute('aria-expanded'), 'false');
+      assert.ok(!panel(), 'the panel stays shut');
       harness.remount();
     });
   });
