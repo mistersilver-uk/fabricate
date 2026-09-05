@@ -11448,9 +11448,13 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
 //
 // WHAT IT ENUMERATES. For each element of the composed panel it walks every rule in the sheet,
 // keeps the ones the element MATCHES, records each declaration with its selector, its
-// specificity and its source order, and computes the winner per property. The browser's own
-// `getComputedStyle` is asserted against that winner, so a wrong enumerator reds here rather
-// than producing a confident wrong report.
+// specificity and its source order, and computes the winner per property. TWO THINGS PIN THAT
+// WINNER. Each of the ~40 properties the clauses below name is compared by SELECTOR against a
+// hard-coded expectation, which is what reds when the tie-break is inverted; and every winner
+// over a CONTESTED property whose declared value is a literal is compared with the browser's own
+// `getComputedStyle` as it is enumerated, which covers the properties no clause names. Without
+// the second, the report printed below — every property on eleven surfaces — was checked against
+// nothing, and a confident wrong report was a state this file could reach.
 //
 // The report itself is printed under `FABRICATE_CASCADE_REPORT=1`, which is how the PR's
 // acceptance evidence is produced. The assertions run either way.
@@ -11567,7 +11571,14 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       };
       for (const sheet of document.styleSheets) collect(sheet.cssRules);
 
-      const enumerateFor = (element) => {
+      // EVERY PROPERTY WHOSE WINNER THE BROWSER DISAGREES WITH, across every probe. The named
+      // assertions below pin ~40 properties by SELECTOR; the report printed under
+      // `FABRICATE_CASCADE_REPORT=1` — which is this change's acceptance evidence — covers every
+      // property on eleven surfaces, and none of those was checked against anything at all. This
+      // list is what makes the enumerator's own claim testable rather than asserted.
+      const mismatches = [];
+
+      const enumerateFor = (element, probeName) => {
         const byProperty = {};
         let order = -1;
         for (const rule of rules) {
@@ -11598,16 +11609,35 @@ test('the composed picker cascade resolves to the shared panel and the callers o
         for (const [property, entries] of Object.entries(byProperty)) {
           let best = entries[0];
           for (const entry of entries) if (beats(entry, best)) best = entry;
+          const computedValue = style.getPropertyValue(property);
           winners[property] = {
             selector: best.selector,
             declared: best.value,
             specificity: best.specificity.join(','),
-            computed: style.getPropertyValue(property),
+            computed: computedValue,
             contenders: entries.length,
             beat: entries
               .filter((entry) => entry !== best)
               .map((entry) => `${entry.selector} (${entry.specificity.join(',')}) = ${entry.value}`),
           };
+
+          // THE CROSS-CHECK, and it is deliberately narrow rather than clever. A declared value
+          // and a computed one are the same string only for LITERALS: `var()`, `calc()`, `min()`
+          // and `max()` are substituted, `inherit` resolves to the parent's value, a percentage
+          // resolves against a box, and a shorthand's longhand text is empty when a custom
+          // property could not be substituted per-longhand. Everything else the browser echoes
+          // back verbatim — so where more than one rule matched and the value is a literal, a
+          // winner the enumerator picked wrongly says one thing and `getComputedStyle` another.
+          if (entries.length < 2) continue;
+          const declaredText = best.value.trim();
+          if (declaredText === '' || computedValue.trim() === '') continue;
+          if (/\b(?:var|calc|min|max|clamp|env)\(/.test(declaredText)) continue;
+          if (declaredText === 'inherit' || declaredText.includes('%')) continue;
+          if (declaredText === computedValue.trim()) continue;
+          mismatches.push(
+            `${probeName}: ${property} — the enumerator picked \`${best.selector}\` declaring ` +
+              `\`${declaredText}\`, the browser computed \`${computedValue.trim()}\``
+          );
         }
         return winners;
       };
@@ -11627,7 +11657,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
         'source-list',
         'source-row-selected',
       ]) {
-        surfaces[name] = enumerateFor(probe(name));
+        surfaces[name] = enumerateFor(probe(name), name);
       }
 
       // ── COMPOSITED COLOUR, MEASURED RATHER THAN ARGUED ──────────────────────────────────
@@ -11687,6 +11717,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
 
       return {
         surfaces,
+        mismatches,
         colours,
         chipRemedy,
         band,
@@ -11716,6 +11747,27 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     if (process.env.FABRICATE_CASCADE_REPORT) {
       console.log(JSON.stringify(report, null, 2));
     }
+
+    // ── THE ENUMERATOR IS PINNED ON THE PROPERTIES THIS FILE DOES NOT NAME ──────────────
+    // The named clauses below compare each winner's SELECTOR against a hard-coded expectation,
+    // which is what makes a wrong enumerator red — but only over the ~40 properties they name.
+    // The report covers every property on eleven surfaces and was checked against nothing, so a
+    // confident wrong report was a state this file could reach. Every literal-valued winner over
+    // a contested property is now compared with the browser's own answer as it is enumerated.
+    assert.deepEqual(
+      report.mismatches,
+      [],
+      'the enumerator resolved a cascade the browser resolves differently, so the report it ' +
+        'prints under `FABRICATE_CASCADE_REPORT=1` cannot be trusted on the properties this ' +
+        `file does not name:\n  ${report.mismatches.join('\n  ')}`
+    );
+    assert.ok(
+      Object.values(report.surfaces).some((winners) =>
+        Object.values(winners).some((winner) => winner.contenders > 1)
+      ),
+      'no probe has a property more than one rule declares, so the clause above quantifies over ' +
+        'nothing and would report clean against any enumerator at all'
+    );
 
     // ── PAIR 1: THE PANEL BOX GOES SHARED, WHOLE ────────────────────────────────────────
     const panel = report.surfaces['icon-panel'];
