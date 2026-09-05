@@ -18,6 +18,10 @@
     the class the primitive emits rather than at `.fabricate-manager`, so a carrier that
     spells `class="manager-button …"` without the root matches nothing in the family and
     renders as a bare Foundry `<button>`. One token, no composition, no new props.
+    It does NOT emit `data-keyboard-focus`, which the two button primitives now do, so unlike a
+    primitive-rendered danger button this one still lets Foundry's Space and arrow bindings fire
+    while it holds focus; issue 1508 closes that, and this component's row stays in the
+    formless-button ledger until it does.
   - The caller keys the armed token on the TARGET DOCUMENT ID, never a row index.
     The Knowledge surface re-projects its rows asynchronously from actor/item
     hooks, so an index-keyed token is a destructive-misfire bug: arm row 2, let

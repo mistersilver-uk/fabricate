@@ -315,22 +315,24 @@
   }
 
   /*
-    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup
-    that is .fabricate-manager-scoped in the GM app and therefore UNSTYLED in the
-    player app. Theme it here with base --fab-* tokens as a single compact inline
-    row (mirrors the gathering environment list), rather than the unstyled block
-    that stacks the summary, nav, and per-page controls onto separate lines.
+    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup.
+    Theme it here with base --fab-* tokens as a single compact inline row (mirrors
+    the gathering environment list), rather than the block that stacks the summary,
+    nav, and per-page controls onto separate lines. (Written before issue 1502, when
+    that markup really was .fabricate-manager-scoped and so unstyled here; see the
+    note below.)
   */
   /*
-    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base`
-    declarations below are what stops that moving the frame. `Pagination` and `IconButton`
-    are rooted at the classes they emit, so `styles/fabricate.css` paints this player-app
-    pager where it previously only painted the manager's. Every property this block already
-    declares still WINS (a Svelte `:global` block is injected unlayered; the sheet is
-    imported at `layer(modules)`), so only the remainder is newly painted — and each
-    `1502 base` declaration restates what the remainder rendered BEFORE the widening, which
-    for this control is Foundry core's own `button` / `select` chrome. The per-property
-    audit for all six player callers is in `components/Pagination.svelte`'s docblock.
+    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
+    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
+    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
+    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
+    is gone from the sentence above. Every property this block already declares still WINS (a
+    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
+    only the remainder is newly painted — and each `1502 base` declaration restates what the
+    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
+    / `select` chrome. The per-property audit for all six player callers is in
+    `components/Pagination.svelte`'s docblock.
   */
   .crafting-browser-pagination :global(.manager-pagination) {
     display: flex;

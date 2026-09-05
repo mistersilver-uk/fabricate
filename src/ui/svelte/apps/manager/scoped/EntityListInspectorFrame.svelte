@@ -1427,8 +1427,9 @@
     flex: 0 0 auto;
   }
 
-  /* `Pagination` renders its own `<section class="manager-pagination">`, so a scoped rule cannot
-     reach it and the sizing has to be stated from this side of the boundary. */
+  /* `Pagination` renders its own `<section>` carrying two classes since issue 1502 — the family
+     root `fabricate-pagination` and `manager-pagination` — so a scoped rule cannot reach it and
+     the sizing has to be stated from this side of the boundary. */
   .manager-scoped-list-column > :global(.manager-pagination) {
     flex: 0 0 auto;
   }
