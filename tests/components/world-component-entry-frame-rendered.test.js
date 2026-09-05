@@ -88,7 +88,8 @@ const harness = createComponentScopeHarness({
 
 // The same host the editor's twin measures in, for the same two reasons: wide enough that the
 // frame keeps both columns (the rail stacks under the column at or below 1000px of container
-// width), short enough that the definition tab's cards overflow the panel.
+// width), short enough that the definition tab's cards overflow the panel. The STACKED side is
+// measured too, in the shared contract's own narrowed arrangement (issue 1371 r19-entry2).
 const HOST_WIDTH_PX = 1280;
 const HOST_HEIGHT_PX = 720;
 // Anti-vacuity for the scoped-CSS collector; the entry's tree compiles to well over this.
@@ -117,7 +118,13 @@ function page(productMarkup, scopedCss, control = '', chrome = '') {
 
 describe('the world component entry’s rendered frame (issue 1371 r18-frame, M32)', () => {
   const rendered = { markup: '', scoped: null };
-  const frames = { hostHeight: HOST_HEIGHT_PX, honest: null, inset: null, unstretched: null };
+  const frames = {
+    hostHeight: HOST_HEIGHT_PX,
+    honest: null,
+    stacked: null,
+    inset: null,
+    unstretched: null,
+  };
   // The same three arrangements re-measured under FOUNDRY'S OWN sheet, where one is harvested
   // (issue 1371 r19-gates2, Foundry review round 5 finding 7). `null` where none is.
   let chromeFrames = null;

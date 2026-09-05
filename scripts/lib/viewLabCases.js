@@ -1958,6 +1958,73 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/utils\/componentScopeValidation\.js$/],
   }),
   managerCase({
+    // ══ THE SHARED EDITOR FRAME, STACKED (issue 1371 r19-entry2) ═══════════════════════════════
+    //
+    // The frame the world Component entry and the system component rules editor share stacks its
+    // rail under its content column below `@container fabricate-manager (max-width: 1000px)`, and
+    // until this revision NOTHING in the registry reached that state on either consumer — while
+    // their three neighbours (`manager-components-stacked`, `manager-essences-stacked`,
+    // `manager-tags-categories-stacked`) all have one. The state is ordinary: the manager window
+    // is resizable with no minimum and opens sixty pixels above the threshold. What the gap let
+    // through was a rules editor whose content column resolved to `0px` when the pane had a
+    // definite height — no tab strip, neither tab, no card, and no scroller to reach them.
+    //
+    // `expectLayout` IS THE ASSERTION THAT ONLY THE STACKED STATE SATISFIES, and it has to be a
+    // measurement rather than a selector: the stack is a container query, so the DOM is identical
+    // on both sides of the threshold and no `expectSelector` can tell them apart. One resolved
+    // column track on the frame's own grid is the stacked shape and exactly two is the wide one,
+    // so a case that stopped stacking would FAIL the capture rather than publish a wide frame
+    // under a name that says otherwise.
+    //
+    // `expectCenterHit` is the other half, and it is the defect stated as a pointer fact: with
+    // the rail taking the pane the first tab is still in the DOM with a box of its own, and only
+    // `elementFromPoint` says that the rail is drawn over it.
+    id: 'world-component-entry-stacked',
+    label: 'Manager — World Component entry stacked',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      // THE STRIP INTO VIEW BEFORE THE POINTER TEST. Stacked, the frame keeps its content height
+      // and `.manager-body` is the scroller; opening the entry moves focus into the tab panel,
+      // which scrolls the strip off the top of the window. `scrollIntoViewIfNeeded` is a no-op
+      // where it is already in frame, so this states "photograph the top of the frame" rather
+      // than moving the case's subject.
+      { selector: '[data-scoped-entry-tab="definition"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-component-entry-page',
+      expectedTracks: 1,
+    },
+    expectCenterHit: '[data-scoped-entry-tab="definition"]',
+    expectContained: [
+      {
+        container: '.manager-component-entry-page',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
+    // 980 RATHER THAN THE REGISTRY'S USUAL 1024, and the twenty-two pixels are measured rather
+    // than chosen: the lab's manager container resolves to the window width MINUS TWO (measured at
+    // five widths), and the frame's own query is `max-width: 1000px` on that container. A 1024px
+    // window leaves the container at 1022 and the frame WIDE — the capture fails with two resolved
+    // tracks, which is how this number was arrived at. 980 clears the threshold by the same margin
+    // it would otherwise miss it by. The height is the registry's narrow one.
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'world', 'scoped', 'responsive'],
+    // The frame is the SHEET's and the two pages that wear it, so a change to either page or to
+    // the shared rail selects this frame alongside its wide twin.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-vocabulary',
     label: 'Manager — World Tags & Categories',
     reaches: 'beyond',
@@ -5747,6 +5814,38 @@ export const VIEW_LAB_CASES = Object.freeze([
     // contain them, which is the unrelated-evidence failure the registry's own orphan check
     // exists to prevent and which no mechanical gate catches: the files ARE in the mounted
     // closure, so both directions of `view-lab-source-coverage` pass either way.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    // THE OTHER CONSUMER OF THE SHARED FRAME, STACKED (issue 1371 r19-entry2). Its twin is
+    // `world-component-entry-stacked`, whose comment carries the whole reasoning; this is the
+    // screen the collapse was actually found on, because its page IS its `<main>` and that
+    // element declares the row template M26 gave it for the full-height rail.
+    id: 'manager-component-edit-stacked',
+    label: 'Manager — Component edit stacked',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-tab="rules"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector: 'main.manager-component-edit-main',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: 'main.manager-component-edit-main',
+      expectedTracks: 1,
+    },
+    expectCenterHit: '[data-component-edit-tab="rules"]',
+    expectContained: [
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({

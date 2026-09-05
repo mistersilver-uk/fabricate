@@ -24942,10 +24942,45 @@
 }
 
 /* THE RAIL STACKS UNDER THE PANEL below the threshold rather than compressing to a column too
-   narrow to read, which is the ruling the shared list frame already makes about its inspector. */
+   narrow to read, which is the ruling the shared list frame already makes about its inspector.
+
+   ── STACKED, EACH HALF KEEPS ITS CONTENT AND THE FRAME SCROLLS (issue 1371 r19-entry2) ────────
+   Stacking on the COLUMN axis alone leaves the ROWS to whatever the frame's own template says,
+   and the two consumers say different things. The world entry's page is a `<div>` inside `main`,
+   so both halves land in implicit `auto` rows. The rules editor's page IS its `main`, and that
+   element declares `grid-template-rows: minmax(0, 1fr)` for M26's full-height rail — one
+   FLEXIBLE row for the content column and an implicit `auto` one for the rail beneath it. Give
+   that grid a definite height and a flexible track takes only what the non-flexible ones leave,
+   which here is nothing: measured in the View Lab at a 900px window with the pane constrained,
+   `grid-template-rows` resolved to `0px 640px` and `0px 520px`, the content column to `0px`
+   tall, and `overflow: hidden` on that same main left no scroller to reach it — no tab strip,
+   neither tab, and no card.
+
+   THE ANSWER IS THE ONE THIS SHEET ALREADY GIVES FOR A STACKED REGION, at `.manager-body`'s own
+   `@container (max-width: 1120px)` rule: `max-content` tracks cannot be squeezed, so each region
+   keeps its own height and the CONTAINER does the scrolling — "which is what the stacked reading
+   order always assumed". Two `max-content` rows plus `overflow: auto` on the frame is that rule
+   restated for this frame; it also restores what the route's deleted `@container (max-width:
+   960px)` block did before M26's row template arrived, and it leaves the shipped narrow geometry
+   byte-identical where the pane is content-sized (the ordinary case, since `.manager-body` hands
+   `main` a `max-content` track below 1120), because `max-content` and `auto` agree there.
+
+   NOT two `minmax(0, 1fr)` rows: that also clears the collapse, but it forces BOTH halves to the
+   taller one's height, so the shorter half — usually the rail — ends in several hundred pixels of
+   dead space in the ordinary content-sized case. Measured before it was rejected.
+
+   TWO SELECTORS FOR ONE RULE, and the second is not decoration: a container query adds no
+   specificity, and the rules editor's `.fabricate-manager .manager-main.manager-component-edit-main`
+   block earlier in this sheet is (0,3,0), so the (0,2,0) frame selector alone would lose the row
+   template and the overflow to it on that consumer no matter where it is written. The (0,3,0)
+   twin matches only the editor's main — the entry's page is a div — and beats that block on
+   source order. */
 @container fabricate-manager (max-width: 1000px) {
-  .fabricate-manager .manager-component-entry-page {
+  .fabricate-manager .manager-component-entry-page,
+  .fabricate-manager .manager-main.manager-component-entry-page {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    overflow: auto;
   }
 
   .fabricate-manager .manager-component-entry-page > .manager-scoped-preview {

@@ -167,6 +167,11 @@ export function measureEntryFrame() {
     railBorderStyle: getComputedStyle(rail).borderLeftStyle,
     panelScrolls: panel.scrollHeight > panel.clientHeight + 1,
     columnScrolls: column.scrollHeight > column.clientHeight + 1,
+    // WHETHER THE FRAME ITSELF OWNS A SCROLLER, over `main` OR the page, because which of the two
+    // it is differs by consumer: the rules editor's page IS its `main`, and the world entry's is a
+    // div inside one. Read as one fact so the shared checks can state one sentence about it.
+    frameScrolls:
+      main.scrollHeight > main.clientHeight + 1 || page.scrollHeight > page.clientHeight + 1,
   };
 }
 
@@ -190,12 +195,36 @@ export const ENTRY_FRAME_UNSTRETCHED_RAIL_CONTROL = `
 `;
 
 /**
- * Lay a suite's page out three times — honest, then under each reddening arrangement — and
- * return the frame measured in each.
+ * The frame's own container NARROWED below its stacking threshold (issue 1371 r19-entry2).
+ *
+ * NOT a reddening control: it is a fourth ARRANGEMENT, a state a GM can reach by dragging the
+ * manager window in, and the checks over it are ordinary claims about the frame rather than
+ * proofs that another claim can fail. The manager window is `resizable: true` with no minimum
+ * and opens at 1280x940, which is only sixty pixels above the frame's own
+ * `@container fabricate-manager (max-width: 1000px)`.
+ *
+ * IT NARROWS THE HOST, not the frame, because the container query reads the width of
+ * `.fabricate-manager` and nothing else may be simulated: shrinking the host is what a GM's drag
+ * does.
+ *
+ * AND IT GIVES THE PANE A DEFINITE HEIGHT, which is the half that matters and the half this
+ * shell does not otherwise supply. A frame whose pane is sized to its own content cannot show
+ * this defect at all — every row resolves to its content and both halves survive by accident —
+ * so a stacked arrangement measured only at the shell's content height would be a check that
+ * cannot fail. 520px is the UX review's own constraint, the height it reproduced the collapse at.
+ */
+export const ENTRY_FRAME_STACKED_ARRANGEMENT = `
+  .probe-host { width: 900px !important; }
+  .fabricate-manager .manager-main { height: 520px !important; max-height: 520px !important; }
+`;
+
+/**
+ * Lay a suite's page out four times — honest, stacked, then under each reddening arrangement —
+ * and return the frame measured in each.
  *
  * @param {(control: string) => string} pageFor the suite's page builder, given the control rules.
  * @param {{width: number, height: number}} viewport
- * @returns {Promise<{honest: object, inset: object, unstretched: object}>}
+ * @returns {Promise<{honest: object, stacked: object, inset: object, unstretched: object}>}
  */
 export async function measureEntryFrameArrangements(pageFor, viewport) {
   const browser = await chromium.launch();
@@ -206,9 +235,10 @@ export async function measureEntryFrameArrangements(pageFor, viewport) {
       return tab.evaluate(measureEntryFrame);
     };
     const honest = await measured('');
+    const stacked = await measured(ENTRY_FRAME_STACKED_ARRANGEMENT);
     const inset = await measured(ENTRY_FRAME_CONTENT_INSET_CONTROL);
     const unstretched = await measured(ENTRY_FRAME_UNSTRETCHED_RAIL_CONTROL);
-    return { honest, inset, unstretched };
+    return { honest, stacked, inset, unstretched };
   } finally {
     await browser.close();
   }
@@ -350,6 +380,56 @@ export const ENTRY_FRAME_CHECKS = Object.freeze([
       assert.ok(
         same(rail.right, main.right),
         `the rail ends ${main.right - rail.right}px short of the pane’s edge`
+      );
+    },
+  ],
+  [
+    'keeps BOTH halves when it stacks over a pane of a definite height: each keeps its content, the tab strip stays in the column, and the frame scrolls (M26, M32)',
+    ({ stacked: { main, column, strip, rail, frameScrolls } }) => {
+      // ── WHY THIS CHECK EXISTS ──────────────────────────────────────────────────────────────
+      // The frame stacks below `@container fabricate-manager (max-width: 1000px)`, and until
+      // r19-entry2 nothing measured the stacked side on either consumer — this suite's own
+      // comment said so, as a reason to stay wide. What it left unmeasured was the rules editor
+      // over a pane with a definite height: its page IS its `main`, which declares
+      // `grid-template-rows: minmax(0, 1fr)` for M26's full-height rail, and a flexible track
+      // takes only what the non-flexible ones leave. The rail's implicit `auto` row left it
+      // nothing, so the content column resolved to `0px` — no tab strip, neither tab, no card —
+      // and `overflow: hidden` on that same element left no scroller to reach any of them.
+      const height = ({ top, bottom }) => bottom - top;
+      // The precondition: this arrangement really is the stacked one. Without it every assertion
+      // below is also true of the two-column frame, and the check would prove nothing.
+      assert.ok(
+        rail.top >= column.bottom - 0.5,
+        `the rail starts ${column.bottom - rail.top}px above the column’s foot — the frame did not stack at this width`
+      );
+      assert.ok(
+        height(column) > 0,
+        'the content column collapsed to nothing: the rail took the whole pane and no scroller reaches the form'
+      );
+      assert.ok(height(rail) > 0, 'the rail collapsed to nothing: the column took the whole pane');
+      // AND NEITHER HALF WAS SQUEEZED INTO THE PANE. This is the assertion that bites, and it is
+      // the sheet's own stacked ruling — the one `.manager-body` states at its 1120px query:
+      // `max-content` tracks cannot be squeezed, so each region keeps its own height and the
+      // container does the scrolling, which is what the stacked reading order always assumed. A
+      // frame that fitted both halves into a definite pane has divided a screenful between them
+      // instead, which is how a `0px` column is reachable at all.
+      assert.ok(
+        height(column) + height(rail) > height(main) + 1,
+        `the two halves fit inside the pane (${Math.round(height(column))}px + ${Math.round(height(rail))}px into ${Math.round(height(main))}px) — the frame divided the pane between them rather than keeping their content`
+      );
+      assert.ok(
+        frameScrolls,
+        'the frame overflows the pane and nothing scrolls it: the halves below the fold are unreachable'
+      );
+      // And the tab strip is IN the column rather than overhung by the rail stacked on top of it.
+      assert.ok(height(strip) > 0, 'the tab strip drew nothing');
+      assert.ok(
+        same(strip.top, column.top),
+        `the strip starts ${strip.top - column.top}px below the column’s top`
+      );
+      assert.ok(
+        strip.bottom <= column.bottom + 0.5,
+        `the strip ends ${strip.bottom - column.bottom}px past the column’s foot — it is overhanging the rail below it`
       );
     },
   ],

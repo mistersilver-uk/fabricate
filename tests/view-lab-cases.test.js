@@ -796,14 +796,40 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
 // one leaves the empty aside wrapped to an implicit grid row, where the track count is still
 // two and the frame still photographs a dead strip.
 const FULL_WIDTH_LAYOUT_CASE_IDS = ['world-scoped-narrow'];
-const LAYOUT_CASE_IDS = [...RESPONSIVE_LAYOUT_CASE_IDS, ...FULL_WIDTH_LAYOUT_CASE_IDS];
+
+// And the two consumers of the SHARED EDITOR FRAME, which assert the stacked shape on a grid of
+// their OWN rather than on `.manager-body` (issue 1371 r19-entry2). They are a third group because
+// the frame's stack is its own container query at 1000px, not the shell's at 960: the frame is one
+// column below its threshold whatever the body around it did, so a `maxContentBoxInlineSize` bound
+// borrowed from the responsive group would be asserting a different screen's breakpoint. The claim
+// they need is the one they carry — exactly ONE resolved column track on the frame's own grid —
+// because the DOM is identical on both sides of a container query and no selector can tell the
+// stacked frame from the wide one.
+const FRAME_STACK_LAYOUT_CASE_IDS = [
+  'world-component-entry-stacked',
+  'manager-component-edit-stacked',
+];
+const LAYOUT_CASE_IDS = [
+  ...RESPONSIVE_LAYOUT_CASE_IDS,
+  ...FULL_WIDTH_LAYOUT_CASE_IDS,
+  ...FRAME_STACK_LAYOUT_CASE_IDS,
+];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 test('exactly the declared 1024px cases carry complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
-    assert.deepEqual(viewCase.position, { width: 1024, height: 860 });
+    // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
+    // shared literal would be asserting one screen's threshold about another's. The shell's stack
+    // is reached at 1024; the shared editor frame's own container query is at 1000 and the lab's
+    // manager container resolves two pixels inside its window, so 1024 leaves that frame WIDE.
+    assert.deepEqual(
+      viewCase.position,
+      FRAME_STACK_LAYOUT_CASE_IDS.includes(viewCase.id)
+        ? { width: 980, height: 860 }
+        : { width: 1024, height: 860 }
+    );
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
   }
@@ -812,6 +838,17 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   )) {
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, 960);
     assert.equal(viewCase.expectLayout.expectedTracks ?? 1, 1, 'a stacked case is one track');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    FRAME_STACK_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
+    // No width bound and no absent aside: the subject is the frame's own grid, and what makes the
+    // case worth capturing is that BOTH halves survive the stack — which the capture driver reads
+    // as one column track plus the pointer hit on the first tab the case also declares.
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.expectedTracks, 1);
+    assert.equal(viewCase.expectLayout.absentSelector, undefined);
+    assert.equal(typeof viewCase.expectCenterHit, 'string');
   }
   for (const viewCase of declared.filter((entry) =>
     FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)

@@ -67,6 +67,9 @@ const harness = createMountedComponentHarness({
 
 // Wide enough that the frame keeps both columns: the page frame stacks the rail under the column
 // at or below 1000px of container width, and a stacked rail has no left hairline to measure.
+// The stacked side is NOT skipped any more (issue 1371 r19-entry2): the shared contract's own
+// `ENTRY_FRAME_STACKED_ARRANGEMENT` narrows this host below the threshold in the same browser and
+// asserts what survives there, which is where the column collapsing to `0px` was found.
 const HOST_WIDTH_PX = 1280;
 // Short enough that the editor's cards overflow their scroller, which is what makes "the panel
 // scrolls and the column does not grow" a measurement rather than an assumption.
@@ -89,7 +92,13 @@ function page(productMarkup, scopedCss, control = '', chrome = '') {
 
 describe('the rules editor’s rendered frame (issue 1371 r18-list M26, r18-frame M32)', () => {
   const rendered = { markup: '', scoped: null };
-  const frames = { hostHeight: HOST_HEIGHT_PX, honest: null, inset: null, unstretched: null };
+  const frames = {
+    hostHeight: HOST_HEIGHT_PX,
+    honest: null,
+    stacked: null,
+    inset: null,
+    unstretched: null,
+  };
   // The same three arrangements re-measured under FOUNDRY'S OWN sheet, where one is harvested
   // (issue 1371 r19-gates2, Foundry review round 5 finding 7). `null` where none is.
   let chromeFrames = null;
