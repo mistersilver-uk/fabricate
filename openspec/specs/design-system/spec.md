@@ -126,7 +126,21 @@ How many namespace roots a primitive needs is a property of its PORTAL SHAPE rat
 A component that portals a panel out of its own root needs one class on each, because those two nodes end up in different subtrees; a component that portals nothing, or whose root element IS the panel it portals, needs one.
 Where two components render one class family between them, the family's roots are the union of theirs, and a class both of them paint is written at both roots.
 
-Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+
+`Select` is the family that made three corollaries of this requirement explicit rather than incidental.
+
+FIRST, a shared primitive's family belongs in the GLOBAL SHEET rather than in a scoped `<style>` block.
+A Svelte-scoped rule compiles to two classes and is injected UNLAYERED against a sheet imported at `layer(modules)`, so it silently out-ranks every global rule at any specificity, and it is invisible to the gate that proves a family is not app-rooted — a primitive that hid its family there would be the one member of the set nobody can check.
+Where a CALL SITE deliberately relies on that same mechanism to state its own per-site skin, the exception is recorded at the call site with its owner named, rather than left for a later reader to find as a defect.
+
+SECOND, a family whose every class carries the `fabricate-` namespace prefix MUST declare every one of those classes as a namespace root in the gate's entry, because the gate tells a namespace root from an application root BY NAME and not by shape.
+Where such a family composes ANOTHER primitive's root markup, its mirrored fixture pairs name the INHERITED classes rather than its own; a self-referential pair is satisfied by construction and protects nothing.
+A fixture written for such a pair therefore writes the composed ROOT with the composing element nested inside it, because the pair's anchor is the root class and not the inner control — a trigger written on its own matches none of the rules that paint it and measures the host's default while still naming the primitive.
+
+THIRD, a primitive rooted OUTSIDE every application area MUST NOT read an area-scoped custom property, and where its design calls for one it writes the LITERAL that property is declared as.
+Outside its area the property is undefined and the declaration silently falls back to inheritance; and rooting the rule inside the area to satisfy that gate re-introduces the app-rooting this requirement forbids, so the two constraints are jointly satisfiable only by the literal.
+A literal written for this reason still takes a published ramp value for every OTHER axis it declares, so paying one gate does not open another — even where the shipped rule it replaces declared no value on that axis at all, in which case the resulting move is a real visual difference and is licensed as one rather than described as a no-op.
 
 A caller MAY carry its OWN family on the primitive's elements through DECLARED CLASS PROPS, and the family is still rooted at a class the PRIMITIVE writes into the DOM, using the value the caller supplies.
 The guarantee above is therefore unchanged, and the gate reads a declared class prop as EMISSION: what moved is which file holds the string, not whether it is rendered.
@@ -517,6 +531,11 @@ Foundry owns the picker dialog, the path is an implementation detail, and a long
 
 A native `select` renders its option popup through the operating system, which reaches it only through the control’s own computed background and `color-scheme`, and differs by browser and platform even then.
 Whenever the options need a selected tick, a group heading, a per-option description, a badge, or a reason for being unavailable, the control MUST render its own option list using the floating-surface geometry instead of a native popup.
+All five of those affordances are now BUILDABLE IN ONE CONTROL, and each has a home: the tick, the badge and the description live in `Select`'s option row; the group heading is drawn by the shared panel's grouped branch, fed by a `Select`-side derivation of the group list from the options themselves; and the reason for being unavailable lives in the primitive rather than at a call site, because a row that merely LOOKS disabled and still selects on click is a lie in the DOM as well as on the screen.
+The key map SKIPS a disabled row rather than parking a cursor on one Enter cannot act on.
+An app-drawn one-of-N list MUST also RESTORE the platform behaviour it replaces rather than trade it away: type-ahead over the option labels, from the CLOSED trigger as well as from the open panel, because the closed trigger is where a native `select`'s type-ahead is actually used.
+The restored behaviour moves an ACTIVE OPTION and never the value, so a dismissal leaves the value untouched and no provisional-value machinery joins the shared surface.
+Two of the five — the badge and the unavailable reason — ship with no caller on this commit and are held by test rather than by a frame.
 `tests/components/design-system-debt-ratchets.test.js` counts every native `<select>` twice over, once as a parsed element in the Svelte templates and once as markup in a JavaScript template string, since a DialogV2 body cannot host a component and is therefore the one place the rule may not reach.
 A single element is exempted by a `<!-- native select: reason -->` comment on the lines above it, which makes the exception a written decision rather than a silent one.
 
@@ -620,6 +639,11 @@ The commit action names the number of records it writes to.
 A trigger that opens a catalogue picker MUST state what will open, and the shared picker MUST take that value as a declared capability rather than hard-coding one.
 `aria-haspopup` is `dialog` when the panel renders a query field and `listbox` when it renders a bare option list, and a caller asking for `listbox` MUST suppress the search field, because a trigger promising a listbox over a panel that contains one inside a dialog promises a control the GM never gets.
 The difference between the two is INFORMATIONAL — it tells assistive technology what is about to appear — so it is absorbed as a prop on the shared picker and is never a reason to hand-roll a second one.
+
+`Select` IS THE SEARCH-SUPPRESSED SHAPE OF THIS SAME PICKER: it announces `aria-haspopup="listbox"`, renders no query field, and uses the primitive's OWN trigger rather than a `trigger` snippet, so the combobox contract, the attribute-omission rule below and the naming route are the primitive's throughout.
+A caller composing the primitive's own trigger INHERITS the primitive's whole class family and its paint, so a composing primitive states its own shell against that inherited cascade rather than assuming a bare element — including the panel's inherited width floor and its inherited corner, neither of which a width PROP alone can change, because a floor declared in the sheet outranks an inline width.
+A per-call-site deviation from that shell — a pager's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
+And the panel is PORTALED to the nearest application root, so every driver that clicks an option — a capture step, a mounted test, a smoke step — addresses it from that root rather than from the trigger's own subtree, and a mounted suite declares the application root its production mount really has.
 
 The picker MUST name both surfaces it renders.
 The portaled panel and the option list inside it take one accessible name from the caller, so a caller that omits it produces a dialog with no name wrapping a list with no name.
@@ -888,17 +912,29 @@ A native `select` popup is drawn by the operating system, so it ignores the them
 Every select in the product MUST therefore render the app’s own option list, using the floating-surface geometry, whether or not the options need any of those affordances.
 Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
 
+THE IMPLEMENTATION IS `src/ui/svelte/components/Select.svelte`, composed over `SearchablePopover` with the query field suppressed, and a surface that needs a one-of-N choice MUST render through it rather than restate its markup.
+The three shared primitives that hosted a native select — `Pagination`, `BulkEditSelect` and `EntityListInspectorFrame` — are converted, so no member of the shared primitive set renders an operating-system popup.
+
+A converted control keeps the identity handles its drivers address it by, and there are TWO of them rather than one.
+The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.
+And each option ROW carries its own identity handle — including a sentinel whose value is the empty string, because a picker that omits the handle on a falsy value leaves its default row unaddressable, which is the one row a "leave unchanged" list most needs a driver to be able to click.
+
+A shared skin that a conversion appears to strand is NARROWED onto its remaining native carrier rather than deleted, until the last carrier converts.
+Deleting it early drops a still-shipping control to the platform's own treatment, which is the defect this requirement exists to remove.
+
 There is ONE exception, and it is structural rather than discretionary: a select inside a Foundry-owned dialog body.
 `DialogV2` cleans its content and re-serialises it through `innerHTML`, so no mounted component and no attached listener survives, its callers read their value back through `form.elements`, and its `dialog` element has no application root to portal into.
 A select there stays native, and the surrounding stylesheet gives the control a themed background, because `color-scheme` alone does not reach the popup.
 There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
-Measured at `aa3c4a3fe`, by that gate's own parse of the Svelte templates: 99 native `select` elements across 38 `.svelte` files — 64 in the manager outside its root, 16 in `CraftingSystemManagerRoot.svelte`, 12 in the interactables windows, 6 in the player apps and 1 in `Pagination.svelte` — plus four written into JavaScript dialog bodies.
-No file carried the marker.
-The two components long counted as the stated exceptions, `BulkEditSelect.svelte` and `InventorySystemSelector.svelte`, carry a DOCBLOCK rather than the marker and are baselined with the rest in `tests/components/design-system-known-debt.json`.
+The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 96 elements across 36 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
+It was 100 across 39 before the three shared primitives converted, and no file carries the marker.
+The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carries a DOCBLOCK rather than the marker and is baselined with the rest.
 
-The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live, and is dropped where the trigger already states the value.
+The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
+It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
+It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 #### Scenario: A select offers three plain options
 
