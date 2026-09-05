@@ -1294,6 +1294,32 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     }
   });
 
+  it('the row’s leading chip is the BORDERLESS variant the reference draws', async () => {
+    // UX F12 → F-B (r9). The reference's leading chip declares no `border` at all (`proto:1085`),
+    // so it computes `border-style: none`; the shipped tile carries a hairline, and that one
+    // difference measured as three `compare` lines on this row — `borderTopWidth`,
+    // `borderTopStyle` and `borderTopColor`. `Medallion`'s `variant="glyph-chip"` was BUILT for
+    // this site and named it, and was wired at one of the three sites it was built for.
+    //
+    // Asserted through the class the variant emits rather than through a computed style, because
+    // the rule lives in the primitive's own scoped block and a mounted tree carries no sheet: the
+    // class IS the seam between the caller and the paint, and its rule is pinned where the
+    // primitive is (`recipe-studio-primitives.test.js`).
+    const root = await browser.mount({
+      itemCards: metalWithFire(),
+      categoryVocabulary: ['Metal', 'Herb'],
+      selectedSystemId: 'sys-1',
+    });
+    const chips = [...root.querySelectorAll('.manager-component-row .fab-medallion')];
+    assert.ok(chips.length > 0, 'the rows draw their chips, so the loop below is not vacuous');
+    for (const chip of chips) {
+      assert.ok(
+        chip.classList.contains('is-glyph-chip'),
+        `the row chip asks for the borderless face; it carried "${chip.className}"`
+      );
+    }
+  });
+
   it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
     // Non-vacuity for the selector above: it is two classes and an element, and the FIRST class
     // is the shared primitive's, not this screen's. A bar that stopped being a `<ManagerToolbar>`

@@ -555,6 +555,47 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
     });
 
+    it('and the OWN run draws the label alone, where the world run leads with a glyph', async () => {
+      // UX F-F (r9). `proto:1337` is `<span … >{{ t.name }}</span>` — the label and nothing else,
+      // with the selection carried by the chip's own fill. The shipped chip led with `fa-tag` and
+      // trailed a `fa-circle-check`/`far fa-circle`, which roughly doubled each chip's width:
+      // eleven tags wrapped to four rows here against the reference's one. The world run above
+      // (`proto:1333`) IS the one that carries a leading icon, so this is a difference between
+      // the two runs rather than a house style, and asserting both directions is what makes it a
+      // measurement rather than a deletion.
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
+        showTags: true,
+      });
+
+      const ownChips = [...target.querySelectorAll('[data-component-edit-tag-toggle]')];
+      assert.ok(ownChips.length >= 2, 'the run draws chips, so the loop below is not vacuous');
+      for (const chip of ownChips) {
+        assert.equal(
+          chip.querySelectorAll('i').length,
+          0,
+          `the own-tag chip "${chip.textContent}" draws its label and no glyph`
+        );
+      }
+      // AND THE STATE IS STILL SAID, in the one place a screen reader reads it. Dropping the
+      // circle costs nothing accessible only while this holds.
+      assert.deepEqual(
+        ownChips.map((chip) => chip.getAttribute('aria-pressed')),
+        ownChips.map((chip) => String(chip.dataset.componentTagChecked === 'true')),
+        'every chip still announces its own pressed state'
+      );
+
+      // THE POSITIVE CONTROL, and it is the half that stops this reading as "remove all icons":
+      // the world run keeps its leading glyph, because the reference draws one there.
+      const worldChips = [...target.querySelectorAll('[data-component-edit-world-tag]')];
+      assert.ok(worldChips.length > 0, 'the world run renders');
+      for (const chip of worldChips) {
+        assert.ok(
+          Boolean(chip.querySelector('i')),
+          `the world tag "${chip.textContent}" still leads with its glyph`
+        );
+      }
+    });
+
     it('and the WORLD run is inked blue where the system run is purple, per the reference', async () => {
       // `proto:5692` inks a world tag blue and `proto:5711` inks the system's own purple, and the
       // two runs stand one label apart. A single tone across both would make the card's two

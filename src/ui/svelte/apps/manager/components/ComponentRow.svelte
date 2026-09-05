@@ -122,8 +122,23 @@
   <button type="button" class="manager-component-identity" onclick={() => onSelect(component?.id)}>
     <!-- The shared Medallion, as the recipe row uses: a flat fill on the surface ramp with a
          real glyph fallback. `tint` carries the component's own colour where the projection
-         resolves one, which is what the reference's per-row chip ink is. -->
-    <Medallion src={component?.img} icon="fas fa-cube" size={40} tint={component?.color || ''} />
+         resolves one, which is what the reference's per-row chip ink is.
+
+         `variant="glyph-chip"` (UX F12 → F-B): the reference draws this leading chip BORDERLESS
+         (`proto:1085` declares no `border` at all, so it computes `none`), and the shipped tile
+         wears a hairline. That single difference measured as three `compare` lines on this row —
+         `borderTopWidth`, `borderTopStyle` and `borderTopColor` — and the variant was built for
+         exactly these three sites and wired at only one of them. The size and the tint stay the
+         caller's: the variant owns only the absent edge, and the fact that a tinted glyph on this
+         chip does not bring a tinted SURFACE with it, which is also the reference's drawing —
+         every row's chip shares one slate fill and differs in the glyph's ink alone. -->
+    <Medallion
+      src={component?.img}
+      icon="fas fa-cube"
+      size={40}
+      tint={component?.color || ''}
+      variant="glyph-chip"
+    />
     <span class="manager-system-copy">
       <span class="manager-component-name-line">
         <span class="manager-system-name" title={component?.name}>{component?.name}</span>

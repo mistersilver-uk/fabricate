@@ -1560,7 +1560,16 @@
             {#if tagDraft.length > 0}
               <!-- The pill IS the shared `Chip` (issue 772). `aria-pressed` is the state, not a
                    class. Written without internal whitespace: `Chip` records that call sites
-                   assert on exact `textContent`. -->
+                   assert on exact `textContent`.
+
+                   THE LABEL ALONE, WITH NO LEADING GLYPH AND NO TRAILING STATE CIRCLE (UX F-F).
+                   `proto:1337` draws this run as bare `<span>{{ t.name }}</span>` and carries the
+                   selection in the chip's own fill; the world run one label above (`proto:1333`)
+                   is the one that leads with an icon, and it still does. The pair this dropped
+                   roughly doubled each chip's width, which is why eleven tags wrapped to four
+                   rows here against the reference's one. Nothing accessible goes with them:
+                   `aria-pressed` below is the state a screen reader reads, and the `tone` swap is
+                   the reference's own visual mechanism for the same fact. -->
               <div class="manager-component-tag-run" data-component-edit-tags>
                 {#each tagDraft as option (option.tag)}
                   <Chip
@@ -1568,16 +1577,11 @@
                     type="button"
                     density="tag-run"
                     tone={option.checked ? 'tag' : 'neutral'}
-                    icon="fas fa-tag"
                     aria-pressed={option.checked === true}
                     data-component-edit-tag-toggle={option.tag}
                     data-component-tag-checked={option.checked === true}
                     onclick={() => toggleTag(option.tag, option.checked !== true)}
-                    disabled={saving}
-                    >{option.tag}<i
-                      class={option.checked ? 'fas fa-circle-check' : 'far fa-circle'}
-                      aria-hidden="true"
-                    ></i></Chip
+                    disabled={saving}>{option.tag}</Chip
                   >
                 {/each}
               </div>
