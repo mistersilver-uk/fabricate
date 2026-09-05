@@ -769,12 +769,34 @@
         dataValue={String(essenceWarningCount)}
       />
     {/if}
-    <!-- r16-cat: swap for the shared essence inset. Maintainer ruling M25 puts an `ESSENCE VALUES`
-         inset on the WORLD bulk panel too and requires ONE shared component for both; lane CAT
-         publishes its contract at `artifacts/r16-essence-inset-contract.md`, which was absent when
-         this group was built, so it stands on `BulkStagingInset` with the row drawn here. -->
+    <!-- THE SHARED `ESSENCE VALUES` INSET (issue 1371 r16-cat, maintainer ruling M25): the same
+         `BulkStagingInset` `stepper` kind the world Component catalogue's bulk panel draws, over
+         this system's essences. The reference's row (`proto:1203`-`1211`) — glyph tile, serif name,
+         `n/N`, the shared `Stepper` — is the kind's; what is this panel's is the WHOLE-MAP reading:
+         every row reads `—` while the axis is unstaged, and the number the write will set — 0
+         included — once it is staged, because that is what the write does. -->
     <BulkStagingInset
       id="essences"
+      kind="stepper"
+      rows={essencePageView.rows.map((essence) => {
+        const quantity = Number(stagedEssences[essence.id]) || 0;
+        return {
+          id: essence.id,
+          name: essence.name,
+          icon: essence.icon,
+          colorToken: essence.colorToken,
+          value: essencesStaged ? quantity : null,
+          state: essencesStaged ? (quantity > 0 ? 'set' : 'strip') : 'unchanged',
+          active: essencesStaged && quantity > 0,
+          allowUnset: !essencesStaged,
+          min: 0,
+          meta: carried(countSelectedWithEssence(selectedCards, essence.id)),
+        };
+      })}
+      rowAttr="data-component-edit-essence"
+      activeAttr="data-component-essence-active"
+      inputAttr="data-component-bulk-essence-input"
+      onStep={(essenceId, next) => setEssence(essenceId, next)}
       query={essenceQuery}
       onQuery={(next) => {
         essenceQuery = next;
@@ -788,56 +810,7 @@
       disabled={inert}
       rowsAttr="data-component-bulk-essences"
       minRows={6}
-    >
-      {#each essencePageView.rows as essence (essence.id)}
-        {@const quantity = Number(stagedEssences[essence.id]) || 0}
-        <!-- The reference's row (`proto:1203`-`1211`): glyph medallion, serif name, `n/N`, then the
-             `− value +` stepper. `—` while the axis is UNSTAGED, because nothing is written then;
-             the number — 0 included — once it is staged, because that is what the write does. The
-             shared `Stepper` is the control (design-system: a number a GM can change is a stepper),
-             and stepping an unstaged row up is what stages the axis. -->
-        <div
-          class="fab-bulk-inset-row is-static fab-component-bulk-essence-row"
-          class:is-staged={essencesStaged && quantity > 0}
-          data-component-edit-essence={essence.id}
-          data-component-essence-active={essencesStaged && quantity > 0}
-        >
-          <span class="fab-component-bulk-essence-glyph" aria-hidden="true">
-            <i class={essence.icon || 'fas fa-mortar-pestle'}></i>
-          </span>
-          <span class="fab-bulk-inset-name fab-component-bulk-essence-name">{essence.name}</span>
-          <span class="fab-bulk-inset-meta"
-            >{carried(countSelectedWithEssence(selectedCards, essence.id))}</span
-          >
-          <Stepper
-            value={essencesStaged ? quantity : null}
-            allowUnset={!essencesStaged}
-            placeholder="—"
-            min={0}
-            disabled={inert}
-            ariaLabel={format('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}', {
-              name: essence.name,
-            })}
-            decrementLabel={format(
-              'FABRICATE.Admin.Items.Editor.DecrementEssence',
-              'Decrement {name}',
-              {
-                name: essence.name,
-              }
-            )}
-            incrementLabel={format(
-              'FABRICATE.Admin.Items.Editor.IncrementEssence',
-              'Increment {name}',
-              {
-                name: essence.name,
-              }
-            )}
-            inputProps={{ 'data-component-bulk-essence-input': essence.id }}
-            onChange={(next) => setEssence(essence.id, next)}
-          />
-        </div>
-      {/each}
-    </BulkStagingInset>
+    />
     <p class="fab-component-bulk-note" data-component-bulk-essences-note>
       {counted(
         'EssencesNote',
@@ -1026,47 +999,6 @@
   .fab-component-bulk-clear:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  /* ── THE ESSENCE ROW (`proto:1203`) ─────────────────────────────────────────────────────
-     The inset's row, as a STATIC box holding a control rather than being one: `padding:5px 9px`
-     around a 22px glyph and a 22px stepper. It keeps the row family's paint (from
-     `BulkStagingInset`) and only stops being a pointer target. */
-  .fab-component-bulk-essence-row.is-static {
-    cursor: default;
-  }
-
-  /* The 22px glyph medallion on `--fab-bg-3`, radius 6 (`proto:5629`). */
-  .fab-component-bulk-essence-glyph {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: var(--fab-bg-3);
-    color: var(--fab-text-secondary);
-    font-size: 0.62rem;
-  }
-
-  /* `600 11px var(--serif)` in the text ink (`proto:1205`). */
-  .fab-component-bulk-essence-name {
-    color: var(--fab-text);
-    font-family: var(--fab-font-serif);
-    font-size: 0.68rem;
-  }
-
-  /* THE STEPPER'S SLOT HAS NO INTRINSIC WIDTH, so its input is capped in this layout context
-     rather than by the primitive (see `Stepper.svelte`'s `fill` note): the reference's value
-     column is 26px, and the shared 48px would push the `n/N` off the row in a 320px rail.
-     `:global()` because the input is rendered by the child and never carries this hash. */
-  .fab-component-bulk-essence-row :global(.fab-stepper-input) {
-    width: 30px;
-  }
-
-  .fab-component-bulk-essence-row :global(.fab-stepper) {
-    flex: 0 0 auto;
   }
 
   .manager-component-bulk-dc-row {

@@ -109,8 +109,11 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   it('PUBLISHED SURFACE: the store legs are unchanged and every family stays wrapped', () => {
     assert.match(
       adminStore,
-      /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*\},/,
-      'the component family is composed under its EXISTING membership keys'
+      // `bulkEditRules` joined the two membership verbs in issue 1371 r16-cat (maintainer ruling
+      // M25): the world bulk panel's essence axis writes per-system RULES, which is the same kind of
+      // verb — a world-scope instruction whose second half lives in `CraftingSystemManager`.
+      /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*(?:\/\/[^\n]*\n\s*)*bulkEditRules: bulkEditComponentRules,\s*\},/,
+      'the component family is composed under its EXISTING membership keys, plus the rules write'
     );
     assert.match(
       adminStore,

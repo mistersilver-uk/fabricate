@@ -12562,6 +12562,7 @@
         onOpenVocabulary={() => setView('world-vocabulary')}
         onCreateFromItemDrop={createWorldComponentFromItemDrop}
         worldItems={worldItemOptions}
+        worldEssences={worldEssenceOptions}
         bind:browserState={managerBrowserState.worldComponentCatalogue}
       />
     {:else if currentView === 'world-component-entry'}

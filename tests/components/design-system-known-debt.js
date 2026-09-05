@@ -431,4 +431,9 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // 49 -> 48 (issue 1371 r16-list): `EssenceQuantityCard` dropped to ONE importer when maintainer
 // ruling M23 rebuilt the system Component Rules bulk panel's essence axis as the reference's inset
 // rows — the card renders in the component editor's grid alone now, so it no longer clears the bar.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+// 48 -> 49 (issue 1371 r16-cat): `BulkStagingInset` gained its SECOND importer when maintainer rulings
+// M24/M25 converged the world Component catalogue's bulk panel onto the inset the system panel had
+// extracted — the same object over different data, which is the maximum reuse the maintainer asked
+// for. It crosses the bar beside `BulkSelectionToolbar` and `BulkEditPanelShell`'s family; whether it
+// is a manifest row with a `library.html` specimen is the outstanding decision this register records.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;

@@ -459,6 +459,7 @@
     "src/ui/svelte/apps/journal/JournalFactRow.svelte | 1",
     "src/ui/svelte/apps/journal/JournalListShell.svelte | 1",
     "src/ui/svelte/apps/journal/RunStatusPill.svelte | 1",
+    "src/ui/svelte/apps/manager/BulkStagingInset.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte | 1",

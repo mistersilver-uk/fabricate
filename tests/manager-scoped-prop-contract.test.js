@@ -595,8 +595,11 @@ test('the world-scope write path is supplied FOUR store legs', () => {
   // product reaches the membership-only verb; this assertion is the only thing that reds.
   assert.match(
     adminStore,
-    /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*\},/,
-    'the published write path composes the two component verbs that have an in-system half'
+    // `bulkEditRules` joined the two membership verbs in issue 1371 r16-cat (maintainer ruling M25):
+    // the world bulk panel's essence axis writes per-system RULES — the same kind of verb, whose
+    // second half lives in `CraftingSystemManager`.
+    /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*(?:\/\/[^\n]*\n\s*)*bulkEditRules: bulkEditComponentRules,\s*\},/,
+    'the published write path composes the two component verbs that have an in-system half, plus the rules write'
   );
   // AND EVERY FAMILY IS WRAPPED so a write that lands re-publishes (issue 1372).
   // `buildWorldScopeState()` is read once per publish, so before the wrapper a generic verb

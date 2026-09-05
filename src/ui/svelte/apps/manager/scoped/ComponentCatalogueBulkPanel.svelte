@@ -76,13 +76,21 @@
    - tagOptions: the world vocabulary's tags, from the same store. A tag authored there and
      applied to no component yet is offered, and the empty sentence below is reached only when
      the world has authored none.
+   - essences: the WORLD essence catalogue's roster, `{id, name, icon?, colorToken?}[]` (issue 1371
+     r16-cat, maintainer ruling M25). The `Essence values` group offers one row per entry; an
+     empty roster draws the sentence naming the catalogue where an essence is minted.
+   - selectedIds: the ticked world component ids, which the essence group needs beyond `count`:
+     the `n/N` it draws is how many of THESE already carry each essence in some system's rules,
+     and the write count the dock names is how many `(system, map)` batches the staged values
+     resolve to over them. Both are read off `systems`, which is the raw roster.
    - applying: an in-flight write. Inerts every control and the Apply.
    - deleting: an in-flight bulk delete. Inerts the same set, and puts the danger control into its
      own busy state rather than into the Apply's.
    - onClearSelection(): drop the whole selection.
-   - onApply(staged): `{mode, systemIds, category, addTags, removeTags}`. Never called with an
-     empty instruction — Apply is genuinely disabled until an axis is staged, so a GM cannot fire
-     a no-op write and read success from it.
+   - onApply(staged): `{mode, systemIds, category, addTags, removeTags, essences}`. Never called
+     with an empty instruction — Apply is genuinely disabled until an axis is staged, so a GM
+     cannot fire a no-op write and read success from it. `essences` is `essenceId -> quantity`
+     with `0` meaning strip; the PAGE resolves it into per-system writes.
    - onDelete(): delete every selected component. Called only from the ARMED state of the shipped
      two-step control; `null` withholds the control entirely, so a call site with no delete leg
      offers no dead affordance.
@@ -91,6 +99,7 @@
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
+  import BulkStagingInset from '../BulkStagingInset.svelte';
   import Callout from '../Callout.svelte';
   import Chip from '../Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -99,6 +108,9 @@
   import {
     componentBulkApplyLabel,
     componentBulkDeleteNote,
+    componentBulkEssenceBatches,
+    componentBulkEssenceCarried,
+    componentBulkEssenceHint,
     componentBulkMembershipModes,
     componentBulkWriteCount,
   } from './componentScoped.js';
@@ -122,10 +134,10 @@
    * @param {Array<{id: string, name: string}>} items
    * @param {{query: string, pageIndex: number, pageSize?: number}} view
    * @param {(key: string, fallback: string, data?: object) => string} say
-   * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
-   *   range: string, pageLabel: string}}
+   * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, rangeStart: number,
+   *   rangeEnd: number, total: number}}
    */
-  function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }, say) {
+  function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }) {
     const needle = String(query ?? '')
       .trim()
       .toLowerCase();
@@ -137,21 +149,15 @@
           .includes(needle)
     );
     const page = paginateRows(matched, { pageIndex, pageSize }, pageSize);
+    // THE SHAPE `BulkStagingInset` WORDS: it owns the range and page sentences (the reference's
+    // `Page 1 of 5`), so the caller hands numbers, never strings.
     return {
       rows: page.rows,
       pageIndex: page.pageIndex,
       pageCount: page.pageCount,
+      rangeStart: page.rangeStart,
+      rangeEnd: page.rangeEnd,
       total: matched.length,
-      range: say(
-        'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerRange',
-        'Showing {start}-{end} of {total}',
-        { start: page.rangeStart, end: page.rangeEnd, total: matched.length }
-      ),
-      pageLabel: say(
-        'FABRICATE.Admin.Manager.Scoped.Component.BulkPickerPage',
-        'Page {page}/{of}',
-        { page: page.pageIndex + 1, of: page.pageCount }
-      ),
     };
   }
 
@@ -160,6 +166,8 @@
     systems = [],
     categoryOptions = [],
     tagOptions = [],
+    essences = [],
+    selectedIds = [],
     applying = false,
     deleting = false,
     onClearSelection = () => {},
@@ -186,6 +194,8 @@
   let stagedCategory = $state(UNCHANGED);
   /** @type {Record<string, 'add'|'remove'>} */
   let stagedTags = $state({});
+  /** `essenceId -> quantity`, `0` meaning strip; absent meaning unchanged (M25). */
+  let stagedEssences = $state({});
 
   // ONE SEARCH AND ONE PAGE INDEX PER INSET. They are the inset's VIEW rather than its
   // instruction, so they are deliberately not part of what `onApply` hands over and are reset
@@ -196,6 +206,10 @@
   let categoryPage = $state(0);
   let tagQuery = $state('');
   let tagPage = $state(0);
+
+  // THE ESSENCE INSET'S OWN VIEW (M25), on the same terms as the three above.
+  let essenceQuery = $state('');
+  let essencePage = $state(0);
 
   /** Whether the two-step delete is armed. Local, because arming is a panel-local intent. */
   let deleteArmed = $state(false);
@@ -221,7 +235,55 @@
   const membershipStaged = $derived(mode !== UNCHANGED && stagedSystemIds.length > 0);
   const categoryStaged = $derived(stagedCategory !== UNCHANGED);
   const tagsStaged = $derived(addTags.length + removeTags.length > 0);
-  const canApply = $derived((membershipStaged || categoryStaged || tagsStaged) && !inert);
+  const essencesStaged = $derived(Object.keys(stagedEssences).length > 0);
+  const canApply = $derived(
+    (membershipStaged || categoryStaged || tagsStaged || essencesStaged) && !inert
+  );
+
+  // THE ESSENCE AXIS'S TWO FACTS, READ OFF THE RAW ROSTER (M25): how many of the selection carry
+  // each essence somewhere, and how many writes the staged values resolve to.
+  const selectedComponentIds = $derived(
+    (Array.isArray(selectedIds) ? selectedIds : []).map((id) => String(id))
+  );
+  const essenceCarried = $derived(componentBulkEssenceCarried(selectedComponentIds, systems));
+  const essenceBatches = $derived(
+    componentBulkEssenceBatches(selectedComponentIds, stagedEssences, systems)
+  );
+
+  // THE ESSENCE ROSTER, worded for the shared inset's `stepper` kind: each row carries the
+  // staged value (`null` while unchanged), its three-state word for the hook, and how many of the
+  // selection already carry it. `min: null`, deliberately: the reference's `−` below zero returns a
+  // row to unchanged (`proto:5631`), which the inset reports as a negative step and
+  // `stageEssenceStep` reads as an unstage.
+  const essenceRoster = $derived(
+    (Array.isArray(essences) ? essences : []).map((essence) => ({
+      id: String(essence?.id ?? ''),
+      name: String(essence?.name ?? essence?.id ?? ''),
+      icon: String(essence?.icon ?? ''),
+      colorToken: String(essence?.colorToken ?? ''),
+    }))
+  );
+  const essencePageView = $derived(
+    componentBulkPickerPage(essenceRoster, { query: essenceQuery, pageIndex: essencePage })
+  );
+  const essenceRows = $derived(
+    essencePageView.rows.map((essence) => {
+      const staged = stagedEssences[essence.id];
+      const touched = staged !== undefined;
+      return {
+        ...essence,
+        value: touched ? Number(staged) : null,
+        state: touched ? (Number(staged) > 0 ? 'set' : 'strip') : 'unchanged',
+        active: touched,
+        allowUnset: true,
+        min: null,
+        meta: `${Number(essenceCarried[essence.id]) || 0}/${Number(count) || 0}`,
+      };
+    })
+  );
+  const stagedEssenceIds = $derived(
+    Object.keys(stagedEssences).filter((id) => essenceRoster.some((essence) => essence.id === id))
+  );
 
   const writeCount = $derived(
     componentBulkWriteCount({
@@ -229,6 +291,7 @@
       systems: membershipStaged ? stagedSystemIds.length : 0,
       category: categoryStaged,
       tags: tagsStaged,
+      essences: essenceBatches.length,
     })
   );
 
@@ -250,6 +313,7 @@
         systems: stagedSystemIds.length,
         category: categoryStaged,
         tags: tagsStaged,
+        essences: essencesStaged,
         writes: writeCount,
       },
       phrase
@@ -381,17 +445,13 @@
   );
 
   const systemPageView = $derived(
-    componentBulkPickerPage(systemItems, { query: systemQuery, pageIndex: systemPage }, phrase)
+    componentBulkPickerPage(systemItems, { query: systemQuery, pageIndex: systemPage })
   );
   const categoryPageView = $derived(
-    componentBulkPickerPage(
-      categoryItems,
-      { query: categoryQuery, pageIndex: categoryPage },
-      phrase
-    )
+    componentBulkPickerPage(categoryItems, { query: categoryQuery, pageIndex: categoryPage })
   );
   const tagPageView = $derived(
-    componentBulkPickerPage(tagItems, { query: tagQuery, pageIndex: tagPage }, phrase)
+    componentBulkPickerPage(tagItems, { query: tagQuery, pageIndex: tagPage })
   );
 
   const stagedLabel = $derived(
@@ -419,9 +479,9 @@
     page: systemPageView,
     onPage: (next) => (systemPage = next),
     onChoose: (id) => toggleSystem(id),
-    // THE ROW'S LEADING EDGE IS A CHECK BOX, NOT A GLYPH (`proto:5273`, M24): the staged state
-    // fills it, so `icon` is not part of this descriptor.
-    box: true,
+    // THE ROW'S LEADING EDGE IS A CHECK BOX, NOT A GLYPH (`proto:5273`, M24): `check` is the
+    // shared inset's kind for it, and the staged state fills the box.
+    kind: 'check',
     rows: systemPageView.rows.map((item) => ({
       id: item.id,
       name: item.name,
@@ -451,11 +511,11 @@
     onChoose: (id) => {
       if (!inert) stagedCategory = id;
     },
+    kind: 'radio',
     rows: categoryPageView.rows.map((item) => ({
       id: item.id,
       name: item.name,
       state: stagedCategory === item.id ? 'on' : 'off',
-      icon: stagedCategory === item.id ? 'fas fa-circle-check' : 'far fa-circle',
       meta: stagedCategory === item.id ? stagedLabel : '',
     })),
   });
@@ -476,13 +536,12 @@
     page: tagPageView,
     onPage: (next) => (tagPage = next),
     onChoose: (id) => cycleTag(id),
+    kind: 'tri',
     rows: tagPageView.rows.map((item) => ({
       id: item.id,
       name: item.name,
       state: stagedTags[item.id] ?? 'off',
-      icon: tagGlyph(item.id) || 'far fa-circle',
       meta: stagedTags[item.id] ? tagDirectionLabel(item.id) : '',
-      hook: 'tag',
     })),
   });
 
@@ -556,6 +615,33 @@
     );
   }
 
+  /**
+   * Stage one essence's value, or unstage it (M25). The inset walks the three states; this owns
+   * the map.
+   *
+   * @param {string} essenceId
+   * @param {number|null} value `null` unstages.
+   */
+  function stageEssence(essenceId, value) {
+    if (inert || !essenceId) return;
+    const next = { ...stagedEssences };
+    if (value === null || value === undefined) delete next[essenceId];
+    else next[essenceId] = Math.max(0, Number(value) || 0);
+    stagedEssences = next;
+  }
+
+  /**
+   * The shared inset's stepper report, read as the reference reads its own (`proto:5629-5631`):
+   * a cleared field or a step below zero is an UNSTAGE, `0` is a STRIP, anything above is a value.
+   *
+   * @param {string} essenceId
+   * @param {number|null} next
+   */
+  function stageEssenceStep(essenceId, next) {
+    if (next === null || next === undefined || Number(next) < 0) stageEssence(essenceId, null);
+    else stageEssence(essenceId, Math.min(9, Number(next)));
+  }
+
   function applyStaged() {
     if (!canApply) return;
     onApply({
@@ -564,11 +650,13 @@
       category: categoryStaged ? (stagedCategory === NO_CATEGORY ? '' : stagedCategory) : null,
       addTags: [...addTags],
       removeTags: [...removeTags],
+      essences: { ...stagedEssences },
     });
     mode = UNCHANGED;
     stagedSystemIds = [];
     stagedCategory = UNCHANGED;
     stagedTags = {};
+    stagedEssences = {};
   }
 </script>
 
@@ -593,7 +681,7 @@
   clearLabel={text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear')}
   hint={text(
     'FABRICATE.Admin.Manager.Scoped.Component.BulkStagingHint',
-    'Pick the systems to add them to, stage a category or tags, then commit below.'
+    'Pick the systems to add them to, stage a category, tags or essence values, then commit below.'
   )}
   panelAttr="data-world-component-bulk-panel"
   clearAttr="data-world-component-bulk-clear"
@@ -615,7 +703,7 @@
     tone="info"
     text={text(
       'FABRICATE.Admin.Manager.Scoped.Component.BulkPerComponentNote',
-      'Names and source links stay per component. What you can change in bulk is which systems these components belong to, and their world category and tags.'
+      'Names and source links stay per component. What you can change in bulk is which systems these components belong to, their world category and tags, and their essence values in every system that has rules for them.'
     )}
     dataAttr="data-world-component-bulk-per-component-note"
   />
@@ -712,6 +800,90 @@
       {text(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkNoTags',
         'No world tags are authored yet. Create them in Tags & Categories first.'
+      )}
+    </p>
+  {/if}
+
+  <!--
+    THE ESSENCE VALUES GROUP (issue 1371 r16-cat, maintainer ruling M25), drawn by the inset the
+    system panel also draws — `proto:1180-1216` on the system panel is the reference for both. A
+    world component has no world-level essence value, so this group's write is into every selected
+    component's RULES in every system that has them; the note says so, and the page resolves the
+    staged map into those writes (`componentBulkEssenceBatches`).
+  -->
+  <BulkEditSection
+    label={text('FABRICATE.Admin.Manager.BulkEdit.EssenceValues', 'Essence values')}
+    hint={componentBulkEssenceHint(stagedEssences, phrase)}
+    trailing={essencesStaged ? clearEssences : undefined}
+  />
+  {#if essenceRoster.length > 0}
+    {#if stagedEssenceIds.length > 0}
+      <!-- THE STAGED RUN, above the inset exactly as `proto:1189` draws it: the one place the
+           DIRECTION is painted rather than listed — a `positive` chip for a value, a `danger` chip
+           reading `removed` for a strip. A chip is a button, and the click unstages. -->
+      <div class="fab-bulk-component-chips" data-world-component-bulk-essence-chips>
+        {#each stagedEssenceIds as id (id)}
+          {@const essence = essenceRoster.find((candidate) => candidate.id === id)}
+          {@const value = Number(stagedEssences[id]) || 0}
+          <Chip
+            tag="button"
+            type="button"
+            density="inspector"
+            tone={value > 0 ? 'positive' : 'danger'}
+            icon={essence?.icon ?? ''}
+            data-world-component-bulk-essence-chip={id}
+            data-world-component-bulk-essence-chip-state={value > 0 ? 'set' : 'strip'}
+            aria-label={phrase(
+              'FABRICATE.Admin.Manager.BulkEdit.EssenceUnstage',
+              'Unstage {name}',
+              {
+                name: essence?.name ?? id,
+              }
+            )}
+            disabled={inert}
+            onclick={() => stageEssence(id, null)}
+            >{essence?.name ?? id}
+            {value > 0 ? value : text('FABRICATE.Admin.Manager.BulkEdit.EssenceRemoved', 'removed')}
+            <i class="fas fa-xmark" aria-hidden="true"></i></Chip
+          >
+        {/each}
+      </div>
+    {/if}
+    <BulkStagingInset
+      id="essences"
+      kind="stepper"
+      rows={essenceRows}
+      rowAttr="data-world-component-bulk-essence"
+      rowStateAttr="data-world-component-bulk-essence-state"
+      inputAttr="data-world-component-bulk-essence-input"
+      onStep={stageEssenceStep}
+      query={essenceQuery}
+      onQuery={(next) => {
+        essenceQuery = next;
+        essencePage = 0;
+      }}
+      placeholder={text('FABRICATE.Admin.Manager.BulkEdit.EssenceSearch', 'Search essences')}
+      page={essencePageView}
+      onPage={(next) => (essencePage = next)}
+      empty={text(
+        'FABRICATE.Admin.Manager.BulkEdit.EssenceNoMatch',
+        'No essence matches that search.'
+      )}
+      hasRows={essenceRows.length > 0}
+      disabled={inert}
+    />
+    <p class="fab-bulk-component-note" data-world-component-bulk-essence-note>
+      {phrase(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkEssenceNote',
+        'Every row starts unchanged. Step a value up to write it on all {count} in every system that has rules for them; step down to 0 to strip that essence from them. A system that does not hold an essence skips it.',
+        { count }
+      )}
+    </p>
+  {:else}
+    <p class="manager-muted fab-bulk-component-empty" data-world-component-bulk-essences-empty>
+      {text(
+        'FABRICATE.Admin.Manager.Scoped.Component.BulkNoEssences',
+        'No world essences are defined yet. Create them in the Essence catalogue first.'
       )}
     </p>
   {/if}
@@ -821,104 +993,45 @@
   </button>
 {/snippet}
 
+{#snippet clearEssences()}
+  <button
+    type="button"
+    class="fab-bulk-component-clear"
+    data-keyboard-focus="true"
+    data-world-component-bulk-clear-essences
+    disabled={inert}
+    onclick={() => (stagedEssences = {})}
+  >
+    {text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear')}
+  </button>
+{/snippet}
+
 <!--
-  ONE INSET, RENDERED THREE TIMES (`proto:628`-`697`).
-
-  The search well, the fixed row window and the pager are identical in all three groups and only
-  the DESCRIPTOR differs — what a row means, what clicking it does, and what it says when it is
-  staged. Writing it once is what keeps the three groups from drifting apart a control at a time,
-  and it is what the SonarCloud duplication gate requires of three near-identical blocks.
-
-  Every row is a real `<button>` with `aria-pressed`, because a row here is a control: the tag
-  rows cycle three states and the system rows toggle, and neither is expressible as a link.
+  ONE INSET, RENDERED THREE TIMES (`proto:628`-`697`), AND IT IS `BulkStagingInset`'S (issue 1371
+  r16-cat, M24/M25): the search well, the fixed row window, the pager AND the rows are the shared
+  component's, drawn from this panel's descriptors — a `check` row for a system, a `radio` row for
+  a category, a `tri` row for a tag — so the two bulk panels are the same object over different
+  data. What is this panel's is the DESCRIPTOR: what a row means, what pressing it does, and what
+  it says when it is staged.
 -->
 {#snippet stagingInset(inset)}
-  <div
-    class="fab-bulk-component-inset"
-    class:has-box={Boolean(inset.box)}
-    data-world-component-bulk-inset={inset.id}
-  >
-    <div class="fab-bulk-component-inset-search">
-      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={inset.query}
-        placeholder={inset.placeholder}
-        aria-label={inset.placeholder}
-        disabled={inert}
-        data-world-component-bulk-search={inset.id}
-        oninput={(event) => inset.onQuery(event.currentTarget.value)}
-      />
-    </div>
-    <div class="fab-bulk-component-inset-rows">
-      {#each inset.rows as row (row.id)}
-        <button
-          type="button"
-          class="fab-bulk-component-inset-row"
-          class:is-staged={row.state !== 'off'}
-          class:has-box={Boolean(inset.box)}
-          data-keyboard-focus="true"
-          data-world-component-bulk-option={row.id}
-          data-world-component-bulk-option-state={row.state}
-          aria-pressed={row.state !== 'off'}
-          disabled={inert || inset.disabled}
-          onclick={() => inset.onChoose(row.id)}
-        >
-          {#if inset.box}
-            <!-- DECORATIVE: the row is the control and `aria-pressed` states the value; the box
-                 paints it where the reference paints it (`proto:5273`). -->
-            <span
-              class="fab-bulk-component-inset-box"
-              class:is-on={row.state !== 'off'}
-              aria-hidden="true"
-            >
-              {#if row.state !== 'off'}<i class="fas fa-check"></i>{/if}
-            </span>
-          {:else}
-            <i class={row.icon} aria-hidden="true"></i>
-          {/if}
-          <span class="fab-bulk-component-inset-name">{row.name}</span>
-          {#if row.meta}
-            <span class="fab-bulk-component-inset-meta">{row.meta}</span>
-          {/if}
-        </button>
-      {:else}
-        <p class="fab-bulk-component-inset-empty" data-world-component-bulk-empty={inset.id}>
-          {inset.empty}
-        </p>
-      {/each}
-    </div>
-    <div class="fab-bulk-component-inset-pager">
-      <span class="fab-bulk-component-inset-range" data-world-component-bulk-range={inset.id}>
-        {inset.page.range}
-      </span>
-      <div class="fab-bulk-component-inset-pages">
-        <button
-          type="button"
-          class="fab-bulk-component-inset-page"
-          data-keyboard-focus="true"
-          data-world-component-bulk-prev={inset.id}
-          disabled={inert || inset.page.pageIndex === 0}
-          aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
-          onclick={() => inset.onPage(inset.page.pageIndex - 1)}
-        >
-          <i class="fas fa-chevron-left" aria-hidden="true"></i>
-        </button>
-        <span class="fab-bulk-component-inset-page-label">{inset.page.pageLabel}</span>
-        <button
-          type="button"
-          class="fab-bulk-component-inset-page"
-          data-keyboard-focus="true"
-          data-world-component-bulk-next={inset.id}
-          disabled={inert || inset.page.pageIndex >= inset.page.pageCount - 1}
-          aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
-          onclick={() => inset.onPage(inset.page.pageIndex + 1)}
-        >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        </button>
-      </div>
-    </div>
-  </div>
+  <BulkStagingInset
+    id={inset.id}
+    kind={inset.kind}
+    rows={inset.rows}
+    rowAttr="data-world-component-bulk-option"
+    rowStateAttr="data-world-component-bulk-option-state"
+    onRow={inset.onChoose}
+    query={inset.query}
+    onQuery={inset.onQuery}
+    placeholder={inset.placeholder}
+    page={inset.page}
+    onPage={inset.onPage}
+    empty={inset.empty}
+    hasRows={inset.rows.length > 0}
+    disabled={inert}
+    rowsDisabled={inset.disabled}
+  />
 {/snippet}
 
 <style>
@@ -970,254 +1083,6 @@
   .fab-bulk-component-clear:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  /* ── THE STAGING INSET (`proto:628`) ───────────────────────────────────────────────────────
-     A recess one rung BELOW the panel, hairline, radius 9 — `design-system/spec.md:218` puts a
-     well on 9, which is the reference's own value. The reference's 9px padding takes
-     `--fab-space-2`, the nearest step on the published 4px scale. */
-  .fab-bulk-component-inset {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-0);
-  }
-
-  /* The 28px search well, lifted back to `--fab-bg-1` inside the recess (`proto:630`). */
-  .fab-bulk-component-inset-search {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    min-width: 0;
-    height: 28px;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
-    background: var(--fab-bg-1);
-  }
-
-  .fab-bulk-component-inset-search > i {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-size: 0.56rem;
-  }
-
-  /* Foundry core sizes every `<input>` to its own height and border; both are reset here so the
-     field is the WELL and not a second box inside it. */
-  .fab-bulk-component-inset-search input {
-    flex: 1 1 auto;
-    width: auto;
-    height: auto;
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    outline: none;
-    background: transparent;
-    color: var(--fab-text);
-    font-family: inherit;
-    font-size: 0.66rem;
-    font-weight: 500;
-  }
-
-  /* THE WINDOW IS A FIXED HEIGHT, which is the whole reason the reference draws a pager on it:
-     a list that grew and shrank with its search would move the two groups below it on every
-     keystroke. Five rows plus their four gaps, at each inset's own row rung (M24): 5 x 28 + 4 x 4
-     for the category and tag insets (the reference's 151), 5 x 30 + 16 for the systems inset
-     (its 181). */
-  .fab-bulk-component-inset-rows {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
-    min-height: 156px;
-    align-content: flex-start;
-  }
-
-  .fab-bulk-component-inset.has-box .fab-bulk-component-inset-rows {
-    min-height: 166px;
-  }
-
-  /* A ROW IS A CONTROL ON THE LADDER (M24): 28px for a category or tag row (`proto:5296`'s 27),
-     30px for a system row (`proto:5273`'s 33, whose extra is the check box it carries), both on
-     the 26-32px band's 7px corner. Fixed rather than padded, so the rung holds whatever the
-     host's button line-height does. */
-  .fab-bulk-component-inset-row {
-    appearance: none;
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    width: 100%;
-    min-width: 0;
-    height: 28px;
-    min-height: 28px;
-    margin: 0;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
-    background: var(--fab-bg-1);
-    color: var(--fab-text);
-    font-family: inherit;
-    font-size: 0.66rem;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .fab-bulk-component-inset-row.has-box {
-    height: 30px;
-    min-height: 30px;
-  }
-
-  /* THE SYSTEM ROW'S CHECK BOX (`proto:5273`): a 15px square on a 5px corner, filled `--accent`
-     with a 7.5px check when the row is staged. 16px and 6px here — the ladder puts a control at
-     or under 24px on 6, and 16 centres a 30px row on the 4px scale where 15 cannot. */
-  .fab-bulk-component-inset-box {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 6px;
-    color: var(--fab-on-accent);
-    font-size: 0.5rem;
-  }
-
-  .fab-bulk-component-inset-box.is-on {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent);
-  }
-
-  .fab-bulk-component-inset-row:hover:not(:disabled) {
-    border-color: var(--fab-border-strong);
-  }
-
-  .fab-bulk-component-inset-row.is-staged {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-  }
-
-  .fab-bulk-component-inset-row:disabled {
-    color: var(--fab-text-disabled);
-    cursor: default;
-  }
-
-  .fab-bulk-component-inset-row:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .fab-bulk-component-inset-row > i {
-    flex: 0 0 auto;
-    width: 9px;
-    font-size: 0.56rem;
-  }
-
-  /* The system row's name is the reference's 11px/600 SERIF (`proto:5274`); a category or tag
-     row's is its 10.5px/600 SANS (`proto:5296`), inherited from the row. */
-  .fab-bulk-component-inset-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    font-family: inherit;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .fab-bulk-component-inset-row.has-box .fab-bulk-component-inset-name {
-    font-family: var(--fab-font-serif);
-    font-size: 0.68rem;
-  }
-
-  /* The trailing fact is a NUMERAL in the reference (`proto:5279`, `font:600 9px var(--mono)`),
-     not a tracked uppercase label; the mono face ships 400 and 500 only. */
-  .fab-bulk-component-inset-meta {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 0.56rem;
-    font-weight: 500;
-  }
-
-  .fab-bulk-component-inset-empty {
-    margin: 0;
-    padding: var(--fab-space-3) var(--fab-space-2);
-    color: var(--fab-text-disabled);
-    font-size: 0.63rem;
-  }
-
-  /* The pager is lifted back to `--fab-bg-1` like the search well, so the recess reads as a card
-     with two lit edges rather than as a flat band (`proto:641`). */
-  .fab-bulk-component-inset-pager {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    min-width: 0;
-    /* `proto:5200` pads `6px 8px`, which the dense unit and the 8px step state exactly (M24). */
-    padding: var(--fab-space-chip) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    /* 7, NOT THE REFERENCE'S 8. `design-system/spec.md:218` gives a 26-32px control 7 and puts
-       nothing on 8 at all, and `design-system-debt-ratchets` refuses a new off-ladder radius —
-       the same snap the row's own 8 takes to 9 one file over. */
-    border-radius: 7px;
-    background: var(--fab-bg-1);
-  }
-
-  .fab-bulk-component-inset-range {
-    color: var(--fab-text-subtle);
-    font-size: 0.56rem;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .fab-bulk-component-inset-pages {
-    display: flex;
-    gap: var(--fab-space-chip);
-    align-items: center;
-    margin-left: auto;
-  }
-
-  /* `proto:5200`'s `pageBtn` is a 22px square on a 6px corner (M24). */
-  .fab-bulk-component-inset-page {
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-bg-0);
-    color: var(--fab-text-secondary);
-    font-size: 0.56rem;
-    cursor: pointer;
-  }
-
-  .fab-bulk-component-inset-page:disabled {
-    color: var(--fab-text-disabled);
-    cursor: default;
-  }
-
-  .fab-bulk-component-inset-page:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .fab-bulk-component-inset-page-label {
-    min-width: 62px;
-    color: var(--fab-text-secondary);
-    font-size: 0.56rem;
-    font-weight: 600;
-    text-align: center;
-    white-space: nowrap;
   }
 
   /* THE DANGER LEG NOW RENDERS INSIDE THE SHELL'S DOCK, and this rule still reaches it: a

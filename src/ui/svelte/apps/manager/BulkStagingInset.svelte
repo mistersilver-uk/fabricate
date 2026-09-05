@@ -26,9 +26,39 @@
   never at an application root — and is what lets a caller write `<button class="fab-bulk-inset-row">`
   and get the row the reference draws.
 
+  ── THE ROWS ARE THIS COMPONENT'S TOO, IN FOUR KINDS (issue 1371 r16-cat, maintainer rulings
+  M24/M25 — "the two bulk panels must be structurally identical, differing only in data sources
+  and write targets") ────────────────────────────────────────────────────────────────────────
+  A caller may still pass `children` (the system panel's category and tag rows do), but a caller
+  that passes `rows` and a `kind` gets the rows drawn HERE, from data, in one of four shapes the
+  reference draws:
+   - `radio`   — one chosen row; a circle glyph, filled when chosen (`proto:5296`).
+   - `check`   — any number chosen; a 16px box, filled with a check when chosen (`proto:5273`).
+   - `tri`     — leave / add / remove; a plus or minus glyph, the removal on the danger pair
+                 (`proto:5330`).
+   - `stepper` — a value per row; the essence's glyph tile, its name, an `n/N` and the shared
+                 `Stepper` (`proto:1203-1211`, `proto:5627-5631`). The row is a static box
+                 holding a control rather than being one.
+  Every row is on a rung: 28px for a glyph row, 30px for a box row, 34px for a stepper row; the
+  window below is sized from the kind so five rows always fit (156 / 166 / 186px — the reference's
+  own 151 / 181 / 186).
+
   Props:
    - id: the inset's name, stamped as `data-bulk-inset={id}` and on every hook below, so two
      insets in one panel are distinguishable by selector.
+   - kind: `children` (default) or one of the four row kinds above.
+   - rows: `{id, name, state, meta?, disabled?, icon?, colorToken?, value?, active?, allowUnset?,
+     min?, max?}[]` — the rows a kind draws. `state` is `on|off` for `radio` and `check`,
+     `off|add|remove` for `tri`, and the caller's own word for `stepper` (stamped, never read).
+   - onRow(id): a `radio` / `check` / `tri` row was pressed.
+   - onStep(id, value|null): a `stepper` row's value changed; `null` when its field was cleared.
+   - rowAttr / rowStateAttr: the attribute NAMES a row is stamped with, valued `row.id` and
+     `row.state` (e.g. `data-world-component-bulk-option` / `-option-state`).
+   - activeAttr: an optional attribute NAME stamped `"true"` / `"false"` from `row.active`
+     (the system panel's `data-component-essence-active`).
+   - inputAttr: an optional attribute NAME spread onto a stepper row's `<input>`, valued `row.id`.
+   - rowsDisabled: inerts the rows alone (the systems inset is inert until a direction is chosen).
+   - max: the stepper rows' ceiling unless a row states its own (the reference's 9).
    - query / onQuery(next): the search well's value and its change.
    - placeholder: the well's placeholder AND its accessible name, already localized.
    - page: `{pageIndex, pageCount, rangeStart, rangeEnd, total}` — `pageBulkInsetRows` output.
@@ -42,10 +72,22 @@
    - children: the rows.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import Stepper from '../../components/Stepper.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
     id = '',
+    kind = 'children',
+    rows = [],
+    onRow = () => {},
+    onStep = () => {},
+    rowAttr = '',
+    rowStateAttr = '',
+    activeAttr = '',
+    inputAttr = '',
+    rowsDisabled = false,
+    max = 9,
     query = '',
     onQuery = () => {},
     placeholder = '',
@@ -77,9 +119,33 @@
   const rowsHook = $derived(rowsAttr ? { [rowsAttr]: '' } : {});
   const pageIndex = $derived(Number(page?.pageIndex) || 0);
   const pageCount = $derived(Math.max(1, Number(page?.pageCount) || 1));
-  // Five rows plus their gaps is the reference's own 181px window; each extra row adds a row and
-  // a gap. Stated as a custom property so the height is one declaration in the CSS below.
+  // Rows plus their gaps: the window is sized from the ROW RUNG the kind draws at (28 / 30 / 34,
+  // plus the 4px gap), so five of them always fit. Stated as a custom property so the height is
+  // one declaration in the CSS below.
   const windowStyle = $derived(`--fab-bulk-inset-rows: ${Math.max(1, Number(minRows) || 5)}`);
+  const rungClass = $derived(
+    kind === 'stepper' ? 'is-rung-34' : kind === 'check' ? 'is-rung-30' : 'is-rung-28'
+  );
+  const drawsRows = $derived(kind !== 'children');
+  const rowList = $derived(Array.isArray(rows) ? rows : []);
+
+  function rowHooks(row) {
+    const hooks = {};
+    if (rowAttr) hooks[rowAttr] = row.id;
+    if (rowStateAttr) hooks[rowStateAttr] = row.state ?? '';
+    if (activeAttr) hooks[activeAttr] = String(Boolean(row.active));
+    return hooks;
+  }
+
+  /** The glyph a `radio` or `tri` row leads with, by its state (`proto:5296`, `proto:5330`). */
+  function glyphOf(state) {
+    if (state === 'add') return 'fas fa-plus';
+    if (state === 'remove') return 'fas fa-minus';
+    if (state === 'on') return 'fas fa-circle-check';
+    return 'far fa-circle';
+  }
+
+  const inert = $derived(disabled || rowsDisabled);
 </script>
 
 <div class="fab-bulk-inset" data-bulk-inset={id}>
@@ -95,8 +161,89 @@
       oninput={(event) => onQuery(event.currentTarget.value)}
     />
   </div>
-  <div class="fab-bulk-inset-rows" style={windowStyle} {...rowsHook}>
-    {#if hasRows}
+  <div class={`fab-bulk-inset-rows ${rungClass}`} style={windowStyle} {...rowsHook}>
+    {#if drawsRows}
+      {#each rowList as row (row.id)}
+        {#if kind === 'stepper'}
+          <!-- A STATIC box holding a control (`proto:1203`): the shared `Stepper` is the control,
+               because a number a GM can change is a stepper. -->
+          <div
+            class="fab-bulk-inset-row is-stepper"
+            class:is-staged={Boolean(row.active)}
+            class:is-removing={row.state === 'strip'}
+            {...rowHooks(row)}
+          >
+            <Medallion
+              icon={row.icon || 'fas fa-mortar-pestle'}
+              tint={row.colorToken || ''}
+              size={22}
+              glyph={10}
+              variant="glyph-chip"
+            />
+            <span class="fab-bulk-inset-name">{row.name}</span>
+            {#if row.meta}<span class="fab-bulk-inset-meta">{row.meta}</span>{/if}
+            <Stepper
+              value={row.value ?? null}
+              allowUnset={row.allowUnset !== false}
+              placeholder="—"
+              min={row.min === undefined ? 0 : row.min}
+              max={row.max ?? max}
+              disabled={inert || row.disabled === true}
+              ariaLabel={phrase(
+                'FABRICATE.Admin.Manager.BulkEdit.EssenceValueFor',
+                'Value for {name}',
+                {
+                  name: row.name,
+                }
+              )}
+              decrementLabel={phrase(
+                'FABRICATE.Admin.Manager.BulkEdit.EssenceStepDown',
+                'Step {name} down',
+                { name: row.name }
+              )}
+              incrementLabel={phrase(
+                'FABRICATE.Admin.Manager.BulkEdit.EssenceStepUp',
+                'Step {name} up',
+                {
+                  name: row.name,
+                }
+              )}
+              inputProps={inputAttr ? { [inputAttr]: row.id } : {}}
+              onChange={(next) => onStep(row.id, next)}
+            />
+          </div>
+        {:else}
+          <!-- A real `<button>` with `aria-pressed`, because a row here is a control: `tri` rows
+               cycle three states, `check` rows toggle, `radio` rows choose. -->
+          <button
+            type="button"
+            class="fab-bulk-inset-row"
+            class:is-staged={row.state === 'on' || row.state === 'add'}
+            class:is-removing={row.state === 'remove'}
+            class:has-box={kind === 'check'}
+            data-keyboard-focus="true"
+            {...rowHooks(row)}
+            aria-pressed={row.state !== 'off'}
+            disabled={inert || row.disabled === true}
+            onclick={() => onRow(row.id)}
+          >
+            {#if kind === 'check'}
+              <!-- DECORATIVE: the row is the control and `aria-pressed` states the value; the box
+                   paints it where the reference paints it (`proto:5273`). -->
+              <span class="fab-bulk-inset-box" class:is-on={row.state !== 'off'} aria-hidden="true">
+                {#if row.state !== 'off'}<i class="fas fa-check"></i>{/if}
+              </span>
+            {:else}
+              <i class={glyphOf(row.state)} aria-hidden="true"></i>
+            {/if}
+            <span class="fab-bulk-inset-name">{row.name}</span>
+            {#if row.meta}<span class="fab-bulk-inset-meta">{row.meta}</span>{/if}
+          </button>
+        {/if}
+      {:else}
+        <p class="fab-bulk-inset-empty" data-bulk-inset-empty={id}>{empty}</p>
+      {/each}
+    {:else if hasRows}
       {@render children?.()}
     {:else}
       <p class="fab-bulk-inset-empty" data-bulk-inset-empty={id}>{empty}</p>
@@ -214,14 +361,32 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-1);
-    min-height: calc(var(--fab-bulk-inset-rows, 5) * 31px - var(--fab-space-1));
+    /* A 28px row plus its 4px gap per row, less the last gap (M24: rows sit on rungs now, so the
+       window is the rung's arithmetic — five glyph rows are 156px). */
+    min-height: calc(
+      var(--fab-bulk-inset-rows, 5) * (28px + var(--fab-space-1)) - var(--fab-space-1)
+    );
     align-content: flex-start;
+  }
+
+  /* The box rows are on the 30 rung (five: 166px) and the stepper rows on 34 (five: 186px, the
+     reference's own `min-height:186px` at `proto:1200`). */
+  .fab-bulk-inset-rows.is-rung-30 {
+    min-height: calc(
+      var(--fab-bulk-inset-rows, 5) * (30px + var(--fab-space-1)) - var(--fab-space-1)
+    );
+  }
+
+  .fab-bulk-inset-rows.is-rung-34 {
+    min-height: calc(
+      var(--fab-bulk-inset-rows, 5) * (34px + var(--fab-space-1)) - var(--fab-space-1)
+    );
   }
 
   /* ── THE ROW, ROOTED AT THIS COMPONENT (see the header) ──────────────────────────────────
      `proto:1146` draws a row as `padding:6px 9px; border-radius:7px` on `--bg1` with a hairline,
-     in `600 10.5px`. The 6px is `--fab-space-chip`, the scale's dense step — a 4 would make every
-     row 4px shorter than the reference's, which is the dimension M24 asks for — and the 9 is
+     in `600 10.5px` — a 27px row, which is the 28 rung (M24). FIXED at the rung rather than padded
+     to it, so the height holds whatever the host's button line-height does; the 9px inset is
      `--fab-space-2`, the nearest step. It is a real `<button>` because a row here is a control. */
   :global(.fab-bulk-inset .fab-bulk-inset-row) {
     appearance: none;
@@ -230,10 +395,10 @@
     align-items: center;
     width: 100%;
     min-width: 0;
-    height: auto;
-    min-height: 0;
+    height: 28px;
+    min-height: 28px;
     margin: 0;
-    padding: var(--fab-space-chip) var(--fab-space-2);
+    padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);
@@ -278,6 +443,60 @@
     flex: 0 0 auto;
     width: 9px;
     font-size: 0.5rem;
+  }
+
+  /* THE BOX ROW (`proto:5273`, the world catalogue's systems): `7px 9px` around a 15px check box
+     — a 33px row, the 30 rung, with a 16px box so the row centres on the 4px scale; the box's 5px
+     corner takes the ladder's 6 for a control at or under 24px. Its name is the reference's
+     11px/600 SERIF where the glyph rows' is 10.5px sans. */
+  :global(.fab-bulk-inset .fab-bulk-inset-row.has-box) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :global(.fab-bulk-inset .fab-bulk-inset-row.has-box .fab-bulk-inset-name),
+  :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-bulk-inset-name) {
+    color: var(--fab-text);
+    font-family: var(--fab-font-serif);
+    font-size: 0.68rem;
+  }
+
+  :global(.fab-bulk-inset .fab-bulk-inset-box) {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 6px;
+    color: var(--fab-on-accent);
+    font-size: 0.5rem;
+  }
+
+  :global(.fab-bulk-inset .fab-bulk-inset-box.is-on) {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent);
+  }
+
+  /* THE STEPPER ROW (`proto:1203`, `proto:5627`): `5px 9px` around a 22px tile and a 22px
+     stepper — a 34px row, which is a rung — as a STATIC box holding a control rather than being
+     one. It keeps the row family's paint and only stops being a pointer target. */
+  :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper) {
+    height: 34px;
+    min-height: 34px;
+    cursor: default;
+  }
+
+  /* THE STEPPER'S SLOT HAS NO INTRINSIC WIDTH, so its input is capped in this layout context
+     rather than by the primitive (see `Stepper.svelte`'s `fill` note): the reference's value
+     column is 26px, and the shared 48px would push the `n/N` off the row in a 320px rail. */
+  :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper) {
+    flex: 0 0 auto;
+  }
+
+  :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper-input) {
+    width: 30px;
   }
 
   :global(.fab-bulk-inset .fab-bulk-inset-name) {
@@ -336,13 +555,15 @@
     margin-left: auto;
   }
 
+  /* `proto:5200`'s `pageBtn` (and `proto:1207`'s stepper adjunct): a 22px square on a 6px corner,
+     which with the pager's `6px 8px` inset is the reference's 36px band (M24). */
   .fab-bulk-inset-page {
     appearance: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     min-height: 0;
     margin: 0;
     padding: 0;

@@ -128,7 +128,7 @@ const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');
  * the row and the routing it produces the same fact rather than two.
  */
 const BULK_EDIT_CHROME_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)\.svelte$/;
 
 /**
  * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
@@ -1576,8 +1576,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // and was only ever offered by the corpus union this ruling struck. `moss` is the one tag in
       // both lists, so this step resolves on either side of the change.
       {
-        selector:
-          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
+        selector: '[data-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
       },
       // AND THE DIRECTION IS STAGED LAST, WHICH IS ALSO WHAT SCROLLS THE PANEL BACK TO ITS HEAD.
       // The three insets make this panel taller than the column, so the LAST click decides what
@@ -1616,11 +1615,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // staged chip, so none of the four assertions above can tell the two forms apart.
       {
         container: '[data-world-component-bulk-panel]',
-        target: '[data-world-component-bulk-inset="systems"]',
+        target: '[data-bulk-inset="systems"]',
       },
       {
         container: '[data-world-component-bulk-panel]',
-        target: '[data-world-component-bulk-inset="tags"]',
+        target: '[data-bulk-inset="tags"]',
       },
       // AND THE DANGER LEG (gap-list row 47), which is the one control on this panel that had no
       // counterpart at all before this revision.

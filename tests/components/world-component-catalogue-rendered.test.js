@@ -345,20 +345,21 @@ function measureBulkGeometry() {
     segmentActive: box('[data-world-component-bulk-mode] .manager-segment.is-active'),
     segmentIdle: box('[data-world-component-bulk-mode] .manager-segment:not(.is-active)'),
     systemRow: box(
-      '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+      '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
     ),
-    systemBox: box('[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-box'),
+    systemBox: box('[data-bulk-inset="systems"] .fab-bulk-inset-box'),
     categoryRow: box(
-      '[data-world-component-bulk-inset="category"] [data-world-component-bulk-option]'
+      '[data-bulk-inset="category"] [data-world-component-bulk-option]'
     ),
-    tagRow: box('[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option]'),
+    tagRow: box('[data-bulk-inset="tags"] [data-world-component-bulk-option]'),
     tagChip: box('[data-world-component-bulk-tag-chip]'),
-    insetPager: box(
-      '[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-pager'
-    ),
-    pagerButton: box(
-      '[data-world-component-bulk-inset="systems"] .fab-bulk-component-inset-page'
-    ),
+    insetPager: box('[data-bulk-inset="systems"] .fab-bulk-inset-pager'),
+    pagerButton: box('[data-bulk-inset="systems"] .fab-bulk-inset-page'),
+    essenceRow: box('[data-world-component-bulk-essence="flame"]'),
+    essenceTile: box('[data-world-component-bulk-essence="flame"] [data-medallion="glyph"]'),
+    essenceStep: box('[data-world-component-bulk-essence="flame"] [data-stepper-increment]'),
+    essenceValue: box('[data-world-component-bulk-essence-input="flame"]'),
+    essenceChip: box('[data-world-component-bulk-essence-chip="flame"]'),
   };
 }
 
@@ -398,6 +399,8 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         // (M24). `buildWorldScopeState` attaches this leg; the projection helper alone does not.
         scope: { ...componentScopeFor(), worldVocabulary: { categories: [], tags: ['fuel'] } },
         systems: COMPONENT_SYSTEMS,
+        // ONE WORLD ESSENCE, so the essence group draws a row whose geometry can be measured (M25).
+        worldEssences: [{ id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' }],
         // `resin` is the one record NO system holds, so the bulk delete plan frees it and the
         // dock's danger leg arms for real rather than branching to `Cannot delete`.
         actions: { deleteEntity: async () => true },
@@ -412,14 +415,18 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       await drainMicrotasks();
       target
         .querySelector(
-          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+          '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
         )
         .click();
       await drainMicrotasks();
       target
         .querySelector(
-          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
+          '[data-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
         )
+        .click();
+      await drainMicrotasks();
+      target
+        .querySelector('[data-world-component-bulk-essence="flame"] [data-stepper-increment]')
         .click();
       await drainMicrotasks();
       const danger = target.querySelector(':scope [data-world-component-bulk-danger] button');
@@ -744,6 +751,24 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     // THE INSET PAGER: `proto:5200` pads `6px 8px` around 22px buttons — 36px.
     assert.equal(Math.round(pagerButton.width), 22, 'a pager button is 22px');
     assert.equal(Math.round(insetPager.height), 36, 'so the pager is the reference`s 36px');
+  });
+
+  it('draws the essence rows at the reference`s dimensions: a 34px row, a 22px tile, 22px steppers (M25)', () => {
+    const { essenceRow, essenceTile, essenceStep, essenceValue, essenceChip } = bulkGeometry;
+    assert.ok(Boolean(essenceRow), 'NON-VACUITY: the essence group drew its row');
+    // `proto:5627` pads `5px 9px` around a 22px tile — a 34px row, which is a rung.
+    assert.equal(Math.round(essenceRow.height), 34, 'an essence row is on the 34px rung');
+    assert.equal(essenceRow.radius, '7px', 'on the 26-32px band`s corner');
+    assert.equal(Math.round(essenceTile.width), 22, '`proto:5628` chip: a 22px tile…');
+    assert.equal(Math.round(essenceTile.height), 22);
+    assert.equal(Math.round(essenceStep.width), 22, '`proto:1207`: the shared Stepper`s 22px adjunct…');
+    assert.equal(Math.round(essenceStep.height), 22);
+    assert.equal(essenceStep.radius, '6px', '…on a 6px corner');
+    // `proto:5628`'s value column is a 26px LABEL; the shared `Stepper`'s is a typeable input, capped
+    // at 30px in this layout context (the system panel's own cap) so the `n/N` stays on the row.
+    assert.equal(Math.round(essenceValue.width), 30, 'the stepper`s input is capped at 30px');
+    assert.ok(Boolean(essenceChip), 'and the staged chip is drawn above the inset');
+    assert.equal(essenceChip.paddingLeft, '8px', 'at the inspector density the tag chips take');
   });
 
   it('and reports a MISS on every one of them under a transparent overlay', () => {

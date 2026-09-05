@@ -321,6 +321,7 @@ function compileManagerRoot() {
   // above: the page imports it statically, so it is in this root's graph whether or not
   // anything ticks a row, and an omission HANGS this file rather than failing one test in it.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte');
+  // ── issue 1371 r16-cat ──────────────────────────────────────────────────────────────────
   // ── issue 1371 r8-list ──────────────────────────────────────────────────────────────────
   // The system Component Rules list's `Add from catalogue` PICKER (M9). The ROOT imports it
   // statically and mounts it unconditionally beside the two import dialogs, so it is in this

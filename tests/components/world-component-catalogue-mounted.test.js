@@ -29,7 +29,11 @@ import {
   drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
-import { componentBulkMembershipModes } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
+import {
+  componentBulkEssenceBatches,
+  componentBulkEssenceCarried,
+  componentBulkMembershipModes,
+} from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory, so the page-size case below states the SHIPPED
 // shape and changes with it rather than hand-rolling a second one.
@@ -880,7 +884,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       await drain();
       target
         .querySelector(
-          `[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="${systemId}"]`
+          `[data-bulk-inset="systems"] [data-world-component-bulk-option="${systemId}"]`
         )
         .click();
       await drain();
@@ -896,7 +900,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     function stageTag(target, tag) {
       target
         .querySelector(
-          `[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="${tag}"]`
+          `[data-bulk-inset="tags"] [data-world-component-bulk-option="${tag}"]`
         )
         .click();
     }
@@ -905,7 +909,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     function insetRows(target, inset) {
       return [
         ...target.querySelectorAll(
-          `[data-world-component-bulk-inset="${inset}"] [data-world-component-bulk-option]`
+          `[data-bulk-inset="${inset}"] [data-world-component-bulk-option]`
         ),
       ].map((row) => row.getAttribute('data-world-component-bulk-option'));
     }
@@ -1021,7 +1025,7 @@ describe('world Component Catalogue (issue 1371)', () => {
 
       const row = () =>
         target.querySelector(
-          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
+          '[data-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]'
         );
       const chip = () => target.querySelector('[data-world-component-bulk-tag-chip="fuel"]');
       assert.equal(row().getAttribute('data-world-component-bulk-option-state'), 'off');
@@ -1156,14 +1160,14 @@ describe('world Component Catalogue (issue 1371)', () => {
       // row beside an unstaged one. `proto:628`-`697` draws the set instead.
       const { target } = await selectedCatalogue();
       for (const inset of ['systems', 'category', 'tags']) {
-        const card = target.querySelector(`[data-world-component-bulk-inset="${inset}"]`);
+        const card = target.querySelector(`[data-bulk-inset="${inset}"]`);
         assert.ok(Boolean(card), `${inset} is drawn inline`);
         assert.ok(
-          Boolean(card.querySelector(`[data-world-component-bulk-search="${inset}"]`)),
+          Boolean(card.querySelector(`[data-bulk-inset-search="${inset}"]`)),
           `${inset} carries its own search well`
         );
         assert.ok(
-          Boolean(card.querySelector(`[data-world-component-bulk-range="${inset}"]`)),
+          Boolean(card.querySelector(`[data-bulk-inset-range="${inset}"]`)),
           `${inset} states the range it is showing`
         );
       }
@@ -1176,13 +1180,13 @@ describe('world Component Catalogue (issue 1371)', () => {
 
     it('searches inside an inset without touching the row selection', async () => {
       const { target } = await selectedCatalogue();
-      const search = target.querySelector('[data-world-component-bulk-search="systems"]');
+      const search = target.querySelector('[data-bulk-inset-search="systems"]');
       search.value = 'alch';
       search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
       await drain();
       assert.deepEqual(insetRows(target, 'systems'), ['sys-alchemy']);
       assert.match(
-        target.querySelector('[data-world-component-bulk-range="systems"]').textContent,
+        target.querySelector('[data-bulk-inset-range="systems"]').textContent,
         /1-1 of 1/
       );
       assert.equal(
@@ -1194,7 +1198,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       search.value = 'zzz';
       search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
       await drain();
-      assert.ok(Boolean(target.querySelector('[data-world-component-bulk-empty="systems"]')));
+      assert.ok(Boolean(target.querySelector('[data-bulk-inset-empty="systems"]')));
     });
 
     it('gates the system inset on a chosen DIRECTION', async () => {
@@ -1202,7 +1206,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       const { target } = await selectedCatalogue();
       const row = () =>
         target.querySelector(
-          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+          '[data-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
         );
       assert.equal(row().disabled, true, 'closed before a direction is chosen');
       target.querySelector('[data-world-component-bulk-mode-option="add"]').click();
@@ -1400,8 +1404,8 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.match(
         target.querySelector('.fab-bulk-edit-hero-hint').textContent,
-        /Pick the systems to add them to, stage a category or tags, then commit below\./,
-        'and the hero names the three axes rather than saying only that changes are staged'
+        /Pick the systems to add them to, stage a category, tags or essence values, then commit below\./,
+        'and the hero names the four axes (M25 added essence values) rather than saying only that changes are staged'
       );
     });
 
@@ -1578,7 +1582,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.equal(
         target.querySelector(
-          '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+          '[data-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
         ).disabled,
         true,
         'and the staging control that would compose a new one is closed'
@@ -1638,10 +1642,10 @@ describe('world Component Catalogue (issue 1371)', () => {
     /** One inset's pager parts. */
     function pagerOf(target, inset) {
       return {
-        prev: target.querySelector(`[data-world-component-bulk-prev="${inset}"]`),
-        next: target.querySelector(`[data-world-component-bulk-next="${inset}"]`),
+        prev: target.querySelector(`[data-bulk-inset-prev="${inset}"]`),
+        next: target.querySelector(`[data-bulk-inset-next="${inset}"]`),
         range: target
-          .querySelector(`[data-world-component-bulk-range="${inset}"]`)
+          .querySelector(`[data-bulk-inset-range="${inset}"]`)
           .textContent.trim(),
       };
     }
@@ -1684,13 +1688,14 @@ describe('world Component Catalogue (issue 1371)', () => {
       const label = () =>
         target
           .querySelector(
-            ':scope [data-world-component-bulk-inset="tags"] .fab-bulk-component-inset-pager'
+            // The pager is `BulkStagingInset`'s since M25 moved the chrome out of the panel.
+            ':scope [data-bulk-inset="tags"] .fab-bulk-inset-pager'
           )
           .textContent.replaceAll(/\s+/g, ' ');
-      assert.match(label(), /Page 1\/2/);
+      assert.match(label(), /Page 1 of 2/, 'the reference`s own sentence (`proto:5199`), which the shared inset words');
       pagerOf(target, 'tags').next.click();
       await drain();
-      assert.match(label(), /Page 2\/2/, 'the sentence moves with the window it describes');
+      assert.match(label(), /Page 2 of 2/, 'the sentence moves with the window it describes');
     });
 
     it('CLEARS the staged systems, and Apply goes inert with them', async () => {
@@ -1709,7 +1714,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.equal(
         target
           .querySelector(
-            ':scope [data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+            ':scope [data-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
           )
           .getAttribute('data-world-component-bulk-option-state'),
         'off',
@@ -1727,7 +1732,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       const { target, calls } = await selectedCatalogue();
       target
         .querySelector(
-          ':scope [data-world-component-bulk-inset="category"] [data-world-component-bulk-option="Refined"]'
+          ':scope [data-bulk-inset="category"] [data-world-component-bulk-option="Refined"]'
         )
         .click();
       await drain();
@@ -1949,7 +1954,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         assert.equal(
           target
             .querySelector(
-              ':scope [data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="ash"]'
+              ':scope [data-bulk-inset="tags"] [data-world-component-bulk-option="ash"]'
             )
             .getAttribute('data-world-component-bulk-option-state'),
           'add'
@@ -2025,17 +2030,17 @@ describe('world Component Catalogue (issue 1371)', () => {
         const { target } = await selectedCatalogue();
         const systemRows = [
           ...target.querySelectorAll(
-            '[data-world-component-bulk-inset="systems"] [data-world-component-bulk-option]'
+            '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
           ),
         ];
         assert.ok(systemRows.length > 1, 'NON-VACUITY: the systems inset has rows');
         for (const row of systemRows) {
           assert.ok(
-            Boolean(row.querySelector('.fab-bulk-component-inset-box')),
+            Boolean(row.querySelector('.fab-bulk-inset-box')),
             '`proto:5273` draws a 15px box at the row`s leading edge, not a glyph'
           );
           assert.ok(
-            !row.querySelector('.fab-bulk-component-inset-box').classList.contains('is-on'),
+            !row.querySelector('.fab-bulk-inset-box').classList.contains('is-on'),
             'and an unstaged row`s box is empty'
           );
         }
@@ -2045,18 +2050,18 @@ describe('world Component Catalogue (issue 1371)', () => {
         systemRows[0].click();
         await drain();
         assert.ok(
-          systemRows[0].querySelector('.fab-bulk-component-inset-box').classList.contains('is-on'),
+          systemRows[0].querySelector('.fab-bulk-inset-box').classList.contains('is-on'),
           'a staged row`s box is filled and carries the check'
         );
         assert.ok(
-          Boolean(systemRows[0].querySelector('.fab-bulk-component-inset-box i.fa-check')),
+          Boolean(systemRows[0].querySelector('.fab-bulk-inset-box i.fa-check')),
           'with the check glyph inside it'
         );
         const categoryRow = target.querySelector(
-          '[data-world-component-bulk-inset="category"] [data-world-component-bulk-option]'
+          '[data-bulk-inset="category"] [data-world-component-bulk-option]'
         );
         assert.ok(
-          !categoryRow.querySelector('.fab-bulk-component-inset-box') &&
+          !categoryRow.querySelector('.fab-bulk-inset-box') &&
             Boolean(categoryRow.querySelector('i')),
           'the category rows keep the reference`s circle glyph (`proto:5296`); only the systems rows are boxes'
         );
@@ -2099,6 +2104,238 @@ describe('world Component Catalogue (issue 1371)', () => {
             .classList.contains('is-flush-bulk'),
           'the resting and inspected columns keep their own inset'
         );
+      });
+    });
+
+    // ── THE ESSENCE VALUES GROUP (issue 1371 r16-cat, maintainer ruling M25) ──────────────────────
+    // "I want a world level essence group too that matches the prototype styling in both places
+    // (system and world)." The group is `BulkEssenceValuesInset`, shared with the system panel;
+    // what is THIS panel's is which essences it offers (the world catalogue's), how the `n/N` is
+    // counted (across every system with rules for the selection) and where an Apply writes (into
+    // each selected component's rules in every system that has them, and nowhere else).
+    describe('the ESSENCE VALUES group stages per-essence values and writes them where the selection has rules (M25)', () => {
+      const WORLD_ESSENCES = Object.freeze([
+        { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'sage' },
+      ]);
+      // THE ROSTER WITH ITS COMPONENTS, which is what the root hands the page: `coal` has rules in
+      // both systems and carries `flame` in the forge, `ingot` has rules in the forge alone, and
+      // `sys-jewel` holds neither — so a write to it would be a write to a system with no rules.
+      const ESSENCE_SYSTEMS = Object.freeze([
+        {
+          id: 'sys-forge',
+          name: 'Forge',
+          components: [
+            { id: 'coal', essences: { flame: 2 } },
+            { id: 'ingot', essences: {} },
+          ],
+        },
+        { id: 'sys-alchemy', name: 'Alchemy', components: [{ id: 'coal', essences: {} }] },
+        { id: 'sys-jewel', name: 'Jewelcraft', components: [] },
+      ]);
+
+      async function essenceCatalogue(worldEssences = WORLD_ESSENCES) {
+        const { calls, actions } = recordingComponentActions();
+        const target = await harness.mount({
+          scope: scopeFor(),
+          systems: ESSENCE_SYSTEMS,
+          actions,
+          worldEssences,
+        });
+        await selectTwo(target);
+        return { target, calls };
+      }
+      const row = (target, id) =>
+        target.querySelector(`[data-world-component-bulk-essence="${id}"]`);
+      const stateOf = (target, id) =>
+        row(target, id).getAttribute('data-world-component-bulk-essence-state');
+      // The shared `Stepper` is the control: its `<input>` reads the staged number, and `—` (its
+      // placeholder) with an EMPTY value while the row is unchanged.
+      const valueOf = (target, id) => {
+        const input = target.querySelector(`[data-world-component-bulk-essence-input="${id}"]`);
+        return input.value === '' ? input.getAttribute('placeholder') : input.value;
+      };
+      const chip = (target, id) =>
+        target.querySelector(`[data-world-component-bulk-essence-chip="${id}"]`);
+      async function press(target, selector) {
+        target.querySelector(selector).click();
+        await drain();
+      }
+      const inc = (target, id) =>
+        press(target, `[data-world-component-bulk-essence="${id}"] [data-stepper-increment]`);
+      const dec = (target, id) =>
+        press(target, `[data-world-component-bulk-essence="${id}"] [data-stepper-decrement]`);
+
+      it('offers one row per WORLD essence, counting how many of the selection already carry it', async () => {
+        const { target } = await essenceCatalogue();
+        const rows = [...target.querySelectorAll('[data-world-component-bulk-essence]')].map(
+          (node) => node.getAttribute('data-world-component-bulk-essence')
+        );
+        assert.deepEqual(rows, ['flame', 'earth'], 'the world catalogue`s essences, in its order');
+        assert.equal(
+          row(target, 'flame').querySelector('.fab-bulk-inset-meta').textContent.trim(),
+          '1/2',
+          '`coal` carries flame in the forge, `ingot` carries it nowhere'
+        );
+        assert.equal(
+          row(target, 'earth').querySelector('.fab-bulk-inset-meta').textContent.trim(),
+          '0/2'
+        );
+        for (const id of rows) {
+          assert.equal(stateOf(target, id), 'unchanged', 'every row starts unchanged');
+          assert.equal(valueOf(target, id), '—', 'and shows no value');
+        }
+        assert.ok(!target.querySelector('[data-world-component-bulk-essence-chips]'), 'no staged run yet');
+        assert.ok(
+          Boolean(row(target, 'flame').querySelector('[data-medallion="glyph"]')),
+          'the row leads with the essence`s glyph tile, as `proto:1204` draws it'
+        );
+      });
+
+      it('steps a row up into a VALUE, down through a STRIP and back to unchanged, and the staged run follows', async () => {
+        const { target } = await essenceCatalogue();
+        // The shared `Stepper` never inerts its `−` (the reference's `−` below zero is a no-op that
+        // leaves the row unchanged, `proto:5631`), so stepping an unchanged row down changes nothing.
+        await dec(target, 'flame');
+        assert.equal(stateOf(target, 'flame'), 'unchanged', 'stepping unchanged down stays unchanged');
+        await inc(target, 'flame');
+        assert.equal(stateOf(target, 'flame'), 'set');
+        assert.equal(valueOf(target, 'flame'), '1');
+        assert.equal(
+          chip(target, 'flame').getAttribute('data-world-component-bulk-essence-chip-state'),
+          'set',
+          'the staged run paints the value'
+        );
+        await inc(target, 'flame');
+        assert.equal(valueOf(target, 'flame'), '2');
+        await dec(target, 'flame');
+        assert.equal(valueOf(target, 'flame'), '1');
+        await dec(target, 'flame');
+        assert.equal(stateOf(target, 'flame'), 'strip', '`1` stepped down is a STRIP, not unchanged');
+        assert.equal(valueOf(target, 'flame'), '0');
+        assert.equal(
+          chip(target, 'flame').getAttribute('data-world-component-bulk-essence-chip-state'),
+          'strip'
+        );
+        assert.match(chip(target, 'flame').textContent, /removed/, 'and the chip says so');
+        await dec(target, 'flame');
+        assert.equal(stateOf(target, 'flame'), 'unchanged', '`0` stepped down is unchanged again');
+        assert.ok(!chip(target, 'flame'), 'and the chip is gone');
+      });
+
+      it('unstages from the chip and from the group`s Clear', async () => {
+        const { target } = await essenceCatalogue();
+        await inc(target, 'flame');
+        await inc(target, 'earth');
+        assert.equal(target.querySelectorAll('[data-world-component-bulk-essence-chip]').length, 2);
+        chip(target, 'flame').click();
+        await drain();
+        assert.equal(stateOf(target, 'flame'), 'unchanged', 'a click on the chip unstages it');
+        assert.equal(stateOf(target, 'earth'), 'set', 'and only it');
+        await press(target, '[data-world-component-bulk-clear-essences]');
+        assert.equal(stateOf(target, 'earth'), 'unchanged', 'Clear unstages the group');
+        assert.ok(!target.querySelector('[data-world-component-bulk-essence-chips]'));
+      });
+
+      it('names the write in the Apply, then hands each system with rules the values grouped by what they write — and nothing to a system without rules', async () => {
+        const { target, calls } = await essenceCatalogue();
+        for (let step = 0; step < 3; step += 1) await inc(target, 'flame');
+        await inc(target, 'earth');
+        await dec(target, 'earth');
+        assert.equal(stateOf(target, 'earth'), 'strip', 'NON-VACUITY: earth is staged as a strip');
+        assert.equal(
+          target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
+          'Set essence values on 2 components',
+          'the dock names the write'
+        );
+        await press(target, '[data-world-component-bulk-apply]');
+        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
+        assert.deepEqual(
+          writes.map((call) => [call.args[0], [...call.args[1]].sort(), call.args[2]]),
+          [
+            // Both forge components end on the same map — coal`s `flame: 2` becomes 3, ingot`s empty
+            // map gains it, and the strip of `earth` removes nothing either carried — so ONE write.
+            ['sys-forge', ['coal', 'ingot'], { essences: { flame: 3 } }],
+            ['sys-alchemy', ['coal'], { essences: { flame: 3 } }],
+          ],
+          'one write per system per resulting map, and none to `sys-jewel`, which holds neither'
+        );
+        assert.equal(
+          calls.filter((call) => call.verb !== 'bulkEditRules').length,
+          0,
+          'no other verb runs for an essence-only instruction'
+        );
+        assert.equal(
+          target.querySelectorAll('[data-scoped-list-row].is-bulk-selected').length,
+          0,
+          'and the selection is cleared on the way out'
+        );
+      });
+
+      it('writes a STRIP only where the essence is carried, and skips a component whose rules would not change', async () => {
+        const { target, calls } = await essenceCatalogue();
+        await inc(target, 'flame');
+        await dec(target, 'flame');
+        assert.equal(stateOf(target, 'flame'), 'strip');
+        await press(target, '[data-world-component-bulk-apply]');
+        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
+        assert.deepEqual(
+          writes.map((call) => [call.args[0], [...call.args[1]], call.args[2]]),
+          [['sys-forge', ['coal'], { essences: {} }]],
+          '`coal` in the forge loses flame; `ingot` there and `coal` in alchemy never carried it, so neither is written'
+        );
+      });
+
+      it('counts the write in a MIXED instruction, so the dock`s record count stays truthful', async () => {
+        const { target } = await essenceCatalogue();
+        await inc(target, 'flame');
+        stageTag(target, 'fuel');
+        await drain();
+        // Two tag writes (one per component) plus the two essence batches above.
+        assert.equal(
+          target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
+          'Write 4 records across 2 components'
+        );
+      });
+
+      it('says so rather than offering an empty inset when the world has no essences', async () => {
+        const { target } = await essenceCatalogue([]);
+        assert.ok(
+          Boolean(target.querySelector('[data-world-component-bulk-essences-empty]')),
+          'the sentence names the catalogue where an essence is minted'
+        );
+        assert.ok(
+          !target.querySelector('[data-bulk-inset="essences"]'),
+          'and no search well over nothing'
+        );
+      });
+
+      describe('the pure model behind it', () => {
+        it('counts a component as carrying an essence when ANY system`s rules for it do', () => {
+          assert.deepEqual(componentBulkEssenceCarried(['coal', 'ingot'], ESSENCE_SYSTEMS), {
+            flame: 1,
+          });
+          assert.deepEqual(componentBulkEssenceCarried([], ESSENCE_SYSTEMS), {});
+        });
+
+        it('batches by system and by the resulting map, merging the staged values into what each component holds', () => {
+          assert.deepEqual(
+            componentBulkEssenceBatches(['coal', 'ingot'], { flame: 3, earth: 0 }, ESSENCE_SYSTEMS),
+            [
+              { systemId: 'sys-forge', componentIds: ['coal', 'ingot'], essences: { flame: 3 } },
+              { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 3 } },
+            ]
+          );
+          // A value a component already holds at that number is not a write.
+          assert.deepEqual(
+            componentBulkEssenceBatches(['coal', 'ingot'], { flame: 2 }, ESSENCE_SYSTEMS),
+            [
+              { systemId: 'sys-forge', componentIds: ['ingot'], essences: { flame: 2 } },
+              { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 2 } },
+            ]
+          );
+          assert.deepEqual(componentBulkEssenceBatches(['coal'], {}, ESSENCE_SYSTEMS), []);
+        });
       });
     });
   });

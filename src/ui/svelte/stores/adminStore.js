@@ -6026,6 +6026,45 @@ export function createAdminStore(services) {
   }
 
   /**
+   * Write one bulk edit to a SET of components' RULES in ONE crafting system (issue 1371 r16-cat,
+   * maintainer ruling M25).
+   *
+   * The world Component catalogue's bulk panel stages essence values for a selection whose members
+   * have rules in several systems, and a component's essence values ARE each system's own rules —
+   * so the world-scope write is per system, through the same set-apply primitive the system
+   * Component Studio's bulk edit uses ({@link applyComponentBulkEdit}), with the system named by
+   * the caller instead of read from the rail's selection. `edit` is forwarded VERBATIM: the
+   * primitive tests key PRESENCE, so `{essences: {}}` is the instruction "strip every essence" and
+   * must not be pruned as empty.
+   *
+   * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
+   * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
+   *
+   * @param {string} systemId the crafting system whose rules are written.
+   * @param {Iterable<string>} componentIds the components, all of which have rules there.
+   * @param {object} edit the staged axes, in `applyBulkEditToComponents`' contract.
+   * @returns {Promise<{updated: number, componentIds: string[]}|false>}
+   */
+  async function bulkEditComponentRules(systemId, componentIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager?.();
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    const ids = Array.from(componentIds || [], String).filter(Boolean);
+    if (!systemManager || !system || ids.length === 0) return false;
+    if (!edit || typeof edit !== 'object' || Object.keys(edit).length === 0) return false;
+    try {
+      const result = await systemManager.applyBulkEditToComponents(system, ids, edit);
+      return {
+        updated: Number(result?.updated) || 0,
+        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
+      };
+    } catch (error) {
+      console.error('Fabricate | Failed to apply component rules bulk edit:', error);
+      services.notify?.error?.(error?.message || 'Failed to apply component rules bulk edit');
+      return false;
+    }
+  }
+
+  /**
    * The message a REFUSED component seed puts in front of the GM.
    *
    * ── IT CARRIES THE REASON, WHICH IS THE HALF THE GM CAN ACT ON ────────────────────────────
@@ -6339,6 +6378,11 @@ export function createAdminStore(services) {
         ...worldScopeFamilies.component,
         addToSystem: joinComponentToSystem,
         removeFromSystem: partComponentFromSystem,
+        // THE PER-SYSTEM RULES WRITE (issue 1371 r16-cat, maintainer ruling M25). Composed HERE,
+        // beside the join/part verbs, because it is the same kind of verb they are: a world-scope
+        // instruction whose second half lives in `CraftingSystemManager`, which the generic family
+        // cannot reach. Wrapped like the rest, so one `refresh()` follows each landed batch.
+        bulkEditRules: bulkEditComponentRules,
       },
       essence: {
         ...worldScopeFamilies.essence,

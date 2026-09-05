@@ -42,6 +42,7 @@
   import {
     componentAliasNote,
     componentBulkDeletePlan,
+    componentBulkEssenceBatches,
     componentGlobalTagNote,
     componentMembershipScopeFilter,
     componentRowStats,
@@ -72,6 +73,10 @@
     // roster's own gate to this route — a `worldItems` handed over without that extension is an
     // empty array, which is the defect the tool screens recorded before it was fixed.
     worldItems = [],
+    // THE WORLD ESSENCE CATALOGUE'S ROSTER (issue 1371 r16-cat, maintainer ruling M25), for the
+    // bulk panel's `Essence values` group: `{id, name, icon?, colorToken?}[]`, which is the
+    // root's `worldEssenceOptions`. Passed by the call site for the reason `worldItems` is.
+    worldEssences = [],
     onOpenEntry = () => {},
     onOpenSystemRules = null,
     // THE VOCABULARY EXIT the `Global tags` card's head action routes through (issue 1371,
@@ -331,6 +336,7 @@
     // caller that is not the panel. It is deliberately kept and deliberately untestable from here.
     if (bulkApplying) return;
     bulkApplying = true;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-run tally, never state
     const failed = new Set();
     try {
       for (const entityId of entityIds) {
@@ -359,6 +365,20 @@
             (tag) => !removeTags.includes(tag)
           );
           await attemptWrite(failed, entityId, () => actions?.setWorldTags?.(entityId, next));
+        }
+      }
+      // THE ESSENCE AXIS WRITES PER SYSTEM, NOT PER COMPONENT (issue 1371 r16-cat, M25): a
+      // component's essence values are each system's own rules, and `applyBulkEditToComponents`
+      // replaces a component's whole map — so the merge is done per component and the components
+      // that end on the same map in the same system go in one write. A batch that throws counts
+      // every component in it as not updated, on `attemptWrite`'s own unit.
+      for (const batch of componentBulkEssenceBatches(entityIds, staged.essences ?? {}, systems)) {
+        try {
+          await actions?.bulkEditRules?.(batch.systemId, [...batch.componentIds], {
+            essences: batch.essences,
+          });
+        } catch {
+          for (const componentId of batch.componentIds) failed.add(componentId);
         }
       }
     } finally {
@@ -564,6 +584,8 @@
     {systems}
     {categoryOptions}
     {tagOptions}
+    essences={worldEssences}
+    {selectedIds}
     applying={bulkApplying}
     deleting={bulkDeleting}
     deletePlan={componentBulkDeletePlan(entries, selectedIds)}

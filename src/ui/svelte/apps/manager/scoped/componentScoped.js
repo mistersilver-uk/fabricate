@@ -1248,10 +1248,14 @@ export function componentBulkMembershipModes(phrase) {
  * @param {boolean} staged.tags
  * @returns {number}
  */
-export function componentBulkWriteCount({ selected, systems, category, tags }) {
+export function componentBulkWriteCount({ selected, systems, category, tags, essences = 0 }) {
   const rows = Number(selected) || 0;
   const systemCount = Number(systems) || 0;
-  return rows * systemCount + (category ? rows : 0) + (tags ? rows : 0);
+  // The essence axis counts its BATCHES (issue 1371 r16-cat, M25): one setting write per system
+  // per resulting map, which is what {@link componentBulkEssenceBatches} answers.
+  return (
+    rows * systemCount + (category ? rows : 0) + (tags ? rows : 0) + (Number(essences) || 0)
+  );
 }
 
 /**
@@ -1272,13 +1276,22 @@ export function componentBulkWriteCount({ selected, systems, category, tags }) {
  * @returns {string}
  */
 export function componentBulkApplyLabel(
-  { count, mode, systems, category, tags, writes },
+  { count, mode, systems, category, tags, writes, essences = false },
   phrase
 ) {
   const selected = Number(count) || 0;
   const systemCount = Number(systems) || 0;
   const membership = systemCount > 0 && (mode === 'add' || mode === 'remove');
-  if (!membership && !category && !tags) {
+  // THE ESSENCE AXIS ALONE names its write the way the category axis does (issue 1371 r16-cat,
+  // M25); combined with any other axis it falls through to the record count below.
+  if (essences && !membership && !category && !tags) {
+    return phrase(
+      'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyEssences',
+      'Set essence values on {count} components',
+      { count: selected }
+    );
+  }
+  if (!membership && !category && !tags && !essences) {
     if (mode === 'add' || mode === 'remove') {
       return phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyPickSystems',
@@ -1300,7 +1313,7 @@ export function componentBulkApplyLabel(
       { count: selected }
     );
   }
-  if (membership && !category && !tags) {
+  if (membership && !category && !tags && !essences) {
     return phrase(
       mode === 'add'
         ? 'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyAdd'
@@ -1311,14 +1324,14 @@ export function componentBulkApplyLabel(
       { count: selected, systems: systemCount }
     );
   }
-  if (!membership && category && !tags) {
+  if (!membership && category && !tags && !essences) {
     return phrase(
       'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyCategory',
       'Set the world category on {count} components',
       { count: selected }
     );
   }
-  if (!membership && !category && tags) {
+  if (!membership && !category && tags && !essences) {
     return phrase(
       'FABRICATE.Admin.Manager.Scoped.Component.BulkApplyTags',
       'Update world tags on {count} components',
@@ -1330,6 +1343,156 @@ export function componentBulkApplyLabel(
     'Write {writes} records across {count} components',
     { writes: Number(writes) || 0, count: selected }
   );
+}
+
+// ── issue 1371 r16-cat ────────────────────────────────────────────────────────────────────────
+//
+// THE BULK PANEL'S ESSENCE AXIS (maintainer ruling M25): "I want a world level essence group too".
+// A world component has NO world-level essence value — essences are each system's own rules —
+// so this axis is a write into every selected component's rules in every crafting system that has
+// rules for it. The three helpers below are pure over the raw roster the root already hands the
+// catalogue page (`systems`, each with its `components[]` and their `essences` maps), so the page
+// never reaches into a system to decide what to write.
+
+/**
+ * A system's rules record for one component, or `null` where the system has none.
+ *
+ * @param {object} system a raw crafting system.
+ * @param {string} componentId
+ * @returns {object|null}
+ */
+function componentRulesIn(system, componentId) {
+  const components = Array.isArray(system?.components) ? system.components : [];
+  return components.find((component) => String(component?.id ?? '') === componentId) ?? null;
+}
+
+/**
+ * The essence map a component's rules carry in one system: `essenceId -> quantity`, with only
+ * POSITIVE quantities, which is the shape `_normalizeComponentEssences` publishes.
+ *
+ * @param {object|null} rules
+ * @returns {Record<string, number>}
+ */
+function carriedEssencesOf(rules) {
+  const out = {};
+  const essences = rules?.essences;
+  if (!essences || typeof essences !== 'object') return out;
+  for (const [id, raw] of Object.entries(essences)) {
+    const quantity = Number(raw);
+    if (Number.isFinite(quantity) && quantity > 0) out[String(id)] = quantity;
+  }
+  return out;
+}
+
+/**
+ * How many of the selection already carry each essence — the `n` of the inset's `n/N`.
+ *
+ * A component CARRIES an essence when ANY system's rules for it hold a positive value: the world
+ * panel writes into every such system, so "already carries it somewhere" is the fact the count
+ * exists to state. Counted once per component however many systems agree.
+ *
+ * @param {string[]} entityIds the ticked world component ids.
+ * @param {Array<object>} systems the raw roster.
+ * @returns {Record<string, number>}
+ */
+export function componentBulkEssenceCarried(entityIds, systems) {
+  const roster = Array.isArray(systems) ? systems : [];
+  const counts = {};
+  for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
+    const componentId = String(rawId ?? '');
+    const carried = new Set();
+    for (const system of roster) {
+      for (const essenceId of Object.keys(carriedEssencesOf(componentRulesIn(system, componentId)))) {
+        carried.add(essenceId);
+      }
+    }
+    for (const essenceId of carried) counts[essenceId] = (counts[essenceId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * The staged map merged into one component's carried map (`proto:4239`): a positive value is
+ * SET, a zero STRIPS the essence, and an essence the instruction does not name is left alone.
+ *
+ * @param {Record<string, number>} carried
+ * @param {Record<string, number>} staged
+ * @returns {Record<string, number>}
+ */
+function mergeStagedEssences(carried, staged) {
+  const merged = { ...carried };
+  for (const [id, raw] of Object.entries(staged ?? {})) {
+    const quantity = Number(raw);
+    if (!Number.isFinite(quantity)) continue;
+    if (quantity > 0) merged[id] = quantity;
+    else delete merged[id];
+  }
+  return merged;
+}
+
+/**
+ * A stable key for one essence map, so two components ending on the same map share a write.
+ *
+ * @param {Record<string, number>} essences
+ * @returns {string}
+ */
+function essenceMapKey(essences) {
+  return Object.keys(essences)
+    .sort((left, right) => left.localeCompare(right))
+    .map((id) => `${id}=${essences[id]}`)
+    .join('|');
+}
+
+/**
+ * The writes an essence instruction makes: one per crafting system per RESULTING map.
+ *
+ * `CraftingSystemManager.applyBulkEditToComponents` REPLACES a component's whole `essences` map,
+ * so the merge is done here per component and the components that end on the same map in the same
+ * system are written together. A system with no rules for a component is not written for it, and
+ * a component whose map would not change is skipped — an Apply that touches nothing on a record is
+ * a write that reports itself and changes nothing.
+ *
+ * Batches are in roster order, then in selection order within a batch.
+ *
+ * @param {string[]} entityIds the ticked world component ids, in list order.
+ * @param {Record<string, number>} staged `essenceId -> quantity`, `0` meaning strip.
+ * @param {Array<object>} systems the raw roster.
+ * @returns {Array<{systemId: string, componentIds: string[], essences: Record<string, number>}>}
+ */
+export function componentBulkEssenceBatches(entityIds, staged, systems) {
+  if (!staged || Object.keys(staged).length === 0) return [];
+  const batches = [];
+  for (const system of Array.isArray(systems) ? systems : []) {
+    const systemId = String(system?.id ?? '');
+    if (!systemId) continue;
+    const groups = new Map();
+    for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
+      const componentId = String(rawId ?? '');
+      const rules = componentRulesIn(system, componentId);
+      if (!rules) continue;
+      const carried = carriedEssencesOf(rules);
+      const merged = mergeStagedEssences(carried, staged);
+      const key = essenceMapKey(merged);
+      if (key === essenceMapKey(carried)) continue;
+      if (!groups.has(key)) groups.set(key, { systemId, componentIds: [], essences: merged });
+      groups.get(key).componentIds.push(componentId);
+    }
+    batches.push(...groups.values());
+  }
+  return batches;
+}
+
+/**
+ * The essence group's head hint: what is staged, in the words the sibling groups use.
+ *
+ * @param {Record<string, number>} staged
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentBulkEssenceHint(staged, phrase) {
+  const count = Object.keys(staged ?? {}).length;
+  if (count === 0) return phrase('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged');
+  return phrase('FABRICATE.Admin.Manager.BulkEdit.EssenceStaged', '{count} staged', { count });
 }
 
 // ── THE WORLD CATALOGUE ENTRY'S OWN MODEL (issue 1371, maintainer parity round 4) ─────────────

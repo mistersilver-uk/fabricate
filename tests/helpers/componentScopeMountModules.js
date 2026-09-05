@@ -212,6 +212,11 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+    // The bulk panel's shared staging inset (issue 1371 r16-cat, maintainer rulings M24/M25) and
+    // the `Stepper` its essence rows render. Both are in the panel's STATIC graph, and an omission
+    // HANGS the suite as `# cancelled` rather than failing a test.
+    'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
@@ -354,6 +359,9 @@ export function recordingComponentActions() {
     'updateEntity',
     'deleteEntity',
     'createEntity',
+    // The per-system RULES write the world bulk panel's essence group uses (issue 1371 r16-cat,
+    // maintainer ruling M25): `bulkEditRules(systemId, componentIds, edit)`.
+    'bulkEditRules',
   ];
   const actions = {};
   for (const verb of verbs) {

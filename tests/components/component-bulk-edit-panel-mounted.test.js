@@ -47,6 +47,9 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25); an
+    // omission HANGS this suite as `# cancelled` rather than failing a test.
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
@@ -447,7 +450,9 @@ describe('ComponentBulkEditPanel essence inset (issue 1371 r16-list, M24)', () =
       'sorted as the reference sorts (`proto:5520`)'
     );
     const fire = essenceRow(root, 'fire');
-    assert.ok(Boolean(fire.querySelector(':scope .fab-component-bulk-essence-glyph i.fa-fire')), 'the glyph medallion');
+    // The tile is the shared inset's `Medallion variant="glyph-chip"` since the essence rows moved
+    // onto `BulkStagingInset`'s `stepper` kind (issue 1371 r16-cat, M25).
+    assert.ok(Boolean(fire.querySelector(':scope [data-medallion="glyph"] i.fa-fire')), 'the glyph medallion');
     assert.equal(fire.querySelector('.fab-bulk-inset-meta').textContent.trim(), '1/3');
     assert.ok(Boolean(fire.querySelector('[data-stepper-decrement]')) && Boolean(fire.querySelector('[data-stepper-increment]')), 'the `− +` pair');
   });
