@@ -12259,3 +12259,550 @@ test('the source picker`s trigger fills its column, and only one of its two site
     await context.close();
   }
 });
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE SHARED SELECT'S PAINT, IN A REAL BROWSER (issue 1504)
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// `tests/helpers/scoped-component-css.js` records that happy-dom cannot compute a cascade and that
+// no mounted harness loads `styles/fabricate.css`, so NONE of the claims below can be made in
+// `tests/components/select-mounted.test.js`. They are made here, in this file's shared Chromium
+// process, because there are three independent things only a real cascade can decide:
+//
+//   1. WHETHER `<Select>` PAINTS AT ALL OUTSIDE THE MANAGER. Its whole point is that a converted
+//      player pager and a converted manager toolbar are ONE control, and the failure mode is not
+//      subtle-but-wrong, it is a control that renders at Foundry's 14px app base with core's own
+//      fixed button height. So the same fixture is measured with NO `.fabricate-manager` ancestor
+//      and again inside one, and the two are asserted IDENTICAL rung for rung.
+//   2. WHETHER THE COMPONENT'S OWN RULES BEAT THE 29 `.fabricate-picker*` RULES IT INHERITS.
+//      `<Select>` renders inside `SearchablePopover`'s own root and panel, so
+//      `.fabricate-picker-popover.manager-travel-popover` — (0,2,0) ON ONE ELEMENT — reaches its
+//      panel and declares `min-width: 240px`, `max-width: 340px` and `border-radius: 10px`. The
+//      component wins on the LAYER axis (this sheet imports at `layer(modules)`; a `css:
+//      'injected'` block lands unlayered), and these are the two declarations that prove it: an
+//      inline panel opening at 240px over a list of two-digit numbers is the defect.
+//   3. WHETHER FOUNDRY'S OWN FOCUS RING IS REPLACED RATHER THAN JOINED. Core paints a burnt-orange
+//      outline plus a 4px glow on `button:focus`; `.fabricate button:focus` strips both and
+//      `.fabricate button:focus-visible` restores a 2px accent OUTSET outline at (0,2,1). The
+//      specimen's focus state is "border to accent-border, no glow", so the component's own rule
+//      has to beat the SUPPLYING half — and because the winning rule draws no outset ring at all,
+//      the clipped-edge defect that `.fabricate-app select:focus-visible`'s INSET ring exists for
+//      cannot arise once the player's page-size control moves off `select` and onto `button`.
+//
+// The `toolbar` rung carries a fourth claim of its own. Its type size is written as the LITERAL
+// `0.72rem` rather than as a read of the area-scoped control-font property, and the observable
+// difference is exactly this: a rule reading that property computes the INHERITED size outside
+// `.fabricate-manager`, so the player half of clause 1 would fail there. The fixture therefore
+// gives the player area Foundry's own 14px app base, so "inherited" and "11.52px" cannot coincide.
+const selectPath = resolve(__dirname, '../../src/ui/svelte/components/Select.svelte');
+const framePath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'
+);
+
+/** The three rungs, and everything each one publishes. Read straight off the specimen. */
+const SELECT_RUNGS = Object.freeze([
+  Object.freeze({
+    rung: 'form',
+    height: 38,
+    radius: '9px',
+    fill: 'surface-soft',
+    fontSize: '12.5px',
+    minWidth: '240px',
+    maxWidth: '340px',
+  }),
+  Object.freeze({
+    rung: 'inline',
+    height: 30,
+    radius: '7px',
+    fill: 'bg-2',
+    fontSize: '11.5px',
+    minWidth: '96px',
+    maxWidth: '240px',
+  }),
+  Object.freeze({
+    rung: 'toolbar',
+    height: 34,
+    radius: '9px',
+    fill: 'bg-1',
+    // 0.72rem against a 16px ROOT. `rem` is root-relative, which is the whole reason the literal
+    // is area-independent where the control-font property is not.
+    fontSize: '11.52px',
+    minWidth: '160px',
+    maxWidth: '320px',
+  }),
+]);
+
+/** One `<Select>` trigger's markup, at one rung, exactly as the component renders it. */
+function selectTriggerFixture(area, rung) {
+  return `
+    <div class="fabricate-picker manager-travel-picker fabricate-select">
+      <button
+        type="button"
+        class="fabricate-select-trigger fabricate-select-trigger-${rung}"
+        data-select-size="${rung}"
+        data-probe="${area}-${rung}"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        role="combobox"
+      ><span class="manager-travel-picker-value fabricate-select-value">Routed by check</span><i
+        class="fas fa-chevron-down" aria-hidden="true"></i></button>
+    </div>`;
+}
+
+/**
+ * One open panel's markup, at one rung, with or without its tick column.
+ *
+ * The panel is PORTALED out of the picker root in the product, so it is a SIBLING here rather than
+ * a descendant — which is the arrangement that makes `.fabricate-picker-popover.manager-travel-popover`
+ * a same-element (0,2,0) contest rather than a descendant one.
+ */
+function selectPanelFixture(area, rung, { ticked }) {
+  const tick = ticked
+    ? '<span class="fabricate-select-tick" aria-hidden="true"><i class="fas fa-check"></i></span>'
+    : '';
+  const tickedClass = ticked ? ` fabricate-select-popover-ticked` : '';
+  return `
+    <div
+      class="fabricate-picker-popover manager-travel-popover fabricate-select-popover fabricate-select-popover-${rung}${tickedClass}"
+      data-probe="${area}-panel-${rung}"
+      role="dialog"
+    >
+      <div class="manager-travel-popover-options fabricate-select-options" role="listbox">
+        <div class="manager-travel-popover-group" role="group">
+          <p class="manager-travel-popover-group-label" data-probe="${area}-heading-${rung}">Instructions</p>
+          <button
+            type="button"
+            class="manager-travel-option fabricate-select-option"
+            role="option"
+            aria-selected="true"
+            data-probe="${area}-row-${rung}"
+          >${tick}<span class="fabricate-select-label">Leave unchanged</span></button>
+        </div>
+      </div>
+    </div>`;
+}
+
+test('the shared Select paints identically in both areas, and beats the paint it inherits', async () => {
+  const selectScoped = scopedComponentCss(selectPath);
+  const frameScoped = scopedComponentCss(framePath);
+
+  // ONLY the classes `Select.svelte` itself writes take its hash. Its trigger, its value span, its
+  // panel, its list, its rows and the group heading all belong to `SearchablePopover`, so those
+  // rules are `:global(…)` and are already unhashed in the emitted CSS — stamping them would make
+  // the fixture MORE specific than the product.
+  const stamp = (markup) =>
+    ['fabricate-select-tick', 'fabricate-select-label', 'fabricate-select-hint'].reduce(
+      (html, className) => withScopeHash(html, className, selectScoped.hashClass),
+      withScopeHash(markup, 'manager-scoped-list-direction', frameScoped.hashClass)
+    );
+
+  const areaBody = (area, panels) =>
+    `${`<button type="button" data-probe="${area}-anchor">anchor</button>`}
+     ${SELECT_RUNGS.map(({ rung }) => selectTriggerFixture(area, rung)).join('\n')}
+     ${panels}`;
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 900, height: 700 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(
+      `
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            /* Foundry core's own host rules, as the two shipped button resets in this sheet
+               already record they must beat: content centred, and a FIXED height rather than a
+               floor — plus the burnt-orange ring and glow the area reset strips. */
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: var(--button-size); }
+              a.button:focus, button:focus {
+                outline: 1px solid var(--button-focus-outline-color);
+                box-shadow: 0 0 4px var(--button-focus-outline-color);
+              }
+              input, select { width: 100%; }
+            }
+            @layer modules { ${css} }
+            ${frameScoped.css}
+            ${selectScoped.css}
+            :root { --button-size: 28px; --button-focus-outline-color: #ff6400; font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            /* Foundry's own application base, which is what "inherited" means outside the manager
+               — 14px, so it can never be mistaken for the toolbar rung's 11.52px literal. */
+            .fabricate { font-size: 14px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+            .probe { width: 10px; height: 10px; }
+          </style>
+        </head>
+        <body>
+          ${stamp(`
+          <div class="fabricate fabricate-app" data-area="player">
+            ${areaBody(
+              'player',
+              [
+                selectPanelFixture('player', 'inline', { ticked: true }),
+                selectPanelFixture('player', 'form', { ticked: false }),
+              ].join('\n')
+            )}
+          </div>
+          <div class="fabricate">
+            <main class="fabricate-manager" data-area="manager">
+              ${areaBody(
+                'manager',
+                [
+                  selectPanelFixture('manager', 'inline', { ticked: true }),
+                  selectPanelFixture('manager', 'toolbar', { ticked: false }),
+                ].join('\n')
+              )}
+              <div class="manager-toolbar manager-scoped-list-toolbar">
+                <div class="manager-search"><input type="text" data-probe="shipped-search"></div>
+                <select data-probe="shipped-select"><option>Name</option></select>
+                <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
+                  ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
+              </div>
+            </main>
+          </div>`)}
+          <div class="probe" data-probe="surface-soft" style="background: var(--fab-surface-soft)"></div>
+          <div class="probe" data-probe="bg-2" style="background: var(--fab-bg-2)"></div>
+          <div class="probe" data-probe="bg-1" style="background: var(--fab-bg-1)"></div>
+          <div class="probe" data-probe="surface-active" style="background: var(--fab-surface-active)"></div>
+          <div class="probe" data-probe="border" style="background: var(--fab-border)"></div>
+          <div class="probe" data-probe="accent-border" style="background: var(--fab-accent-border)"></div>
+        </body>
+      </html>
+    `
+    );
+
+    const report = await page.evaluate(() => {
+      const at = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const of = (name) => getComputedStyle(at(name));
+      const fill = (name) => of(name).backgroundColor;
+      const trigger = (name) => {
+        const style = of(name);
+        return {
+          height: at(name).getBoundingClientRect().height,
+          radius: style.borderTopLeftRadius,
+          borderColour: style.borderTopColor,
+          background: style.backgroundColor,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          justify: style.justifyContent,
+        };
+      };
+      const panel = (name) => {
+        const style = of(name);
+        return {
+          minWidth: style.minWidth,
+          maxWidth: style.maxWidth,
+          radius: style.borderTopLeftRadius,
+        };
+      };
+      const rungs = ['form', 'inline', 'toolbar'];
+      return {
+        triggers: Object.fromEntries(
+          ['player', 'manager'].flatMap((area) =>
+            rungs.map((rung) => [`${area}-${rung}`, trigger(`${area}-${rung}`)])
+          )
+        ),
+        panels: {
+          'player-inline': panel('player-panel-inline'),
+          'manager-inline': panel('manager-panel-inline'),
+          'player-form': panel('player-panel-form'),
+          'manager-toolbar': panel('manager-panel-toolbar'),
+        },
+        rows: {
+          alignItems: of('player-row-inline').alignItems,
+          selectedFill: of('player-row-inline').backgroundColor,
+          tickOpacity: getComputedStyle(at('player-row-inline').querySelector('span')).opacity,
+        },
+        headings: {
+          ticked: of('player-heading-inline').paddingLeft,
+          untickedPlayer: of('player-heading-form').paddingLeft,
+          untickedManager: of('manager-heading-toolbar').paddingLeft,
+        },
+        shipped: {
+          select: { size: of('shipped-select').fontSize, weight: of('shipped-select').fontWeight },
+          search: { size: of('shipped-search').fontSize, weight: of('shipped-search').fontWeight },
+          direction: {
+            size: of('shipped-direction').fontSize,
+            weight: of('shipped-direction').fontWeight,
+          },
+        },
+        tokens: {
+          'surface-soft': fill('surface-soft'),
+          'bg-2': fill('bg-2'),
+          'bg-1': fill('bg-1'),
+          'surface-active': fill('surface-active'),
+          border: fill('border'),
+          'accent-border': fill('accent-border'),
+        },
+      };
+    });
+
+    // ── THE THREE RUNGS, IN BOTH AREAS, IDENTICALLY ─────────────────────────────────────────
+    for (const rung of SELECT_RUNGS) {
+      for (const area of ['player', 'manager']) {
+        const measured = report.triggers[`${area}-${rung.rung}`];
+        const where = `${area} ${rung.rung}`;
+        assert.ok(
+          Math.abs(measured.height - rung.height) <= 1,
+          `${where}: the rung stands at ${rung.height}px (measured ${measured.height.toFixed(1)}px)`
+        );
+        assert.equal(measured.radius, rung.radius, `${where}: corner`);
+        assert.equal(measured.borderColour, report.tokens.border, `${where}: hairline edge`);
+        assert.equal(
+          measured.background,
+          report.tokens[rung.fill],
+          `${where}: fill is --fab-${rung.fill}, which is its own axis rather than a consequence ` +
+            'of the geometry'
+        );
+        assert.equal(measured.fontSize, rung.fontSize, `${where}: type size`);
+        assert.equal(
+          measured.fontWeight,
+          '500',
+          `${where}: a published ramp numeral at EVERY rung, rather than the \`normal\` the ` +
+            'shipped toolbar select computes today'
+        );
+        assert.notEqual(
+          measured.justify,
+          'center',
+          `${where}: the Foundry host reset landed — core's \`button { justify-content: center }\` ` +
+            'would otherwise centre every value in every select'
+        );
+      }
+
+      assert.deepEqual(
+        report.triggers[`player-${rung.rung}`],
+        report.triggers[`manager-${rung.rung}`],
+        `the ${rung.rung} rung is the SAME control in both areas, on every measured axis — which ` +
+          'is the claim a shared primitive makes and the one a manager-rooted family cannot'
+      );
+    }
+
+    // The literal's whole observable consequence, stated as its own clause: a rule reading the
+    // area-scoped control-font property would compute the player area's inherited 14px here.
+    assert.equal(
+      report.triggers['player-toolbar'].fontSize,
+      '11.52px',
+      'the toolbar rung ships a LITERAL 0.72rem, so it is 11.52px with no manager ancestor'
+    );
+    assert.notEqual(
+      report.triggers['player-toolbar'].fontSize,
+      '14px',
+      'and not the inherited app base, which is what an area-scoped property read would give'
+    );
+
+    // ── THE PANEL BEATS (0,2,0) ON ONE ELEMENT, TWICE ───────────────────────────────────────
+    for (const rung of SELECT_RUNGS) {
+      const key = Object.keys(report.panels).find((name) => name.endsWith(`-${rung.rung}`));
+      assert.equal(
+        report.panels[key].radius,
+        '11px',
+        `${key}: the specimen corners the option list at 11px, against the 10px the panel ` +
+          'inherits — the second declaration proving the override lands'
+      );
+      assert.equal(report.panels[key].minWidth, rung.minWidth, `${key}: the rung's own floor`);
+      assert.equal(report.panels[key].maxWidth, rung.maxWidth, `${key}: and its own ceiling`);
+    }
+    assert.equal(
+      report.panels['player-inline'].minWidth,
+      '96px',
+      'an inline panel opens at its own 96px floor rather than at the sheet`s 240px, which is ' +
+        'the defect: a 240px panel over a list of two-digit page sizes'
+    );
+    assert.deepEqual(
+      report.panels['player-inline'],
+      report.panels['manager-inline'],
+      'and the panel is the same box in both areas'
+    );
+
+    // ── THE TICKED ROW'S GEOMETRY, AND THE HEADING'S INSET ──────────────────────────────────
+    assert.equal(
+      report.rows.alignItems,
+      'flex-start',
+      'a ticked-and-hinted row is two lines, so the tick sits on the FIRST one rather than ' +
+        'floating between them'
+    );
+    assert.equal(
+      report.rows.selectedFill,
+      report.tokens['surface-active'],
+      'and the selected row keeps a fill as well as its tick'
+    );
+    assert.equal(report.rows.tickOpacity, '1', 'the selected row`s tick is the one that shows');
+    assert.equal(
+      report.headings.ticked,
+      '28px',
+      'a group heading aligns with the option LABELS: the row`s own 8px inset PLUS the 12px ' +
+        'tick box PLUS the 8px row gap. Equal insets would put it over the tick column'
+    );
+    assert.equal(
+      report.headings.untickedPlayer,
+      '8px',
+      'and with no tick column there is nothing to clear, so it falls back to the row`s inset'
+    );
+    assert.equal(report.headings.untickedManager, report.headings.untickedPlayer, 'in both areas');
+
+    // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW, AS A NUMBER ────────────────────────────
+    // Decision KK moves the two CONVERTED controls' weight from the shipped `normal` to 500, and
+    // no Fabricate rule declares a weight for anything on this row. So the split is real and the
+    // three neighbours are measured rather than reasoned about: the row is 11.52px throughout
+    // BEFORE and AFTER, and only the converted controls' weight moves.
+    assert.equal(report.shipped.select.size, '11.52px', 'the shipped sort select`s type size');
+    assert.equal(report.shipped.search.size, '11.52px', 'and its search field`s');
+    assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
+    assert.deepEqual(
+      [report.shipped.select.weight, report.shipped.search.weight, report.shipped.direction.weight],
+      ['400', '400', '400'],
+      'none of the three declares a weight, so each computes `normal` — which is OFF the ' +
+        'published ramp, and is the figure the converted rung`s 500 stands beside'
+    );
+    assert.equal(
+      report.triggers['manager-toolbar'].fontWeight,
+      '500',
+      'so the toolbar line`s SIZE is intact across the conversion and only its WEIGHT moves'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('the shared Select replaces Foundry`s focus ring rather than joining it, in both areas', async () => {
+  // TWO STATES AND TWO AREAS, and the pair is the point. `:focus` is what a mouse leaves behind
+  // and `.fabricate button:focus` must have stripped core's orange outline AND its 4px glow;
+  // `:focus-visible` is what a keyboard leaves, and there the component's own rule has to beat
+  // `.fabricate button:focus-visible`'s 2px accent OUTSET outline with the specimen's "border to
+  // accent-border, no glow".
+  //
+  // Programmatic `.focus()` on a `<button>` does NOT match `:focus-visible` in Chromium, so the
+  // keyboard half focuses a preceding anchor and presses Tab — a real keyboard interaction, which
+  // is what sets the focus-visible modality.
+  const selectScoped = scopedComponentCss(selectPath);
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 900, height: 400 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: var(--button-size); }
+              a.button:focus, button:focus {
+                outline: 1px solid var(--button-focus-outline-color);
+                box-shadow: 0 0 4px var(--button-focus-outline-color);
+              }
+            }
+            @layer modules { ${css} }
+            ${selectScoped.css}
+            :root { --button-size: 28px; --button-focus-outline-color: #ff6400; font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fabricate { font-size: 14px; }
+            .fas::before { content: "x"; }
+            .probe { width: 10px; height: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="fabricate fabricate-app" data-area="player">
+            <button type="button" data-probe="player-anchor">anchor</button>
+            ${selectTriggerFixture('player', 'inline')}
+          </div>
+          <div class="fabricate">
+            <main class="fabricate-manager" data-area="manager">
+              <button type="button" data-probe="manager-anchor">anchor</button>
+              ${selectTriggerFixture('manager', 'inline')}
+            </main>
+          </div>
+          <div class="probe" data-probe="accent-border" style="background: var(--fab-accent-border)"></div>
+          <div class="probe" data-probe="border" style="background: var(--fab-border)"></div>
+          <div class="probe" data-probe="accent" style="background: var(--fab-accent)"></div>
+        </body>
+      </html>
+    `);
+
+    const measure = (name) =>
+      page.evaluate((probe) => {
+        const style = getComputedStyle(document.querySelector(`[data-probe="${probe}"]`));
+        return {
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          outlineColour: style.outlineColor,
+          boxShadow: style.boxShadow,
+          borderColour: style.borderTopColor,
+        };
+      }, name);
+
+    const tokens = await page.evaluate(() =>
+      Object.fromEntries(
+        ['accent-border', 'border', 'accent'].map((name) => [
+          name,
+          getComputedStyle(document.querySelector(`[data-probe="${name}"]`)).backgroundColor,
+        ])
+      )
+    );
+
+    for (const area of ['player', 'manager']) {
+      // THE MOUSE STATE. A click leaves `:focus` without `:focus-visible`.
+      await page.click(`[data-probe="${area}-inline"]`);
+      const clicked = await measure(`${area}-inline`);
+      assert.equal(
+        clicked.outlineStyle,
+        'none',
+        `${area}: core's burnt-orange outline is stripped by the area reset on :focus`
+      );
+      assert.equal(
+        clicked.boxShadow,
+        'none',
+        `${area}: and so is its 4px glow, which is the half a reset that only cleared the ` +
+          'outline would have left painting'
+      );
+      assert.equal(
+        clicked.borderColour,
+        tokens.border,
+        `${area}: a mouse press is not a keyboard focus, so the edge stays the hairline`
+      );
+
+      // THE KEYBOARD STATE, reached by a real Tab so the focus-visible modality is set.
+      await page.focus(`[data-probe="${area}-anchor"]`);
+      await page.keyboard.press('Tab');
+      const tabbed = await measure(`${area}-inline`);
+      assert.equal(
+        tabbed.borderColour,
+        tokens['accent-border'],
+        `${area}: the specimen's focus state is the BORDER moving to accent-border`
+      );
+      assert.equal(
+        tabbed.outlineStyle,
+        'none',
+        `${area}: "no glow" — so the component's rule beats \`.fabricate button:focus-visible\`'s ` +
+          '2px accent outset outline at (0,2,1), which it does on the layer axis and again at (0,3,0)'
+      );
+      assert.equal(
+        tabbed.boxShadow,
+        'none',
+        `${area}: and no ring is drawn as a shadow either. Because the winning rule draws NO ` +
+          'outset ring, the clipped-edge defect that the player select`s inset ring exists for ' +
+          'cannot arise for a converted control at all'
+      );
+      assert.notEqual(
+        tabbed.outlineColour,
+        tokens.accent,
+        `${area}: nor is the accent outline merely recoloured — it is gone`
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
