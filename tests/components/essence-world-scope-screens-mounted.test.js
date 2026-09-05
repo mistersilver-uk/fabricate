@@ -521,6 +521,68 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     assert.equal(reported.handle.isDirty(), false);
   });
 
+  // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THIS SCREEN NOW SAYS SO (issue 1371 r20-entry3,
+  // Foundry review round 6 finding 4) ──────────────────────────────────────────────────────────
+  // `Save essence` stages a MULTI-SECTION sequence off `scope.sections`, and a world-setting write
+  // that Foundry's socket layer refuses posts its own raw `error.message` and then REJECTS. r19
+  // caught the rejection here — the route-exit guard declines the exit rather than rejecting — but
+  // passed no `onRefused`, so a rejection at write *k* left `1..k-1` landed DURABLY with the GM
+  // told only Foundry's sentence, which cannot say which step stopped or which had landed. And the
+  // store publishes its cache before awaiting the write, so every open manager surface shows all of
+  // them as saved until a reload.
+  it('a REJECTING section write answers false and names the step that stopped and the one that had landed', async () => {
+    const notified = [];
+    const previousUi = globalThis.ui;
+    Reflect.set(globalThis, 'ui', {
+      notifications: {
+        error: (message) => {
+          notified.push(message);
+        },
+      },
+    });
+    try {
+      const reported = { handle: null };
+      const root = await entryHarness.mount({
+        scope: essenceScope(),
+        actions: {
+          updateEntity: () => true,
+          updateWorldDefaultSection: async () => {
+            throw new Error('The requested Setting update was refused');
+          },
+        },
+        entityId: 'ash',
+        onBackToCatalogue: () => {},
+        onDraftChange: (handle) => (reported.handle = handle),
+        onDirtyChange: () => {},
+      });
+      assert.ok(reported.handle, 'the editor reported no draft handle, so nothing below is measured');
+
+      // The IDENTITY patch lands first and the sections after it, so staging both is what puts a
+      // landed write behind the refused one.
+      const name = root.querySelector('[data-scoped-entry-name]');
+      name.value = 'Aether';
+      name.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      root.querySelector('[data-scoped-world-default-clear]').click();
+      await entryHarness.setProps({});
+
+      assert.equal(
+        await reported.handle.save(),
+        false,
+        'the Save RESOLVES false — the route-exit guard declines the exit rather than rejecting'
+      );
+      assert.deepEqual(
+        notified,
+        [
+          'Saving the active effect source did not complete; the name, icon, colour and description had already been saved. The requested Setting update was refused',
+        ],
+        'ONE sentence, naming the step that stopped and the one that had landed durably before it — and the identity fragment is THIS editor’s field set, which carries its colour token'
+      );
+      assert.equal(reported.handle.isDirty(), true, 'the edit is still in front of the GM');
+    } finally {
+      Reflect.set(globalThis, 'ui', previousUi);
+    }
+  });
+
   it('WITHDRAWS the handle when the editor unmounts, so a stale one cannot answer for it', async () => {
     const { reported } = await mountEntry();
     entryHarness.remount();

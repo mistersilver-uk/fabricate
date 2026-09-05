@@ -262,7 +262,8 @@ export const SCOPED_ENTRY_IDENTITY_STEP = 'identity';
  * @param {(refusal: {step: string, error: unknown, landed: string[]}) => void} [options.onRefused]
  *   Called ONCE, with the step that threw and the steps that had already landed, when a write
  *   REJECTS. Not called for a `false`: a verb that answers `false` has declined the write itself
- *   and has already said so its own way, and a second sentence over that one is an echo.
+ *   and has already said so its own way, and a second sentence over that one is an echo. Its own
+ *   throw is caught and logged rather than allowed to reject this function.
  * @returns {Promise<boolean>} whether every write landed.
  */
 export async function flushScopedEntryDraft({
@@ -292,7 +293,18 @@ export async function flushScopedEntryDraft({
     }
   } catch (error) {
     console.error('Fabricate | A scoped entry save was refused:', error);
-    onRefused?.({ step, error, landed });
+    // THE REPORT MAY NOT RE-REJECT THE FLUSH (issue 1371 r20-entry3, Foundry review round 6
+    // finding 5). `onRefused` is a documented public parameter, and a throw from it inside this
+    // catch would escape as a rejection from the very function whose contract is "answers `false`
+    // when a write refused OR rejected" — putting the route-exit guard back where the uncaught
+    // rejection left it. It is total today (`notifyError` and `localize` are fully optional-chained
+    // on `globalThis`), and that is precisely the guarantee that should not rest on every future
+    // caller's callback.
+    try {
+      onRefused?.({ step, error, landed });
+    } catch (reportError) {
+      console.error('Fabricate | A scoped entry save refusal could not be reported:', reportError);
+    }
     return false;
   }
   return true;

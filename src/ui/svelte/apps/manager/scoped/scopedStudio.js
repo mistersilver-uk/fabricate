@@ -126,6 +126,165 @@ export function scopedSectionLabel(section, text) {
   return text(copy.key, copy.label);
 }
 
+// ── issue 1371 r20-entry3: the refused-save sentence, hoisted off the three entry pages ────────
+
+/**
+ * Per-step SENTENCE FRAGMENTS for the refused-save report, keyed exactly as {@link SECTION_COPY}
+ * is — plus the two ENTRY-LEVEL steps a component's Save stages that are not world-default
+ * sections (M34): its world tags land through `setWorldTags` and its import aliases through
+ * `updateEntity`, so neither has an inherit row and neither belongs in `SECTION_COPY`.
+ *
+ * WHY A SECOND FORM OF THE SAME NAMES, AND WHY IT IS STILL ONE HOME. `scopedSectionLabel` answers
+ * the TITLE a section renders under — `Category`, `Essence values` — which is right for an inherit
+ * row, a filter chip or a card heading, and wrong inside `Saving {section} did not complete.`. A
+ * translation has to be free to inflect the fragment for that sentence, so the two forms are
+ * genuinely different strings. What must not happen is a fragment set sitting in a PAGE:
+ * `WorldComponentEntryPage.svelte` carried one until r20 while its two siblings called
+ * `scopedSectionLabel` for the same sections, which is the divergence this module exists to
+ * prevent (Foundry review round 6 finding 6). Both forms live here, keyed alike, and
+ * `tests/scoped-entry-draft.test.js` asserts every section a scope descriptor declares has one.
+ *
+ * @type {Readonly<Record<string, {key: string, label: string}>>}
+ */
+const SAVE_STEP_FRAGMENT = Object.freeze({
+  category: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepCategory',
+    label: 'the world category',
+  }),
+  essences: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepEssences',
+    label: 'the world essence values',
+  }),
+  tags: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepTags',
+    label: 'the world tags',
+  }),
+  aliases: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepAliases',
+    label: 'the import aliases',
+  }),
+  effectSource: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepEffectSource',
+    label: 'the active effect source',
+  }),
+  macro: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepMacro',
+    label: 'the macro on craft',
+  }),
+  breakage: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepBreakage',
+    label: 'the breakage settings',
+  }),
+  onBreak: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepOnBreak',
+    label: 'what happens on break',
+  }),
+  prerequisites: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepPrerequisites',
+    label: 'the prerequisites',
+  }),
+  bonus: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepBonus',
+    label: 'the check bonus',
+  }),
+});
+
+/**
+ * The identity PATCH's fragment, per entity type, because it is the one step of a Save that is
+ * not a section and the three editors buffer DIFFERENT field sets: the component lifts
+ * `name`/`img`/`description`, the essence adds its icon and colour token, and the tool buffers
+ * its name alone. A GM told "the name, icon, colour and description did not save" on a screen
+ * that never buffered a colour has been told something false.
+ *
+ * @type {Readonly<Record<string, {key: string, label: string}>>}
+ */
+const SAVE_IDENTITY_FRAGMENT = Object.freeze({
+  component: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepComponentIdentity',
+    label: 'the name, art and description',
+  }),
+  essence: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepEssenceIdentity',
+    label: 'the name, icon, colour and description',
+  }),
+  tool: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Save.StepToolIdentity',
+    label: 'the name',
+  }),
+});
+
+/**
+ * Every step name a refused Save can report a fragment for, for the mirror guard that keeps this
+ * table level with the scope descriptors.
+ *
+ * @type {readonly string[]}
+ */
+export const SCOPED_SAVE_STEP_FRAGMENTS = Object.freeze(Object.keys(SAVE_STEP_FRAGMENT));
+
+/**
+ * The sentence a REFUSED scoped-entry Save puts in front of the GM, posted through the caller's
+ * own notifier — and it is a second, DIFFERENT statement rather than an echo of Foundry's.
+ *
+ * Foundry toasts a refused world-setting write's own `error.message` verbatim before it rejects,
+ * so a catch that re-posted that message would put one sentence on screen twice. This one says
+ * what Foundry's cannot: WHICH step of the staged sequence stopped it, and — the half that
+ * matters under M34 — which steps had already landed durably, because the store publishes its
+ * cache before awaiting the write and every open manager surface shows them as saved until a
+ * reload. Same shape as `adminStore`'s membership failure sentences: localized, with an English
+ * floor that cannot be a raw key, and the reason carried as `{error}` so a translation can state
+ * it too.
+ *
+ * THE THREE ENTRY EDITORS SHARE IT (issue 1371 r20-entry3; Foundry review round 6 findings 4 and
+ * 6). The component entry composed this alone while the essence and tool entries passed no
+ * `onRefused` at all, so a rejection at write *k* on either sibling left `1..k-1` landed durably
+ * with the GM's only signal being Foundry's raw message — and both stage MULTI-SECTION sequences.
+ *
+ * `notify` and `format` are the caller's, so this module still posts no toast and localizes
+ * nothing itself, exactly as its header says. `identityStep` is the caller's too, taken from
+ * `scopedEntryDraft.js`'s exported constant rather than imported here: `scopedStudio.js` is in
+ * every hand-rolled mounted tree and `scopedEntryDraft.js` is in only some of them, and a module
+ * a tree omits does not fail the suite — it HANGS it.
+ *
+ * @param {object} options
+ * @param {{step: string, error: unknown, landed: string[]}} options.refusal what the flush reported.
+ * @param {string} options.entityType `component`, `essence` or `tool`.
+ * @param {string} options.identityStep `SCOPED_ENTRY_IDENTITY_STEP`, from `scopedEntryDraft.js`.
+ * @param {(key: string, fallback: string, data: object) => string} options.format the page's own
+ *   localizing formatter.
+ * @param {(message: string) => void} options.notify the page's own error notifier.
+ * @returns {void}
+ */
+export function reportRefusedScopedEntrySave({
+  refusal,
+  entityType,
+  identityStep,
+  format,
+  notify,
+}) {
+  const { step, error, landed = [] } = refusal ?? {};
+  const named = (name) => {
+    const copy =
+      name === identityStep ? SAVE_IDENTITY_FRAGMENT[entityType] : SAVE_STEP_FRAGMENT[name];
+    return copy ? format(copy.key, copy.label, {}) : name;
+  };
+  const data = {
+    section: named(step),
+    landed: landed.map(named).join(', '),
+    error: error?.message ? String(error.message) : '',
+  };
+  notify(
+    format(
+      landed.length > 0
+        ? 'FABRICATE.Admin.Manager.Scoped.Save.FailedAfter'
+        : 'FABRICATE.Admin.Manager.Scoped.Save.Failed',
+      landed.length > 0
+        ? 'Saving {section} did not complete; {landed} had already been saved. {error}'
+        : 'Saving {section} did not complete. {error}',
+      data
+    ).trim()
+  );
+}
+
 /**
  * The scope descriptor for one entity type, or `null`.
  *

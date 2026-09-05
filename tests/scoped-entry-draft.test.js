@@ -35,6 +35,11 @@ import {
   withScopedEntryDefault,
   withScopedEntryIdentity,
 } from '../src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js';
+import {
+  SCOPED_SAVE_STEP_FRAGMENTS,
+  reportRefusedScopedEntrySave,
+} from '../src/ui/svelte/apps/manager/scoped/scopedStudio.js';
+import { WORLD_SCOPE_DESCRIPTORS } from '../src/ui/svelte/stores/worldScopeProjection.js';
 
 /** The essence entry editor's own shape, which is what the shipped caller passes. */
 const SHAPE = Object.freeze({
@@ -394,6 +399,28 @@ describe('flushing a draft through the world-scope write family', () => {
     assert.deepEqual(refusals, []);
   });
 
+  // ── A REPORT MAY NOT RE-REJECT THE FLUSH (issue 1371 r20-entry3, Foundry review round 6 F5) ──
+  it('survives an `onRefused` that THROWS, and still answers false rather than rejecting', async () => {
+    const actions = actionsOf({
+      updateWorldDefaultSection: async () => {
+        throw new Error('The requested Setting update was refused');
+      },
+    });
+    // `onRefused` is a documented public parameter, so the contract "answers `false` when a write
+    // refused OR rejected" may not rest on every future caller's callback being total: a throw
+    // from it inside the catch would escape as a rejection from this very function, putting the
+    // route-exit guard back where the unhandled rejection left it.
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: null, sections: [{ section: 'category', value: 'Raw' }] },
+      actions,
+      onRefused: () => {
+        throw new Error('the reporter itself blew up');
+      },
+    });
+    assert.equal(landed, false, 'the flush RESOLVED false over a throwing report');
+  });
+
   it('refuses an empty entity id rather than writing against nothing', async () => {
     const actions = actionsOf();
     assert.equal(
@@ -468,6 +495,95 @@ describe('the route-exit guard', () => {
     assert.equal(
       finishScopedEntryExit(false, { save: () => assert.fail('saved'), discard: () => assert.fail('discarded') }),
       false
+    );
+  });
+});
+
+// ── THE REFUSED-SAVE SENTENCE, WHICH ALL THREE ENTRY EDITORS NOW COMPOSE FROM ONE TABLE ────────
+// (issue 1371 r20-entry3; Foundry review round 6 findings 4 and 6.)
+// The component entry carried its own four-name map while its two siblings read the shared
+// section table and reported nothing at all, so a rejection on either sibling left the GM with
+// Foundry's raw message. `reportRefusedScopedEntrySave` is the one composer; what is tested here
+// is the sentence it makes and the table it makes it from.
+describe('the refused-save sentence', () => {
+  /** A localizer with NO translations, so every assertion reads the English floor. */
+  const format = (key, fallback, data) => {
+    let result = fallback;
+    for (const [token, value] of Object.entries(data ?? {})) {
+      result = result.replaceAll(`{${token}}`, String(value));
+    }
+    return result;
+  };
+
+  const sentenceFor = (refusal, entityType) => {
+    const said = [];
+    reportRefusedScopedEntrySave({
+      refusal,
+      entityType,
+      identityStep: SCOPED_ENTRY_IDENTITY_STEP,
+      format,
+      notify: (message) => {
+        said.push(message);
+      },
+    });
+    return said;
+  };
+
+  it('names the step that stopped AND the steps that had already landed durably', () => {
+    assert.deepEqual(
+      sentenceFor(
+        {
+          step: 'tags',
+          error: new Error('The requested Setting update was refused'),
+          landed: ['category'],
+        },
+        'component'
+      ),
+      [
+        'Saving the world tags did not complete; the world category had already been saved. The requested Setting update was refused',
+      ]
+    );
+  });
+
+  it('says only what stopped when NOTHING had landed, rather than an empty landed clause', () => {
+    assert.deepEqual(
+      sentenceFor({ step: 'category', error: new Error('refused'), landed: [] }, 'component'),
+      ['Saving the world category did not complete. refused']
+    );
+  });
+
+  it('names the IDENTITY patch with the fields THIS editor buffers, which differ per entity type', () => {
+    // A GM told "the name, icon, colour and description did not save" on the tool entry — which
+    // buffers its name alone — has been told something false, so the identity fragment is per
+    // entity type rather than one sentence for all three.
+    const identity = { step: SCOPED_ENTRY_IDENTITY_STEP, error: new Error('refused'), landed: [] };
+    assert.deepEqual(sentenceFor(identity, 'component'), [
+      'Saving the name, art and description did not complete. refused',
+    ]);
+    assert.deepEqual(sentenceFor(identity, 'essence'), [
+      'Saving the name, icon, colour and description did not complete. refused',
+    ]);
+    assert.deepEqual(sentenceFor(identity, 'tool'), [
+      'Saving the name did not complete. refused',
+    ]);
+  });
+
+  it('EVERY section a scope descriptor declares has a fragment, so no sentence can name a raw key', () => {
+    // The mirror guard. The fragment table is hand-maintained beside `SECTION_COPY`, and a
+    // section added to a descriptor without one would fall through to its own key — putting
+    // `Saving effectSource did not complete.` in front of a GM. The two entry-level steps the
+    // component's draft stages (M34) are not descriptor sections and are named explicitly.
+    const declared = new Set(['tags', 'aliases']);
+    for (const descriptor of Object.values(WORLD_SCOPE_DESCRIPTORS)) {
+      for (const section of descriptor.sections ?? []) declared.add(section);
+    }
+    const missing = [...declared].filter(
+      (section) => !SCOPED_SAVE_STEP_FRAGMENTS.includes(section)
+    );
+    assert.deepEqual(
+      missing,
+      [],
+      `these save steps have no sentence fragment, so a refusal would name them by raw key: ${missing.join(', ')}`
     );
   });
 });

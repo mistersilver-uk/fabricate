@@ -390,6 +390,66 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.equal(draftHandle.isDirty(), false, 'a landed Save leaves nothing to write');
     });
 
+    // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THIS SCREEN NOW SAYS SO (issue 1371 r20-entry3,
+    // Foundry review round 6 finding 4) ────────────────────────────────────────────────────────
+    // `Save tool` stages a MULTI-SECTION sequence off `scope.sections`, and a world-setting write
+    // that Foundry's socket layer refuses posts its own raw `error.message` and then REJECTS. r19
+    // caught the rejection here — the route-exit guard declines the exit rather than rejecting —
+    // but passed no `onRefused`, so a rejection at write *k* left `1..k-1` landed DURABLY with the
+    // GM told only Foundry's sentence, which cannot say which step stopped or which had landed.
+    // And the store publishes its cache before awaiting the write, so every open manager surface
+    // shows all of them as saved until a reload.
+    it('a REJECTING section write answers false and names the step that stopped and the one that had landed', async () => {
+      const notified = [];
+      const previousUi = globalThis.ui;
+      Reflect.set(globalThis, 'ui', {
+        notifications: {
+          error: (message) => {
+            notified.push(message);
+          },
+        },
+      });
+      try {
+        const target = await mountTab({
+          scope: scopeFor({ breakage: { mode: 'breakageChance', breakageChance: 8 } }),
+          actions: {
+            updateEntity: () => true,
+            updateWorldDefaultSection: async () => {
+              throw new Error('The requested Setting update was refused');
+            },
+          },
+        });
+        const name = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
+        name.value = 'Miners Pick';
+        name.dispatchEvent(new Event('input', { bubbles: true }));
+        await harness.setProps({});
+
+        target.querySelector('#world-tool-entry-tab-breakage').click();
+        await harness.setProps({});
+        const chance = target.querySelector('[data-world-tool-entry-breakage-chance]');
+        chance.value = '17';
+        chance.dispatchEvent(new Event('input', { bubbles: true }));
+        chance.dispatchEvent(new Event('change', { bubbles: true }));
+        await harness.setProps({});
+
+        assert.equal(
+          await draftHandle.save(),
+          false,
+          'the Save RESOLVES false — the route-exit guard declines the exit rather than rejecting'
+        );
+        assert.deepEqual(
+          notified,
+          [
+            'Saving the breakage settings did not complete; the name had already been saved. The requested Setting update was refused',
+          ],
+          'ONE sentence, naming the step that stopped and the one that had landed durably before it — and the identity fragment is THIS editor’s field set, which is its name alone'
+        );
+        assert.equal(draftHandle.isDirty(), true, 'the edit is still in front of the GM');
+      } finally {
+        Reflect.set(globalThis, 'ui', previousUi);
+      }
+    });
+
     it('WITHDRAWS the buffered identity on unmount, so it cannot name another route', async () => {
       // The channel this page reports into is SHARED by all three scoped entry routes, and the
       // shell's reader is generic across them. A page that reported and never withdrew would
