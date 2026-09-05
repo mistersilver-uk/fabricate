@@ -59,12 +59,22 @@
  * `$derived.by(…)` right-hand side included, since the resolver sweeps an expression's quoted and
  * template runs rather than parsing it.
  *
- * The rule is keyed on the ATTRIBUTE NAME, and that is the whole of its safety. The one-line
- * alternative — teaching the catch-all literal sweep to read backticks too — would make every
- * identifier run in every template literal under `src/` live, an unaudited widening of a gate
- * whose failure mode is a dead rule silently surviving. A `title={`Hello ${name}`}` therefore
- * contributes nothing, and `tests/stylesheet-live-classes.test.js` holds that negative as a row
- * beside the three positive ones.
+ * The rule is keyed on the ATTRIBUTE NAME AND ON THE MARKUP REGION, and the pair is the whole of
+ * its safety. The one-line alternative — teaching the catch-all literal sweep to read backticks
+ * too — would make every identifier run in every template literal under `src/` live, an unaudited
+ * widening of a gate whose failure mode is a dead rule silently surviving. A
+ * `title={`Hello ${name}`}` therefore contributes nothing, and
+ * `tests/stylesheet-live-classes.test.js` holds that negative as a row beside the positive ones.
+ *
+ * THE REGION HALF IS NOT DECORATION, and it was added after the name half shipped alone. A name
+ * ending in `Class` is an ordinary JavaScript identifier as well as an attribute name, so on the
+ * whole comment-stripped text `const probeClass = 'zz-dead-probe';` — in a plain `.js` module,
+ * with no component and no call site anywhere — read exactly like a prop on an element and kept a
+ * dead rule alive. `class=` is bounded by the language rather than by this module (`class` is a
+ * reserved word, so it cannot be assigned), and this channel had no such bound. So a class prop is
+ * evidence only where a prop can be WRITTEN: in a `.svelte` file, outside its `<script>` and
+ * `<style>` regions. A `Class`-suffixed binding that no markup ever hands to a component is dead,
+ * and the negative corpus holds that as its own row.
  *
  * ── THE ONE ASYMMETRY IN RULE 2 ──────────────────────────────────────────────────────────────
  * `class="${x}"` and `class={x}` do NOT resolve the same way. The quoted form is split into parts
@@ -144,12 +154,18 @@ const CLASS_ATTRIBUTE = /(?<![\w-])class\s*=\s*/gu;
  * A CLASS PROP: an attribute whose name ends in `Class`, which a shared primitive puts on an
  * element for its caller. Same `(?<![\w-])` guard as {@link CLASS_ATTRIBUTE}, and `class` itself
  * does not match it — the name must have at least one character before the capital `C`.
+ *
+ * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}: on the whole text this
+ * shape matches a plain JavaScript assignment as readily as an attribute.
  */
 const CLASS_PROP_ATTRIBUTE = /(?<![\w-])([A-Za-z_$][\w$]*Class)\s*=\s*/gu;
 
 /**
  * A braced expression that is EXACTLY a `Class`-suffixed identifier: Svelte's shorthand
  * `{triggerClass}`, and the explicit `someProp={triggerClass}` it abbreviates.
+ *
+ * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}, for the same reason the
+ * attribute form is: on the whole text this shape also matches a destructuring pattern.
  *
  * The `(?<!\$)` guard excludes `${fooClass}` INSIDE a template literal, and that is a correctness
  * point rather than caution. Such a hole is already resolved by {@link expandTemplate} AT ITS OWN
@@ -276,6 +292,45 @@ function embeddedRegions(text) {
     }
   }
   return regions;
+}
+
+/**
+ * The spans of a file in which a component prop can be WRITTEN, as `[start, end)` pairs.
+ *
+ * A `.svelte` file's markup is everything outside its `<script>` and `<style>` regions, which
+ * {@link embeddedRegions} already locates for the comment strippers. Every other extension has no
+ * markup at all: a `.js` or `.mjs` module can hold an HTML template literal, and `class=` is read
+ * there, but it cannot hold a Svelte component tag and therefore cannot hold a class PROP.
+ *
+ * Offsets are into the same comment-stripped text every channel reads, so a caller compares a
+ * match index against them directly.
+ *
+ * @param {string} file Repo-relative path; only its extension is read.
+ * @param {string} text Comment-stripped source.
+ * @returns {Array<{start: number, end: number}>} Ascending, non-overlapping.
+ */
+function markupRegions(file, text) {
+  if (!file.endsWith('.svelte')) return [];
+  const embedded = [...embeddedRegions(text)].sort((left, right) => left.start - right.start);
+  const spans = [];
+  let cursor = 0;
+  for (const region of embedded) {
+    if (region.start > cursor) spans.push({ start: cursor, end: region.start });
+    cursor = Math.max(cursor, region.end);
+  }
+  if (cursor < text.length) spans.push({ start: cursor, end: text.length });
+  return spans;
+}
+
+/**
+ * Whether an offset falls inside one of the spans {@link markupRegions} returned.
+ *
+ * @param {Array<{start: number, end: number}>} spans
+ * @param {number} at
+ * @returns {boolean}
+ */
+function withinRegions(spans, at) {
+  return spans.some((span) => at >= span.start && at < span.end);
 }
 
 /**
@@ -466,11 +521,15 @@ function* matchesOf(pattern, text) {
  * @param {string} text Comment-stripped source.
  * @param {RegExp} pattern A global pattern whose match ends at the attribute's `=`.
  * @param {(match: RegExpExecArray) => string} label The origin prefix for {@link harvestFile}.
+ * @param {Array<{start: number, end: number}>} within Spans the match must fall inside. The
+ *   whole-file span is stated explicitly by the one channel that takes it, rather than left
+ *   implicit, so no channel is unbounded by omission.
  * @returns {Array<{parts: string[], holes: string[], origin: string}>}
  */
-function attributeTemplates(text, pattern, label) {
+function attributeTemplates(text, pattern, label, within) {
   const templates = [];
   for (const match of matchesOf(pattern, text)) {
+    if (!withinRegions(within, match.index)) continue;
     for (const template of attributeValueTemplates(text, match.index + match[0].length)) {
       templates.push({ ...template, origin: label(match) });
     }
@@ -490,11 +549,13 @@ function attributeTemplates(text, pattern, label) {
  *
  * @param {string} text Comment-stripped source.
  * @param {Map<string, string[]>} definitions
+ * @param {Array<{start: number, end: number}>} markup Spans the shorthand must fall inside.
  * @returns {Array<{parts: string[], holes: string[], origin: string}>}
  */
-function classPropShorthandTemplates(text, definitions) {
+function classPropShorthandTemplates(text, definitions, markup) {
   const templates = [];
   for (const match of matchesOf(CLASS_PROP_SHORTHAND, text)) {
+    if (!withinRegions(markup, match.index)) continue;
     for (const rhs of definitions.get(match[1]) ?? []) {
       for (const template of quotedTemplatesIn(rhs)) {
         templates.push({ ...template, origin: `class prop {${match[1]}}=` });
@@ -511,15 +572,22 @@ function classPropShorthandTemplates(text, definitions) {
  * caller, and that prop's Svelte shorthand. See the module header for why the prop is read here
  * rather than by widening the catch-all literal sweep to backticks.
  *
+ * The two PROP channels are bounded to the file's markup and `class=` is not, which is the
+ * asymmetry the header's region paragraph explains: `class` cannot be assigned in JavaScript, and
+ * a `Class`-suffixed name can.
+ *
+ * @param {string} file Repo-relative path, for {@link markupRegions}.
  * @param {string} text Comment-stripped source.
  * @param {Map<string, string[]>} definitions
  * @returns {Array<{parts: string[], holes: string[], origin: string}>}
  */
-function classEvidenceTemplates(text, definitions) {
+function classEvidenceTemplates(file, text, definitions) {
+  const markup = markupRegions(file, text);
+  const wholeFile = [{ start: 0, end: text.length }];
   return [
-    ...attributeTemplates(text, CLASS_ATTRIBUTE, () => 'class='),
-    ...attributeTemplates(text, CLASS_PROP_ATTRIBUTE, (match) => `class prop ${match[1]}=`),
-    ...classPropShorthandTemplates(text, definitions),
+    ...attributeTemplates(text, CLASS_ATTRIBUTE, () => 'class=', wholeFile),
+    ...attributeTemplates(text, CLASS_PROP_ATTRIBUTE, (match) => `class prop ${match[1]}=`, markup),
+    ...classPropShorthandTemplates(text, definitions, markup),
   ];
 }
 
@@ -801,7 +869,7 @@ function harvestFile(file, source, sink) {
   for (const match of text.matchAll(CLASS_DIRECTIVE)) sink.literals.add(match[1]);
   for (const match of text.matchAll(GLOBAL_SELECTOR)) sink.literals.add(match[1]);
 
-  for (const template of classEvidenceTemplates(text, definitions)) {
+  for (const template of classEvidenceTemplates(file, text, definitions)) {
     for (const part of template.parts) {
       for (const run of part.matchAll(IDENTIFIER_RUN)) sink.literals.add(run[0]);
     }

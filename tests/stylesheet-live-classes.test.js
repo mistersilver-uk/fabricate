@@ -188,6 +188,20 @@ const SOURCE_ROWS = [
       + ' the file own definitions — a $derived template included',
   },
   {
+    id: 'a *Class binding outside markup is not a class prop',
+    file: 'src/ui/svelte/util/koppaNavigation.js',
+    source: [
+      "const koppaSuffix = 'alpha';",
+      "const koppaProbeClass = 'koppa-probe-${koppaSuffix}';",
+    ].join('\n'),
+    exact: ['koppa-probe-'],
+    dead: ['koppa-probe-alpha'],
+    because: 'the class-prop rule is keyed on the attribute name AND on the markup region, because'
+      + ' a name ending in Class is an ordinary JavaScript identifier too. This module holds no'
+      + ' markup and hands the value to nothing, so it writes no class onto any element and the'
+      + ' hole beside its static half must not resolve into one',
+  },
+  {
     id: 'a template literal that is not a class prop stays dead',
     file: 'src/ui/svelte/apps/Digamma.svelte',
     source: [
@@ -247,7 +261,7 @@ test('every liveness rule holds on its synthetic row', () => {
 });
 
 test('the corpus is alive, so the loop above cannot pass by iterating nothing', () => {
-  assert.ok(SOURCE_ROWS.length >= 13, 'the synthetic corpus lost rows');
+  assert.ok(SOURCE_ROWS.length >= 14, 'the synthetic corpus lost rows');
   const covered = SOURCE_ROWS.filter((row) => (row.exact ?? row.live ?? row.dead ?? []).length > 0);
   assert.equal(covered.length, SOURCE_ROWS.length, 'a row asserts nothing at all');
 });
