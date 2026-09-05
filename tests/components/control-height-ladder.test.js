@@ -16,7 +16,7 @@
  * a spec marks touch-reachable", which is an authored fact in `openspec/specs/**` and not a
  * property CSS carries at all. No selector heuristic can adjudicate it, and reading a
  * selector-classified sample confirms it: plenty of off-ladder heights are plainly not controls
- * — a 6px slider track at `styles/fabricate.css:15949`, a 14px toggle knob at
+ * — a 6px slider track at `styles/fabricate.css:15959`, a 14px toggle knob at
  * `apps/gathering/GatheringEnvironmentList.svelte:292`, textarea minimums at 68, 78 and 122
  * (`styles/fabricate.css:1608`, `:10379`, `:9018`), native radio and checkbox inputs at 16px
  * (`styles/fabricate.css:10717`, `:23525`, `:23573`). That classification was a one-off reading rather
