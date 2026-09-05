@@ -394,47 +394,84 @@ describe('ComponentBulkEditPanel tag inset (issue 1371 r16-list)', () => {
   });
 });
 
-describe('ComponentBulkEditPanel search and pager (issue 1371 r16-list)', () => {
+describe('ComponentBulkEditPanel search and pager (issue 1371 r16-list; every inset since r17-b)', () => {
   const SEVEN = ['ash', 'bone', 'coal', 'dust', 'ember', 'flux', 'grit'];
 
-  it('windows five rows, pages, and states the range (`proto:1155`)', async () => {
-    const { root } = await mountPanel({ tags: SEVEN });
-    const rows = () => [...inset(root, 'tags').querySelectorAll('[data-bulk-tag]')].map((r) => r.getAttribute('data-bulk-tag'));
-    assert.deepEqual(rows(), ['ash', 'bone', 'coal', 'dust', 'ember']);
-    assert.equal(rangeOf(root, 'tags'), 'Showing 1-5 of 7');
-    assert.equal(root.querySelector('[data-bulk-inset-prev="tags"]').disabled, true);
+  /**
+   * The three insets, each as what differs between them (quality N1): the prop that gives it
+   * seven rows, the hook its rows carry, how a row is staged and where the draft records it.
+   * Each inset binds the shared `BulkStagingInset` through its OWN view (`insetView()` in the
+   * panel), and until this table only the tags inset's binding was ever pressed.
+   */
+  const AXES = [
+    {
+      id: 'category',
+      props: { categoryOptions: SEVEN.map((name) => ({ name, count: 0 })) },
+      rowAttr: 'data-component-bulk-category-option',
+      stage: (root) => click(categoryRow(root, 'ash')),
+      staged: (draft) => draft.category,
+      stagedValue: 'ash',
+    },
+    {
+      id: 'tags',
+      props: { tags: SEVEN },
+      rowAttr: 'data-bulk-tag',
+      stage: (root) => click(tagRow(root, 'ash')),
+      staged: (draft) => draft.tagAdd,
+      stagedValue: ['ash'],
+    },
+    {
+      id: 'essences',
+      props: { essenceDefinitions: SEVEN.map((id) => ({ id, name: id, icon: 'fas fa-fire' })) },
+      rowAttr: 'data-component-edit-essence',
+      stage: (root) => click(essenceRow(root, 'ash').querySelector('[data-stepper-increment]')),
+      staged: (draft) => draft.essences.ash,
+      stagedValue: 1,
+    },
+  ];
+  const rowsOf = (root, axis) =>
+    [...inset(root, axis.id).querySelectorAll(`[${axis.rowAttr}]`)].map((r) => r.getAttribute(axis.rowAttr));
+  const pageLabel = (root, id) => inset(root, id).querySelector(':scope .fab-bulk-inset-page-label').textContent;
 
-    click(root.querySelector('[data-bulk-inset-next="tags"]'));
-    assert.deepEqual(rows(), ['flux', 'grit']);
-    assert.equal(rangeOf(root, 'tags'), 'Showing 6-7 of 7');
-    assert.equal(root.querySelector('[data-bulk-inset-next="tags"]').disabled, true);
-    assert.match(inset(root, 'tags').querySelector(':scope .fab-bulk-inset-page-label').textContent, /Page 2 of 2/);
-  });
+  for (const axis of AXES) {
+    it(`${axis.id}: windows five rows, pages forward and back through its own binding, and states the range (\`proto:1155\`)`, async () => {
+      const { root } = await mountPanel(axis.props);
+      assert.deepEqual(rowsOf(root, axis), ['ash', 'bone', 'coal', 'dust', 'ember']);
+      assert.equal(rangeOf(root, axis.id), 'Showing 1-5 of 7');
+      assert.match(pageLabel(root, axis.id), /Page 1 of 2/);
+      assert.equal(root.querySelector(`[data-bulk-inset-prev="${axis.id}"]`).disabled, true);
 
-  it('searches inside an inset without touching what is staged, and says when nothing matches', async () => {
-    const { root, state } = await mountPanel({ tags: SEVEN });
-    click(tagRow(root, 'ash'));
-    type(root.querySelector('[data-bulk-inset-search="tags"]'), 'em');
-    assert.deepEqual(
-      [...inset(root, 'tags').querySelectorAll('[data-bulk-tag]')].map((r) => r.getAttribute('data-bulk-tag')),
-      ['ember']
-    );
-    assert.equal(rangeOf(root, 'tags'), 'Showing 1-1 of 1');
-    assert.deepEqual(state.draft.tagAdd, ['ash'], 'a search is the inset’s VIEW, not its instruction');
+      click(root.querySelector(`[data-bulk-inset-next="${axis.id}"]`));
+      assert.deepEqual(rowsOf(root, axis), ['flux', 'grit'], 'NEXT moves the window');
+      assert.equal(rangeOf(root, axis.id), 'Showing 6-7 of 7');
+      assert.equal(root.querySelector(`[data-bulk-inset-next="${axis.id}"]`).disabled, true);
+      assert.match(pageLabel(root, axis.id), /Page 2 of 2/);
 
-    type(root.querySelector('[data-bulk-inset-search="tags"]'), 'zzz');
-    const empty = root.querySelector('[data-bulk-inset-empty="tags"]');
-    assert.ok(Boolean(empty));
-    assert.equal(empty.textContent.trim(), 'No tag matches that search.');
-    assert.equal(rangeOf(root, 'tags'), 'Showing 0-0 of 0');
-  });
+      click(root.querySelector(`[data-bulk-inset-prev="${axis.id}"]`));
+      assert.deepEqual(rowsOf(root, axis), ['ash', 'bone', 'coal', 'dust', 'ember'], 'and PREV moves it back');
+      assert.equal(rangeOf(root, axis.id), 'Showing 1-5 of 7');
+    });
 
-  it('searches the essence inset by name', async () => {
-    const { root } = await mountPanel();
-    type(root.querySelector('[data-bulk-inset-search="essences"]'), 'ear');
-    assert.ok(Boolean(essenceRow(root, 'earth')));
-    assert.ok(!essenceRow(root, 'fire'));
-  });
+    it(`${axis.id}: searches inside the inset through its own binding without touching what is staged, and says when nothing matches`, async () => {
+      const { root, state } = await mountPanel(axis.props);
+      axis.stage(root);
+      assert.deepEqual(axis.staged(state.draft), axis.stagedValue, 'NON-VACUITY: staged first');
+
+      type(root.querySelector(`[data-bulk-inset-search="${axis.id}"]`), 'em');
+      assert.deepEqual(rowsOf(root, axis), ['ember']);
+      assert.equal(rangeOf(root, axis.id), 'Showing 1-1 of 1');
+      assert.deepEqual(axis.staged(state.draft), axis.stagedValue, 'a search is the inset’s VIEW, not its instruction');
+
+      type(root.querySelector(`[data-bulk-inset-search="${axis.id}"]`), 'zzz');
+      const empty = root.querySelector(`[data-bulk-inset-empty="${axis.id}"]`);
+      assert.ok(Boolean(empty));
+      assert.match(empty.textContent, /matches that search\./);
+      assert.equal(rangeOf(root, axis.id), 'Showing 0-0 of 0');
+
+      type(root.querySelector(`[data-bulk-inset-search="${axis.id}"]`), '');
+      assert.deepEqual(rowsOf(root, axis), ['ash', 'bone', 'coal', 'dust', 'ember'], 'clearing the well restores page one');
+    });
+  }
 });
 
 describe('ComponentBulkEditPanel essence inset (issue 1371 r16-list, M24)', () => {

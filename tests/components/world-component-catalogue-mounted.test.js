@@ -1618,30 +1618,96 @@ describe('world Component Catalogue (issue 1371)', () => {
       return row.querySelector('.fab-bulk-edit-hint')?.textContent.trim() ?? '';
     }
 
+    // ── issue 1371 r17-b ──────────────────────────────────────────────────────────────────────
+    /** Seven names, alphabetical: the smallest corpus with a second page that is not a full one. */
+    const SEVEN = Object.freeze(['alloy', 'bulk', 'ceramic', 'dust', 'ember', 'fuel', 'glass']);
+
     /**
-     * Mount with a tag vocabulary LARGER than one inset page, which the shared corpus is not.
+     * The four insets a seven-row proof presses (quality N1), each as the things that differ
+     * between them: the mount that gives it seven rows, the hook its rows carry, how one row is
+     * staged, and the hint the group states once it is.
      *
-     * `pageSize` is 5 and the shared corpus authors two tags across two systems, so no mounted
-     * assertion has ever entered the paged branch: `range` only ever read `1-1 of 1` or
-     * `1-2 of 2`, and the window arithmetic, the clamp, the `Page {page}/{of}` sentence and both
-     * pager handlers were unmeasured. Seven tags is the smallest corpus with a second page that
-     * is not also a full one, so the range sentence differs at both ends.
+     * `pageSize` is 5 on every inset and the shared corpus never fills one, so until this table
+     * only the tags inset had ever entered the paged branch — and each inset binds the shared
+     * `BulkStagingInset` through its OWN view (`insetView()` in the panel), so a dead binding on
+     * any of the other three shipped green. `systems` is the inset whose rows are also gated on a
+     * direction (`rowsDisabled`), which is why its staging picks `add` first and why it alone
+     * presses a row on page TWO. The category inset leads with the `No world category` row, so it
+     * pages eight.
      */
-    async function selectedWithSevenTags() {
-      const { calls, actions } = recordingComponentActions();
-      const target = await harness.mount({
+    const SEVEN_ROW_INSETS = Object.freeze([
+      {
+        id: 'systems',
+        label: 'Systems',
+        mount: () => ({ systems: SEVEN.map((id) => ({ id, name: id })) }),
+        rowAttr: 'data-world-component-bulk-option',
+        rows: SEVEN,
+        stage: (target) => stageMembership(target, 'add', 'alloy'),
+        stagedHint: '1 chosen',
+      },
+      {
+        id: 'category',
+        label: 'World category',
+        mount: () => ({ scope: scopeFor({}, { categories: SEVEN, tags: CORPUS_VOCABULARY.tags }) }),
+        rowAttr: 'data-world-component-bulk-option',
+        rows: ['none', ...SEVEN],
+        stage: async (target) => {
+          target
+            .querySelector('[data-bulk-inset="category"] [data-world-component-bulk-option="alloy"]')
+            .click();
+          await drain();
+        },
+        stagedHint: 'alloy',
+      },
+      {
+        id: 'tags',
+        label: 'World tags',
         // AUTHORED in the vocabulary, not applied to a record (issue 1371 r14-cat, M18): the
         // inset pages over what the world has, and a tag no component carries yet is still a
         // row a GM may stage.
-        scope: scopeFor({}, {
-          categories: CORPUS_VOCABULARY.categories,
-          tags: ['alloy', 'bulk', 'ceramic', 'dust', 'ember', 'fuel', 'glass'],
-        }),
+        mount: () => ({ scope: scopeFor({}, { categories: CORPUS_VOCABULARY.categories, tags: SEVEN }) }),
+        rowAttr: 'data-world-component-bulk-option',
+        rows: SEVEN,
+        stage: async (target) => {
+          stageTag(target, 'alloy');
+          await drain();
+        },
+        stagedHint: '1 added · 0 removed',
+      },
+      {
+        id: 'essences',
+        label: 'Essence values',
+        mount: () => ({ worldEssences: SEVEN.map((id) => ({ id, name: id, icon: 'fas fa-fire' })) }),
+        rowAttr: 'data-world-component-bulk-essence',
+        rows: SEVEN,
+        stage: async (target) => {
+          target
+            .querySelector('[data-world-component-bulk-essence="alloy"] [data-stepper-increment]')
+            .click();
+          await drain();
+        },
+        stagedHint: '1 staged',
+      },
+    ]);
+
+    /** Mount with ONE inset holding seven rows, and two catalogue rows ticked. */
+    async function selectedWithSevenRows(inset) {
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
         systems: COMPONENT_SYSTEMS,
         actions,
+        ...inset.mount(),
       });
       await selectTwo(target);
       return { target, calls };
+    }
+
+    /** One inset's rows by the hook its rows carry, in rendered order. */
+    function rowsOf(target, inset) {
+      return [
+        ...target.querySelectorAll(`[data-bulk-inset="${inset.id}"] [${inset.rowAttr}]`),
+      ].map((row) => row.getAttribute(inset.rowAttr));
     }
 
     /** One inset's pager parts. */
@@ -1652,56 +1718,93 @@ describe('world Component Catalogue (issue 1371)', () => {
         range: target
           .querySelector(`[data-bulk-inset-range="${inset}"]`)
           .textContent.trim(),
+        label: target
+          .querySelector(`:scope [data-bulk-inset="${inset}"] .fab-bulk-inset-pager`)
+          .textContent.replaceAll(/\s+/g, ' '),
       };
     }
 
-    it('pages an inset FORWARD and BACK, and inerts each end of the window', async () => {
-      const { target } = await selectedWithSevenTags();
-      assert.deepEqual(
-        insetRows(target, 'tags'),
-        ['alloy', 'bulk', 'ceramic', 'dust', 'ember'],
-        'page one holds the window, not the whole vocabulary'
-      );
-      assert.equal(pagerOf(target, 'tags').range, 'Showing 1-5 of 7');
-      assert.equal(pagerOf(target, 'tags').prev.disabled, true, 'and there is no page before it');
-      assert.equal(pagerOf(target, 'tags').next.disabled, false);
-
-      pagerOf(target, 'tags').next.click();
+    /** Type into one inset's search well, as a GM does. */
+    async function searchInset(target, inset, value) {
+      const search = target.querySelector(`[data-bulk-inset-search="${inset}"]`);
+      search.value = value;
+      search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
       await drain();
-      assert.deepEqual(
-        insetRows(target, 'tags'),
-        ['fuel', 'glass'],
-        'NEXT moves the window — the two rows page one could not hold'
-      );
-      assert.equal(pagerOf(target, 'tags').range, 'Showing 6-7 of 7');
-      assert.equal(
-        pagerOf(target, 'tags').next.disabled,
-        true,
-        'and the far end inerts, so the clamp is not merely arithmetic nobody can reach'
-      );
-      assert.equal(pagerOf(target, 'tags').prev.disabled, false);
+    }
 
-      pagerOf(target, 'tags').prev.click();
-      await drain();
-      assert.deepEqual(insetRows(target, 'tags'), ['alloy', 'bulk', 'ceramic', 'dust', 'ember']);
-      assert.equal(pagerOf(target, 'tags').range, 'Showing 1-5 of 7');
-      assert.equal(pagerOf(target, 'tags').prev.disabled, true);
-    });
+    for (const inset of SEVEN_ROW_INSETS) {
+      const total = inset.rows.length;
 
-    it('names the page a GM is on, out of the pages there are', async () => {
-      const { target } = await selectedWithSevenTags();
-      const label = () =>
-        target
-          .querySelector(
-            // The pager is `BulkStagingInset`'s since M25 moved the chrome out of the panel.
-            ':scope [data-bulk-inset="tags"] .fab-bulk-inset-pager'
-          )
-          .textContent.replaceAll(/\s+/g, ' ');
-      assert.match(label(), /Page 1 of 2/, 'the reference`s own sentence (`proto:5199`), which the shared inset words');
-      pagerOf(target, 'tags').next.click();
-      await drain();
-      assert.match(label(), /Page 2 of 2/, 'the sentence moves with the window it describes');
-    });
+      it(`pages the ${inset.id} inset FORWARD and BACK through its own binding, and inerts each end of the window`, async () => {
+        const { target } = await selectedWithSevenRows(inset);
+        // The systems inset's rows are inert until a direction is chosen; staging one row
+        // through `add` is what makes the page-two press below a press on a LIVE row.
+        if (inset.id === 'systems') await inset.stage(target);
+        assert.deepEqual(
+          rowsOf(target, inset),
+          inset.rows.slice(0, 5),
+          'page one holds the window, not the whole corpus'
+        );
+        assert.equal(pagerOf(target, inset.id).range, `Showing 1-5 of ${total}`);
+        assert.match(pagerOf(target, inset.id).label, /Page 1 of 2/, 'the reference`s own sentence (`proto:5199`)');
+        assert.equal(pagerOf(target, inset.id).prev.disabled, true, 'and there is no page before it');
+        assert.equal(pagerOf(target, inset.id).next.disabled, false);
+
+        pagerOf(target, inset.id).next.click();
+        await drain();
+        assert.deepEqual(
+          rowsOf(target, inset),
+          inset.rows.slice(5),
+          'NEXT moves the window — the rows page one could not hold'
+        );
+        assert.equal(pagerOf(target, inset.id).range, `Showing 6-${total} of ${total}`);
+        assert.match(pagerOf(target, inset.id).label, /Page 2 of 2/, 'the sentence moves with the window');
+        assert.equal(
+          pagerOf(target, inset.id).next.disabled,
+          true,
+          'and the far end inerts, so the clamp is not merely arithmetic nobody can reach'
+        );
+        assert.equal(pagerOf(target, inset.id).prev.disabled, false);
+        if (inset.id === 'systems') {
+          // A row on page two ACTS: the sixth system can be staged at all only through the pager.
+          target
+            .querySelector('[data-bulk-inset="systems"] [data-world-component-bulk-option="fuel"]')
+            .click();
+          await drain();
+          assert.equal(sectionHint(target, 'Systems'), '2 chosen', 'the sixth system is staged from page two');
+        }
+
+        pagerOf(target, inset.id).prev.click();
+        await drain();
+        assert.deepEqual(rowsOf(target, inset), inset.rows.slice(0, 5));
+        assert.equal(pagerOf(target, inset.id).range, `Showing 1-5 of ${total}`);
+        assert.equal(pagerOf(target, inset.id).prev.disabled, true);
+      });
+
+      it(`searches the ${inset.id} inset through its own binding, without touching what is staged`, async () => {
+        const { target } = await selectedWithSevenRows(inset);
+        await inset.stage(target);
+        assert.equal(sectionHint(target, inset.label), inset.stagedHint, 'NON-VACUITY: staged first');
+
+        await searchInset(target, inset.id, 'em');
+        assert.deepEqual(rowsOf(target, inset), ['ember'], 'the well narrows the window');
+        assert.equal(pagerOf(target, inset.id).range, 'Showing 1-1 of 1');
+        assert.equal(
+          sectionHint(target, inset.label),
+          inset.stagedHint,
+          'a search is the inset`s VIEW, not its instruction'
+        );
+
+        await searchInset(target, inset.id, 'zzz');
+        assert.ok(Boolean(target.querySelector(`[data-bulk-inset-empty="${inset.id}"]`)), 'and says when nothing matches');
+        assert.equal(pagerOf(target, inset.id).range, 'Showing 0-0 of 0');
+
+        await searchInset(target, inset.id, '');
+        assert.deepEqual(rowsOf(target, inset), inset.rows.slice(0, 5), 'clearing the well restores page one');
+        assert.equal(sectionHint(target, inset.label), inset.stagedHint);
+        assert.equal(target.querySelector('[data-world-component-bulk-apply]').disabled, false);
+      });
+    }
 
     it('CLEARS the staged systems, and Apply goes inert with them', async () => {
       const { target, calls } = await selectedCatalogue();

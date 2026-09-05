@@ -186,13 +186,41 @@
   const canApply = $derived(bulkDraftHasChanges(draft) && !inert);
   const axes = $derived(stagedBulkAxes(draft));
 
-  // ── THE INSETS' VIEW STATE: one search and one page per inset ───────────────────────────
-  let categoryQuery = $state('');
-  let categoryPage = $state(0);
-  let tagQuery = $state('');
-  let tagPage = $state(0);
-  let essenceQuery = $state('');
-  let essencePage = $state(0);
+  /**
+   * One inset's VIEW — its search and its page — behind the one pair of handlers every inset
+   * binds (issue 1371 r17-b, quality N1). Three insets bound Three hand-written copies of the same
+   * two closures, and a no-op in any one of them shipped green: with one factory there is one
+   * binding per inset to prove, and the seven-row mounts in the suite press each inset's pager
+   * and well through it. A query resets the page, because a search over a moved window would
+   * show its second page of matches first. The view is the inset's VIEW rather than its
+   * instruction: it is deliberately no part of what `onApply` hands over, and a Clear un-stages
+   * the instruction and leaves the window where the GM left it.
+   *
+   * @returns {{query: string, page: number, onQuery: (next: string) => void,
+   *   onPage: (next: number) => void}}
+   */
+  function insetView() {
+    const view = $state({ query: '', page: 0 });
+    return {
+      get query() {
+        return view.query;
+      },
+      get page() {
+        return view.page;
+      },
+      onQuery: (next) => {
+        view.query = next;
+        view.page = 0;
+      },
+      onPage: (next) => {
+        view.page = next;
+      },
+    };
+  }
+
+  const categoryView = insetView();
+  const tagView = insetView();
+  const essenceView = insetView();
 
   const byName = (a, b) => String(a.name).localeCompare(String(b.name));
   const carried = (n) => format(`${KEY}.Carried`, '{count}/{total}', { count: n, total: count });
@@ -210,7 +238,7 @@
       .sort(byName)
   );
   const categoryPageView = $derived(
-    pageBulkInsetRows(categoryItems, { query: categoryQuery, pageIndex: categoryPage })
+    pageBulkInsetRows(categoryItems, { query: categoryView.query, pageIndex: categoryView.page })
   );
   const categoryHint = $derived(
     categoryStaged
@@ -239,7 +267,7 @@
       .sort(byName)
   );
   const tagPageView = $derived(
-    pageBulkInsetRows(tagItems, { query: tagQuery, pageIndex: tagPage })
+    pageBulkInsetRows(tagItems, { query: tagView.query, pageIndex: tagView.page })
   );
   const tagHint = $derived(
     tagsStaged
@@ -303,7 +331,7 @@
       .sort(byName)
   );
   const essencePageView = $derived(
-    pageBulkInsetRows(essenceItems, { query: essenceQuery, pageIndex: essencePage })
+    pageBulkInsetRows(essenceItems, { query: essenceView.query, pageIndex: essenceView.page })
   );
   const essencesSetCount = $derived(
     Object.values(stagedEssences).filter((quantity) => Number(quantity) > 0).length
@@ -580,14 +608,11 @@
   />
   <BulkStagingInset
     id="category"
-    query={categoryQuery}
-    onQuery={(next) => {
-      categoryQuery = next;
-      categoryPage = 0;
-    }}
+    query={categoryView.query}
+    onQuery={categoryView.onQuery}
     placeholder={text(`${KEY}.CategorySearch`, 'Search categories')}
     page={categoryPageView}
-    onPage={(next) => (categoryPage = next)}
+    onPage={categoryView.onPage}
     empty={categoryItems.length === 0
       ? format(`${KEY}.CategoryNone`, '{system} defines no component categories.', { system })
       : text(`${KEY}.CategoryNoMatch`, 'No category matches that search.')}
@@ -670,14 +695,11 @@
   {#if tagItems.length > 0}
     <BulkStagingInset
       id="tags"
-      query={tagQuery}
-      onQuery={(next) => {
-        tagQuery = next;
-        tagPage = 0;
-      }}
+      query={tagView.query}
+      onQuery={tagView.onQuery}
       placeholder={text(`${KEY}.TagSearch`, 'Search tags')}
       page={tagPageView}
-      onPage={(next) => (tagPage = next)}
+      onPage={tagView.onPage}
       empty={text(`${KEY}.TagNoMatch`, 'No tag matches that search.')}
       hasRows={tagPageView.rows.length > 0}
       disabled={inert}
@@ -797,14 +819,11 @@
       activeAttr="data-component-essence-active"
       inputAttr="data-component-bulk-essence-input"
       onStep={(essenceId, next) => setEssence(essenceId, next)}
-      query={essenceQuery}
-      onQuery={(next) => {
-        essenceQuery = next;
-        essencePage = 0;
-      }}
+      query={essenceView.query}
+      onQuery={essenceView.onQuery}
       placeholder={text(`${KEY}.EssenceSearch`, 'Search essences')}
       page={essencePageView}
-      onPage={(next) => (essencePage = next)}
+      onPage={essenceView.onPage}
       empty={text(`${KEY}.EssenceNoMatch`, 'No essence matches that search.')}
       hasRows={essencePageView.rows.length > 0}
       disabled={inert}
