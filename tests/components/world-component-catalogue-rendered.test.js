@@ -276,10 +276,13 @@ function measureToolbarType() {
  * The list column's LEAD and FOOT, measured against the column itself (issue 1371 r13-cat).
  *
  * M13: the drop zone takes the whole lead row now that the `+ Register item` action is gone.
- * M19: the pager spans the column edge to edge and sits flush at its bottom, the way the system
- * rules list draws its footer — measured in the lab before the change at 337→1143 inside a
- * 321→1159 column, i.e. 16px short of both edges and of the bottom, because it sat inside the
- * column's own `--fab-space-4` inset.
+ * M21 (issue 1371 r16-cat, superseding r13's M19): the whole list column runs edge to edge in its
+ * pane — toolbar, rows scroller and pager all start and end at the column's own edges, the toolbar
+ * sits at the pane's top and the pager flush at its bottom, the way the system Component Rules
+ * list's `.manager-main` draws them. Measured in the lab before the change: a 321→1159 column
+ * carrying a 16px inset on every side, so the toolbar and rows ran 337→1143 and the pager alone
+ * bled through it (M19's negative margins). The rows keep their own inline inset INSIDE the
+ * scroller, so they still sit inside the pager band exactly as the rules list's rows do.
  *
  * Read off a mount whose view-state pages at TWO rows, because the frame's pager is
  * `multiPageOnly` and the corpus is four records: at the default window there is no pager in
@@ -293,7 +296,10 @@ function measureListFrame() {
     return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, width: b.width };
   };
   return {
+    frame: box('.manager-scoped-list-frame'),
     column: box('.manager-scoped-list-column'),
+    toolbar: box('.manager-scoped-list-toolbar'),
+    rows: box('.manager-scoped-list-rows'),
     lead: box('.manager-scoped-list-lead'),
     dropZone: box('[data-item-drop-zone="component-create"]'),
     registerAction: box('[data-scoped-list-register-item]'),
@@ -520,31 +526,48 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     );
   });
 
-  it('draws the pager edge to edge and flush at the column`s bottom, as the rules list does (M19)', () => {
-    const { column, pager, firstRow, pagerSummary } = listFrame;
+  it('runs the list column edge to edge in its pane, with the toolbar, the rows and the pager at the column`s own edges (M21)', () => {
+    const { frame, column, toolbar, rows, pager, firstRow, pagerSummary } = listFrame;
     assert.ok(Boolean(pager), 'the two-row window puts a foot pager in the markup');
-    assert.ok(pager.width > 400, 'NON-VACUITY: the pager is a real width');
-    // THE ROWS SIT INSIDE THE BAND'S EDGES, which is the relationship the maintainer's frame
-    // showed inverted: the band stopped short of the rows' own inset on both sides.
-    assert.ok(
-      firstRow.left > pager.left && firstRow.right < pager.right,
-      `the rows (${firstRow.left}→${firstRow.right}) are inside the band ` +
-        `(${pager.left}→${pager.right})`
-    );
+    assert.ok(column.width > 400, 'NON-VACUITY: the column is a real width');
+    // THE COLUMN IS THE PANE'S WHOLE LEFT TRACK. Before M21 the column itself was already the
+    // track; what the maintainer saw was the inset INSIDE it, so the pane edge is the reference
+    // every child is measured against below, not the column's padding edge.
+    assert.equal(Math.round(column.left), Math.round(frame.left), 'the column starts at the pane`s left edge');
+    assert.equal(Math.round(column.top), Math.round(frame.top), 'and at its top');
+    assert.equal(Math.round(column.bottom), Math.round(frame.bottom), 'and reaches its bottom');
+    for (const [name, child] of [
+      ['toolbar', toolbar],
+      ['rows scroller', rows],
+      ['pager', pager],
+    ]) {
+      assert.equal(
+        Math.round(child.left),
+        Math.round(column.left),
+        `the ${name} starts at the column\`s left edge, not 16px inside it`
+      );
+      assert.equal(
+        Math.round(child.right),
+        Math.round(column.right),
+        `and the ${name} ends at the column\`s right edge, which is the inspector\`s divider`
+      );
+    }
     assert.equal(
-      Math.round(pager.left),
-      Math.round(column.left),
-      'the band starts at the column`s own left edge, not at its padding edge'
-    );
-    assert.equal(
-      Math.round(pager.right),
-      Math.round(column.right),
-      'and ends at the column`s right edge, which is the inspector`s divider'
+      Math.round(toolbar.top),
+      Math.round(column.top),
+      'the toolbar sits at the pane`s top, as the rules list`s toolbar does'
     );
     assert.equal(
       Math.round(pager.bottom),
       Math.round(column.bottom),
-      'and sits flush at the column`s bottom, as the rules list`s footer does'
+      'and the pager sits flush at the pane`s bottom, as the rules list`s footer does'
+    );
+    // THE ROWS SIT INSIDE THE BAND'S EDGES: the scroller keeps its own inline inset, so the band
+    // and the toolbar frame the rows exactly as the rules list frames its own.
+    assert.ok(
+      firstRow.left > pager.left && firstRow.right < pager.right,
+      `the rows (${firstRow.left}→${firstRow.right}) are inside the band ` +
+        `(${pager.left}→${pager.right})`
     );
     assert.ok(
       pagerSummary.left > pager.left,

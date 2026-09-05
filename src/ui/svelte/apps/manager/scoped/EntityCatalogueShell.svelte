@@ -143,6 +143,11 @@
     // and OFF by default, so the essence and tool catalogues open on the resting inspector they
     // always did; the world Component catalogue is the lane that turns it on.
     autoSelectFirst = false,
+    // WHETHER THE LIST COLUMN RUNS EDGE TO EDGE IN ITS PANE (issue 1371 r16-cat, maintainer
+    // ruling M21). Threaded straight to the frame; see its own prop note. OPT-IN and OFF by
+    // default, so the essence and tool catalogues keep the pane inset they always carried; the
+    // world Component catalogue is the lane that turns it on.
+    flushColumn = false,
     onOpenEntry = () => {},
     rowMeta = undefined,
     // Threaded straight to the frame; see its own prop notes. All three are OPT-IN and default to
@@ -320,6 +325,7 @@
     bind:selectedId
     {onSelect}
     {autoSelectFirst}
+    {flushColumn}
     bind:armedToken
     inspectorBody={catalogueInspector}
   />

@@ -343,6 +343,20 @@
     // the list on the resting inspector by writing `''`, because that is exactly the state it
     // fills. No caller of this opt-in does; the world Component catalogue never writes `''`.
     autoSelectFirst = false,
+    // ── THE LIST COLUMN RUNS EDGE TO EDGE (issue 1371 r16-cat, maintainer ruling M21) ────────
+    // "the entire world component catalogue browser has unnecessary padding/whitespace around its
+    // central rail body and does not occupy all of the space available to it." The column below
+    // carries the pane's `--fab-space-4` inset on every side, so the toolbar, the rows scroller
+    // and the pager all stopped 16px short of the pane's edges while the system Component Rules
+    // list beside it — `ComponentsBrowserView`'s `.manager-main`, which carries no inset — runs
+    // its toolbar and footer edge to edge. With this ON the column drops that inset and nothing
+    // else: the toolbar keeps `ManagerToolbar`'s own padding, the rows keep the inline inset the
+    // route sheet gives the scroller, and the pager keeps its own — so the CONTENT sits where it
+    // did and only the dead frame around it goes, which is what the rules list draws.
+    //
+    // OPT-IN and OFF by default. The essence and tool catalogues keep the inset they shipped
+    // with; the ruling names the Component catalogue and that lane is the one that turns it on.
+    flushColumn = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
     // Search, membership, the lane filters, the sort pair and the page live on an object the
@@ -941,7 +955,7 @@
       control disappear — that was its shipped behaviour when the page drew it as a sibling of
       this frame, and the swap to `columnLead` must not quietly change it.
     -->
-    <div class="manager-scoped-list-column">
+    <div class="manager-scoped-list-column" class:is-flush={flushColumn}>
       {#if columnLead}
         <div class="manager-scoped-list-column-lead">{@render columnLead()}</div>
       {/if}
@@ -1666,6 +1680,14 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fab-space-4);
+  }
+
+  /* AND THE ONE CATALOGUE THAT DROPS IT (M21; see `flushColumn`). The inset alone: the column's
+     rhythm, its slack distribution and its children's own insets are untouched, so the toolbar
+     sits at the pane's top edge and the pager flush at its bottom exactly as the system rules
+     list's `.manager-main` places them. */
+  .manager-scoped-list-column.is-flush {
+    padding: 0;
   }
 
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands

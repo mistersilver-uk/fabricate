@@ -26250,39 +26250,30 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════════
-   issue 1371 r13-cat — the world Component catalogue's foot pager (maintainer ruling M19).
-   Appended; no rule above this block is edited by it. The two `+ Register item` rules that
-   stood in the r8-cat block above are DELETED in the same change (M13 removed the control).
+   issue 1371 r16-cat — the world Component catalogue's foot pager, second pass (maintainer
+   ruling M21, superseding r13-cat's M19 rule that stood here). Appended; no rule above this block
+   is edited by it. The two `+ Register item` rules that stood in the r8-cat block above were
+   DELETED by r13-cat in the same change that added M19 (M13 removed the control).
    ═══════════════════════════════════════════════════════════════════════════════════════════ */
 
-/* ── THE PAGER IS A FULL-WIDTH BAND, AS THE SYSTEM RULES LIST DRAWS ITS OWN (M19) ────────────
-   "the pagination footer on the component browser is not full width in the world component
-   catalogue." Measured in the lab before this rule: the band ran 337→1143 inside a 321→1159
-   column, 16px short of both edges and of the bottom, because `EntityListInspectorFrame`'s
-   list column carries the pane's `--fab-space-4` inset and the pager is a flex child inside it.
-   The system Component Rules list draws its footer edge to edge and flush at the pane's bottom
-   — its `Pagination` is a child of a `.manager-main` that carries no inset — and that is the
-   example copied here: the band bleeds through the column's inset on the three edges it meets
-   and keeps its own 12px content inset, so the summary and the per-page select stay off the
-   pane edge. The rows above keep their inset and sit inside the band's edges, exactly as the
-   rules list's rows sit inside its footer.
+/* ── THE PAGER IS A FULL-WIDTH BAND BY CONSTRUCTION NOW (M21) ────────────────────────────────
+   M19 ("the pagination footer on the component browser is not full width") was closed in r13 by
+   bleeding the pager through the list column's `--fab-space-4` inset with three negative margins.
+   M21 then ruled on the inset itself — "the entire world component catalogue browser has
+   unnecessary padding/whitespace around its central rail body" — and the column drops it on this
+   route (`EntityListInspectorFrame`'s `flushColumn`, turned on by the catalogue page), so the
+   toolbar, the rows scroller and this pager all start and end at the pane's edges without any
+   rule bleeding anything. The negative margins are RETIRED with the inset they bled through: a
+   margin that walks a band into padding that no longer exists would overhang the pane instead.
 
-   THE FILL COMES BACK WITH THE WIDTH. The route block flattened this pager to transparent when
-   the rows were flattened; r8 gave the rows their `--fab-bg-1` fill back and left the band, so
-   a full-width transparent band would read as a hairline floating under the list rather than
-   as the rules list's footer. The wash restated here is the shared `.manager-pagination` one
-   the rules list draws, stated at the route rather than un-flattened in the older block.
+   WHAT STAYS IS THE WASH, for the reason r13 recorded: the route flatten above painted this pager
+   transparent when the rows were flattened, r8 gave the rows their `--fab-bg-1` fill back and
+   left the band, and a full-width transparent band reads as a hairline floating under the list
+   rather than as the rules list's footer. The wash restated here is the shared
+   `.manager-pagination` one the rules list draws.
 
-   `margin-block-end`, not `bottom`: the column is a flex column and the pager is its last
-   child, so a negative end margin walks it into the column's own padding-bottom. THIS ROUTE
-   ONLY: M19 names one screen, and the essence and tool catalogues keep the band they draw.
-
-   SPECIFICITY, NOT SOURCE ORDER. The route flatten and the r8-cat block are (0,3,0); this is
-   (0,4,0) through the column class, so it decides wherever it is written. The frame's own
-   `.manager-scoped-list-column > :global(.manager-pagination)` declares `flex` alone, so the
-   unlayered block it lives in contests nothing here. */
+   SPECIFICITY, NOT SOURCE ORDER, as before: the route flatten is (0,3,0); this is (0,4,0) through
+   the column class, so it decides wherever it is written. */
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .manager-pagination {
-  margin-inline: calc(-1 * var(--fab-space-4));
-  margin-block-end: calc(-1 * var(--fab-space-4));
   background: var(--fab-overlay-light-03);
 }

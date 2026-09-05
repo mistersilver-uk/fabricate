@@ -512,6 +512,7 @@
     )}
     membershipFilter={false}
     autoSelectFirst
+    flushColumn
     bind:browserState
     bind:selectedId
     onSelect={(entityId) => (selectedId = entityId)}

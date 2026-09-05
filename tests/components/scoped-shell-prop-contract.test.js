@@ -68,6 +68,13 @@ const CATALOGUE_PROPS = [
   // on. It is the shell's because a page composes the shell and never the frame.
   'autoSelectFirst',
   'bulk',
+  // THE FLUSH LIST COLUMN (issue 1371 r16-cat, maintainer ruling M21). OPT-IN and OFF by default:
+  // with it unset the frame's list column carries the pane's `--fab-space-4` inset exactly as it
+  // always did, so the essence and tool catalogues are byte-identical; the world Component
+  // catalogue turns it on and its toolbar, rows and pager run edge to edge like the system
+  // Component Rules list's. It is the shell's because a page composes the shell and never the
+  // frame.
+  'flushColumn',
   // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
   // shells, so the difference clause below is unchanged: one composition, configured per scope.
   'browserState',
@@ -247,6 +254,9 @@ describe('the shells declare the pinned prop sets', () => {
       // an inspector system row that shell has no inspector to draw.
       'describeEntry',
       'extraCards',
+      // M21's opt-in is catalogue-only for the reason M14's is: the rules-list shell's column is
+      // `ComponentsBrowserView`'s own `.manager-main`, which already runs edge to edge.
+      'flushColumn',
       // AND THE TWO PARITY OPT-OUTS (issue 1371), catalogue-only for the same reason as the
       // rest: both are about the INSPECTOR, and the rules-list shell renders none.
       'inspectorBody',
@@ -1025,6 +1035,26 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     assert.ok(
       !/autoSelectFirst[\s\S]{0,600}?inspectorElement\?\.focus/.test(frame),
       'and the auto-selection does not call the inspector focus a row CLICK calls'
+    );
+  });
+
+  it('hands the frame the flush list column, OFF by default (M21)', () => {
+    const source = shell();
+    assert.match(source, /\n\s*flushColumn = false,/, 'declared, and OFF by default');
+    assert.match(source, /\{flushColumn\}/, 'and forwarded to the frame');
+    const frame = sourceOf(FRAME);
+    assert.match(frame, /\n\s*flushColumn = false,/, 'the frame declares it OFF by default too');
+    // The class is emitted from the prop and nothing else, so an unset shell renders the column
+    // it always did — which is the whole content of "byte-identical when off".
+    assert.match(
+      frame,
+      /class="manager-scoped-list-column"\s+class:is-flush=\{flushColumn\}/,
+      'the frame`s column wears `is-flush` when and only when the prop is on'
+    );
+    assert.match(
+      frame,
+      /\.manager-scoped-list-column\.is-flush \{\s*padding: 0;\s*\}/,
+      'and the flush column drops the pane inset and nothing else'
     );
   });
 
