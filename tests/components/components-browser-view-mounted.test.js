@@ -1310,7 +1310,9 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       categoryVocabulary: ['Metal', 'Herb'],
       selectedSystemId: 'sys-1',
     });
-    const chips = [...root.querySelectorAll('.manager-component-row .fab-medallion')];
+    // `:scope` so the query cannot climb out of the mount root, and so this line adds no ESLint
+    // problem to a file `npm run lint` does not cover and therefore never cleans up.
+    const chips = [...root.querySelectorAll(':scope .manager-component-row .fab-medallion')];
     assert.ok(chips.length > 0, 'the rows draw their chips, so the loop below is not vacuous');
     for (const chip of chips) {
       assert.ok(
