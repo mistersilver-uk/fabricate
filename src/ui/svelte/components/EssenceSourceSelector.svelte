@@ -30,6 +30,12 @@
     click and the keyboard cursor's marker — which is the whole point of the re-platform: the
     focus model is written once, in one component, for every picker in the product.
 
+    THE ROW MEASUREMENT, handed to the primitive as `measureListMetrics`. The primitive floors the
+    list to a WHOLE number of rows, but only a caller can say how tall a row is: the 44px tile and
+    its 6px pitch are this file's own sheet rules. Measured from the rendered box rather than
+    restated, and without it the grid fills the panel and slices its last row of bordered tiles
+    against the bottom inset.
+
     THE CLASS FAMILY. `essence-source-*` is addressed by `styles/fabricate.css`, by
     `tests/components/overlay-portal-host-position.test.js`, by the manager's own mounted suites
     and by this component's own suite, so the families ride onto the primitive's elements through
@@ -93,6 +99,54 @@
       : localize('FABRICATE.Admin.Features.Essences.DropOrPickSourceItem')
   );
 
+  /**
+   * The row pitch and the popover chrome the whole-row flooring needs (issue 1503).
+   *
+   * WITHOUT THIS THE GRID SIMPLY FILLS THE PANEL, and the panel's height comes from the viewport
+   * — so the last visible row is sliced at whatever pixel the budget ran out on, hard against the
+   * panel's bottom inset. On a grid of BORDERED tiles that reads worst of all: half a border box
+   * with its bottom edge missing looks like a rendering fault rather than like "more below".
+   * `SearchablePopover` has offered the seam since this component was re-platformed onto it, and
+   * a caller that measures nothing gets `listMaxHeight: null` and the old fill behaviour.
+   *
+   * Every figure is MEASURED from the rendered box rather than restated here, for the same reason
+   * the sibling icon picker measures its own: the row's height is a sheet rule and the gaps are
+   * tokens, so a number written here would be a second copy free to drift from the stylesheet.
+   * The row is read through the caller's own option class, which rides onto the primitive's row
+   * element, because that is the element the sheet gives the 44px floor and the border to.
+   *
+   * `listExtra` is 0 and stated rather than omitted: it is height rendered INSIDE the list that no
+   * pitch can see, which for the icon picker is the outer margin under its pinned resolved row.
+   * This panel pins nothing — every tile is an ordinary option — so there is none, and saying so
+   * is what stops a future reader assuming the key was forgotten.
+   *
+   * @param {object} elements
+   * @param {Element|null} elements.popover The portaled panel.
+   * @param {Element|null} elements.list The `role="listbox"` element.
+   * @param {Element|null} elements.search The query field.
+   * @returns {{rowPitch?: number, rowGap?: number, chromeHeight?: number, listExtra?: number}}
+   *   The measured metrics.
+   */
+  function measurePopoverMetrics({ popover, list, search }) {
+    if (!popover || !list) return {};
+    const popoverStyles = getComputedStyle(popover);
+    const listStyles = getComputedStyle(list);
+    const firstTile = list.querySelector('.essence-source-picker-option');
+    const rowHeight = firstTile?.getBoundingClientRect?.().height ?? 0;
+    const rowGap = Number.parseFloat(listStyles.rowGap) || 0;
+    if (!rowHeight) return {};
+
+    // Composed from the panel's own computed box rather than by subtracting the list's height,
+    // which would be circular: the list's height is what the layout is about to set.
+    const chromeHeight =
+      (Number.parseFloat(popoverStyles.paddingTop) || 0) +
+      (Number.parseFloat(popoverStyles.paddingBottom) || 0) +
+      (Number.parseFloat(popoverStyles.rowGap) || 0) +
+      (search?.getBoundingClientRect?.().height ?? 0);
+
+    return { rowPitch: rowHeight + rowGap, rowGap, chromeHeight, listExtra: 0 };
+  }
+
   function clearItem(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -123,6 +177,7 @@
   searchAriaLabel={localize('FABRICATE.Admin.Features.Essences.SearchSourceLabel')}
   emptyHint={localize('FABRICATE.Admin.Features.Essences.NoComponentsAvailable')}
   noMatchesHint={localize('FABRICATE.Admin.Features.Essences.NoMatchingComponents')}
+  measureListMetrics={measurePopoverMetrics}
   onChoose={(itemId) => onSelect?.(itemId)}
 >
   {#snippet trigger({ attributes, open })}
