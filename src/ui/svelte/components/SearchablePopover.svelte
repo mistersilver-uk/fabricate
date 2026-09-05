@@ -476,7 +476,11 @@
   // the panel and not yet pressed an arrow key, which is a different state from "row 0 is
   // active": no row carries the active marker, and Enter is a NO-OP rather than a blind choice of
   // whatever sits at the top of a list they have not looked through. See `util/listboxNavigation.js`.
-  let activeIndex = $state(-1);
+  //
+  // The position is STAMPED WITH THE LIST IT INDEXES rather than held on its own, because a
+  // cursor cannot outlive that list and the expiry must be a READ. See `optionListGeneration`
+  // below for what a generation is and why the reset cannot be an `$effect`.
+  let cursor = $state({ generation: '', index: -1 });
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let optionsList = $state(null);
@@ -484,7 +488,14 @@
   let searchInput = $state(null);
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
-  const filteredOptions = $derived(filterOptions(options, normalizedSearch) ?? []);
+  // `filterOptions` is a CALLER'S seam, and everything below indexes what it returns — the
+  // cursor arithmetic, the option ids, `renderedOptions[activeIndex]`. A seam that returns
+  // something other than an array would throw on `.length` inside a derived, which surfaces as a
+  // dead panel rather than as a message naming the caller, so the coercion is here and not there.
+  const filteredOptions = $derived.by(() => {
+    const rows = filterOptions(options, normalizedSearch);
+    return Array.isArray(rows) ? rows : [];
+  });
 
   // THE LIST'S FORM, resolved once. A grid with no usable `columns` is a single column, which is
   // the list form's arithmetic — the horizontal axis exists only where there is more than one
@@ -569,28 +580,43 @@
   // `role="listbox"` element renders only when `filteredOptions.length > 0`, and the empty branch
   // below replaces it entirely. An `aria-controls` pointing at an id that resolves to no element
   // is a defect, so both attributes are conditioned on the same predicate the list is.
+  // A CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and three independent inputs rebuild that list.
+  // Opening starts a fresh pass over the options, every query keystroke rebuilds
+  // `filteredOptions`, and a caller may replace `options` under an open panel with the query
+  // unchanged — so index 3 names an unrelated option the moment any of them moves. Resetting to
+  // -1 rather than clamping is the point: the GM has not arrowed into the NEW list, so nothing in
+  // it is active and Enter stays a no-op until they do.
+  //
+  // All three are read through one GENERATION string because `open` is `$bindable` — the World
+  // Parties travel tile opens the picker without being the trigger, and a page-size change forces
+  // it shut — so neither direction reliably passes through `toggle` or `close`. The options leg
+  // is their count plus the first and last id rather than the whole list, because the generation
+  // is rebuilt on every keystroke and a whole-list key would be O(n) per character; a swap that
+  // keeps the count AND both ends is the one case it cannot see, and `renderedOptions[activeIndex]`
+  // still refuses an index past the end.
+  const optionListGeneration = $derived(
+    [
+      open ? 'open' : 'closed',
+      normalizedSearch,
+      options.length,
+      options[0]?.id ?? '',
+      options[options.length - 1]?.id ?? '',
+    ].join('/')
+  );
+
+  // THE RESET IS A READ, NOT A WRITE, and that is the whole reason the cursor carries the
+  // generation it was set in. Cleared from an `$effect`, the reset lands AFTER the derived pass
+  // that rebuilt `filteredOptions` — so for one flush `data-active-option` and
+  // `aria-activedescendant` name a position in the PREVIOUS list, and only a test that refuses to
+  // flush can see it. Stamped, the stale cursor never renders at all: the generation it was
+  // written under no longer matches, so it reads as the -1 sentinel in the same pass.
+  const activeIndex = $derived(cursor.generation === optionListGeneration ? cursor.index : -1);
+
   const listRendered = $derived(open && filteredOptions.length > 0);
   const controlledListId = $derived(listRendered ? listId : undefined);
   const activeDescendantId = $derived(
     listRendered ? activeOptionId(instanceId, activeIndex) : undefined
   );
-
-  // A CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and two independent inputs rebuild that list.
-  // Opening starts a fresh pass over the options, and every query keystroke rebuilds
-  // `filteredOptions`, so index 3 names an unrelated option the moment either moves. Resetting to
-  // -1 rather than clamping is the point: the GM has not arrowed into the NEW list, so nothing in
-  // it is active and Enter stays a no-op until they do.
-  //
-  // Both inputs are read through one generation string because `open` is `$bindable` — the World
-  // Parties travel tile opens the picker without being the trigger, and a page-size change forces
-  // it shut — so neither direction reliably passes through `toggle` or `close`.
-  const optionListGeneration = $derived(`${open ? 'open' : 'closed'}/${normalizedSearch}`);
-  let cursorGeneration = '';
-  $effect(() => {
-    if (cursorGeneration === optionListGeneration) return;
-    cursorGeneration = optionListGeneration;
-    activeIndex = -1;
-  });
 
   // KEEP THE CURSOR IN VIEW. The list scrolls, so the row the GM has arrowed to can be outside
   // its window — and because nothing is FOCUSED, the browser will not scroll to it on its own.
@@ -602,6 +628,47 @@
     const active = popoverRoot.querySelector?.('[data-active-option="true"]');
     active?.scrollIntoView?.({ block: 'nearest' });
   });
+
+  // WHICH EDGE OF A TEXT FIELD EACH CARET KEY BELONGS TO (issue 1503).
+  //
+  // The holder is USUALLY A TEXT FIELD, and these four keys are the caret's before they are the
+  // cursor's. The map records the edge at which pressing the key would move the caret NOWHERE,
+  // which is exactly the state in which handing it to the list costs the GM nothing.
+  const CARET_EDGE = new Map([
+    ['ArrowLeft', 'start'],
+    ['Home', 'start'],
+    ['ArrowRight', 'end'],
+    ['End', 'end'],
+  ]);
+
+  /**
+   * Whether this keypress belongs to the query field's caret rather than to the list cursor.
+   *
+   * The boundary, rather than a choice between the two key maps, is what makes both shippable.
+   * `ArrowLeft`/`ArrowRight` are not a convenience on a grid: with `columns = 2` `ArrowDown`
+   * steps +2 over the flat order, so on an even filtered count half the tiles are unreachable
+   * without them. Home/End reach the ends of a long list. But both pairs are text-editing keys in
+   * a field the GM is typing into, and taking them unconditionally is what
+   * `util/listboxNavigation.js` refuses to do for Left/Right in the list form while doing it for
+   * Home/End everywhere — an inconsistency this predicate removes rather than documents.
+   *
+   * Nothing becomes unreachable: every cursor movement is still one extra keypress away, which is
+   * the behaviour of every editable combobox. And two populations do not change at all — a
+   * `<button>` holder has no `selectionStart`, so the five search-suppressed sites keep today's
+   * map exactly, and a freshly opened panel has an empty query, so both edges hold and the cursor
+   * takes all four keys, which is when a GM actually arrows.
+   *
+   * @param {KeyboardEvent} event the keypress on the holder.
+   * @returns {boolean} true when the field must keep the key.
+   */
+  function caretOwnsKey(event) {
+    const field = event.target;
+    if (typeof field?.selectionStart !== 'number') return false; // a trigger holder: never
+    const edge = CARET_EDGE.get(event.key);
+    if (!edge) return false;
+    if (field.selectionStart !== field.selectionEnd) return true; // a selection is the caret's
+    return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
+  }
 
   // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
   // which keys are CONSUMED, and what Enter chooses. A key the module does not own returns `null`
@@ -620,12 +687,20 @@
       choose(active.id);
       return;
     }
+    // A MODIFIED KEY IS NEVER THIS WIDGET'S. `Shift+End` selects to the end of the query,
+    // `Ctrl+Home` jumps to its start, and both are the ordinary way a GM fixes a typo in a long
+    // search — none of them is a cursor movement, and consuming them would take the field's
+    // selection keys away with no listbox behaviour offered in exchange.
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (caretOwnsKey(event)) return;
     const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
       columns: gridColumns,
     });
     if (next === null) return;
     event.preventDefault();
-    activeIndex = next;
+    // Stamped with the generation it indexes, so the list that replaces this one reads it as the
+    // -1 sentinel rather than inheriting a position in a list that no longer exists.
+    cursor = { generation: optionListGeneration, index: next };
   }
 
   // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
@@ -688,6 +763,27 @@
 
   function stop(event) {
     event.stopPropagation();
+  }
+
+  // THE PANEL'S OWN CHROME MUST NOT TAKE FOCUS EITHER (issue 1503).
+  //
+  // The portaled panel is `role="dialog" tabindex="-1"`, so it is the nearest focusable
+  // ancestor of everything inside it: a click on the panel inset, on an inter-row gap, on the
+  // header or on the empty note moves DOM focus off the holder and onto the dialog. The option
+  // rows suppress their own `mousedown`, but nothing else did — and with focus on the dialog the
+  // key map is gone, because it is bound to the holder rather than to the panel, so the arrows
+  // stop moving and typing goes nowhere. It is also INVISIBLE: the module root rings
+  // `:focus-visible` only, and a mouse click does not match it, so the panel draws no ring to
+  // explain what happened.
+  //
+  // The exception list is every element that has its OWN reason to take focus — the query field
+  // above all, whose caret placement and text selection are exactly what a suppressed `mousedown`
+  // would break. Native scrollbar drags are unaffected, because a scrollbar interaction
+  // dispatches no `mousedown` to the element at all.
+  const FOCUSABLE_PANEL_CHROME = 'input, button, textarea, select, [href]';
+
+  function keepFocusOnHolder(event) {
+    if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
   }
 
   // The trigger keeps its `stopPropagation` in BOTH shapes, gains the key map in the one where it
@@ -915,6 +1011,7 @@
         ignoreScrollWithin,
       }}
       onclick={stop}
+      onmousedown={keepFocusOnHolder}
       onkeydown={(event) => {
         if (event.key === 'Escape') {
           stop(event);

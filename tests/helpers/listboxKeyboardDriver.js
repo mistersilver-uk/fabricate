@@ -81,6 +81,26 @@ export function typeQuery(field, term) {
 }
 
 /**
+ * Put the caret somewhere in a query field, which is what decides who owns Home/End/Left/Right.
+ *
+ * Four keys are the caret's before they are the list cursor's, and `SearchablePopover` hands each
+ * of them to the cursor ONLY from the edge at which the caret would not move. happy-dom follows
+ * the HTML spec and collapses the selection to the end of the value when `value` is assigned, so
+ * `typeQuery` alone always leaves the caret at one particular edge — a suite that never called
+ * this would measure that edge and never the other, and would read as though there were no rule.
+ *
+ * @param {HTMLInputElement} field The query field.
+ * @param {number|[number, number]} caret An offset, or a two-element RANGE — the third state the
+ *   boundary distinguishes, because a selection belongs to the field whichever edge it touches.
+ */
+export function placeCaret(field, caret) {
+  const [start, end] = Array.isArray(caret) ? caret : [caret, caret];
+  field.selectionStart = start;
+  field.selectionEnd = end;
+  return field;
+}
+
+/**
  * Press one key `presses` times, asserting after EVERY press that focus is still on the holder,
  * and return what the holder announced each time.
  *
