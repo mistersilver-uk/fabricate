@@ -201,6 +201,12 @@ const GATE_TARGETS = [
   // gate, which decides which of the sheet's class selectors any component can still match. It
   // is only ever imported by tests, so no other entry in this list would drag it in.
   'scripts/lib/stylesheetLiveClasses.js',
+  // The duplicate-selector census (issue 1501): the shared merge predicate behind the sheet's
+  // selector-repetition ratchet and the report the issue publishes, plus the CLI shell that
+  // prints it. Same reasoning as the entry above — only tests import the library, and nothing
+  // imports the runner at all, so neither would be reached by any other entry in this list.
+  'scripts/lib/stylesheetSelectorCensus.js',
+  'scripts/stylesheet-selector-census.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
