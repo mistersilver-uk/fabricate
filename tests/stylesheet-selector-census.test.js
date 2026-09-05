@@ -36,7 +36,10 @@
  * concludes there are 119 merges waiting to be done.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   censusBlockerWalk,
@@ -47,6 +50,34 @@ import {
   scopedBlockerWalk,
   selectorAppearances,
 } from '../scripts/lib/stylesheetSelectorCensus.js';
+
+const MODULE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'scripts',
+  'lib',
+  'stylesheetSelectorCensus.js'
+);
+
+/**
+ * The module has to stay searchable, and only a byte-level assertion can say that it is.
+ *
+ * A raw control character used as a key separator is behaviourally perfect and invisible in every
+ * review: `git` still diffs the file as text, prettier and eslint round-trip it, and the module's
+ * own tests pass. What it costs is `grep`, `rg` and `file`, all of which classify a file holding
+ * one NUL as binary and report a match without the line — in a repository whose whole workflow is
+ * grep-driven, that is a module nobody can navigate. The separator is spelled as an escape instead,
+ * which is the same character at runtime and ordinary text on disk.
+ */
+test('the module source carries no control characters, so grep can read it', () => {
+  const source = readFileSync(MODULE, 'utf8');
+  // eslint-disable-next-line no-control-regex -- the point of the gate is to find control bytes
+  const found = [...source.matchAll(/[\u{0}-\u{8}\u{B}\u{C}\u{E}-\u{1F}]/gu)].map(
+    (match) =>
+      String.raw`\u${match[0].codePointAt(0).toString(16).padStart(4, '0')} at offset ${match.index}`
+  );
+  assert.deepEqual(found, [], 'a control byte makes the module binary to grep, rg and file');
+});
 
 /** One rule block, written over as many lines as it has declarations, so a line citation is real. */
 const block = (selector, ...declarations) => [
