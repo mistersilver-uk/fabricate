@@ -26,17 +26,23 @@ import {
 } from '../../src/utils/componentScopeValidation.js';
 import {
   componentAttributionNote,
-  componentBulkEssenceBatches,
+  componentBulkEssenceCarried,
+  componentBulkEssencePlan,
   componentCategoryInheritOffered,
   componentCategoryNote,
   componentDeleteNote,
+  componentEssenceChips,
   componentEssenceFilter,
+  componentEssenceInheritOffered,
+  componentEssenceNote,
   componentRowEssenceChips,
+  componentWorldEssenceNote,
   componentRowStats,
   componentSalvageInLabel,
   componentWorldCategoryNote,
   componentWorldEssenceMap,
   componentWorldTagNote,
+  mergeStagedEssences,
   offeredWorldComponentCategories,
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 
@@ -534,52 +540,150 @@ describe('the inspector’s `Salvage in` heading names the system as its own nod
   });
 });
 
-// ── issue 1371 r17-b ──────────────────────────────────────────────────────────────────────────
-describe('the world essence write goes only where a system HOLDS the essence (M25)', () => {
-  // A roster whose systems differ in exactly one respect: what each one's own `essenceDefinitions`
-  // row set holds. `forge` holds both essences, `alchemy` holds `flame` alone, and `glass` has
-  // rules for `coal` and holds NOTHING — the shape the reviewer traced: a write into it would be
-  // normalized away by the store (`_scopeBasis`) and reported as an update that landed nothing.
+// ── issue 1371 r18-entry — M31: THE WORLD BULK `Essence values` GROUP WRITES THE WORLD SECTION ──
+describe('the world bulk essence instruction is ONE world write per changed record (M31)', () => {
+  // Three world records, each carrying a different world map: `coal` has an elected map, `ingot`
+  // an authored EMPTY one, and `orphan` none at all. `resin` is not selected and must never be
+  // planned. The raw roster is present only so the union fallback has something to read for a
+  // record with no world section; it must not be written to.
+  const ENTRIES = [
+    { id: 'coal', defaults: { category: 'Raw', essences: { flame: 2, tide: 1 } } },
+    { id: 'ingot', defaults: { category: 'Refined', essences: {} } },
+    { id: 'orphan' },
+    { id: 'resin', defaults: { essences: { flame: 9 } } },
+  ];
   const ROSTER = [
-    {
-      id: 'sys-forge',
-      essenceDefinitions: [{ id: 'flame' }, { id: 'earth' }],
-      components: [{ id: 'coal', essences: { flame: 1 } }],
-    },
-    {
-      id: 'sys-alchemy',
-      essenceDefinitions: [{ id: 'flame' }],
-      components: [{ id: 'coal', essences: {} }],
-    },
-    { id: 'sys-glass', essenceDefinitions: [], components: [{ id: 'coal', essences: {} }] },
-    // A system carrying NO roster at all, which is what an unmigrated fixture hands over: it holds
-    // nothing, so nothing is written to it either.
-    { id: 'sys-bare', components: [{ id: 'coal', essences: {} }] },
+    { id: 'sys-forge', components: [{ id: 'orphan', essences: { earth: 4 } }] },
   ];
 
-  it('drops the keys a system does not hold, and yields NO batch for a system holding none of them', () => {
-    assert.deepEqual(componentBulkEssenceBatches(['coal'], { flame: 3, earth: 2 }, ROSTER), [
-      { systemId: 'sys-forge', componentIds: ['coal'], essences: { flame: 3, earth: 2 } },
-      { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 3 } },
-    ]);
+  it('merges the staged map over each record’s WORLD map: a positive value sets, a zero strips, an unnamed key is left alone', () => {
+    assert.deepEqual(mergeStagedEssences({ flame: 2, tide: 1 }, { flame: 3, tide: 0, earth: 1 }), {
+      flame: 3,
+      earth: 1,
+    });
+    assert.deepEqual(mergeStagedEssences({}, { flame: 0 }), {}, 'a strip of nothing is nothing');
+    assert.deepEqual(mergeStagedEssences({ flame: 2 }, { flame: 'x' }), { flame: 2 }, 'a non-number is ignored');
   });
 
-  it('skips a system whose only staged key it does not hold, even when its rules carry that value', () => {
-    // `glass` carries a stale `earth` on its rules and holds no `earth`: a strip is not written
-    // there, because the store would refuse the key on the way in and the write would land nothing.
-    const stale = [
-      { id: 'sys-glass', essenceDefinitions: [], components: [{ id: 'coal', essences: { earth: 2 } }] },
-    ];
-    assert.deepEqual(componentBulkEssenceBatches(['coal'], { earth: 0 }, stale), []);
+  it('plans one `updateWorldDefaultSection(id, "essences", map)` per SELECTED record whose map changes, in selection order', () => {
+    assert.deepEqual(
+      componentBulkEssencePlan(['coal', 'ingot', 'orphan'], { flame: 3, tide: 0 }, { entries: ENTRIES, systems: ROSTER }),
+      [
+        { entityId: 'coal', essences: { flame: 3 } },
+        { entityId: 'ingot', essences: { flame: 3 } },
+        // `orphan` has no world section: the union fallback (`earth: 4`) is its current map, so
+        // the write carries it forward beside the staged value rather than erasing it.
+        { entityId: 'orphan', essences: { earth: 4, flame: 3 } },
+      ]
+    );
   });
 
-  it('reads the legacy `essences` spelling of the roster as `_scopeBasis` does', () => {
-    const legacy = [
-      { id: 'sys-old', essences: [{ id: 'earth' }], components: [{ id: 'coal', essences: {} }] },
-    ];
-    assert.deepEqual(componentBulkEssenceBatches(['coal'], { flame: 3, earth: 2 }, legacy), [
-      { systemId: 'sys-old', componentIds: ['coal'], essences: { earth: 2 } },
+  it('skips a record whose world map would not change, and plans nothing for an empty instruction', () => {
+    assert.deepEqual(
+      componentBulkEssencePlan(['coal', 'ingot'], { flame: 2 }, { entries: ENTRIES, systems: ROSTER }),
+      [{ entityId: 'ingot', essences: { flame: 2 } }],
+      '`coal` already carries flame at 2, so only `ingot` is written'
+    );
+    assert.deepEqual(
+      componentBulkEssencePlan(['coal', 'ingot'], { earth: 0 }, { entries: ENTRIES, systems: ROSTER }),
+      [],
+      'a strip of an essence nobody carries writes nothing'
+    );
+    assert.deepEqual(componentBulkEssencePlan(['coal'], {}, { entries: ENTRIES, systems: ROSTER }), []);
+    assert.deepEqual(componentBulkEssencePlan(['coal'], { flame: 1 }, {}), [
+      { entityId: 'coal', essences: { flame: 1 } },
+    ], 'an unknown record is written from an empty base rather than skipped');
+  });
+
+  it('counts the `n/N` off each selected record’s WORLD map', () => {
+    assert.deepEqual(
+      componentBulkEssenceCarried(['coal', 'ingot', 'orphan'], { entries: ENTRIES, systems: ROSTER }),
+      { flame: 1, tide: 1, earth: 1 }
+    );
+    assert.deepEqual(componentBulkEssenceCarried([], { entries: ENTRIES }), {});
+    assert.deepEqual(
+      componentBulkEssenceCarried(['resin'], { entries: ENTRIES }),
+      { flame: 1 },
+      'the count reads the world section, never a system roster'
+    );
+  });
+});
+
+// ── issue 1371 r18-entry — M31: THE ENTRY'S ESSENCE CARD AND THE EDITOR'S INHERIT CHOICE ─────
+describe('the essence inherit choice is offered exactly when the world has AUTHORED a map (M31)', () => {
+  it('offers it for a map, including an authored EMPTY one, and withholds it for absence', () => {
+    assert.equal(componentEssenceInheritOffered({ flame: 2 }), true);
+    assert.equal(componentEssenceInheritOffered({}), true, '`{}` is an authored "no essences"');
+    assert.equal(componentEssenceInheritOffered(undefined), false);
+    assert.equal(componentEssenceInheritOffered(null), false);
+    assert.equal(componentEssenceInheritOffered([]), false, 'an array is not a map');
+    assert.equal(componentEssenceInheritOffered('flame'), false);
+  });
+});
+
+describe('the system-scope essence note has the category note’s three branches (M31)', () => {
+  it('is muted and `unset` when the world authored nothing', () => {
+    const note = componentEssenceNote({ worldEssences: undefined, inheriting: true, systemName: 'Forge' }, phrase);
+    assert.equal(note.state, 'unset');
+    assert.equal(note.tone, 'muted');
+    assert.match(note.text, /No world essence values are set/);
+  });
+
+  it('is info and `inherited` while the switch is on', () => {
+    const note = componentEssenceNote({ worldEssences: { flame: 2 }, inheriting: true, systemName: 'Forge' }, phrase);
+    assert.equal(note.state, 'inherited');
+    assert.equal(note.tone, 'info');
+    assert.equal(note.icon, 'fas fa-earth-americas');
+    assert.match(note.text, /Following the world values/);
+  });
+
+  it('is warning and `overridden` while the switch is off, naming the system', () => {
+    const note = componentEssenceNote({ worldEssences: {}, inheriting: false, systemName: 'Forge' }, phrase);
+    assert.equal(note.state, 'overridden');
+    assert.equal(note.tone, 'warning');
+    assert.match(note.text, /Overriding the world values for Forge only/);
+  });
+});
+
+describe('the world entry’s essence note counts inheriting and overriding members (M31)', () => {
+  // `membershipCount` is the projection's own member tally, which is what the note counts against.
+  const entry = (inheriting, members) => ({
+    membershipCount: members,
+    inheritCounts: { category: 0, essences: inheriting },
+  });
+
+  it('reads the two clauses off `inheritCounts.essences`, pluralised independently', () => {
+    assert.equal(componentWorldEssenceNote(entry(2, 3), phrase), '2 of 3 systems inherit it · 1 overrides locally.');
+    assert.equal(componentWorldEssenceNote(entry(0, 1), phrase), '0 of 1 system inherits it · 1 overrides locally.');
+    assert.equal(componentWorldEssenceNote(entry(2, 2), phrase), '2 of 2 systems inherit it · 0 override locally.');
+  });
+
+  it('says so when no system has rules for the record', () => {
+    assert.equal(componentWorldEssenceNote(entry(0, 0), phrase), 'No system has rules for this yet.');
+  });
+
+  it('and the category note is the SAME sentence over the other section, so the two cannot drift', () => {
+    const both = { membershipCount: 3, inheritCounts: { category: 1, essences: 2 } };
+    assert.equal(componentWorldCategoryNote(both, phrase), '1 of 3 systems inherit it · 2 override locally.');
+    assert.equal(componentWorldEssenceNote(both, phrase), '2 of 3 systems inherit it · 1 overrides locally.');
+  });
+});
+
+describe('an essence map is drawn as chips over the world catalogue, in its order (M31)', () => {
+  const ESSENCES = [
+    { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
+    { id: 'earth', name: 'Earth' },
+    { id: 'tide' },
+  ];
+
+  it('draws one chip per POSITIVE value the catalogue names, with the roster’s glyph and colour', () => {
+    assert.deepEqual(componentEssenceChips({ tide: 1, flame: 2, ghost: 3, earth: 0 }, ESSENCES), [
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember', quantity: 2 },
+      { id: 'tide', name: 'tide', icon: 'fas fa-mortar-pestle', colorToken: '', quantity: 1 },
     ]);
+    assert.deepEqual(componentEssenceChips({}, ESSENCES), []);
+    assert.deepEqual(componentEssenceChips(null, ESSENCES), []);
+    assert.deepEqual(componentEssenceChips({ flame: 2 }, []), []);
   });
 });
 

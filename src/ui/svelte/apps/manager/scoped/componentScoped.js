@@ -575,6 +575,32 @@ export function componentUseSummary(entry, systems, phrase) {
  * @returns {string}
  */
 export function componentWorldCategoryNote(entry, phrase) {
+  return componentWorldSectionNote(entry, 'category', phrase);
+}
+
+/**
+ * The world entry's essence note (issue 1371 r18-entry, maintainer ruling M31): the same two
+ * counted clauses over the `essences` section, read off `inheritCounts.essences`.
+ *
+ * @param {object|null} entry
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+export function componentWorldEssenceNote(entry, phrase) {
+  return componentWorldSectionNote(entry, 'essences', phrase);
+}
+
+/**
+ * ONE sentence for both inheritable sections. The clauses say "inherit it" and "override
+ * locally" and never name the section, so the category card and the essence card read the same
+ * words over their own counts; a second copy per section is how the two notes would drift.
+ *
+ * @param {object|null} entry
+ * @param {'category'|'essences'} section
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {string}
+ */
+function componentWorldSectionNote(entry, section, phrase) {
   const members = componentMemberCount(entry);
   if (members === 0) {
     return phrase(
@@ -582,7 +608,7 @@ export function componentWorldCategoryNote(entry, phrase) {
       'No system has rules for this yet.'
     );
   }
-  const inheriting = Number(entry?.inheritCounts?.category) || 0;
+  const inheriting = Number(entry?.inheritCounts?.[section]) || 0;
   const overriding = members - inheriting;
   // TWO CLAUSES, PLURALISED INDEPENDENTLY (issue 1371, round 3). The single composed sentence read
   // `0 of 1 systems inherit it · 1 override locally.` on the commonest state of all — a component
@@ -723,6 +749,82 @@ export function componentCategoryNote({ worldCategory, inheriting, systemName },
  */
 export function componentCategoryInheritOffered(worldCategory) {
   return String(worldCategory ?? '').trim() !== '';
+}
+
+/**
+ * Whether a world essence map is AUTHORED at all — the shape rule the normalizer states
+ * (`normalizeComponentEssenceMap`, issue 1371 r18-store): a plain object is a map, an EMPTY one
+ * is an authored "no essences", and anything else is absence.
+ *
+ * @param {unknown} worldEssences `entry.defaults?.essences`.
+ * @returns {boolean}
+ */
+export function componentWorldEssencesAuthored(worldEssences) {
+  return (
+    worldEssences !== null && typeof worldEssences === 'object' && !Array.isArray(worldEssences)
+  );
+}
+
+/**
+ * Whether the rules editor's essence inherit choice is offered (issue 1371 r18-entry, M31).
+ *
+ * Mirrors {@link componentCategoryInheritOffered}: the choice is withheld when the world has
+ * authored nothing, because flipping a switch over absence resolves the in-system map either way —
+ * a control that changes nothing while looking as though it did. An authored EMPTY map DOES offer
+ * it: inheriting `{}` means this system contributes no essences, which is a real choice.
+ *
+ * @param {unknown} worldEssences `entry.defaults?.essences`.
+ * @returns {boolean}
+ */
+export function componentEssenceInheritOffered(worldEssences) {
+  return componentWorldEssencesAuthored(worldEssences);
+}
+
+/**
+ * The system-scope essence note, in the category note's three branches (issue 1371 r18-entry,
+ * maintainer ruling M31). Same shape, same tones, same glyphs as {@link componentCategoryNote},
+ * so the two cards under one head read alike.
+ *
+ * @param {object} options
+ * @param {unknown} options.worldEssences the world map, or absence.
+ * @param {boolean} options.inheriting whether this system's switch is on.
+ * @param {string} options.systemName
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {{state: string, icon: string, tone: string, text: string}}
+ */
+export function componentEssenceNote({ worldEssences, inheriting, systemName }, phrase) {
+  if (!componentWorldEssencesAuthored(worldEssences)) {
+    return {
+      state: 'unset',
+      icon: 'fas fa-circle-info',
+      tone: 'muted',
+      text: phrase(
+        'FABRICATE.Admin.Manager.Component.EssencesEdit.NoteUnset',
+        'No world essence values are set, so this system supplies its own.'
+      ),
+    };
+  }
+  if (inheriting) {
+    return {
+      state: 'inherited',
+      icon: 'fas fa-earth-americas',
+      tone: 'info',
+      text: phrase(
+        'FABRICATE.Admin.Manager.Component.EssencesEdit.NoteInherited',
+        'Following the world values. Change them in the catalogue entry and every inheriting system follows.'
+      ),
+    };
+  }
+  return {
+    state: 'overridden',
+    icon: 'fas fa-code-branch',
+    tone: 'warning',
+    text: phrase(
+      'FABRICATE.Admin.Manager.Component.EssencesEdit.NoteOverridden',
+      'Overriding the world values for {system} only.',
+      { system: systemName }
+    ),
+  };
 }
 
 /**
@@ -1251,8 +1353,8 @@ export function componentBulkMembershipModes(phrase) {
 export function componentBulkWriteCount({ selected, systems, category, tags, essences = 0 }) {
   const rows = Number(selected) || 0;
   const systemCount = Number(systems) || 0;
-  // The essence axis counts its BATCHES (issue 1371 r16-cat, M25): one setting write per system
-  // per resulting map, which is what {@link componentBulkEssenceBatches} answers.
+  // The essence axis counts ONE world write per changed record (issue 1371 r18-entry, M31), which
+  // is the length of the plan {@link componentBulkEssencePlan} answers.
   return (
     rows * systemCount + (category ? rows : 0) + (tags ? rows : 0) + (Number(essences) || 0)
   );
@@ -1387,39 +1489,39 @@ function carriedEssencesOf(rules) {
 /**
  * How many of the selection already carry each essence — the `n` of the inset's `n/N`.
  *
- * A component CARRIES an essence when ANY system's rules for it hold a positive value: the world
- * panel writes into every such system, so "already carries it somewhere" is the fact the count
- * exists to state. Counted once per component however many systems agree.
+ * READ OFF EACH RECORD'S WORLD MAP (issue 1371 r18-entry, maintainer ruling M31), through the
+ * same {@link componentWorldEssenceMap} the catalogue's row chips and essence filter read, so the
+ * panel's count can never disagree with the rows it stands beside. Under M25 it counted "any
+ * system's rules hold a positive value" off a raw roster the root never handed this page, so it
+ * read `0/N` in the live app whatever the records carried.
  *
  * @param {string[]} entityIds the ticked world component ids.
- * @param {Array<object>} systems the raw roster.
+ * @param {{entries?: Array<object>, systems?: Array<object>}} context the projected entries and
+ *   the raw roster (the latter only for the union fallback a record with no world section reads).
  * @returns {Record<string, number>}
  */
-export function componentBulkEssenceCarried(entityIds, systems) {
-  const roster = Array.isArray(systems) ? systems : [];
+export function componentBulkEssenceCarried(entityIds, { entries = [], systems = [] } = {}) {
   const counts = {};
   for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
-    const componentId = String(rawId ?? '');
-    const carried = new Set();
-    for (const system of roster) {
-      for (const essenceId of Object.keys(carriedEssencesOf(componentRulesIn(system, componentId)))) {
-        carried.add(essenceId);
-      }
-    }
-    for (const essenceId of carried) counts[essenceId] = (counts[essenceId] ?? 0) + 1;
+    const map = componentWorldEssenceMap(componentEntryById(entries, rawId), systems);
+    for (const essenceId of Object.keys(map)) counts[essenceId] = (counts[essenceId] ?? 0) + 1;
   }
   return counts;
 }
 
 /**
- * The staged map merged into one component's carried map (`proto:4239`): a positive value is
- * SET, a zero STRIPS the essence, and an essence the instruction does not name is left alone.
+ * The staged map merged into one record's current map (`proto:4239`): a positive value is SET,
+ * a zero STRIPS the essence, and an essence the instruction does not name is left alone.
+ *
+ * EXPORTED since issue 1371 r18-entry, because the page's `applyBulk` and the panel's write count
+ * both resolve the same plan through {@link componentBulkEssencePlan} and a test has to reach the
+ * merge rule directly.
  *
  * @param {Record<string, number>} carried
  * @param {Record<string, number>} staged
  * @returns {Record<string, number>}
  */
-function mergeStagedEssences(carried, staged) {
+export function mergeStagedEssences(carried, staged) {
   const merged = { ...carried };
   for (const [id, raw] of Object.entries(staged ?? {})) {
     const quantity = Number(raw);
@@ -1431,101 +1533,69 @@ function mergeStagedEssences(carried, staged) {
 }
 
 /**
- * A stable key for one essence map, so two components ending on the same map share a write.
+ * The writes an essence instruction makes: ONE `updateWorldDefaultSection(entityId, 'essences',
+ * map)` per selected record whose world map would change, in selection order (issue 1371
+ * r18-entry, maintainer ruling M31).
  *
- * @param {Record<string, number>} essences
- * @returns {string}
- */
-function essenceMapKey(essences) {
-  return Object.keys(essences)
-    .sort((left, right) => left.localeCompare(right))
-    .map((id) => `${id}=${essences[id]}`)
-    .join('|');
-}
-
-/**
- * The essences one system HOLDS: the ids on its own `essenceDefinitions` roster, which is the
- * in-system row a joined world essence carries (issue 1371 r17-b, reviewer 5 / Foundry 2).
+ * M31 SUPERSEDES M25'S ROUTE. The world catalogue's `Essence values` group used to write into each
+ * selected component's IN-SYSTEM rules in every system holding it (`bulkEditRules`, batched per
+ * system per resulting map, narrowed to each system's roster) — and no world screen reads
+ * per-system rules, so the write persisted nowhere the GM could see it, which is the defect the
+ * maintainer's third live test named. The world record carries an `essences` SECTION now
+ * (`data-models/spec.md` `### Component scope` requirement 2a), every system that has rules for
+ * the component inherits it unless it overrides, and that section is what this plan writes.
  *
- * Read exactly as `CraftingSystemManager._scopeBasis` reads it — `essenceDefinitions`, with the
- * legacy `essences` spelling behind it — because that is the basis the store normalizes a bulk
- * write's map against: a key the system does not hold is dropped there, so a batch carrying it
- * would report an update and land nothing. A system carrying no roster at all holds nothing.
- *
- * @param {object} system a raw crafting system.
- * @returns {Set<string>}
- */
-function heldEssenceIdsOf(system) {
-  const roster = Array.isArray(system?.essenceDefinitions)
-    ? system.essenceDefinitions
-    : Array.isArray(system?.essences)
-      ? system.essences
-      : [];
-  return new Set(
-    roster.map((definition) => String(definition?.id ?? '')).filter((id) => id !== '')
-  );
-}
-
-/**
- * The staged map narrowed to the essences one system holds.
- *
- * @param {Record<string, number>} staged
- * @param {Set<string>} held
- * @returns {Record<string, number>}
- */
-function stagedEssencesHeldBy(staged, held) {
-  const out = {};
-  for (const [id, quantity] of Object.entries(staged ?? {})) {
-    if (held.has(id)) out[id] = quantity;
-  }
-  return out;
-}
-
-/**
- * The writes an essence instruction makes: one per crafting system per RESULTING map.
- *
- * `CraftingSystemManager.applyBulkEditToComponents` REPLACES a component's whole `essences` map,
- * so the merge is done here per component and the components that end on the same map in the same
- * system are written together. A system with no rules for a component is not written for it, and
- * a component whose map would not change is skipped — an Apply that touches nothing on a record is
- * a write that reports itself and changes nothing.
- *
- * A SYSTEM THAT DOES NOT HOLD AN ESSENCE SKIPS IT (issue 1371 r17-b): the staged map is narrowed
- * to each system's own roster ({@link heldEssenceIdsOf}) before it is merged, so a system holding
- * none of the staged essences yields NO batch, and one holding some of them is written only those
- * keys. This is the mechanism the panel's note and `docs/components/index.md` describe, and it
- * matches what the store would otherwise do silently on the way in.
- *
- * Batches are in roster order, then in selection order within a batch.
+ * The base of each merge is the record's CURRENT world map as the screen states it
+ * ({@link componentWorldEssenceMap}: the world section when it exists, else the union fallback),
+ * so a record with no section yet has its displayed values carried forward beside the staged
+ * ones rather than erased by the first bulk write. A record whose map would not change is
+ * skipped — an Apply that touches nothing on a record is a write that reports itself and changes
+ * nothing.
  *
  * @param {string[]} entityIds the ticked world component ids, in list order.
  * @param {Record<string, number>} staged `essenceId -> quantity`, `0` meaning strip.
- * @param {Array<object>} systems the raw roster.
- * @returns {Array<{systemId: string, componentIds: string[], essences: Record<string, number>}>}
+ * @param {{entries?: Array<object>, systems?: Array<object>}} context the projected entries and
+ *   the raw roster (the latter only for the union fallback).
+ * @returns {Array<{entityId: string, essences: Record<string, number>}>}
  */
-export function componentBulkEssenceBatches(entityIds, staged, systems) {
+export function componentBulkEssencePlan(entityIds, staged, { entries = [], systems = [] } = {}) {
   if (!staged || Object.keys(staged).length === 0) return [];
-  const batches = [];
-  for (const system of Array.isArray(systems) ? systems : []) {
-    const systemId = String(system?.id ?? '');
-    if (!systemId) continue;
-    const stagedHere = stagedEssencesHeldBy(staged, heldEssenceIdsOf(system));
-    if (Object.keys(stagedHere).length === 0) continue;
-    const groups = new Map();
-    for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
-      const componentId = String(rawId ?? '');
-      const rules = componentRulesIn(system, componentId);
-      if (!rules) continue;
-      const carried = carriedEssencesOf(rules);
-      const merged = mergeStagedEssences(carried, stagedHere);
-      const key = essenceMapKey(merged);
-      if (key === essenceMapKey(carried)) continue;
-      if (!groups.has(key)) groups.set(key, { systemId, componentIds: [], essences: merged });
-      groups.get(key).componentIds.push(componentId);
-    }
-    batches.push(...groups.values());
+  const plan = [];
+  for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
+    const entityId = String(rawId ?? '');
+    if (!entityId) continue;
+    const current = componentWorldEssenceMap(componentEntryById(entries, entityId), systems);
+    const next = mergeStagedEssences(current, staged);
+    if (essenceMapsEqual(current, next)) continue;
+    plan.push({ entityId, essences: next });
   }
-  return batches;
+  return plan;
+}
+
+/**
+ * One projected entry by id, or a bare `{id}` so an unknown record reads as an empty map rather
+ * than as a throw.
+ *
+ * @param {Array<object>} entries
+ * @param {unknown} rawId
+ * @returns {object}
+ */
+function componentEntryById(entries, rawId) {
+  const id = String(rawId ?? '');
+  return (Array.isArray(entries) ? entries : []).find((entry) => entry?.id === id) ?? { id };
+}
+
+/**
+ * Whether two positive essence maps carry the same keys at the same values.
+ *
+ * @param {Record<string, number>} left
+ * @param {Record<string, number>} right
+ * @returns {boolean}
+ */
+function essenceMapsEqual(left, right) {
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  return leftKeys.every((key) => right[key] === left[key]);
 }
 
 /**
@@ -2056,25 +2126,18 @@ export function componentRulesSubtitle({ systemName, category, salvageModeLabel 
 // {@link componentWorldEssenceMap}, so the filter and the chips can never disagree about what a
 // row carries.
 //
-// r18-store: read the world essence map. Under maintainer ruling M31 the world record gains an
-// `essences` SECTION beside `category` — world-level values every system inherits unless it
-// overrides — and that map is what this screen states. Lane STORE is publishing it; it is
-// written through `updateWorldDefaultSection(entityId, 'essences', map)`, which by the
-// `category` precedent lands on the world default record the projection publishes as
-// `entry.defaults` — so {@link componentWorldEssenceMap} reads `entry.defaults.essences` FIRST
-// and the screen is live the moment STORE integrates. STORE's contract
-// (`artifacts/r18-essence-section-contract.md`) names that exact field — `undefined` when
-// unauthored, `{}` as an authored "no essences" — so nothing needs re-pointing; the marker
-// stays for the driver to strip when the two lanes integrate.
+// THE MAP IS THE WORLD RECORD'S `essences` SECTION (issue 1371 r18-store / r18-entry, maintainer
+// ruling M31): world-level values beside `category`, inherited by every system that has rules for
+// the component unless it overrides, published as `entry.defaults.essences` — `undefined` while
+// unauthored, `{}` as an authored "no essences" — and written through
+// `updateWorldDefaultSection(entityId, 'essences', map)` by the world entry's `Essence
+// contribution` card and the catalogue's bulk `Essence values` group alike.
 //
-// UNTIL THE WORLD SECTION EXISTS ON A RECORD, the map is the UNION of the record's per-system
-// essence values read off a raw system roster carrying `components[].essences` (the shape the
-// M25 bulk helpers above read). THAT ROSTER IS NOT WHAT THE ROOT HANDS THE PAGE TODAY: the page's
-// `systems` is the admin store's narrowed system list (`adminStore.js`, `systemList` — id, name,
-// description, enabled, resolution mode, feature count), which carries no `components`, so the
-// union answers nothing in the live app and the M25 bulk helpers read the same nothing there.
-// The union stands only as the honest fallback for a roster that does carry rules; the world
-// section is the read that matters.
+// A RECORD WITH NO SECTION FALLS BACK TO THE UNION of its per-system essence values read off a
+// raw roster carrying `components[].essences`. That roster is not what the root hands this page
+// (`systems` is the admin store's narrowed list, which carries no `components`), so the fallback
+// answers nothing in the live app; it stands as the honest reading for a roster that does carry
+// rules, and the `1.32.0` migration elects a world map for every record a system holds a row for.
 
 /**
  * The essence filter's two PREDICATE values (`proto:5533`; `proto:5477`-`5479` is the predicate
@@ -2088,10 +2151,10 @@ export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
  * The essence map the catalogue states for one world component: `essenceId -> quantity`, with
  * only POSITIVE quantities.
  *
- * r18-store: read the world essence map — see the block note above. The WORLD SECTION wins
- * whenever the record carries one (`entry.defaults.essences`, M31); a record without one falls
- * back to the union of the per-system values, keeping the LARGEST where systems disagree, so a
- * value one system has raised is not hidden behind another system's lower one.
+ * The WORLD SECTION wins whenever the record carries one (`entry.defaults.essences`, M31); a
+ * record without one falls back to the union of the per-system values, keeping the LARGEST where
+ * systems disagree, so a value one system has raised is not hidden behind another system's lower
+ * one. See the block note above.
  *
  * @param {object|null} entry the world catalogue entry.
  * @param {Array<object>} systems the raw crafting-system roster.
@@ -2131,17 +2194,34 @@ export function componentWorldEssenceMap(entry, systems) {
  * @returns {Array<{id: string, name: string, icon: string, colorToken: string, quantity: number}>}
  */
 export function componentRowEssenceChips(entry, { systems = [], essences = [] } = {}) {
-  const map = componentWorldEssenceMap(entry, systems);
+  return componentEssenceChips(componentWorldEssenceMap(entry, systems), essences);
+}
+
+/**
+ * One essence map drawn as chips over the WORLD essence catalogue, in its order (issue 1371
+ * r18-entry, maintainer ruling M31): the row's chips, the entry rail's run and the rules
+ * editor's rail run are all this, over the map each screen states.
+ *
+ * Only POSITIVE values draw; an essence the catalogue does not list draws nothing (see
+ * {@link componentRowEssenceChips}).
+ *
+ * @param {Record<string, number>|null|undefined} map `essenceId -> quantity`.
+ * @param {Array<{id: string, name?: string, icon?: string, colorToken?: string}>} essences
+ * @returns {Array<{id: string, name: string, icon: string, colorToken: string, quantity: number}>}
+ */
+export function componentEssenceChips(map, essences) {
+  const values = map && typeof map === 'object' ? map : {};
   const chips = [];
   for (const essence of Array.isArray(essences) ? essences : []) {
     const id = String(essence?.id ?? '');
-    if (!id || !(map[id] > 0)) continue;
+    const quantity = Number(values[id]);
+    if (!id || !(quantity > 0)) continue;
     chips.push({
       id,
       name: String(essence?.name ?? '').trim() || id,
       icon: String(essence?.icon ?? '').trim() || 'fas fa-mortar-pestle',
       colorToken: String(essence?.colorToken ?? '').trim(),
-      quantity: map[id],
+      quantity,
     });
   }
   return chips;

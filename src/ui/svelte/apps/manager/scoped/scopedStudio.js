@@ -6,9 +6,10 @@
  * DESCRIPTOR - which sections an entity has, whether it can be enabled, whether it carries
  * world tags - onto the copy and the row set the shared patterns render.
  *
- * ## A component has ONE section, and the row set is derived rather than listed
+ * ## A component has TWO sections, and the row set is derived rather than listed
  *
- * `COMPONENT_SECTIONS` is `['category']`; essences have two; tools have FOUR since `1.31.0`
+ * `COMPONENT_SECTIONS` is `['category', 'essences']` since `1.32.0` (issue 1371 r18, maintainer
+ * ruling M31); essences have two; tools have FOUR since `1.31.0`
  * (`breakage`, `onBreak`, `prerequisites`, `bonus`), plus the seeded `repairRequirements` that is
  * NOT a section and gets no switch. Every row set here comes
  * from `WORLD_SCOPE_DESCRIPTORS[entityType].sections`, so a screen cannot draw a switch for a
@@ -71,6 +72,11 @@ const SECTION_COPY = Object.freeze({
   category: Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Sections.Category',
     label: 'Category',
+  }),
+  // issue 1371 r18-entry, maintainer ruling M31: the component's second section.
+  essences: Object.freeze({
+    key: 'FABRICATE.Admin.Manager.Scoped.Sections.Essences',
+    label: 'Essence values',
   }),
   effectSource: Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Sections.EffectSource',

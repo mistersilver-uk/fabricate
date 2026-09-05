@@ -20,8 +20,11 @@
   are row chips in the system rules library)", and no way to filter by them either. Under M31 the
   world record gains an `essences` section beside `category`, so what the row states is a WORLD
   value every system inherits unless it overrides — a world fact after all, and the one this row
-  used to withhold. The chips in the trailing column and the essence select on the toolbar read
-  that one map through `componentScoped.js`, where the `r18-store` marker names the seam.
+  used to withhold. The chips in the trailing column, the essence select on the toolbar and the
+  bulk panel's `n/N` all read that one map through `componentScoped.js`
+  (`componentWorldEssenceMap`), and the bulk `Essence values` group WRITES it: one
+  `updateWorldDefaultSection(entityId, 'essences', map)` per selected record whose map changes
+  (issue 1371 r18-entry, M31), which every system that inherits the section follows.
 
   == THE STANDING NOTE IS NARROWER THAN "NOTHING HERE IS READ" =============================
   The world `category` this screen's inspector states IS consumed: every system whose inherit
@@ -48,7 +51,7 @@
   import {
     componentAliasNote,
     componentBulkDeletePlan,
-    componentBulkEssenceBatches,
+    componentBulkEssencePlan,
     componentEssenceFilter,
     componentGlobalTagNote,
     componentMembershipScopeFilter,
@@ -351,7 +354,7 @@
     // caller that is not the panel. It is deliberately kept and deliberately untestable from here.
     if (bulkApplying) return;
     bulkApplying = true;
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-run tally, never state
+    // A per-run tally, never state: it is read once, in `reportBulkFailures`, after the loop.
     const failed = new Set();
     try {
       for (const entityId of entityIds) {
@@ -382,19 +385,23 @@
           await attemptWrite(failed, entityId, () => actions?.setWorldTags?.(entityId, next));
         }
       }
-      // THE ESSENCE AXIS WRITES PER SYSTEM, NOT PER COMPONENT (issue 1371 r16-cat, M25): a
-      // component's essence values are each system's own rules, and `applyBulkEditToComponents`
-      // replaces a component's whole map — so the merge is done per component and the components
-      // that end on the same map in the same system go in one write. A batch that throws counts
-      // every component in it as not updated, on `attemptWrite`'s own unit.
-      for (const batch of componentBulkEssenceBatches(entityIds, staged.essences ?? {}, systems)) {
-        try {
-          await actions?.bulkEditRules?.(batch.systemId, [...batch.componentIds], {
-            essences: batch.essences,
-          });
-        } catch {
-          for (const componentId of batch.componentIds) failed.add(componentId);
-        }
+      // THE ESSENCE AXIS WRITES THE WORLD SECTION, ONE RECORD AT A TIME (issue 1371 r18-entry,
+      // maintainer ruling M31, superseding M25). The world record carries an `essences` section
+      // beside `category` now, inherited by every system that has rules for the component unless
+      // it overrides, and `updateWorldDefaultSection` REPLACES the section — so the plan merges the
+      // staged map over each record's CURRENT world map (a positive value sets, a zero strips, an
+      // unnamed key is carried forward) and skips a record whose map would not change. M25's route
+      // wrote per-system rules through `bulkEditRules`, which no world screen reads; that verb is
+      // still the SYSTEM panel's and is not called from here. Same `attemptWrite` unit as the
+      // category and tag axes: a throw counts the record, and the run goes on.
+      for (const { entityId, essences } of componentBulkEssencePlan(
+        entityIds,
+        staged.essences ?? {},
+        { entries, systems }
+      )) {
+        await attemptWrite(failed, entityId, () =>
+          actions?.updateWorldDefaultSection?.(entityId, 'essences', essences)
+        );
       }
     } finally {
       bulkApplying = false;
@@ -601,6 +608,7 @@
     {categoryOptions}
     {tagOptions}
     essences={worldEssences}
+    {entries}
     {selectedIds}
     applying={bulkApplying}
     deleting={bulkDeleting}

@@ -34,8 +34,7 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import {
-  componentBulkEssenceBatches,
-  componentBulkEssenceCarried,
+  componentBulkEssencePlan,
   componentBulkMembershipModes,
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
@@ -2263,54 +2262,33 @@ describe('world Component Catalogue (issue 1371)', () => {
       });
     });
 
-    // ── THE ESSENCE VALUES GROUP (issue 1371 r16-cat, maintainer ruling M25) ──────────────────────
-    // "I want a world level essence group too that matches the prototype styling in both places
-    // (system and world)." The group is `BulkEssenceValuesInset`, shared with the system panel;
-    // what is THIS panel's is which essences it offers (the world catalogue's), how the `n/N` is
-    // counted (across every system with rules for the selection) and where an Apply writes (into
-    // each selected component's rules in every system that has them, and nowhere else).
-    describe('the ESSENCE VALUES group stages per-essence values and writes them where the selection has rules (M25)', () => {
+    // ── THE ESSENCE VALUES GROUP WRITES THE WORLD SECTION (issue 1371 r18-entry, maintainer ruling
+    // M31, superseding M25's route) ─────────────────────────────────────────────────────────────
+    // "even the bulk edit does not seem to persist or be visible anywhere": under M25 the group
+    // wrote each selected component's IN-SYSTEM rules through `bulkEditRules`, and no world screen
+    // reads per-system rules. The world record carries an `essences` SECTION now, so what this
+    // panel offers is still the world catalogue's essences, but the `n/N` counts records whose
+    // WORLD map carries the essence and an Apply is ONE `updateWorldDefaultSection(id, 'essences',
+    // map)` per selected record whose map changes — inherited by every system that does not
+    // override, and written into no system's own rules.
+    describe('the ESSENCE VALUES group stages per-essence values and writes each record’s WORLD map (M31)', () => {
       const WORLD_ESSENCES = Object.freeze([
         { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
         { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'sage' },
       ]);
-      // THE ROSTER WITH ITS COMPONENTS, which is what the root hands the page: `coal` has rules in
-      // both systems and carries `flame` in the forge, `ingot` has rules in the forge alone, and
-      // `sys-jewel` holds neither — so a write to it would be a write to a system with no rules.
-      // EACH SYSTEM'S OWN `essenceDefinitions` ROSTER IS WHAT IT HOLDS (issue 1371 r17-b): `forge`
-      // holds both, `alchemy` holds `flame` alone, and `sys-glass` has rules for `coal` and holds
-      // NOTHING — the system the write must skip, because the store normalizes a foreign key away
-      // and the docs already promise "a system that does not hold an essence skips it".
-      const ESSENCE_SYSTEMS = Object.freeze([
-        {
-          id: 'sys-forge',
-          name: 'Forge',
-          essenceDefinitions: [{ id: 'flame' }, { id: 'earth' }],
-          components: [
-            { id: 'coal', essences: { flame: 2 } },
-            { id: 'ingot', essences: {} },
-          ],
-        },
-        {
-          id: 'sys-alchemy',
-          name: 'Alchemy',
-          essenceDefinitions: [{ id: 'flame' }],
-          components: [{ id: 'coal', essences: {} }],
-        },
-        { id: 'sys-jewel', name: 'Jewelcraft', essenceDefinitions: [], components: [] },
-        {
-          id: 'sys-glass',
-          name: 'Glassworks',
-          essenceDefinitions: [],
-          components: [{ id: 'coal', essences: {} }],
-        },
+      // THE WORLD MAPS, ON THE RECORDS: `coal` carries `flame: 2` on its world section, `ingot` an
+      // authored EMPTY section. The selection is these two. The raw roster the root hands the page
+      // carries no `components`, exactly as the live `systems` prop does not, so a write that
+      // reached for per-system rules would have nothing to read and nothing to write.
+      const ESSENCE_DEFAULTS = Object.freeze([
+        { id: 'ingot', category: 'Refined', essences: {} },
+        { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'], essences: { flame: 2 } },
       ]);
 
       async function essenceCatalogue(worldEssences = WORLD_ESSENCES) {
         const { calls, actions } = recordingComponentActions();
         const target = await harness.mount({
-          scope: scopeFor(),
-          systems: ESSENCE_SYSTEMS,
+          scope: scopeFor({ defaults: [...ESSENCE_DEFAULTS] }),
           actions,
           worldEssences,
         });
@@ -2339,8 +2317,13 @@ describe('world Component Catalogue (issue 1371)', () => {
         press(target, `[data-world-component-bulk-essence="${id}"] [data-stepper-increment]`);
       const dec = (target, id) =>
         press(target, `[data-world-component-bulk-essence="${id}"] [data-stepper-decrement]`);
+      /** The world section writes, as `[entityId, section, map]`, in the order they ran. */
+      const sectionWrites = (calls) =>
+        calls
+          .filter((call) => call.verb === 'updateWorldDefaultSection')
+          .map((call) => call.args);
 
-      it('offers one row per WORLD essence, counting how many of the selection already carry it', async () => {
+      it('offers one row per WORLD essence, counting how many of the selection carry it on their WORLD map', async () => {
         const { target } = await essenceCatalogue();
         const rows = [...target.querySelectorAll('[data-world-component-bulk-essence]')].map(
           (node) => node.getAttribute('data-world-component-bulk-essence')
@@ -2349,7 +2332,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         assert.equal(
           row(target, 'flame').querySelector('.fab-bulk-inset-meta').textContent.trim(),
           '1/2',
-          '`coal` carries flame in the forge, `ingot` carries it nowhere'
+          '`coal`’s world map carries flame; `ingot`’s authored-empty map does not'
         );
         assert.equal(
           row(target, 'earth').querySelector('.fab-bulk-inset-meta').textContent.trim(),
@@ -2411,7 +2394,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         assert.ok(!target.querySelector('[data-world-component-bulk-essence-chips]'));
       });
 
-      it('names the write in the Apply, then hands each system with rules the values grouped by what they write — and nothing to a system without rules', async () => {
+      it('names the write in the Apply, then writes ONE world `essences` section per selected record — and no system’s rules', async () => {
         const { target, calls } = await essenceCatalogue();
         for (let step = 0; step < 3; step += 1) await inc(target, 'flame');
         await inc(target, 'earth');
@@ -2423,24 +2406,24 @@ describe('world Component Catalogue (issue 1371)', () => {
           'the dock names the write'
         );
         await press(target, '[data-world-component-bulk-apply]');
-        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
         assert.deepEqual(
-          writes.map((call) => [
-            call.args[0],
-            [...call.args[1]].sort((left, right) => left.localeCompare(right)),
-            call.args[2],
-          ]),
+          sectionWrites(calls),
           [
-            // Both forge components end on the same map — coal`s `flame: 2` becomes 3, ingot`s empty
-            // map gains it, and the strip of `earth` removes nothing either carried — so ONE write.
-            ['sys-forge', ['coal', 'ingot'], { essences: { flame: 3 } }],
-            ['sys-alchemy', ['coal'], { essences: { flame: 3 } }],
+            // Selection order. `coal`'s `flame: 2` becomes 3 and the strip of `earth` removes
+            // nothing it carried; `ingot`'s empty map gains flame. Each is the record's WHOLE next
+            // world map, because `updateWorldDefaultSection` REPLACES the section.
+            ['ingot', 'essences', { flame: 3 }],
+            ['coal', 'essences', { flame: 3 }],
           ],
-          'one write per system per resulting map, none to `sys-jewel`, which holds neither, ' +
-            'and none to `sys-glass`, which has rules for `coal` and holds no essence'
+          'one world write per selected record, carrying that record’s merged map'
         );
         assert.equal(
-          calls.filter((call) => call.verb !== 'bulkEditRules').length,
+          calls.filter((call) => call.verb === 'bulkEditRules').length,
+          0,
+          'M31 SUPERSEDES M25: nothing is written into any system`s own rules'
+        );
+        assert.equal(
+          calls.filter((call) => call.verb !== 'updateWorldDefaultSection').length,
           0,
           'no other verb runs for an essence-only instruction'
         );
@@ -2451,50 +2434,31 @@ describe('world Component Catalogue (issue 1371)', () => {
         );
       });
 
-      it('writes an essence only into a system that HOLDS it, dropping the key elsewhere (issue 1371 r17-b)', async () => {
-        // `earth` is held by the forge alone. Staged beside `flame`, the alchemy batch carries
-        // `flame` and NOT `earth`; `sys-glass`, holding neither, gets no batch at all.
+      it('merges over each record’s CURRENT world map, so a value the instruction does not name is carried forward', async () => {
         const { target, calls } = await essenceCatalogue();
-        await inc(target, 'flame');
         await inc(target, 'earth');
         await inc(target, 'earth');
-        assert.equal(
-          target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
-          'Set essence values on 2 components'
-        );
         await press(target, '[data-world-component-bulk-apply]');
-        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
         assert.deepEqual(
-          writes.map((call) => [
-            call.args[0],
-            [...call.args[1]].sort((left, right) => left.localeCompare(right)),
-            call.args[2],
-          ]),
+          sectionWrites(calls),
           [
-            // `coal` already carries `flame: 2` in the forge, so its map ends `{flame: 1, earth: 2}`
-            // exactly as `ingot`'s does — one write.
-            ['sys-forge', ['coal', 'ingot'], { essences: { flame: 1, earth: 2 } }],
-            ['sys-alchemy', ['coal'], { essences: { flame: 1 } }],
+            ['ingot', 'essences', { earth: 2 }],
+            ['coal', 'essences', { flame: 2, earth: 2 }],
           ],
-          'the alchemy write drops `earth`, which that system does not hold; `sys-glass` is not written'
-        );
-        assert.ok(
-          writes.every((call) => call.args[0] !== 'sys-glass'),
-          'NON-VACUITY, stated on its own: the system with rules and no roster is skipped'
+          '`coal` keeps its flame beside the staged earth; a replace that dropped it would be a silent strip'
         );
       });
 
-      it('writes a STRIP only where the essence is carried, and skips a component whose rules would not change', async () => {
+      it('writes a STRIP only where the essence is carried, and skips a record whose world map would not change', async () => {
         const { target, calls } = await essenceCatalogue();
         await inc(target, 'flame');
         await dec(target, 'flame');
         assert.equal(stateOf(target, 'flame'), 'strip');
         await press(target, '[data-world-component-bulk-apply]');
-        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
         assert.deepEqual(
-          writes.map((call) => [call.args[0], [...call.args[1]], call.args[2]]),
-          [['sys-forge', ['coal'], { essences: {} }]],
-          '`coal` in the forge loses flame; `ingot` there and `coal` in alchemy never carried it, so neither is written'
+          sectionWrites(calls),
+          [['coal', 'essences', {}]],
+          '`coal` loses flame and ends on an authored EMPTY map; `ingot` never carried it, so it is not written'
         );
       });
 
@@ -2503,11 +2467,39 @@ describe('world Component Catalogue (issue 1371)', () => {
         await inc(target, 'flame');
         stageTag(target, 'fuel');
         await drain();
-        // Two tag writes (one per component) plus the two essence batches above.
+        // Two tag writes (one per component) plus two world essence writes (one per changed record).
         assert.equal(
           target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
           'Write 4 records across 2 components'
         );
+      });
+
+      it('and a record already at the staged value is not counted as a write', async () => {
+        const { target } = await essenceCatalogue();
+        await inc(target, 'flame');
+        await inc(target, 'flame');
+        stageTag(target, 'fuel');
+        await drain();
+        // `coal` already carries `flame: 2` on its world map, so only `ingot` is written for the
+        // essence axis: two tag writes plus ONE essence write.
+        assert.equal(
+          target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
+          'Write 3 records across 2 components'
+        );
+      });
+
+      it('states the WORLD write and its reach in the group note and the standing note, and no longer promises a per-system write', async () => {
+        const { target } = await essenceCatalogue();
+        const note = target.querySelector('[data-world-component-bulk-essence-note]').textContent;
+        assert.match(note, /world value/i, 'the group note names the write as the world value');
+        assert.match(note, /inherit/i, 'and names the reach: every system that inherits it follows');
+        assert.doesNotMatch(note, /in every system that has rules/i, 'M25`s per-system sentence is gone');
+        assert.doesNotMatch(note, /does not hold an essence skips it/i, 'and so is the r17-b roster clause');
+        const standing = target.querySelector(
+          '[data-world-component-bulk-per-component-note]'
+        ).textContent;
+        assert.match(standing, /world category, tags and essence values/i);
+        assert.doesNotMatch(standing, /in every system that has rules/i);
       });
 
       it('says so rather than offering an empty inset when the world has no essences', async () => {
@@ -2522,32 +2514,20 @@ describe('world Component Catalogue (issue 1371)', () => {
         );
       });
 
-      describe('the pure model behind it', () => {
-        it('counts a component as carrying an essence when ANY system`s rules for it do', () => {
-          assert.deepEqual(componentBulkEssenceCarried(['coal', 'ingot'], ESSENCE_SYSTEMS), {
-            flame: 1,
-          });
-          assert.deepEqual(componentBulkEssenceCarried([], ESSENCE_SYSTEMS), {});
-        });
-
-        it('batches by system and by the resulting map, merging the staged values into what each component holds', () => {
-          assert.deepEqual(
-            componentBulkEssenceBatches(['coal', 'ingot'], { flame: 3, earth: 0 }, ESSENCE_SYSTEMS),
-            [
-              { systemId: 'sys-forge', componentIds: ['coal', 'ingot'], essences: { flame: 3 } },
-              { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 3 } },
-            ]
-          );
-          // A value a component already holds at that number is not a write.
-          assert.deepEqual(
-            componentBulkEssenceBatches(['coal', 'ingot'], { flame: 2 }, ESSENCE_SYSTEMS),
-            [
-              { systemId: 'sys-forge', componentIds: ['ingot'], essences: { flame: 2 } },
-              { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 2 } },
-            ]
-          );
-          assert.deepEqual(componentBulkEssenceBatches(['coal'], {}, ESSENCE_SYSTEMS), []);
-        });
+      it('and the page’s writes are exactly the plan the shared model answers for the same selection', async () => {
+        // The panel counts the plan and the page runs it; this pins that the two read ONE function.
+        const { target, calls } = await essenceCatalogue();
+        await inc(target, 'flame');
+        await press(target, '[data-world-component-bulk-apply]');
+        const entries = scopeFor({ defaults: [...ESSENCE_DEFAULTS] }).entries;
+        assert.deepEqual(
+          sectionWrites(calls),
+          componentBulkEssencePlan(['ingot', 'coal'], { flame: 1 }, { entries }).map((step) => [
+            step.entityId,
+            'essences',
+            step.essences,
+          ])
+        );
       });
     });
   });

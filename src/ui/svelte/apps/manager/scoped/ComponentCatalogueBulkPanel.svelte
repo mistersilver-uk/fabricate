@@ -108,9 +108,9 @@
   import {
     componentBulkApplyLabel,
     componentBulkDeleteNote,
-    componentBulkEssenceBatches,
     componentBulkEssenceCarried,
     componentBulkEssenceHint,
+    componentBulkEssencePlan,
     componentBulkMembershipModes,
     componentBulkWriteCount,
   } from './componentScoped.js';
@@ -167,6 +167,11 @@
     categoryOptions = [],
     tagOptions = [],
     essences = [],
+    // THE PROJECTED ENTRIES, for the essence group's two facts (issue 1371 r18-entry, M31): the
+    // `n/N` counts records whose WORLD map carries an essence, and the write count is one world
+    // write per record whose map the staged values change. Only the page holds the projection, as
+    // for `deletePlan`; the staged map is this panel's, so the plan is resolved here.
+    entries = [],
     selectedIds = [],
     applying = false,
     deleting = false,
@@ -263,14 +268,17 @@
     (membershipStaged || categoryStaged || tagsStaged || essencesStaged) && !inert
   );
 
-  // THE ESSENCE AXIS'S TWO FACTS, READ OFF THE RAW ROSTER (M25): how many of the selection carry
-  // each essence somewhere, and how many writes the staged values resolve to.
+  // THE ESSENCE AXIS'S TWO FACTS, READ OFF EACH RECORD'S WORLD MAP (issue 1371 r18-entry, M31):
+  // how many of the selection carry each essence on their world section, and the world writes the
+  // staged values resolve to — one per record whose map changes, which is what the page runs.
   const selectedComponentIds = $derived(
     (Array.isArray(selectedIds) ? selectedIds : []).map((id) => String(id))
   );
-  const essenceCarried = $derived(componentBulkEssenceCarried(selectedComponentIds, systems));
-  const essenceBatches = $derived(
-    componentBulkEssenceBatches(selectedComponentIds, stagedEssences, systems)
+  const essenceCarried = $derived(
+    componentBulkEssenceCarried(selectedComponentIds, { entries, systems })
+  );
+  const essencePlan = $derived(
+    componentBulkEssencePlan(selectedComponentIds, stagedEssences, { entries, systems })
   );
 
   // THE ESSENCE ROSTER, worded for the shared inset's `stepper` kind: each row carries the
@@ -317,7 +325,7 @@
       systems: membershipStaged ? stagedSystemIds.length : 0,
       category: categoryStaged,
       tags: tagsStaged,
-      essences: essenceBatches.length,
+      essences: essencePlan.length,
     })
   );
 
@@ -723,7 +731,7 @@
     tone="info"
     text={text(
       'FABRICATE.Admin.Manager.Scoped.Component.BulkPerComponentNote',
-      'Names and source links stay per component. What you can change in bulk is which systems these components belong to, their world category and tags, and their essence values in every system that has rules for them.'
+      'Names and source links stay per component. What you can change in bulk is which systems these components belong to, and their world category, tags and essence values — the values every system inherits unless it overrides.'
     )}
     dataAttr="data-world-component-bulk-per-component-note"
   />
@@ -826,10 +834,15 @@
 
   <!--
     THE ESSENCE VALUES GROUP (issue 1371 r16-cat, maintainer ruling M25), drawn by the inset the
-    system panel also draws — `proto:1180-1216` on the system panel is the reference for both. A
-    world component has no world-level essence value, so this group's write is into every selected
-    component's RULES in every system that has them; the note says so, and the page resolves the
-    staged map into those writes (`componentBulkEssenceBatches`).
+    system panel also draws — `proto:1180-1216` on the system panel is the reference for both.
+
+    IT WRITES THE WORLD SECTION (issue 1371 r18-entry, maintainer ruling M31, superseding M25's
+    route). The world record carries an `essences` section beside `category` now, so this group's
+    write is each selected record's WORLD map — one `updateWorldDefaultSection(id, 'essences', map)`
+    per record whose map changes (`componentBulkEssencePlan`), which every system that inherits the
+    section follows at once and a system that overrides keeps its own. M25's write went into each
+    component's IN-SYSTEM rules, which no world screen reads — "even the bulk edit does not seem to
+    persist or be visible anywhere" was that write landing where nothing looked. The note says so.
   -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.BulkEdit.EssenceValues', 'Essence values')}
@@ -892,7 +905,7 @@
     <p class="fab-bulk-component-note" data-world-component-bulk-essence-note>
       {phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkEssenceNote',
-        'Every row starts unchanged. Step a value up to write it on all {count} in every system that has rules for them; step down to 0 to strip that essence from them. A system that does not hold an essence skips it.',
+        'Every row starts unchanged. Step a value up to set it as the world value on all {count}, which every system that inherits it follows; step down to 0 to strip that essence from them. A system that overrides keeps its own.',
         { count }
       )}
     </p>
