@@ -380,6 +380,16 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
   // HANGS every mounted crafting suite rather than failing it.
   'src/ui/svelte/components/Stepper.svelte',
+  // THE UPPERCASE MICRO-LABEL every section header in `detail/` is now (issue 1505). Nine
+  // components in that directory render it, and all nine are listed below, so omitting it
+  // HANGS every mounted crafting suite (# cancelled) rather than failing one.
+  'src/ui/svelte/components/Kicker.svelte',
+  // THE AT-A-GLANCE FIGURE the Shopping list's three summary cards are (issue 1505). It
+  // COMPOSES the `Kicker` above, which makes that entry a leaf TWO rungs down on this route
+  // as well — a suite mounting `ShoppingList` pulls a kicker in without naming one anywhere,
+  // verbatim the `ActionMenu` shape that first reported as `# cancelled 7` with no failures
+  // on a suite whose tests never ran.
+  'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',

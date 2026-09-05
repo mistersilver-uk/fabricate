@@ -22,6 +22,7 @@
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { SLOT_KIND, SLOT_STATE } from '../../../util/requirementSlots.js';
   import RequirementTile from './RequirementTile.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     slots = [],
@@ -140,9 +141,9 @@
 {#if items.length > 0}
   <section class="requirement-rail" data-recipe-section="requirement-rail">
     <div class="requirement-rail-header">
-      <p class="crafting-detail-section-title">
+      <Kicker as="p">
         {localize('FABRICATE.App.Crafting.Slots.Title')}
-      </p>
+      </Kicker>
       {#if canPickForMe}
         <!-- NO aria-label. The visible label is "Pick for me" and the hint is a whole
              sentence, so labelling the button with the hint would leave an accessible
@@ -287,18 +288,6 @@
   .requirement-rail-live {
     margin: 0;
     font-size: 11px;
-    color: var(--fab-text-muted);
-  }
-
-  /* Matches the sibling IO section headers. Svelte scopes CSS per component and this
-     class is not global, so the rule is redefined here (the IngredientOptionSelector
-     precedent). */
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--fab-text-muted);
   }
 </style>

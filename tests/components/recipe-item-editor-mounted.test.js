@@ -56,6 +56,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // The shared eyebrow (issue 1505). `RecipeItemOverviewTab` renders three of them, and
+    // the compiled editor imports that tab statically, so omitting it HANGS this suite.
+    'src/ui/svelte/components/Kicker.svelte',
     // The salvage bodies render the house chip primitive. The preview never reaches them,
     // but the compiled router imports them statically, so it is still in the graph.
     'src/ui/svelte/components/StatusPill.svelte',
@@ -86,6 +89,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
+    // The salvage banner became the shared strip (issue 1505), which is what makes that
+    // primitive's first PLAYER importer. Omitting it CANCELS this suite rather than
+    // failing it.
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     // The multi-system participation selector InventoryComponentDetail imports (issue 766).
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',

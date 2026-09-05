@@ -793,6 +793,9 @@
       {/if}
       {#if !available}
         <div class="manager-scoped-list-unavailable">
+          <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: the corpus
+               could not be read, so this reports a live failure the GM can act on by reloading
+               — not documentation, and not a settled outcome. -->
           <Callout
             tone="warning"
             text={text(

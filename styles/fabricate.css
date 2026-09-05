@@ -2662,8 +2662,10 @@
    INFO family, and the only place on this screen that paints one — a mode explanation is
    a permanent statement about how the surface behaves, which is what `info` is for.
 
-   Not `.manager-callout`: that primitive is one glyph plus one sentence, and widening it
-   to carry a title, a paragraph and a fact list would make one component two shapes. */
+   Not `.manager-callout`, and the reason has narrowed rather than gone (issue 1505): that
+   primitive now carries a title and an actions slot, so what still separates the two is the
+   FACT ROW. A run of label/value facts is an `InfoStrip`, deferred to issue 1521, and a
+   paragraph plus a fact list under one title is still two shapes. */
 .fabricate-manager .manager-checks-mode-callout {
   display: flex;
   align-items: flex-start;
@@ -3901,29 +3903,6 @@
 
 .fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
   font-size: 11px;
-}
-
-/* The note the On failure screen ends on, at this studio's metrics. `Callout` is the manager's
-   shared standing-statement strip and its default is the INFO tint; the prototype draws this one
-   quietly — the surface fill and the ordinary border, with the glyph carrying the only colour —
-   because it is a pointer to two other screens rather than a hazard. Same primitive, this
-   studio's metrics, exactly as the flag list above restates `ToggleCard`. */
-.fabricate-manager .manager-callout[data-failure-salvage-note] {
-  gap: 11px;
-  align-items: flex-start;
-  padding: 13px 14px;
-  border-color: var(--fab-border);
-  border-radius: 10px;
-  color: var(--fab-text-muted);
-  background: var(--fab-surface-soft);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.55;
-}
-
-.fabricate-manager .manager-callout[data-failure-salvage-note] > i {
-  color: var(--fab-info);
-  font-size: 12px;
 }
 
 /* ── The Validation screen ────────────────────────────────────────────────────────────
@@ -6402,8 +6381,8 @@
   background: var(--fab-accent-soft);
 }
 
-/* Informational policy card (issue 651), reusing the `--fab-info-*` tokens the
-   `.manager-recipe-info-strip` wears. Toned on `.is-on` only — `.is-off` needs no
+/* Informational policy card (issue 651), reusing the `--fab-info-*` tokens the shared
+   `Callout`'s info tone wears — the strip this used to name became one (issue 1505). Toned on `.is-on` only — `.is-off` needs no
    variant because the base rule above already covers it. A default-on card is then
    permanently tinted in its resting state, which is precedent-following rather than
    semantics-inventing: `.is-enabled.is-on` is already exactly that, since
@@ -11280,19 +11259,6 @@
   margin: 0 0 var(--fab-space-2);
   padding: 0;
   list-style: none;
-}
-
-/* Roll-budget info strip (progressive, §C4). */
-.fabricate-manager .manager-recipe-info-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-info-border);
-  border-radius: 9px;
-  background: var(--fab-info-soft);
-  color: var(--fab-info-text);
-  font-size: 0.78rem;
 }
 
 /* The full-width dashed add-set / add-stage row (§C6) is no longer expressed by a

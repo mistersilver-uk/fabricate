@@ -570,6 +570,7 @@ A mark carries a LABEL and a TONE and never a glyph: a PASS mark is the issue ve
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
+The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
 An empty state INSIDE AN OVERLAY the product has already drawn a boundary around — a picker popover, a suggestion list — is a note rather than a panel: one quiet line at that overlay's own scale, with no border, no fill and no icon tile, because a second bordered box inside a bordered panel reads as a card the GM could act on.
 
@@ -1030,6 +1031,7 @@ It dismisses on an outside click; a step that would lose work confirms first.
 A page MUST show at most one BLOCKING notice at a time, and a second blocking notice replaces the first.
 Non-blocking notices MUST stack in a region beneath it, because a save can produce independent simultaneous outcomes — an unsaved-changes warning and a validation failure are both true at once, and a rule that forbids stacking cannot render them.
 A notice that appears without a focus change MUST be announced through a live region.
+The notice is the unit that carries that distinction: a blocking notice takes the page position, a non-blocking one takes the stacking region, and either announces itself through the live region when it appears without a focus change.
 
 Grouped, navigable validation output is NOT a notice: it is the validation surface, which carries passing, warning and blocking counts simultaneously and drives the count on its own tab.
 

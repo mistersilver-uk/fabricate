@@ -18,6 +18,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // The shared eyebrow (issue 1505). All three field labels are `<Kicker>`s, so
+    // omitting it HANGS this suite (# cancelled), never fails it.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',

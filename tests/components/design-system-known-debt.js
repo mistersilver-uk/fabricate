@@ -292,9 +292,27 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * ladder's 9. So the row leaves because a control moved onto a rung, which is the one way this
  * number is meant to fall. The key count falls 140 → 139 with it.
  *
+ * 316 → 315 with issue 1505, and it is the same kind of snap. `apps/crafting/ShoppingList.svelte
+ * | border-radius | 8px` falls 2 → 1: the three summary cards became `<StatBox>`es, whose corner
+ * is the specimen's — and the ladder's — 9. The file's other 8px is an unrelated rule and stays,
+ * so the KEY count is unchanged at 139. The manager's converted stat tiles move NO row in either
+ * direction: they read `var(--fab-books-panel-radius)`, which resolves to a compliant 6px and
+ * therefore never had one.
+ *
+ * 315 → 314 with the same issue's alchemy conversion, and it is a third snap of the same kind.
+ * `apps/alchemy/Workbench.svelte | border-radius | 10px` falls 5 → 4: the last-brew banner's
+ * corner went with its scoped block, and the `<Notice>` it became takes the specimen's r11. The
+ * wrapper the caller keeps carries only its `margin-bottom`, so nothing brings the radius back.
+ *
+ * 314 → 312 with the same issue's `Callout` convergence, and both movers are the snap this
+ * number exists to reward. `apps/manager/Callout.svelte | border-radius | 8px | 1` is DELETED —
+ * the primitive's own corner takes the specimen's r11 — and `styles/fabricate.css |
+ * border-radius | 10px` falls 14 → 13, because the deleted `[data-failure-salvage-note]`
+ * override carried one of those fourteen. The key count falls 139 → 138 with the first.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 316;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 312;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

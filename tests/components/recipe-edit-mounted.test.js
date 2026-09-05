@@ -152,6 +152,9 @@ const RECIPE_COMPILED = [
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
+  // The Results tab's two standing notes became the shared strip (issue 1505). A `.svelte`
+  // the tree renders but the harness omits does not fail this suite, it CANCELS it.
+  'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   // The two mode-conditional tabs (issue 676), rehomed from the deleted context rail.

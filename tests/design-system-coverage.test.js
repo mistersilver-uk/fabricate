@@ -242,21 +242,25 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 32 library entries with no shipped implementation.
+ * The 29 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
  * built and gains a manifest row, up when the library specifies a new one. Either way the edit is
  * the same size as the change that caused it.
+ *
+ * `Kicker`, `Notice` and `StatBox` left it at issue 1505, which built all three. `InfoStrip` STAYS:
+ * that change measured five candidate call sites for it and exactly one qualifies, which is below
+ * the two-independent-importer membership bar, so it defers rather than shipping on one caller.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
-  'ChoiceGroup', 'DataTable', 'InfoStrip', 'Kicker',
-  'ListRow', 'LogList', 'Menu', 'Meter', 'NavSidebar',
-  'Notice', 'PageHeader', 'PickerRow', 'Rail',
-  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search',
-  'SetPicker', 'SortableList', 'StageBars', 'StatBox', 'TierTrack',
-  'ValidationList', 'ValidationSummary', 'ViewToggle', 'Well', 'XrefList',
+  'ChoiceGroup', 'DataTable', 'InfoStrip', 'ListRow',
+  'LogList', 'Menu', 'Meter', 'NavSidebar', 'PageHeader',
+  'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',
+  'RuleSentence', 'Search', 'SetPicker', 'SortableList',
+  'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
+  'ViewToggle', 'Well', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {

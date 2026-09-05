@@ -635,7 +635,12 @@
             {:else}
               <!-- THE BLOCK STATE. No membership record means nothing in this system reads any
                  of the values below, so the editor says so and offers the one action that
-                 changes it. -->
+                 changes it.
+
+                 WARNING STANDS (issue 1505). The tone union widened to six and the default
+                 became neutral, so every site was re-read against the specimen's rule. This one
+                 is a conditional the GM can still resolve, on this record, right now — which is
+                 what warning names. -->
               <Callout
                 tone="warning"
                 text={formatted(

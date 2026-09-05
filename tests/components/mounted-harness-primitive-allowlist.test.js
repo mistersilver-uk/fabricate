@@ -203,6 +203,24 @@ const SHARED_PRIMITIVES = [
   // of a dependency. That is exactly how this conversion first reported: `# cancelled 7`, no
   // failures, on a suite whose tests never ran.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // THE THREE THAT SHIPPED TOGETHER (issue 1505), and between them they carry every shape this
+  // list exists for.
+  //
+  // `Kicker` is the sharpest entry on the list. It is a LEAF TWO RUNGS DOWN on two separate
+  // routes: nine crafting components in one directory render it directly, and `StatBox` COMPOSES
+  // it — so a suite that mounts the Shopping list or the Books & Scrolls inspector pulls a kicker
+  // in without naming one anywhere, verbatim the `ActionMenu` shape recorded above, which first
+  // reported as `# cancelled 7` with no failures on a suite whose tests never ran.
+  //
+  // `StatBox` sits in two mounted trees already — the player crafting app and the manager's
+  // Books & Scrolls aside — which is the membership bar itself, so neither is optional.
+  //
+  // `Notice` is the entry that forced the root SET below to widen again: its only two callers are
+  // the alchemy workbench and the inventory bulk report, and neither is under the manager root or
+  // the gathering view.
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/StatBox.svelte',
+  'src/ui/svelte/components/Notice.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
@@ -436,9 +454,18 @@ test('every inspected suite resolves at least one real component, so none passes
 // and nothing in the manager renders it. Widening to a declared root SET is the fix that
 // spec names, and it is a widening rather than a weakening — a primitive must still be
 // reachable from a real application root, just not from that one.
+//
+// A THIRD ROOT joins at issue 1505, on the same widening rule and for the same reason `FillBar`
+// forced the second. `Notice`'s two callers are `apps/alchemy/Workbench.svelte` (through
+// `AlchemyView`) and `apps/inventory/bulk/InventoryBulkReport.svelte` (through
+// `InventoryBulkPanel` and `InventoryView`), and neither is under the manager root or the
+// gathering view — so the guard below could not see a primitive that plainly clears the bar.
+// `FabricateAppRoot.svelte` imports every player view, which is the honest root of that window
+// and admits the alchemy, inventory and Journal surfaces the rule already names.
 const APPLICATION_ROOTS = [
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
   'src/ui/svelte/apps/gathering/GatheringView.svelte',
+  'src/ui/svelte/apps/FabricateAppRoot.svelte',
 ];
 
 test('the shared primitives are reachable from a declared application root, so the guard has teeth', () => {

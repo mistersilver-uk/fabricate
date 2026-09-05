@@ -32,6 +32,7 @@
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     craftability = null,
@@ -125,7 +126,7 @@
 
   {#if essences.length > 0}
     <div class="crafting-io-group" data-io-group="essences">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Essences')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Essences')}</Kicker>
       <ul class="crafting-io-list">
         {#each essences as state, index (state.type ?? state.essenceType ?? index)}
           <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
@@ -153,7 +154,7 @@
 
   {#if tools.length > 0}
     <div class="crafting-io-group" data-io-group="tools">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Tools')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Tools')}</Kicker>
       <ul class="crafting-io-list">
         {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
           <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
@@ -177,7 +178,7 @@
 
   {#if outputs.length > 0}
     <div class="crafting-io-group" data-io-group="outputs">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Output')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
           <li class="crafting-io-output" data-io-output>
@@ -290,15 +291,6 @@
   .crafting-io-output-qty {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--fab-text-muted);
   }
 </style>

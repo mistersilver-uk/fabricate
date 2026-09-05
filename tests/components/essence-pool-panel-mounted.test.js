@@ -34,6 +34,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
+    // The shared eyebrow (issue 1505). The panel's section title is a `<Kicker>`, so
+    // omitting it HANGS this suite (# cancelled), never fails it.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',

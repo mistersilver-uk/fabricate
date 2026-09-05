@@ -152,6 +152,11 @@ const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/comp
  * that unrepresentable rather than merely unlikely.
  */
 const EXPECTED_OVERRIDE_KEYS = [
+  // Issue 1505: the widened standing statement, and the FIRST entry here whose primitive earned
+  // its frames by being re-authored rather than by acquiring a new state. Two frames, because the
+  // widening moved the neutral default in one window and the tinted title-bearing form in the
+  // other. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change.
+  'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -175,6 +180,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
+  // Issue 1505: the uppercase micro-label, on fourteen converted eyebrow sites. Two frames, one
+  // per window, because the conversion is a different act in each — a section title joining the
+  // ladder in the crafting detail, and three field labels changing size, weight and tracking in
+  // the recipe-item editor.
+  'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
@@ -182,6 +192,10 @@ const EXPECTED_OVERRIDE_KEYS = [
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   // Its override names the one frame that draws the capped reading.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 1505: the surface that reports something that just happened. ONE frame, because only one
+  // of its two callers is reachable — the alchemy brew banner is drawn by no case in the registry
+  // and is held by its own mounted suite instead, which that entry records.
+  'src/ui/svelte/components/Notice.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -196,6 +210,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because
+  // this list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`. ONE frame, for the
+  // same reason as `Notice`: the manager caller's grid is drawn by no case, since nothing in the
+  // registry selects a Books & Scrolls row.
+  'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
@@ -248,7 +267,7 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * whose path ends `.svelte` and which has no `BROAD_SIGNAL_CASE_OVERRIDES` entry. A change to one
  * of these publishes `manager-components-normal` and `fabricate-app-shell` and nothing else, and
  * whether either frame contains the changed component is unexamined — which is issue 1116's
- * complaint, unresolved for these 20 and resolved for `Stepper` and `ThresholdBandStrip`, whose
+ * complaint, unresolved for these 19 and resolved for `Stepper` and `ThresholdBandStrip`, whose
  * entries issue 1378 added, and for `EditorValidationSurface`, whose entry issue 1444 added when
  * it closed that primitive.
  *
@@ -274,10 +293,15 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * re-platformed onto `SearchablePopover` and `manager-essences-source-picker` became the first
  * frame in the registry to open it — the essence it selects, `mote`, is the lab corpus's only
  * sourceless one, and so the only inspector that draws this control rather than the linked card.
+ * `Callout` left it at issue 1505, and it is the first to leave by being WIDENED: the primitive
+ * converged onto its specimen and gained a player caller, and the two frames its override names
+ * are the neutral default in the manager and the tinted title-bearing form in the player window.
+ * Three components shipped under `components/` in that same change — `Kicker`, `Notice` and
+ * `StatBox` — and NONE of them entered this list, because each arrived with its own override
+ * naming a frame that draws it, which is the only way a new broad-signal component may ship.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
@@ -311,13 +335,13 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  // 49 as of issue 1504, which added `components/Select.svelte` — the app's one select, and the
-  // first member admitted by BUILDING a library entry rather than by promoting a component that
-  // had quietly crossed the membership bar. It was 48 as of issue 1392, which promoted
-  // `apps/manager/VocabularyPanel.svelte`: the World Vocabulary screen was its second independent
-  // caller, and property (e) below reported it as a component that had crossed the bar with
-  // nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 49, 'the shipped primitive set changed size');
+  // 52 as of issue 1505, which added `components/{Kicker,Notice,StatBox}.svelte` — three more
+  // members admitted by BUILDING a library entry, and the first time three arrived together. It
+  // was 49 as of issue 1504, which added `components/Select.svelte` the same way, and 48 as of
+  // issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary screen
+  // was its second independent caller, and property (e) below reported it as a component that had
+  // crossed the bar with nobody adjudicating it.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

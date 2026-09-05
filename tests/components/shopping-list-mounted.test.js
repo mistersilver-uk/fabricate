@@ -57,10 +57,21 @@ function aggregate(overrides = {}) {
 
 const ENTRY = { recipeId: 'recipe-1', quantity: 2, name: 'Healing Potion', img: null };
 
+// The three summary cards are `<StatBox>`es since issue 1505, so both class selectors here
+// name the PRIMITIVE's elements rather than the hand-rolled ones whose rules went with the
+// conversion. `.fab-stat-box-value` also carries the card's leading glyph, which contributes no
+// text, so the trim below still yields the bare figure.
 function summaryCount(target, kind) {
   return target
-    .querySelector(`[data-summary="${kind}"] .crafting-shopping-summary-count`)
+    .querySelector(`[data-summary="${kind}"] .fab-stat-box-value`)
     .textContent.trim();
+}
+
+// The alerting state was `is-alert` on the caller's own card. It is now the primitive's `danger`
+// tone, which it publishes as an attribute — `StatBox` emits no caller-supplied class, and
+// `tests/stat-box-source-contract.test.js` pins the attribute as an emission for that reason.
+function summaryTone(target, kind) {
+  return target.querySelector(`[data-summary="${kind}"]`).getAttribute('data-stat-tone');
 }
 
 describe('ShoppingList mounted behavior', () => {
@@ -71,7 +82,7 @@ describe('ShoppingList mounted behavior', () => {
   it('always renders the three summary cards; empty state with no queued recipes', async () => {
     const target = await harness.mount({ aggregate: null, entries: [] });
     assert.equal(
-      target.querySelectorAll('.crafting-shopping-summary-card').length,
+      target.querySelectorAll('.fab-stat-box').length,
       3,
       'three summary cards always shown'
     );
@@ -507,8 +518,9 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       '0',
       'but nothing the player can buy clears a GM setup problem, so it is not their debt'
     );
-    assert.ok(
-      !target.querySelector('[data-summary="components"]').classList.contains('is-alert'),
+    assert.equal(
+      summaryTone(target, 'components'),
+      'default',
       'and it must not redden the card that means "go and acquire these"'
     );
   });
@@ -566,7 +578,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       entries: [ENTRY]
     });
     assert.equal(summaryCount(target, 'components'), '1');
-    assert.ok(target.querySelector('[data-summary="components"]').classList.contains('is-alert'));
+    assert.equal(summaryTone(target, 'components'), 'danger');
   });
 
   // -------------------------------------------------------------------------

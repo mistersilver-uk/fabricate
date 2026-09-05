@@ -1322,32 +1322,44 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 
 // Issue 785: the two Knowledge tabs rendered the same standing statement at two sizes —
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
-// `Callout` is ONE shape for both tones; a tone that also changed the geometry or the type
+// `Callout` is ONE shape for every tone; a tone that also changed the geometry or the type
 // would put the drift straight back.
+//
+// THE ONE SHAPE IS NOW THE SPECIMEN'S, AND THE DEFAULT TONE IS NEUTRAL (issue 1505). This
+// test used to pin r8 / 0.7rem / 500 / 1.45 over an info-tinted default with a `--fab-info`
+// glyph — the taller treatment, defended as "the one already approved visually". The design
+// system's own specimen draws the control quietly (r11 / 11.5px / 1.6 / `--fab-text-muted`
+// on the surface fill and the ordinary border) and reserves the info tint for "a note about
+// live state", and the Checks studio was already overriding the component back to exactly
+// that. So the numbers below move with the convergence; what does NOT move is the property
+// this test exists for — a tone still changes colour and nothing else.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
   const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
   const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
-  const warningIconBlock = blockIn(calloutStyles, '.manager-callout.is-warning > i');
+  const warningIconBlock = blockIn(
+    calloutStyles,
+    '.manager-callout.is-warning > i,\n  .manager-callout.is-warning .manager-callout-title'
+  );
 
-  // The taller treatment — the one already approved visually — is the ONLY shape.
+  // The specimen's treatment — `library.html:219-220` — is the ONLY shape.
   for (const declaration of [
     'padding: var(--fab-space-3);',
-    'font-size: 0.7rem;',
-    'font-weight: 500;',
-    'line-height: 1.45;',
-    'border-radius: 8px;',
+    'font-size: 11.5px;',
+    'font-weight: 400;',
+    'line-height: 1.6;',
+    'border-radius: 11px;',
   ]) {
     assert.ok(calloutBlock.includes(declaration), `the callout should declare ${declaration}`);
   }
   assert.ok(
-    calloutBlock.includes('border: 1px solid var(--fab-info-border);') &&
-      calloutBlock.includes('background: var(--fab-info-soft);'),
-    'the default tone is info, drawn from the info token ramp'
+    calloutBlock.includes('border: 1px solid var(--fab-border);') &&
+      calloutBlock.includes('background: var(--fab-surface-soft);'),
+    'the default tone is NEUTRAL: the surface fill and the ordinary border'
   );
   assert.ok(
-    calloutIconBlock.includes('color: var(--fab-info);'),
-    'the glyph carries the tone at full strength'
+    calloutIconBlock.includes('color: var(--fab-text-subtle);'),
+    'and its glyph is quiet too — the tint is what a tone spends, so neutral spends none'
   );
 
   // Tone is a colour concern only.
@@ -1357,8 +1369,8 @@ test('the shared callout keeps one shape and lets tone change only its colours',
     'the warning tone repaints the edge and the fill'
   );
   assert.ok(
-    warningIconBlock.includes('color: var(--fab-warning);'),
-    'the warning tone repaints the glyph'
+    warningIconBlock.includes('color: var(--fab-warning-text);'),
+    'the warning tone repaints the glyph — and the title with it, in ONE rule as `.k-notice` does'
   );
   assert.equal(
     /padding|font-size|font-weight|line-height|gap:/.test(warningBlock),
@@ -1366,6 +1378,141 @@ test('the shared callout keeps one shape and lets tone change only its colours',
     'a tone must not change the callout geometry or type scale'
   );
 });
+
+// Issue 1505: the widened `Callout` takes an `actions` snippet, and the Tool Studio's identity
+// notice is its first caller — its `World Tool` button MOVED from a sibling of the strip into
+// the strip's own body. `Notice` does the same with its action and dismiss controls. A control
+// that has been repositioned INSIDE another component's flex row is exactly the case a mounted
+// test cannot see: happy-dom computes no cascade, so a body that grew over the button, or a
+// glyph column that overlapped it, would still report a button in the DOM and a handler bound
+// to it. So the press is measured where a user makes it — at the control's own centre, in a
+// real browser, against the components' real scoped CSS injected in the real order.
+test('the controls nested inside a callout and a notice own their own pointer targets', async () => {
+  const calloutScoped = scopedComponentCss(calloutPath);
+  const noticeScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/Notice.svelte')
+  );
+
+  // The rendered shapes, element for element: a `<div role="note">` once a title or an action is
+  // present, the body between the glyph and the controls, and the controls last.
+  let fixture = `
+    <div class="fabricate">
+      <main class="fabricate-manager">
+        <div class="strip">
+          <div role="note" class="manager-callout is-warning">
+            <i class="fas fa-link-slash" aria-hidden="true"></i>
+            <span class="manager-callout-body"
+              ><span class="manager-callout-text">This Tool names no game-world Item. Its identity
+              is set on the world Tool, not here, and it cannot be saved until that link is
+              restored.</span></span
+            >
+            <span class="manager-callout-actions"
+              ><button
+                type="button"
+                class="fabricate-button manager-button fab-manager-button"
+                data-probe="callout-action"
+                ><i class="fas fa-globe" aria-hidden="true"></i><span>World Tool</span></button
+              ></span
+            >
+          </div>
+          <div class="fab-notice is-danger">
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <div class="fab-notice-body">
+              <div class="fab-notice-title">This recipe cannot be saved</div>
+              <div class="fab-notice-detail">Step 2 has no ingredients, and the Critical result
+              set routes to a tier that no longer exists.</div>
+            </div>
+            <button type="button" class="fab-notice-button" data-probe="notice-action">Show both</button>
+            <button type="button" class="fab-notice-button is-dismiss" data-probe="notice-dismiss"
+              aria-label="Dismiss"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      </main>
+    </div>
+  `;
+  for (const contractClass of [
+    'manager-callout',
+    'manager-callout-body',
+    'manager-callout-text',
+    'manager-callout-actions',
+  ]) {
+    fixture = withScopeHash(fixture, contractClass, calloutScoped.hashClass);
+  }
+  for (const contractClass of [
+    'fab-notice',
+    'fab-notice-body',
+    'fab-notice-title',
+    'fab-notice-detail',
+    'fab-notice-button',
+  ]) {
+    fixture = withScopeHash(fixture, contractClass, noticeScoped.hashClass);
+  }
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 900, height: 600 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    // The scoped blocks come AFTER the global sheet, which is the order `css: 'injected'`
+    // produces at runtime — see `tests/helpers/scoped-component-css.js`.
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>@layer modules { ${css} }</style>
+          <style>${calloutScoped.css}</style>
+          <style>${noticeScoped.css}</style>
+          <style>
+            :root { font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fabricate { font-size: 14px; }
+            .fas::before { content: "x"; }
+            .strip { width: 520px; display: grid; gap: 12px; }
+          </style>
+        </head>
+        <body>${fixture}</body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const probe = (name) => {
+        const element = document.querySelector(`[data-probe="${name}"]`);
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return {
+          own: hit === element || element.contains(hit),
+          tag: hit?.tagName ?? 'none',
+          className: String(hit?.className ?? ''),
+          width: box.width,
+          height: box.height,
+        };
+      };
+      return {
+        'callout-action': probe('callout-action'),
+        'notice-action': probe('notice-action'),
+        'notice-dismiss': probe('notice-dismiss'),
+      };
+    });
+
+    for (const [name, measured] of Object.entries(report)) {
+      assert.ok(
+        measured.width > 0 && measured.height > 0,
+        `${name}: the nested control collapsed to ${measured.width}x${measured.height} — a flex ` +
+          'row whose sibling took the whole line leaves a control that cannot be pressed'
+      );
+      assert.ok(
+        measured.own,
+        `${name}: the press at its centre landed on <${measured.tag} ` +
+          `class="${measured.className}"> instead of the control itself`
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 
 // Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
 // rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,

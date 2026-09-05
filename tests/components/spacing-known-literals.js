@@ -171,8 +171,40 @@ export function isExemptSpacingPixels(pixels) {
  * matched no element, at base `0eff5b36e`. That took four occurrences with it and emptied one
  * row (`styles/fabricate.css | padding | 48`). None of them was tokenized: the declarations
  * simply went, along with the rules carrying them, so the debt fell rather than being paid.
+ *
+ * It was 913 until issue 1505 converted the Shopping list's three summary cards to the shared
+ * `<StatBox>`. Two occurrences went with the scoped block: the card's `gap: 2px` between the
+ * figure and its label, which the specimen's centred box does not have at all and which the
+ * row `…/ShoppingList.svelte | gap | 2` counted alone, so that row is DELETED; and the value
+ * line's `gap: 6px`, which the primitive re-states as `var(--fab-space-chip)` — the published
+ * 6px token — so `| gap | 6` falls 2 to 1 against the file's other, unconverted occurrence.
+ * The first is a deletion and the second is a tokenization, and neither leaves a slot open.
+ *
+ * It was 911 until the same issue converted the alchemy workbench's last-brew banner and the
+ * inventory bulk report's banner to the shared `<Notice>`. Five occurrences went, and they are
+ * two kinds. The workbench's banner block took its `gap: 9px` and its `padding: 11px 13px` with
+ * it, so three rows each fall 2 to 1 against the file's other, unconverted occurrence of the
+ * same literal — the primitive states the specimen's `var(--fab-space-3)` for both, so this is
+ * a tokenization. The bulk report's `gap: 2px` (the title/summary separation, which the
+ * specimen expresses as the detail's own `margin-top`) and `padding: 10px` were each that
+ * file's only occurrence, so both rows are DELETED.
+ *
+ * `…/Workbench.svelte | margin-bottom | 12` is deliberately UNCHANGED. That declaration is the
+ * caller's LAYOUT rather than the notice's geometry — `.alchemy-brew-area` is a plain block, so
+ * it is the only separation between the banner and the Brew button — so `.alchemy-banner`
+ * survives the conversion stripped to it, and a shrink there would be a defect rather than a
+ * re-bank.
+ *
+ * It was 906 until the same issue widened `Callout` onto its own specimen. Five more occurrences
+ * went, from two deletions. The Checks studio's `[data-failure-salvage-note]` override — the
+ * caller rule whose content the primitive converged onto — took `gap: 11px` and
+ * `padding: 13px 14px` with it, so three `styles/fabricate.css` rows each fall by one against
+ * the sheet's other occurrences; and the inventory salvage banner's scoped block took its
+ * `padding: 10px` and its title/rule `gap: 2px`, each that file's only occurrence, so both rows
+ * are DELETED. Every one of the five is now `var(--fab-space-3)` or the specimen's own
+ * `margin-top` inside the primitive, so none of them left a slot open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 913;
+export const KNOWN_RAW_SPACING_TOTAL = 901;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

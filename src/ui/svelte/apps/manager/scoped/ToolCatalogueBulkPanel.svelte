@@ -167,8 +167,10 @@
     }}
   />
 
+  <!-- NEUTRAL (issue 1505): which settings stay per-Tool is true of every selection, so it
+       is documentation rather than a note about the live one. -->
   <Callout
-    tone="info"
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Tools.BulkEdit.PerToolNote',
       'Breakage, on-break, prerequisites and the check bonus each carry a value of their own, so they stay per-Tool — open a Tool to edit them.'
