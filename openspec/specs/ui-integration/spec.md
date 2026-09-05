@@ -2544,6 +2544,8 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     Every run is the order of the ROSTER the site states over the map it states — the system's own essence definitions on the system-scope surfaces, the world essence catalogue on the world-scope ones — and an essence that roster does not list draws no chip anywhere.
     So the same component reads the same way on its rules-list row, in its inspector and in its rules editor's rail; the world catalogue row follows the world roster's order, which can differ from a system's own once that system orders its definitions differently.
     The system rules row built its own run from the map's own key order and was the last site outside the model, which is how one component printed `Earth · Fire · Air` on the list beside `Air · Earth · Fire` on the rail.
+    **AND THE DRAWN RUN IS NOT THE AUTHORING ONE** (issue 1371 r22-store4): the chip model drops an id the system's roster cannot name, which is right for a chip and wrong for a SEED, so the GM component card publishes the drawn run beside the whole resolved map rather than in place of it.
+    The row, the inspector and the browser's essence filter read the drawn one; the component editor is seeded from the whole one, because an editor seeded from a narrowed map drops every id outside the roster on its next save (`data-models` `### Component scope` requirement 2a).
 
 ### GM World Tool Screens
 

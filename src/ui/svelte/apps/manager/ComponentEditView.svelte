@@ -931,26 +931,60 @@
     return false;
   }
 
+  /**
+   * The essence map a set of rows produces, with the ids this system's roster cannot render
+   * carried forward (issue 1371 r20-store3, reviewer round 6 finding 2).
+   *
+   * `essenceOptions` is built by mapping over the SYSTEM's `essenceDefinitions`, and a world map
+   * is not narrowed to the ids a given system holds — so an id outside the roster has no row here
+   * and was silently DROPPED from the write, on a save the GM made to change a category. It is
+   * carried rather than rendered because the system has no name, icon or colour for it and no
+   * control that could edit it.
+   *
+   * ONE FUNCTION FOR TWO ROW SETS (issue 1371 r22-store4). The write passes the DRAFT and the
+   * baseline passes the rows as they were DRAWN, and those two answers have to be produced the
+   * same way or an untouched save differs from its own baseline for a reason that is an artefact
+   * of the arithmetic rather than an edit the GM made.
+   *
+   * @param {object[]} rows either `essenceDraft` or `essenceOptions`.
+   * @returns {Record<string, number>}
+   */
+  function essenceMapFrom(rows) {
+    const essences = carriedComponentEssences(component?.essences, essenceOptions);
+    for (const option of Array.isArray(rows) ? rows : []) {
+      const quantity = clampComponentEssenceQuantity(option.quantity);
+      if (quantity > 0 && option.id) essences[option.id] = quantity;
+    }
+    return essences;
+  }
+
+  /**
+   * The map an UNTOUCHED save of the rows THIS EDITOR DREW would produce — the baseline the
+   * override rule answers "did the GM author anything" against (issue 1371 r22-store4, the
+   * Foundry integrator's round-8 finding 1).
+   *
+   * STATED RATHER THAN LEFT TO BE ASSUMED. `updateComponent` takes a caller that omits it to have
+   * been seeded from the read union, and this editor is seeded from the item CARD — which is
+   * close but is not the same object, and stopped being the same map the moment the card grew a
+   * narrowed display run beside the resolved one. `data-models` §Component scope 2a: the baseline
+   * is a fact about the RENDER, so it is captured where the rows were drawn and travels with them.
+   *
+   * `undefined` where the section is not rendered at all, which is the "state no baseline" the
+   * rule falls back from — there is no essence axis in the write either, so nothing compares.
+   *
+   * @returns {Record<string, number>|undefined}
+   */
+  function renderedEssenceBaseline() {
+    return showEssences ? essenceMapFrom(essenceOptions) : undefined;
+  }
+
   function buildUpdates() {
     const updates = {};
     updates.category = categoryDraft;
     if (showTags) {
       updates.tags = tagDraft.filter((opt) => opt.checked).map((opt) => opt.tag);
     }
-    if (showEssences) {
-      // THE ESSENCES THIS SYSTEM'S ROSTER DOES NOT DEFINE, CARRIED FORWARD (issue 1371
-      // r20-store3, reviewer round 6 finding 2). `essenceOptions` is built by mapping over the
-      // SYSTEM's `essenceDefinitions`, and a world map is not narrowed to the ids a given system
-      // holds — so an id outside the roster had no row here and was silently DROPPED from the
-      // write, on a save the GM made to change a category. It is carried rather than rendered
-      // because the system has no name, icon or colour for it and no control that could edit it.
-      const essences = carriedComponentEssences(component?.essences, essenceOptions);
-      for (const option of essenceDraft) {
-        const quantity = clampComponentEssenceQuantity(option.quantity);
-        if (quantity > 0 && option.id) essences[option.id] = quantity;
-      }
-      updates.essences = essences;
-    }
+    if (showEssences) updates.essences = essenceMapFrom(essenceDraft);
     if (showSalvage) {
       // Spread the preserved (unedited) salvage fields first, then overwrite the
       // three authored fields so enabled/ingredientQuantity/toolIds survive a save.
@@ -1479,7 +1513,9 @@
           return;
         }
       }
-      const result = await onSave(component.id, updates);
+      const result = await onSave(component.id, updates, {
+        baseline: renderedEssenceBaseline(),
+      });
       if (result === false) saveFailed = true;
     } catch {
       saveFailed = true;

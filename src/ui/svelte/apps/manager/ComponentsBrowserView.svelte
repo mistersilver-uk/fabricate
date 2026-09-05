@@ -25,6 +25,7 @@
     COMPONENT_SORT_KEYS,
     buildComponentBrowserModel,
     componentCategoryOptions,
+    componentEssenceRun,
     createComponentBrowserState,
     groupComponentsByCategory,
   } from '../../../../utils/componentBrowserModel.js';
@@ -119,17 +120,17 @@
     ui.systemId = selectedSystemId;
   });
 
+  // THE FILTER READS THE RUN THE ROWS DRAW (issue 1371 r22-store4). The card carries two: the
+  // whole resolved map under `essences`, which is what the component EDITOR is seeded from, and
+  // the drawn chips under `essenceChips`. Offering an option for an essence no row can show is
+  // the divergence `ui-integration` requirement 2's one-function rule exists to prevent.
   const showComponentEssences = $derived(
-    (itemCards || []).some(
-      (item) => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)
-    )
+    (itemCards || []).some((item) => item.showEssences || componentEssenceRun(item).length > 0)
   );
   const componentEssenceOptions = $derived(
     uniqueSorted(
       (itemCards || []).flatMap((item) =>
-        Array.isArray(item.essences)
-          ? item.essences.map((essence) => essence.name || essence.id)
-          : []
+        componentEssenceRun(item).map((essence) => essence.name || essence.id)
       )
     )
   );

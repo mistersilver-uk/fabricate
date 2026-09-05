@@ -290,15 +290,35 @@ function _createItemCard(item, systemId, options) {
     description: storedDescription,
     hasDescription: storedDescription.length > 0,
     tags: showTags ? item.tags || [] : [],
-    // ONE CHIP MODEL, IN THE ROSTER'S ORDER (issue 1371 r21-store4, the UX designer's round-7
-    // note). This used to walk `Object.entries(essenceMap)`, so the run's order was the order the
-    // MAP's keys happened to be authored in — the same component drew `Earth · Fire · Air` on the
-    // list and `Air · Earth · Fire` on the rail beside it, because the rail already read the
-    // shared unit. `componentEssenceChips` owns the whole model: the catalogue's order, the
-    // roster's name / glyph / `--fab-tag-*` colour key, positive quantities only, and no chip at
-    // all for an id the roster does not list — which is the id a deleted essence leaves behind,
-    // and a chip reading `3` under a fallback glyph and no name states a count of nothing.
+    // ── TWO RUNS, BECAUSE THE CARD ANSWERS TWO QUESTIONS (issue 1371 r22-store4, the Foundry
+    //    integrator's round-8 finding 1) ─────────────────────────────────────────────────────
+    //
+    // `essences` is WHAT THIS SYSTEM RESOLVES, whole and un-narrowed, and it is the card's
+    // AUTHORING answer: `componentForEdit` IS this card, so `buildComponentEditorState` and
+    // `ComponentEditView`'s `carriedComponentEssences` are both seeded from it. A world map is
+    // not narrowed to the ids a given system holds, so narrowing this run makes the carried set
+    // — the ids that have no row and must travel forward untouched — EMPTY by construction, and
+    // the editor's next save silently drops every off-roster essence. r21 narrowed it and that
+    // is exactly what happened: a tag-only save on an inheriting pair flipped `inherit.essences`
+    // and persisted the roster's ids alone, durably losing the rest.
+    //
+    // `essenceChips` is WHAT THE ROW DRAWS: the same map through the one shared chip model, in
+    // the world catalogue's order, with no chip for an id the roster does not list — which is
+    // the id a deleted essence leaves behind, and a chip reading `3` under a fallback glyph and
+    // no name states a count of nothing. The row, the inspector and the browser's essence filter
+    // read this one; nothing that SEEDS an editor may.
     essences: showEssences
+      ? Object.entries(essenceMap || {}).map(([id, quantity]) => ({
+          id,
+          name: essenceDefinitionById.get(id)?.name || id,
+          icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+          // The essence's colour as the bare `--fab-tag-*` key (issue 1371 r18-colour, M29),
+          // '' when unauthored — what the row's chips and the inspector's run draw it in.
+          colorToken: essenceDefinitionById.get(id)?.colorToken || '',
+          quantity,
+        }))
+      : [],
+    essenceChips: showEssences
       ? componentEssenceChips(essenceMap, [...essenceDefinitionById.values()])
       : [],
     registeredItemUuidDisplay,

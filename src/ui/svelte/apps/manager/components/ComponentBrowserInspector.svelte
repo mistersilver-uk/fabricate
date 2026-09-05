@@ -85,9 +85,11 @@
 
   const salvageHeading = $derived(componentSalvageInLabel(systemName, text));
   const systemTags = $derived(Array.isArray(selectedComponent?.tags) ? selectedComponent.tags : []);
-  const essences = $derived(
-    Array.isArray(selectedComponent?.essences) ? selectedComponent.essences : []
-  );
+  // The DRAWN run, for `ComponentRow`'s reason (issue 1371 r22-store4): the card's `essences` is
+  // the whole resolved map the component editor is seeded from, and `essenceChips` is what the
+  // shared chip model draws from it.
+  const essenceRun = $derived(selectedComponent?.essenceChips ?? selectedComponent?.essences);
+  const essences = $derived(Array.isArray(essenceRun) ? essenceRun : []);
   const hasRegisteredItemUuid = $derived(Boolean(selectedComponent?.hasRegisteredItemUuid));
   const sourceMissing = $derived(Boolean(selectedComponent?.sourceMissing));
   const registeredItemUuid = $derived(String(selectedComponent?.registeredItemUuidDisplay || ''));

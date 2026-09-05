@@ -689,6 +689,30 @@ const EDITOR_ROOT_SOURCE = readFileSync(
   'utf8'
 );
 
+// The MANAGER root's own hop, pinned as source for the same reason as the two above: it is a
+// 16,000-line `.svelte` module, and the one branch that matters here is a single forwarded
+// argument no mounted case can see — `ComponentEditView` states the baseline and the store
+// consumes it, and both halves are driven behaviourally, but the verb BETWEEN them is a mirror.
+// Deleting the argument left every suite in the repository green (measured, issue 1371 r22).
+const MANAGER_ROOT_SOURCE = readFileSync(
+  new URL('../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte', import.meta.url),
+  'utf8'
+);
+
+test('1371 r22: the manager root forwards the editor’s stated baseline to the store verb', () => {
+  // Foundry integrator round 8, finding 1(b). Without this the rule falls back to "this caller was
+  // seeded from the read union", which was true of the in-page editor only while the item card's
+  // essence run WAS that union — a premise revision 21 falsified from the other direction.
+  assert.ok(
+    MANAGER_ROOT_SOURCE.includes('async function saveComponentEdit(itemId, updates, { baseline } = {})'),
+    'the save seam accepts the editor’s third argument'
+  );
+  assert.ok(
+    MANAGER_ROOT_SOURCE.includes('store.updateComponent?.(itemId, merged, { baseline })'),
+    'and hands it to the override-aware store verb rather than dropping it'
+  );
+});
+
 test('1371 r21: the editor root emits the seed’s two facts WITH the rows it drew', () => {
   // Foundry integrator round 7, finding 2. Both are facts about the RENDER, and the window
   // registers no hooks — so anything re-derived at save time is a different world's answer.

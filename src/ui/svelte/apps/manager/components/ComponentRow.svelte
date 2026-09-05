@@ -86,7 +86,14 @@
     onToggleSelect = () => {},
   } = $props();
 
-  const essences = $derived(member && Array.isArray(component?.essences) ? component.essences : []);
+  // THE DRAWN RUN, NOT THE RESOLVED MAP (issue 1371 r22-store4). The card carries both: whole
+  // under `essences`, because the component editor is seeded from that same card and a narrowed
+  // seed drops every off-roster essence on the next save; drawn under `essenceChips`, which is
+  // the shared chip model — the world catalogue's order, and no chip for an id this system's
+  // roster does not list. A hand-built card carries `essences` alone, and for one of those the
+  // two runs are the same thing.
+  const essenceRun = $derived(component?.essenceChips ?? component?.essences);
+  const essences = $derived(member && Array.isArray(essenceRun) ? essenceRun : []);
 </script>
 
 <li

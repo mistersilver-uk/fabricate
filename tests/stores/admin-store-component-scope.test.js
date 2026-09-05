@@ -25,6 +25,10 @@ import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.j
 import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { resolveScopedEntityRead } from '../../src/systems/scopedEntityReads.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import {
+  buildComponentEditorState,
+  buildComponentEditorUpdates,
+} from '../../src/ui/svelte/util/componentEditor.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { recipeReferencesComponent } from '../../src/utils/recipeComponentReferences.js';
 import { getItemMatchUuids } from '../../src/utils/sourceReferenceUnion.js';
@@ -1864,13 +1868,164 @@ test('1371 r21: a row’s essence chips are the WORLD catalogue’s order, not t
 
   const [card] = get(store.viewState).itemCards;
   assert.deepEqual(
-    card.essences.map((essence) => essence.id),
+    card.essenceChips.map((essence) => essence.id),
     ['earth', 'fire', 'air'],
     'the roster’s order, which is what every other surface draws'
   );
   assert.deepEqual(
-    card.essences.map((essence) => essence.quantity),
+    card.essenceChips.map((essence) => essence.quantity),
     [2, 3, 1],
     'each with its own count'
   );
+  assert.ok(
+    card.essenceChips.every((essence) => essence.id !== 'ghost'),
+    'and no chip for an id the roster does not list'
+  );
+  // AND THE DRAWN RUN IS NOT THE SEED (issue 1371 r22-store4). `card.essences` is what the
+  // component editor is seeded from, so it stays whole — narrowing it made the editor's carried
+  // set empty and its next save dropped every off-roster id.
+  assert.ok(
+    card.essences.some((essence) => essence.id === 'ghost'),
+    'the seed run keeps the id the roster cannot name'
+  );
+});
+
+// ── ROUND 8: THE CARD ANSWERS TWO QUESTIONS AND MUST NOT CONFLATE THEM (r22-store4) ─────────
+//
+// Revision 21 narrowed `card.essences` to the system roster for the row's chips. That same array
+// is what the MANAGER's component editor is seeded from — `componentForEdit` IS the card — so the
+// narrowing made `carriedComponentEssences` empty by construction and an untouched save started
+// dropping every essence the world map carries and this system does not define. The card now
+// publishes both: `essences`, the whole resolved map, for the editor; `essenceChips`, the drawn
+// run, for the row, the inspector and the browser's filter.
+
+/**
+ * The world after `1.32.0` with an OFF-ROSTER world essence: `ingot` resolves `{fire: 3, water: 4}`
+ * while this system's roster defines `fire` alone.
+ *
+ * That state is ordinary rather than adversarial — a world map is NOT narrowed to the ids a given
+ * system holds (`data-models` §Component scope 2a) — and it is the one the editor's round trip has
+ * to survive, because `water` has no row here, no name, no glyph and no control.
+ *
+ * @returns {Promise<{store: object, scope: object, harness: object}>}
+ */
+async function openOffRosterPair() {
+  const harness = makeEssenceStoreHarness({
+    essences: [{ id: 'fire', name: 'Fire' }],
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { fire: 1 }, tags: [] }],
+  });
+  harness.system.itemTags = ['bar'];
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3, water: 4 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+  return { store, scope, harness };
+}
+
+test('1371 r22: the card draws the roster’s chips while still SEEDING the editor with the whole map', async () => {
+  const { store } = await openOffRosterPair();
+
+  const [card] = get(store.viewState).itemCards;
+  assert.deepEqual(
+    card.essenceChips.map((essence) => essence.id),
+    ['fire'],
+    'the DRAWN run carries no chip for an id this system’s roster cannot name'
+  );
+  assert.deepEqual(
+    card.essences.map((essence) => [essence.id, essence.quantity]),
+    [
+      ['fire', 3],
+      ['water', 4],
+    ],
+    'while the SEED run is the whole map the system resolves'
+  );
+});
+
+test('1371 r22: the manager’s editor saves a tag change without dropping an off-roster essence', async () => {
+  // The Foundry integrator's round-8 finding 1, end to end over the shipped units: the card the
+  // store publishes, `buildComponentEditorState` (which is what `CraftingSystemManagerRoot`'s
+  // `componentEssenceOptionsFor` calls), and `buildComponentEditorUpdates` (which
+  // `ComponentEditView.buildUpdates` is a line-for-line mirror of, through `essenceMapFrom`).
+  const { store, scope, harness } = await openOffRosterPair();
+  const calls = installSingleComponentWrite(harness);
+  const [card] = get(store.viewState).itemCards;
+
+  const state = buildComponentEditorState(harness.system, card);
+  assert.deepEqual(
+    state.essenceOptions.map((option) => option.id),
+    ['fire'],
+    'the editor can only offer a row for an essence this system defines'
+  );
+  assert.deepEqual(
+    state.carriedEssences,
+    { water: 4 },
+    'so `water` must be CARRIED, which is exactly what the narrowing made impossible'
+  );
+
+  // The GM ticks a tag and touches nothing else — the rows go back exactly as they were drawn.
+  const updates = buildComponentEditorUpdates({
+    showTags: true,
+    showEssences: true,
+    tagOptions: [{ tag: 'bar', checked: true }],
+    essenceOptions: state.essenceOptions,
+    carriedEssences: state.carriedEssences,
+  });
+  assert.deepEqual(
+    updates.essences,
+    { water: 4, fire: 3 },
+    'the round trip restates the whole resolved map rather than the roster’s half of it'
+  );
+
+  // NO BASELINE STATED — the state the round-8 report measured, and the fallback the rule uses is
+  // the UN-narrowed resolved map. The two agree again, so the essence key is dropped.
+  const saved = await store.updateComponent('ingot', updates);
+
+  assert.equal(saved, true);
+  assert.deepEqual(
+    calls.map((call) => call.updates),
+    [{ tags: ['bar'] }],
+    'the tag change lands and carries NO essence key'
+  );
+  assert.equal(
+    membershipRecord(scope).inherit.essences,
+    undefined,
+    'no durable world-setting write was spent on a save that authored nothing'
+  );
+  assert.deepEqual(
+    resolvedIngotEssences(harness, scope),
+    { fire: 3, water: 4 },
+    'and nothing was dropped: the pair still resolves the world map whole'
+  );
+});
+
+test('1371 r22: and the render-time baseline the editor now states says the same thing', async () => {
+  // Fix (b). `saveComponentEdit` used to state no baseline, so the rule fell back to "this caller
+  // was seeded from the read union" — true of this editor only while the card's essence run WAS
+  // that union. The editor now computes the baseline from the rows it drew and hands it over, so
+  // the rule no longer depends on a premise a projection change can falsify.
+  const { store, scope, harness } = await openOffRosterPair();
+  const calls = installSingleComponentWrite(harness);
+  const [card] = get(store.viewState).itemCards;
+  const state = buildComponentEditorState(harness.system, card);
+  const updates = buildComponentEditorUpdates({
+    showTags: true,
+    showEssences: true,
+    tagOptions: [{ tag: 'bar', checked: true }],
+    essenceOptions: state.essenceOptions,
+    carriedEssences: state.carriedEssences,
+  });
+
+  const saved = await store.updateComponent('ingot', updates, {
+    baseline: state.baselineEssences,
+  });
+
+  assert.deepEqual(state.baselineEssences, { water: 4, fire: 3 }, 'the rows as they were drawn');
+  assert.equal(saved, true);
+  assert.deepEqual(calls.map((call) => call.updates), [{ tags: ['bar'] }]);
+  assert.equal(membershipRecord(scope).inherit.essences, undefined);
 });

@@ -6998,7 +6998,7 @@
     componentEditDirty = draft?.dirty === true;
   }
 
-  async function saveComponentEdit(itemId, updates) {
+  async function saveComponentEdit(itemId, updates, { baseline } = {}) {
     if (componentEditSaving || !itemId) return false;
     componentEditSaving = true;
     try {
@@ -7008,7 +7008,15 @@
       const merged = componentDifficultyShown
         ? { ...(updates || {}), difficulty: normalizeComponentDifficulty(componentDifficultyDraft) }
         : updates;
-      const result = await store.updateComponent?.(itemId, merged);
+      // AND THE BASELINE THE EDITOR DREW TRAVELS WITH IT (issue 1371 r22-store4, the Foundry
+      // integrator's round-8 finding 1). A system-scope essence write is an OVERRIDE, and the
+      // rule tells a restatement of the editor's own seed from a real authored override by
+      // comparing against the baseline the caller states. This verb used to state none, so the
+      // rule fell back to "the caller was seeded from the read union" — true of this editor only
+      // while the item card's essence run WAS that union, which stopped being so when the card
+      // grew a narrowed display run beside it. `ComponentEditView` computes it from the rows it
+      // rendered, which is the only place that fact exists.
+      const result = await store.updateComponent?.(itemId, merged, { baseline });
       if (result === false) return false;
       componentEditDirty = false;
       componentEditDraft = null;

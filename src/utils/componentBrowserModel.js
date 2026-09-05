@@ -118,10 +118,30 @@ export function componentCategoryOf(component) {
   return normalizeComponentCategory(component?.category);
 }
 
+/**
+ * The essence run a card DRAWS — `essenceChips`, falling back to `essences` (issue 1371
+ * r22-store4).
+ *
+ * The projection publishes two runs: `essences` is what the system RESOLVES, whole, because the
+ * component editor is seeded from that card and a narrowed seed silently drops every essence
+ * outside this system's roster on the next save; `essenceChips` is the same map through the one
+ * shared chip model, which draws nothing for an id the roster does not list. `ui-integration`
+ * requirement 2's rule is that ONE function answers the chips and the filter, so the filter reads
+ * the drawn run — a row showing no chip can never pass `Carries any essence`.
+ *
+ * The fallback is not defensive style: a hand-built card (a fixture, or a caller that projects its
+ * own rows) carries `essences` alone, and for such a card the two runs are the same thing.
+ *
+ * @param {object|null} component
+ * @returns {object[]}
+ */
+export function componentEssenceRun(component) {
+  if (Array.isArray(component?.essenceChips)) return component.essenceChips;
+  return Array.isArray(component?.essences) ? component.essences : [];
+}
+
 function essenceNames(component) {
-  return (Array.isArray(component?.essences) ? component.essences : []).map(
-    (essence) => essence?.name || essence?.id
-  );
+  return componentEssenceRun(component).map((essence) => essence?.name || essence?.id);
 }
 
 /**

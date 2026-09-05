@@ -83,8 +83,12 @@ async function openEditor(
   // VALUE through `onSave` and the membership INHERIT FLAG through `setSectionInherited` — both
   // land on Save, and their ORDER is the thing a half-failed save turns on. Two separate spies
   // could not state an ordering between them at all.
-  const onSave = async (id, updates) => {
-    calls.push({ verb: 'onSave', args: [id, updates] });
+  //
+  // THE THIRD ARGUMENT IS RECORDED TOO (issue 1371 r22-store4): since the Foundry integrator's
+  // round-8 finding the editor states the BASELINE it drew, and the whole point of stating it is
+  // that the receiver no longer has to assume which projection the rows came from.
+  const onSave = async (id, updates, options) => {
+    calls.push({ verb: 'onSave', args: [id, updates], options });
     await Promise.resolve();
     return saveResult;
   };
@@ -328,6 +332,42 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         calls.at(-1).args[1].essences,
         { moss: 1, flame: 2, earth: 1 },
         'the GM’s step lands AND the essence this system cannot show survives the write'
+      );
+    });
+
+    it('states the BASELINE it drew, so an untouched save is not read as an authored override', async () => {
+      // The Foundry integrator's round-8 finding 1, at the surface. The receiver used to be left
+      // to assume this editor was seeded from the read union, and revision 21 falsified that by
+      // narrowing the item card's essence run — after which an untouched save differed from the
+      // rule's fallback by exactly the off-roster ids, flipped `inherit.essences` and dropped
+      // them. The baseline is a fact about the RENDER, so the editor computes it from the rows it
+      // drew and hands it over, and the rule no longer depends on a premise a projection change
+      // can falsify.
+      const { target, calls } = await openEssences('ingot', 'sys-forge', options(2), {
+        component: {
+          ...componentRecord('ingot', 'Iron Ingot', 'Refined'),
+          essences: [
+            { id: 'flame', name: 'Flame', quantity: 2 },
+            { id: 'moss', name: 'moss', quantity: 1 },
+          ],
+        },
+      });
+
+      save(target);
+      await drain();
+
+      const saved = calls.at(-1);
+      assert.equal(saved.verb, 'onSave');
+      assert.deepEqual(
+        saved.options.baseline,
+        { moss: 1, flame: 2 },
+        'the map an untouched save of THESE rows produces — carried entry and all, and `earth` ' +
+          'absent because a zero row is no essence rather than a zero one'
+      );
+      assert.deepEqual(
+        saved.args[1].essences,
+        saved.options.baseline,
+        'and an untouched save restates it EXACTLY, which is what makes the exemption fire'
       );
     });
 
