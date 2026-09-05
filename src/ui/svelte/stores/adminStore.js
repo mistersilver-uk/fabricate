@@ -6035,21 +6035,48 @@ export function createAdminStore(services) {
    * bare `Try again.` — same key shape, one more thing said.
    *
    * ── AND IT CANNOT PRINT THE KEY ───────────────────────────────────────────────────────────
-   * `localize` answers a MISSING key with the key itself, so `localize(k) || fallback` never
-   * reaches its fallback and would put `FABRICATE.…` on screen. This is the store's own shipped
-   * idiom for that (`_essenceDeleteDialogContent`, `_componentDeleteDialogContent`): take the
-   * answer only when it is not the key back. `lang-keys-no-orphans` and `ui-lang-keys-resolve`
-   * are what keep the key present; this is what keeps a GM from ever reading one.
+   * That guard is {@link _componentMembershipFailureMessage}, shared with the removal twin.
    *
    * @param {unknown} error the refusal thrown by the in-system write.
    * @returns {string}
    */
   function _componentJoinFailureMessage(error) {
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.AddToSystemFailed',
+      'The component could not be added to this system.',
+      error
+    );
+  }
+
+  /**
+   * One membership-failure sentence, localized, with an English floor that CANNOT be a raw key.
+   *
+   * ── WHY THIS IS ONE FUNCTION AND NOT TWO (issue 1371, round 11) ───────────────────────────
+   * `localize` answers a MISSING key with the key itself, so `localize(k) || fallback` never
+   * reaches its fallback and would put `FABRICATE.…` on a GM's screen. This is the store's own
+   * shipped idiom for that (`_essenceDeleteDialogContent`, `_componentDeleteDialogContent`):
+   * take the answer only when it is not the key back. `lang-keys-no-orphans` and
+   * `ui-lang-keys-resolve` are what keep the key present; this is what keeps a GM from ever
+   * reading one.
+   *
+   * The join and the removal need that same guard around two different keys, and written out
+   * twice the pair differs only in two literals — a near-identical block of exactly the shape
+   * the duplication gate counts, and two places for the guard to be dropped from instead of one.
+   * So the KEY and the FLOOR are arguments and the guard is written once.
+   *
+   * THE DETAIL IS PASSED AS `{error}` EITHER WAY, so a translation can state the reason too
+   * rather than only the English floor being able to.
+   *
+   * @param {string} key the lang key for this sentence.
+   * @param {string} fallback the English sentence, used verbatim when the key echoes.
+   * @param {unknown} error the failure to state the reason from.
+   * @returns {string}
+   */
+  function _componentMembershipFailureMessage(key, fallback, error) {
     const detail = error?.message ? String(error.message) : '';
-    const key = 'FABRICATE.Admin.Manager.Component.AddToSystemFailed';
     const localized = services.localize?.(key, { error: detail });
     if (localized && localized !== key) return localized.trim();
-    return `The component could not be added to this system. ${detail}`.trim();
+    return `${fallback} ${detail}`.trim();
   }
 
   /**
@@ -6181,27 +6208,27 @@ export function createAdminStore(services) {
   /**
    * The message a FAILED component removal puts in front of the GM.
    *
-   * ── IT IS PLAIN ENGLISH ON PURPOSE, unlike its join twin ──────────────────────────────────
-   * `_componentJoinFailureMessage` names a lang key because one exists for it. There is no
-   * component `RemoveFromSystemFailed` key — the Tool family has one, the component family does
-   * not — and `localize` answers a MISSING key with the key itself, so naming one here would put
-   * `FABRICATE.…` on the GM's screen instead of a sentence. Adding the key belongs to whichever
-   * lane owns `lang/en.json`; until then this reads as English, which is the floor the key-echo
-   * idiom exists to guarantee anyway.
-   *
-   * ── AND IT SAYS "DID NOT COMPLETE" RATHER THAN "FAILED", which is a precision and not a hedge ─
+   * ── IT SAYS "DID NOT COMPLETE" RATHER THAN "FAILED", which is a precision and not a hedge ──
    * The join either lands or is undone, so its message can say the component was not added. This
    * one cannot: a throw from the second half leaves the in-system row really gone, and a throw
    * from the first leaves the manager's in-memory system and the saved setting disagreeing about
    * it. The sentence has to be true of every one of those, and "did not complete" is — where "was
-   * not removed" would be a fresh false statement in two of the three.
+   * not removed" would be a fresh false statement in two of the three. The lang key carries the
+   * same wording for the same reason, and a translation that narrowed it to "was not removed"
+   * would be re-introducing the false statement in another language.
+   *
+   * ── AND IT CANNOT PRINT THE KEY, through the shared guard ─────────────────────────────────
+   * {@link _componentMembershipFailureMessage}, exactly as the join twin does.
    *
    * @param {unknown} error the failure thrown by either half of the removal.
    * @returns {string}
    */
   function _componentPartFailureMessage(error) {
-    const detail = error?.message ? String(error.message) : '';
-    return `Removing the component from this system did not complete. ${detail}`.trim();
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.RemoveFromSystemFailed',
+      'Removing the component from this system did not complete.',
+      error
+    );
   }
 
   /**

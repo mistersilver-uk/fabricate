@@ -2705,6 +2705,7 @@
           "GhostAdd": "Add to system",
           "GhostAddNamed": "Add {name} to this system",
           "AddToSystemFailed": "The component could not be added to this system. {error}",
+          "RemoveFromSystemFailed": "Removing the component from this system did not complete. {error}",
           "WorldTags": {
             "GroupLabel": "From the world"
           },

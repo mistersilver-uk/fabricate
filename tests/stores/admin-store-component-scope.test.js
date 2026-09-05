@@ -641,15 +641,34 @@ test('1371: the removal deletes the IN-SYSTEM row first, while the membership re
  * must not depend on which side of the persist the manager fell over, since it cannot tell.
  * Written once so the two cannot drift, and so the pair adds no duplicated block to the gate.
  *
+ * `translations` installs a WORLD THAT HAS THE KEY. The harness's own localizer answers every key
+ * with the key itself, which reproduces Foundry's missing-key behaviour exactly — so by default
+ * this drives the English-floor branch, and passing a table drives the translated branch. Both are
+ * real states of a shipped world and the store has to be right in both.
+ *
  * @param {'persist'|'reconcile'} failAt which seam of the shipped cascade throws.
- * @returns {Promise<{answer: boolean, membership: string[], rows: string[], errors: string[]}>}
+ * @param {{translations?: Record<string, string>}} [options] the lang table this world has.
+ * @returns {Promise<{answer: boolean, membership: string[], rows: string[], errors: string[],
+ *   localizations: Array<{key: string, data: object}>}>}
  */
-async function driveRemovalFailure(failAt) {
+async function driveRemovalFailure(failAt, { translations } = {}) {
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness, { failAt });
   await store.worldScope.component.addToSystem('ingot', 'sys1');
   harness.notifications.error.length = 0;
+  if (translations) {
+    const echoing = harness.services.localize;
+    harness.services.localize = (key, data) => {
+      // The shipped localizer still runs, so the (key, data) pair is recorded either way and the
+      // two branches are asserted against the same evidence.
+      const echoed = echoing(key, data);
+      const translated = translations[key];
+      return translated
+        ? translated.replaceAll('{error}', String(data?.error ?? ''))
+        : echoed;
+    };
+  }
 
   // NO `assert.rejects` HERE, and that is the first thing under test: the verb has to ANSWER.
   const answer = await store.worldScope.component.removeFromSystem('ingot', 'sys1');
@@ -659,6 +678,7 @@ async function driveRemovalFailure(failAt) {
     membership: Object.values(scope.payload.membership).map((record) => record.entityId),
     rows: componentsOf(harness).map((record) => record.id),
     errors: [...harness.notifications.error],
+    localizations: [...harness.localizations],
   };
 }
 
@@ -680,8 +700,8 @@ test('1371: a delete that throws BEFORE its persist leaves the membership record
   );
   assert.ok(
     !outcome.errors[0].startsWith('FABRICATE.'),
-    'and no GM ever reads a raw key: there is no component RemoveFromSystemFailed key, so this ' +
-      'path states its English rather than naming a key that would print itself'
+    'and no GM ever reads a raw key — this harness answers every key with the key itself, so ' +
+      'what is read here is the English floor, which is the branch an incomplete lang file gets'
   );
 });
 
@@ -782,4 +802,56 @@ test('1371: a removal that writes nothing at all answers false, and spends no re
     'nothing was written, so nothing is missing'
   );
   assert.equal(harness.notifications.error.length, 1, 'and the GM is still told it did not happen');
+});
+
+// ── AND THE SENTENCE THE GM READS IS LOCALIZED (issue 1371, round 11 follow-up) ────────────
+//
+// The removal shipped its message as plain English because no component `RemoveFromSystemFailed`
+// key existed and `localize` answers a MISSING key with the key itself — so naming one before it
+// was in `lang/en.json` would have put `FABRICATE.…` on a GM's screen. The key is added beside
+// `AddToSystemFailed` and the sentence now reads through the same key-echo-guarded localizer the
+// join uses. BOTH branches are pinned, because a world with an incomplete lang file takes the
+// second one and it is the branch the guard exists for.
+
+/** The key the removal's failure sentence is asked for under. */
+const REMOVE_FAILED_KEY = 'FABRICATE.Admin.Manager.Component.RemoveFromSystemFailed';
+
+test('1371: a world that HAS the key reads the translation, reason and all', async () => {
+  const outcome = await driveRemovalFailure('persist', {
+    translations: { [REMOVE_FAILED_KEY]: 'Le retrait ne s’est pas terminé. {error}' },
+  });
+
+  assert.equal(
+    outcome.errors[0],
+    'Le retrait ne s’est pas terminé. The crafting systems setting could not be saved.',
+    'the translated sentence is what the GM reads, and the reason is interpolated into it — so ' +
+      'the `{error}` parameter is carried through the localizer rather than only reaching the ' +
+      'English floor'
+  );
+  const request = outcome.localizations.find((entry) => entry.key === REMOVE_FAILED_KEY);
+  assert.ok(Boolean(request), 'the key is asked for, so a translation CAN answer');
+  assert.ok(
+    String(request.data?.error ?? '').includes('The crafting systems setting could not be saved.'),
+    'and it is handed the reason as `{error}`'
+  );
+});
+
+test('1371: and a world that does NOT reads the English floor, never the key', async () => {
+  // THE HARNESS ANSWERS EVERY KEY WITH THE KEY, which is Foundry's missing-key behaviour exactly.
+  // `localize(k) || fallback` would return the key here and print `FABRICATE.…`; the guard is what
+  // makes this branch a sentence.
+  const outcome = await driveRemovalFailure('persist');
+
+  assert.equal(
+    outcome.errors[0],
+    'Removing the component from this system did not complete. ' +
+      'The crafting systems setting could not be saved.',
+    'the floor is the shipped English sentence with the reason after it'
+  );
+  assert.ok(!outcome.errors[0].startsWith('FABRICATE.'), 'and never the raw key');
+  assert.ok(
+    outcome.localizations.some((entry) => entry.key === REMOVE_FAILED_KEY),
+    'the key was still ASKED for — the floor is a fallback from a real lookup, not a decision to ' +
+      'skip localization, which is the difference a rename on the key has to be able to expose'
+  );
 });
