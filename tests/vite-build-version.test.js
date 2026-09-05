@@ -1,15 +1,30 @@
 /**
- * `__FABRICATE_BUILD_VERSION__` MUST BE DEFINED IN EVERY CONFIG `vite.config.js` RETURNS
+ * `__FABRICATE_BUILD_VERSION__` MUST BE DEFINED IN THE `build` CONFIG AND ONLY THERE
  * (issue 1565).
  *
  * The module compares the version its running build was made from against the installed module
  * version to detect a stale cached entry script. That comparison is only as good as the define:
- * with it absent the identifier is a free variable, the `typeof` guard in `src/main.js` yields
- * `''`, and the check silently no-ops — the exact invisible failure this change exists to remove,
- * moved one layer down where no runtime test can see it.
+ * with it absent from a production build the identifier is a free variable, the `typeof` guard in
+ * `src/main.js` yields `''`, and the check silently no-ops — the exact invisible failure this
+ * change exists to remove, moved one layer down where no runtime test can see it.
  *
- * TWO CONFIGS, NOT ONE. `vite.config.js` returns EARLY for `command === 'serve'`, so a define
- * added to the tail return alone would be missing from `npm run dev` and nothing would say so.
+ * WHY `serve` MUST NOT CARRY IT, which is the other half of the invariant and the reason this file
+ * asserts an absence as hard as it asserts a presence. `tests/helpers/extension-composition-
+ * harness.js` starts Vite with `createServer({ root: repoRoot, ... })` and NO `configFile`, so
+ * default config discovery loads the root `vite.config.js` and every mounted Svelte suite inherits
+ * whatever the `serve` branch defines. Those suites install the View Lab Foundry shim, which
+ * reports `0.0.0-viewlab` as the installed version of any module, and they dispatch `ready` — so a
+ * baked version present in serve mode differs from the installed one and the stale-entry check
+ * fires a user-facing "reload to complete the update" notice on every mounted run. Serve mode also
+ * has nothing to detect: `npm run dev` reads its installed version from the same tracked
+ * `module.json` the config falls back to, so the check would compare a value with itself. The
+ * invariant is therefore uniform — the define exists in a production build and nowhere else —
+ * and restoring symmetry between the two returns would reintroduce that notice.
+ *
+ * TWO CONFIGS, NOT ONE. `vite.config.js` returns EARLY for `command === 'serve'`, so each branch
+ * is a separate object and each is asserted here against its own contract. Both assertions first
+ * pin which branch they were handed (`server` versus `build`), so neither can pass vacuously if
+ * the factory's shape changes.
  *
  * THE QUOTING IS PINNED, not incidental. A `define` value is substituted as an EXPRESSION, so
  * `1.9.5` would be spliced in as arithmetic and `0.1.0` is a syntax error that fails the build.
@@ -54,39 +69,69 @@ async function configFor(buildVersion, command) {
   return mod.default({ command, mode: command === 'serve' ? 'development' : 'production' });
 }
 
-const COMMANDS = ['serve', 'build'];
+/**
+ * Resolve the `build` config and prove it is the tail return rather than the early `serve` one.
+ *
+ * @param {string|undefined} buildVersion The env value, or `undefined` to unset it.
+ * @returns {Promise<object>} The build config object.
+ */
+async function buildConfigFor(buildVersion) {
+  const config = await configFor(buildVersion, 'build');
+  assert.ok(config.build, 'the build config must be the branch carrying `build` options');
+  assert.ok(config.define, 'the build config must carry a define block');
+  return config;
+}
 
-for (const command of COMMANDS) {
-  test(`the ${command} config bakes FABRICATE_BUILD_VERSION as a JSON-quoted string`, async () => {
-    const config = await configFor('9.9.9-envtest', command);
-    assert.ok(config.define, `the ${command} config must carry a define block`);
-    assert.equal(config.define[DEFINE_NAME], '"9.9.9-envtest"');
-  });
+/**
+ * Resolve the `serve` config and prove it is the early return rather than the tail `build` one.
+ *
+ * @param {string|undefined} buildVersion The env value, or `undefined` to unset it.
+ * @returns {Promise<object>} The serve config object.
+ */
+async function serveConfigFor(buildVersion) {
+  const config = await configFor(buildVersion, 'serve');
+  assert.ok(config.server, 'the serve config must be the branch carrying `server` options');
+  assert.ok(!config.build, 'the serve config must not be the build branch');
+  return config;
+}
 
-  test(`the ${command} config falls back to the tracked module.json version`, async () => {
-    const config = await configFor(undefined, command);
-    assert.equal(config.define[DEFINE_NAME], JSON.stringify(TRACKED_VERSION));
-  });
+test('the build config bakes FABRICATE_BUILD_VERSION as a JSON-quoted string', async () => {
+  const config = await buildConfigFor('9.9.9-envtest');
+  assert.equal(config.define[DEFINE_NAME], '"9.9.9-envtest"');
+});
 
-  test(`the ${command} config treats an empty FABRICATE_BUILD_VERSION as unset`, async () => {
-    // An env var set to '' is how a shell passes "no value"; baking '' would make the runtime
-    // guard read a known-empty version and stay silent forever.
-    const config = await configFor('', command);
-    assert.equal(config.define[DEFINE_NAME], JSON.stringify(TRACKED_VERSION));
+test('the build config falls back to the tracked module.json version', async () => {
+  const config = await buildConfigFor(undefined);
+  assert.equal(config.define[DEFINE_NAME], JSON.stringify(TRACKED_VERSION));
+});
+
+test('the build config treats an empty FABRICATE_BUILD_VERSION as unset', async () => {
+  // An env var set to '' is how a shell passes "no value"; baking '' would make the runtime
+  // guard read a known-empty version and stay silent forever.
+  const config = await buildConfigFor('');
+  assert.equal(config.define[DEFINE_NAME], JSON.stringify(TRACKED_VERSION));
+});
+
+for (const [label, envValue] of [
+  ['set', '9.9.9-envtest'],
+  ['unset', undefined],
+  ['empty', ''],
+]) {
+  test(`the serve config defines no build version with FABRICATE_BUILD_VERSION ${label}`, async () => {
+    // The absence is the product requirement, not a gap: see the file header. A define here is
+    // inherited by every mounted suite (they start Vite on this repo root with no `configFile`)
+    // and makes the stale-entry notice fire against the View Lab shim's `0.0.0-viewlab`.
+    const config = await serveConfigFor(envValue);
+    assert.ok(
+      !Object.hasOwn(config.define ?? {}, DEFINE_NAME),
+      `the serve config must not define ${DEFINE_NAME}; the mounted harness loads this config`
+    );
+    assert.equal(config.define?.[DEFINE_NAME], undefined);
   });
 }
 
-test('both configs define the same value from one declaration', async () => {
-  // Pinned as a PAIR rather than twice over, because the defect being guarded is divergence:
-  // `serve` returns early, so the two returns are separate objects that can drift apart.
-  const serve = await configFor('9.9.9-pairtest', 'serve');
-  const build = await configFor('9.9.9-pairtest', 'build');
-  assert.equal(serve.define[DEFINE_NAME], build.define[DEFINE_NAME]);
-  assert.equal(build.define[DEFINE_NAME], '"9.9.9-pairtest"');
-});
-
 test('the baked value is a quoted string, never a bare expression', async () => {
-  const config = await configFor('1.9.5', 'build');
+  const config = await buildConfigFor('1.9.5');
   const baked = config.define[DEFINE_NAME];
   assert.ok(baked.startsWith('"') && baked.endsWith('"'), `must be JSON-quoted; got ${baked}`);
   // The real proof that it is substitutable: it parses as an expression on its own.

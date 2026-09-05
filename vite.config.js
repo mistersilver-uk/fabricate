@@ -43,8 +43,8 @@ function stripGlobalCss() {
 function resolveBuildVersion() {
   const fromEnv = process.env.FABRICATE_BUILD_VERSION;
   if (typeof fromEnv === 'string' && fromEnv !== '') return fromEnv;
-  // `npm run dev` and a bare `vite build` fall back to the tracked manifest, which is also what
-  // the module's installed version reads in dev — so the two agree and nothing is reported.
+  // A bare `vite build` falls back to the tracked manifest. Serve mode never reaches here: it
+  // declares no define at all (see the build return, which explains why).
   const manifest = JSON.parse(readFileSync(resolve(import.meta.dirname, 'module.json'), 'utf8'));
   return typeof manifest.version === 'string' ? manifest.version : '';
 }
@@ -72,16 +72,11 @@ export default defineConfig(({ command }) => {
     );
   }
 
-  // `define` SUBSTITUTES AN EXPRESSION, so the value has to be JSON.stringify'd: a bare 1.9.5
-  // would be spliced in as arithmetic and a bare 0.1.0 is a syntax error outright. Declared once
-  // and spread into BOTH returned configs below — the `serve` branch returns early, and a define
-  // present in only one of them is a define the other silently lacks.
-  const define = { __FABRICATE_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()) };
-
   if (command === 'serve') {
+    // NO `define` HERE. `__FABRICATE_BUILD_VERSION__` is a production-build value only; the build
+    // return below owns it and records why serve must never carry it.
     return {
       plugins,
-      define,
       server: {
         // PIN THE IPv4 ADDRESS. Vite's default host ('localhost') binds whichever single
         // address the OS resolves that name to — on Windows that is `[::1]`, leaving the IPv4
@@ -127,7 +122,23 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
-    define,
+    // BUILD ONLY, AND NOT AN OVERSIGHT. `define` SUBSTITUTES AN EXPRESSION, so the value has to be
+    // JSON.stringify'd: a bare 1.9.5 would be spliced in as arithmetic and a bare 0.1.0 is a syntax
+    // error outright.
+    //
+    // WHY THE `serve` RETURN ABOVE DECLARES NONE. `tests/helpers/extension-composition-harness.js`
+    // starts Vite with `createServer({ root: repoRoot, ... })` and NO `configFile`, so default
+    // config discovery loads THIS file and every mounted Svelte suite inherits whatever `serve`
+    // defines. Those suites install the View Lab Foundry shim, which reports `0.0.0-viewlab` as the
+    // installed version of any module, and they dispatch `ready` — so a baked version present in
+    // serve mode differs from the installed one and `src/main.js`'s stale-entry check fires a
+    // user-facing "reload to complete the update" notice on every mounted run. Serve mode has
+    // nothing to detect in the first place: `npm run dev` reads its installed version from the same
+    // tracked `module.json` this file falls back to, so the check would compare a value with
+    // itself. Keeping the identifier undeclared outside a build lets the `typeof` guard in
+    // `src/main.js` short-circuit, uniformly, in the dev server, the mounted harness and the
+    // screenshot lab alike. Do not restore the symmetry.
+    define: { __FABRICATE_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()) },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
