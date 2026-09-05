@@ -573,7 +573,7 @@ describe('the world essence entry editor buffers its edit until Save', () => {
       assert.deepEqual(
         notified,
         [
-          'Saving the active effect source did not complete; the name, icon, colour and description had already been saved. The requested Setting update was refused',
+          'Saving the active effect source did not complete; the shared identity fields had already been saved. The requested Setting update was refused',
         ],
         'ONE sentence, naming the step that stopped and the one that had landed durably before it — and the identity fragment is THIS editor’s field set, which carries its colour token'
       );

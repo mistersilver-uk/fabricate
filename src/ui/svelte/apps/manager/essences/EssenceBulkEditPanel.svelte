@@ -357,8 +357,18 @@
   </div>
 
   {#if worldOwnsColour}
-    <!-- THE WITHHELD AXIS, STATED IN PLACE. See the header note: the world catalogue owns this
-         essence's colour and the read overlay would hide anything written here. -->
+    <!-- THE WITHHELD AXIS, STATED IN PLACE AND UNDER ITS OWN HEADING. See the header note: the
+         world catalogue owns this essence's colour and the read overlay would hide anything
+         written here.
+
+         THE HEADING STAYS (issue 1371 r21-store4, the UX designer's round-7 note). Withholding
+         the control is not withholding the AXIS: the rail reads Icon / Colour / Status, and
+         dropping the label left a bare note floating between two headed sections, so a GM
+         scanning the rail could not tell whether the panel had a colour axis at all. It is the
+         same `BulkEditSection` the offered branch renders, with the note where its control
+         would be — the section heading emits siblings rather than wrapping, so "in its body" is
+         the next flex item. -->
+    <BulkEditSection label={text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')} />
     <Callout
       tone="info"
       text={text(

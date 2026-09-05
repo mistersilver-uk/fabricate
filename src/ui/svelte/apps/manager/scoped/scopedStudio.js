@@ -196,22 +196,67 @@ const SAVE_STEP_FRAGMENT = Object.freeze({
  * its name alone. A GM told "the name, icon, colour and description did not save" on a screen
  * that never buffered a colour has been told something false.
  *
+ * ── THE FRAGMENTS CARRY NO COMMAS (issue 1371 r21-store4, the UX designer's round-7 note) ────
+ * Every fragment is an ITEM in a list the sentence below joins, so a fragment that is itself a
+ * comma-separated list makes the join unreadable: "the name, art and description, the world
+ * category had already been saved" reads as three or four things, and the reader cannot see
+ * where one landed step ends and the next begins. The two enumerating labels are therefore
+ * stated as the FIELD SET rather than the field list; the per-type keys stay, so a translation
+ * may still differentiate, and the tool's "the name" is already a single item and is unchanged.
+ * That also keeps the property the enumeration existed for: naming no field cannot name one the
+ * screen never buffered.
+ *
  * @type {Readonly<Record<string, {key: string, label: string}>>}
  */
 const SAVE_IDENTITY_FRAGMENT = Object.freeze({
   component: Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Save.StepComponentIdentity',
-    label: 'the name, art and description',
+    label: 'the shared identity fields',
   }),
   essence: Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Save.StepEssenceIdentity',
-    label: 'the name, icon, colour and description',
+    label: 'the shared identity fields',
   }),
   tool: Object.freeze({
     key: 'FABRICATE.Admin.Manager.Scoped.Save.StepToolIdentity',
     label: 'the name',
   }),
 });
+
+/**
+ * Join the landed steps as a LIST, in the GM's own language.
+ *
+ * `Intl.ListFormat` is the one localization decision this module makes, and it is here rather
+ * than at the three callers because what they supply is `format` — a key/fallback interpolator
+ * that receives an already-joined string and cannot see the items. A bare `', '` join said
+ * "a, b" where every language this ships in says "a and b", and the sentence reads as a run-on
+ * the moment there is more than one landed step.
+ *
+ * THE LANGUAGE IS FOUNDRY'S, NOT THE RUNTIME'S. `game.i18n.lang` is the setting a GM chose;
+ * `Intl`'s default is the browser's, which is routinely a different one. It is REFERENCED
+ * through `globalThis` and optional-chained, never imported, so this module still runs in a
+ * hand-rolled mounted tree with no `game` at all.
+ *
+ * THE FALLBACK IS THE ENGLISH SHAPE rather than the comma join it replaces, so a runtime with
+ * no `Intl.ListFormat` degrades to a readable sentence instead of the defect this closes.
+ *
+ * @param {string[]} items already-localized fragments.
+ * @returns {string}
+ */
+function joinLandedSteps(items) {
+  if (items.length < 2) return items[0] ?? '';
+  let lang;
+  try {
+    lang = globalThis.game?.i18n?.lang;
+  } catch {
+    lang = undefined;
+  }
+  try {
+    return new Intl.ListFormat(lang || 'en', { style: 'long', type: 'conjunction' }).format(items);
+  } catch {
+    return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+  }
+}
 
 /**
  * Every step name a refused Save can report a fragment for, for the mirror guard that keeps this
@@ -269,7 +314,7 @@ export function reportRefusedScopedEntrySave({
   };
   const data = {
     section: named(step),
-    landed: landed.map(named).join(', '),
+    landed: joinLandedSteps(landed.map(named)),
     error: error?.message ? String(error.message) : '',
   };
   notify(

@@ -552,20 +552,47 @@ describe('the refused-save sentence', () => {
     );
   });
 
-  it('names the IDENTITY patch with the fields THIS editor buffers, which differ per entity type', () => {
+  it('names the IDENTITY patch per entity type, and names NO field it cannot promise', () => {
     // A GM told "the name, icon, colour and description did not save" on the tool entry — which
     // buffers its name alone — has been told something false, so the identity fragment is per
-    // entity type rather than one sentence for all three.
+    // entity type rather than one sentence for all three. The two enumerating labels became the
+    // FIELD SET at r21-store4 (UX round 7): every fragment is an item in the list the landed
+    // clause joins, so a fragment that is itself a comma list makes the join unreadable.
     const identity = { step: SCOPED_ENTRY_IDENTITY_STEP, error: new Error('refused'), landed: [] };
     assert.deepEqual(sentenceFor(identity, 'component'), [
-      'Saving the name, art and description did not complete. refused',
+      'Saving the shared identity fields did not complete. refused',
     ]);
     assert.deepEqual(sentenceFor(identity, 'essence'), [
-      'Saving the name, icon, colour and description did not complete. refused',
+      'Saving the shared identity fields did not complete. refused',
     ]);
     assert.deepEqual(sentenceFor(identity, 'tool'), [
       'Saving the name did not complete. refused',
     ]);
+    for (const entityType of ['component', 'essence', 'tool']) {
+      assert.ok(
+        !sentenceFor(identity, entityType)[0].split(' did not complete')[0].includes(','),
+        `the ${entityType} identity fragment carries no comma of its own`
+      );
+    }
+  });
+
+  it('joins SEVERAL landed steps as a list, not with a bare comma', () => {
+    // UX round 7. Three landed steps read "a, b, c had already been saved", which is a run-on the
+    // moment any fragment carries a comma — and reads as a list of clauses rather than of things
+    // even when none does. `Intl.ListFormat` says what the GM's own language says.
+    assert.deepEqual(
+      sentenceFor(
+        {
+          step: 'aliases',
+          error: new Error('refused'),
+          landed: [SCOPED_ENTRY_IDENTITY_STEP, 'category', 'tags'],
+        },
+        'component'
+      ),
+      [
+        'Saving the import aliases did not complete; the shared identity fields, the world category, and the world tags had already been saved. refused',
+      ]
+    );
   });
 
   it('EVERY section a scope descriptor declares has a fragment, so no sentence can name a raw key', () => {

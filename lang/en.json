@@ -6253,8 +6253,8 @@
           "Save": {
             "Failed": "Saving {section} did not complete. {error}",
             "FailedAfter": "Saving {section} did not complete; {landed} had already been saved. {error}",
-            "StepComponentIdentity": "the name, art and description",
-            "StepEssenceIdentity": "the name, icon, colour and description",
+            "StepComponentIdentity": "the shared identity fields",
+            "StepEssenceIdentity": "the shared identity fields",
             "StepToolIdentity": "the name",
             "StepCategory": "the world category",
             "StepEssences": "the world essence values",

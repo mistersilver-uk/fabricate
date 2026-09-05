@@ -542,6 +542,14 @@ describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalo
       note.textContent.includes('Essence Catalogue'),
       'and it names where the colour is edited instead'
     );
+    // AND THE AXIS KEEPS ITS HEADING (issue 1371 r21-store4). Withholding the control is not
+    // withholding the axis: the rail reads Icon / Colour / Status, and a bare note between two
+    // headed sections left a GM unable to tell whether the panel had a colour axis at all.
+    assert.deepEqual(
+      [...root.querySelectorAll('.fab-bulk-edit-label')].map((label) => label.textContent.trim()),
+      ['Icon', 'Colour', 'Status'],
+      'the rail still reads Icon / Colour / Status, with the note where the control would be'
+    );
     // NON-VACUITY: the two axes this panel still owns are untouched.
     assert.ok(root.querySelector('[data-essence-bulk-icon-reset]'), 'the Icon axis stays');
     assert.ok(root.querySelector('[data-essence-bulk-status]'), 'and the Status axis stays');
