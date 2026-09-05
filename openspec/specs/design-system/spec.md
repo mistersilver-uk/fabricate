@@ -127,6 +127,15 @@ A component that portals a panel out of its own root needs one class on each, be
 Where two components render one class family between them, the family's roots are the union of theirs, and a class both of them paint is written at both roots.
 
 Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+
+A caller MAY carry its OWN family on the primitive's elements through DECLARED CLASS PROPS, and the family is still rooted at a class the PRIMITIVE writes into the DOM, using the value the caller supplies.
+The guarantee above is therefore unchanged, and the gate reads a declared class prop as EMISSION: what moved is which file holds the string, not whether it is rendered.
+A declared class prop is checked against the component it is PASSED TO rather than the component that passes it, so a renamed prop on the primitive reds rather than leaving the gate reading a value the framework discards.
+
+The CASCADE forces a corollary.
+A caller rule that must out-rank the primitive's own is deepened at the CALLER's own namespace roots.
+It is never deepened by putting the primitive's root in front of the caller's class, which is an application root from the caller's point of view and is refused.
+A PRIMITIVE-owned rule may DOUBLE the primitive's own root for the same purpose, because that root is its own.
 The three most-imported controls satisfy it too: `ManagerButton` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
 None of the three portals anything, so each needs one root, and each writes it on the element that already carries the family class — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
@@ -392,6 +401,13 @@ A leading inset bar is a single-select affordance and MUST NOT be drawn on a lis
 So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
 Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
 
+A KEYBOARD CURSOR is a fourth state and takes a different CHANNEL rather than a fourth fill rung.
+The three fill rungs are exhausted by a listbox that also marks a current value — rest, hover, and the marked row — and a row can be the cursor AND the marked value AND hovered at once, so a fill would either invent a rung or erase the selected face on the row that most needs both.
+The cursor is `outline: 2px solid var(--fab-accent)` at a NEGATIVE offset, which composes over any fill instead of replacing it and is told apart from the module's focus ring by the SIGN of the offset.
+
+A COROLLARY a reviewer must be able to check: a translucent token's RENDERED colour is a function of its backdrop, so moving a surface between background rungs changes every translucent declaration on it even when the declaration is retained verbatim.
+An adoption that moves a panel MUST enumerate them, and a retained declaration whose composited colour has moved is a licensed change rather than an unchanged one.
+
 #### Scenario: A multi-select list marks the rows a GM has chosen
 
 - **WHEN** a list lets more than one row be selected at once
@@ -452,6 +468,15 @@ A listbox MUST keep DOM focus on ONE element and drive selection with `aria-acti
 A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
 Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
+This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
+The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at five shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
+Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
+An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
+The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
+Each option row therefore ALSO carries the keyboard-focus attribute, because a `tabindex="-1"` non-form element is exactly the case above and a formless button answers `hasFocus` false.
+There is a SECOND, independent reason the pointer path suppresses focus, and both are stated because either alone reads as defensive: the module root rings any focused `[tabindex]` descendant, so a row that took focus would draw a competing outline at a POSITIVE offset against the keyboard cursor's inset one.
+The cursor index and the option ids are defined over the FLAT RENDERED order, so a grouped list cannot emit duplicate ids and `aria-activedescendant` cannot be ambiguous.
+A typeahead COMBOBOX and a multi-select CHECKLIST are not this widget and are adjudicated as non-members below.
 
 A floating surface MUST be portalled to the NEAREST application root of the element that opens it, resolved by walking UP from that element rather than by naming a root, and positioned by measurement, flip and clamp against that same element's box.
 Core clips at `.window-content` and the manager adds further clipping boundaries, so a CSS offset cannot escape them; `document.body` is NOT a valid portal target because it loses window stacking.
@@ -593,6 +618,13 @@ The picker MUST name both surfaces it renders.
 The portaled panel and the option list inside it take one accessible name from the caller, so a caller that omits it produces a dialog with no name wrapping a list with no name.
 Neither is visible in a frame, neither is a compiler error and no lint rule covers it, so the naming obligation is enforced at the source.
 
+There is a THIRD NAMING ROUTE for the trigger, and it exists because a caller that supplies a trigger SNIPPET renders its own button and the primitive renders none.
+Such a caller does not name the trigger through the primitive's label prop; it names it on the element it spreads the primitive's attributes onto.
+A MECHANICAL HAZARD makes this more than a convention: the caller spreads the primitive's attributes LAST so the primitive's contract cannot be overridden, and Svelte REMOVES an attribute whose spread value is `undefined`.
+So the primitive MUST omit undefined-valued keys from the object it hands a snippet, and MUST ADDITIONALLY omit the disabled pair, because `false` is not undefined and would silently re-enable a control the caller disabled.
+Without both halves the spread erases the very name this clause requires and re-arms a trigger mid-save.
+The gate therefore reads the SOURCE route AND a mounted assertion of the rendered name and disabled state, because a source read alone would pass over a nameless, enabled DOM.
+
 A control that resembles the picker MUST be adjudicated against it by its WIDGET rather than by its markup, and the verdict MUST be recorded with the measurement that produced it.
 Three families are adjudicated NON-MEMBERS and are recorded in `scripts/lib/designSystemPrimitives.json`:
 
@@ -607,6 +639,10 @@ It toggles membership, stays open across choices and marks several options selec
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
 It has been adopted: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which is the shipped surface the unscoping and the portal-host resolver are now proved by rather than merely permitted for.
+
+`IconPicker` and `EssenceSourceSelector` render THROUGH the shared picker and are no longer look-alikes.
+Each keeps its own TRIGGER through a snippet and its own CLASS FAMILY through declared class props, and the family is preserved rather than folded for a measured reason: the View Lab case registry's own walk, the live Foundry smoke and about thirty assertions address those trigger classes by name, so a rename would edit all three to change nothing a GM sees and belongs to the family-rename change instead.
+Which specimen capabilities remain UNBUILT is recorded with the measurement that says so: an async source, its loading and error states, and multi-select have ZERO shipped callers, and the checklist that would use multi-select is already an adjudicated non-member above.
 A primitive that has cleared this bar BELONGS in the shared directory, and the picker was moved into `src/ui/svelte/components/` at issue 1500 to say so; a shared primitive left under one application's directory tells every reader, and the View Lab's broad-signal routing, that it is that application's component.
 The bar runs the other way too, and moved out of the same directory in the same change: a 506-line screen region with one caller is not a shared component, whichever primitives it reuses.
 
