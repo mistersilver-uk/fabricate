@@ -24,6 +24,11 @@
   the 28px arrow box) and five IconButton rules (the shared base block plus the `font:
   inherit` issue 1502 adds to it, `:disabled`, `:hover`, the 34px box, and the glyph rule).
 
+  It also declares its own focus PAIR for the BUTTONS it contains: a `:focus` strip and a
+  `:focus-visible` repaint at `fabricate.css:5616` and `:5634`. Buttons only, deliberately —
+  the sheet comment above those rules says why an `:is(button, select)` form would delete the
+  player app's inset select ring.
+
   Issue 1502 preserves the frame; it does not adopt the primitive's paint. Issues 1503 and
   1504 are where that adoption is decided, with their own visual review. (Written without a
   leading hash: `tests/components/theme-colour-contract.test.js` reads a four-digit issue

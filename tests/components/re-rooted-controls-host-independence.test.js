@@ -218,7 +218,7 @@ const COMPARED = Object.freeze([
  * a measured fact rather than a convenience.
  *
  * The button families declare `box-sizing: border-box` on their own shared base rule
- * (`fabricate.css:13496`), so the comparison is live for them and reds if that declaration goes.
+ * (`fabricate.css:13529-13530`), so the comparison is live for them and reds if that declaration goes.
  * `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather than a
  * value the family owns: in the manager it picks `border-box` up from
  * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`), a UNIVERSAL rule that is the

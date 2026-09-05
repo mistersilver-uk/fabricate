@@ -52,7 +52,7 @@
   pager gives it (`:13782`) and its own focus pair, the `:focus` strip at `:13756` and
   the `:focus-visible` repaint at `:13769` — and a scoped block here would be a second
   source of truth for the same control and would begin to disagree with the sheet.
-  Those four are LOCATORS: the sheet is 20k lines and every number in it rots, so find
+  Those five are LOCATORS: the sheet is 20k lines and every number in it rots, so find
   them by selector.
 
   It USED to be a MANAGER primitive as well as a manager-shaped one: every one of those
