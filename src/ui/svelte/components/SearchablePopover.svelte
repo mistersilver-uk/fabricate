@@ -787,16 +787,75 @@
     return true;
   }
 
+  /** The four keys that OPEN a closed select-only combobox and land the cursor somewhere. */
+  const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
+
+  /**
+   * THE OPENING KEYS OF A CLOSED TRIGGER, which a native `<select>` answered and this did not.
+   *
+   * ── WHAT WAS MISSING ──────────────────────────────────────────────────────────────────────
+   * Issue 1504's closed branch specified the type-ahead half only, and `typeAheadCursor` refuses
+   * anything that is not a printable character — so on a focused, closed trigger `ArrowDown`,
+   * `ArrowUp`, `Home`, `End` and `Alt+ArrowDown` did nothing AND were not consumed, leaving the
+   * browser's own scroll to run. The `<select>` each converted site replaced answered `ArrowDown`
+   * by changing its value. This is the WAI-ARIA select-only combobox's version of that: the keys
+   * OPEN the panel and move an ACTIVE OPTION, so the value is still only committed by `Enter` or
+   * a click and every dismissal path leaves it untouched.
+   *
+   * ── WHY THE CURSOR IS SEEDED HERE AND NOT LEFT AT THE SENTINEL ────────────────────────────
+   * A click or `Enter` opens with NO active row on purpose (issue 1503): the GM has said "show me
+   * the list", not "move me through it". A GM who presses `ArrowDown` has said the second thing,
+   * so the key that opened the panel also names where the cursor lands — `nextActiveIndex` from
+   * the `-1` sentinel answers all four, skipping a gated row at either end, so no arithmetic is
+   * added and `util/listboxNavigation.js` is untouched. `Alt+ArrowDown` is the exception the
+   * pattern names: it opens the panel WITHOUT moving anything, which is how a keyboard user looks
+   * at the options without disturbing the value's neighbourhood.
+   *
+   * `Ctrl`, `Meta` and `Shift` are refused outright, and `Alt` is refused everywhere except that
+   * one pairing — the same rule the open branch's modifier guard states, and for the same reason:
+   * a modified press is the platform's or the caller's, never this widget's.
+   *
+   * @param {KeyboardEvent} event the keypress on a CLOSED trigger holder.
+   * @returns {boolean} true when the key opened the panel and was consumed.
+   */
+  function openingKeyOwns(event) {
+    if (showSearch) return false;
+    // The refusal `toggle()` and the type-ahead both make. A `triggerAriaDisabled` trigger is
+    // focusable precisely so a capped control stays reachable, so it is a button that HAS focus
+    // and refuses to open; an opening key must not be the one route around that.
+    if (disabled || triggerAriaDisabled) return false;
+    if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const altOpen = event.altKey && event.key === 'ArrowDown';
+    if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return false;
+    event.preventDefault();
+    // OPEN FIRST, then stamp — the same ordering the type-ahead states: the generation reads
+    // `open`, so a stamp taken before the panel opened would be stale in the very pass that was
+    // supposed to set it.
+    open = true;
+    if (altOpen) return true;
+    const landing = nextActiveIndex(-1, renderedOptions.length, event.key, {
+      columns: gridColumns,
+      isDisabled: optionIsDisabled,
+    });
+    // `null` is an empty or wholly gated list: the panel still opens, on its own empty branch or
+    // with nothing to arrow to, and the cursor stays at the sentinel rather than naming a row.
+    if (landing !== null) cursor = { generation: optionListGeneration, index: landing };
+    return true;
+  }
+
   // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
   // which keys are CONSUMED, and what Enter chooses. A key the module does not own returns `null`
   // and is left entirely alone, which is what keeps every printable character going to the query
   // field. Escape is not handled here: `dismissOnOutsideClick` on the picker root takes it at the
   // document's capture phase, which is the only place that reaches the inline search shape.
   function onHolderKeydown(event) {
-    // A CLOSED PANEL HAS ONE KEY, and it is the type-ahead's (issue 1504). This runs only from
-    // the TRIGGER, which is the holder in the search-suppressed shape and the only element that
-    // exists while the panel is shut — a query field cannot receive a key it is not rendered for.
+    // A CLOSED PANEL HAS TWO KEY FAMILIES, and both are issue 1504's: the keys that OPEN it, and
+    // the type-ahead. This runs only from the TRIGGER, which is the holder in the search-
+    // suppressed shape and the only element that exists while the panel is shut — a query field
+    // cannot receive a key it is not rendered for. The opening keys are asked first because they
+    // are exact key names while the type-ahead reads any printable character.
     if (!open) {
+      if (openingKeyOwns(event)) return;
       typeAheadOwnsKey(event);
       return;
     }

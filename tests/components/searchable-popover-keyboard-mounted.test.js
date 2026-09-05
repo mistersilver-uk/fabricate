@@ -617,6 +617,77 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
   // A native `<select>` jumps to the option a typed character names, and a GM who tabs to a page
   // size control and types `2` today gets 25 rows. The arithmetic is proved against the pure
   // module in `tests/util/listbox-navigation.test.js`; what only a mount can show is the WIRING,
+  describe('the opening keys of a CLOSED trigger holder', () => {
+    /** The search-suppressed shape, focused, panel shut — the state a GM tabs into. */
+    async function mountClosedHolder(props = {}) {
+      chosen.length = 0;
+      await mountPicker({
+        options: TIERS,
+        showSearch: false,
+        triggerHasPopup: 'listbox',
+        ...props,
+      });
+      trigger().focus();
+      return trigger();
+    }
+
+    it('opens the panel on ArrowDown with the first row active', async () => {
+      const button = await mountClosedHolder();
+      assert.equal(button.getAttribute('aria-expanded'), 'false', 'the panel starts shut');
+
+      const pressed = pressKey('ArrowDown');
+      await settle();
+
+      assert.ok(pressed.defaultPrevented, 'the key is the listbox`s rather than the page`s scroll');
+      assert.equal(button.getAttribute('aria-expanded'), 'true');
+      const opened = harness.target.querySelector('.fabricate-picker-popover');
+      assert.ok(Boolean(opened), 'and the panel is really rendered');
+      assert.equal(
+        activeDescendant(button),
+        optionRows(opened)[0].id,
+        'the key that opened the panel also says where the cursor lands'
+      );
+      assert.deepEqual(chosen, [], 'and it chooses nothing');
+      harness.remount();
+    });
+
+    it('leaves DOM focus on the trigger it opened from', async () => {
+      const button = await mountClosedHolder();
+
+      pressKey('ArrowDown');
+      await settle();
+
+      assert.equal(
+        button.getAttribute('aria-expanded'),
+        'true',
+        'the panel opened, or the focus claim below is about a control that did nothing'
+      );
+      // The holder does not change because the panel opened from a key rather than a click: the
+      // search-suppressed shape renders no field for focus to move into, and a row must never
+      // take it. Asserted as a boolean, never as a node — see this file's own note on why.
+      assert.ok(
+        document.activeElement === button,
+        'the trigger is still the holder, and no row took DOM focus'
+      );
+      harness.remount();
+    });
+
+    it('does not answer an opening key in the SEARCH shape', async () => {
+      // The 17 callers that render a query field are untouched: with a field rendered the trigger
+      // is not the holder, and this branch must stay the search-suppressed shape's alone.
+      chosen.length = 0;
+      await mountPicker({ options: TIERS });
+      trigger().focus();
+
+      const pressed = pressKey('ArrowDown');
+      await settle();
+
+      assert.ok(!pressed.defaultPrevented, 'nothing consumed it');
+      assert.equal(trigger().getAttribute('aria-expanded'), 'false', 'and nothing opened');
+      harness.remount();
+    });
+  });
+
   // and the CLOSED trigger is the primary case because it is the branch nobody has written: the
   // trigger had no key handling at all before issue 1503 routed keys to it.
   describe('the type-ahead, whose primary case is a CLOSED trigger', () => {
