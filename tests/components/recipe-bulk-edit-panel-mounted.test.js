@@ -29,6 +29,12 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/utils/recipeBulkEditModel.js';
+import {
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -65,6 +71,11 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // The shared set-delete card and the armed control inside it (issue 1132). Both are
     // STATIC imports of the panel, so the closure validator throws on an omission.
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
@@ -166,7 +177,12 @@ async function mountPanel(props = {}) {
 }
 
 const applyButton = (root) => root.querySelector('[data-recipe-bulk-apply]');
-const tierSelect = (root) => root.querySelector('[data-recipe-bulk-check-tier]');
+const TIER_HOOK = '[data-recipe-bulk-check-tier]';
+const tierSelect = (root) => root.querySelector(TIER_HOOK);
+/** The value the shared control stamps on the empty-string sentinel's row. */
+const UNCHANGED_OPTION_ID = '__unchanged__';
+/** The value the trigger currently shows, which is a LABEL now rather than an option value. */
+const tierLabel = (root) => selectTriggerText(root, TIER_HOOK);
 
 // ── The book axis ────────────────────────────────────────────────────────────────
 const bookTrigger = (root) => root.querySelector('.fab-bulk-book-trigger');
@@ -257,10 +273,20 @@ function chooseSegment(root, axis, value) {
   flushSync();
 }
 
-function chooseOption(select, value) {
-  select.value = value;
-  select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-  flushSync();
+/**
+ * Choose a value on a converted `<Select>` (issue 1504).
+ *
+ * `root` rather than the control, because the panel of rows is PORTALED out of the trigger's
+ * subtree onto the nearest application root — which in a mounted suite is the harness's own
+ * mount target. Reaching for a row through the trigger's container finds nothing.
+ *
+ * @param {HTMLElement} root The harness mount target.
+ * @param {string} hook The control's own `data-*` hook, which rides across the conversion.
+ * @param {string} value The option's value; the sentinel's is the empty string.
+ * @returns {void}
+ */
+function chooseOption(root, hook, value) {
+  chooseSelectOption(root, hook, value === '' ? UNCHANGED_OPTION_ID : value);
 }
 
 before(async () => {
@@ -815,33 +841,90 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
   it('round-trips the three distinct instructions without collapsing two of them', async () => {
     const { root, state } = await mountPanel();
 
-    assert.equal(tierSelect(root).value, '', 'a fresh draft leaves the axis unstaged');
+    // THE TRIGGER STATES A LABEL, NOT A VALUE (issue 1504). The control is a `<Select>` whose
+    // trigger renders the chosen option's label, so what a GM reads is `Leave unchanged` where
+    // a native `<select>`'s `.value` read `''`. The staged VALUE is asserted on the draft
+    // beside it, which is the fact this case is actually about.
+    assert.equal(tierLabel(root), 'Leave unchanged', 'a fresh draft leaves the axis unstaged');
     assert.equal(state.draft.checkTierStaged, false);
 
-    chooseOption(tierSelect(root), '__default__');
+    chooseOption(root, TIER_HOOK, '__default__');
     assert.equal(state.draft.checkTierStaged, true, 'Default DC is a REAL instruction');
     assert.equal(state.draft.checkTierId, null);
-    assert.equal(tierSelect(root).value, '__default__', 'and the control shows it');
+    assert.equal(tierLabel(root), 'Default DC', 'and the control shows it');
     assert.equal(applyButton(root).disabled, false);
 
-    chooseOption(tierSelect(root), 'tier-easy');
+    chooseOption(root, TIER_HOOK, 'tier-easy');
     assert.equal(state.draft.checkTierId, 'tier-easy');
-    assert.equal(tierSelect(root).value, 'tier-easy');
+    assert.equal(tierLabel(root), 'Easy (DC 8)');
 
-    chooseOption(tierSelect(root), '');
+    chooseOption(root, TIER_HOOK, '');
     assert.equal(state.draft.checkTierStaged, false, 'back to leave-alone, not to Default DC');
     assert.equal(applyButton(root).disabled, true);
   });
 
   it('renders a tier as {name} (DC {dc}), falling back to Unnamed tier', async () => {
     const { root } = await mountPanel();
-    const labels = [...tierSelect(root).querySelectorAll('option')].map((o) => o.textContent);
-    assert.deepEqual(labels, [
-      'Leave unchanged',
-      'Default DC',
-      'Easy (DC 8)',
-      'Unnamed tier (DC 18)'
-    ]);
+    // Read off the OPEN panel's rows, and with each row's HINT stripped: issue 1504 groups this
+    // list and gives its two instructions a second line each, so a row's whole text is now
+    // `label + hint` rather than the label alone.
+    const HINT_JOIN = / (?:Every|Clears) .*$/;
+    assert.deepEqual(
+      selectOptionLabels(root, TIER_HOOK).map((text) => text.replace(HINT_JOIN, '')),
+      ['Leave unchanged', 'Default DC', 'Easy (DC 8)', 'Unnamed tier (DC 18)']
+    );
+  });
+
+  it('groups the two instructions above the authored tiers, and hints each of them', async () => {
+    // THE ONE LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY (issue 1504). `Leave unchanged`
+    // and `Default DC` are INSTRUCTIONS and the rest are the system's authored tiers, so the
+    // list takes the design's grouped shape rather than running all four together and leaving a
+    // GM to infer which two are verbs. First-appearance order is what puts the instructions on
+    // top with no second prop to say so.
+    const { root } = await mountPanel();
+    const panel = openSelectPanel(root, TIER_HOOK);
+
+    const headings = [...panel.querySelectorAll('.manager-travel-popover-group-label')].map(
+      (heading) => heading.textContent.trim()
+    );
+    assert.deepEqual(
+      headings,
+      ['Instructions', 'Authored tiers'],
+      'two localized headings, instructions first — the group VALUE is the heading TEXT, which ' +
+        'is why nothing may key off `data-popover-group`'
+    );
+
+    const buckets = [...panel.querySelectorAll('[data-popover-group]')].map((bucket) =>
+      [...bucket.querySelectorAll('[role="option"]')].map((row) =>
+        row.getAttribute('data-popover-option')
+      )
+    );
+    assert.deepEqual(
+      buckets,
+      [['__unchanged__', '__default__'], ['tier-easy', 'tier-unnamed']],
+      'the two instructions are one bucket and the authored tiers the other'
+    );
+
+    const hints = [...panel.querySelectorAll('[role="option"]')].map(
+      (row) => row.querySelector('.fabricate-select-hint')?.textContent?.trim() ?? ''
+    );
+    assert.deepEqual(
+      hints,
+      [
+        'Every selected recipe keeps the tier it has.',
+        "Clears every selected recipe to the system's default DC.",
+        '',
+        '',
+      ],
+      'each INSTRUCTION carries its own second line, and a tier carries none — a tier says ' +
+        'what it is in its own label'
+    );
+
+    assert.ok(
+      panel.className.split(/\s+/).includes('fabricate-select-popover-ticked'),
+      'and the tick column is KEPT here, against the two category axes, because the trigger`s ' +
+        'label alone cannot tell an instruction from a tier'
+    );
   });
 
   // One case per `describeRecipeCheckTierAxis` reason. The panel STATES which case it is

@@ -26,7 +26,7 @@ import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js
 // second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
 // getting it wrong reports as `# cancelled`, never `# fail` (issue 1185). It is also the exact
 // near-identical `tests/**` block SonarCloud's new-code duplication gate counts.
-import { rewriteClientImports } from '../helpers/svelte-component-harness.js';
+import { SEARCHABLE_POPOVER_RAW_MODULES, rewriteClientImports } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
@@ -51,6 +51,14 @@ import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComp
 // world corpus on every trigger — which a fake store would assert about itself.
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
+// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
+// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
+// lookup is therefore rooted on the mount target and not on the control's own container.
+import {
+  chooseSelectOption,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -305,6 +313,17 @@ function compileManagerRoot() {
   // theirs in parallel with no ordering between them, so each adds all three idempotently. A
   // duplicate is a one-minute textual conflict; an omission is a silent hang somebody bisects.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte');
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+    const rawDestination = join(tempRoot, rawModule);
+    mkdirSync(dirname(rawDestination), { recursive: true });
+    writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
+  }
+  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+  // composes. A module missing from a manifest does not fail this suite — it is reported as
+  // `# cancelled`, never `# fail`.
+  writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
@@ -7902,9 +7921,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    const size = target.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-pagination-size]', 10);
     await tick();
     flushSync();
     target.querySelector('[data-pagination-next]').click();
@@ -8518,9 +8535,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
 
-    const pageSize = pagination.querySelector('[data-pagination-size]');
-    pageSize.value = '6';
-    pageSize.dispatchEvent(new Event('change', { bubbles: true }));
+    // Rooted on `target` rather than on `pagination`: the panel is portaled out of the pager's
+    // subtree onto the manager root, so a `pagination`-rooted lookup matches nothing.
+    chooseSelectOption(target, '[data-pagination-size]', 6);
     await tick();
     flushSync();
 
@@ -9459,10 +9476,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     target.querySelector('[data-bulk-tag="herb"]').click();
     flushSync();
-    const categorySelect = target.querySelector('[data-component-bulk-category]');
-    categorySelect.value = 'Reagent';
-    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(target, '[data-component-bulk-category]', 'Reagent');
 
     target.querySelector('[data-component-bulk-apply]').click();
     await tick();
@@ -19252,9 +19266,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Selecting 9 fits all seven components on a single page. The per-page selector must
     // survive so the user can still switch back — the prev/next nav is the only part that
     // should disappear once there is a single page.
-    const select = sizeSelect();
-    select.value = '9';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-pagination-size]', 9);
     await tick();
     flushSync();
     assert.equal(
@@ -19266,7 +19278,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       sizeSelect(),
       'per-page selector must remain visible when the chosen size fits everything on one page'
     );
-    assert.equal(sizeSelect().value, '9', 'per-page selector should reflect the chosen page size');
+    // THE CONTROL STATES ITS VALUE AS A LABEL NOW (issue 1504). A native `<select>` carried it in
+    // `.value`; the converted trigger renders the chosen option's label, so what a GM reads is
+    // `9` as text rather than `9` as an attribute.
+    assert.equal(
+      selectTriggerText(target, '[data-pagination-size]'),
+      '9',
+      'per-page selector should reflect the chosen page size'
+    );
     assert.equal(
       footer.querySelector('[data-pagination-next]'),
       null,
@@ -19274,9 +19293,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     // Recoverability: the surviving selector still works to reduce the page size again.
-    const restore = sizeSelect();
-    restore.value = '6';
-    restore.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-pagination-size]', 6);
     await tick();
     flushSync();
     assert.equal(
@@ -25831,14 +25848,18 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     /** Stage the first real option of a bulk category select, so Apply becomes live. */
     function stageFirstCategory(attribute) {
-      const select = target.querySelector(`[${attribute}]`);
-      const option = Array.from(select.options).find((candidate) => candidate.value);
+      // ISSUE 1504: the axis is a shared `<Select>`, so the offered values are rows in a
+      // PORTALED panel rather than `<option>`s inside the control. The sentinel's row is the
+      // one with the declared `__unchanged__` handle, so "the first real category" is the first
+      // row that is not it — which is what this used to mean by "the first option with a value".
+      const values = selectOptionValues(target, `[${attribute}]`).filter(
+        (value) => value !== '__unchanged__'
+      );
       assert.ok(
-        Boolean(option),
+        values.length > 0,
         `[${attribute}] offers nothing but "leave unchanged", so nothing can be staged through it`
       );
-      select.value = option.value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, `[${attribute}]`, values[0]);
     }
 
     const REGION = '[data-manager-bulk-selection-announce]';

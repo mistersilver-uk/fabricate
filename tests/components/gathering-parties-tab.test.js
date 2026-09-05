@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
+// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
+// a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
+// harness's own mount target, which is why every lookup below is rooted there.
+import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -16,6 +23,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-parties-tab-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
@@ -33,6 +42,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
@@ -200,10 +214,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     flushSync();
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 3 of 5/);
 
-    const select = root.querySelector('[data-pagination-size]');
-    select.value = '6';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 6);
 
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
     assert.equal(
@@ -245,13 +256,10 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('offers exactly 3/6/9 per page and defaults to 3', async () => {
     const root = await mountTab({ parties: makeParties(9) });
-    const select = root.querySelector('[data-pagination-size]');
-    // Counted, not merely present: the select renders unconditionally, so a presence
-    // assertion cannot fail.
-    assert.deepEqual(
-      Array.from(select.querySelectorAll('option')).map((option) => option.value),
-      ['3', '6', '9']
-    );
+    // Counted, not merely present: the control renders unconditionally, so a presence
+    // assertion cannot fail. Read off the OPEN panel's rows, which is where the offered
+    // values live now.
+    assert.deepEqual(selectOptionValues(root, '[data-pagination-size]'), ['3', '6', '9']);
     assert.equal(cards(root).length, 3);
   });
 
@@ -291,10 +299,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
     // A page CHANGE would unmount the keyed cards and close both incidentally; a page
     // SIZE change keeps them mounted, so it is the only case that proves the close.
-    const select = root.querySelector('[data-pagination-size]');
-    select.value = '6';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 6);
 
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');

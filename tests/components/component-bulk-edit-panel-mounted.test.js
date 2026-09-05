@@ -21,8 +21,14 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createComponentBulkDraft } from '../../src/utils/componentBulkEditModel.js';
+// Issue 1504: the category axis is a shared `<Select>`, so staging one is two clicks on a
+// portaled panel rather than a `change` on a native `<select>`.
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -30,6 +36,8 @@ const panel = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
@@ -61,6 +69,13 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The set delete's arm/confirm control (issue 1129) and the shared card that now renders
     // it (issue 1132). Both are STATIC imports of the component under test; omitting either
     // HANGS this suite as `# cancelled` rather than failing it.
@@ -205,11 +220,7 @@ describe('ComponentBulkEditPanel apply enablement (issue 772)', () => {
     assert.equal(applyButton(root).disabled, true, 'a no-op Apply would report success and write nothing');
     assert.match(applyButton(root).textContent, /3/, 'and it names the exact blast radius');
 
-    root.querySelector('[data-component-bulk-category]').value = 'Metal';
-    root.querySelector('[data-component-bulk-category]').dispatchEvent(
-      new globalThis.Event('change', { bubbles: true })
-    );
-    flushSync();
+    chooseSelectOption(root, '[data-component-bulk-category]', 'Metal');
 
     assert.equal(applyButton(root).disabled, false);
     assert.equal(state.draft.category, 'Metal');
