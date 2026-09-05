@@ -5360,15 +5360,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     // The STAGED face. `data-component-select` sits on a visually hidden input, so the click
     // target is its wrapping `<label>`; two rows, because a one-row selection reads as an
-    // accident. Then the three axes the smoke stages: a category — an inline inset ROW since
-    // issue 1371 r16-list (M23), so a click rather than a select — the tag tri-state at BOTH its
-    // non-default faces (one click = add, two = remove), and one essence increment, which is what
-    // arms the destructive-overwrite warning.
+    // accident. Then the three axes the smoke stages: one essence increment, which is what arms
+    // the destructive-overwrite warning; the tag tri-state at BOTH its non-default faces (one
+    // click = add, two = remove); and a category — an inline inset ROW since issue 1371 r16-list
+    // (M23), so a click rather than a select.
+    //
+    // THE ESSENCE IS STAGED FIRST AND THE CATEGORY LAST (issue 1371 r17-b, quality N4), because
+    // the LAST click decides what the frame shows: the three insets make the panel taller than
+    // its column, and Playwright scrolls the clicked control into view. Ending on the essence
+    // stepper photographed the panel from the tags inset's third row down, with the staged
+    // category and the chip run above the fold; ending on the category row lands the shutter on
+    // the panel's head, as the world twin does. The axes are independent, so the order composes
+    // the same instruction.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
-      { selector: '[data-component-bulk-category-option="Refined"]' },
+      { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
       // The tag inset is a PAGED window over the system's tags (issue 1371 r16-cat converged both
       // panels on one `BulkStagingInset`), so `ore` and `ingot` sit past page one: reach each
       // through the inset's own search well, as the world bulk case reaches its rows, then clear
@@ -5379,9 +5387,34 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-bulk-inset-search="tags"]', fill: '' },
-      { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
+      { selector: '[data-component-bulk-category-option="Refined"]' },
     ],
     expectView: 'components',
+    expectSelector: '[data-component-bulk-panel]',
+    // THE THREE STAGED AXES, asserted (issue 1371 r17-b, quality N4): a category radio or tag
+    // tri-state that stopped staging on THIS panel would otherwise still publish a green frame.
+    // The tag states are read off the staged CHIP RUN rather than the rows, because the well is
+    // cleared above and both tags sit past page one of the resting inset.
+    expectContained: [
+      {
+        container: '[data-component-bulk-panel]',
+        target:
+          '[data-component-bulk-category-option="Refined"][data-component-bulk-option-state="on"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target: '[data-component-bulk-tag-chip="ore"][data-component-bulk-tag-chip-state="add"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target:
+          '[data-component-bulk-tag-chip="ingot"][data-component-bulk-tag-chip-state="remove"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target: '[data-component-bulk-essences-staged="true"]',
+      },
+    ],
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
