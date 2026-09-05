@@ -5356,9 +5356,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
       { selector: '[data-component-bulk-category-option="Refined"]' },
+      // The tag inset is a PAGED window over the system's tags (issue 1371 r16-cat converged both
+      // panels on one `BulkStagingInset`), so `ore` and `ingot` sit past page one: reach each
+      // through the inset's own search well, as the world bulk case reaches its rows, then clear
+      // the well so the frame shows the resting inset under the staged chip run.
+      { selector: '[data-bulk-inset-search="tags"]', fill: 'ore' },
       { selector: '[data-bulk-tag="ore"]' },
+      { selector: '[data-bulk-inset-search="tags"]', fill: 'ingot' },
       { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-bulk-tag="ingot"]' },
+      { selector: '[data-bulk-inset-search="tags"]', fill: '' },
       { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
     ],
     expectView: 'components',
