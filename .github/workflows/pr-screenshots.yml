@@ -261,18 +261,43 @@ jobs:
       # alongside a job that never runs `npm test` reads as a safety control and is not one; this
       # file did exactly that until review caught it.
       #
-      # BOTH suites belong here, and the second one was a skipped test everywhere until it was
-      # added (issue 1371, quality review r9 F2). `tests/view-lab-fixture-assets.test.js` walks
-      # every asset path the lab world names and asserts it resolves in the harvested chrome; the
-      # defect it exists for — a 404 fixture path that aborts a capture run and publishes ZERO
-      # frames — is precisely a CI failure mode. `ci.yml`'s `npm test` runner holds no cache, so
-      # the suite skipped there, and this job was the only one that harvests a cache and it ran the
-      # drift suite alone. The guard existed and executed nowhere.
+      # ALL THREE suites belong here, and each was a skipped or vacuous test everywhere until it
+      # was added. `tests/view-lab-fixture-assets.test.js` walks every asset path the lab world
+      # names and asserts it resolves in the harvested chrome; the defect it exists for — a 404
+      # fixture path that aborts a capture run and publishes ZERO frames — is precisely a CI
+      # failure mode. `ci.yml`'s `npm test` runner holds no cache, so the suite skipped there, and
+      # this job was the only one that harvests a cache and it ran the drift suite alone. The guard
+      # existed and executed nowhere (issue 1371, quality review r9 F2).
+      #
+      # `tests/components/components-browser-rendered.test.js` joined for the same reason (issue
+      # 1371, quality review round 5 Q2). Its M28 claim — that a component row's medallion stays at
+      # the row's leading edge under a chrome that centres a button's content — is measured under a
+      # HAND-WRITTEN one-line stand-in for Foundry's sheet and, separately, under the harvested
+      # sheet itself. Only the second arm measures Foundry; with no cache it skipped, so in CI the
+      # ruling was carried entirely by the transcription. The suite now also reads a bare `<button>`
+      # under each chrome and asserts the two agree, which is the drift check the mirror never had —
+      # and that check is likewise real only where a harvest exists.
+      #
+      # `--conditions=browser` because this third suite MOUNTS Svelte components (`npm test` sets
+      # the same condition); without it every mount fails with "mount(...) is not available on the
+      # server". `--test-timeout` matches `npm test` rather than leaving the default of none, so a
+      # hung Chromium fails the step instead of running out the job's clock.
+      #
+      # THE STEP'S NAME IS LOAD-BEARING and is deliberately left as it was. Both chrome-dependent
+      # suites quote it verbatim in their own SKIP-POLICY docblocks — that quotation is how a
+      # reader of a skipped test finds the one runner where the skip cannot be taken — so renaming
+      # it here without rewriting those docblocks in the same commit re-opens the gap this step
+      # exists to close. It reads narrower than the three suites it now runs; the comment above is
+      # where the third one is accounted for.
       - name: Verify the harvested chrome still matches, and every lab asset path resolves in it
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
-        run: node --test tests/view-lab-chrome-drift.test.js tests/view-lab-fixture-assets.test.js
+        run: |
+          node --conditions=browser --test --test-timeout=300000 \
+            tests/view-lab-chrome-drift.test.js \
+            tests/view-lab-fixture-assets.test.js \
+            tests/components/components-browser-rendered.test.js
 
       - name: Render the selected frames
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'
