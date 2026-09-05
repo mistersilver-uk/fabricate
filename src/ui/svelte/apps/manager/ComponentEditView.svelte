@@ -1958,11 +1958,26 @@
                   />
                 {/each}
               </div>
-            {:else}
+            {:else if essenceDraft.length === 0}
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.Manager.Component.EssencesEdit.NoEssences',
                   'No essences are defined for this system yet.'
+                )}
+              </p>
+            {:else}
+              <!-- TWO EMPTY STATES, BECAUSE THE GRID IS EMPTY FOR TWO DIFFERENT REASONS (issue
+                 1371 r21-store4, the domain expert's loop-6 pass). Since r20 the guard reads
+                 `offeredEssences` — enabled essences plus the disabled ones this component
+                 carries — so an all-DISABLED roster over a component carrying none reaches the
+                 empty state on a system that DOES define essences, and was told the opposite.
+                 The fork is on the roster the system holds, which is the fact the two states
+                 differ on and the only one a GM can act on differently: create essences, or
+                 enable the ones already there. -->
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.Component.EssencesEdit.NoEnabledEssences',
+                  'No essences are enabled for this system yet, and this component carries none.'
                 )}
               </p>
             {/if}

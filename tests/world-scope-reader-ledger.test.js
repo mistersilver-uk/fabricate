@@ -139,14 +139,22 @@ const BASE_SCAN = Object.freeze({
   collisionSites: 64,
 });
 
-/** The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor. */
+/**
+ * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor.
+ *
+ * `162 -> 163` at issue 1371 r21-store4: `_overrideInheritedEssencesBeforeStrip` walks
+ * `system.components` to find the rows the essence delete AFFECTS, which is the same
+ * authoring-accessor question every other `for (const component of system.components || [])` in
+ * that file asks — it mutates those rows in place before the one `save()`, so it must read the
+ * record the save writes and not the read union's merged copies.
+ */
 const SCAN_TOTALS = Object.freeze({
-  matches: 162,
-  lines: 146,
+  matches: 163,
+  lines: 147,
   files: 19,
   pairs: 118,
   collisionGroups: 17,
-  collisionSites: 45,
+  collisionSites: 46,
 });
 
 /**
@@ -215,7 +223,7 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 5, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 4, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 5, 'writer'],
   ['src/systems/CraftingSystemManager.js', "for (const tool of system.tools || []) {", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "definitions: system.components || [],", 1, 'restamp'],
   ['src/systems/CraftingSystemManager.js', "definitions: (system.tools || []).filter(", 1, 'restamp'],

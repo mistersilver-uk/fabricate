@@ -1105,8 +1105,31 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
       assert.match(
         essenceSection(target).textContent,
-        /No essences are defined for this system yet\./,
+        /No essences are enabled for this system yet, and this component carries none\./,
         'the card said nothing at all about a roster it can offer nothing from'
+      );
+      // AND IT SAYS WHICH EMPTY IT IS (issue 1371 r21-store4, the domain expert's loop-6 pass).
+      // This system DEFINES two essences, so the older sentence — the one the other empty state
+      // still uses — was false here, and pointed a GM at Create when what they need is Enable.
+      assert.doesNotMatch(
+        essenceSection(target).textContent,
+        /No essences are defined for this system yet\./,
+        'the defined-none sentence belongs to the other empty state'
+      );
+    });
+
+    it('keeps the defined-NONE sentence for a system with no essences at all', async () => {
+      // The other side of the fork, and the non-vacuity arm for it: the two states are told apart
+      // by the roster the system holds, not by the tiles the grid can draw.
+      const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
+        showEssences: true,
+        essenceOptions: [],
+      });
+      assert.deepEqual(tiles(target), []);
+      assert.match(
+        essenceSection(target).textContent,
+        /No essences are defined for this system yet\./,
+        'a system that defines none is told to create some'
       );
     });
   });

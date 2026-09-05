@@ -3019,6 +3019,7 @@
             "Title": "Essence contribution",
             "Hint": "Keyed to the {count} essences {system} uses. A system that drops an essence drops these values with it.",
             "NoEssences": "No essences are defined for this system yet.",
+            "NoEnabledEssences": "No essences are enabled for this system yet, and this component carries none.",
             "NoteUnset": "No world essence values are set, so this system supplies its own.",
             "NoteInherited": "Following the world values. Change them in the catalogue entry and every inheriting system follows.",
             "NoteOverridden": "Overriding the world values for {system} only."

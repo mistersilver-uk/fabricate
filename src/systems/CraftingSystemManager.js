@@ -6848,22 +6848,24 @@ export class CraftingSystemManager {
     const resolved = resolvedComponentEssencesById(this, system.id);
     if (!resolved) return { overridden: [], unreachable: [] };
 
+    // ONE pass over the rows, holding each affected row BESIDE the map it resolved: the second
+    // walk this used to make was a second raw read of `system.components` for no new information,
+    // and `tests/world-scope-reader-ledger.test.js` counts every one of those.
     const affected = new Map();
     for (const component of system.components || []) {
       const id = String(component?.id ?? '');
       const map = resolved.get(id);
       if (!map || typeof map !== 'object') continue;
       if (Object.keys(map).every((essenceId) => !deleted.has(essenceId))) continue;
-      affected.set(id, map);
+      affected.set(id, { component, map });
     }
     if (affected.size === 0) return { overridden: [], unreachable: [] };
 
     const writable = new Set(await overrideInheritedEssences(system.id, [...affected.keys()]));
     const overridden = [];
-    for (const component of system.components || []) {
-      const id = String(component?.id ?? '');
-      if (!writable.has(id) || !affected.has(id)) continue;
-      component.essences = { ...affected.get(id) };
+    for (const [id, { component, map }] of affected) {
+      if (!writable.has(id)) continue;
+      component.essences = { ...map };
       overridden.push(id);
     }
     const unreachable = [...affected.keys()].filter((id) => !writable.has(id));
