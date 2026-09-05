@@ -432,3 +432,33 @@ test('1371 r21: a rollback given BARE IDS restores the switch alone', async () =
   assert.deepEqual(clears, []);
   assert.equal(recordNow().inherit.essences, true, 'the switch is back');
 });
+
+// ---------------------------------------------------------------------------
+// Quality engineer round 7, gap N5 — the cohort is per SYSTEM
+// ---------------------------------------------------------------------------
+
+test('1371 r21: the shadow set is read for THIS system, not for every system holding the pair', async () => {
+  // `shadowedIn` walks a corpus whose membership list is every `(entity, system)` pair in the
+  // world, so the `record.systemId !== systemId` filter is the only thing keeping one system's
+  // inherit switch from deciding another's write. Deleting it left every fixture green, because
+  // every other corpus in this file holds exactly one system.
+  const corpus = {
+    entities: [{ id: 'ingot' }],
+    defaults: [{ id: 'ingot', essences: { fire: 2 } }],
+    membership: [
+      { entityId: 'ingot', systemId: 'sys1', inherit: { essences: false } },
+      { entityId: 'ingot', systemId: 'sys2' },
+    ],
+  };
+  const { override, switchWrites } = makeOverride({ corpus });
+
+  const cohort = await override.cohortFor('sys1', ['ingot'], { essences: { fire: 4 } });
+  assert.deepEqual(cohort.writable, ['ingot'], 'sys1 overrides already, so the write is direct');
+  assert.deepEqual(cohort.refused, []);
+  assert.deepEqual(cohort.flipped, [], 'sys2’s inheriting switch is not sys1’s business');
+  assert.deepEqual(switchWrites, []);
+
+  const other = await override.cohortFor('sys2', ['ingot'], { essences: { fire: 4 } });
+  assert.deepEqual(other.flipped, [{ componentId: 'ingot', seeded: true }], 'and sys2 still flips');
+  assert.deepEqual(switchWrites, [['ingot', 'sys2', false]], 'on its OWN pair');
+});

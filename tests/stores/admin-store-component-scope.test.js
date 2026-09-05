@@ -1579,3 +1579,225 @@ test('1371 r20: an UNAUTHORED world essence section shadows nothing, so no switc
     'nothing shadowed the write, so the pair keeps the world default it has not yet received'
   );
 });
+
+// ── ROUND 7: THE WRITE HALF CATCHES UP WITH THE READ HALF (r21-store4) ───────────────────────
+//
+// Round 6 made every GM READ of a component's essences go through the resolved accessor. Three
+// WRITES were still acting on the persisted row while the surface around them spoke for the
+// resolved one: the essence delete's cascade, a rollback that restored a field rather than a
+// record, and a compensated region wide enough to contain the republish.
+
+/**
+ * The membership record for `(ingot, sys1)` as the fake store holds it right now.
+ *
+ * @param {object} scope
+ * @param {string} [componentId]
+ * @returns {object|undefined}
+ */
+function membershipRecord(scope, componentId = 'ingot') {
+  return scope.payload.membership[membershipKey(componentId, 'sys1')];
+}
+
+test('1371 r21: an essence delete is handed a seam that flips an inheriting pair to override', async () => {
+  // Reviewer finding 1, at the store. `CraftingSystemManager.deleteEssence` decides the cascade's
+  // reach and calls back for the flag write, because the flag is a world-scope setting and the
+  // manager holds no path to one. This pins the store's half: the seam it supplies really moves
+  // the switch, over the shipped rule, on the shipped family.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  let seam = null;
+  harness.services.getCraftingSystemManager().deleteEssence = async (_id, _essenceId, options) => {
+    seam = options;
+    await options.overrideInheritedEssences('sys1', ['ingot']);
+    return true;
+  };
+
+  assert.equal(await store.deleteEssence('fire'), true);
+
+  assert.equal(typeof seam?.overrideInheritedEssences, 'function', 'the seam is supplied at all');
+  assert.equal(
+    membershipRecord(scope).inherit.essences,
+    false,
+    'and it flipped the pair, so the manager’s strip lands on the row the system now resolves'
+  );
+});
+
+test('1371 r21: an essence delete that THROWS puts the switch it flipped back, block and all', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getCraftingSystemManager().deleteEssence = async (_id, _essenceId, options) => {
+    await options.overrideInheritedEssences('sys1', ['ingot']);
+    throw new Error('the crafting system could not be written');
+  };
+
+  await assert.rejects(store.deleteEssence('fire'));
+
+  assert.equal(membershipRecord(scope).inherit.essences, true, 'the switch is back');
+  assert.equal(
+    membershipRecord(scope).essences,
+    undefined,
+    'and so is the block the flip seeded, which a switch-only rollback used to leave standing'
+  );
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { fire: 3 }, 'so nothing durable moved');
+});
+
+test('1371 r21: the bulk essence delete supplies the same seam and rolls back the same way', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getCraftingSystemManager().deleteEssences = async (_id, _ids, options) => {
+    await options.overrideInheritedEssences('sys1', ['ingot']);
+    throw new Error('the crafting system could not be written');
+  };
+
+  const result = await store.deleteEssences(['fire']);
+
+  assert.equal(result.deleted, 0, 'the failure is reported rather than thrown at the panel');
+  assert.equal(membershipRecord(scope).inherit.essences, true);
+  assert.equal(membershipRecord(scope).essences, undefined);
+});
+
+test('1371 r21: a REPUBLISH that throws after a landed write does NOT roll the switch back', async () => {
+  // Foundry integrator finding 3. `refresh()` is a projection walk over Foundry documents, not a
+  // settings write, and it used to sit inside the compensated `try` — so a throw there produced
+  // the INVERSE of the intended repair: the authored map durably on the row, the switch put back
+  // to inheriting so the world map shadows it again, and a toast saying the update failed.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  await seedInheritingPair(store, scope);
+  harness.services.getWorldActors = () => {
+    throw new Error('the actor directory is unavailable');
+  };
+
+  const saved = await store.updateComponent('ingot', { essences: { ash: 1 } });
+
+  assert.equal(saved, true, 'the values landed, so the save is not a failure');
+  assert.equal(calls.length, 1, 'and the write really was made');
+  assert.equal(
+    membershipRecord(scope).inherit.essences,
+    false,
+    'the switch stays OFF, so the map the GM authored is what the system resolves'
+  );
+  assert.deepEqual(harness.notifications.error, [], 'and nothing tells them it failed');
+});
+
+test('1371 r21: a bulk edit whose REPUBLISH throws keeps its flips too', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getWorldActors = () => {
+    throw new Error('the actor directory is unavailable');
+  };
+
+  const result = await store.applyComponentBulkEdit(['ingot'], { essences: { ash: 4 } });
+
+  assert.equal(result.updated, 1);
+  assert.equal(membershipRecord(scope).inherit.essences, false);
+});
+
+test('1371 r21: the SECOND cohort pass cannot roll back a first pass that already landed', async () => {
+  // Reviewer finding 2. `flipped` is a subset of `writable`, so with the writable pass first a
+  // throw on the refused pass un-flipped pairs whose essence values were already persisted —
+  // silently putting them back under the world map while the GM was told the write failed. The
+  // refused pass now runs FIRST, so a throw always precedes the flipped pairs' values.
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      { id: 'fire', name: 'Fire' },
+      { id: 'iron', name: 'Iron' },
+      { id: 'ash', name: 'Ash' },
+    ],
+    components: [
+      { id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } },
+      { id: 'coal', name: 'Coal', essences: {} },
+    ],
+  });
+  const { store, scope } = await openStore(harness, [LINKED, { ...LINKED, id: 'coal', name: 'Coal' }]);
+  installReadUnion(harness, scope);
+  for (const id of ['ingot', 'coal']) {
+    scope.payload.defaults[id] = { id, essences: { fire: 3 } };
+    scope.payload.membership[membershipKey(id, 'sys1')] = {
+      entityId: id,
+      systemId: 'sys1',
+      inherit: {},
+    };
+  }
+  await store.refresh();
+
+  // `coal`'s flag write is refused and `ingot`'s is not, which is the mixed outcome that makes a
+  // two-pass write reachable at all.
+  const save = scope.store.save;
+  scope.store.save = async (next) => {
+    if (next.membership[membershipKey('coal', 'sys1')]?.inherit?.essences === false) {
+      throw new Error('The requested Setting update was refused');
+    }
+    return save(next);
+  };
+  // The refused pair's category-only pass is what THROWS, so the question the case asks is
+  // whether the flipped pair's essence values had already been persisted when it did.
+  const attempted = [];
+  // Installed for its WRITE, not for its recording: this case needs to see the pass that THREW,
+  // which never reaches the recorder inside it.
+  installBulkComponentWrite(harness, scope);
+  const primitive = harness.services.getCraftingSystemManager().applyBulkEditToComponents;
+  harness.services.getCraftingSystemManager().applyBulkEditToComponents = async (
+    systemId,
+    componentIds,
+    edit
+  ) => {
+    attempted.push(edit);
+    if (!Object.hasOwn(edit, 'essences')) throw new Error('the components could not be written');
+    return primitive(systemId, componentIds, edit);
+  };
+
+  const result = await store.applyComponentBulkEdit(['ingot', 'coal'], {
+    category: 'ore',
+    essences: { ash: 4 },
+  });
+
+  assert.equal(result, null, 'the write failed and is reported as such');
+  assert.deepEqual(
+    attempted,
+    [{ category: 'ore' }],
+    'the REFUSED pass ran first and threw, so the flipped pair’s essence pass never ran at all'
+  );
+  assert.deepEqual(
+    harness.system.components.find((component) => component.id === 'ingot').essences,
+    { iron: 2 },
+    'so no authored value is on disk for the pair the catch is about to put back'
+  );
+  assert.equal(
+    membershipRecord(scope).inherit.essences,
+    true,
+    'and the rollback is therefore correct rather than the inverse of a repair'
+  );
+});
+
+test('1371 r21: the rules-bulk verb rolls its flips back when the value write throws', async () => {
+  // Quality gap N6. `bulkEditComponentRules`' `cohortFor` arm was driven; its ROLLBACK arm was
+  // not, so a rollback deleted from that catch left every suite green.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getCraftingSystemManager().applyBulkEditToComponents = async () => {
+    throw new Error('the components could not be written');
+  };
+
+  const result = await store.worldScope.component.bulkEditRules('sys1', ['ingot'], {
+    essences: { ash: 4 },
+  });
+
+  assert.equal(result, false);
+  assert.equal(membershipRecord(scope).inherit.essences, true, 'the switch is back');
+  assert.equal(membershipRecord(scope).essences, undefined, 'and the seeded block with it');
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { fire: 3 });
+});
