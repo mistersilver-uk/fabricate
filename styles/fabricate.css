@@ -1009,10 +1009,19 @@
    ROOTED AT `.fabricate`, the class every Fabricate application root emits, so the pair is
    written ONCE rather than once per app area (issue 1501). It replaces the `.fabricate-app`
    pair that stood here and the byte-identical `.fabricate-manager` pair that stood ~590 lines
-   below. `.fabricate-manager` is a <div> INSIDE the manager window rather than an application
-   root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2 frame's own
-   header controls - the one asymmetry in the widening, and the same accent ring those controls
-   already carry in the player app and the three interactables windows.
+   below.
+
+   THE WIDENING REACHES FOUR PLACES NEITHER DONOR DID, and they are worth naming because a
+   reader checking this rule against the old pair will otherwise read the collapse as an
+   equivalence. (1) `.fabricate-manager` is a <div> INSIDE the manager window rather than an
+   application root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2
+   frame's own header controls - the same accent ring those controls already carry in the
+   player app and the three interactables windows. (2) The standalone component-editor window
+   (`SvelteComponentEditorApp`) carried no pair at all and now takes both halves. (3) Nor did
+   the interaction-prompt toast, whose dimmed close control is why the `:focus-visible` opacity
+   rule far below exists. (4) `a` is newly named on BOTH halves in the player app, which listed
+   `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits no
+   <a>, so what this reaches is enriched content links and Foundry frame chrome.
 
    WRITTEN FLAT, and that is prescribed rather than stylistic. `.fabricate a:focus` is (0,2,1),
    the rank both donor blocks held, so per-component focus rings still win. The `:is()` form
@@ -5697,8 +5706,9 @@
 }
 
 /* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's
-   `a.button:focus, button:focus` paints an orange outline and a 4px glow that only the two area
-   resets remove, and this family now renders in hosts that have neither. BUTTONS ONLY here for
+   `a.button:focus, button:focus` paints an orange outline and a 4px glow that the module reset
+   removes inside every Fabricate window, and this family now renders in hosts that have no
+   Fabricate root at all. BUTTONS ONLY here for
    the same reason the ring below is, and above the ring because the two tie at (0,2,1). */
 .fabricate-pagination button:focus {
   outline: none;
@@ -5708,8 +5718,8 @@
 /* THE PAGER'S OWN KEYBOARD RING (issue 1502). Now that this family is rooted at the class
    `Pagination.svelte` emits rather than at an application root, it renders in areas whose
    own bare-element ring it can no longer assume — `design-system/spec.md` puts that chrome
-   on the primitive. The declarations are the two area rings' verbatim (`:1043-1044`,
-   `:1605-1606`), so nothing moves where an area ring already reached.
+   on the primitive. The declarations are the module ring's verbatim (`.fabricate
+   <element>:focus-visible`, issue 1501), so nothing moves where that ring already reaches.
 
    BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too, TIES
    `.fabricate-app select:focus-visible` and wins on source order — which would delete that
@@ -10213,7 +10223,7 @@
 /* visually-hidden: pinned, and its un-hider's specificity contract is load-bearing (issue
    1523). This is a fourth byte-identical copy of the utility declared near the top of this
    sheet, and the requirement that utility carries would have it adopt. It does not, because
-   the paired un-hider below settles on the (0,4,1)-beats-(0,3,1) contract its own comment
+   the paired un-hider below settles on the (0,5,0)-beats-(0,4,0) contract its own comment
    records, which a (0,2,0) utility class would rewrite. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
   position: absolute;
@@ -10233,8 +10243,8 @@
    under a kicker that already names it. The Tool Requirements gate-mode pair does not — it was
    the one group on that screen with no visible heading at all — and the honest repair is to
    un-hide the fieldset's accessible name rather than to print a second heading beside it.
-   (0,3,1) against the hiding rule's (0,3,1) would be a tie settled on order, so the state class
-   is CHAINED onto the card, which makes it (0,4,1) and settles it on specificity. It restates
+   (0,4,0) against the hiding rule's (0,4,0) would be a tie settled on order, so the state class
+   is CHAINED onto the card, which makes it (0,5,0) and settles it on specificity. It restates
    every property the hiding rule sets, because a partially reset visually-hidden block is a
    1px-tall legend with its text clipped. */
 .fabricate-manager
@@ -13696,23 +13706,23 @@
 /* THE STRIP HALF OF THE FAMILY'S FOCUS CHROME, and it is not optional (issue 1502). Foundry core
    paints EVERY focused button with `outline: 1px solid var(--button-focus-outline-color)` — a
    burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The two
-   AREA resets above (`.fabricate-app …:focus` and `.fabricate-manager …:focus`) strip that only
-   inside their own app root, so a control rooted at the class this primitive emits keeps core's
-   orange under the accent ring the moment it renders in a host carrying neither area class. A
-   primitive that declares its own ring therefore declares the PAIR, which is the same rule
-   CONTRIBUTING.md states for an area. Written ABOVE the repaint because the two halves tie at
+   MODULE reset above (`.fabricate <element>:focus`, issue 1501) strips that inside every Fabricate
+   window, but a control rooted at the class this primitive emits also renders in hosts carrying no
+   Fabricate root at all — a chat card, another module's sheet — where core's orange survives under
+   the accent ring. A primitive that declares its own ring therefore declares the PAIR, which is the
+   same rule CONTRIBUTING.md states for the module root. Written ABOVE the repaint because the two halves tie at
    (0,2,0) and a keyboard-focused control matches both, so source order is what decides. */
 .fabricate-button:focus {
   outline: none;
   box-shadow: none;
 }
 
-/* THE FAMILY'S OWN FOCUS RING (issue 1502). The two AREA rings — `.fabricate-app …:focus-visible`
-   and `.fabricate-manager …:focus-visible` above — are bare-element selectors an area declares
-   for itself, and a primitive that leans on one renders no ring at all in an application that has
-   none, exactly as it would render Foundry's default font without the `font: inherit` above. The
-   declarations are COPIED from those two rules rather than re-chosen, so nothing moves where an
-   area ring already reached. */
+/* THE FAMILY'S OWN FOCUS RING (issue 1502). The MODULE ring above — `.fabricate
+   <element>:focus-visible`, issue 1501 — is (0,2,1) and beats this (0,2,0) rule wherever a
+   Fabricate root is an ancestor; the declarations are COPIED from it verbatim rather than
+   re-chosen, so nothing moves there. What this rule is FOR is a host carrying no Fabricate root at
+   all, where a primitive that leaned on the module ring would render no ring whatever, exactly as
+   it would render Foundry's default font without the `font: inherit` above. */
 .fabricate-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -13847,7 +13857,7 @@
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
-   `button:focus` outline and 4px glow survive in any host carrying neither area class, so the
+   `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
    repaint below would sit on top of them rather than replace them. Above the repaint because the
    two tie at (0,2,0). */
 .fabricate-icon-button:focus {
@@ -13855,13 +13865,12 @@
   box-shadow: none;
 }
 
-/* The primitive's OWN focus ring (issue 1502). The two area rings — `.fabricate-app
-   button:focus-visible` and `.fabricate-manager button:focus-visible` — are (0,2,1) and stop
-   at their app root, so a control re-rooted at `fabricate-icon-button` would keep its paint
-   and lose its ring the moment it renders outside either area. The declarations are copied
-   verbatim from those two rules, so wherever an area ring also applies it BEATS this (0,2,0)
-   one and nothing moves; this rule paints only in a host that carries neither area class,
-   which is the case it was added for. The ghost/danger `:focus-visible` pairs above are (0,4,0)
+/* The primitive's OWN focus ring (issue 1502). The MODULE ring above — `.fabricate
+   <element>:focus-visible`, issue 1501 — is (0,2,1) and reaches every Fabricate window, so it
+   BEATS this (0,2,0) rule wherever a Fabricate root is an ancestor. The declarations are copied
+   from it verbatim, so nothing moves there. What this rule paints in is a host carrying no
+   Fabricate root at all — a chat card, another module's sheet — where a control re-rooted at
+   `fabricate-icon-button` would otherwise keep its paint and lose its ring. The ghost/danger `:focus-visible` pairs above are (0,4,0)
    colour-and-background only, so nothing here contends with them. */
 .fabricate-icon-button:focus-visible {
   outline: 2px solid var(--fab-accent);
@@ -19091,8 +19100,6 @@
   scrollbar-gutter: stable;
   padding-right: var(--fab-space-3);
 }
-
-/* Recipe editor tab shell + validation helpers built on the shared primitives. */
 
 /* Recipe editor header identity block (issue 643): medallion + name + the
    "<category> · <mode>" subline. `min-width: 0` on the copy column is what keeps a
