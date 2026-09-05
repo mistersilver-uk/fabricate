@@ -577,6 +577,9 @@
       {/snippet}
     </BulkEditSection>
     {#if essencesStaged && essenceWarningCount > 0}
+      <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: this is authored
+           data about to be overwritten on a counted number of the selected components, which is
+           the conditional hazard warning exists for rather than a standing note. -->
       <Callout
         tone="warning"
         text={format(
