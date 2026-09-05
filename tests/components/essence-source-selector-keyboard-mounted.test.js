@@ -24,6 +24,31 @@
  * `EssenceSourceSelector`'s panel appears in NO View Lab case (`scripts/lib/viewLabCases.js`
  * records that `.essence-source-trigger` is in no case's steps), so this suite is the only
  * instrument that sees the panel's DOM at all.
+ *
+ * ── WHAT THIS SUITE ANSWERS FOR AFTER THE RE-PLATFORM (issue 1503) ─────────────────────
+ * The panel, the query field, the list and every tile are now `SearchablePopover`'s elements, and
+ * this component supplies a `trigger` snippet, an `option` snippet and its own class family. Three
+ * things follow that only a mounted DOM can see, and each has its own case below.
+ *
+ *   1. THE TRIGGER SURVIVES THE SPREAD. The caller spreads the primitive's `attributes` LAST, so
+ *      its own `aria-label`, `title` and `disabled` are the ones a defect would erase: Svelte's
+ *      `set_attributes` REMOVES an attribute whose spread value is `undefined`, and a spread
+ *      `disabled: false` would override a caller's `disabled={true}` mid-save. The primitive omits
+ *      both classes of key; these cases are the runtime net for that, because a source read of the
+ *      snippet cannot see an attribute erased at render time.
+ *   2. THE LIST'S FORM IS EMITTED, not styled inline: `data-picker-as="grid"` and
+ *      `data-picker-columns="2"` on the `role="listbox"` element, because `anchoredPopover`
+ *      rewrites the list's whole `style` attribute on every measure. The sheet paints the grid
+ *      from those attributes, and the class lists below are what lets it.
+ *   3. THE MARKED ROW IS THE STORED ONE, which depends on `value={value?.id}` reaching the
+ *      primitive — it marks with `option.id === value`, so without the mapping
+ *      `[aria-selected='true']` matches nothing in a panel no frame photographs.
+ *
+ * What this suite CANNOT answer for: anything needing a resolved cascade. The harness compiles with
+ * `css: 'injected'` and never loads `styles/fabricate.css` (`tests/helpers/scoped-component-css.js`
+ * records that happy-dom cannot compute a cascade), and happy-dom returns zero-sized rects, so no
+ * inline panel width is ever written here. The width band is read from the source instead, and the
+ * sheet's own `max-width` is `icon-picker-layout.test.js`'s to read.
  */
 
 import assert from 'node:assert/strict';
@@ -71,7 +96,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/portal.js',
   ],
-  compiledModules: [SOURCE_SELECTOR],
+  compiledModules: [
+    // The primitive this component now renders, plus the two import-free leaves it renders
+    // itself. A `.svelte` the mounted tree reaches but the harness omits does not fail — the
+    // closure validator throws in `before()` and `node --test` reports `# cancelled`.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    SOURCE_SELECTOR,
+  ],
   componentPath: SOURCE_SELECTOR,
 });
 
@@ -98,6 +131,20 @@ function sheetGridColumns() {
   assert.ok(template, 'and one of its blocks declares a repeated column template');
   return Number(template[1]);
 }
+
+/**
+ * The two trigger labels, by key rather than by sentence.
+ *
+ * The harness's `localize` returns the key it is handed, so a rendered label IS its key here —
+ * which is what makes these assertions read the component's choice of string rather than a
+ * translation. `ChangeSourceItem` carries the stored item's name after it, because a trigger whose
+ * value is an IMAGE has no other way to say which item it is holding.
+ */
+const CHANGE_KEY = 'FABRICATE.Admin.Features.Essences.ChangeSourceItem';
+const DROP_OR_PICK_KEY = 'FABRICATE.Admin.Features.Essences.DropOrPickSourceItem';
+
+/** A node's authored classes, with Svelte's per-component scope hash removed. */
+const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
 
 before(harness.setup);
 after(() => harness.teardown());
@@ -302,33 +349,11 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
     );
   });
 
-  it('marks the stored item as the current value without making it the cursor', async () => {
-    const { panel } = await openPanel({ value: { id: 'cloth', name: 'Linen Cloth' } });
-
-    assert.deepEqual(
-      optionRows(panel)
-        .filter((row) => row.getAttribute('aria-selected') === 'true')
-        .map((row) => row.title),
-      ['Linen Cloth'],
-      'exactly one row is the current value, and it is the row whose id matches the stored item'
-    );
-    assert.deepEqual(
-      markedRows(panel).map((row) => row.id),
-      [],
-      'the CURRENT VALUE and the KEYBOARD CURSOR are different states: opening on a stored item ' +
-        'does not put the cursor anywhere'
-    );
-  });
-
   it('names no row when the list is empty, and leaves the arrows to the field', async () => {
     const { panel } = await openPanel({ items: [] });
     const holder = holderOf(panel);
 
     assert.equal(optionRows(panel).length, 0, 'no items, so no rows');
-    assert.ok(
-      Boolean(panel.querySelector('.essence-source-picker-empty')),
-      'the empty note renders in the list the rows would have filled'
-    );
     assert.equal(
       holder.getAttribute('aria-activedescendant'),
       null,
@@ -336,9 +361,14 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
     );
     assert.equal(
       holder.getAttribute('aria-controls'),
-      panel.querySelector('[role="listbox"]').id,
-      'the list ELEMENT still renders here — the note is drawn inside it — so `aria-controls` ' +
-        'still resolves to a rendered element'
+      null,
+      'and it controls nothing either: the primitive renders NO `role="listbox"` element in the ' +
+        'empty branch, so an `aria-controls` naming one would point at an id that resolves to ' +
+        'nothing — which is worse than omitting it'
+    );
+    assert.ok(
+      !panel.querySelector('[role="listbox"]'),
+      'the list element itself is absent, which is the structural half of the empty re-platform'
     );
 
     const inert = pressKey('ArrowDown');
@@ -347,5 +377,240 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
       'with nothing to move a cursor over, the arrows are left to the field'
     );
     assert.ok(globalThis.document.activeElement === holder, 'focus is still on the holder');
+  });
+
+  // ── THE TWO EMPTINESSES, AND WHERE THE NOTE NOW SITS (issue 1503) ───────────────────────
+  //
+  // A catalogue that holds nothing and a query that matched nothing are different facts, and this
+  // component always had two sentences for them — but it drew both as a `<p class="hint">` INSIDE
+  // its two-column grid, so the note rendered at roughly HALF the panel's width and reached
+  // `.fabricate-manager .hint` for its colour, which draws nothing at all outside the manager.
+  // The primitive's `EmptyState note` replaces both: one quiet line, full panel width, in a
+  // `role="status"` region that is a SIBLING of the list rather than a non-`option` child of a
+  // `role="listbox"`.
+  it('says the catalogue is empty when nothing is authored, across the whole panel', async () => {
+    const { panel } = await openPanel({ items: [] });
+
+    const note = panel.querySelector('.manager-travel-popover-empty');
+    assert.ok(Boolean(note), 'the empty branch renders the note region the primitive owns');
+    assert.ok(
+      !panel.querySelector('.essence-source-picker-empty'),
+      'and the `<p class="hint">` it replaces is gone, with it the `.fabricate-manager .hint` ' +
+        'colour this shared component could only read inside the manager'
+    );
+    assert.equal(note.getAttribute('role'), 'status');
+    assert.equal(
+      note.getAttribute('aria-live'),
+      'polite',
+      'the region announces itself as the GM types, because its CONTENT is what changes'
+    );
+    assert.ok(
+      authoredClasses(note.parentElement).includes('manager-travel-popover'),
+      'the note is a child of the PANEL, not of the two-column grid it used to render at half ' +
+        `the width of: ${authoredClasses(note.parentElement).join(' ')}`
+    );
+    assert.ok(
+      authoredClasses(note.querySelector('.manager-empty')).includes('is-note'),
+      'and it is the NOTE variant rather than the dashed hero, which is the shared treatment'
+    );
+    assert.match(
+      note.textContent.replace(/\s+/g, ' ').trim(),
+      /NoComponentsAvailable/,
+      'an unfiltered emptiness gets the sentence about the SYSTEM, through `emptyHint`'
+    );
+  });
+
+  it('says nothing matched when a query empties an authored catalogue', async () => {
+    const { panel } = await openPanel({});
+    typeQuery(holderOf(panel), 'zzzz');
+
+    const note = panel.querySelector('.manager-travel-popover-empty');
+    assert.ok(Boolean(note), 'a filtered-to-nothing grid renders the same note region');
+    const line = note.textContent.replace(/\s+/g, ' ').trim();
+    assert.match(
+      line,
+      /NoMatchingComponents/,
+      'a filtered emptiness gets the sentence about the QUERY, through `noMatchesHint`'
+    );
+    assert.ok(
+      !line.includes('NoComponentsAvailable'),
+      'a GM who typed a query into a system holding five components must not be told the system ' +
+        `holds none: ${line}`
+    );
+  });
+
+  // ── CRITERION 1: THE TRIGGER SURVIVES THE SPREAD ────────────────────────────────────────
+  //
+  // These two cases are the RUNTIME net for the primitive's omission rule, and they are mounted
+  // rather than source-read for a reason the source cannot see: the caller spreads `attributes`
+  // LAST, so an `aria-label: undefined` key in that object would REMOVE the label the snippet
+  // wrote, and a `disabled: false` key would override a caller's `disabled={true}`. Both are
+  // invisible to a reader of this component's markup and to the compiler.
+  it('keeps the accessible name the snippet wrote, after the primitive spread', async () => {
+    const stored = await mountSelector({ value: { id: 'cloth', name: 'Linen Cloth' } });
+    const holding = trigger(stored);
+    assert.equal(
+      holding.getAttribute('aria-label'),
+      `${CHANGE_KEY}: Linen Cloth`,
+      'the trigger of a picker HOLDING an item names the item, because its value is an image ' +
+        'and has no other voice'
+    );
+    assert.equal(
+      holding.getAttribute('title'),
+      `${CHANGE_KEY}: Linen Cloth`,
+      'and the tooltip says the same thing, which is what `manager-mounted.test.js` reads on the ' +
+        'icon picker side of this same rule'
+    );
+
+    // The primitive's own contract arrived through the same spread, which is what proves the
+    // spread ran at all rather than the assertions above passing on an un-spread button.
+    assert.equal(holding.getAttribute('type'), 'button');
+    assert.equal(holding.getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(holding.getAttribute('aria-expanded'), 'false');
+
+    harness.remount();
+    const empty = await mountSelector({});
+    assert.equal(
+      trigger(empty).getAttribute('aria-label'),
+      DROP_OR_PICK_KEY,
+      'and an EMPTY trigger names the two things a GM can do to it'
+    );
+  });
+
+  it('renders the refusal the caller set, and refuses to open on it', async () => {
+    const root = await mountSelector({
+      disabled: true,
+      value: { id: 'cloth', name: 'Linen Cloth' },
+    });
+    const button = trigger(root);
+
+    assert.ok(
+      button.hasAttribute('disabled'),
+      'a caller-set `disabled` survives the spread. Without it three shipped surfaces would ' +
+        'render an ENABLED trigger mid-save, because the primitive`s own `disabled` is `false`'
+    );
+    assert.ok(
+      !root.querySelector('.essence-source-clear'),
+      'and the clear button stays away while the row is saving, exactly as before'
+    );
+
+    button.click();
+    flushSync();
+    await settle();
+    assert.ok(
+      !root.querySelector('.fabricate-source-picker-popover'),
+      'a disabled trigger opens no panel: the browser refuses the click, and the guard inside ' +
+        'the primitive refuses it too'
+    );
+  });
+
+  // ── CRITERION 3(a): WHAT A MOUNTED DOM CAN SEE OF THE GRID ──────────────────────────────
+  it('emits the grid form on the list rather than styling it inline', async () => {
+    const columns = sheetGridColumns();
+    const { panel } = await openPanel({});
+    const list = panel.querySelector('[role="listbox"]');
+
+    assert.equal(
+      list.getAttribute('data-picker-as'),
+      'grid',
+      'the list declares its FORM as an attribute. An inline `display: grid` would be erased: ' +
+        '`anchoredPopover` rewrites the whole `style` attribute of this element on every measure'
+    );
+    assert.equal(
+      list.getAttribute('data-picker-columns'),
+      String(columns),
+      'and it declares the count the sheet draws, so one rung paints what the key map steps by'
+    );
+    assert.equal(
+      list.getAttribute('style'),
+      null,
+      'nothing writes an inline style here: this caller measures no list metrics, so the ' +
+        'primitive registers no secondary style target at all'
+    );
+  });
+
+  it('composes the primitive class with this picker own on every element', async () => {
+    const { root, panel } = await openPanel({});
+    const pickerRoot = root.querySelector('.fabricate-picker');
+
+    // EXACT lists, not `includes`. The sheet's rules for this picker are (0,2,0) descendant
+    // selectors under the caller's roots and the primitive's alike, so a class silently dropped
+    // from any one of these five elements deletes a rule rather than merely renaming a hook —
+    // and nothing else in the repository can see it, because no frame photographs this panel.
+    assert.deepEqual(authoredClasses(pickerRoot), [
+      'fabricate-picker',
+      'manager-travel-picker',
+      'fabricate-source-picker',
+      'essence-source-selector',
+    ]);
+    assert.deepEqual(authoredClasses(panel), [
+      'fabricate-picker-popover',
+      'manager-travel-popover',
+      'fabricate-source-picker-popover',
+      'essence-source-picker-popover',
+    ]);
+    assert.deepEqual(authoredClasses(panel.querySelector('.essence-source-picker-search')), [
+      'manager-travel-popover-search',
+      'essence-source-picker-search',
+    ]);
+    assert.deepEqual(authoredClasses(panel.querySelector('[role="listbox"]')), [
+      'manager-travel-popover-options',
+      'essence-source-picker-grid',
+    ]);
+    assert.deepEqual(authoredClasses(optionRows(panel)[0]), [
+      'manager-travel-option',
+      'essence-source-picker-option',
+    ]);
+
+    // The row's CONTENT is the caller's snippet and nothing else. A trailing marker or a Chip
+    // appended after it would retarget every `span` reader the sheet and the suites use.
+    const tile = optionRows(panel)[0];
+    assert.equal(tile.children.length, 2, 'the option snippet is the row SOLE content');
+    assert.equal(tile.querySelector('img').getAttribute('src'), ITEMS[0].img);
+    assert.equal(tile.querySelector('span:last-child').textContent, 'Iron Ore');
+  });
+
+  it('asks the primitive for the shared width band rather than the withdrawn 420', () => {
+    // A SOURCE READ, and it is the only route there is: happy-dom returns zero-sized rects, so
+    // `computeIconPickerPopoverLayout` refuses and no inline width is ever written in a mounted
+    // DOM. The sheet's own governing `max-width` is `icon-picker-layout.test.js`'s to read.
+    const source = readFileSync(resolve(repoRoot, SOURCE_SELECTOR), 'utf8');
+    assert.match(source, /minWidth=\{280\}/, 'the 280px floor is this picker own, and is kept');
+    assert.match(
+      source,
+      /maxWidth=\{340\}/,
+      'the ceiling is the SHARED band. The 420 it used to ask for was already dead — the shared ' +
+        'panel rule caps the box at 340px — so asking for it would state a width nothing honours'
+    );
+    assert.ok(
+      !source.includes('420'),
+      'and the withdrawn number is gone rather than left beside the real one'
+    );
+  });
+
+  it('marks the stored item as the current value without making it the cursor', async () => {
+    const { panel } = await openPanel({ value: { id: 'cloth', name: 'Linen Cloth' } });
+    const rows = optionRows(panel);
+    const marked = rows.filter((row) => row.getAttribute('aria-selected') === 'true');
+
+    assert.equal(
+      marked.length,
+      1,
+      'EXACTLY one row is the current value. This is what `value={value?.id}` buys: the primitive ' +
+        'marks with `option.id === value`, so a caller passing the whole item object marks nothing'
+    );
+    assert.equal(
+      rows.indexOf(marked[0]),
+      2,
+      'and it is the third tile — the one whose `option.id` is the stored item`s id, not the ' +
+        'one whose name sorts first'
+    );
+    assert.equal(marked[0].title, 'Linen Cloth');
+    assert.deepEqual(
+      markedRows(panel).map((row) => row.id),
+      [],
+      'the CURRENT VALUE and the KEYBOARD CURSOR are different states: opening on a stored item ' +
+        'does not put the cursor anywhere'
+    );
   });
 });
