@@ -156,16 +156,26 @@ const OVERLAY_CONTROL = `
   .manager-scoped-list-row::after { content: ''; position: absolute; inset: 0; }
   .fab-bulk-edit-dock { position: relative; }
   .fab-bulk-edit-dock::after { content: ''; position: absolute; inset: 0; }
+  .fab-bulk-inset { position: relative; }
+  .fab-bulk-inset::after { content: ''; position: absolute; inset: 0; }
+  .fab-bulk-component-chips { position: relative; }
+  .fab-bulk-component-chips::after { content: ''; position: absolute; inset: 0; }
 `;
 
 /**
- * The four controls the delta names, each as the point a GM aims at and the control it must hit.
+ * The four controls the delta names, each as the point a GM aims at and the control it must hit —
+ * and, since issue 1371 r17-b (quality N3), the five controls r16 put inside the bulk insets.
  *
- * `probe` and `target` differ for the checkbox ALONE, and that difference is the finding line 540
- * of the delta got backwards. `SelectionCheckbox` keeps the real `<input>` in the DOM at 1x1
- * `opacity: 0` and paints a sibling `<span class="fab-selection-check">`; the pointer aims at the
- * painted box and the control that receives it is the `<label>` wrapping both. Probing the input
- * would measure a one-pixel point no GM can aim at.
+ * `probe` and `target` differ for the checkbox and for the inset row. `SelectionCheckbox` keeps
+ * the real `<input>` in the DOM at 1x1 `opacity: 0` and paints a sibling
+ * `<span class="fab-selection-check">`; the pointer aims at the painted box and the control that
+ * receives it is the `<label>` wrapping both. Probing the input would measure a one-pixel point
+ * no GM can aim at. An inset row is a `<button>` whose label is a `<span>` child: a GM aims at the
+ * name, and the point must belong to the row.
+ *
+ * The inset controls are the fragile kind a geometry read cannot see: 22px icon-only pager
+ * buttons inside a 36px band inside a recessed card, 22px stepper adjuncts beside a 30px-capped
+ * input, and a chip run painted above the inset, all inside a scroller the dock bleeds across.
  */
 const TARGETS = [
   {
@@ -188,6 +198,49 @@ const TARGETS = [
     probe: '[data-world-component-bulk-danger] [data-armed="true"]',
     target: '[data-world-component-bulk-danger] [data-armed="true"]',
   },
+  // ── issue 1371 r17-b ──────────────────────────────────────────────────────────────────────
+  {
+    label: 'system inset row, aimed at its name',
+    probe: '[data-bulk-inset="systems"] [data-world-component-bulk-option] .fab-bulk-inset-name',
+    target: '[data-bulk-inset="systems"] [data-world-component-bulk-option]',
+  },
+  {
+    // LIVE, not disabled: the honest mount hands the panel seven systems, so page two exists and
+    // this button is the one a GM presses to reach the sixth.
+    label: 'system inset pager next',
+    probe: '[data-bulk-inset-next="systems"]',
+    target: '[data-bulk-inset-next="systems"]',
+  },
+  {
+    // The WELL is what a GM aims at and the `<input>` is the control, as with the checkbox: the
+    // input must fill the well, or a click at the well's edge focuses nothing.
+    label: 'tag inset search well, aimed at the well',
+    probe: '[data-bulk-inset="tags"] .fab-bulk-inset-search',
+    target: '[data-bulk-inset-search="tags"]',
+  },
+  {
+    label: 'essence stepper increment',
+    probe: '[data-world-component-bulk-essence="flame"] [data-stepper-increment]',
+    target: '[data-world-component-bulk-essence="flame"] [data-stepper-increment]',
+  },
+  {
+    label: 'staged tag chip',
+    probe: '[data-world-component-bulk-tag-chip="fuel"]',
+    target: '[data-world-component-bulk-tag-chip="fuel"]',
+  },
+];
+
+/**
+ * SEVEN systems for the honest mount (issue 1371 r17-b): five more than the shared roster, so the
+ * systems inset pages and its `Next` is a live control rather than a disabled one. The corpus's
+ * membership still names only the first two; the five extra hold nothing.
+ */
+const SEVEN_SYSTEMS = [
+  ...COMPONENT_SYSTEMS,
+  ...['Glass', 'Herb', 'Jewel', 'Loom', 'Mint'].map((name) => ({
+    id: `sys-${name.toLowerCase()}`,
+    name,
+  })),
 ];
 
 /**
@@ -205,6 +258,11 @@ function measurePointerTargets(targets) {
   return targets.map(({ label, probe, target }) => {
     const element = document.querySelector(probe);
     if (!element) return { label, probe, target, found: false };
+    // AS A GM REACHES IT: the bulk panel is taller than its column, so a control below the fold
+    // or under the sticky dock is scrolled to before it is aimed at. `elementFromPoint` answers
+    // `null` outside the viewport and the dock for a point beneath it, and neither is a hit-test
+    // of the control — the first measurement of the inset controls read exactly those two.
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
     return {
@@ -354,6 +412,8 @@ function measureBulkGeometry() {
     tagRow: box('[data-bulk-inset="tags"] [data-world-component-bulk-option]'),
     tagChip: box('[data-world-component-bulk-tag-chip]'),
     insetPager: box('[data-bulk-inset="systems"] .fab-bulk-inset-pager'),
+    searchWell: box('[data-bulk-inset="tags"] .fab-bulk-inset-search'),
+    searchInput: box('[data-bulk-inset-search="tags"]'),
     pagerButton: box('[data-bulk-inset="systems"] .fab-bulk-inset-page'),
     essenceRow: box('[data-world-component-bulk-essence="flame"]'),
     essenceTile: box('[data-world-component-bulk-essence="flame"] [data-medallion="glyph"]'),
@@ -398,7 +458,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         // ONE VOCABULARY TAG, so the tag inset draws a row and a staged chip can be measured
         // (M24). `buildWorldScopeState` attaches this leg; the projection helper alone does not.
         scope: { ...componentScopeFor(), worldVocabulary: { categories: [], tags: ['fuel'] } },
-        systems: COMPONENT_SYSTEMS,
+        systems: SEVEN_SYSTEMS,
         // ONE WORLD ESSENCE, so the essence group draws a row whose geometry can be measured (M25).
         worldEssences: [{ id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' }],
         // `resin` is the one record NO system holds, so the bulk delete plan frees it and the
@@ -455,10 +515,12 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       await page.setContent(cataloguePage(rendered.markup, rendered.scoped.css, ''), {
         waitUntil: 'load',
       });
-      honest = await page.evaluate(measurePointerTargets, TARGETS);
+      // GEOMETRY FIRST, hit-tests after: the hit-tests scroll the panel to each control, and the
+      // geometry pass reads viewport-relative boxes.
       rowOrder = await page.evaluate(measureRowOrder);
       toolbarType = await page.evaluate(measureToolbarType);
       bulkGeometry = await page.evaluate(measureBulkGeometry);
+      honest = await page.evaluate(measurePointerTargets, TARGETS);
       await page.setContent(
         cataloguePage(rendered.markup, rendered.scoped.css, OVERLAY_CONTROL),
         { waitUntil: 'load' }
@@ -473,7 +535,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     }
   });
 
-  it('ships the four controls, armed, in the rendered product markup', () => {
+  it('ships the controls, armed, in the rendered product markup', () => {
     assert.ok(
       rendered.markup.length > 0,
       'the page rendered nothing at all — every measurement below would be about an empty tree'
@@ -749,6 +811,21 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.equal(Math.round(insetPager.height), 36, 'so the pager is the reference`s 36px');
   });
 
+  it('makes the whole 28px search well the control, not a strip inside it (issue 1371 r17-b)', () => {
+    // FOUND BY THE HIT-TEST, not by a geometry read: the first measurement of the well put the
+    // `<input>` at 263x11 inside a 28px well, so a GM aiming at the well's upper or lower third
+    // clicked the well's padding and focused nothing. `design-system/spec.md` puts a hit target
+    // at 24px or more; the input now stretches to the well.
+    const { searchWell, searchInput } = bulkGeometry;
+    assert.ok(Boolean(searchWell) && Boolean(searchInput), 'NON-VACUITY: the well and its input render');
+    assert.equal(Math.round(searchWell.height), 28, '`proto:1139`: the well is 28px');
+    assert.ok(
+      searchInput.height >= 24,
+      `the input fills the well (measured ${searchInput.height}px) — a click anywhere in the ` +
+        'well reaches the field'
+    );
+  });
+
   it('draws the essence rows at the reference`s dimensions: a 34px row, a 22px tile, 22px steppers (M25)', () => {
     const { essenceRow, essenceTile, essenceStep, essenceValue, essenceChip } = bulkGeometry;
     assert.ok(Boolean(essenceRow), 'NON-VACUITY: the essence group drew its row');
@@ -768,14 +845,15 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   });
 
   it('and reports a MISS on every one of them under a transparent overlay', () => {
-    // The control. Without it, `matched: true` for four selectors is equally consistent with a
+    // The control. Without it, `matched: true` for nine selectors is equally consistent with a
     // hit test that works and one that answers `true` for anything.
     const missed = overlaid.filter((entry) => entry.found && !entry.matched);
     assert.equal(
       missed.length,
       TARGETS.length,
-      'an overlay stretched over the row and the dock must intercept ALL FOUR targets; it ' +
-        `intercepted ${missed.length}: ${JSON.stringify(overlaid, null, 2)}`
+      'an overlay stretched over the row, the dock, the insets and the chip run must intercept ' +
+        `ALL ${TARGETS.length} targets; it intercepted ${missed.length}: ` +
+        JSON.stringify(overlaid, null, 2)
     );
     for (const entry of missed) {
       assert.ok(

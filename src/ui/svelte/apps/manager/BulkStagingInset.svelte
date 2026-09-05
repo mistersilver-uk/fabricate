@@ -335,9 +335,12 @@
   }
 
   /* Foundry core sizes every `<input>` to its own height and border; both are reset here so the
-     field is the WELL and not a second box inside it. */
+     field is the WELL and not a second box inside it. STRETCHED to the well's height (issue 1371
+     r17-b): with `height: auto` alone the field was an 11px strip on the well's centre line, so a
+     click in the well's upper or lower third focused nothing — the whole well is the control. */
   .fab-bulk-inset-search input {
     flex: 1 1 auto;
+    align-self: stretch;
     width: auto;
     height: auto;
     min-width: 0;
