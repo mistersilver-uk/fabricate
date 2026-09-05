@@ -13000,6 +13000,7 @@ test('a hovered SELECTED option row keeps the shared Select`s own fill', async (
 const CONVERTED_PAGER_SITES = Object.freeze([
   Object.freeze({
     probe: 'inventory',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'inventory-grid-pagination',
     component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
@@ -13009,6 +13010,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
   Object.freeze({
     probe: 'recipes',
+    padding: '8px',
     area: 'fabricate-app',
     wrapper: 'crafting-browser-pagination',
     component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
@@ -13018,6 +13020,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
   Object.freeze({
     probe: 'environments',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'gathering-env-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
@@ -13027,6 +13030,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
   Object.freeze({
     probe: 'tasks',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte',
@@ -13036,6 +13040,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
   Object.freeze({
     probe: 'events',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte',
@@ -13045,6 +13050,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
   Object.freeze({
     probe: 'journal',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'journal-history-body',
     component: 'src/ui/svelte/apps/journal/HistoryList.svelte',
@@ -13056,6 +13062,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   // which is the visible move the frames carry — and it is the ONLY site with a width floor.
   Object.freeze({
     probe: 'manager',
+    padding: '12px',
     area: 'fabricate-manager',
     wrapper: 'manager-main',
     component: '',
@@ -13131,6 +13138,7 @@ test('every converted pager site paints its own trigger fill, and only the manag
         return {
           background: style.backgroundColor,
           minWidth: style.minWidth,
+          paddingInline: style.paddingInlineStart,
           height: element.getBoundingClientRect().height,
           radius: style.borderTopLeftRadius,
         };
@@ -13196,6 +13204,21 @@ test('every converted pager site paints its own trigger fill, and only the manag
         measured.radius,
         '7px',
         `${site.probe}: and so does the corner, which is the axis the pager matches its arrows on`
+      );
+      // THE TRIGGER'S OWN INLINE PADDING, which is the axis the conversion widened. The family
+      // declares `--fab-space-3` (12px) each side, and against the native control it replaced
+      // that is 12px of extra box — absorbed by the summary, which is the only shrinkable item
+      // in every one of these bars. Six bars have room for it; the crafting browser's is the
+      // narrowest column in either application and its summary truncated INSIDE the range
+      // number, so that site alone narrows to `--fab-space-2`. Asserted per site rather than
+      // once, because a family-wide change is the way this per-site licence gets lost.
+      assert.equal(
+        measured.paddingInline,
+        site.padding,
+        `${site.probe}: the trigger's inline padding is ${site.padding}` +
+          (site.padding === '8px'
+            ? ', narrowed at this site because the summary beside it is the row`s only shrink'
+            : ', the family`s own --fab-space-3 rung')
       );
       const hit = report.hits[site.probe];
       assert.ok(

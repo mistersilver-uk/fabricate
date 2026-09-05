@@ -393,6 +393,15 @@
        native select it replaces: the footer is one nowrap line in a narrow column, and a floor
        is the thing that would wrap it. */
     min-width: 0;
+    /* AND IT NARROWS THE TRIGGER'S OWN INLINE PADDING, at this site only. The family's
+       `padding: 0 var(--fab-space-3)` plus its gap and chevron measure 12px wider than the
+       native control they replace (49 -> 61px), and the summary beside them is the row's only
+       shrinkable item — so the whole 12px came out of it and `Showing 1-12 o…` truncated to
+       `Showing 1-1…`, inside the range number, which reads as a different and wrong fact. The
+       narrowest player column is the reason this site alone takes it: the inventory pager's
+       summary survives the same growth intact. `--fab-space-2` is a published step, so the
+       spacing ladder does not move. */
+    padding-inline: var(--fab-space-2);
   }
 
   .crafting-browser-pagination :global(.manager-icon-button) {
