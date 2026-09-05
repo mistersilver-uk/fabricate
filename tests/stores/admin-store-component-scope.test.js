@@ -76,11 +76,27 @@ function componentsOf(harness) {
  * `makeEssenceStoreHarness` ships no `deleteComponents` (it was written for the essence suites), and
  * `tests/helpers/**` belongs to no one lane, so the seam is installed here.
  *
+ * ## And the two failure windows are injected HERE, into the shipped cascade
+ *
+ * `failAt` reddens one of the two seams the cascade actually has, and their ORDER is the whole
+ * point (issue 1371, round 11). `_deleteComponentSet` persists ONCE, at its end:
+ *
+ *   `persist`   — `this.save()` throws. Nothing durable landed; the saved `craftingSystems` value
+ *                 still holds the row.
+ *   `reconcile` — `_reconcileAlchemySignaturesAfterDeletion` throws, which `deleteComponents` runs
+ *                 only AFTER `_deleteComponentSet` has returned. The row is durably gone.
+ *
+ * They are injected as collaborators of the REAL method bodies rather than as a thrown-from stub
+ * standing in for the cascade, so what the store sees on the way out — including what
+ * `getSystem` reads afterwards — is what the shipped manager leaves behind, not what a fixture
+ * decided to leave behind. That distinction is load-bearing for the two window tests below.
+ *
  * @param {object} harness the essence store harness.
+ * @param {{failAt?: 'persist'|'reconcile'}} [options] which seam of the cascade should throw.
  * @returns {{calls: Array<{systemId: string, componentIds: string[]}>, infos: string[]}} what the
  *   store asked for, and what the GM was told.
  */
-function installSanctionedComponentDelete(harness) {
+function installSanctionedComponentDelete(harness, { failAt } = {}) {
   const proto = CraftingSystemManager.prototype;
   const infos = [];
   // `deleteComponents` announces the cascade through the Foundry global. Undeclared, `ui?.` is a
@@ -104,11 +120,15 @@ function installSanctionedComponentDelete(harness) {
       notifyRecipesChanged: () => {},
     },
     getSystem: (systemId) => harness.systemManager.getSystem(systemId),
-    save: async () => {},
+    save: async () => {
+      if (failAt === 'persist') throw new Error('The crafting systems setting could not be saved.');
+    },
     _assertGM: () => {},
     _notifySystemsChanged: () => {},
     _cleanupSalvageRunsForComponent: async () => {},
-    _reconcileAlchemySignaturesAfterDeletion: async () => {},
+    _reconcileAlchemySignaturesAfterDeletion: async () => {
+      if (failAt === 'reconcile') throw new Error('Alchemy signatures could not be reconciled.');
+    },
     _stripComponentsFromRecipes: proto._stripComponentsFromRecipes,
     _deleteComponentSet: proto._deleteComponentSet,
   };
@@ -565,4 +585,201 @@ test('1371: but a membership record it did NOT write is left alone', async () =>
     'the pre-existing membership record survives the refusal'
   );
   assert.equal(harness.notifications.error.length, 1, 'and the GM is still told the seed failed');
+});
+
+// ── THE REMOVAL'S FAILURE WINDOWS (issue 1371, round 11) ───────────────────────────────────
+//
+// Round 8 closed the MISSING-seam case (a manager with no `deleteComponents` refuses the whole
+// removal) and left the THROWING-seam case open: the membership half was written first and
+// awaited, so a rejection out of the delete cascade escaped with the membership record already
+// gone and the in-system row still standing — the ghost this verb is composed to prevent, reached
+// by failure instead of by design — and escaped the catalogue's bulk loop as an unhandled
+// rejection on the way.
+//
+// The fix is the ORDER rather than a rollback, so these tests are about ORDER and about the two
+// windows the shipped cascade actually has. `_deleteComponentSet` persists once at its end, so a
+// throw before that persist leaves the row durably in place and a throw after it (from
+// `_reconcileAlchemySignaturesAfterDeletion`) leaves it really gone. Both are driven below, and
+// both are driven through the REAL method bodies — a stub that just threw would prove nothing
+// about what the manager leaves behind, which is the whole question.
+
+test('1371: the removal deletes the IN-SYSTEM row first, while the membership record still stands', async () => {
+  // THE ORDER IS THE COMPENSATION, so the order is what is pinned. Swapping the two lines back
+  // passes every end-state assertion in this file — both halves are gone either way — and reddens
+  // only here.
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+
+  // A PROBE ON THE DELETE, so the order is observable rather than inferred: the membership record
+  // lives in the scope payload and the row in the system, so neither one's absence at the end says
+  // which went first.
+  const membershipAtDelete = [];
+  const installed = harness.systemManager.deleteComponents;
+  harness.systemManager.deleteComponents = async (systemId, componentIds) => {
+    membershipAtDelete.push(...Object.values(scope.payload.membership));
+    return await installed(systemId, componentIds);
+  };
+
+  assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), true);
+
+  assert.equal(
+    membershipAtDelete.length,
+    1,
+    'the membership record was STILL THERE when the delete cascade ran — so a throw out of the ' +
+      'cascade cannot leave the ghost, because the half that creates it has not run yet'
+  );
+  assert.deepEqual(Object.values(scope.payload.membership), [], 'and it is gone afterwards');
+  assert.deepEqual(componentsOf(harness).map((record) => record.id), [], 'as is the row');
+});
+
+/**
+ * Drive a removal whose in-system half throws at one of the cascade's two seams.
+ *
+ * Shared by the two window tests because they are ONE contract asked twice — the store's answer
+ * must not depend on which side of the persist the manager fell over, since it cannot tell.
+ * Written once so the two cannot drift, and so the pair adds no duplicated block to the gate.
+ *
+ * @param {'persist'|'reconcile'} failAt which seam of the shipped cascade throws.
+ * @returns {Promise<{answer: boolean, membership: string[], rows: string[], errors: string[]}>}
+ */
+async function driveRemovalFailure(failAt) {
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness, { failAt });
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+  harness.notifications.error.length = 0;
+
+  // NO `assert.rejects` HERE, and that is the first thing under test: the verb has to ANSWER.
+  const answer = await store.worldScope.component.removeFromSystem('ingot', 'sys1');
+
+  return {
+    answer,
+    membership: Object.values(scope.payload.membership).map((record) => record.entityId),
+    rows: componentsOf(harness).map((record) => record.id),
+    errors: [...harness.notifications.error],
+  };
+}
+
+test('1371: a delete that throws BEFORE its persist leaves the membership record ALONE', async () => {
+  // WINDOW ONE. `_deleteComponentSet` gets as far as `this.save()` and the settings write is
+  // refused, so nothing durable landed and the saved `craftingSystems` value still holds the row.
+  const outcome = await driveRemovalFailure('persist');
+
+  assert.deepEqual(
+    outcome.membership,
+    ['ingot'],
+    'the membership record survives, because the ordering means it was never written to at all — ' +
+      'this is the assertion the ghost cannot get past'
+  );
+  assert.equal(outcome.errors.length, 1, 'the GM is told, once');
+  assert.ok(
+    outcome.errors[0].includes('The crafting systems setting could not be saved.'),
+    'and told the reason the manager gave, which is the half they can act on'
+  );
+  assert.ok(
+    !outcome.errors[0].startsWith('FABRICATE.'),
+    'and no GM ever reads a raw key: there is no component RemoveFromSystemFailed key, so this ' +
+      'path states its English rather than naming a key that would print itself'
+  );
+});
+
+test('1371: and so does one that throws AFTER it — the store cannot tell the two windows apart', async () => {
+  // WINDOW TWO, and THE MEASUREMENT THAT SETTLES THE DESIGN. `deleteComponents` runs
+  // `_reconcileAlchemySignaturesAfterDeletion` only once `_deleteComponentSet` has returned, so
+  // here the row is DURABLY gone where in window one it was not.
+  //
+  // The obvious alternative fix — keep the membership-first order and restore the record "only if
+  // the in-system row still stands" — needs those two windows to be told apart from the store.
+  // They cannot be: `_deleteComponentSet` mutates `system.components` IN PLACE before it persists,
+  // and `getSystem` hands back that same live object, so the row reads GONE in both. The
+  // assertion below is that reading, and it is why the shipped fix is the order instead.
+  const before = await driveRemovalFailure('persist');
+  const after = await driveRemovalFailure('reconcile');
+
+  assert.deepEqual(after.membership, ['ingot'], 'the membership record survives here too');
+  assert.equal(after.errors.length, 1, 'and the GM is told, once');
+  assert.deepEqual(
+    after.rows,
+    [],
+    'the row reads GONE after a throw from beyond the persist, which is the true state'
+  );
+  assert.deepEqual(
+    before.rows,
+    [],
+    'AND IT READS GONE after a throw from the persist itself, where the setting still holds it — ' +
+      'so "restore the membership record only if the row still stands" would never once fire in ' +
+      'the window it would have been written for'
+  );
+  assert.equal(
+    before.answer,
+    after.answer,
+    'so the two windows get the same answer, because the store has no way to give them different ' +
+      'ones honestly'
+  );
+  assert.equal(
+    after.answer,
+    true,
+    'and the answer is "something changed" rather than "it worked": `_republishingFamily` gates ' +
+      'the re-projection on it, and a screen still drawing a row no reader can find is the one ' +
+      'outcome worse than a failure the GM was told about'
+  );
+});
+
+test('1371: a membership write that throws leaves only the INERT half, and still moves the screen', async () => {
+  // THE SECOND HALF'S OWN WINDOW. The row is gone and the recipe cascade has already run, so there
+  // is nothing to give back — re-seeding the row could not restore the rewritten recipes, and the
+  // membership record standing over a missing row is the harmless partial state: the read union
+  // iterates the IN-SYSTEM array, finds nothing, and draws nothing.
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+  scope.store.save = async () => {
+    throw new Error('The component scope setting could not be saved.');
+  };
+  harness.notifications.error.length = 0;
+
+  const answer = await store.worldScope.component.removeFromSystem('ingot', 'sys1');
+
+  assert.equal(
+    answer,
+    true,
+    'the row really is gone, so the projection MUST be re-published even though the verb failed'
+  );
+  assert.deepEqual(componentsOf(harness).map((record) => record.id), [], 'the row is gone');
+  assert.deepEqual(
+    Object.values(scope.payload.membership).map((record) => record.entityId),
+    ['ingot'],
+    'and the membership record is the half left over — invisible to the read union, and reused ' +
+      'rather than tripped over by the next Add to system'
+  );
+  assert.equal(harness.notifications.error.length, 1, 'the GM is told, once');
+});
+
+test('1371: a removal that writes nothing at all answers false, and spends no re-projection', async () => {
+  // THE NEGATIVE CONTROL FOR THE CATCH'S ANSWER. Every assertion above reads `true` out of a
+  // failure, so an implementation that simply answered `true` from the catch would pass all of
+  // them. Here the system holds no row at all and the scope write is refused: nothing moved, and
+  // the honest answer is `false` — `_republishingFamily` must not spend a publish on it.
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  scope.store.save = async () => {
+    throw new Error('The component scope setting could not be saved.');
+  };
+
+  assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), false);
+  assert.deepEqual(
+    Object.values(scope.payload.membership).map((record) => record.entityId),
+    ['ingot'],
+    'nothing was written, so nothing is missing'
+  );
+  assert.equal(harness.notifications.error.length, 1, 'and the GM is still told it did not happen');
 });

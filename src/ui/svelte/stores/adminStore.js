@@ -6100,29 +6100,108 @@ export function createAdminStore(services) {
    * "remove from this system" and "delete this system's component" leave the same system behind.
    * The world entity is what survives one and not the other.
    *
-   * A MANAGER THAT CANNOT DELETE REFUSES THE WHOLE ACTION rather than half of it, on
-   * {@link adoptWorldTool}'s precedent: it checks for `upsertTool` BEFORE writing the membership
-   * record because a write it cannot complete is worse than one it never starts. Here the
-   * asymmetry is sharper still — removing the membership record and then failing to remove the
-   * row leaves the component resolving in a system the GM has removed it from, with the world
-   * layer no longer consulted, which is the exact defect this verb is composed to prevent.
+   * ── THE ORDER IS THE COMPENSATION (issue 1371, round 11) ──────────────────────────────────
+   * The two halves used to run membership-first, awaited, with nothing around the second — so a
+   * throw out of the delete cascade escaped with the membership record already gone and the
+   * in-system row still standing. That is the ghost the first paragraph exists to prevent,
+   * reached by failure rather than by design.
+   *
+   * The answer is the ORDER, not a rollback, because the two partial states are not equally bad:
+   *
+   *   ROW GONE, MEMBERSHIP LEFT — inert. The read union iterates the IN-SYSTEM array and only
+   *     enriches rows it finds there, so a membership record with no row draws NOTHING. The
+   *     component is absent from the system, which is what the GM asked for; the stale record is
+   *     invisible and the next `Add to system` reuses it rather than tripping over it.
+   *   MEMBERSHIP GONE, ROW LEFT — the ghost. The row resolves on, with the world layer no longer
+   *     consulted, and no screen says so.
+   *
+   * So THE DELETE GOES FIRST and the membership record second. A throw from the first half has
+   * then written no membership at all, and a throw from the second can only leave the inert half.
+   * Neither window can reach the ghost, and neither needs a compensating write — which is the
+   * point of ordering rather than rolling back: a rollback is one more write that can fail, on a
+   * path only reached because a write already failed.
+   *
+   * AND THE ROLLBACK COULD NOT HAVE BEEN WRITTEN CORRECTLY HERE, which is worth recording
+   * because it is the obvious alternative and it was the one asked for. Two reasons, both
+   * measured rather than argued:
+   *
+   *   1. THERE IS NO VERB TO RESTORE THE RECORD WITH. `removeFromSystem` deletes the membership
+   *      record AND its per-section overrides, and the family publishes no "write this record
+   *      back": `addToSystem` mints a FRESH `{entityId, systemId, inherit: {}}`. Re-adding
+   *      through it would answer a failed removal by discarding every per-system override the GM
+   *      authored — a data loss the failure itself did not cause.
+   *   2. THE TWO FAILURE WINDOWS ARE NOT DISTINGUISHABLE FROM HERE. `_deleteComponentSet` mutates
+   *      `system.components` IN PLACE and persists ONCE at the end, and `getSystem` hands back
+   *      that same live object — so after a throw from the persist (nothing durable, the setting
+   *      still holds the row) and after a throw from `_reconcileAlchemySignaturesAfterDeletion`
+   *      (fully durable, the row really is gone) the row reads GONE either way. A "restore the
+   *      membership record only if the row still stands" rule therefore never fires in the window
+   *      it would have been written for. Both windows are pinned, with that reading printed, in
+   *      `tests/stores/admin-store-component-scope.test.js`.
+   *
+   * ── WHAT THE CATCH ANSWERS, AND WHY IT IS NOT ALWAYS `false` ──────────────────────────────
+   * The failure is REPORTED rather than propagated, on the same rule the join follows: the
+   * catalogue's bulk apply runs this verb over many component/system pairs, and an escaping
+   * rejection skips every remaining pair, never reaches `clearSelection()` and surfaces as an
+   * unhandled rejection.
+   *
+   * The value it answers is "did anything change", NOT "did it succeed", because that is what
+   * `_republishingFamily` gates the re-projection on. The delete's in-memory mutation lands
+   * before every throw that can follow it, so on failure the answer is read off the state every
+   * reader can now see: if the row is gone the screen is stale and MUST be re-projected even
+   * though the operation failed, and if it still stands nothing moved and a publish would be
+   * spent on nothing.
+   *
+   * A MANAGER THAT CANNOT DELETE STILL REFUSES THE WHOLE ACTION rather than half of it, on
+   * {@link adoptWorldTool}'s precedent, and the guard is load-bearing under this order too:
+   * without it `_dropInSystemComponent` would answer `false` for a missing seam and the
+   * membership half would then run ALONE, which is the ghost by the shortest route of all.
    *
    * @param {string} entityId the world component id.
    * @param {string} systemId the crafting system to remove it from.
-   * @returns {Promise<boolean>} whether anything was written.
+   * @returns {Promise<boolean>} whether anything changed.
    */
   async function partComponentFromSystem(entityId, systemId) {
     const target = typeof entityId === 'string' ? entityId.trim() : '';
     const system = typeof systemId === 'string' ? systemId.trim() : '';
     if (!target || !system) return false;
     const systemManager = services.getCraftingSystemManager?.();
-    const holdsRecord = _inSystemComponents(systemManager, system).some(
-      (record) => String(record?.id ?? '').trim() === target
-    );
+    const holdsRecord = _systemHoldsComponentRow(systemManager, system, target);
     if (holdsRecord && typeof systemManager?.deleteComponents !== 'function') return false;
-    const parted = await worldScopeFamilies.component.removeFromSystem(target, system);
-    const dropped = holdsRecord ? await _dropInSystemComponent(target, system) : false;
-    return parted || dropped;
+    try {
+      const dropped = holdsRecord ? await _dropInSystemComponent(target, system) : false;
+      const parted = await worldScopeFamilies.component.removeFromSystem(target, system);
+      return parted || dropped;
+    } catch (error) {
+      services.notify?.error?.(_componentPartFailureMessage(error));
+      return holdsRecord && !_systemHoldsComponentRow(systemManager, system, target);
+    }
+  }
+
+  /**
+   * The message a FAILED component removal puts in front of the GM.
+   *
+   * ── IT IS PLAIN ENGLISH ON PURPOSE, unlike its join twin ──────────────────────────────────
+   * `_componentJoinFailureMessage` names a lang key because one exists for it. There is no
+   * component `RemoveFromSystemFailed` key — the Tool family has one, the component family does
+   * not — and `localize` answers a MISSING key with the key itself, so naming one here would put
+   * `FABRICATE.…` on the GM's screen instead of a sentence. Adding the key belongs to whichever
+   * lane owns `lang/en.json`; until then this reads as English, which is the floor the key-echo
+   * idiom exists to guarantee anyway.
+   *
+   * ── AND IT SAYS "DID NOT COMPLETE" RATHER THAN "FAILED", which is a precision and not a hedge ─
+   * The join either lands or is undone, so its message can say the component was not added. This
+   * one cannot: a throw from the second half leaves the in-system row really gone, and a throw
+   * from the first leaves the manager's in-memory system and the saved setting disagreeing about
+   * it. The sentence has to be true of every one of those, and "did not complete" is — where "was
+   * not removed" would be a fresh false statement in two of the three.
+   *
+   * @param {unknown} error the failure thrown by either half of the removal.
+   * @returns {string}
+   */
+  function _componentPartFailureMessage(error) {
+    const detail = error?.message ? String(error.message) : '';
+    return `Removing the component from this system did not complete. ${detail}`.trim();
   }
 
   /**
@@ -6135,6 +6214,24 @@ export function createAdminStore(services) {
   function _inSystemComponents(systemManager, systemId) {
     const system = systemManager?.getSystem?.(systemId);
     return Array.isArray(system?.components) ? system.components : [];
+  }
+
+  /**
+   * Whether one system's in-system `components` array currently holds a row for this id.
+   *
+   * Read TWICE by {@link partComponentFromSystem} — once to decide whether the delete half runs
+   * at all, and once after a failure to decide whether the screen has to move — so it is one
+   * predicate rather than the same `.some` written out in two places that could drift apart.
+   *
+   * @param {object|null|undefined} systemManager
+   * @param {string} systemId
+   * @param {string} entityId
+   * @returns {boolean}
+   */
+  function _systemHoldsComponentRow(systemManager, systemId, entityId) {
+    return _inSystemComponents(systemManager, systemId).some(
+      (record) => String(record?.id ?? '').trim() === entityId
+    );
   }
 
   /**
@@ -6379,15 +6476,38 @@ export function createAdminStore(services) {
   // rather than fixed from a component lane.
   //
   // THE SAME FOLLOW-UP CARRIES THE UNCOMPENSATED TWO-KEY SPLIT ON BOTH FAMILIES (issue 1371,
-  // round 8, recorded rather than built). Every composed membership verb here writes TWO world
-  // settings — `componentScope` (or its tool twin) and `craftingSystems` — one after the other,
-  // with no pre-state snapshot and no reverse-order compensation. `adoptWorldTool` and
-  // `joinComponentToSystem` each undo their OWN first write when the second is refused, which is
-  // the reachable half; what neither can report is a compensation that itself fails, and neither
-  // `removeFromSystem` path compensates at all. Restoring a membership record after a partial
-  // delete would manufacture the very ghost state the rollback exists to prevent, so the remove
-  // paths deliberately do not try. Closing this properly means one transactional seam over both
-  // settings, which belongs to the tool follow-up above and not to a component lane.
+  // rounds 8 and 11, recorded rather than built). Every composed membership verb here writes TWO
+  // world settings — `componentScope` (or its tool twin) and `craftingSystems` — one after the
+  // other, with no pre-state snapshot and no cross-setting transaction. What each verb can do,
+  // and now does, is make its OWN failure windows harmless:
+  //
+  //   `adoptWorldTool` and `joinComponentToSystem` undo their own first write when the second is
+  //     refused, because for an ADD the dangerous partial state is the one their first write
+  //     creates.
+  //   `partComponentFromSystem` ORDERS the two halves so that neither partial state is the
+  //     dangerous one, because for a REMOVE there is nothing to undo: the delete cascade has
+  //     already rewritten this system's recipes by the time the second half can fail, and no
+  //     membership write can give those back.
+  //
+  // ROUND 11 CORRECTED THIS NOTE'S REASON, which is worth saying because it was over-broad and a
+  // later lane would have inherited it. It read that restoring a membership record after a
+  // partial delete "would manufacture the very ghost state the rollback exists to prevent", as
+  // if that held generally. It does not: `_deleteComponentSet` persists ONCE at its end, so a
+  // throw before that persist leaves the row durably in place and restoring membership would
+  // have restored the CORRECT state, not a ghost. Only a throw after it — from
+  // `_reconcileAlchemySignaturesAfterDeletion`, which `deleteComponents` runs once
+  // `_deleteComponentSet` has returned — leaves the row really gone. The reason the remove path
+  // does not restore is narrower and stated where it belongs, on
+  // {@link partComponentFromSystem}: the two windows are indistinguishable from here (the
+  // cascade mutates the live system object before it persists, so the row reads gone in both),
+  // and the family publishes no verb that could write the removed record back with its
+  // overrides intact.
+  //
+  // WHAT IS STILL OPEN is the tool family's `removeFromSystem`, which is the generic verb and so
+  // has neither the delete cascade nor the ordering, and the genuinely undetectable case on every
+  // verb here: a compensation that itself fails. Closing those properly means one transactional
+  // seam over both settings, which belongs to the tool follow-up above and not to a component
+  // lane.
   const worldScopeApi = {
     ...worldScope,
     tool: { ...worldScope.tool, addToSystem: adoptWorldTool },
