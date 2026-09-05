@@ -154,7 +154,8 @@ Only a component with no linked source item takes typed **Name** and **Descripti
 
 **Save entry** holds every edit made on this screen and writes them together when you press it: the name and description on a component with no linked source item, then the world category, the world tags, the world essence values, and the aliases, in that order.
 The **Unsaved changes** marker lights while any of them is pending, so **Save entry** covers a linked component's category, tags, essence values, or aliases even though its name and description cannot be typed over.
-If part of the save fails, the rest of the sequence stops there, whatever had already been written stays written, and Fabricate tells you which part could not be saved and, if anything had already landed, what that was.
+If part of the save fails, the rest of the sequence stops there and whatever had already been written stays written.
+Where Fabricate can name what happened, it tells you which part could not be saved and, if anything had already landed, what that was.
 The linked item itself, adding or removing this component from a crafting system, and deleting the entry, take effect immediately and are not part of what **Save entry** writes.
 
 If you leave with unsaved changes, Fabricate asks whether to save, discard, or keep editing.
@@ -251,7 +252,7 @@ A rail on the right, present on both tabs, shows the same preview a player sees:
 Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
 The rail updates live as you edit the entry.
 It is the same rail a crafting system's own Component Rules editor draws, narrowed to what that system resolves.
-On a narrow window the rail moves below the tab strip and its cards instead of standing beside them, and both keep their own scrolling.
+On a narrow window the rail moves below the tab strip and its cards instead of standing beside them, each keeping its own full height while the whole pane scrolls.
 
 ## Component Rules
 
@@ -489,4 +490,4 @@ A rail on the right, present on both tabs, shows the same preview a player sees 
 Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
 The rail updates live as you edit, and states that art, name and description come from the world catalogue entry.
 It is the same rail the component's world entry draws, narrowed to what this system resolves.
-On a narrow window it moves below the tab strip and its cards instead of standing beside them, and both keep their own scrolling.
+On a narrow window it moves below the tab strip and its cards instead of standing beside them, each keeping its own full height while the whole pane scrolls.

@@ -178,8 +178,8 @@ From there you can:
 - stage an icon, a colour, or an enabled/disabled status across every selected essence, leaving anything you do not touch unchanged
 - see how many essences are currently selected before you apply
 
-The colour control is withheld, with a note in its place, whenever any selected essence already has a colour set in the Essence Catalogue.
-A value staged here would only be overridden by that shared colour the moment you saved it, so the panel does not offer it.
+The colour control is withheld, with a note in its place, for every essence the world Essence Catalogue already holds.
+Colour is authored once on the world essence, and this system's own copy is not what any screen draws, so the axis is offered only for an essence the world does not hold yet.
 
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
