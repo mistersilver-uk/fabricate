@@ -241,7 +241,7 @@ That is its category, its tags, its essences, its salvage setup, and, in Progres
 **Add from catalogue**, in the header, opens a picker listing every world catalogue component this system does not already hold.
 Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
 Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.
-The confirm button names how many components and which system they are joining, such as **Add 2 to Mythwright Forge**.
+The confirm button reads **Create rules**; the picker's title names the system the components are joining, and the count in its foot says how many.
 As the picker's own subtitle says, new rules start empty, and the world category is inherited until this system overrides it.
 Fabricate adds the ticked components one at a time.
 If one cannot be added, for example because another component in this system already claims the same source item, the rest are still added, and the picker stays open with the refused rows still ticked under a sentence counting how many could not be added.
@@ -336,10 +336,10 @@ Each row shows the component's name and a short description line, together with 
 The toolbar above the list gives you:
 
 - a **Category** filter, defaulting to **All categories**
-- an essence filter, defaulting to **All essences**
+- an essence filter, defaulting to **All essences**, which also offers **Carries any essence** and **No essences** ahead of the system's own essences
 - a **Select all** checkbox, which opens the bulk panel in the inspector once anything is selected, described under [Bulk editing rules in this system](#bulk-editing-rules-in-this-system) below
 - a **Group by category** switch, on by default
-- a **Sort by** control offering **Name**, **Category**, **Essences**, and **Salvage**, with a button to flip between ascending and descending
+- a **Sort by** control offering **Name**, **Category**, **Essences**, **Tags**, and **Salvage**, with a button to flip between ascending and descending
 
 While **Group by category** is on, the list is split into a heading per category with a count of the components in it.
 Groups do not collapse.
