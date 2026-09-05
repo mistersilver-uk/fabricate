@@ -2416,6 +2416,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    **A FLAG WRITE THAT LANDS AHEAD OF A VALUE WRITE THAT THEN FAILS IS ROLLED BACK TO THE RECORD'S PRE-STATE, NOT MERELY TO THE FIELD IT MOVED** (issue 1371 r21-store4).
    The flip is a durable, replicated world-setting write made BEFORE the values, so leaving it standing over a failed write would opt those pairs out of every later world edit while the GM is told the write failed.
    Moving the switch OFF has a SECOND effect — it seeds the membership record's own block from the world map when the record carried none — and moving it back ON does not undo that half, so a switch-only compensation leaves a retained dormant override the pre-state did not have.
+   The restored switch reads as inheriting again through an explicit `true` where the pre-state commonly had the key absent; every reader tests `!== false`, so the two are one state.
    Nothing resolves that block, so the state reads as repaired; but a later genuine flip-off RESTORES a retained block rather than re-seeding, so the system would silently start from the map as it stood at the failed save rather than as the world has it now.
    The compensation therefore also removes a block the flip itself seeded, and the writer records, per flipped pair, whether it seeded — a fact the corpus can no longer answer once the block exists.
    **AND THE COMPENSATED REGION IS THE WRITE, NEVER THE REPUBLISH THAT FOLLOWS IT.**
@@ -2431,6 +2432,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    **THE BASELINE IS A FACT ABOUT THE RENDER, SO IT IS CAPTURED WHERE THE ROWS WERE DRAWN AND TRAVELS WITH THEM** (issue 1371 r21-store4).
    Re-deriving it when the save runs reads the record as it is THEN, and an editor window registers no hooks: a replicated world-scope write landing while it is open moves the baseline out from under the rows the GM is looking at, so an untouched save differs from it and is read as an authored override.
    A draft that carries its own baseline is believed over anything the caller re-derives, and the same holds for the carried entries below.
+   The standalone component editor states its baseline this way; the in-page rules editor states none and the rule falls back to the map the system resolves at save time, so on that screen a world-scope write landing while the editor is open can still read an untouched save as authored — a narrow, two-GM window recorded on the follow-up issue rather than closed here.
    **AND AN EDITOR'S ROUND TRIP MUST NOT NARROW THE MAP.**
    Since a world map is not narrowed to the ids a given system holds, an editor whose rows come from that system's essence roster carries every id outside it FORWARD in the write instead of dropping it; such an id is carried rather than offered, because the system has no name, icon or control for it.
    What an in-system row may finally HOLD is still `## CraftingSystem`'s own roster rule, enforced at the in-system normalizer.
