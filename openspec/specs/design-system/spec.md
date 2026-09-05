@@ -134,7 +134,7 @@ FIRST, a shared primitive's family belongs in the GLOBAL SHEET rather than in a 
 A Svelte-scoped rule compiles to two classes and is injected UNLAYERED against a sheet imported at `layer(modules)`, so it silently out-ranks every global rule at any specificity, and it is invisible to the gate that proves a family is not app-rooted — a primitive that hid its family there would be the one member of the set nobody can check.
 Where a CALL SITE deliberately relies on that same mechanism to state its own per-site skin, the exception is recorded at the call site with its owner named, rather than left for a later reader to find as a defect.
 
-SECOND, a family whose every class carries the `fabricate-` namespace prefix MUST declare every one of those classes as a namespace root in the gate's entry, because the gate tells a namespace root from an application root BY NAME and not by shape.
+SECOND, a family whose every class carries the `fabricate-` namespace prefix MUST declare every one of those classes as a namespace root in the gate's entry, because the gate tells a namespace root from an application root BY NAME and not by shape — every class it writes as a WHOLE TOKEN by name, and every class it composes by interpolation by PATTERN, because listing an interpolated rung as a literal reds the clause that proves a declared root is actually emitted.
 Where such a family composes ANOTHER primitive's root markup, its mirrored fixture pairs name the INHERITED classes rather than its own; a self-referential pair is satisfied by construction and protects nothing.
 A fixture written for such a pair therefore writes the composed ROOT with the composing element nested inside it, because the pair's anchor is the root class and not the inner control — a trigger written on its own matches none of the rules that paint it and measures the host's default while still naming the primitive.
 
@@ -535,6 +535,7 @@ All five of those affordances are now BUILDABLE IN ONE CONTROL, and each has a h
 The key map SKIPS a disabled row rather than parking a cursor on one Enter cannot act on.
 An app-drawn one-of-N list MUST also RESTORE the platform behaviour it replaces rather than trade it away: type-ahead over the option labels, from the CLOSED trigger as well as from the open panel, because the closed trigger is where a native `select`'s type-ahead is actually used.
 The restored behaviour moves an ACTIVE OPTION and never the value, so a dismissal leaves the value untouched and no provisional-value machinery joins the shared surface.
+A match from a CLOSED trigger opens the panel on the matched row rather than committing it; a prefix that matches nothing opens nothing, so a mistyped character is not a state change.
 Two of the five — the badge and the unavailable reason — ship with no caller on this commit and are held by test rather than by a frame.
 `tests/components/design-system-debt-ratchets.test.js` counts every native `<select>` twice over, once as a parsed element in the Svelte templates and once as markup in a JavaScript template string, since a DialogV2 body cannot host a component and is therefore the one place the rule may not reach.
 A single element is exempted by a `<!-- native select: reason -->` comment on the lines above it, which makes the exception a written decision rather than a silent one.
@@ -648,6 +649,8 @@ And the panel is PORTALED to the nearest application root, so every driver that 
 The picker MUST name both surfaces it renders.
 The portaled panel and the option list inside it take one accessible name from the caller, so a caller that omits it produces a dialog with no name wrapping a list with no name.
 Neither is visible in a frame, neither is a compiler error and no lint rule covers it, so the naming obligation is enforced at the source.
+That name is taken as a STRING or as a POINTER at a caption the caller already renders, because a caller whose control is named by a visible caption has no string to pass and would otherwise resolve the panel's name to nothing; where both are given the pointer is emitted and the string is omitted, so the two surfaces cannot be named twice or differently.
+A source read alone cannot discharge the obligation once a PRIMITIVE composes the primitive: a forwarded expression is present in the text of the call site and still resolves to the empty string at runtime, so a composing primitive owes a MOUNTED assertion of the rendered names as well.
 
 There is a THIRD NAMING ROUTE for the trigger, and it exists because a caller that supplies a trigger SNIPPET renders its own button and the primitive renders none.
 Such a caller does not name the trigger through the primitive's label prop; it names it on the element it spreads the primitive's attributes onto.
@@ -913,7 +916,7 @@ Every select in the product MUST therefore render the app’s own option list, u
 Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
 
 THE IMPLEMENTATION IS `src/ui/svelte/components/Select.svelte`, composed over `SearchablePopover` with the query field suppressed, and a surface that needs a one-of-N choice MUST render through it rather than restate its markup.
-The three shared primitives that hosted a native select — `Pagination`, `BulkEditSelect` and `EntityListInspectorFrame` — are converted, so no member of the shared primitive set renders an operating-system popup.
+The three shared CONTROLS that hosted a native select — `Pagination` and `BulkEditSelect` from the primitive set, and `EntityListInspectorFrame`, which is a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
 
 A converted control keeps the identity handles its drivers address it by, and there are TWO of them rather than one.
 The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.
@@ -929,11 +932,11 @@ There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
 The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 96 elements across 36 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
-It was 100 across 39 before the three shared primitives converted, and no file carries the marker.
+It was 100 across 39 before those three shared controls converted, and no file carries the marker.
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carries a DOCBLOCK rather than the marker and is baselined with the rest.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
-It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
+It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panels' category axes.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 #### Scenario: A select offers three plain options
