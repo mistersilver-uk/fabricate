@@ -581,12 +581,14 @@
   }
 
   /* The ROW draws the ring (the `:has()` rule above). Without this the button ALSO
-     matches `.fabricate-app button:focus-visible` in `styles/fabricate.css` and the row
+     matches `.fabricate button:focus-visible` in `styles/fabricate.css` and the row
      gets two concentric accent rings, the outer one painting over its border. Scoped,
-     this is (0,3,0) and beats that area rule at (0,2,1) — which is held at single-class
-     specificity for exactly this purpose. `.crafting-shopping-remove:focus-visible`
-     below is the same pattern. The area rule's `:focus` half already covers the mouse
-     case, so `:focus-visible` alone is enough. */
+     this is (0,3,0) and beats that module rule at (0,2,1) — which is held at
+     single-class specificity for exactly this purpose, and stayed there when issue 1501
+     collapsed the `.fabricate-app` pair onto the module root, so this argument survives
+     the rename unchanged. `.crafting-shopping-remove:focus-visible` below is the same
+     pattern. The module rule's `:focus` half already covers the mouse case, so
+     `:focus-visible` alone is enough. */
   .crafting-shopping-entry-main:focus-visible {
     outline: none;
   }

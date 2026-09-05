@@ -498,7 +498,7 @@
                           onclick={(event) => handleSuggestion(event, entry, suggestion.expression)}
                         >
                           <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          <span>{suggestion.expression}</span>
+                          <span class="fab-truncate">{suggestion.expression}</span>
                         </button>
                       {/each}
                     </div>

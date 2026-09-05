@@ -638,7 +638,7 @@
           </p>
         {:else}
           <Field as="label">
-            <span class="sr-only"
+            <span class="visually-hidden"
               >{text(
                 'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
                 'Preview against record'

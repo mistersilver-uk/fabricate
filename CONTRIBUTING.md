@@ -355,15 +355,15 @@ No Jest, Vitest, or Playwright.
 
 Foundry core ships global styles for `button`, `input`, `select`, `textarea`, and `[tabindex]` controls.
 These frequently win over — or fight with — Fabricate's own styling.
-The override almost always belongs in **global per-area CSS in `styles/fabricate.css`**, not in a scoped Svelte component `<style>`.
+The override almost always belongs in **global CSS in `styles/fabricate.css`**, not in a scoped Svelte component `<style>`.
 
 **Why global, not scoped:**
 
 - `styles/fabricate.css` is served directly by Foundry, so edits take effect on reload with no Svelte rebuild.
   A scoped component `<style>` only ships after the Vite bundle is rebuilt — a stale bundle silently keeps the old behavior.
 - Scoped component rules race the global stylesheet on specificity in ways that are easy to get wrong (see the specificity ladder below).
-  Centralizing the override in one per-area block keeps the cascade predictable.
-- The areas are keyed by the root application classes (`SvelteFabricateApp` → `['fabricate', 'fabricate-app']`; the manager → `.fabricate-manager`; the admin shell → `.fabricate-admin`).
+  Centralizing the override in one root-level block keeps the cascade predictable.
+- The areas are keyed by root classes — `.fabricate`, the shared module root every Fabricate application emits, carries the focus pair for the player app and the manager, while the three interactables windows and the roll-prompt dialog issue 1520 owns still key on their own.
 
 **Instance 1 — button layout.**
 Foundry's global `button` styles center content (`justify-content: center`) and pin a fixed height.
@@ -372,29 +372,34 @@ Verify in real Foundry, not just compiled source.
 
 **Instance 2 — the orange focus ring.**
 Foundry paints an orange focus ring on focusable controls.
-Each app-area neutralizes it with a **paired block** in `styles/fabricate.css`:
+The module root `.fabricate` carries one **paired block** for the player app and the manager in `styles/fabricate.css`; the three interactables windows and the roll-prompt dialog issue 1520 owns still carry their own:
 
 ```css
 /* strip Foundry's orange ring (mouse focus) */
-.fabricate-app button:focus,
-.fabricate-app input:focus,
-.fabricate-app select:focus,
-.fabricate-app textarea:focus,
-.fabricate-app [tabindex]:focus {
+.fabricate a:focus,
+.fabricate button:focus,
+.fabricate input:focus,
+.fabricate select:focus,
+.fabricate textarea:focus,
+.fabricate [tabindex]:focus {
   outline: none;
   box-shadow: none;
 }
 
 /* repaint an intentional accent ring (keyboard focus) */
-.fabricate-app button:focus-visible,
-.fabricate-app input:focus-visible,
-.fabricate-app select:focus-visible,
-.fabricate-app textarea:focus-visible,
-.fabricate-app [tabindex]:focus-visible {
+.fabricate a:focus-visible,
+.fabricate button:focus-visible,
+.fabricate input:focus-visible,
+.fabricate select:focus-visible,
+.fabricate textarea:focus-visible,
+.fabricate [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 ```
+
+Write the element list **flat**, not as `.fabricate :is(a, button, …):focus`.
+`:is()` takes the specificity of its most specific argument — `[tabindex]` here — so the `:is()` form is 0,3,0 and would newly beat every per-component ring in the sheet, which is exactly what the ladder below keeps it from doing.
 
 `:focus` vs `:focus-visible` is load-bearing.
 Handle `:focus-visible` **explicitly**.
@@ -402,25 +407,25 @@ A button lands in the `:focus-visible` state after a sibling/panel re-render —
 A `:focus:not(:focus-visible)` rule alone strips the ring on a plain mouse click but leaves it in exactly that "clicked-away, panel re-rendered" state, which is the symptom that originally got reported.
 
 **Specificity ladder.**
-Keep area blocks at **single area-class** specificity so per-component focus rings still win:
+Keep the block at **single root-class** specificity so per-component focus rings still win:
 
 | Selector | Specificity | Role |
 | --- | --- | --- |
-| `.fabricate-app button:focus-visible` | 0,2,1 | area default — strips/repaints Foundry's ring |
-| `.fabricate-button:focus-visible` | 0,2,0 | shared-primitive family ring — global sheet, below the area default |
+| `.fabricate button:focus-visible` | 0,2,1 | module default — strips/repaints Foundry's ring |
+| `.fabricate-button:focus-visible` | 0,2,0 | shared-primitive family ring — global sheet, below the module default |
 | `.some-widget:focus-visible` (scoped Svelte, `+ .svelte-hash`) | 0,3,0 | per-component ring (custom offset, inset, color) |
 | `.fabricate.fabricate-app button:focus-visible` | 0,3,1 | ❌ clobbers the per-component ring |
 
-Using the doubled root class (`.fabricate.fabricate-app …`) raises the area default to 0,3,1, which overrides component-scoped rings (e.g. gathering rows that intentionally use `outline-offset: -2px`).
-Use the single class (`.fabricate-app …`) — matching how `.fabricate-admin`/`.fabricate-manager` are written — so component rings at 0,3,0 stay authoritative.
+Using the doubled root class (`.fabricate.fabricate-app …`) raises the module default to 0,3,1, which overrides component-scoped rings (e.g. gathering rows that intentionally use `outline-offset: -2px`).
+Use the single class (`.fabricate …`) — matching how `.fabricate-interactables-manager` and the other three blocks issue 1520 owns are written — so component rings at 0,3,0 stay authoritative.
 
 **Checklist when adding/auditing a control or surface:**
 
-- New top-level app surface (new root application class)? It needs its own paired focus block — a partial `:focus:not(:focus-visible)` rule reads as "handled" but isn't.
-- Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so both area defaults still win where they apply.
-A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host that has neither.
-- Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — put it in the area block.
-Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the area default doesn't fight them.
+- New top-level app surface? It inherits the `.fabricate` paired block automatically — add a per-area block only where a surface deliberately needs a different treatment, and say why.
+- Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so the module default still wins where it applies.
+A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host carrying no Fabricate root at all.
+- Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — the module block already handles it.
+Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the module default doesn't fight them.
 - Custom-content button clipping? Apply the layout fix in Instance 1.
 - Verify both in real Foundry (`npm run test:foundry`) — Foundry's global cascade is not reproduced by compiled-source inspection or unit tests.
 

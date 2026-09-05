@@ -165,7 +165,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     assert.match(announcement, /2/, 'and its new position');
   });
 
-  it('the live region is present, polite, and sr-only', async () => {
+  it('the live region is present, polite, and visually hidden', async () => {
     const target = await harness.mount({
       recipe: progressiveRecipe(),
       craftability: craftability(),
@@ -177,7 +177,9 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const status = target.querySelector('[data-progressive-stage-status]');
     assert.ok(status, 'the region renders');
     assert.equal(status.getAttribute('aria-live'), 'polite');
-    assert.ok(status.classList.contains('sr-only'), 'and is visually hidden');
+    // `.sr-only` was retired in issue 1501: the utility is declared once at `.fabricate` under
+    // the name 21 of its 24 sites already carried.
+    assert.ok(status.classList.contains('visually-hidden'), 'and is visually hidden');
     assert.equal(status.textContent.trim(), 'Fine Blade moved to position 1 of 3');
   });
 

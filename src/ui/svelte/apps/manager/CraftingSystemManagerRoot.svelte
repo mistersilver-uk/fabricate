@@ -14144,7 +14144,7 @@
                 </div>
               </div>
 
-              <div class="manager-rules-stack">
+              <div class="fab-stack" data-gap="2">
                 <div class="manager-rule-row">
                   <span class="manager-rule-icon" aria-hidden="true"
                     ><i class="fas fa-gift"></i></span
@@ -15753,7 +15753,7 @@
     rather than having its text rewritten, and each announcement is a genuine insertion.
     `aria-atomic` then has the region read as one sentence rather than as a diff.
 
-    `.visually-hidden` is declared under `.fabricate-manager` in `styles/fabricate.css`, which
+    `.visually-hidden` is declared under `.fabricate` in `styles/fabricate.css`, which
     this element is inside; do not lift this region out of that root.
   -->
   <p

@@ -424,7 +424,7 @@
       'Preview as'
     )}
   </p>
-  <section class="manager-tool-actor-preview" data-tool-actor-preview>
+  <section class="fab-stack" data-gap="2" data-tool-actor-preview>
     <select
       class="manager-tool-actor-select"
       data-tool-preview-actor
@@ -464,7 +464,7 @@
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.Tools.Editor.RequiredForKicker', 'Required for')}
   </p>
-  <section class="manager-tool-required-for" data-tool-required-for>
+  <section class="manager-tool-required-for fab-stack" data-gap="2" data-tool-required-for>
     {#if requiredFor.length === 0}
       <EmptyState
         compact

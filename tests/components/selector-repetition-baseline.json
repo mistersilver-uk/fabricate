@@ -1,0 +1,232 @@
+{
+  "pinnedTotal": 244,
+  "rows": [
+    { "key": "(top level) | .fabricate-button.manager-button", "count": 2 },
+    { "key": "(top level) | .fabricate-color-picker-popover .manager-color-preset", "count": 2 },
+    { "key": "(top level) | .fabricate-icon-button.manager-icon-button", "count": 2 },
+    { "key": "(top level) | .fabricate-icon-picker .essence-icon-picker-trigger", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-icon-picker-popover .essence-icon-picker-option",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .environment-stale-warning", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .form-group input", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .form-group select", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .form-group textarea", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-modifier",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-availability-pill.is-realm", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-availability-pill.is-tag", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-timeOfDay",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-availability-pill.is-weather", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-breadcrumbs button", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-checks-formula-join", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-checks-formula-sep", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-checks-trigger-body .manager-field select",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-component-drop-zone small", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-component-inline-control", "count": 3 },
+    { "key": "(top level) | .fabricate-manager .manager-component-row", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-component-row.is-selected", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-component-toolbar .manager-search input",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-component-toolbar select", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-drop-empty-component", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-environment-evidence", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-environment-evidence-dimension",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-environment-identity", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-environment-preview", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-environment-row", "count": 3 },
+    { "key": "(top level) | .fabricate-manager .manager-environment-thumb", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-essence-row", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-essence-row.is-selected", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-essence-toolbar .manager-search input",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-essence-toolbar select", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range'])",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-field select", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-field textarea", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-gathering-event-row", "count": 3 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-gathering-task-drop-row", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-gathering-task-drop-table-head",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-gathering-task-row", "count": 3 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-row .manager-action-group",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-inspector", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-inspector-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-inspector-name", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-item-drop-zone-copy small", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-main", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-nav", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-party-actor-open", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-rail", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-rail-title", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-option-component", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-preview", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-row", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-row.is-selected", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-step-mode-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-tool-row", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-recipe-toolbar select", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar .manager-search input",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar select", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-section-header", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-system-description", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-system-identity", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-system-name", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-system-row", "count": 3 },
+    { "key": "(top level) | .fabricate-manager .manager-table-head", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-task-availability-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-task-card-header h3", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-task-component-browser-card", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-task-component-card-copy > span:not(.manager-task-component-card-tags)",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager .manager-task-component-card-copy strong",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-task-core-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-task-drops-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-titlebar-badge", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-authority-readonly h3", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-authority-readonly p", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-tool-bonus-row input[type='radio']",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-tool-edit-actions", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-edit-identity", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-editor-panel", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-preview", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-tool-replacement-card .manager-tool-replacement-component-trigger",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-tool-rule-card-body", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-head",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-manager .manager-tool-rule-card-sub", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tool-rule-card-title", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-toolbar", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tools-authority-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-tools-row", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-vocabulary-card", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-world-heading-row h2", "count": 2 },
+    { "key": "(top level) | .fabricate-manager .manager-world-heading-row span", "count": 2 },
+    { "key": "(top level) | .fabricate-manager select", "count": 2 },
+    { "key": "(top level) | .fabricate-manager textarea", "count": 3 },
+    {
+      "key": "(top level) | .fabricate-manager[data-manager-view=\"tool-edit\"] .manager-rail",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager[data-manager-view=\"world-components\"] .manager-main",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager[data-manager-view=\"world-essences\"] .manager-main",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager[data-manager-view=\"world-tool-entry\"] .manager-main",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager[data-manager-view=\"world-tools\"] .manager-main",
+      "count": 2
+    },
+    { "key": "(top level) | .fabricate-roll-prompt__modifier-value", "count": 2 },
+    { "key": "(top level) | .fabricate-source-picker .essence-source-clear", "count": 2 },
+    { "key": "(top level) | .fabricate-source-picker .essence-source-trigger", "count": 2 },
+    {
+      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-grid",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-option",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-option img",
+      "count": 2
+    },
+    { "key": "(top level) | :root", "count": 2 },
+    {
+      "key": "@container fabricate-manager (max-width: 1120px) | .fabricate-manager .manager-gathering-task-drop-row",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 1120px) | .fabricate-manager .manager-gathering-task-drop-table-head",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 1120px) | .fabricate-manager .manager-rail > .manager-rail-block",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 1120px) | .fabricate-manager .manager-rail > .manager-rail-title",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 1120px) | .fabricate-manager[data-manager-view=\"world-downtime\"] .manager-body.is-rail-collapsed",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 680px) | .fabricate-manager .manager-edit-card-heading",
+      "count": 2
+    },
+    {
+      "key": "@container fabricate-manager (max-width: 680px) | .fabricate-manager .manager-tool-authority-readonly",
+      "count": 2
+    }
+  ]
+}

@@ -710,18 +710,18 @@
             >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
           >
           <div class="manager-recipe-head-cluster">
-            <span class="manager-recipe-head-cell is-io"
+            <span class="manager-recipe-head-cell fab-truncate is-io"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span
             >
-            <span class="manager-recipe-head-cell is-check"
+            <span class="manager-recipe-head-cell fab-truncate is-check"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span
             >
             <!-- STATUS spans both the lock and the enable-toggle columns: lock and
                  enable are both status controls, so the header sits over the pair. -->
-            <span class="manager-recipe-head-cell is-status"
+            <span class="manager-recipe-head-cell fab-truncate is-status"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span
             >
-            <span class="manager-recipe-head-cell is-edit"></span>
+            <span class="manager-recipe-head-cell fab-truncate is-edit"></span>
           </div>
         </div>
         {#each model.groups as group (group.category || '__ungrouped')}

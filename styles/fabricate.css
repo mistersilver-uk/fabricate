@@ -995,11 +995,48 @@
   overflow: hidden;
 }
 
-.fabricate-app button:focus,
-.fabricate-app input:focus,
-.fabricate-app select:focus,
-.fabricate-app textarea:focus,
-.fabricate-app [tabindex]:focus {
+/* THE MODULE'S FOCUS-RING CONTRACT, and it is a PAIR: this half suppresses whatever ring
+   Foundry's core or the browser would draw, and the `:focus-visible` block below supplies
+   Fabricate's own on keyboard focus only. The two element lists must therefore match, or an
+   element type is stripped of a ring by the first half and given none by the second.
+
+   `a` and `textarea` are in both lists from issue 1118. Twelve manager buttons are anchors
+   now - docs links, the premium unlock, the explainer card's links - and an anchor matched
+   neither list, so those twelve were the only manager buttons with no accent ring on keyboard
+   focus; `textarea` was in the suppressing half and absent from the supplying one, so a
+   focused manager textarea drew NO ring at all.
+
+   ROOTED AT `.fabricate`, the class every Fabricate application root emits, so the pair is
+   written ONCE rather than once per app area (issue 1501). It replaces the `.fabricate-app`
+   pair that stood here and the byte-identical `.fabricate-manager` pair that stood ~590 lines
+   below.
+
+   THE WIDENING REACHES FOUR PLACES NEITHER DONOR DID, and they are worth naming because a
+   reader checking this rule against the old pair will otherwise read the collapse as an
+   equivalence. (1) `.fabricate-manager` is a <div> INSIDE the manager window rather than an
+   application root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2
+   frame's own header controls - the same accent ring those controls already carry in the
+   player app and the three interactables windows. (2) The standalone component-editor window
+   (`SvelteComponentEditorApp`) carried no pair at all and now takes both halves. (3) Nor did
+   the interaction-prompt toast, whose dimmed close control is why the `:focus-visible` opacity
+   rule far below exists. (4) `a` is newly named on BOTH halves in the player app, which listed
+   `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits no
+   <a>, so what this reaches is enriched content links and Foundry frame chrome.
+
+   WRITTEN FLAT, and that is prescribed rather than stylistic. `.fabricate a:focus` is (0,2,1),
+   the rank both donor blocks held, so per-component focus rings still win. The `:is()` form
+   `.fabricate :is(a, button, input, select, textarea, [tabindex]):focus` would be (0,3,0) -
+   `:is()` takes its most specific argument, here `[tabindex]` - and would newly beat every
+   component ring in the sheet.
+
+   Written at the EARLIER of the two donor positions, which is what keeps
+   `.fabricate-app select:focus-visible` below following the ring and still winning. */
+.fabricate a:focus,
+.fabricate button:focus,
+.fabricate input:focus,
+.fabricate select:focus,
+.fabricate textarea:focus,
+.fabricate [tabindex]:focus {
   outline: none;
   box-shadow: none;
 }
@@ -1034,14 +1071,109 @@
    keyboard users. The :focus rule above strips the orange on mouse click; this
    restores an intentional ring on :focus-visible (which is also the state a nav
    button lands in after the tab panel re-renders on click). Kept at single-class
-   specificity so per-component focus rings (e.g. gathering rows) still win. */
-.fabricate-app button:focus-visible,
-.fabricate-app input:focus-visible,
-.fabricate-app select:focus-visible,
-.fabricate-app textarea:focus-visible,
-.fabricate-app [tabindex]:focus-visible {
+   specificity so per-component focus rings (e.g. gathering rows) still win.
+
+   The SUPPLYING half of the module-rooted pair described above (issue 1501): its element list
+   must stay identical to the suppressing half's, for the reason that comment gives. */
+.fabricate a:focus-visible,
+.fabricate button:focus-visible,
+.fabricate input:focus-visible,
+.fabricate select:focus-visible,
+.fabricate textarea:focus-visible,
+.fabricate [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* ══════════════════════════════════════════
+   MODULE UTILITIES (issue 1501)
+   ══════════════════════════════════════════
+   A class that carries no meaning beyond a repeated declaration set — truncation, a column
+   stack, a wrapping cluster — is a UTILITY. It is declared ONCE and rooted at `.fabricate`,
+   the class every Fabricate application root emits, rather than once per app area, and its
+   callers carry it in markup.
+
+   THE POSITION IS LOAD-BEARING RATHER THAN INCIDENTAL. `.fabricate .fab-stack` is (0,2,0), the
+   same rank as every rule it replaces, so each adoption's paint is decided entirely by source
+   order. These are declared HERE, above every donor, and each adoption shipped with a blocker
+   walk over the interval between this position and its donor's.
+
+   A utility ships only where TWO OR MORE rules already declared its set property for property
+   and value for value; one adopter is a rename rather than a shared treatment. `.fab-list-reset`
+   is NOT declared for that reason — all 20 list-reset rules in this sheet carry other
+   declarations too, so none of them could adopt it (issue 1523).
+
+   The `data-gap` mapping declares only the rungs the actual adopters use. The dead-class gate
+   fires on a declared-and-unemitted CLASS and cannot see an unused `[data-gap='4']` variant
+   while the class itself is live, so an unused rung would be dead weight nothing catches. A
+   further rung is added with the adopter that needs it.
+
+   The base rung is `2`, and it is written as a `[data-gap='2']` rule rather than left implicit —
+   seven call sites name that rung, and a call site naming a rung no rule reads renders at
+   whatever the base happens to be rather than at what its markup says. The other direction of
+   that mirror is gated: every emitted `data-gap` value must have a declared rung, and both
+   defaults are named there, so the base rung cannot be changed without meeting the gate
+   (issue 1501).
+
+   A FOURTH UTILITY IS NOT DECLARED HERE. `.fabricate .visually-hidden` obeys the same rule and
+   the same rooting, about 4,350 lines below: each utility sits at the earliest of its own donors'
+   positions, decided by that adoption's blocker walk rather than by this section. */
+
+.fabricate .fab-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate .fab-stack {
+  /* The rung default is set HERE rather than as a `var()` fallback, so every `.fab-stack`
+     writes its own and none inherits a nested ancestor's rung. */
+  --fab-stack-gap: var(--fab-space-2);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-stack-gap);
+  min-width: 0;
+}
+
+.fabricate .fab-cluster {
+  --fab-cluster-gap: var(--fab-space-2);
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-cluster-gap);
+}
+
+/* The rungs, written as (0,3,0) rules that set a CUSTOM PROPERTY rather than `gap` itself. That
+   indirection is what keeps the three rules above the only ones competing on `gap`, and keeps
+   that contest at the donors' own (0,2,0). */
+.fabricate .fab-stack[data-gap='2xs'] {
+  --fab-stack-gap: var(--fab-space-2xs);
+}
+
+.fabricate .fab-stack[data-gap='1'] {
+  --fab-stack-gap: var(--fab-space-1);
+}
+
+.fabricate .fab-stack[data-gap='2'] {
+  --fab-stack-gap: var(--fab-space-2);
+}
+
+.fabricate .fab-stack[data-gap='3'] {
+  --fab-stack-gap: var(--fab-space-3);
+}
+
+.fabricate .fab-cluster[data-gap='1'] {
+  --fab-cluster-gap: var(--fab-space-1);
+}
+
+.fabricate .fab-cluster[data-gap='2'] {
+  --fab-cluster-gap: var(--fab-space-2);
+}
+
+.fabricate .fab-cluster[data-gap='3'] {
+  --fab-cluster-gap: var(--fab-space-3);
 }
 
 /* Focus ring for <select> controls. A select can sit flush against the edge of
@@ -1357,6 +1489,10 @@
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
 */
+
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class;
+   `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across
+   hundreds of unmarked manager text fields and selects. */
 .fabricate-manager input[type="text"],
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
@@ -1419,6 +1555,10 @@
   claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
   to `.fabricate-manager .manager-field select:disabled` (0,2,2).
 */
+
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class; its
+   (0,1,1) low-specificity fallback exists so ANY select nothing else claims still paints,
+   a guarantee a class-scoped skin does not reproduce. */
 .fabricate-manager select {
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
@@ -1573,38 +1713,6 @@
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
-}
-
-/* THE MANAGER'S FOCUS-RING CONTRACT, and it is a PAIR: the first half suppresses whatever
-   ring Foundry's core or the browser would draw, and the second supplies the manager's own on
-   keyboard focus only. The two element lists must therefore match, or an element type is
-   stripped of a ring by the first half and given none by the second.
-
-   `a` joins both lists in issue 1118. Twelve manager buttons are anchors now — docs links,
-   the premium unlock, the explainer card's links — and an anchor matched neither list, so
-   those twelve were the only manager buttons with no accent ring on keyboard focus.
-
-   `textarea` joins the second list in the same edit, and it is a repair rather than a
-   symmetry tidy-up: it was in the suppressing half and absent from the supplying one, so a
-   focused manager textarea drew NO ring at all. */
-.fabricate-manager a:focus,
-.fabricate-manager button:focus,
-.fabricate-manager input:focus,
-.fabricate-manager select:focus,
-.fabricate-manager textarea:focus,
-.fabricate-manager [tabindex]:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-manager a:focus-visible,
-.fabricate-manager button:focus-visible,
-.fabricate-manager input:focus-visible,
-.fabricate-manager select:focus-visible,
-.fabricate-manager textarea:focus-visible,
-.fabricate-manager [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
 }
 
 /*
@@ -4263,12 +4371,6 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-checks-breakage-tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
 /* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
    Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the
    suggestion chips. Every value is the prototype's, authored in px for the reason the
@@ -4934,13 +5036,6 @@
   font-size: 0.72rem;
 }
 
-.fabricate-manager .manager-modifier-expression-suggestion > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .fabricate-manager .manager-character-modifier-actions {
   display: flex;
   gap: var(--fab-space-chip);
@@ -5340,12 +5435,6 @@
   margin-left: auto;
 }
 
-.fabricate-manager .manager-character-modifier-row-bounds {
-  display: flex;
-  gap: var(--fab-space-3);
-  flex-wrap: wrap;
-}
-
 .fabricate-manager .manager-character-modifier-row-bounds .manager-field {
   flex: 1 1 80px;
   min-width: 0;
@@ -5367,7 +5456,18 @@
   font-style: italic;
 }
 
-.fabricate-manager .visually-hidden {
+/* THE VISUALLY-HIDDEN UTILITY, declared ONCE for the whole module (issue 1501). It was three
+   byte-identical copies — `.fabricate-manager .visually-hidden` here, `.fabricate-manager
+   .sr-only` and `.fabricate-app .sr-only` about 10,400 lines below — under two class names.
+   `.visually-hidden` is the surviving name, which 21 of the 24 markup sites already carried;
+   the three `.sr-only` sites are renamed onto it. `.fabricate` is the module's OWN root, the
+   class every Fabricate application root emits, so rooting here is not the unscoped utility
+   the deleted copy's comment warned would leak into Foundry's own chrome.
+
+   None of the three donors had a `:focus`/`:focus-within` reveal companion, so no skip-link
+   behaviour is lost in the collapse. Written at the earliest of the three positions, at the
+   donors' unchanged (0,2,0). */
+.fabricate .visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -5610,9 +5710,10 @@
 }
 
 /* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's
-   `a.button:focus, button:focus` paints an orange outline and a 4px glow that only the two area
-   resets remove, and this family now renders in hosts that have neither. BUTTONS ONLY here for
-   the same reason the ring below is, and above the ring because the two tie at (0,2,1). */
+   `a.button:focus, button:focus` paints an orange outline and a 4px glow that the module reset
+   removes inside every Fabricate window, and this family now renders in hosts that have no
+   Fabricate root at all. BUTTONS ONLY here for the same reason the ring below is, and above the
+   ring because the two tie at (0,2,1). */
 .fabricate-pagination button:focus {
   outline: none;
   box-shadow: none;
@@ -5621,8 +5722,8 @@
 /* THE PAGER'S OWN KEYBOARD RING (issue 1502). Now that this family is rooted at the class
    `Pagination.svelte` emits rather than at an application root, it renders in areas whose
    own bare-element ring it can no longer assume — `design-system/spec.md` puts that chrome
-   on the primitive. The declarations are the two area rings' verbatim (`:1043-1044`,
-   `:1605-1606`), so nothing moves where an area ring already reached.
+   on the primitive. The declarations are the module ring's verbatim (`.fabricate
+   <element>:focus-visible`, issue 1501), so nothing moves where that ring already reaches.
 
    BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too, TIES
    `.fabricate-app select:focus-visible` and wins on source order — which would delete that
@@ -5767,13 +5868,6 @@
   flex-shrink: 0;
   place-items: center;
   margin-left: auto;
-}
-
-.fabricate-manager .manager-recipe-head-cell {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Explicit column placement so the labels sit over the RIGHT cells. At the WIDEST band
@@ -6209,6 +6303,9 @@
    select chrome. Give them the Fabricate surface + the theme-appropriate native
    chevron, matching the recipe-toolbar select treatment. The two-class-plus-element
    selector (0,2,1) outranks Foundry core's aggressive `select` rules (issue 643). */
+
+/* skin census (issue 1523): pinned by tests/components/tool-studio-mounted.test.js (a
+   mounted assertion at `:975`/`:977` closes on `.manager-recipe-field`). */
 .fabricate-manager .manager-recipe-field select {
   width: 100%;
   min-width: 0;
@@ -6538,6 +6635,12 @@
    `color-scheme: dark` — rather than Foundry core's default light select chrome, which
    they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
    outranks Foundry core's aggressive `select` rules. */
+
+/* skin census (issue 1523): pinned three ways — tests/components/manager-layout.test.js
+   (a selector-list lookup asserting `height: 34px`), tests/components/essence-studio-
+   fidelity.test.js (a sheet-text occurrence count), and tests/components/component-studio-
+   font-size.test.js / tests/components/recipe-studio-font-size.test.js (fixture markup
+   rendered against this sheet). */
 .fabricate-manager .manager-recipe-toolbar select,
 .fabricate-manager .manager-component-toolbar select,
 .fabricate-manager .manager-essence-toolbar select {
@@ -6763,14 +6866,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-identity,
-.fabricate-manager .manager-component-browser-inspector-identity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
 /* The flavour text, WHOLE. It used to be cut at 160 characters in the one panel with the
    room to show it. */
 .fabricate-manager .manager-recipe-browser-inspector-flavour,
@@ -6906,6 +7001,8 @@
   min-width: 0;
 }
 
+/* skin census (issue 1523): pinned by tests/components/component-studio-font-size.test.js
+   (fixture markup rendered against this sheet, `:163`). */
 .fabricate-manager .manager-recipe-stat,
 .fabricate-manager .manager-component-stat,
 .fabricate-manager .manager-essence-stat {
@@ -9093,14 +9190,6 @@
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-requirements-list,
-.fabricate-manager .manager-inspector-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-requirement-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -9575,6 +9664,9 @@
   border-radius: 9px;
 }
 
+/* skin census (issue 1523): pinned by
+   tests/components/world-vocabulary-control-row-cascade.test.js (fixture markup rendered
+   against this sheet, `:159`, queried at `:295`). */
 .fabricate-manager .manager-scoped-list-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
@@ -10132,6 +10224,11 @@
   background: none;
 }
 
+/* visually-hidden: pinned, and its un-hider's specificity contract is load-bearing (issue
+   1523). This is a fourth byte-identical copy of the utility declared near the top of this
+   sheet, and the requirement that utility carries would have it adopt. It does not, because
+   the paired un-hider below settles on the (0,5,0)-beats-(0,4,0) contract its own comment
+   records, which a (0,2,0) utility class would rewrite. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
   position: absolute;
   width: 1px;
@@ -10150,8 +10247,8 @@
    under a kicker that already names it. The Tool Requirements gate-mode pair does not — it was
    the one group on that screen with no visible heading at all — and the honest repair is to
    un-hide the fieldset's accessible name rather than to print a second heading beside it.
-   (0,3,1) against the hiding rule's (0,3,1) would be a tie settled on order, so the state class
-   is CHAINED onto the card, which makes it (0,4,1) and settles it on specificity. It restates
+   (0,4,0) against the hiding rule's (0,4,0) would be a tie settled on order, so the state class
+   is CHAINED onto the card, which makes it (0,5,0) and settles it on specificity. It restates
    every property the hiding rule sets, because a partially reset visually-hidden block is a
    1px-tall legend with its text clipped. */
 .fabricate-manager
@@ -10200,6 +10297,10 @@
    had been taken, which left a tile one rung above its card and nothing marking where it ends.
    A hairline is what makes a plate a plate once the fill is quiet enough to belong to the card.
    The 40px box is unchanged — every element in this app is `box-sizing: border-box`. */
+
+/* skin census (issue 1523): not an adopter — this tile's fill and border were taken
+   TOGETHER from the prototype under issue 1373 as a component treatment, not a shared
+   field/well rung; its tuple joins the card-skin census as a deferral. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -13608,24 +13709,25 @@
 
 /* THE STRIP HALF OF THE FAMILY'S FOCUS CHROME, and it is not optional (issue 1502). Foundry core
    paints EVERY focused button with `outline: 1px solid var(--button-focus-outline-color)` — a
-   burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The two
-   AREA resets above (`.fabricate-app …:focus` and `.fabricate-manager …:focus`) strip that only
-   inside their own app root, so a control rooted at the class this primitive emits keeps core's
-   orange under the accent ring the moment it renders in a host carrying neither area class. A
-   primitive that declares its own ring therefore declares the PAIR, which is the same rule
-   CONTRIBUTING.md states for an area. Written ABOVE the repaint because the two halves tie at
-   (0,2,0) and a keyboard-focused control matches both, so source order is what decides. */
+   burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The
+   MODULE reset above (`.fabricate <element>:focus`, issue 1501) strips that inside every
+   Fabricate window, but a control rooted at the class this primitive emits also renders in hosts
+   carrying no Fabricate root at all — a chat card, another module's sheet — where core's orange
+   survives under the accent ring. A primitive that declares its own ring therefore declares the
+   PAIR, which is the same rule CONTRIBUTING.md states for the module root. Written ABOVE the
+   repaint because the two halves tie at (0,2,0) and a keyboard-focused control matches both, so
+   source order is what decides. */
 .fabricate-button:focus {
   outline: none;
   box-shadow: none;
 }
 
-/* THE FAMILY'S OWN FOCUS RING (issue 1502). The two AREA rings — `.fabricate-app …:focus-visible`
-   and `.fabricate-manager …:focus-visible` above — are bare-element selectors an area declares
-   for itself, and a primitive that leans on one renders no ring at all in an application that has
-   none, exactly as it would render Foundry's default font without the `font: inherit` above. The
-   declarations are COPIED from those two rules rather than re-chosen, so nothing moves where an
-   area ring already reached. */
+/* THE FAMILY'S OWN FOCUS RING (issue 1502). The MODULE ring above — `.fabricate
+   <element>:focus-visible`, issue 1501 — is (0,2,1) and beats this (0,2,0) rule wherever a
+   Fabricate root is an ancestor; the declarations are COPIED from it verbatim rather than
+   re-chosen, so nothing moves there. What this rule is FOR is a host carrying no Fabricate root at
+   all, where a primitive that leaned on the module ring would render no ring whatever, exactly as
+   it would render Foundry's default font without the `font: inherit` above. */
 .fabricate-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -13760,7 +13862,7 @@
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
-   `button:focus` outline and 4px glow survive in any host carrying neither area class, so the
+   `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
    repaint below would sit on top of them rather than replace them. Above the repaint because the
    two tie at (0,2,0). */
 .fabricate-icon-button:focus {
@@ -13768,14 +13870,14 @@
   box-shadow: none;
 }
 
-/* The primitive's OWN focus ring (issue 1502). The two area rings — `.fabricate-app
-   button:focus-visible` and `.fabricate-manager button:focus-visible` — are (0,2,1) and stop
-   at their app root, so a control re-rooted at `fabricate-icon-button` would keep its paint
-   and lose its ring the moment it renders outside either area. The declarations are copied
-   verbatim from those two rules, so wherever an area ring also applies it BEATS this (0,2,0)
-   one and nothing moves; this rule paints only in a host that carries neither area class,
-   which is the case it was added for. The ghost/danger `:focus-visible` pairs above are (0,4,0)
-   colour-and-background only, so nothing here contends with them. */
+/* The primitive's OWN focus ring (issue 1502). The MODULE ring above — `.fabricate
+   <element>:focus-visible`, issue 1501 — is (0,2,1) and reaches every Fabricate window, so it
+   BEATS this (0,2,0) rule wherever a Fabricate root is an ancestor. The declarations are copied
+   from it verbatim, so nothing moves there. What this rule paints in is a host carrying no
+   Fabricate root at all — a chat card, another module's sheet — where a control re-rooted at
+   `fabricate-icon-button` would otherwise keep its paint and lose its ring. The ghost/danger
+   `:focus-visible` pairs above are (0,4,0) colour-and-background only, so nothing here contends
+   with them. */
 .fabricate-icon-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -15883,36 +15985,6 @@
   color: var(--fab-accent);
 }
 
-.fabricate-manager .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* The same visually-hidden utility for the PLAYER app root (issue 651). `.sr-only` had
-   only ever been scoped to `.fabricate-manager`, whose two components were its only
-   consumers — so the crafting app's `aria-live` region, copied verbatim from the GM
-   pattern, would PAINT AS VISIBLE TEXT under the stage list. The rule is duplicated
-   rather than un-scoped because `.fabricate-app` and `.fabricate-manager` are separate
-   theme roots and an unscoped utility would leak into Foundry's own chrome. */
-.fabricate-app .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
 .fabricate-manager .manager-condition-panel-hint {
   margin: calc(-1 * var(--fab-space-2xs)) 0 0;
   color: var(--fab-text-muted);
@@ -16138,6 +16210,10 @@
    (`border-radius: 9px` is its own literal), so the manager's rendering is unchanged and the
    popover is now self-sufficient — which is what `SearchablePopover`'s and the icon/source
    pickers' own search inputs already were. */
+
+/* skin census (issue 1523): not an adopter — this node is portaled
+   (`ManagerColorPopover.svelte`) and can fall back to `document.body` outside `.fabricate`,
+   where an ancestor-scoped skin would stop matching. */
 .fabricate-color-picker-popover .manager-color-custom input {
   appearance: none;
   -webkit-appearance: none;
@@ -16215,13 +16291,6 @@
   background: var(--fab-overlay-light-08);
 }
 
-.fabricate-manager .manager-rules-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-rule-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -16293,7 +16362,7 @@
 }
 
 /* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a
-   SIBLING of its `.manager-rule-row` inside the flex `.manager-rules-stack`, not a child of
+   SIBLING of its `.manager-rule-row` inside the rules `.fab-stack`, not a child of
    it, so `padding-left` is what lines it up under the description column: the row's icon
    track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
    did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
@@ -17309,28 +17378,6 @@
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-tool-overview-source,
-.fabricate-manager .manager-tool-on-break {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-/* THE REQUIREMENTS SECTIONS RUN ON THE REFERENCE'S OWN STEP (issue 1373, round 5). Every gap
-   inside one of these two sections is 8px or 9px in the reference — `proto:2334`'s `margin: 9px
-   0` around the standing sentence, `proto:2355`'s `margin-bottom: 8px` under the bonus eyebrow,
-   `proto:2367`'s `margin-top: 8px` above the bonus note — and 9px rounds to the 4px scale's
-   `--fab-space-2`. This column carried `--fab-space-3`, half again as much, on every one of
-   them. Split out of the block above because the Overview and On-break stacks are different
-   surfaces with their own frames. */
-.fabricate-manager .manager-tool-requirements-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 /* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared
    `ExplainerCard.svelte`, which wears the manager's own `.manager-inspector-card` shell
    and `.manager-card-title` heading instead of restating a bordered card and a fourth
@@ -17715,14 +17762,9 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-tool-actor-preview,
-.fabricate-manager .manager-tool-required-for {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
+/* skin census (issue 1523): the single unpinned carrier of the target tuple at this
+   tree — zero hits under tests/ or scripts/; its sole emitter is
+   `ToolBehaviorPreview.svelte:429`. */
 .fabricate-manager .manager-tool-actor-select {
   width: 100%;
   min-width: 0;
@@ -17989,6 +18031,9 @@
    still carries the sibling formula TEXT input, which is not a stepper and must keep this
    rule. Note that dropping the `manager-recipe-name-input` class does not help here — the
    rule keys on `.manager-recipe-field input`, not on that class. */
+
+/* skin census (issue 1523): not an adopter — its `:not(.fab-stepper-input)` guard is
+   rule-level and cannot be expressed by a stamped markup class. */
 .fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
@@ -18811,13 +18856,6 @@
   align-items: start;
 }
 
-.fabricate-manager .manager-environment-context-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-environment-context-hint {
   margin: 0;
   font-size: 0.8em;
@@ -19067,14 +19105,6 @@
   overflow: auto;
   scrollbar-gutter: stable;
   padding-right: var(--fab-space-3);
-}
-
-/* Recipe editor tab shell + validation helpers built on the shared primitives. */
-.fabricate-manager .manager-recipe-edit-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
 }
 
 /* Recipe editor header identity block (issue 643): medallion + name + the
@@ -19665,12 +19695,6 @@
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
-}
-
-.fabricate-manager .manager-environment-evidence-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-evidence-chip {
@@ -20460,6 +20484,18 @@
   opacity: 1;
 }
 
+/* The close control rests at `opacity: 0.6`, and `opacity` composites an element's OUTLINE
+   with the element, so the accent focus ring the module-rooted `:focus-visible` block now
+   paints on this toast (issue 1501) would render at 60% - measured 2.79:1 against the toast's
+   `--fab-bg-2` fill in `ironblood-forge` and 2.85:1 in `hearth-herb`, below the 3:1 floor
+   WCAG 2.1 SC 1.4.11 sets for a focus indicator. Restoring full opacity on `:focus-visible`
+   is the shipped pattern from `ComponentSourcesBar.svelte:295-304`, where the same dimmed
+   icon button restores opacity in the rule set that paints its ring. Written at the sheet's
+   own two-class shape here so it matches its `:hover` sibling's specificity. */
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close:focus-visible {
+  opacity: 1;
+}
+
 /* ==========================================
    Interactable config panel (rich GM behaviour sheet)
    ==========================================
@@ -20468,7 +20504,12 @@
    this block carries only the area-level focus-ring override (Foundry core paints
    an orange ring that must be stripped on :focus and repainted on :focus-visible
    per app surface) plus the Tile-HUD discoverability button. All selectors are
-   namespaced under the app root / HUD button class so nothing bleeds. */
+   namespaced under the app root / HUD button class so nothing bleeds.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactable-config-app button:focus,
 .fabricate-interactable-config-app input:focus,
 .fabricate-interactable-config-app select:focus,
@@ -20497,7 +20538,12 @@
    body lives in InteractableBrowserRoot.svelte; this block strips Foundry core's
    orange :focus ring and repaints the accent ring on :focus-visible per app
    surface (mirroring the config app block above), kept at single area-class
-   specificity so the component-scoped focus rings still win. */
+   specificity so the component-scoped focus rings still win.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactable-browser-app button:focus,
 .fabricate-interactable-browser-app input:focus,
 .fabricate-interactable-browser-app select:focus,
@@ -20526,7 +20572,12 @@
    repaint the accent ring on :focus-visible — single area-class specificity so the
    per-element rings still win), the custom-content button layout override (the
    panel renders icon+label and icon-only buttons), and the panel layout. All
-   colours use `var(--fab-*)` theme tokens. */
+   colours use `var(--fab-*)` theme tokens.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactables-manager button:focus,
 .fabricate-interactables-manager input:focus,
 .fabricate-interactables-manager select:focus,
@@ -21883,13 +21934,6 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-roll-prompt__titles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
 .fabricate-roll-prompt__title {
   margin: 0;
   border: none;
@@ -22304,7 +22348,12 @@
 }
 
 /* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
-   The app-scoped focus rules elsewhere don't match this DialogV2 root. */
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): the
+   dialog root emits `fabricate` too, so `.fabricate` now reaches this DialogV2 body at the
+   same (0,2,1) rank and with a wider element list. This block still follows it in source and
+   so still wins for the three targets it names. Left in place because deleting it belongs to
+   issue 1520, which owns these copies and is named by the gate's own message. */
 .fabricate-roll-prompt-dialog button:focus,
 .fabricate-roll-prompt-dialog input:focus,
 .fabricate-roll-prompt-dialog select:focus {

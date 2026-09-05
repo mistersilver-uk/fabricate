@@ -116,7 +116,7 @@
 
     <div class="manager-component-browser-inspector-hero">
       <Medallion src={selectedComponent.img} icon="fas fa-cube" size={52} />
-      <div class="manager-component-browser-inspector-identity">
+      <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedComponent.name}>
           {selectedComponent.name}
         </h2>

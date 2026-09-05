@@ -530,7 +530,7 @@
 
   <!-- No live region in the fixed state: nothing can change, so nothing is announced. -->
   {#if canReorder}
-    <p class="sr-only" aria-live="polite" data-progressive-stage-status>{announcement}</p>
+    <p class="visually-hidden" aria-live="polite" data-progressive-stage-status>{announcement}</p>
   {/if}
 </div>
 

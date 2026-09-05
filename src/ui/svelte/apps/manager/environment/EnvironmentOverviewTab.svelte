@@ -246,7 +246,7 @@
           )}
         </h3>
         <div class="manager-environment-context-split">
-          <div class="manager-environment-context-col">
+          <div class="fab-stack" data-gap="3">
             {#if realmsEnabled}
               <Field
                 as="div"
