@@ -149,6 +149,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',

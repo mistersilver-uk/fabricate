@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
