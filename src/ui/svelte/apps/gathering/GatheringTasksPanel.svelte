@@ -445,6 +445,10 @@
      this row is a nowrap single line in a narrow column, and a floor is what would wrap it. */
   .gathering-detail-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
+    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
+       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
+       is the thing that would wrap it. */
+    min-width: 0;
   }
 
   .gathering-detail-pagination :global(.manager-icon-button) {
