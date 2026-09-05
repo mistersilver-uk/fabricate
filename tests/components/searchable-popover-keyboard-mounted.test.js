@@ -612,11 +612,14 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
-  // ── THE TYPE-AHEAD (issue 1504) ───────────────────────────────────────────────────────────
+  // ── THE OPENING KEYS (issue 1504) ─────────────────────────────────────────────────────────
   //
-  // A native `<select>` jumps to the option a typed character names, and a GM who tabs to a page
-  // size control and types `2` today gets 25 rows. The arithmetic is proved against the pure
-  // module in `tests/util/listbox-navigation.test.js`; what only a mount can show is the WIRING,
+  // A native `<select>` a GM has tabbed to answers ArrowDown, ArrowUp, Home and End by
+  // changing its value, and Alt+ArrowDown by dropping its list open. The search-suppressed
+  // trigger holder is the shape that replaced it, so the keys are its obligation rather than
+  // an enhancement — and until issue 1504 it answered none of them, leaving the browser to
+  // scroll the page instead. What only a mount can show is that the key OPENS and seeds the
+  // cursor in one press, which is a wiring claim rather than an arithmetic one.
   describe('the opening keys of a CLOSED trigger holder', () => {
     /** The search-suppressed shape, focused, panel shut — the state a GM tabs into. */
     async function mountClosedHolder(props = {}) {
@@ -688,6 +691,11 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
+  // ── THE TYPE-AHEAD (issue 1504) ───────────────────────────────────────────────────────────
+  //
+  // A native `<select>` jumps to the option a typed character names, and a GM who tabs to a page
+  // size control and types `2` today gets 25 rows. The arithmetic is proved against the pure
+  // module in `tests/util/listbox-navigation.test.js`; what only a mount can show is the WIRING,
   // and the CLOSED trigger is the primary case because it is the branch nobody has written: the
   // trigger had no key handling at all before issue 1503 routed keys to it.
   describe('the type-ahead, whose primary case is a CLOSED trigger', () => {

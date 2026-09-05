@@ -13217,8 +13217,8 @@ test('every converted pager site paints its own trigger fill, and only the manag
         site.padding,
         `${site.probe}: the trigger's inline padding is ${site.padding}` +
           (site.padding === '8px'
-            ? ', narrowed at this site because the summary beside it is the row`s only shrink'
-            : ', the family`s own --fab-space-3 rung')
+            ? ", narrowed at this site because the summary beside it is the row's only shrink"
+            : ", the family's own --fab-space-3 rung")
       );
       const hit = report.hits[site.probe];
       assert.ok(

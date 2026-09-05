@@ -453,24 +453,42 @@ describe('1504 Select — the select every screen renders', () => {
         );
         harness.remount();
 
-        await mountSelect({ ariaLabel: '', ariaLabelledBy: caption.id });
-        const pointed = await openPanel();
-        const surfaces = [
-          ['dialog', pointed],
-          ['listbox', pointed.querySelector('[role="listbox"]')],
+        // THE POINTER SHAPE ARRIVES TWICE, and only the second shape can red the SUPPRESSION.
+        // A caller that names its control by a caption alone leaves `dialogAriaLabel` empty, so
+        // dropping the mutual exclusion (`dialogAriaLabel || undefined`) still resolves to
+        // `undefined` and the panel looks correct. A control carrying BOTH — a `label`, which is
+        // also the panel's string name, and an `ariaLabelledBy` that must win over it — is the
+        // only shape where the suppression is the thing under measurement rather than a
+        // coincidence of an empty string.
+        const pointedShapes = [
+          ['named ONLY by the caption', { ariaLabel: '', ariaLabelledBy: caption.id }],
+          ['ALSO carrying a string name', { label: 'Resolution', ariaLabelledBy: caption.id }],
         ];
-        for (const [what, element] of surfaces) {
-          const pointsAt = element.getAttribute('aria-labelledby');
-          assert.equal(pointsAt, caption.id, `the ${what} is named by the caller's own caption`);
-          assert.ok(
-            !element.getAttribute('aria-label'),
-            `and no aria-label beside it on the ${what}: a labelledby WINS, so a string there ` +
-              'would be dead text free to drift from the caption'
-          );
-          assert.ok(
-            (document.querySelector(`[id="${pointsAt}"]`)?.textContent ?? '').trim().length > 0,
-            `and the ${what}'s pointer resolves to an element that actually says something`
-          );
+        for (const [shape, props] of pointedShapes) {
+          await mountSelect(props);
+          const pointed = await openPanel();
+          const surfaces = [
+            ['dialog', pointed],
+            ['listbox', pointed.querySelector('[role="listbox"]')],
+          ];
+          for (const [what, element] of surfaces) {
+            const pointsAt = element.getAttribute('aria-labelledby');
+            assert.equal(
+              pointsAt,
+              caption.id,
+              `the ${what} of a control ${shape} is named by the caller's own caption`
+            );
+            assert.ok(
+              !element.getAttribute('aria-label'),
+              `and no aria-label beside it on the ${what} of a control ${shape}: a labelledby ` +
+                'WINS, so a string there would be dead text free to drift from the caption'
+            );
+            assert.ok(
+              (document.querySelector(`[id="${pointsAt}"]`)?.textContent ?? '').trim().length > 0,
+              `and the ${what}'s pointer resolves to an element that actually says something`
+            );
+          }
+          harness.remount();
         }
       } finally {
         caption.remove();
@@ -756,13 +774,13 @@ describe('1504 Select — the select every screen renders', () => {
       });
     }
 
-    it('opens on Alt+ArrowDown with NO cursor, which is the pattern`s own exception', async () => {
+    it("opens on Alt+ArrowDown with NO cursor, which is the pattern's own exception", async () => {
       const button = await closedTrigger();
 
       const pressed = pressKey('ArrowDown', { altKey: true });
       await settle();
 
-      assert.ok(pressed.defaultPrevented, 'the pairing is the widget`s');
+      assert.ok(pressed.defaultPrevented, "the pairing is the widget's");
       assert.equal(button.getAttribute('aria-expanded'), 'true', 'the panel opens');
       assert.equal(
         activeDescendant(),
@@ -779,7 +797,7 @@ describe('1504 Select — the select every screen renders', () => {
       const pressed = pressKey('ArrowDown', { shiftKey: true });
       await settle();
 
-      assert.ok(!pressed.defaultPrevented, 'a modified press is the platform`s, never this one`s');
+      assert.ok(!pressed.defaultPrevented, "a modified press is the platform's, never this one's");
       assert.equal(button.getAttribute('aria-expanded'), 'false');
       assert.ok(!panel(), 'and nothing opened');
       harness.remount();
