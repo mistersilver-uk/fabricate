@@ -416,6 +416,29 @@
     return getComponentCategoryLabel(name, localize);
   }
 
+  /**
+   * The category axis as the shared select's option list (issue 1504).
+   *
+   * `BulkEditSelect` takes DATA now rather than a snippet of `<option>` elements, and this is
+   * where the sentinel's meaning still lives: it is FIRST and carries the empty string, which
+   * is the model's `Leave unchanged` and the only affordance for unstaging this axis. The
+   * shared control gives that row a non-empty `data-popover-option` of its own, so the one row
+   * a capture walk most needs to click is addressable rather than the one row with no handle.
+   *
+   * No `({count})` suffix, for the reason the markup used to state: a count of the components
+   * currently IN a category says nothing about it as an assignment target.
+   */
+  const categorySelectOptions = $derived([
+    {
+      value: '',
+      label: text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged'),
+    },
+    ...categoryOptions.map((option) => ({
+      value: option.name,
+      label: categoryOptionLabel(option.name),
+    })),
+  ]);
+
   // Every mutator below REASSIGNS through the caller: the model's helpers return a NEW
   // draft and never mutate their argument.
   function cycleTag(tag) {
@@ -458,24 +481,19 @@
     label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
   />
   <!--
-    The sentinel is FIRST and carries `value=""`, which is the model's `Leave unchanged`.
-    The options carry NO `({count})` suffix the browser's filter uses: a count of the
-    components currently IN a category says nothing about it as an assignment target.
+    `showTick={false}`: the trigger states the staged category, and a tick column beside a flat
+    list of vocabulary names would mark what the control already says. See
+    `categorySelectOptions` for where the sentinel's meaning lives.
   -->
   <BulkEditSelect
     data-component-bulk-category=""
     value={draft?.category || ''}
+    options={categorySelectOptions}
+    showTick={false}
     disabled={applying}
     ariaLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
     onChange={(value) => setCategory(value)}
-  >
-    <option value=""
-      >{text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')}</option
-    >
-    {#each categoryOptions as option (option.name)}
-      <option value={option.name}>{categoryOptionLabel(option.name)}</option>
-    {/each}
-  </BulkEditSelect>
+  />
 
   <BulkEditSection
     label={tagsLabel}

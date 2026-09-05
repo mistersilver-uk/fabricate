@@ -21747,6 +21747,16 @@
   width: 100%;
 }
 
+/* AND THE SAME JOB FOR THE SAME RAIL, one control along (issue 1504). `BulkEditSelect` was a
+   native `<select>` whose own scoped rule carried `width: 100%` for exactly the reason above;
+   it is a shared `<Select>` now, whose trigger is rendered by `SearchablePopover` and whose
+   API deliberately exposes no trigger-box prop. So the width is reached the way the rule above
+   reaches it, from the class the caller puts on the picker root. Nothing else about the control
+   is stated here: its height, corner, fill and type are the `form` rung's. */
+.fabricate-manager .fab-bulk-edit-select .fabricate-select-trigger {
+  width: 100%;
+}
+
 .fabricate-picker .manager-travel-picker-trigger {
   justify-content: flex-start;
   height: auto;

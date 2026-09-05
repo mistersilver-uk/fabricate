@@ -373,6 +373,78 @@
     text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')
   );
 
+  /**
+   * The category axis as the shared select's option list (issue 1504).
+   *
+   * The sentinel is FIRST and carries the empty string, which is the model's `Leave unchanged`
+   * and this axis's only affordance for unstaging. The shared control gives that row a
+   * non-empty `data-popover-option` of its own, so the panel's default row is addressable by a
+   * capture step and a mounted test rather than being the one row with no handle.
+   */
+  const categorySelectOptions = $derived([
+    { value: '', label: leaveUnchangedLabel },
+    ...categoryOptions.map((category) => ({
+      value: category,
+      label: getRecipeCategoryLabel(category, localize),
+    })),
+  ]);
+
+  const checkTierInstructionsGroup = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierGroupInstructions', 'Instructions')
+  );
+
+  const checkTierTiersGroup = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierGroupTiers', 'Authored tiers')
+  );
+
+  /**
+   * The check-tier axis as the shared select's option list, GROUPED and HINTED (issue 1504).
+   *
+   * THIS IS THE ONE LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY, and that is why it is
+   * the one that earns the design's grouped shape. It mixes two INSTRUCTIONS with the system's
+   * authored tiers: `Leave unchanged` stages nothing, and `Default DC` is a real instruction
+   * that clears every selected recipe to the system's default — not a second way of saying
+   * "leave alone". A GM reading `Leave unchanged`, `Default DC`, `Standard (DC 15)` as one flat
+   * run has to infer which two of those are verbs.
+   *
+   * So the two instructions carry a `group` of their own, authored FIRST because `Select`
+   * derives its bucket order from first appearance, and each carries its own `hint` — the
+   * second line the design draws under a grouped row's label. The tiers take the second group.
+   *
+   * BOTH GROUP VALUES ARE LOCALIZED, because the value IS the heading text the shared panel
+   * renders. That also makes `data-popover-group` locale-dependent, so nothing may key off it:
+   * a row's identity handle is `data-popover-option`.
+   *
+   * `showTick` is TRUE here against the specimen's own grouped caption, as the caller's
+   * judgement: with two instructions beside named tiers the trigger's label alone does not say
+   * which of the two kinds is live.
+   */
+  const checkTierSelectOptions = $derived([
+    {
+      value: RECIPE_CHECK_TIER_UNCHANGED,
+      label: leaveUnchangedLabel,
+      hint: text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierUnchangedHint',
+        'Every selected recipe keeps the tier it has.'
+      ),
+      group: checkTierInstructionsGroup,
+    },
+    {
+      value: RECIPE_CHECK_TIER_DEFAULT,
+      label: text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC'),
+      hint: text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHint',
+        "Clears every selected recipe to the system's default DC."
+      ),
+      group: checkTierInstructionsGroup,
+    },
+    ...checkTierOptions.map((tier) => ({
+      value: tier.id,
+      label: `${tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')} (DC ${tier.dc})`,
+      group: checkTierTiersGroup,
+    })),
+  ]);
+
   // The section heading, and the accessible name of the staged list under it, so the group
   // name and the heading a sighted GM reads are one string. `recipe item` remains the
   // canonical spec noun; `Books & scrolls` is the display name the manager's own navigation
@@ -875,19 +947,17 @@
   {onApply}
 >
   <BulkEditSection label={text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')} />
-  <!-- The sentinel is FIRST and carries `value=""`, which is the model's `Leave unchanged`. -->
+  <!-- `showTick={false}`: the trigger states the staged category, and a tick beside a flat run
+       of vocabulary names would mark what the control already says. -->
   <BulkEditSelect
     data-recipe-bulk-category=""
     value={draft?.category || ''}
+    options={categorySelectOptions}
+    showTick={false}
     disabled={inert}
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}
     onChange={(value) => setCategory(value)}
-  >
-    <option value="">{leaveUnchangedLabel}</option>
-    {#each categoryOptions as category (category)}
-      <option value={category}>{getRecipeCategoryLabel(category, localize)}</option>
-    {/each}
-  </BulkEditSelect>
+  />
 
   <!--
     The standing sub-hint states the RULE; the Callout below the control states the COUNT.
@@ -955,26 +1025,18 @@
       : ''}
   />
   {#if checkTierAvailable}
+    <!-- GROUPED, HINTED AND TICKED — the only list in this panel that is not a flat vocabulary.
+         `checkTierSelectOptions` carries the reasoning; the short version is that two of these
+         rows are INSTRUCTIONS and the rest are the system's authored tiers, and a GM should not
+         have to infer which is which from a flat run. -->
     <BulkEditSelect
       data-recipe-bulk-check-tier=""
       value={checkTierValue}
+      options={checkTierSelectOptions}
       disabled={inert}
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
       onChange={(value) => setCheckTier(value)}
-    >
-      <option value={RECIPE_CHECK_TIER_UNCHANGED}>{leaveUnchangedLabel}</option>
-      <!-- A REAL instruction, not a second way of saying "leave alone": it clears every
-           selected recipe to the system's default DC. -->
-      <option value={RECIPE_CHECK_TIER_DEFAULT}
-        >{text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC')}</option
-      >
-      {#each checkTierOptions as tier (tier.id)}
-        <option value={tier.id}
-          >{(tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) +
-            ` (DC ${tier.dc})`}</option
-        >
-      {/each}
-    </BulkEditSelect>
+    />
   {:else}
     <Callout
       tone="info"
