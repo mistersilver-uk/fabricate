@@ -28575,9 +28575,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       const saveDisabled = () =>
         target.querySelector('[data-world-component-save]')?.disabled === true;
 
-      /** Open the entry the way a GM does: the world rail, then the row's own open action. */
+      /**
+       * Open the entry the way a GM does: the world rail, then the row's own open action.
+       *
+       * @returns {Promise<object>} the real admin store, for a caller that has to settle it.
+       */
       async function openSaltEntry() {
-        await mountWithRealStore({ worldComponents: [{ ...UNBOUND_SALT }] });
+        const store = await mountWithRealStore({ worldComponents: [{ ...UNBOUND_SALT }] });
         worldNavItem('component-catalogue').click();
         await settleEntryRoute();
         const open = target.querySelector(
@@ -28595,6 +28599,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           'world-component-entry',
           'the row action did not commit the entry route'
         );
+        return store;
       }
 
       /**
@@ -28640,6 +28645,90 @@ describe('CraftingSystemManager mounted behavior', () => {
           'and the Save is armed: the marker and the Save read one dirty flag, and a screen ' +
             'showing a pending edit while refusing to write it is the failure here'
         );
+      });
+
+      // ── AND SOMETHING PRESSES IT (issue 1371 r19-entry2) ────────────────────────────────
+      //
+      // Everything above proves the Save EXISTS and ENABLES. Nothing pressed it, and under M34
+      // that button is the only way four staged sections reach the disk: before this case,
+      // replacing the shell's `onSave={saveWorldComponentEntry}` with `() => {}` left every one
+      // of this file's tests green. The page's own suite drives the HANDLE, which is the seam
+      // rather than the control, so the wire from the header's button through the shell to that
+      // handle was covered by nothing at all.
+      //
+      // READ BACK OFF THE CORPUS, not off a spy: this block mounts the REAL admin store over the
+      // real scope store, so "the write landed" is a fact about what a reload would find rather
+      // than about which function was called.
+
+      /**
+       * Give the world a vocabulary, so the category picker and the tag run have something to
+       * offer. The default leg is `null` — a world with none authored — and the entry withholds
+       * both controls over it, so a case that stages them has to author them first.
+       *
+       * @param {object} store the real admin store.
+       * @returns {Promise<void>}
+       */
+      async function authorVocabulary(store) {
+        scopeStores.vocabulary = {
+          corpus: () => ({
+            componentCategories: [{ id: 'Raw' }],
+            componentTags: [{ id: 'ore' }],
+            recipeCategories: [],
+          }),
+        };
+        await store.refresh();
+        await settleEntryRoute();
+      }
+
+      /** The world record as a reload would read it: the entity, and its world defaults. */
+      const persistedSalt = () => {
+        const corpus = scopeStores.component.get();
+        return {
+          name: corpus.entities.find((entry) => entry.id === UNBOUND_SALT.id)?.name,
+          category: corpus.defaults[UNBOUND_SALT.id]?.category,
+          tags: corpus.defaults[UNBOUND_SALT.id]?.tags,
+        };
+      };
+
+      it('CLICKING the Save lands the staged name, category and tag on the world corpus, and the marker goes', async () => {
+        const store = await openSaltEntry();
+        await authorVocabulary(store);
+        await typeName('Bound Salt');
+        target.querySelector('[data-scoped-entry-category-input]').click();
+        await settleEntryRoute();
+        const raw = [...target.querySelectorAll('[data-popover-option]')].find(
+          (option) => option.textContent.trim() === 'Raw'
+        );
+        assert.ok(Boolean(raw), 'the category picker offered nothing, so the stage below is vacuous');
+        raw.click();
+        await settleEntryRoute();
+        const ore = target.querySelector('[data-scoped-entry-tag="ore"]');
+        assert.ok(Boolean(ore), 'the tag run offered nothing, so the stage below is vacuous');
+        ore.click();
+        await settleEntryRoute();
+
+        assert.deepEqual(
+          persistedSalt(),
+          { name: 'Unbound Salt', category: undefined, tags: undefined },
+          'THREE EDITS, ZERO WRITES so far (M34) — which is what makes the click below the thing being measured'
+        );
+        assert.equal(unsavedMarker(), 'Unsaved changes');
+
+        const save = target.querySelector('[data-world-component-save]');
+        assert.ok(Boolean(save) && !save.disabled, 'the Save is there and armed');
+        save.click();
+        await settleEntryRoute();
+
+        assert.deepEqual(
+          persistedSalt(),
+          { name: 'Bound Salt', category: 'Raw', tags: ['ore'] },
+          'the click carried all three staged sections through the shell to the world corpus'
+        );
+        assert.ok(
+          !target.querySelector('[data-world-component-entry-unsaved]'),
+          'and the marker goes, because there is nothing pending any more'
+        );
+        assert.ok(saveDisabled(), 'and the Save disarms');
       });
     });
 

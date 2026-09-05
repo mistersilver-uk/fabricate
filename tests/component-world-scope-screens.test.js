@@ -339,6 +339,41 @@ describe('the two world component pages declare only what their call site passes
   });
 });
 
+// ── THE THREE ENTRY WIRES THE GATEWAY OWNS AND NO MOUNT OF THE PAGE CAN SEE (issue 1371
+// r19-entry2, quality Q1 and Q8) ──────────────────────────────────────────────────────────────
+//
+// The page's own mounted suite mounts the PAGE. Everything on this list is written where the page
+// is not: two of them in `.manager-header`, which is a sibling of `.manager-main` and structurally
+// unreachable from the page's tree, and the third a value the gateway derives and hands down. Each
+// has the same failure shape — the screen still renders, the control is still there, and the thing
+// it was supposed to carry is silently absent.
+describe('the world component entry’s gateway-owned wires are pinned at source', () => {
+  it('names the two header hooks the capture registry and the mounted suites press', () => {
+    // The sibling screens carry this pair (`essence-world-scope-screens.test.js`) and this one
+    // did not: `grep data-world-component-save` over the whole repository answered the gateway's
+    // own attribute and ONE `disabled` read, so a rename would have been caught by nothing that
+    // could name the button. `ScopedEntryHeaderActions` takes both as props precisely so that a
+    // shared edit cannot rename one site out from under another.
+    assert.match(rootSource, /backAttribute="data-world-component-back"/);
+    assert.match(rootSource, /saveAttribute="data-world-component-save"/);
+  });
+
+  it('hands the entry the WORLD essence roster, which is what makes the M31 card non-empty', () => {
+    // Hand this the wrong list — the selected system's essences, an empty array, nothing at all —
+    // and the `Essence contribution` card draws `[data-scoped-entry-essences-empty]`: a dead end
+    // that looks deliberate, on the card the whole world-essences section exists for. The lab case
+    // that would catch it (`world-component-entry-essences`) is selected by the PAGE's files, not
+    // by the gateway's, so a root-only change reaches neither it nor any mounted suite.
+    const mount = /<WorldComponentEntryPage\b([\s\S]*?)\/>/.exec(rootSource);
+    assert.ok(mount, 'the gateway mounts the entry');
+    assert.match(
+      mount[1],
+      /worldEssences=\{worldEssenceOptions\}/,
+      'the entry reads the world essence catalogue, not the selected system’s roster'
+    );
+  });
+});
+
 describe('the `Add from catalogue` header action opens a picker and navigates nowhere (M9)', () => {
   // Revision 5's control read `openWorldScopedEntry('world-component-' + 'catalogue', '')`. That
   // token is a VIEW LAB CASE ID rather than a route: `WORLD_SCOPED_VIEWS` does not carry it, the
