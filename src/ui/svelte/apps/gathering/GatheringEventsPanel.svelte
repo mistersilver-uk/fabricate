@@ -371,10 +371,10 @@
   }
 
   /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
-     and colour all come from the sheet's `.fabricate-select*` family — measured identical to
-     what this block declared, border included. Only the FILL is this pager's own, and the
-     sheet's family note records how this block still beats the family for it. No `min-width`:
-     this row is a nowrap single line in a narrow column, and a floor is what would wrap it. */
+     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
+     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
+     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
+     sheet's family note records how this block still beats the family for it. */
   .gathering-detail-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
     /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
@@ -397,7 +397,7 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--fab-border);
-    border-radius: 7px; /* 1504: the specimen`s icon rung, so the pager reads as one pair */
+    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;
