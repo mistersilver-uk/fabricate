@@ -464,6 +464,18 @@ test('isReleaseZipName recognises a published archive and nothing else', () => {
   for (const name of ['module.json', 'main.js', 'fabricate.zip', 'fabricate-v1.9.5.zip.map']) {
     assert.ok(!isReleaseZipName(name), `${name} must not read as a published archive`);
   }
+
+  // THE `v` IS REQUIRED, DELIBERATELY, and this row exists so that narrowness is a decision
+  // rather than an accident. `release-s3.js` builds its per-target cohort archives under the
+  // other shape, `${moduleId}-${version}.zip` with no `v`, and this predicate does not match
+  // them. It does not have to: those are written into a per-target directory under the staging
+  // root (`join(stagingDir, target.label)`) and never into `dist/`, which is the only directory
+  // `release.js` scans with this predicate. Matching them would mean this gate could mistake a
+  // cohort archive for the published one; refusing them cannot hide a real `dist/` archive.
+  assert.ok(
+    !isReleaseZipName('fabricate-0.1.0.zip'),
+    "release-s3's cohort archive shape is not the published archive, and never lands in dist/"
+  );
 });
 
 test('findMissingChunkReferences reports an absent entry rather than reading it', () => {
