@@ -1113,7 +1113,11 @@
    whatever the base happens to be rather than at what its markup says. The other direction of
    that mirror is gated: every emitted `data-gap` value must have a declared rung, and both
    defaults are named there, so the base rung cannot be changed without meeting the gate
-   (issue 1501). */
+   (issue 1501).
+
+   A FOURTH UTILITY IS NOT DECLARED HERE. `.fabricate .visually-hidden` obeys the same rule and
+   the same rooting, about 4,350 lines below: each utility sits at the earliest of its own donors'
+   positions, decided by that adoption's blocker walk rather than by this section. */
 
 .fabricate .fab-truncate {
   min-width: 0;
@@ -5708,8 +5712,8 @@
 /* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's
    `a.button:focus, button:focus` paints an orange outline and a 4px glow that the module reset
    removes inside every Fabricate window, and this family now renders in hosts that have no
-   Fabricate root at all. BUTTONS ONLY here for
-   the same reason the ring below is, and above the ring because the two tie at (0,2,1). */
+   Fabricate root at all. BUTTONS ONLY here for the same reason the ring below is, and above the
+   ring because the two tie at (0,2,1). */
 .fabricate-pagination button:focus {
   outline: none;
   box-shadow: none;
@@ -13705,13 +13709,14 @@
 
 /* THE STRIP HALF OF THE FAMILY'S FOCUS CHROME, and it is not optional (issue 1502). Foundry core
    paints EVERY focused button with `outline: 1px solid var(--button-focus-outline-color)` — a
-   burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The two
-   MODULE reset above (`.fabricate <element>:focus`, issue 1501) strips that inside every Fabricate
-   window, but a control rooted at the class this primitive emits also renders in hosts carrying no
-   Fabricate root at all — a chat card, another module's sheet — where core's orange survives under
-   the accent ring. A primitive that declares its own ring therefore declares the PAIR, which is the
-   same rule CONTRIBUTING.md states for the module root. Written ABOVE the repaint because the two halves tie at
-   (0,2,0) and a keyboard-focused control matches both, so source order is what decides. */
+   burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The
+   MODULE reset above (`.fabricate <element>:focus`, issue 1501) strips that inside every
+   Fabricate window, but a control rooted at the class this primitive emits also renders in hosts
+   carrying no Fabricate root at all — a chat card, another module's sheet — where core's orange
+   survives under the accent ring. A primitive that declares its own ring therefore declares the
+   PAIR, which is the same rule CONTRIBUTING.md states for the module root. Written ABOVE the
+   repaint because the two halves tie at (0,2,0) and a keyboard-focused control matches both, so
+   source order is what decides. */
 .fabricate-button:focus {
   outline: none;
   box-shadow: none;
@@ -13870,8 +13875,9 @@
    BEATS this (0,2,0) rule wherever a Fabricate root is an ancestor. The declarations are copied
    from it verbatim, so nothing moves there. What this rule paints in is a host carrying no
    Fabricate root at all — a chat card, another module's sheet — where a control re-rooted at
-   `fabricate-icon-button` would otherwise keep its paint and lose its ring. The ghost/danger `:focus-visible` pairs above are (0,4,0)
-   colour-and-background only, so nothing here contends with them. */
+   `fabricate-icon-button` would otherwise keep its paint and lose its ring. The ghost/danger
+   `:focus-visible` pairs above are (0,4,0) colour-and-background only, so nothing here contends
+   with them. */
 .fabricate-icon-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
