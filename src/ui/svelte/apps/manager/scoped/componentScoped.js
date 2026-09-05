@@ -170,21 +170,37 @@ export function componentGlobalTagNote(entry, phrase) {
 }
 
 /**
- * The catalogue's ONE lane filter: whether the record names a source Item.
+ * The catalogue's source filter: WHICH KIND of address a record names, and whether it dangles.
  *
- * `hasSourceLink` answers PRESENCE and never resolution — see `componentScopeValidation.js` for
- * why a resolution answer is not the projection's to give — so the two options are exactly the
- * two states presence has.
+ * FOUR OPTIONS, WHICH ARE THE REFERENCE'S OWN (`proto:579`, UX round-2 finding F-C). It shipped
+ * as a two-option presence question — `Linked` / `Not linked` — and presence is the one thing
+ * the row already states in its own pill; what a GM comes to this select for is the pair of
+ * questions the pill can only answer one row at a time. `Broken link` above all: a world that
+ * has moved its Items has no other way to ask "show me what no longer resolves", and the
+ * predicate that answers it was already written in this file and already painting the row flag.
  *
+ * IT ROUTES THROUGH THE ROW'S OWN TWO ANSWERS AND HOLDS NO THIRD OPINION.
+ * {@link componentSourceKind} decides what kind of address a record names and
+ * {@link componentSourceBroken} decides whether a world address dangles; the row's pill and its
+ * flag are painted from exactly those two, so a filtered set and the pills inside it cannot
+ * disagree. A predicate re-deriving `Compendium.` here would be a second copy that goes on
+ * testing the old field names after a rename.
+ *
+ * IT THEREFORE TAKES THE ITEM ROSTER. `Broken link` is a RESOLUTION question and resolution is
+ * answerable only where a document roster is — the same argument {@link componentSourceBroken}'s
+ * own note makes at length. A call site with no roster hands over `[]`, which answers "not
+ * known to be broken" for every record rather than flagging the whole screen.
+ *
+ * @param {{worldItems?: Array<{uuid?: string}>}} context the game-world Item roster.
  * @param {(key: string, fallback: string, data?: object) => string} phrase
  * @returns {Array<object>}
  */
-export function componentSourceFilters(phrase) {
+export function componentSourceFilters({ worldItems = [] } = {}, phrase) {
   return [
     {
       id: 'source-type',
       label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterSource', 'Source item'),
-      // BESIDE THE SEARCH FIELD (`proto:578`), which is the frame's default row anyway; it is
+      // BESIDE THE SEARCH FIELD (`proto:579`), which is the frame's default row anyway; it is
       // stated because the membership descriptor below states the other one, and a pair of
       // descriptors where only one answers the question reads as an oversight.
       toolbarRow: 'lead',
@@ -194,19 +210,33 @@ export function componentSourceFilters(phrase) {
           label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterSourceAll', 'Any source'),
         },
         {
-          value: 'linked',
-          label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterSourceLinked', 'Linked'),
+          value: 'world',
+          label: phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.FilterSourceWorld',
+            'World items'
+          ),
         },
         {
-          value: 'unlinked',
+          value: 'compendium',
           label: phrase(
-            'FABRICATE.Admin.Manager.Scoped.Component.FilterSourceUnlinked',
-            'Not linked'
+            'FABRICATE.Admin.Manager.Scoped.Component.FilterSourcePack',
+            'Compendium'
+          ),
+        },
+        {
+          value: 'broken',
+          label: phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.FilterSourceBroken',
+            'Broken link'
           ),
         },
       ],
-      matches: (entry, value) =>
-        value === 'linked' ? entry?.hasSourceLink === true : entry?.hasSourceLink !== true,
+      matches: (entry, value) => {
+        if (value === 'broken') return componentSourceBroken(entry, worldItems);
+        if (value === 'world') return componentSourceKind(entry) === 'world';
+        if (value === 'compendium') return componentSourceKind(entry) === 'pack';
+        return true;
+      },
     },
   ];
 }
@@ -224,14 +254,33 @@ function nameOf(entry) {
 }
 
 /**
- * The catalogue's ONE lane sort: linked records before unlinked ones.
+ * THE ORDER THE THREE SOURCE KINDS SORT IN, and why it is a rank rather than a string compare.
+ *
+ * The reference sorts its `Source type` key with `a.src.localeCompare(b.src)` over its own
+ * labels (`proto:5150`), which in English is `Compendium` before `Foundry item`. Comparing the
+ * LOCALIZED label would make the row order depend on the client's language — a French world
+ * would sort `Compendium` after `Objet Foundry` — so the rank states the reference's order once,
+ * in the vocabulary {@link componentSourceKind} answers, and the labels stay free to translate.
+ *
+ * @type {Readonly<Record<string, number>>}
+ */
+const SOURCE_KIND_ORDER = Object.freeze({ pack: 0, world: 1, none: 2 });
+
+/**
+ * The catalogue's ONE lane sort: by the KIND of source address a record names.
+ *
+ * IT SORTS WHAT ITS LABEL SAYS (`proto:5228`, UX round-2 finding F-C). It shipped as
+ * `Source item` — linked records before unlinked ones — which is the presence question the
+ * source FILTER used to ask, so the two controls beside each other split one axis two ways and
+ * neither of them was the reference's. `Source type` is the reference's own key and its own
+ * word, and the three-way order is the one the row's pill already prints.
  *
  * A REVERSIBLE PAIR SHARING ONE OPTION (issue 1371, gap-list row 11). It shipped as one
  * descriptor and therefore as one whole order, which left the frame's direction toggle greyed
  * whenever this sort was chosen — the reference pairs all three of its sort keys with a live
- * direction control (`proto:581`-`584`). The frame composes `${key}-${direction}` for any key it
+ * direction control (`proto:581`-`587`). The frame composes `${key}-${direction}` for any key it
  * does not hold a descriptor for, so declaring the two ids and naming the shared `optionId` is
- * the whole of it: the select offers one `Source item` entry and the toggle resolves to a real
+ * the whole of it: the select offers one `Source type` entry and the toggle resolves to a real
  * descriptor in both positions. Name, and the system-count sort, are the frame's own and are not
  * restated here.
  *
@@ -239,17 +288,20 @@ function nameOf(entry) {
  * @returns {Array<{id: string, label: string, compare: (left: object, right: object) => number}>}
  */
 export function componentSorts(phrase) {
-  const label = phrase('FABRICATE.Admin.Manager.Scoped.Component.SortSource', 'Source item');
+  const label = phrase('FABRICATE.Admin.Manager.Scoped.Component.SortSource', 'Source type');
   /**
-   * Linked before unlinked, or the reverse, with the NAME tie-break running in the same
-   * direction either way — so reversing the sort key does not also shuffle equal rows.
+   * Compendium, then world Items, then the records naming nothing — or the reverse, with the
+   * NAME tie-break running in the same direction either way, so reversing the sort key does not
+   * also shuffle equal rows.
    *
-   * @param {number} direction `1` for linked-first, `-1` for unlinked-first.
+   * @param {number} direction `1` for the reference's own order, `-1` for its reverse.
    * @returns {(left: object, right: object) => number}
    */
   const bySource = (direction) => (left, right) => {
     const order =
-      (Number(right?.hasSourceLink === true) - Number(left?.hasSourceLink === true)) * direction;
+      (SOURCE_KIND_ORDER[componentSourceKind(left)] -
+        SOURCE_KIND_ORDER[componentSourceKind(right)]) *
+      direction;
     if (order !== 0) return order;
     return nameOf(left).localeCompare(nameOf(right));
   };
@@ -315,16 +367,43 @@ export function componentRowStats(entry, systemCount, phrase) {
  * @returns {string}
  */
 export function componentSourceType(entry, text) {
-  const uuid = String(
-    entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || ''
-  ).trim();
-  if (!uuid || entry?.hasSourceLink !== true) {
+  const kind = componentSourceKind(entry);
+  if (kind === 'none') {
     return text('FABRICATE.Admin.Manager.Scoped.Component.SourceNone', 'No source item');
   }
-  if (uuid.startsWith('Compendium.')) {
+  if (kind === 'pack') {
     return text('FABRICATE.Admin.Manager.Scoped.Component.SourceTypePack', 'Compendium');
   }
   return text('FABRICATE.Admin.Manager.Scoped.Component.SourceTypeWorld', 'Foundry item');
+}
+
+/**
+ * WHICH KIND of source address a record names, as a value rather than as a sentence.
+ *
+ * ── WHY THE DISCRIMINATION HAS ONE HOME (issue 1371 r11-cat) ──────────────────────────────────
+ * Three surfaces ask this question: the row's pill says it in words
+ * ({@link componentSourceType}), the toolbar's four-option filter selects on it and the
+ * `Source type` sort orders by it ({@link componentSourceFilters}, {@link componentSorts}).
+ * Each of them re-reading `registeredItemUuid || originItemUuid` and testing `Compendium.`
+ * itself would be three copies of one rule: a rename of either field would leave the pill
+ * correct and the filter silently matching nothing, or the reverse, and every type-level gate
+ * would stay green through it. So the rule is written once and the three surfaces phrase it.
+ *
+ * `none` is PRESENCE, and it is deliberately the projection's answer rather than this module's:
+ * `hasSourceLink` is decided in `buildEntry` beside the one list of source-link field names,
+ * which is why a record carrying a uuid the projection does not count as a link still answers
+ * `none` here. Resolution — whether a world address still finds its Item — is a different
+ * question again and belongs to {@link componentSourceBroken}, which needs a roster to answer it.
+ *
+ * @param {object|null} entry
+ * @returns {'world'|'pack'|'none'}
+ */
+export function componentSourceKind(entry) {
+  const uuid = String(
+    entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || ''
+  ).trim();
+  if (!uuid || entry?.hasSourceLink !== true) return 'none';
+  return uuid.startsWith('Compendium.') ? 'pack' : 'world';
 }
 
 /**

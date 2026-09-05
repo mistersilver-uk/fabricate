@@ -804,9 +804,20 @@
     }))
   );
 
+  // ── `SYSTEM COUNT` RATHER THAN `SYSTEMS` (issue 1371 r11-cat, UX F-C) ─────────────────────
+  // The reference names this key `System count` on BOTH world catalogues it draws — `proto:5228`
+  // for components and `proto:4775` for tools — and it is what the key sorts by: the number of
+  // crafting systems holding the record. `Systems` reads as a sort BY the systems and left
+  // `inventory` reporting `MISSING LABEL "system count"` on this route.
+  //
+  // ONE SHARED STRING RATHER THAN A PER-LANE OVERRIDE, and that is the whole argument for
+  // touching it here: the three catalogues that compose this frame sort by the identical count,
+  // so a prop threaded through the shell to relabel it on one of them would put two names on one
+  // meaning — the failure the design-system spec names first. The row STAT label stays `Systems`
+  // (`proto:5248`), which is a different fact in a different place.
   const sortKeyLabels = $derived({
     name: text('FABRICATE.Admin.Manager.Scoped.List.SortKeyName', 'Name'),
-    systems: text('FABRICATE.Admin.Manager.Scoped.List.SortKeySystems', 'Systems'),
+    systems: text('FABRICATE.Admin.Manager.Scoped.List.SortKeySystems', 'System count'),
   });
 
   // ── ONE OPTION MAY STAND FOR A PAIR OF DESCRIPTORS (issue 1371 r8-cat) ────────────────────
@@ -1882,6 +1893,42 @@
   .manager-scoped-list-direction:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  /* ── THE WORLD COMPONENT CATALOGUE'S TWO MICRO-TYPE CORRECTIONS (issue 1371 r11-cat) ──────
+     UX round-2 finding F-K. `proto:582` and `proto:585` draw `Membership` and `Sort by` with the
+     IDENTICAL `font:700 8.5px var(--sans);letter-spacing:.09em`, and `proto:587` draws the
+     direction toggle beside them at `font:600 11px var(--sans);color:var(--text2)`. On that route
+     the membership label already measures right and these two do not — 9.28px/600/0.08em and
+     11.52px/400 in the manager's own ink — so one toolbar row draws two micro-labels two ways and
+     one control at a weight its neighbours do not use. That internal inconsistency is what makes
+     these per-site drift rather than a systematic ramp, and no rung, scale or M-number covers it.
+
+     ── AND WHY THEY ARE HERE RATHER THAN IN `styles/fabricate.css` ────────────────────────────
+     That sheet already carries this route's other type corrections, including the membership
+     label's own. It CANNOT carry these two: it is imported at `layer(modules)` while this
+     component's `css: 'injected'` block is UNLAYERED, and an unlayered author declaration beats a
+     layered one at ANY specificity — so a `font-size` for `.manager-scoped-list-sort-label`
+     written there would match, be overridden and never be used. The sheet's own note beside
+     `.manager-scoped-list-count` records that exact loss. The declarations these override are the
+     two rules directly above, so the override lives beside them.
+
+     ── ROUTE-SCOPED, SO THE ESSENCE AND TOOL CATALOGUES DO NOT MOVE ───────────────────────────
+     Three screens compose this frame and only one of them has a reference to be right about. The
+     `:global()` prefix reaches the manager area root, which is outside this component's markup;
+     everything after it stays scoped, so these rules can still only match THIS frame's own
+     elements. Deleting the attribute selector would take both values to all three catalogues. */
+  :global(.fabricate-manager[data-manager-view='world-components'])
+    .manager-scoped-list-sort-label {
+    font-size: 0.531rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+  }
+
+  :global(.fabricate-manager[data-manager-view='world-components']) .manager-scoped-list-direction {
+    color: var(--fab-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 600;
   }
 
   /* `6 of 6 essences`, pushed to the trailing edge of the row exactly as the prototype draws it.

@@ -22,9 +22,9 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COMPONENT_SYSTEMS,
-  SEARCHABLE_POPOVER_RAW_MODULES,
+  componentCorpus,
   componentScopeFor,
-  createComponentScopeHarness,
+  createWorldComponentCatalogueHarness,
   drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
@@ -35,33 +35,9 @@ import { createScopedListBrowserState } from '../../src/utils/managerBrowserView
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const harness = createComponentScopeHarness({
+const { harness } = createWorldComponentCatalogueHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-component-catalogue-',
-  componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte',
-  rawExtras: [
-    ...SEARCHABLE_POPOVER_RAW_MODULES,
-    // The drop zone's two leaves: the action it binds and the payload normalizer behind it.
-    'src/ui/svelte/actions/dragDrop.js',
-    'src/ui/svelte/util/dropUtils.js',
-  ],
-  compiledExtras: [
-    'src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte',
-    'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
-    'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
-    'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
-    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
-    'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/components/InspectorCard.svelte',
-  ],
 });
 
 // The projection wrapper and the microtask drain are SHARED with the entry suite; both suites
@@ -317,7 +293,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
-    it('leaves the sort DIRECTION live against the source-item sort', async () => {
+    it('leaves the sort DIRECTION live against the source-type sort', async () => {
       // Gap-list row 11. A lane sort shipped as one descriptor and therefore as one whole order,
       // which inerted the toggle: `source-type-asc` did not exist and nothing said so.
       const target = await mountToolbar();
@@ -337,6 +313,146 @@ describe('world Component Catalogue (issue 1371)', () => {
       direction.click();
       await drain();
       assert.equal(names()[0], 'orphan', 'and the unlinked one leads once reversed');
+    });
+  });
+
+  // ── THE SOURCE FILTER AND THE SORT ARE THE REFERENCE'S OWN SETS (issue 1371 r11-cat) ────────
+  // UX round-2 finding F-C. `proto:579` offers `Any source` / `World items` / `Compendium` /
+  // `Broken link` and `proto:5228` sorts by `Name` / `System count` / `Source type`; the screen
+  // offered a two-option PRESENCE question and a `Source item` sort, so `inventory` reported
+  // `MISSING LABEL` for four of the reference's own words and a GM could not ask the one question
+  // the catalogue exists to answer on a world whose Items have moved.
+  //
+  // EVERY CASE HERE ACTS: it selects the option and reads the rows that survive, because an
+  // `<option>` list assertion passes just as well over a predicate wired to the wrong answer.
+  describe('the source filter asks WHICH KIND of address, and the sort orders by it', () => {
+    // A FIFTH RECORD, and the corpus has no other way to state the compendium case: the shared
+    // four are one world link, one dangling world link, one unlinked and one more world link, so
+    // `Compendium` and `World items` would select the same set and `Source type` would be a
+    // two-value order dressed as a three-value one. It is added HERE rather than in the shared
+    // corpus because the entry suite counts that corpus's records.
+    const PACK_RECORD = Object.freeze({
+      id: 'quartz',
+      name: 'Sky Quartz',
+      description: 'Bought in from a pack.',
+      originItemUuid: 'Compendium.fabricate.demo-items.Item.sky-quartz',
+    });
+
+    async function mountFiveSources(props = {}) {
+      const base = componentCorpus();
+      return harness.mount({
+        scope: componentScopeFor({ entities: [...base.entities, PACK_RECORD] }),
+        systems: COMPONENT_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        systemId: 'sys-forge',
+        ...props,
+      });
+    }
+
+    /** The rendered row ids, sorted, so an assertion is about the SET rather than the order. */
+    function rowIds(target) {
+      return [...target.querySelectorAll('[data-scoped-list-row]')]
+        .map((row) => row.getAttribute('data-scoped-list-row'))
+        .sort((left, right) => left.localeCompare(right));
+    }
+
+    /** Choose one source option and let the projection settle. */
+    async function chooseSource(target, value) {
+      const select = target.querySelector('[data-scoped-list-filter="source-type"]');
+      select.value = value;
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      return select;
+    }
+
+    it('offers the reference’s four options, in the reference’s own words', async () => {
+      const target = await mountFiveSources();
+      const select = target.querySelector('[data-scoped-list-filter="source-type"]');
+      assert.deepEqual(
+        [...select.options].map((option) => option.textContent.trim()),
+        ['Any source', 'World items', 'Compendium', 'Broken link'],
+        '`proto:579`, verbatim — the shipped pair asked about presence, which the row pill ' +
+          'already states one row at a time'
+      );
+    });
+
+    it('narrows to the WORLD Items, which is not the same set as “has a link”', async () => {
+      const target = await mountFiveSources();
+      assert.deepEqual(
+        rowIds(target),
+        ['coal', 'ingot', 'orphan', 'quartz', 'resin'],
+        'unfiltered first, so every narrowing below is a real change'
+      );
+      await chooseSource(target, 'world');
+      assert.deepEqual(
+        rowIds(target),
+        ['coal', 'ingot', 'resin'],
+        'the three world addresses — and NOT the pack-linked record, which the old ' +
+          '`Linked` option would have included'
+      );
+    });
+
+    it('narrows to the COMPENDIUM records, which the shipped filter could not ask for', async () => {
+      const target = await mountFiveSources();
+      await chooseSource(target, 'compendium');
+      assert.deepEqual(rowIds(target), ['quartz'], 'only the pack address');
+    });
+
+    it('narrows to the BROKEN links, from the same roster the row flag is painted from', async () => {
+      const target = await mountFiveSources();
+      await chooseSource(target, 'broken');
+      assert.deepEqual(
+        rowIds(target),
+        ['coal', 'resin'],
+        'the two world addresses the Item roster does not hold'
+      );
+      // THE FLAGS AND THE FILTERED SET AGREE, which is the whole reason the option routes
+      // through `componentSourceBroken` rather than re-deriving the answer.
+      assert.equal(
+        target.querySelectorAll('[data-world-component-row-flag]').length,
+        2,
+        'every surviving row wears the broken flag'
+      );
+    });
+
+    it('claims nothing is broken when the call site handed over no Item roster', async () => {
+      // The loudest possible false alarm is the failure a resolution answer must not have: an
+      // empty roster means "not known", so this option selects NOTHING rather than everything.
+      const target = await mountFiveSources({ worldItems: [] });
+      await chooseSource(target, 'broken');
+      assert.deepEqual(rowIds(target), [], 'no roster, no claim');
+    });
+
+    it('offers the reference’s three sort keys, in the reference’s own words', async () => {
+      // `proto:5228`. `System count` is the FRAME's own key — every catalogue sorts by the same
+      // member-system count, so it is renamed at the shared string rather than overridden here;
+      // `Source type` is this lane's, and `Source item` was the presence question the filter
+      // beside it used to ask.
+      const target = await mountFiveSources();
+      assert.deepEqual(
+        [...target.querySelector('[data-scoped-list-sort]').options].map((option) =>
+          option.textContent.trim()
+        ),
+        ['Name', 'System count', 'Source type']
+      );
+    });
+
+    it('sorts by the KIND of source, compendium first, with the name tie-break', async () => {
+      const target = await mountFiveSources();
+      const sort = target.querySelector('[data-scoped-list-sort]');
+      sort.value = 'source-type';
+      sort.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      assert.deepEqual(
+        [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
+          row.getAttribute('data-scoped-list-row')
+        ),
+        ['quartz', 'coal', 'ingot', 'resin', 'orphan'],
+        'Compendium, then the three world Items by name, then the record naming nothing — ' +
+          'an order a linked/unlinked compare cannot produce, because it puts the pack record ' +
+          'in the same bucket as the three world ones'
+      );
     });
   });
 
@@ -1464,6 +1580,312 @@ describe('world Component Catalogue (issue 1371)', () => {
 
       release();
       await drain();
+    });
+
+    // ── THE PANEL'S OWN CONTROLS ARE ACTED ON, NOT SEEN (issue 1371 r11-cat) ──────────────────
+    // Quality round-2 finding F1: five controls the r8-r10 rebuild ADDED to this panel — the
+    // inset pager's two buttons and the three `Clear`s — were referenced by no file under
+    // `tests/` at all, and replacing all five `onclick` bodies with no-ops left the suites green.
+    // Each test below stages something, presses the control, and reads the state it changes.
+
+    /** The `Systems` / `World category` / `World tags` group's inline hint, by group label. */
+    function sectionHint(target, label) {
+      const row = [...target.querySelectorAll('.fab-bulk-edit-label-row')].find(
+        (candidate) => candidate.querySelector('.fab-bulk-edit-label')?.textContent.trim() === label
+      );
+      assert.ok(Boolean(row), `the ${label} group renders a label row`);
+      return row.querySelector('.fab-bulk-edit-hint')?.textContent.trim() ?? '';
+    }
+
+    /**
+     * Mount with a tag vocabulary LARGER than one inset page, which the shared corpus is not.
+     *
+     * `pageSize` is 5 and the shared corpus authors two tags across two systems, so no mounted
+     * assertion has ever entered the paged branch: `range` only ever read `1-1 of 1` or
+     * `1-2 of 2`, and the window arithmetic, the clamp, the `Page {page}/{of}` sentence and both
+     * pager handlers were unmeasured. Seven tags is the smallest corpus with a second page that
+     * is not also a full one, so the range sentence differs at both ends.
+     */
+    async function selectedWithSevenTags() {
+      const { calls, actions } = recordingComponentActions();
+      const base = componentCorpus();
+      const target = await harness.mount({
+        scope: componentScopeFor({
+          defaults: [
+            ...base.defaults.filter((row) => row.id !== 'coal'),
+            {
+              id: 'coal',
+              category: 'Raw',
+              tags: ['alloy', 'bulk', 'ceramic', 'dust', 'ember', 'fuel', 'glass'],
+            },
+          ],
+        }),
+        systems: COMPONENT_SYSTEMS,
+        actions,
+      });
+      await selectTwo(target);
+      return { target, calls };
+    }
+
+    /** One inset's pager parts. */
+    function pagerOf(target, inset) {
+      return {
+        prev: target.querySelector(`[data-world-component-bulk-prev="${inset}"]`),
+        next: target.querySelector(`[data-world-component-bulk-next="${inset}"]`),
+        range: target
+          .querySelector(`[data-world-component-bulk-range="${inset}"]`)
+          .textContent.trim(),
+      };
+    }
+
+    it('pages an inset FORWARD and BACK, and inerts each end of the window', async () => {
+      const { target } = await selectedWithSevenTags();
+      assert.deepEqual(
+        insetRows(target, 'tags'),
+        ['alloy', 'bulk', 'ceramic', 'dust', 'ember'],
+        'page one holds the window, not the whole vocabulary'
+      );
+      assert.equal(pagerOf(target, 'tags').range, 'Showing 1-5 of 7');
+      assert.equal(pagerOf(target, 'tags').prev.disabled, true, 'and there is no page before it');
+      assert.equal(pagerOf(target, 'tags').next.disabled, false);
+
+      pagerOf(target, 'tags').next.click();
+      await drain();
+      assert.deepEqual(
+        insetRows(target, 'tags'),
+        ['fuel', 'glass'],
+        'NEXT moves the window — the two rows page one could not hold'
+      );
+      assert.equal(pagerOf(target, 'tags').range, 'Showing 6-7 of 7');
+      assert.equal(
+        pagerOf(target, 'tags').next.disabled,
+        true,
+        'and the far end inerts, so the clamp is not merely arithmetic nobody can reach'
+      );
+      assert.equal(pagerOf(target, 'tags').prev.disabled, false);
+
+      pagerOf(target, 'tags').prev.click();
+      await drain();
+      assert.deepEqual(insetRows(target, 'tags'), ['alloy', 'bulk', 'ceramic', 'dust', 'ember']);
+      assert.equal(pagerOf(target, 'tags').range, 'Showing 1-5 of 7');
+      assert.equal(pagerOf(target, 'tags').prev.disabled, true);
+    });
+
+    it('names the page a GM is on, out of the pages there are', async () => {
+      const { target } = await selectedWithSevenTags();
+      const label = () =>
+        target
+          .querySelector(
+            ':scope [data-world-component-bulk-inset="tags"] .fab-bulk-component-inset-pager'
+          )
+          .textContent.replaceAll(/\s+/g, ' ');
+      assert.match(label(), /Page 1\/2/);
+      pagerOf(target, 'tags').next.click();
+      await drain();
+      assert.match(label(), /Page 2\/2/, 'the sentence moves with the window it describes');
+    });
+
+    it('CLEARS the staged systems, and Apply goes inert with them', async () => {
+      const { target, calls } = await selectedCatalogue();
+      await stageMembership(target, 'add', 'sys-forge');
+      assert.equal(sectionHint(target, 'Systems'), '1 chosen', 'staged first');
+      assert.equal(target.querySelector('[data-world-component-bulk-apply]').disabled, false);
+
+      target.querySelector('[data-world-component-bulk-clear-systems]').click();
+      await drain();
+      assert.equal(
+        sectionHint(target, 'Systems'),
+        'None',
+        'the group reads back to its unstaged state — the only reset this axis offers'
+      );
+      assert.equal(
+        target
+          .querySelector(
+            ':scope [data-world-component-bulk-inset="systems"] [data-world-component-bulk-option="sys-forge"]'
+          )
+          .getAttribute('data-world-component-bulk-option-state'),
+        'off',
+        'and the row it staged is untick'
+      );
+      assert.equal(
+        target.querySelector('[data-world-component-bulk-apply]').disabled,
+        true,
+        'so Apply has nothing left to commit'
+      );
+      assert.deepEqual(calls, [], 'and clearing a stage writes nothing');
+    });
+
+    it('CLEARS the staged world category, back to leaving it unchanged', async () => {
+      const { target, calls } = await selectedCatalogue();
+      target
+        .querySelector(
+          ':scope [data-world-component-bulk-inset="category"] [data-world-component-bulk-option="Refined"]'
+        )
+        .click();
+      await drain();
+      assert.equal(sectionHint(target, 'World category'), 'Refined', 'staged first');
+      assert.equal(target.querySelector('[data-world-component-bulk-apply]').disabled, false);
+
+      target.querySelector('[data-world-component-bulk-clear-category]').click();
+      await drain();
+      assert.equal(
+        sectionHint(target, 'World category'),
+        'Leave unchanged',
+        'CLEAR is not the same instruction as `No world category`, which is itself a write'
+      );
+      assert.equal(
+        target
+          .querySelector('[data-world-component-bulk-category-state]')
+          .getAttribute('data-world-component-bulk-category-state'),
+        'unchanged'
+      );
+      assert.equal(target.querySelector('[data-world-component-bulk-apply]').disabled, true);
+      assert.deepEqual(calls, []);
+    });
+
+    it('CLEARS both staged tag directions at once', async () => {
+      const { target, calls } = await selectedCatalogue();
+      stageTag(target, 'fuel');
+      await drain();
+      stageTag(target, 'bulk');
+      await drain();
+      stageTag(target, 'bulk');
+      await drain();
+      assert.equal(
+        sectionHint(target, 'World tags'),
+        '1 added · 1 removed',
+        'one of each direction staged, so the clear has both to undo'
+      );
+
+      target.querySelector('[data-world-component-bulk-clear-tags]').click();
+      await drain();
+      assert.equal(
+        sectionHint(target, 'World tags'),
+        'Leave unchanged',
+        'a GM cycling eleven tag rows back through three states by hand is what this control is for'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-component-bulk-tags]'),
+        'and the staged chip run goes with it'
+      );
+      assert.equal(target.querySelector('[data-world-component-bulk-apply]').disabled, true);
+      assert.deepEqual(calls, []);
+    });
+
+    // ── A THROWN PAIR IS A REFUSED PAIR (issue 1371 r11-cat) ──────────────────────────────────
+    // Reviewer round-2 finding 4 / Foundry round-2 finding 4. `applyBulk` had no `try`/`catch`,
+    // so a throw out of one write skipped every remaining pair, never reached `clearSelection()`
+    // and escaped as an unhandled rejection — leaving a page of rows still ticked, some written
+    // and some not, with no statement of which. `ui-integration/spec.md` requirement 6 states the
+    // opposite rule for the same composed verb.
+    //
+    // BOTH AXES ARE DRIVEN, and the tag axis is the one that is still REACHABLE at the store:
+    // lane STORE's r11 change makes `partComponentFromSystem` catch, notify and answer, so the
+    // membership leg no longer throws in the product — while `setWorldTags` and
+    // `updateWorldDefaultSection` are raw family verbs with no such wrapper and reject straight
+    // into this loop on a refused settings write.
+    it('finishes the run when ONE pair throws, and still clears the selection', async () => {
+      const { calls, actions } = recordingComponentActions();
+      const thrown = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {
+          ...actions,
+          removeFromSystem: async (entityId, systemId) => {
+            calls.push({ verb: 'removeFromSystem', args: [entityId, systemId] });
+            await Promise.resolve();
+            if (entityId === 'ingot') {
+              thrown.push(entityId);
+              throw new Error('the settings write was refused');
+            }
+            return true;
+          },
+        },
+      });
+      await selectTwo(target);
+      await applyMembership(target, 'remove', 'sys-forge');
+
+      assert.deepEqual(thrown, ['ingot'], 'NON-VACUITY: the throwing leg really threw');
+      assert.deepEqual(
+        calls.map((call) => call.args[0]),
+        ['ingot', 'coal'],
+        'the pair AFTER the throw still runs — the whole defect was that it did not'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-component-bulk-panel]'),
+        'and the selection is cleared, so no page of rows is left ticked over a half-run instruction'
+      );
+      assert.equal(
+        target.querySelectorAll('input[data-scoped-list-select]:checked').length,
+        0,
+        'read off the rows themselves as well as off the panel'
+      );
+    });
+
+    it('runs the remaining components when a RAW family verb rejects on one of them', async () => {
+      // `setWorldTags` is not a composed verb: nothing catches for it, so a refused settings
+      // write arrives here as a rejection. The membership write of the SAME component precedes
+      // it and the next component's writes follow it, so this pins both halves of "counted, not
+      // propagated" — the pair that threw is skipped and nothing else is.
+      const { calls, actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {
+          ...actions,
+          setWorldTags: async (entityId, tags) => {
+            calls.push({ verb: 'setWorldTags', args: [entityId, tags] });
+            await Promise.resolve();
+            if (entityId === 'ingot') throw new Error('the settings write was refused');
+            return true;
+          },
+        },
+      });
+      await selectTwo(target);
+      await stageMembership(target, 'add', 'sys-forge');
+      stageTag(target, 'fuel');
+      await drain();
+      target.querySelector('[data-world-component-bulk-apply]').click();
+      await drain();
+
+      assert.deepEqual(
+        calls.map((call) => `${call.verb}:${call.args[0]}`),
+        ['addToSystem:ingot', 'setWorldTags:ingot', 'addToSystem:coal', 'setWorldTags:coal'],
+        'ingot’s tag write threw and BOTH of coal’s writes still ran — the rejecting pair is ' +
+          'counted like a refused one and nothing else in the run is skipped'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-component-bulk-panel]'),
+        'and the selection clears, so the panel does not sit open over a finished run'
+      );
+    });
+
+    it('and re-arms after a throwing run rather than staying busy forever', async () => {
+      // The in-flight flag is reset in the `finally`; a throw that escaped it would leave the
+      // panel inert for the rest of the session with no way back.
+      const { actions } = recordingComponentActions();
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: {
+          ...actions,
+          removeFromSystem: async () => {
+            throw new Error('the settings write was refused');
+          },
+        },
+      });
+      await selectTwo(target);
+      await applyMembership(target, 'remove', 'sys-forge');
+
+      target.querySelector('[data-scoped-list-select="ingot"]').click();
+      await drain();
+      await stageMembership(target, 'add', 'sys-forge');
+      assert.equal(
+        target.querySelector('[data-world-component-bulk-apply]').disabled,
+        false,
+        'a second instruction can be staged and committed after the failed one'
+      );
     });
   });
 

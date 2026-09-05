@@ -184,6 +184,60 @@ export function createComponentScopeHarness({
 }
 
 /**
+ * THE WORLD COMPONENT CATALOGUE'S OWN TREE, declared once for the two suites that mount it.
+ *
+ * The mounted contract suite and the real-browser pointer hit-test suite render the SAME screen
+ * and therefore need the same twenty-odd module manifest. Two copies of it is what the tier
+ * comment above forbids for the same two reasons: SonarCloud counts `tests/**` like `src/**`, so
+ * a second copy of a twenty-string manifest is twenty duplicated lines against the new-code gate;
+ * and a manifest that has to be edited in two places is one where the suite that misses the edit
+ * goes silently unrunnable — reported as `# cancelled`, never as `# fail`.
+ *
+ * It answers the compiled list as well as the harness, because the hit-test suite needs it a
+ * second time: it collects each rendered component's SCOPED CSS to inject beside the global
+ * sheet, and a component whose block is missing there lays out unstyled in the browser and makes
+ * the measurement meaningless. Reading the same list twice is what stops those two sets drifting.
+ *
+ * @param {{repoRoot: string, tmpPrefix: string}} args
+ * @returns {{harness: object, compiledModules: string[]}}
+ */
+export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
+  const componentPath = 'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte';
+  const compiledExtras = [
+    'src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte',
+    'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
+    'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+  ];
+  return {
+    harness: createComponentScopeHarness({
+      repoRoot,
+      tmpPrefix,
+      componentPath,
+      rawExtras: [
+        ...SEARCHABLE_POPOVER_RAW_MODULES,
+        // The drop zone's two leaves: the action it binds and the payload normalizer behind it.
+        'src/ui/svelte/actions/dragDrop.js',
+        'src/ui/svelte/util/dropUtils.js',
+      ],
+      compiledExtras,
+    }),
+    compiledModules: [...SCOPED_SHARED_COMPILED_MODULES, componentPath, ...compiledExtras],
+  };
+}
+
+/**
  * The world-scope projection over {@link componentCorpus}, which every mounted assertion in both
  * world-component suites is driven from.
  *

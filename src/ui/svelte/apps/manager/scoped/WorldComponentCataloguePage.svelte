@@ -32,7 +32,7 @@
   this page raises the RAW drag data and the root resolves, refuses, creates and navigates.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localize, notifyError } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
@@ -160,8 +160,11 @@
       )?.name ?? ''
     )
   );
+  // THE SOURCE FILTER TAKES THE ITEM ROSTER, because one of its four options is a RESOLUTION
+  // question (`Broken link`) and only this page holds the roster that answers one. The same
+  // roster the row's flag is painted from, so a filtered set and the flags inside it agree.
   const filters = $derived([
-    ...componentSourceFilters(phrase),
+    ...componentSourceFilters({ worldItems }, phrase),
     ...componentMembershipScopeFilter({ systemId, systemName: addressedSystemName }, phrase),
   ]);
   const sorts = $derived(componentSorts(phrase));
@@ -259,6 +262,76 @@
   }
 
   /**
+   * Run ONE write of a bulk run, and treat a throw exactly as the store's own refusal is treated.
+   *
+   * ── WHY A BULK LOOP MAY NOT BE ABANDONED BY A THROW (issue 1371 r11-cat) ─────────────────────
+   * `ui-integration/spec.md`'s `### GM World Component Screens` requirement 6 states the rule for
+   * the COMPOSED membership verbs: "the refusal is REPORTED rather than thrown: the verb answers
+   * `false` and notifies, so a bulk apply continues through its remaining pairs instead of
+   * abandoning the run at the first collision." An UNCAUGHT throw out of one pair broke exactly
+   * that promise from the other side — the loop stopped where it stopped, `clearSelection()`
+   * never ran, and the GM was left with a page of rows still ticked, some of them written and
+   * some of them not, and no statement of which. Every remaining pair was skipped in silence.
+   *
+   * THE COMPOSED VERBS ARE NO LONGER THE REACHABLE HALF OF THAT, and the rest of the loop still
+   * is. `joinComponentToSystem` and `partComponentFromSystem` both catch, notify and answer now,
+   * so requirement 6 holds at the store for `add` and `remove`. `updateWorldDefaultSection` and
+   * `setWorldTags` are RAW family verbs with no such wrapper, and `addToSystem` reaches this page
+   * through an optional chain that answers `undefined` rather than `false` when a call site
+   * supplies no leg — so a settings write refused on the category or the tag axis is exactly the
+   * unreported throw this loop must survive, and it is the axis the mounted proof drives.
+   *
+   * So a throw is counted, not propagated: the run finishes, the selection clears, and
+   * {@link reportBulkFailures} says how much of the instruction did not land. The store is still
+   * the layer that explains WHY a single write was refused — it notifies on its own `false` — and
+   * this only exists for the failure the store did not turn into an answer.
+   *
+   * THE UNIT IS THE COMPONENT, not the write, because that is the unit the GM ticked. One
+   * component whose membership write and whose tag write both throw is one component that did not
+   * take the instruction, and `2 components could not be updated` over a selection of one would
+   * be a sentence about nothing on the screen.
+   *
+   * @param {Set<string>} failed collects the entity ids at least one of whose writes threw.
+   * @param {string} entityId the component this write belongs to.
+   * @param {() => unknown} write the write itself.
+   * @returns {Promise<void>}
+   */
+  async function attemptWrite(failed, entityId, write) {
+    try {
+      await write();
+    } catch {
+      failed.add(entityId);
+    }
+  }
+
+  /**
+   * State how much of a bulk run did not land, or say nothing at all when it all did.
+   *
+   * SILENT ON THE HAPPY PATH. A run that wrote everything it was asked to needs no notification:
+   * the rows untick and the panel closes, which is the outcome. This speaks only for the writes
+   * that threw, and it counts them rather than naming them — a selection may be a whole page, and
+   * a notification listing forty names is one a GM closes without reading.
+   *
+   * @param {Set<string>} failed the entity ids at least one of whose writes threw.
+   * @returns {void}
+   */
+  function reportBulkFailures(failed) {
+    if (failed.size === 0) return;
+    notifyError(
+      failed.size === 1
+        ? text(
+            'FABRICATE.Admin.Manager.Scoped.Component.BulkWriteFailedOne',
+            'One component could not be updated. The rest of the run finished.'
+          )
+        : phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.BulkWriteFailed',
+            '{count} components could not be updated. The rest of the run finished.',
+            { count: failed.size }
+          )
+    );
+  }
+
+  /**
    * Apply one staged bulk instruction across the ticked rows, then drop the selection.
    *
    * SEQUENTIAL, and that is not caution. Every world-scope action loads the persisted payload,
@@ -266,8 +339,10 @@
    * would have thirty-six writers racing one setting and the last one home would carry only its
    * own edit. The in-flight flag refuses a second Apply for the same reason.
    *
-   * The selection is cleared on the way out because the instruction has LANDED: leaving rows
-   * ticked under a panel whose staged axes have reset reads as an edit still pending.
+   * The selection is cleared on the way out because the instruction has BEEN RUN: leaving rows
+   * ticked under a panel whose staged axes have reset reads as an edit still pending. It clears
+   * even when a write threw, because the alternative — a half-written run under a full selection
+   * and a re-armed Apply — invites a second run over the pairs that already landed.
    *
    * @param {string[]} entityIds the ticked rows, in list order.
    * @param {object} staged the panel's instruction.
@@ -284,14 +359,22 @@
     // caller that is not the panel. It is deliberately kept and deliberately untestable from here.
     if (bulkApplying) return;
     bulkApplying = true;
+    const failed = new Set();
     try {
       for (const entityId of entityIds) {
         for (const systemId of staged.systemIds ?? []) {
-          if (staged.mode === 'add') await actions?.addToSystem?.(entityId, systemId);
-          else if (staged.mode === 'remove') await actions?.removeFromSystem?.(entityId, systemId);
+          if (staged.mode === 'add') {
+            await attemptWrite(failed, entityId, () => actions?.addToSystem?.(entityId, systemId));
+          } else if (staged.mode === 'remove') {
+            await attemptWrite(failed, entityId, () =>
+              actions?.removeFromSystem?.(entityId, systemId)
+            );
+          }
         }
         if (staged.category !== null && staged.category !== undefined) {
-          await actions?.updateWorldDefaultSection?.(entityId, 'category', staged.category);
+          await attemptWrite(failed, entityId, () =>
+            actions?.updateWorldDefaultSection?.(entityId, 'category', staged.category)
+          );
         }
         const addTags = staged.addTags ?? [];
         const removeTags = staged.removeTags ?? [];
@@ -303,13 +386,20 @@
           const next = [...new Set([...current, ...addTags])].filter(
             (tag) => !removeTags.includes(tag)
           );
-          await actions?.setWorldTags?.(entityId, next);
+          await attemptWrite(failed, entityId, () => actions?.setWorldTags?.(entityId, next));
         }
       }
     } finally {
       bulkApplying = false;
+      // IN THE `finally` AS BELT AND BRACES, and not falsifiable from this surface: every write
+      // is awaited through `attemptWrite`, which catches, so the loop below cannot throw and
+      // moving these two lines after the `try` keeps the mounted suite green. What the `finally`
+      // defends is a throw from something that is NOT a write — a malformed `staged`, or the
+      // frame's own reset — where clearing the rows and stating the shortfall still matter. It
+      // is deliberately kept and deliberately untestable, exactly as the in-flight guard above.
+      clearSelection();
+      reportBulkFailures(failed);
     }
-    clearSelection();
   }
 
   /**
@@ -343,14 +433,16 @@
       return;
     }
     bulkDeleting = true;
+    const failed = new Set();
     try {
       for (const entityId of deletable) {
-        await actions?.deleteEntity?.(entityId);
+        await attemptWrite(failed, entityId, () => actions?.deleteEntity?.(entityId));
       }
     } finally {
       bulkDeleting = false;
+      clearSelection();
+      reportBulkFailures(failed);
     }
-    clearSelection();
   }
 </script>
 
