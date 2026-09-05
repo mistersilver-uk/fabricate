@@ -893,6 +893,37 @@ function previewAsActor(actorId) {
 }
 
 /**
+ * Choose a value on one of the app's own `<Select>` controls.
+ *
+ * TWO STEPS, for the reason `previewAsActor` above takes two: the control is not a native
+ * `<select>` and there is no `selectOption` to issue (issue 1504). The trigger is clicked by the
+ * SAME stable hook the case already carried — `data-pagination-size`, `data-scoped-list-sort`,
+ * `data-recipe-bulk-category` and friends ride across the conversion on `Select`'s `triggerData`
+ * and land on the trigger button — and the row is then clicked by its own `data-popover-option`
+ * identity handle rather than by its localized label.
+ *
+ * SCOPED TO THE PANEL, not to the trigger's container. `SearchablePopover` portals the open panel
+ * out of the trigger's subtree into the nearest `.fabricate-manager` / `.fabricate-app` root, so a
+ * row selector inherited from the trigger's scope — `.manager-main`,
+ * `.inventory-grid-pagination` — matches nothing and the step throws. `.fabricate-select-popover`
+ * is the primitive's own panel class: it sits inside the portal host in BOTH applications, so one
+ * form serves the manager and the player, and it cannot match a row in another picker's panel.
+ *
+ * A sentinel option carrying the empty string is stamped `__unchanged__` instead, because an
+ * attribute cannot carry an empty value (`Select.svelte`); no case chooses one today.
+ *
+ * @param {string} trigger Selector for the control's trigger button.
+ * @param {string} value The option's own value, as `data-popover-option` carries it.
+ * @returns {object[]} The ordered steps.
+ */
+function chooseSelectOption(trigger, value) {
+  return [
+    { selector: trigger },
+    { selector: `.fabricate-select-popover [data-popover-option="${value}"]` },
+  ];
+}
+
+/**
  * @param {object} entry Case fields.
  * @returns {object} A complete case.
  */
@@ -2222,7 +2253,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the top of the list. This is the frame that has to be read against those.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
-      { selector: '[data-scoped-list-sort]', select: 'systems' },
+      ...chooseSelectOption('[data-scoped-list-sort]', 'systems'),
       { selector: '[data-scoped-list-direction]' },
     ],
     expectView: 'world-tools',
@@ -2274,7 +2305,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the fixture too, so a later edit to either end has a note at the other.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
-      { selector: '[data-scoped-list-sort]', select: 'break-asc' },
+      ...chooseSelectOption('[data-scoped-list-sort]', 'break-asc'),
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-direction][disabled]',
@@ -3649,7 +3680,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-main [data-pagination-size]', select: '10' },
+      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'recipes',
@@ -3699,12 +3730,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Crafting',
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
       { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
-      { selector: '[data-recipe-bulk-category]', select: 'Armoursmithing' },
+      ...chooseSelectOption('[data-recipe-bulk-category]', 'Armoursmithing'),
       { selector: '[data-recipe-bulk-status-option="enable"]' },
       { selector: '[data-recipe-bulk-lock-option="lock"]' },
       // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
       // only populated one in the world; every other system renders the info Callout instead.
-      { selector: '[data-recipe-bulk-check-tier]', select: 'sm-tier-masterwork' },
+      ...chooseSelectOption('[data-recipe-bulk-check-tier]', 'sm-tier-masterwork'),
       { selector: '.fab-bulk-book-trigger' },
       { selector: '[data-popover-option="sm-book"]' },
       { selector: '[data-recipe-bulk-book-add]' },
@@ -4807,7 +4838,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
-      { selector: '[data-component-bulk-category]', select: 'Refined' },
+      ...chooseSelectOption('[data-component-bulk-category]', 'Refined'),
       { selector: '[data-bulk-tag="ore"]' },
       { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-bulk-tag="ingot"]' },
@@ -5934,7 +5965,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
-      { selector: '.manager-main [data-pagination-size]', select: '10' },
+      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'components',
@@ -9411,8 +9442,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   // is exactly what the six existing inventory cases narrow with a search box to avoid. A search
   // filter cannot be used here — bulk selection needs SEVERAL cards on screen at once, and a filter
   // narrow enough to guarantee one card's position removes the others. Page size is the fallback if
-  // that ever stops holding (`{selector: '.inventory-grid-pagination select', select: '75'}`), and
-  // no case needs it today.
+  // that ever stops holding (`chooseSelectOption` on the grid pager's `[data-pagination-size]` at
+  // `'75'`, which the five cases below already do), and no case needs it today.
   //
   // ONE STATE THIS SET DELIBERATELY DOES NOT PHOTOGRAPH, recorded here rather than left as an
   // unexplained absence:
@@ -9546,7 +9577,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-simple',
     label: 'Player app — Inventory bulk salvage, simple mode',
     steps: [
-      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-smithing:sm-longsword'),
     ],
     // Guaranteed, because simple with no authored roll formula awards its whole result set
@@ -9561,7 +9592,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-routed',
     label: 'Player app — Inventory bulk salvage, routed mode',
     steps: [
-      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-runework:rw-slag'),
     ],
     expectSelector:
@@ -9573,7 +9604,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-progressive',
     label: 'Player app — Inventory bulk salvage, progressive mode',
     steps: [
-      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
     ],
     // Progressive is the one mode that honours a player's saved stage order, so this is also
@@ -9622,7 +9653,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // from three differently-resolved ladders, which is where same-named components from
     // different systems would collapse if the preview keyed on name rather than id.
     steps: [
-      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-smithing:sm-longsword'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -9804,7 +9835,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // with nothing but blocked ones, and the unbroken queue row this frame reads against would be
     // unreachable. It is the first step so the two card clicks land on a settled grid.
     steps: [
-      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-longsword'),
     ],
