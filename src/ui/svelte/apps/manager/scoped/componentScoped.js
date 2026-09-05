@@ -2046,3 +2046,165 @@ export function componentRulesSubtitle({ systemName, category, salvageModeLabel 
     { system: systemName, category, mode: salvageModeLabel }
   );
 }
+
+// ── THE ROW'S ESSENCES AND THE TOOLBAR'S ESSENCE FILTER (issue 1371 r18-cat, maintainer ruling
+// M30) ──────────────────────────────────────────────────────────────────────────────────────
+//
+// "There's no way to filter the world component catalogue by essence like there is in the system
+// rules, and there's no way to view the essences on a component in the world catalogue library
+// rows (there are row chips in the system rules library)." Both read ONE map per world component,
+// {@link componentWorldEssenceMap}, so the filter and the chips can never disagree about what a
+// row carries.
+//
+// r18-store: read the world essence map. Under maintainer ruling M31 the world record gains an
+// `essences` SECTION beside `category` — world-level values every system inherits unless it
+// overrides — and that map is what this screen states. Lane STORE is publishing it; it is
+// written through `updateWorldDefaultSection(entityId, 'essences', map)`, which by the
+// `category` precedent lands on the world default record the projection publishes as
+// `entry.defaults` — so {@link componentWorldEssenceMap} reads `entry.defaults.essences` FIRST
+// and the screen is live the moment STORE integrates. The driver re-points that one read if
+// STORE publishes the map under another name.
+//
+// UNTIL THE WORLD SECTION EXISTS ON A RECORD, the map is the UNION of the record's per-system
+// essence values read off a raw system roster carrying `components[].essences` (the shape the
+// M25 bulk helpers above read). THAT ROSTER IS NOT WHAT THE ROOT HANDS THE PAGE TODAY: the page's
+// `systems` is the admin store's narrowed system list (`adminStore.js`, `systemList` — id, name,
+// description, enabled, resolution mode, feature count), which carries no `components`, so the
+// union answers nothing in the live app and the M25 bulk helpers read the same nothing there.
+// The union stands only as the honest fallback for a roster that does carry rules; the world
+// section is the read that matters.
+
+/**
+ * The essence filter's two PREDICATE values (`proto:5533`; `proto:5477`-`5479` is the predicate
+ * each applies). The per-essence values are the world catalogue's IDS, so these two take a form
+ * no authored id can spell; `all` is the frame's own neutral value for every lane filter.
+ */
+export const COMPONENT_ESSENCE_FILTER_ANY = '__any';
+export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
+
+/**
+ * The essence map the catalogue states for one world component: `essenceId -> quantity`, with
+ * only POSITIVE quantities.
+ *
+ * r18-store: read the world essence map — see the block note above. The WORLD SECTION wins
+ * whenever the record carries one (`entry.defaults.essences`, M31); a record without one falls
+ * back to the union of the per-system values, keeping the LARGEST where systems disagree, so a
+ * value one system has raised is not hidden behind another system's lower one.
+ *
+ * @param {object|null} entry the world catalogue entry.
+ * @param {Array<object>} systems the raw crafting-system roster.
+ * @returns {Record<string, number>}
+ */
+export function componentWorldEssenceMap(entry, systems) {
+  const componentId = String(entry?.id ?? '');
+  const map = {};
+  if (!componentId) return map;
+  const world = entry?.defaults?.essences;
+  if (world && typeof world === 'object' && !Array.isArray(world)) {
+    return carriedEssencesOf({ essences: world });
+  }
+  for (const system of Array.isArray(systems) ? systems : []) {
+    const carried = carriedEssencesOf(componentRulesIn(system, componentId));
+    for (const [essenceId, quantity] of Object.entries(carried)) {
+      map[essenceId] = Math.max(map[essenceId] ?? 0, quantity);
+    }
+  }
+  return map;
+}
+
+/**
+ * The row's essence chips: one per essence the component carries, in the WORLD essence
+ * catalogue's order, each carrying the roster's name, glyph and colour token beside its count.
+ *
+ * AN ESSENCE THE WORLD CATALOGUE DOES NOT LIST DRAWS NO CHIP. The roster is what names an essence
+ * and gives it a glyph; a value keyed on an id the roster has dropped has neither, and a chip
+ * reading `3` under a fallback glyph and no name would state a count of nothing.
+ *
+ * The glyph fallback is the rules row's own (`components/ComponentRow.svelte`), so the two rows
+ * draw the same chip for the same essence.
+ *
+ * @param {object|null} entry
+ * @param {{systems?: Array<object>, essences?: Array<{id: string, name?: string, icon?: string,
+ *   colorToken?: string}>}} context the raw system roster and the world essence catalogue.
+ * @returns {Array<{id: string, name: string, icon: string, colorToken: string, quantity: number}>}
+ */
+export function componentRowEssenceChips(entry, { systems = [], essences = [] } = {}) {
+  const map = componentWorldEssenceMap(entry, systems);
+  const chips = [];
+  for (const essence of Array.isArray(essences) ? essences : []) {
+    const id = String(essence?.id ?? '');
+    if (!id || !(map[id] > 0)) continue;
+    chips.push({
+      id,
+      name: String(essence?.name ?? '').trim() || id,
+      icon: String(essence?.icon ?? '').trim() || 'fas fa-mortar-pestle',
+      colorToken: String(essence?.colorToken ?? '').trim(),
+      quantity: map[id],
+    });
+  }
+  return chips;
+}
+
+/**
+ * The catalogue's essence filter: the rules list's option set (`proto:5533`) over the WORLD
+ * essence catalogue, applying the rules list's predicates (`proto:5477`-`5479`).
+ *
+ * ON THE LEAD ROW after the source select, which is where the rules list puts its own — after its
+ * category select, on the row the search field leads (`ComponentsBrowserView.svelte`). The
+ * prototype's catalogue draws no such control (`proto:577`-`579`); it is the maintainer's extra.
+ *
+ * WITHHELD OVER AN EMPTY ROSTER, as the rules list withholds its select: two predicates over a
+ * world with no essences is a control that changes nothing while looking as though it did.
+ *
+ * IT READS THE SAME LIST THE CHIPS DRAW, through {@link componentRowEssenceChips}, so a row that
+ * shows no chip never passes `Carries any essence` and a row that shows one never passes
+ * `No essences`.
+ *
+ * @param {{essences?: Array<object>, systems?: Array<object>}} context
+ * @param {(key: string, fallback: string, data?: object) => string} phrase
+ * @returns {Array<object>}
+ */
+export function componentEssenceFilter({ essences = [], systems = [] } = {}, phrase) {
+  const roster = Array.isArray(essences) ? essences.filter((essence) => essence?.id) : [];
+  if (roster.length === 0) return [];
+  const carriedIds = (entry) =>
+    componentRowEssenceChips(entry, { systems, essences: roster }).map((chip) => chip.id);
+  return [
+    {
+      id: 'essence',
+      label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterEssence', 'Essence'),
+      toolbarRow: 'lead',
+      options: [
+        {
+          value: 'all',
+          label: phrase('FABRICATE.Admin.Manager.Scoped.Component.FilterEssenceAll', 'All essences'),
+        },
+        {
+          value: COMPONENT_ESSENCE_FILTER_ANY,
+          label: phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.FilterEssenceAny',
+            'Carries any essence'
+          ),
+        },
+        {
+          value: COMPONENT_ESSENCE_FILTER_NONE,
+          label: phrase(
+            'FABRICATE.Admin.Manager.Scoped.Component.FilterEssenceNone',
+            'No essences'
+          ),
+        },
+        ...roster.map((essence) => ({
+          value: String(essence.id),
+          label: String(essence.name ?? '').trim() || String(essence.id),
+        })),
+      ],
+      matches: (entry, value) => {
+        if (value === 'all') return true;
+        const ids = carriedIds(entry);
+        if (value === COMPONENT_ESSENCE_FILTER_ANY) return ids.length > 0;
+        if (value === COMPONENT_ESSENCE_FILTER_NONE) return ids.length === 0;
+        return ids.includes(String(value));
+      },
+    },
+  ];
+}

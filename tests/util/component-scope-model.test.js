@@ -25,9 +25,12 @@ import {
   componentCategoryInheritOffered,
   componentCategoryNote,
   componentDeleteNote,
+  componentEssenceFilter,
+  componentRowEssenceChips,
   componentRowStats,
   componentSalvageInLabel,
   componentWorldCategoryNote,
+  componentWorldEssenceMap,
   componentWorldTagNote,
   offeredWorldComponentCategories,
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
@@ -572,5 +575,121 @@ describe('the world essence write goes only where a system HOLDS the essence (M2
     assert.deepEqual(componentBulkEssenceBatches(['coal'], { flame: 3, earth: 2 }, legacy), [
       { systemId: 'sys-old', componentIds: ['coal'], essences: { earth: 2 } },
     ]);
+  });
+});
+
+// ── M30: THE ROW'S ESSENCES AND THE ESSENCE FILTER (issue 1371 r18-cat) ─────────────────────
+describe('the catalogue reads one essence map per world component (M30)', () => {
+  // `coal` carries flame in two systems at two values and tide in one; `ingot` carries an
+  // essence the world catalogue does not list; `resin` carries a zero and a NaN.
+  const ROSTER = [
+    {
+      id: 'sys-forge',
+      components: [
+        { id: 'coal', essences: { flame: 2 } },
+        { id: 'ingot', essences: { earth: 1, ghost: 3 } },
+      ],
+    },
+    {
+      id: 'sys-alchemy',
+      components: [
+        { id: 'coal', essences: { flame: 1, tide: 1 } },
+        { id: 'resin', essences: { earth: 0, tide: 'x' } },
+      ],
+    },
+    { id: 'sys-bare' },
+  ];
+  const ESSENCES = [
+    { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
+    { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
+    { id: 'tide' },
+  ];
+  const entry = (id) => ({ id, entity: { id, name: id } });
+
+  it('reads the WORLD section first when the record carries one (M31), positive values only', () => {
+    // r18-store: read the world essence map — `entry.defaults.essences` is where the section
+    // write lands, and it wins over whatever the systems carry.
+    const sectioned = { ...entry('coal'), defaults: { category: 'Raw', essences: { earth: 3, flame: 0 } } };
+    assert.deepEqual(componentWorldEssenceMap(sectioned, ROSTER), { earth: 3 });
+    const emptied = { ...entry('coal'), defaults: { essences: {} } };
+    assert.deepEqual(componentWorldEssenceMap(emptied, ROSTER), {}, 'an authored EMPTY section is empty');
+  });
+
+  it('unions the per-system values where no world section exists, keeping the LARGEST where systems disagree', () => {
+    // r18-store: read the world essence map — the union is the fallback for a record without one.
+    assert.deepEqual(componentWorldEssenceMap(entry('coal'), ROSTER), { flame: 2, tide: 1 });
+    const unsectioned = { ...entry('coal'), defaults: { category: 'Raw' } };
+    assert.deepEqual(componentWorldEssenceMap(unsectioned, ROSTER), { flame: 2, tide: 1 });
+  });
+
+  it('drops zero and non-numeric values, and answers nothing for a record no system has rules for', () => {
+    assert.deepEqual(componentWorldEssenceMap(entry('resin'), ROSTER), {});
+    assert.deepEqual(componentWorldEssenceMap(entry('nobody'), ROSTER), {});
+    assert.deepEqual(componentWorldEssenceMap(entry('coal'), null), {});
+    assert.deepEqual(componentWorldEssenceMap(null, ROSTER), {});
+  });
+
+  it('draws the chips in the WORLD catalogue’s order, with the roster’s name and glyph', () => {
+    assert.deepEqual(componentRowEssenceChips(entry('coal'), { systems: ROSTER, essences: ESSENCES }), [
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember', quantity: 2 },
+      { id: 'tide', name: 'tide', icon: 'fas fa-mortar-pestle', colorToken: '', quantity: 1 },
+    ]);
+  });
+
+  it('draws no chip for an essence the world catalogue does not list', () => {
+    assert.deepEqual(componentRowEssenceChips(entry('ingot'), { systems: ROSTER, essences: ESSENCES }), [
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: '', quantity: 1 },
+    ]);
+    assert.deepEqual(componentRowEssenceChips(entry('ingot'), { systems: ROSTER, essences: [] }), []);
+  });
+});
+
+describe('the catalogue’s essence filter is the rules list’s, over the world catalogue (M30)', () => {
+  const ROSTER = [
+    {
+      id: 'sys-forge',
+      components: [
+        { id: 'coal', essences: { flame: 2 } },
+        { id: 'ingot', essences: { earth: 1 } },
+      ],
+    },
+  ];
+  const ESSENCES = [
+    { id: 'flame', name: 'Flame' },
+    { id: 'earth', name: 'Earth' },
+  ];
+  const entry = (id) => ({ id, entity: { id, name: id } });
+  const [filter] = componentEssenceFilter({ essences: ESSENCES, systems: ROSTER }, phrase);
+
+  it('is ONE lead-row descriptor with the reference’s option set (`proto:5533`)', () => {
+    assert.equal(filter.id, 'essence');
+    assert.equal(filter.toolbarRow, 'lead');
+    assert.equal(filter.label, 'Essence');
+    assert.deepEqual(
+      filter.options.map((option) => [option.value, option.label]),
+      [
+        ['all', 'All essences'],
+        ['__any', 'Carries any essence'],
+        ['__none', 'No essences'],
+        ['flame', 'Flame'],
+        ['earth', 'Earth'],
+      ]
+    );
+  });
+
+  it('applies the reference’s three predicates (`proto:5477`-`5479`) and a named essence', () => {
+    const passes = (value) =>
+      ['coal', 'ingot', 'orphan'].filter((id) => filter.matches(entry(id), value));
+    assert.deepEqual(passes('all'), ['coal', 'ingot', 'orphan']);
+    assert.deepEqual(passes('__any'), ['coal', 'ingot']);
+    assert.deepEqual(passes('__none'), ['orphan']);
+    assert.deepEqual(passes('flame'), ['coal']);
+    assert.deepEqual(passes('earth'), ['ingot']);
+    assert.deepEqual(passes('ghost'), [], 'an unknown value matches nothing rather than everything');
+  });
+
+  it('is WITHHELD over an empty world essence catalogue', () => {
+    assert.deepEqual(componentEssenceFilter({ essences: [], systems: ROSTER }, phrase), []);
+    assert.deepEqual(componentEssenceFilter({ systems: ROSTER }, phrase), []);
   });
 });

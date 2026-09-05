@@ -2976,4 +2976,272 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
   });
+
+  // ── M30: THE ESSENCE FILTER AND THE ROW'S ESSENCE CHIPS (issue 1371 r18-cat) ────────────────
+  // "There's no way to filter the world component catalogue by essence like there is in the
+  // system rules, and there's no way to view the essences on a component in the world catalogue
+  // library rows (there are row chips in the system rules library)." Both are maintainer-ruled
+  // EXTRAS: the prototype's catalogue toolbar draws a search field and the source select alone
+  // (`proto:577`-`579`) and its row draws no essence chip (`proto:602`-`613`), so the reference
+  // for both is the rules list — its essence select's option set (`proto:5533`) and predicates
+  // (`proto:5477`-`5479`), and its row's compact essence chips.
+  //
+  // EVERY OPTION ACTS: each case selects the option and reads the rows that survive, because an
+  // `<option>` list assertion passes just as well over a predicate wired to the wrong answer.
+  describe('the toolbar filters by essence, and the row draws its essences (M30)', () => {
+    // THE WORLD ESSENCE CATALOGUE'S ROSTER, in its own order, which is the order the chips and the
+    // options follow. `tide` carries no icon, so the glyph fallback has a subject.
+    const ROW_ESSENCES = Object.freeze([
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'sage' },
+      { id: 'tide', name: 'Tide' },
+    ]);
+    // THE RAW SYSTEM ROSTER with each system's rules, which is what the root hands the page.
+    // `coal` carries flame in BOTH systems at different values and tide in alchemy alone, so the
+    // union across systems is what the row has to state; `ingot` carries a `ghost` essence the
+    // world catalogue does not list; `resin` carries a ZERO, which is no essence at all.
+    const ROW_SYSTEMS = Object.freeze([
+      {
+        id: 'sys-forge',
+        name: 'Forge',
+        components: [
+          { id: 'coal', essences: { flame: 2 } },
+          { id: 'ingot', essences: { earth: 1, ghost: 3 } },
+          { id: 'orphan', essences: {} },
+        ],
+      },
+      {
+        id: 'sys-alchemy',
+        name: 'Alchemy',
+        components: [
+          { id: 'coal', essences: { flame: 1, tide: 1 } },
+          { id: 'resin', essences: { earth: 0 } },
+        ],
+      },
+    ]);
+
+    async function mountEssences(props = {}) {
+      return harness.mount({
+        scope: scopeFor(),
+        systems: ROW_SYSTEMS,
+        actions: {},
+        worldItems: WORLD_ITEMS,
+        worldEssences: ROW_ESSENCES,
+        ...props,
+      });
+    }
+
+    /** The rendered row ids, sorted, so an assertion is about the SET rather than the order. */
+    function rowIds(target) {
+      return [...target.querySelectorAll('[data-scoped-list-row]')]
+        .map((row) => row.getAttribute('data-scoped-list-row'))
+        .sort((left, right) => left.localeCompare(right));
+    }
+
+    /** Choose one option on a lane filter and let the projection settle. */
+    async function choose(target, filterId, value) {
+      const select = target.querySelector(`[data-scoped-list-filter="${filterId}"]`);
+      select.value = value;
+      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      await drain();
+      return select;
+    }
+
+    it('offers the rules list’s option set over the WORLD essence catalogue, in its order', async () => {
+      const target = await mountEssences();
+      const select = target.querySelector('[data-scoped-list-filter="essence"]');
+      assert.ok(Boolean(select), 'the toolbar renders an essence select');
+      assert.deepEqual(
+        [...select.options].map((option) => option.textContent.trim()),
+        ['All essences', 'Carries any essence', 'No essences', 'Flame', 'Earth', 'Tide'],
+        '`proto:5533`: the neutral entry, the two predicates, then one entry per world essence'
+      );
+      assert.deepEqual(
+        [...select.options].map((option) => option.value).slice(3),
+        ['flame', 'earth', 'tide'],
+        'the per-essence values are the world catalogue’s IDS, not names'
+      );
+    });
+
+    it('stands on the LEAD row directly after the source select, at the same 38px rung', async () => {
+      const target = await mountEssences();
+      const lead = target.querySelector('[data-scoped-list-search-row]');
+      const source = lead.querySelector('[data-scoped-list-filter="source-type"]');
+      assert.ok(Boolean(source), 'NON-VACUITY: the source select is on the lead row');
+      const essence = source.nextElementSibling;
+      assert.equal(
+        essence?.getAttribute('data-scoped-list-filter'),
+        'essence',
+        'the essence select is the source select’s next sibling — where the rules list puts its'
+      );
+      assert.ok(
+        essence.classList.contains('is-size-38'),
+        'and it takes the lead row’s rung, exactly as the source select beside it does'
+      );
+      assert.ok(
+        !target.querySelector(
+          ':scope .manager-scoped-list-filter-row [data-scoped-list-filter="essence"]'
+        ),
+        'and it is NOT on the membership/sort row'
+      );
+    });
+
+    it('`Carries any essence` keeps the carriers, reading the UNION across systems', async () => {
+      const target = await mountEssences();
+      assert.deepEqual(
+        rowIds(target),
+        ['coal', 'ingot', 'orphan', 'resin'],
+        'unfiltered first, so every narrowing below is a real change'
+      );
+      await choose(target, 'essence', '__any');
+      assert.deepEqual(
+        rowIds(target),
+        ['coal', 'ingot'],
+        'coal and ingot carry something somewhere; orphan carries nothing and resin’s value is zero'
+      );
+    });
+
+    it('`No essences` keeps the rows that carry nothing at all', async () => {
+      const target = await mountEssences();
+      await choose(target, 'essence', '__none');
+      assert.deepEqual(rowIds(target), ['orphan', 'resin'], 'a zero value is no essence');
+    });
+
+    it('a named essence keeps its carriers, even when only ONE system’s rules carry it', async () => {
+      const target = await mountEssences();
+      await choose(target, 'essence', 'tide');
+      assert.deepEqual(rowIds(target), ['coal'], 'tide is carried in alchemy alone');
+      await choose(target, 'essence', 'earth');
+      assert.deepEqual(rowIds(target), ['ingot'], 'and resin’s zero earth does not count');
+      await choose(target, 'essence', 'all');
+      assert.deepEqual(rowIds(target), ['coal', 'ingot', 'orphan', 'resin'], 'and `all` restores');
+    });
+
+    it('composes with the source filter rather than bypassing it', async () => {
+      const target = await mountEssences();
+      await choose(target, 'essence', '__any');
+      await choose(target, 'source-type', 'broken');
+      assert.deepEqual(
+        rowIds(target),
+        ['coal'],
+        'a carrier whose world address dangles — ingot carries but resolves, so it is out'
+      );
+    });
+
+    it('withholds the select entirely when the world essence catalogue is empty', async () => {
+      // As the rules list does: two predicates over a roster of nothing are a control that
+      // changes nothing while looking as though it did.
+      const target = await mountEssences({ worldEssences: [] });
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-filter="source-type"]')),
+        'NON-VACUITY: the lead row still renders its source select'
+      );
+      assert.ok(
+        !target.querySelector('[data-scoped-list-filter="essence"]'),
+        'and no essence select stands beside it'
+      );
+    });
+
+    it('draws each row’s essences as compact count chips, in the world catalogue’s order', async () => {
+      const target = await mountEssences();
+      const chips = [
+        ...target.querySelectorAll(
+          ':scope [data-scoped-list-row="coal"] [data-world-component-row-essence]'
+        ),
+      ];
+      assert.deepEqual(
+        chips.map((chip) => chip.getAttribute('data-world-component-row-essence')),
+        ['flame', 'tide'],
+        'coal: flame and tide, in the roster’s order, and no earth'
+      );
+      assert.deepEqual(
+        chips.map((chip) => chip.textContent.trim()),
+        ['2', '1'],
+        'each chip is the COUNT — the larger of the two systems’ flame values'
+      );
+      assert.equal(chips[0].getAttribute('title'), 'Flame 2', 'the name and count on hover');
+      assert.equal(chips[0].getAttribute('aria-label'), 'Flame 2', 'and as the accessible name');
+      assert.ok(
+        chips[0].classList.contains('manager-chip') &&
+          chips[0].classList.contains('manager-essence-compact-chip'),
+        'the rules row’s own compact chip face'
+      );
+      // The glyph's class list also carries `Chip`'s own scoped hash, so the token is what is read.
+      assert.ok(
+        chips[0].querySelector('i')?.classList.contains('fa-fire'),
+        'the world essence’s glyph'
+      );
+      assert.ok(
+        chips[1].querySelector('i')?.classList.contains('fa-mortar-pestle'),
+        'and the rules row’s fallback glyph where the essence has none'
+      );
+    });
+
+    it('reads the WORLD essence section when a record carries one, over the id-and-name roster the root hands the page (M31)', async () => {
+      // THE ROOT'S `systems` IS THE STORE'S NARROWED LIST — `{id, name, …}` with no `components`
+      // — so the per-system union has nothing to read in the live app. The world section is the
+      // read that carries the screen: a record with `defaults.essences` draws its chips and
+      // passes the filter over exactly that roster.
+      const base = componentCorpus();
+      const target = await mountEssences({
+        scope: scopeFor({
+          defaults: [...base.defaults, { id: 'resin', essences: { earth: 2 } }],
+        }),
+        systems: COMPONENT_SYSTEMS,
+      });
+      assert.deepEqual(
+        [
+          ...target.querySelectorAll(
+            ':scope [data-scoped-list-row="resin"] [data-world-component-row-essence]'
+          ),
+        ].map((chip) => `${chip.getAttribute('data-world-component-row-essence')}:${chip.textContent.trim()}`),
+        ['earth:2'],
+        'the world section is drawn with no system roster behind it'
+      );
+      assert.ok(
+        !target.querySelector(':scope [data-scoped-list-row="coal"] [data-world-component-row-essences]'),
+        'and a record with no section and no readable rules draws nothing'
+      );
+      await choose(target, 'essence', 'earth');
+      assert.deepEqual(rowIds(target), ['resin'], 'the filter reads the same section');
+    });
+
+    it('draws NO chip for an essence the world catalogue does not list, and no run at all for a row that carries nothing', async () => {
+      const target = await mountEssences();
+      assert.deepEqual(
+        [
+          ...target.querySelectorAll(
+            ':scope [data-scoped-list-row="ingot"] [data-world-component-row-essence]'
+          ),
+        ].map((chip) => chip.getAttribute('data-world-component-row-essence')),
+        ['earth'],
+        'ingot’s `ghost` has no name and no glyph to draw'
+      );
+      for (const id of ['orphan', 'resin']) {
+        assert.ok(
+          !target.querySelector(`[data-scoped-list-row="${id}"] [data-world-component-row-essences]`),
+          `${id} draws no chip run — an empty run would still take the meta column’s gap`
+        );
+      }
+    });
+
+    it('puts the chips in the trailing meta column, BEFORE the stat columns and outside the identity button', async () => {
+      // The rules row’s order: `[essence dots] [Recipes stat] [action]` (`proto:1088`-`1089`).
+      const target = await mountEssences();
+      const row = target.querySelector('[data-scoped-list-row="coal"]');
+      const run = row.querySelector('[data-world-component-row-essences="coal"]');
+      const stats = row.querySelector('[data-world-component-row-meta="coal"]');
+      const meta = row.querySelector('.manager-scoped-list-row-meta');
+      assert.ok(Boolean(run) && Boolean(stats) && Boolean(meta), 'NON-VACUITY: all three render');
+      assert.ok(meta.contains(run), 'the run is in the meta column');
+      assert.ok(
+        !row.querySelector('[data-scoped-list-inspect]').contains(run),
+        'and not inside the identity button'
+      );
+      assert.ok(
+        run.compareDocumentPosition(stats) & target.ownerDocument.defaultView.Node.DOCUMENT_POSITION_FOLLOWING,
+        'the stat columns FOLLOW the chips'
+      );
+    });
+  });
 });

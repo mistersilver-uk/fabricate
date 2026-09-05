@@ -8,14 +8,20 @@
   filter and sort, the two reach stats, the world-default card copy, the bulk panel and the
   create-from-drop zone.
 
-  == THE ROW CARRIES TWO REACH STATS AND NO CHIP ============================================
+  == THE ROW CARRIES TWO REACH STATS AND, SINCE M30, ITS ESSENCE CHIPS =======================
   A world component's row says how many recipes name it and how many systems hold it, and both
   are REACH facts rather than behaviour facts. The tool row's own note states the rule this
   follows: a chip beside a name reads as something the entity DOES, so a reach count set as a
-  chip reads as a third property. A component's behaviour — its essences, its salvage, its
-  difficulty — is a MEMBERSHIP fact and belongs to no world row at all, so this row has nothing
-  in the chip category and draws none. There is no category chip and no tag run for the same
-  reason: `category` is one system's resolved answer, not the world record's.
+  chip reads as a third property. There is no category chip and no tag run: `category` is one
+  system's resolved answer, not the world record's.
+
+  ESSENCES ARE THE ONE BEHAVIOUR FACT THE ROW DRAWS (issue 1371 r18-cat, maintainer ruling M30):
+  "there's no way to view the essences on a component in the world catalogue library rows (there
+  are row chips in the system rules library)", and no way to filter by them either. Under M31 the
+  world record gains an `essences` section beside `category`, so what the row states is a WORLD
+  value every system inherits unless it overrides — a world fact after all, and the one this row
+  used to withhold. The chips in the trailing column and the essence select on the toolbar read
+  that one map through `componentScoped.js`, where the `r18-store` marker names the seam.
 
   == THE STANDING NOTE IS NARROWER THAN "NOTHING HERE IS READ" =============================
   The world `category` this screen's inspector states IS consumed: every system whose inherit
@@ -43,8 +49,10 @@
     componentAliasNote,
     componentBulkDeletePlan,
     componentBulkEssenceBatches,
+    componentEssenceFilter,
     componentGlobalTagNote,
     componentMembershipScopeFilter,
+    componentRowEssenceChips,
     componentRowStats,
     componentSearchText,
     componentSorts,
@@ -74,8 +82,10 @@
     // empty array, which is the defect the tool screens recorded before it was fixed.
     worldItems = [],
     // THE WORLD ESSENCE CATALOGUE'S ROSTER (issue 1371 r16-cat, maintainer ruling M25), for the
-    // bulk panel's `Essence values` group: `{id, name, icon?, colorToken?}[]`, which is the
-    // root's `worldEssenceOptions`. Passed by the call site for the reason `worldItems` is.
+    // bulk panel's `Essence values` group — and, since r18-cat (M30), for the toolbar's essence
+    // filter and the row's essence chips, both of which follow its order and draw its names and
+    // glyphs: `{id, name, icon?, colorToken?}[]`, which is the root's `worldEssenceOptions`.
+    // Passed by the call site for the reason `worldItems` is.
     worldEssences = [],
     onOpenEntry = () => {},
     onOpenSystemRules = null,
@@ -170,6 +180,11 @@
   // roster the row's flag is painted from, so a filtered set and the flags inside it agree.
   const filters = $derived([
     ...componentSourceFilters({ worldItems }, phrase),
+    // THE ESSENCE FILTER FOLLOWS THE SOURCE SELECT ON THE LEAD ROW (issue 1371 r18-cat, M30),
+    // which is where the rules list puts its own, at the lead row's 38px rung the frame already
+    // gives every lead-row select. It takes the raw system roster because the map it reads is
+    // the union of per-system values until STORE lands — see the descriptor's own note.
+    ...componentEssenceFilter({ essences: worldEssences, systems }, phrase),
     ...componentMembershipScopeFilter({ systemId, systemName: addressedSystemName }, phrase),
   ]);
   const sorts = $derived(componentSorts(phrase));
@@ -540,6 +555,7 @@
     {onOpenEntry}
     {onOpenSystemRules}
     rowNameTrailing={componentRowNameTrailing}
+    rowMeta={componentRowEssences}
     rowTrailing={componentRowStatColumns}
   />
 </main>
@@ -804,6 +820,43 @@
 {/snippet}
 
 <!--
+  THE ROW'S ESSENCE CHIPS (issue 1371 r18-cat, maintainer ruling M30).
+
+  The rules library's row draws its essences as compact count chips ahead of its `Recipes` stat
+  (`components/ComponentRow.svelte`), and the maintainer wants the world row to show the same
+  thing. The prototype's catalogue row draws none (`proto:602`-`613`), so this run is a ruled
+  extra, and it copies the rules row's chip exactly — `Chip` in the `manager-essence-compact-chip`
+  face, the glyph, the count, and `{name} {quantity}` as the title and the accessible name — so a
+  GM reads one chip on both screens.
+
+  IT RENDERS THROUGH THE FRAME'S OPT-IN `rowMeta` SNIPPET, which under `rowSecondLine:
+  'description'` lands in the trailing meta column BEFORE `rowTrailing`'s stat columns — the rules
+  row's own order, `[essence dots] [Recipes stat] [action]` — and outside the identity button.
+  The snippet is absent by default, so the essence and tool catalogues are byte-identical.
+
+  r18-colour: swap for the essence chip. Lane COLOUR's tinted essence-chip primitive (M29) is the
+  face this run should wear; each chip already carries the roster's `colorToken` for it. Until
+  the contract lands the run renders through `Chip` exactly as the rules row's does.
+-->
+{#snippet componentRowEssences(entry)}
+  {@const chips = componentRowEssenceChips(entry, { systems, essences: worldEssences })}
+  {#if chips.length > 0}
+    <span class="manager-world-component-row-essences" data-world-component-row-essences={entry.id}>
+      {#each chips as chip (chip.id)}
+        <!-- r18-colour: swap for the essence chip -->
+        <Chip
+          class="manager-essence-compact-chip"
+          icon={chip.icon}
+          title={`${chip.name} ${chip.quantity}`}
+          aria-label={`${chip.name} ${chip.quantity}`}
+          data-world-component-row-essence={chip.id}>{chip.quantity}</Chip
+        >
+      {/each}
+    </span>
+  {/if}
+{/snippet}
+
+<!--
   THE TRAILING STAT CLUSTER (issue 1371, gap-list row 16).
 
   `proto:606`-`608`: two right-aligned 60px-minimum columns, each a mono numeral over an 8px
@@ -878,6 +931,19 @@
     letter-spacing: 0.07em;
     text-transform: uppercase;
     white-space: nowrap;
+  }
+
+  /* ── THE ROW'S ESSENCE CHIP RUN (issue 1371 r18-cat, M30) ──────────────────────────────────
+     The rules row's `.manager-component-essence-dots` run, restated for this row because the
+     frame's meta column is a WRAPPING flex: the run itself never wraps, so a component with many
+     essences widens the column rather than breaking the chips onto a second line and growing the
+     row the rendered suite pins at the chipless row's height. */
+  .manager-world-component-row-essences {
+    display: inline-flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--fab-space-1);
   }
 
   /* The name line's two pills keep their intrinsic width; the NAME is what ellipsises. */

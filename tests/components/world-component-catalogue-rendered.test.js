@@ -160,6 +160,8 @@ const OVERLAY_CONTROL = `
   .fab-bulk-inset::after { content: ''; position: absolute; inset: 0; }
   .fab-bulk-component-chips { position: relative; }
   .fab-bulk-component-chips::after { content: ''; position: absolute; inset: 0; }
+  .manager-scoped-list-search-row { position: relative; }
+  .manager-scoped-list-search-row::after { content: ''; position: absolute; inset: 0; }
 `;
 
 /**
@@ -228,6 +230,12 @@ const TARGETS = [
     probe: '[data-world-component-bulk-tag-chip="fuel"]',
     target: '[data-world-component-bulk-tag-chip="fuel"]',
   },
+  // ── issue 1371 r18-cat (M30) ─────────────────────────────────────────────────────────────
+  {
+    label: 'essence filter select',
+    probe: '[data-scoped-list-filter="essence"]',
+    target: '[data-scoped-list-filter="essence"]',
+  },
 ];
 
 /**
@@ -241,7 +249,15 @@ const SEVEN_SYSTEMS = [
     id: `sys-${name.toLowerCase()}`,
     name,
   })),
-];
+].map((system) =>
+  // ONE SYSTEM'S RULES CARRY AN ESSENCE FOR `resin` (issue 1371 r18-cat, M30), so the measured
+  // row draws a chip run and its geometry can be read; `coal` carries none, so a chipless row
+  // stands beside it for the height comparison. Rules on a raw system are not membership — the
+  // corpus's membership still names only the first two systems, so the delete plan is unmoved.
+  system.id === 'sys-glass'
+    ? { ...system, components: [{ id: 'resin', essences: { flame: 2 } }] }
+    : system
+);
 
 /**
  * Hit-test every target at its own centre, wholly inside the page.
@@ -430,6 +446,13 @@ function measureRowOrder() {
   const checkbox = row.querySelector('.fab-selection-checkbox').getBoundingClientRect();
   const medallion = row.querySelector('.fab-medallion').getBoundingClientRect();
   const pen = row.querySelector('[data-scoped-list-action="open-entry"]').getBoundingClientRect();
+  // THE ESSENCE CHIP RUN AND THE STAT COLUMNS (issue 1371 r18-cat, M30), and a chipless row's
+  // height to hold the chipped one against.
+  const run = row.querySelector('[data-world-component-row-essences="resin"]');
+  const chip = row.querySelector('[data-world-component-row-essence="flame"]');
+  const stats = row.querySelector('[data-world-component-row-meta="resin"]');
+  const chipless = document.querySelector('[data-scoped-list-row="coal"]');
+  const rect = (element) => (element ? element.getBoundingClientRect() : null);
   return {
     rowHeight: box.height,
     rowLeft: box.left,
@@ -437,6 +460,43 @@ function measureRowOrder() {
     checkboxLeft: checkbox.left,
     medallionLeft: medallion.left,
     penLeft: pen.left,
+    essenceRun: rect(run),
+    essenceChip: rect(chip),
+    essenceChipRadius: chip ? getComputedStyle(chip).borderTopLeftRadius : null,
+    stats: rect(stats),
+    chiplessRowHeight: chipless ? chipless.getBoundingClientRect().height : null,
+  };
+}
+
+/**
+ * The lead toolbar row's two selects (issue 1371 r18-cat, M30): the source select the prototype
+ * draws (`proto:579`, measured by the parity region `cat-toolbar-source-filter`) and the essence
+ * select the ruling adds beside it, which the prototype's catalogue does not draw and which has
+ * therefore to match the control it stands beside rather than a prototype element of its own.
+ */
+function measureLeadRow() {
+  const read = (selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return { found: false, selector };
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return {
+      found: true,
+      selector,
+      left: box.left,
+      right: box.right,
+      height: box.height,
+      borderTopLeftRadius: style.borderTopLeftRadius,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      backgroundColor: style.backgroundColor,
+      borderTopColor: style.borderTopColor,
+    };
+  };
+  return {
+    source: read('[data-scoped-list-filter="source-type"]'),
+    essence: read('[data-scoped-list-filter="essence"]'),
+    search: read('[data-scoped-list-search]'),
   };
 }
 
@@ -446,6 +506,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   let overlaid = null;
   let rowOrder = null;
   let toolbarType = null;
+  let leadRow = null;
   let listFrame = null;
   let bulkGeometry = null;
 
@@ -519,6 +580,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       // geometry pass reads viewport-relative boxes.
       rowOrder = await page.evaluate(measureRowOrder);
       toolbarType = await page.evaluate(measureToolbarType);
+      leadRow = await page.evaluate(measureLeadRow);
       bulkGeometry = await page.evaluate(measureBulkGeometry);
       honest = await page.evaluate(measurePointerTargets, TARGETS);
       await page.setContent(
@@ -641,6 +703,67 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       toolbarType.secondaryInk,
       'and takes the secondary ink the reference gives it — compared against the TOKEN the ' +
         'theme resolves, so a theme change moves both sides together'
+    );
+  });
+
+  // ── issue 1371 r18-cat (M30) ───────────────────────────────────────────────────────────────
+  it('draws the essence select as the source select’s twin: same rung, corner, type and paint, to its right (M30)', () => {
+    // The prototype's catalogue lead row is a search field and ONE select (`proto:577`-`579`);
+    // the essence select is the maintainer's extra, so its reference is the control it stands
+    // beside — the one `cat-toolbar-source-filter` measures against `proto:579` — and the
+    // rules list's own essence select, which the fixture records at the same 38px / 9px / 12px
+    // / 500 (`sys-toolbar-essence-filter`). Asserted AGAINST THE SIBLING rather than against
+    // literals, then pinned to the rung so two selects that both resolved to nothing cannot pass.
+    assert.ok(leadRow.source.found, 'NON-VACUITY: the source select renders');
+    assert.ok(leadRow.essence.found, 'and so does the essence select');
+    const face = ({ height, borderTopLeftRadius, fontSize, fontWeight, backgroundColor, borderTopColor }) => ({
+      height,
+      borderTopLeftRadius,
+      fontSize,
+      fontWeight,
+      backgroundColor,
+      borderTopColor,
+    });
+    assert.deepEqual(face(leadRow.essence), face(leadRow.source), 'one face for the two selects');
+    assert.equal(leadRow.essence.height, 38, 'on the lead row’s 38px rung');
+    assert.equal(leadRow.essence.borderTopLeftRadius, '9px', 'radius 9 for a 34-38px control');
+    assert.ok(
+      leadRow.essence.left >= leadRow.source.right,
+      `the essence select stands to the RIGHT of the source select (${leadRow.essence.left} vs ${leadRow.source.right})`
+    );
+    assert.ok(
+      leadRow.source.left >= leadRow.search.right,
+      'and the source select still follows the search field, so the row reads search, source, essence'
+    );
+  });
+
+  it('draws the row’s essence chips in the trailing column before the stat columns, without growing the row (M30)', () => {
+    assert.ok(Boolean(rowOrder.essenceRun), 'NON-VACUITY: the resin row draws its chip run');
+    assert.ok(Boolean(rowOrder.essenceChip), 'and the flame chip inside it');
+    assert.ok(Boolean(rowOrder.stats), 'and its stat columns');
+    assert.ok(
+      rowOrder.essenceRun.right <= rowOrder.stats.left,
+      `the chips end before the stat columns begin (${rowOrder.essenceRun.right} vs ${rowOrder.stats.left})`
+    );
+    assert.ok(
+      rowOrder.essenceRun.left > rowOrder.medallionLeft,
+      'and start after the medallion — the trailing column, not the identity cell'
+    );
+    assert.equal(
+      rowOrder.rowHeight,
+      rowOrder.chiplessRowHeight,
+      'a row with chips is exactly as tall as a row without: the compact chip fits the row'
+    );
+    assert.ok(
+      rowOrder.essenceChip.top >= rowOrder.essenceRun.top - 0.5 &&
+        rowOrder.essenceChip.height <= 24,
+      `the chip is the compact scale (${rowOrder.essenceChip.height}px), not the default badge`
+    );
+    // A PILL: the corner is at least half the chip's height, which is what makes the ends round
+    // whatever literal the primitive declares (`Chip` computes 10px on its 20px compact face).
+    assert.ok(
+      Number.parseFloat(rowOrder.essenceChipRadius) >= rowOrder.essenceChip.height / 2,
+      `a pill, as every manager chip is (${rowOrder.essenceChipRadius} on ${rowOrder.essenceChip.height}px)`
     );
   });
 
@@ -851,7 +974,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.equal(
       missed.length,
       TARGETS.length,
-      'an overlay stretched over the row, the dock, the insets and the chip run must intercept ' +
+      'an overlay stretched over the row, the dock, the insets, the chip run and the lead toolbar row must intercept ' +
         `ALL ${TARGETS.length} targets; it intercepted ${missed.length}: ` +
         JSON.stringify(overlaid, null, 2)
     );
