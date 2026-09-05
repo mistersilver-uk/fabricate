@@ -38,6 +38,7 @@ import {
   optionRows,
   pressKey,
   settle,
+  placeCaret,
   typeQuery,
 } from '../helpers/listboxKeyboardDriver.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -198,8 +199,23 @@ describe('1503 IconPicker — the listbox focus model', () => {
     const { panel, rows } = await openFourRowPanel();
     const holder = holderOf(panel);
 
+    // HOME AND END ARE THE CARET'S FIRST, and this picker is where that matters most: its query
+    // field is the one a GM types a whole icon name into, so the keys that jump to the ends of
+    // that text cannot be taken unconditionally. The component hands each of them to the cursor
+    // only from the edge at which the caret would not move — so after typing, End (the caret is
+    // already at the end of `bolt`) is the list's, and Home is not until the caret is at 0.
     pressKey('End');
     assert.equal(activeDescendant(holder), rows[3].id, 'End reaches the last row');
+
+    const kept = pressKey('Home');
+    assert.ok(
+      !kept.defaultPrevented,
+      'with the caret at the end of a typed query, Home is how a GM gets back to the start of ' +
+        'what they typed — taking it would leave the field with no way to reach its own start'
+    );
+    assert.equal(activeDescendant(holder), rows[3].id, 'and the cursor did not move either');
+
+    placeCaret(holder, 0);
     pressKey('Home');
     assert.equal(activeDescendant(holder), rows[0].id, 'Home reaches the first');
 

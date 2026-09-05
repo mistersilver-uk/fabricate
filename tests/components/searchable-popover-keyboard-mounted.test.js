@@ -33,6 +33,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { placeCaret } from '../helpers/listboxKeyboardDriver.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
@@ -106,8 +107,13 @@ async function settle() {
  * dispatching at the original holder could report an unchanged `activeElement` while the browser
  * had in fact moved on.
  */
-function pressKey(key) {
-  const event = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+function pressKey(key, modifiers = {}) {
+  const event = new window.KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...modifiers,
+  });
   document.activeElement.dispatchEvent(event);
   flushSync();
   return event;
@@ -128,6 +134,12 @@ function search(panel, term) {
   field.value = term;
   field.dispatchEvent(new window.Event('input', { bubbles: true }));
   flushSync();
+  return field;
+}
+
+/** Type a query and then PUT THE CARET SOMEWHERE, which is the whole subject of the caret clauses. */
+function searchWithCaret(panel, term, caret) {
+  return placeCaret(search(panel, term), caret);
 }
 
 describe('1503 SearchablePopover — the listbox focus model', () => {
@@ -231,6 +243,80 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'index 1 in the OLD list is not a cursor position in the new one, so there is no cursor'
       );
       assert.equal(activeDescendant(holder), null);
+      harness.remount();
+    });
+
+    it('never marks a row of the INCOMING list with the outgoing cursor', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      pressKey('ArrowDown');
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'the cursor is on Wood');
+
+      // THE DEFECT THIS REFUSES IS A WINDOW, NOT A STATE, so the assertion is on the DOM's own
+      // record of what happened rather than on what is there afterwards. Cleared from an
+      // `$effect`, the cursor is reset AFTER the derived pass that rebuilt the list — so index 1
+      // is written onto the new row at index 1 (Cloth) and taken off again in the same
+      // `flushSync`, and every assertion in this file that reads the settled DOM reports clean.
+      // A `MutationObserver` sees both writes; `oldValue === null` is the one that says GAINED.
+      const observer = new window.MutationObserver(() => {});
+      observer.observe(panel, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-active-option'],
+        attributeOldValue: true,
+      });
+      search(panel, 'o');
+      const gained = observer
+        .takeRecords()
+        .filter((record) => record.oldValue === null)
+        .map((record) => record.target.textContent.replace(/\s+/g, ' ').trim());
+      observer.disconnect();
+
+      assert.deepEqual(
+        optionRows(panel).map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
+        ['Wood', 'Cloth'],
+        'the query rebuilt the list, so index 1 names Cloth where it named Wood'
+      );
+      assert.deepEqual(
+        gained,
+        [],
+        'no row of the new list is EVER marked by a cursor the GM set in the old one, not even ' +
+          'for the one flush a reset written as an `$effect` would take to correct it'
+      );
+      harness.remount();
+    });
+
+    it('drops the cursor when the CALLER replaces the options under an open panel', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      pressKey('ArrowDown');
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'the cursor is on Wood');
+
+      // The third input that rebuilds the list, and the only one that reaches neither `toggle`
+      // nor a keystroke: a caller swapping `options` while the panel is open with the query
+      // unchanged. Same COUNT, different vocabulary — so a generation keyed on the query alone
+      // would carry index 1 over onto a row the GM has never seen, and Enter would choose it.
+      await harness.setProps({
+        options: [
+          { id: 'iron', label: 'Iron' },
+          { id: 'silver', label: 'Silver' },
+          { id: 'gold', label: 'Gold' },
+        ],
+      });
+      const replaced = harness.target.querySelector('.fabricate-picker-popover');
+      assert.deepEqual(
+        optionRows(replaced).map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
+        ['Iron', 'Silver', 'Gold'],
+        'the panel is still open over an entirely different list'
+      );
+      assert.deepEqual(markedRows(replaced).map((row) => row.id), [], 'and nothing in it is active');
+      assert.equal(activeDescendant(replaced.querySelector('.manager-travel-popover-search input')), null);
       harness.remount();
     });
 
@@ -436,6 +522,238 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       assert.ok(!panel.querySelector('[role="listbox"]'), 'the filtered-to-nothing branch renders');
       assert.equal(holder.getAttribute('aria-controls'), null);
       assert.equal(holder.getAttribute('aria-activedescendant'), null);
+      harness.remount();
+    });
+  });
+
+  describe('the caret boundary, where the holder is a TEXT FIELD', () => {
+    // Four keys are the caret's before they are the cursor's, and the component hands each of
+    // them over only from the edge at which the caret would not move. Every clause below fixes
+    // the same query — `o`, which matches Wood and Cloth — and varies ONLY where the caret sits,
+    // so a clause that passed for a reason other than the boundary would have to pass for both
+    // positions and the pair would collapse.
+
+    it('takes End for the cursor when the caret is already at the end of the query', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+      searchWithCaret(panel, 'o', 1);
+
+      const pressed = pressKey('End');
+      assert.ok(pressed.defaultPrevented, 'there is nowhere for the caret to go, so the list has it');
+      assert.equal(
+        activeDescendant(holder),
+        optionRows(panel)[1].id,
+        'End reaches the last row of the FILTERED list, which is what the key is for'
+      );
+      harness.remount();
+    });
+
+    it('leaves End to the caret while there is text to its right', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+      searchWithCaret(panel, 'o', 0);
+
+      const pressed = pressKey('End');
+      assert.ok(
+        !pressed.defaultPrevented,
+        'a GM editing a query must keep the key that jumps to the end of what they typed'
+      );
+      assert.equal(
+        activeDescendant(holder),
+        null,
+        'and the cursor does not move either, or the key would do two things at once'
+      );
+      assert.deepEqual(markedRows(panel).map((row) => row.id), []);
+      harness.remount();
+    });
+
+    it('takes Home for the cursor at the start of the query and leaves it otherwise', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      searchWithCaret(panel, 'o', 1);
+      const left = pressKey('Home');
+      assert.ok(!left.defaultPrevented, 'there is text to the caret`s left, so Home is the field`s');
+      assert.equal(activeDescendant(holder), null);
+
+      searchWithCaret(panel, 'o', 0);
+      const taken = pressKey('Home');
+      assert.ok(taken.defaultPrevented, 'at the start of the query the caret cannot move, so the list has it');
+      assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
+      harness.remount();
+    });
+
+    it('leaves a SELECTION alone whichever edge it touches', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+      searchWithCaret(panel, 'o', [0, 1]);
+
+      const pressed = pressKey('End');
+      assert.ok(
+        !pressed.defaultPrevented,
+        'End over a selection collapses it to the end of the value — a caret movement the ' +
+          'offsets alone would report as "nowhere to go", because both edges are at a boundary'
+      );
+      assert.equal(activeDescendant(holder), null);
+      harness.remount();
+    });
+
+    it('never takes a MODIFIED caret key, even from the edge that would hand it over', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+      searchWithCaret(panel, 'o', 1);
+
+      // The caret is at the edge, so the boundary rule ALONE would hand every one of these to
+      // the list. `Shift+End` selects to the end of the query and `Ctrl+Home` jumps to its
+      // start: they are the ordinary way a GM fixes a typo in a long search, and none of them
+      // is a cursor movement this widget has anything to offer in exchange for.
+      for (const [key, modifiers] of [
+        ['End', { shiftKey: true }],
+        ['Home', { ctrlKey: true }],
+        ['End', { metaKey: true }],
+        ['ArrowRight', { shiftKey: true }],
+      ]) {
+        const pressed = pressKey(key, modifiers);
+        const name = `${Object.keys(modifiers)[0].replace('Key', '')}+${key}`;
+        assert.ok(!pressed.defaultPrevented, `${name} belongs to the field`);
+        assert.equal(activeDescendant(holder), null, `${name} moved the cursor`);
+      }
+      harness.remount();
+    });
+
+    it('keeps the whole map on a TRIGGER holder, which has no caret to protect', async () => {
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox' });
+      const button = trigger();
+      button.focus();
+      const panel = await openPanel();
+      const rows = optionRows(panel);
+
+      // A `<button>` has no `selectionStart` at all, so the boundary predicate is false for it by
+      // construction and the five search-suppressed call sites keep exactly today's key map.
+      const pressed = pressKey('End');
+      assert.ok(pressed.defaultPrevented, 'End on a trigger holder is the list`s, as it always was');
+      assert.equal(activeDescendant(button), rows[2].id);
+      assert.ok(pressKey('Home').defaultPrevented);
+      assert.equal(activeDescendant(button), rows[0].id);
+      harness.remount();
+    });
+
+    it('gives a FRESHLY OPENED panel all four keys, because the query is empty', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      // Both edges of an empty field are the same position, so nothing is owed to the caret —
+      // and this is the state a GM is in when they actually arrow through a list.
+      assert.equal(holder.value, '', 'the panel opens with no query');
+      assert.ok(pressKey('End').defaultPrevented);
+      assert.equal(activeDescendant(holder), optionRows(panel)[2].id);
+      assert.ok(pressKey('Home').defaultPrevented);
+      assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
+      harness.remount();
+    });
+  });
+
+  describe('the grid form, whose horizontal axis competes with the same caret', () => {
+    it('takes ArrowRight at the end of the query and leaves it mid-query', async () => {
+      await mountPicker({ as: 'grid', columns: 2 });
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      // ArrowLeft/Right are not a convenience here: with two columns ArrowDown steps +2 over the
+      // flat order, so on an even filtered count half the tiles are unreachable without them.
+      searchWithCaret(panel, 'o', 1);
+      assert.ok(pressKey('ArrowRight').defaultPrevented, 'at the end of the query the grid has it');
+      assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
+
+      // The query is UNCHANGED, so the list — and therefore the cursor — is the same one; only
+      // the caret moved. That is what makes the pair a controlled comparison.
+      searchWithCaret(panel, 'o', 0);
+      const left = pressKey('ArrowRight');
+      assert.ok(!left.defaultPrevented, 'with text to its right the caret keeps it');
+      assert.equal(
+        activeDescendant(holder),
+        optionRows(panel)[0].id,
+        'and the cursor stayed exactly where the previous press put it'
+      );
+      harness.remount();
+    });
+
+    it('takes ArrowLeft at the start of the query and leaves it mid-query', async () => {
+      await mountPicker({ as: 'grid', columns: 2 });
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      searchWithCaret(panel, 'o', 0);
+      assert.ok(pressKey('ArrowLeft').defaultPrevented, 'at the start of the query the grid has it');
+      assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'ArrowLeft from the sentinel lands on the END of the flat order');
+
+      searchWithCaret(panel, 'o', 1);
+      const kept = pressKey('ArrowLeft');
+      assert.ok(!kept.defaultPrevented, 'with text to its left the caret keeps it');
+      assert.equal(
+        activeDescendant(holder),
+        optionRows(panel)[1].id,
+        'and the cursor stayed where the previous press put it, because only the caret moved'
+      );
+      harness.remount();
+    });
+  });
+
+  describe('the panel`s own chrome, which must not become the focus holder', () => {
+    it('suppresses a mousedown on the panel inset so DOM focus stays on the holder', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      // The panel is `role="dialog" tabindex="-1"`, so it is the nearest focusable ancestor of
+      // its own inset, its inter-row gaps, its header and its empty note. A click landing on any
+      // of them would focus the DIALOG — and the key map is bound to the holder, so the arrows
+      // would stop moving and typing would go nowhere, with no ring drawn to explain it because
+      // the module root rings `:focus-visible` only and a mouse click does not match it.
+      const onPanel = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      panel.dispatchEvent(onPanel);
+      flushSync();
+      assert.ok(
+        onPanel.defaultPrevented,
+        'without this the panel takes focus off the holder and the whole keyboard model dies'
+      );
+      assert.equal(document.activeElement, holder);
+
+      // AND THE EXCEPTION IS REAL. Suppressing the field`s own `mousedown` would break caret
+      // placement and text selection in the one control the GM types into.
+      const onField = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      holder.dispatchEvent(onField);
+      flushSync();
+      assert.ok(
+        !onField.defaultPrevented,
+        'the query field owns its caret, so its pointer default is left alone'
+      );
+      harness.remount();
+    });
+  });
+
+  describe('the caller seam that feeds the cursor its list', () => {
+    it('renders the empty branch when `filterOptions` returns something that is not an array', async () => {
+      // Everything downstream INDEXES what the seam returns — the cursor arithmetic, the option
+      // ids, `renderedOptions[activeIndex]` — so a seam returning a bare object or a string would
+      // throw inside a `$derived` and take the whole panel down, with a stack that names this
+      // component rather than the caller that misread the contract. The coercion belongs here
+      // because this is where the assumption is made.
+      await mountPicker({ filterOptions: () => 'not an array' });
+      const panel = await openPanel();
+
+      assert.ok(!panel.querySelector('[role="listbox"]'), 'no list, because there are no rows');
+      assert.ok(
+        Boolean(panel.querySelector('.manager-travel-popover-empty')),
+        'the empty branch renders instead of the panel dying'
+      );
+      assert.ok(!pressKey('ArrowDown').defaultPrevented, 'and there is no cursor to move');
       harness.remount();
     });
   });
