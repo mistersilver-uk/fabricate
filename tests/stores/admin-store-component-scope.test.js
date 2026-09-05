@@ -1801,3 +1801,43 @@ test('1371 r21: the rules-bulk verb rolls its flips back when the value write th
   assert.equal(membershipRecord(scope).essences, undefined, 'and the seeded block with it');
   assert.deepEqual(resolvedIngotEssences(harness, scope), { fire: 3 });
 });
+
+test('1371 r21: the store forwards a STATED baseline to the rule, and it decides the save', async () => {
+  // Quality gap N1, the store's half. Every earlier fixture's baseline EQUALLED the resolved map,
+  // so unwiring this argument changed nothing anywhere. A world map the editor's steppers cannot
+  // restate — a fractional quantity, reachable through an import or a hand-edited setting — makes
+  // the two answers differ, so the forwarding is falsifiable.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 2.5 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+
+  const stated = await store.updateComponent('ingot', { essences: { fire: 2 } }, {
+    baseline: { fire: 2 },
+  });
+
+  assert.equal(stated, true);
+  assert.deepEqual(calls, [], 'a restatement of the stated baseline writes nothing');
+  assert.equal(
+    membershipRecord(scope).inherit.essences,
+    undefined,
+    'and spends no durable world-setting write'
+  );
+
+  const assumed = await store.updateComponent('ingot', { essences: { fire: 2 } });
+
+  assert.equal(assumed, true);
+  assert.deepEqual(
+    calls.map((call) => call.updates),
+    [{ essences: { fire: 2 } }],
+    'with NO baseline stated the resolved 2.5 is the fallback, so 2 is a real authored override'
+  );
+  assert.equal(membershipRecord(scope).inherit.essences, false, 'and the switch moves for it');
+});

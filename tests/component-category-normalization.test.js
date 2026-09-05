@@ -673,4 +673,140 @@ test('1371 r19: the editor app delegates its save and never writes a component i
     EDITOR_APP_SOURCE.includes('baseline: seed.baselineEssences'),
     'and the save states the baseline it was seeded from rather than leaving the rule to assume it'
   );
+  assert.ok(
+    EDITOR_APP_SOURCE.includes('carriedEssences: seed.carriedEssences'),
+    'and hands over the carried entries too — `saveComponentEditorDraft` falls back to this ' +
+      'argument, so unwiring it silently restores the foreign-id drop on the one path no ' +
+      'behavioural case here can see'
+  );
+});
+
+// The editor ROOT's own branch, pinned as source for `SvelteComponentEditorApp`'s reason: it is a
+// `.svelte` module, so the alternative is a hand-written mirror of `handleSave` that keeps passing
+// however the real one is written. The behavioural case below drives what this emits.
+const EDITOR_ROOT_SOURCE = readFileSync(
+  new URL('../src/ui/svelte/apps/ComponentEditorRoot.svelte', import.meta.url),
+  'utf8'
+);
+
+test('1371 r21: the editor root emits the seed’s two facts WITH the rows it drew', () => {
+  // Foundry integrator round 7, finding 2. Both are facts about the RENDER, and the window
+  // registers no hooks — so anything re-derived at save time is a different world's answer.
+  assert.ok(
+    EDITOR_ROOT_SOURCE.includes('carriedEssences: editorState.carriedEssences'),
+    'the carried entries travel with the draft'
+  );
+  assert.ok(
+    EDITOR_ROOT_SOURCE.includes('baselineEssences: editorState.baselineEssences'),
+    'and so does the baseline an untouched save of THESE rows would produce'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The BASELINE is a fact about the RENDER (issue 1371 r21-store4)
+// ---------------------------------------------------------------------------
+//
+// Round 6 gave the rule a stated baseline; round 7 found that both hops carrying it were unproven
+// (quality N1 — every fixture's baseline EQUALLED the resolved map, so unwiring either hop changed
+// nothing) and that the app re-derived it at SAVE time (Foundry integrator finding 2), which is a
+// different world's answer the moment a replicated `componentScope` write lands while the window
+// is open.
+
+/**
+ * The draft `ComponentEditorRoot.handleSave` emits from a rendered state, with one tag ticked.
+ *
+ * It carries the seed's two facts BESIDE the rows, which is the whole correction: they describe
+ * the state that was drawn, and `saveComponentEditorDraft` prefers them over anything the caller
+ * re-derives later.
+ *
+ * @param {object} state the rendered editor state.
+ * @returns {object}
+ */
+function rootEmittedDraft(state) {
+  return {
+    showTags: state.showTags,
+    showEssences: state.showEssences,
+    tagOptions: state.tagOptions.map((option, index) =>
+      index === 0 ? { ...option, checked: true } : option
+    ),
+    essenceOptions: state.essenceOptions,
+    carriedEssences: state.carriedEssences,
+    baselineEssences: state.baselineEssences,
+  };
+}
+
+test('1371 r21: a FRACTIONAL world quantity does not turn an untouched save into an override', async () => {
+  // Quality N1, and the case that makes both `{baseline}` hops falsifiable. The steppers clamp, so
+  // an untouched save of the rendered rows produces `{fire: 2}` while the RESOLVED map — the
+  // fallback the rule uses when no baseline is stated — is `{fire: 2.5}`. Unwire either hop and
+  // the two differ, so a save that ticked a tag flips the switch and pins the pair to `{fire: 2}`.
+  // Reachable through an import or a hand-edited setting; unreachable from the module's own writes.
+  const { store, persisted } = makeInheritingScopeStore({}, { fire: 2.5 });
+  const { manager, calls } = makeEditorManager(store);
+  manager.updateSystem('sys1', { itemTags: ['bar'] });
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const state = appEditorState(manager);
+  assert.deepEqual(state.baselineEssences, { fire: 2 }, 'the rendered rows are clamped');
+  assert.deepEqual(
+    resolvedComponentEssencesFor(manager, 'sys1', 'ingot'),
+    { fire: 2.5 },
+    'while the resolved map the rule would otherwise fall back to is not'
+  );
+
+  const saved = await saveWithOnlyATagTouched(state, writeComponent);
+
+  assert.equal(saved, true);
+  assert.deepEqual(calls[0].updates, { tags: ['bar'] }, 'the essence key is dropped');
+  assert.equal(
+    persisted().membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'and no durable world-setting write was spent on a save that authored nothing'
+  );
+});
+
+test('1371 r21: a world edit landing WHILE the editor is open does not flip an untouched save', async () => {
+  // Foundry integrator finding 2. The window registers no hooks, so the GM is still looking at
+  // `{fire: 3}` when the world map becomes `{fire: 3, water: 4}`. Re-deriving the baseline at save
+  // time compares the rendered rows against a map they were never drawn from, reads the difference
+  // as an authored override, and pins the pair to the stale map with a durable, replicated write.
+  const { store, persisted } = makeInheritingScopeStore();
+  const { manager, calls } = makeEditorManager(store);
+  manager.updateSystem('sys1', { itemTags: ['bar'] });
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const rendered = appEditorState(manager);
+  assert.deepEqual(rendered.baselineEssences, { fire: 3 }, 'what the GM is looking at');
+
+  await store.save({
+    ...store.get(),
+    defaults: { ingot: { id: 'ingot', essences: { fire: 3, water: 4 } } },
+  });
+  const atSaveTime = appEditorState(manager);
+  assert.notDeepEqual(atSaveTime.baselineEssences, rendered.baselineEssences, 'the world moved');
+
+  // The app hands over what it can re-derive NOW; the draft carries what was DRAWN, and the draft
+  // wins. This is exactly the pair of arguments `_saveEditorState` supplies.
+  const saved = await saveComponentEditorDraft(rootEmittedDraft(rendered), {
+    systemId: 'sys1',
+    componentId: 'ingot',
+    carriedEssences: atSaveTime.carriedEssences,
+    baseline: atSaveTime.baselineEssences,
+    writeComponent,
+  });
+
+  assert.equal(saved, true);
+  assert.equal(calls.length, 1, 'the tag change still lands');
+  assert.deepEqual(calls[0].updates, { tags: ['bar'] }, 'and carries NO essence key');
+  assert.equal(
+    persisted().membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'so the pair is not silently opted out of the world map it is still following'
+  );
 });
