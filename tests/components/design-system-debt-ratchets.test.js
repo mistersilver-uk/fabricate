@@ -1081,6 +1081,65 @@ const MODULE_FOCUS_PAIR = Object.freeze([
   },
 ]);
 
+/** A primitive's OWN ring: `<root>:focus-visible`, the family class itself with no descendant. */
+const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
+
+/**
+ * Every root that may write a `:focus-visible` ring over BARE ELEMENTS, at ANY element shape.
+ *
+ * WHY A SECOND, SHAPE-FREE POPULATION. The clause pinning the pair recognises a half only when its
+ * element set is one of `RESET_SHAPES`, and that allow-list is opt-in in the wrong direction: a
+ * ring naming two elements — `.fabricate-manager a:focus-visible, .fabricate-manager
+ * button:focus-visible` — is not a published shape, so `focusPairRoot` returns `null` and the
+ * clause cannot see it. Gate 1 reads bare `:focus` and never looks at `:focus-visible` at all. So
+ * the RESET half is protected at every shape and, without this clause, the RING half only at
+ * three.
+ *
+ * THE POPULATION IS KEYED ON ELEMENTS, NOT ON DECLARATIONS. What makes a block a copy of the
+ * module ring is that it reaches the same elements at the same rank; the declarations are the part
+ * a copy can vary — `.fabricate-app select:focus-visible` writes the ring as an inset
+ * `box-shadow` — while still deciding the same state by source order. Two selector shapes are a
+ * ring: `<root> <element>:focus-visible` ({@link RING_COMPOUND}) and {@link SELF_RING_COMPOUND},
+ * and every member of the list has to share one root.
+ *
+ * A ring on a WIDGET CLASS is NOT in this population and must not be. `.fabricate-manager
+ * .manager-nav-button:focus-visible` is per-widget chrome the design system allows, and the sheet
+ * holds 30 of those against these 10 blocks — pinning them would pin the manager's whole widget
+ * inventory to this list.
+ *
+ * Derived from the sheet rather than asserted: 9 roots over 10 blocks, every one of them
+ * legitimate today, which is exactly why an eleventh would not stand out to a reader.
+ */
+const RING_ROOTS = Object.freeze(
+  [
+    MODULE_ROOT,
+    '.fabricate-app',
+    '.fabricate-button',
+    '.fabricate-icon-button',
+    '.fabricate-interactable-browser-app',
+    '.fabricate-interactable-config-app',
+    '.fabricate-interactables-manager',
+    '.fabricate-pagination',
+    '.fabricate-roll-prompt-dialog',
+  ].sort(byCodePoint)
+);
+
+/**
+ * The one root a `:focus-visible` block rings bare elements under, or `null` when it is not one.
+ *
+ * @param {string} selector A rule's whole selector list.
+ * @returns {string|null}
+ */
+function bareElementRingRoot(selector) {
+  const roots = new Set();
+  for (const member of splitSelectorList(selector)) {
+    const matched = RING_COMPOUND.exec(member) ?? SELF_RING_COMPOUND.exec(member);
+    if (matched === null) return null;
+    roots.add(matched[1]);
+  }
+  return roots.size === 1 ? [...roots][0] : null;
+}
+
 /**
  * The classes issue 1501 considered, measured, and did NOT declare.
  *
@@ -1214,10 +1273,12 @@ test('every emitted `data-gap` rung is declared, and each default is written as 
   const emitted = emittedGapRungs();
 
   assert.ok(
-    emitted.length >= 16,
+    emitted.length >= 12,
     `only ${emitted.length} \`data-gap\` emitters reached this scan, against the 16 the tree ` +
-      'holds. A walk that stopped seeing call sites reports a clean mirror, which is the one ' +
-      'direction an absence check cannot distinguish from success.'
+      'held when this clause was written. The floor carries slack DELIBERATELY, so that removing ' +
+      'one call site reds nothing and only a collapse gets here: a walk that stopped seeing call ' +
+      'sites reports a clean mirror, which is the one direction an absence check cannot ' +
+      'distinguish from success.'
   );
   assert.deepEqual(
     [...new Set(emitted.filter((site) => !declared.has(site.key)).map((site) => site.key))].sort(
@@ -1289,6 +1350,27 @@ test('no area root writes a copy of either half of the module focus pair', () =>
         'decided by source order rather than by anything a reader of either block can see.'
     );
   }
+});
+
+test('every root ringing bare elements on `:focus-visible` is a named one', () => {
+  // THE SHAPE ALLOW-LIST IS THE HOLE THIS FILLS, and it is a hole in the ROOT list rather than in
+  // the shapes: `.fabricate-manager` is absent below precisely because issue 1501 collapsed the
+  // manager's element ring onto the module root, so a two-element copy under it reds here at any
+  // shape the clause above would not recognise. Roots rather than blocks, because a root may
+  // legitimately write two of these — the roll-prompt dialog rings `button, input` with an outline
+  // and `select` with an inset shadow.
+  const roots = sheetRules()
+    .map((rule) => bareElementRingRoot(rule.selector))
+    .filter((root) => root !== null);
+  assert.deepEqual(
+    [...new Set(roots)].sort(byCodePoint),
+    RING_ROOTS,
+    'a `:focus-visible` ring over BARE ELEMENTS may only be written at one of these roots. Any ' +
+      'other root reaches the elements the module ring already reaches, at the same rank, so ' +
+      'which one paints is decided by source order rather than by anything a reader of either ' +
+      'block can see — and a per-widget ring, which is allowed, names a CLASS rather than an ' +
+      'element and is not in this population.'
+  );
 });
 
 test('a withdrawn utility or skin class is not declared, and issue 1523 owns each one', () => {

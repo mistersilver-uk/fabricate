@@ -52,16 +52,25 @@ import {
   specificityOf,
 } from '../scripts/lib/stylesheetSelectorCensus.js';
 
-const MODULE = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  'scripts',
-  'lib',
-  'stylesheetSelectorCensus.js'
-);
+const REPOSITORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The module has to stay searchable, and only a byte-level assertion can say that it is.
+ * The census's WHOLE script surface, not the one module that happened to hold the defect.
+ *
+ * A property stated of one file is a property one file has. All three of these are read by the
+ * same author working on the same census — the predicate, the liveness rules it shares, and the
+ * command-line entry point that prints the report — and all three sit in the `lint` and
+ * `format:check` globs, which say nothing about control bytes. Naming one leaves the identical
+ * defect free to land next door, where the gate is not looking.
+ */
+const SEARCHABLE_MODULES = Object.freeze([
+  'scripts/lib/stylesheetSelectorCensus.js',
+  'scripts/lib/stylesheetLiveClasses.js',
+  'scripts/stylesheet-selector-census.mjs',
+]);
+
+/**
+ * The census's sources have to stay searchable, and only a byte-level assertion can say they are.
  *
  * A raw control character used as a key separator is behaviourally perfect and invisible in every
  * review: `git` still diffs the file as text, prettier and eslint round-trip it, and the module's
@@ -70,14 +79,16 @@ const MODULE = path.join(
  * grep-driven, that is a module nobody can navigate. The separator is spelled as an escape instead,
  * which is the same character at runtime and ordinary text on disk.
  */
-test('the module source carries no control characters, so grep can read it', () => {
-  const source = readFileSync(MODULE, 'utf8');
-  // eslint-disable-next-line no-control-regex -- the point of the gate is to find control bytes
-  const found = [...source.matchAll(/[\u{0}-\u{8}\u{B}\u{C}\u{E}-\u{1F}]/gu)].map(
-    (match) =>
-      String.raw`\u${match[0].codePointAt(0).toString(16).padStart(4, '0')} at offset ${match.index}`
-  );
-  assert.deepEqual(found, [], 'a control byte makes the module binary to grep, rg and file');
+test('the census sources carry no control characters, so grep can read them', () => {
+  for (const module of SEARCHABLE_MODULES) {
+    const source = readFileSync(path.join(REPOSITORY, module), 'utf8');
+    // eslint-disable-next-line no-control-regex -- the point of the gate is to find control bytes
+    const found = [...source.matchAll(/[\u{0}-\u{8}\u{B}\u{C}\u{E}-\u{1F}]/gu)].map(
+      (match) =>
+        String.raw`\u${match[0].codePointAt(0).toString(16).padStart(4, '0')} at offset ${match.index}`
+    );
+    assert.deepEqual(found, [], `a control byte in ${module} makes it binary to grep, rg and file`);
+  }
 });
 
 /** One rule block, written over as many lines as it has declarations, so a line citation is real. */
