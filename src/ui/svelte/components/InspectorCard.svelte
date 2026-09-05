@@ -6,7 +6,7 @@
   Before this component the manager's card was a CSS CONVENTION and nothing else:
   write `class="manager-inspector-card"` on a `<section>` and the sheet gives you the
   padding, the hairline border, the 8px radius, the surface fill and the stacked
-  `gap` (`fabricate.css:12937` for the stack, `:13663` for the box). 80 sites across
+  `gap` (`fabricate.css:12937` for the stack, `:13673` for the box). 80 sites across
   20 components wrote that out by hand.
 
   It is the lowest-drama member of this programme and that is precisely the argument

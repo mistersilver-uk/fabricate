@@ -90,8 +90,8 @@
   declared outside the array and keep the array's own string literals to the three
   unconditional classes: an inline conditional there puts its tokens into every probe
   and the gate goes green while measuring markup this component never emits. It also
-  declares its own focus PAIR — a `:focus` strip at `fabricate.css:13608` and a
-  `:focus-visible` repaint at `fabricate.css:13619`.
+  declares its own focus PAIR — a `:focus` strip at `fabricate.css:13618` and a
+  `:focus-visible` repaint at `fabricate.css:13629`.
 
   ── RELATIONSHIP TO `ArmedDangerButton` ───────────────────────────────────────────
   INDEPENDENT, not composed. `ArmedDangerButton` also renders

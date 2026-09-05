@@ -83,7 +83,7 @@
      something more than store the string — resetting a pager is the common one.
    - placeholder / ariaLabel: already localized. Both are present at all 19 sites.
    - compact: emits `is-compact`, the 32px-tall `min(220px, 30%)` density
-     (`fabricate.css:15183`). Three converted sites take it, all in the gathering task
+     (`fabricate.css:15193`). Three converted sites take it, all in the gathering task
      editor. A boolean rather than a `density` string because the sheet declares
      exactly two states and the base one is the absence of the class.
    - class: an EXTRA class, appended after the primitive's own and after `is-compact`,
@@ -122,7 +122,7 @@
     // The input's accessible name, already localized. The `<label>` wraps an icon and an input
     // and no text, so it contributes no name of its own.
     ariaLabel = undefined,
-    // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:15183`).
+    // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:15193`).
     compact = false,
     // An EXTRA class, appended after the primitive's own and after `is-compact` — never a
     // replacement. Named rather than a rest key for the reason `InspectorCard.svelte` records.
