@@ -1404,6 +1404,19 @@ const repetitionKey = (entry) =>
  */
 const PUBLISHED_REPETITION_FIGURES = Object.freeze([
   ['keyed on the selector alone', /ALONE the sheet holds ([\d,]+) repeated selectors/],
+  // THE COPY IN THIS FILE, which the first shape of this gate exempted (issue 1503, review r2).
+  // The clause below reads the ledger AND this file, because the ratchet's own comment restates
+  // two of the ledger's figures and was therefore the one unguarded copy left: changed to 2,999 /
+  // 2,111 it kept the suite green, which is the finding this gate exists for reproduced one file
+  // over. The patterns match across the `//` line break the comment wraps at.
+  [
+    'every (at-context, selector) key',
+    /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n  \/\/ keys under this very keying/,
+  ],
+  [
+    'keys appearing exactly once',
+    /keys under this very keying, of which ([\d,]+) appear exactly once/,
+  ],
   ['repeated keys, keyed on (at-context, selector)', /rather than these ([\d,]+),/],
   ['every (at-context, selector) key', /Unfiltered, the sheet holds ([\d,]+) `\(at-context, selector\)` keys/],
   ['keys appearing exactly once', /of which ([\d,]+) appear exactly\n \* once/],
@@ -1439,10 +1452,14 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
     ],
   ]);
 
-  const source = readFileSync(
-    new URL('./selector-repetition-baseline.js', import.meta.url),
-    'utf8'
-  );
+  // BOTH FILES THAT PUBLISH THESE FIGURES, joined. The ledger's docblock is where they are
+  // stated for a reader; this file's own ratchet comment restates two of them to explain why it
+  // filters, and a figure restated and derived nowhere is exactly the mirror this gate exists to
+  // catch. Reading the union means either copy going stale reds, and the labels above say which
+  // measurement each pattern is a copy of.
+  const source = ['./selector-repetition-baseline.js', './design-system-debt-ratchets.test.js']
+    .map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
+    .join('\n');
   const wrong = [];
   for (const [label, pattern] of PUBLISHED_REPETITION_FIGURES) {
     const found = source.match(pattern);
