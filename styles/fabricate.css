@@ -24979,7 +24979,7 @@
    draws that spacing as the row's `margin-bottom: 11px` (`proto:1058`), which snaps to 12 on the
    4px scale; written here as the band's own padding rather than as a row margin because that is
    what the world catalogue's `.manager-toolbar` does — one box owns all four edges — and the
-   rendered geometry test (`components-browser-toolbar-rendered.test.js`) measures the band. */
+   rendered geometry test (`components-browser-rendered.test.js`) measures the band. */
 .fabricate-manager .manager-component-toolbar {
   padding: var(--fab-space-3) var(--fab-space-5);
 }
@@ -26331,4 +26331,30 @@
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
+}
+
+/* ══ issue 1371 r18-list — THE RULES LIST ROW'S MEDALLION SITS AT THE LEADING EDGE ═══════════════
+   Maintainer ruling M28: rows reading `No description` drew their medallion shunted to the middle
+   of the row while rows with a description sat flush.
+
+   THE ROW'S IDENTITY IS A `<button>`, AND FOUNDRY'S OWN CHROME CENTRES A BUTTON'S CONTENT.
+   Measured in Chromium against the harvested 14.365 sheet (`components-browser-rendered.test.js`):
+   the identity resolved `justify-content: center` under it and `normal` without it. The list rule
+   above sets the identity to `display: flex` and never says where its content sits, so the chrome
+   decided; and the copy column beside the medallion was `flex: 0 1 auto`, so on a short description
+   the medallion-and-copy pair floated to the centre of whatever width the row left them — 190px in
+   on a `No description` row, ~45px in on a described one. A long description happened to fill the
+   column and hide it.
+
+   TWO DECLARATIONS, ONE PER CAUSE. The identity states its own alignment, so no host sheet can
+   re-arbitrate it; and the copy takes the free space, so there is none left to float in. The type
+   selector on the first is the point rather than a specificity trick: it names the element whose
+   user-agent and host defaults are being overruled. Appended, because the four-class list rule
+   above is written once and `no-duplicate-selectors` refuses a second block under it. */
+.fabricate-manager .manager-components-list .manager-component-row button.manager-component-identity {
+  justify-content: flex-start;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-identity .manager-system-copy {
+  flex: 1 1 auto;
 }

@@ -387,7 +387,7 @@ export function recordingComponentActions() {
  *
  * Same reason as {@link createWorldComponentCatalogueHarness}, one screen over: the mounted
  * contract suite (`components-browser-view-mounted.test.js`) and the real-browser toolbar geometry
- * suite (`components-browser-toolbar-rendered.test.js`) render the SAME `ComponentsBrowserView`,
+ * suite (`components-browser-rendered.test.js`) render the SAME `ComponentsBrowserView`,
  * so a second copy of its manifest is duplicated lines against the new-code gate and a manifest
  * the second suite can miss an edit to — reported as `# cancelled`, never as `# fail`. The
  * compiled list is answered beside the harness because the rendered suite injects each compiled
