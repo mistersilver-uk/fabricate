@@ -1569,9 +1569,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       // `Pick a … ▾` popover triggers and are now the reference's inline search + rows + pager
       // insets, so the chip this step used to click no longer exists; the row is the stager and
       // the chip is what a staged direction PUTS on screen.
+      //
+      // issue 1371 r14-cat: THE TAG IS ONE THE WORLD VOCABULARY AUTHORS. The inset offers the
+      // vocabulary's tags and nothing else (maintainer ruling M18 on its second surface), and the
+      // lab world authors `ore`, `ingot` and `moss` — `fuel` is applied by a migrated world default
+      // and was only ever offered by the corpus union this ruling struck. `moss` is the one tag in
+      // both lists, so this step resolves on either side of the change.
       {
         selector:
-          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="fuel"]',
+          '[data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
       },
       // AND THE DIRECTION IS STAGED LAST, WHICH IS ALSO WHAT SCROLLS THE PANEL BACK TO ITS HEAD.
       // The three insets make this panel taller than the column, so the LAST click decides what
@@ -1603,7 +1609,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       {
         container: '[data-world-component-bulk-panel]',
-        target: '[data-world-component-bulk-tag-chip="fuel"]',
+        target: '[data-world-component-bulk-tag-chip="moss"]',
       },
       // AND THE THREE INSETS THEMSELVES (issue 1371 r8-cat, gap-list rows 43-45). A panel that
       // fell back to the popover triggers still renders the mode track, the Apply dock and a
