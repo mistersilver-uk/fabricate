@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -17,6 +18,35 @@ function stripGlobalCss() {
       if (id === NOOP_ID) return '';
     },
   };
+}
+
+/**
+ * The version THIS BUILD WAS MADE FROM, baked into the bundle as `__FABRICATE_BUILD_VERSION__`
+ * (issue 1565).
+ *
+ * WHY A BUILD-TIME DEFINE AND NOT A RUNTIME READ. Foundry renders a module's `esmodules` entry as
+ * a plain `<script type="module" src="modules/fabricate/main.js">` with no cache-busting
+ * parameter, so the entry script's URL never changes between versions, while the version a client
+ * REPORTS comes from server-injected package data read from `module.json` on disk. That asymmetry
+ * is the whole defect: `game.modules` can say 1.9.4 while the JavaScript executing is 1.9.3. Only
+ * a value fixed at build time can tell the module which of the two it actually is.
+ *
+ * THE ENV VAR IS WHAT MAKES IT CORRECT ON A RELEASE. `scripts/release.js` sets
+ * `FABRICATE_BUILD_VERSION` from the very same `version` binding it writes into
+ * `dist/module.json`, so the baked and shipped versions cannot disagree. Without it a release
+ * would bake the TRACKED manifest version — semantic-release builds with `--dist-version <next>`
+ * and never writes the tracked `module.json`, which still reads 0.1.0 — and every user would then
+ * be warned about a staleness that was really this build lying about itself.
+ *
+ * @returns {string} The version to bake in.
+ */
+function resolveBuildVersion() {
+  const fromEnv = process.env.FABRICATE_BUILD_VERSION;
+  if (typeof fromEnv === 'string' && fromEnv !== '') return fromEnv;
+  // `npm run dev` and a bare `vite build` fall back to the tracked manifest, which is also what
+  // the module's installed version reads in dev — so the two agree and nothing is reported.
+  const manifest = JSON.parse(readFileSync(resolve(import.meta.dirname, 'module.json'), 'utf8'));
+  return typeof manifest.version === 'string' ? manifest.version : '';
 }
 
 export default defineConfig(({ command }) => {
@@ -42,9 +72,16 @@ export default defineConfig(({ command }) => {
     );
   }
 
+  // `define` SUBSTITUTES AN EXPRESSION, so the value has to be JSON.stringify'd: a bare 1.9.5
+  // would be spliced in as arithmetic and a bare 0.1.0 is a syntax error outright. Declared once
+  // and spread into BOTH returned configs below — the `serve` branch returns early, and a define
+  // present in only one of them is a define the other silently lacks.
+  const define = { __FABRICATE_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()) };
+
   if (command === 'serve') {
     return {
       plugins,
+      define,
       server: {
         // PIN THE IPv4 ADDRESS. Vite's default host ('localhost') binds whichever single
         // address the OS resolves that name to — on Windows that is `[::1]`, leaving the IPv4
@@ -90,6 +127,7 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
+    define,
     build: {
       outDir: 'dist',
       emptyOutDir: true,
