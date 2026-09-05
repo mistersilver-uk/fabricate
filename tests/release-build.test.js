@@ -351,11 +351,12 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
     `${what}: the literal is neither bound to an identifier nor inlined at a console call, so` +
       ' this assertion cannot locate the write — update it against the current minifier output'
   );
-  // `assert.ok(regex.test(...))`, NEVER `assert.match(bundle, ...)`. Measured while proving this
-  // assertion flips: on failure `node:assert` serialises the actual value into its diff, and the
-  // actual value is a megabyte of minified bundle. That overflows the test runner's IPC channel,
-  // so the whole FILE reports `Unable to deserialize cloned data` and no test is ever named — a
-  // real regression here would have been undiagnosable.
+  // `assert.ok(regex.test(...))` rather than `assert.match(bundle, ...)`, for READABILITY. The
+  // actual value is `dist/main.js` — 1.7 MB of minified bundle — and `node:assert` inspects the
+  // actual to build its failure report, so one `assert.match` failure here prints roughly 23,000
+  // characters of minified JavaScript (Node truncates it with a `... N more characters` tail) and
+  // still never names the console level it found. The message below carries that instead. A local
+  // choice for a whole-bundle actual, not a rule about `assert.match`.
   assert.ok(
     new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
     `${what}: must be written at console.${level} in the built bundle`

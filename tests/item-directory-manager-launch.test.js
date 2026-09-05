@@ -3,9 +3,10 @@
  * fails (issues 150 and 1565).
  *
  * A SOURCE-TEXT GUARD, because `src/main.js` statically imports CSS and no test can import it.
- * So this file can only pin DISPATCH — which wrapper is called where — and deliberately pins
- * nothing about what the wrappers DO; that behaviour is executed by
- * `tests/deferred-entry-notice.test.js` against the module the dispatches name.
+ * So this file can only pin what the source SAYS — which wrapper is called where, and how the
+ * reporter's Foundry edge is wired — and deliberately pins nothing about what the wrappers DO;
+ * that behaviour is executed by `tests/deferred-entry-notice.test.js` against the module the
+ * dispatches name.
  *
  * WHY THE ASSERTIONS ARE SHAPED LIKE THIS. The previous form of this file sliced a region and
  * ran unanchored `assert.match` over it. Measured during plan review: appending a `.catch(...)`
@@ -19,12 +20,19 @@
  *  2. Nothing re-slices to the first `'},'`. That delimiter moves the moment Prettier breaks a
  *     chain across lines, which is exactly what happens when a `.catch` or a wrapper is added.
  *
- * AND EVERY ASSERTION IS `assert.ok(regex.test(...))`, NEVER `assert.match`. Measured: on failure
- * `node:assert` serialises the actual value to build its diff, and the actual value here is
- * `src/main.js` — 300,000 characters. That dump does not merely make the failure unreadable; it
- * overflows the test runner's IPC channel, and the sibling file in the same `node --test`
- * invocation died with `Unable to deserialize cloned data`, losing ITS results too. Same hazard,
- * and same remedy, as the repo's rule against asserting a mounted DOM node against `null`.
+ * AND EVERY ASSERTION IS `assert.ok(regex.test(...))` RATHER THAN `assert.match`, for
+ * READABILITY. The actual value here is the whole of `src/main.js`, over 300,000 characters, and
+ * `node:assert` inspects the actual to build its failure report: one `assert.match` failure
+ * against this file prints roughly 23,000 characters of the module's import block (Node truncates
+ * it with a `... N more characters` tail) and never says which dispatch moved. Testing the regex
+ * and putting the diagnosis in the assertion message keeps a real regression legible.
+ *
+ * That is a local choice for the two files whose actual is a whole file — this one and
+ * `tests/release-build.test.js`, which reads the built bundle — and NOT a rule about
+ * `assert.match`, which the rest of the suite uses freely: `tests/` holds some 2,400 of them,
+ * four against this very `src/main.js` (`tests/setting-change-bridge.test.js` among them). Every
+ * regex below is `g`-flag-free, so `.test()` carries no `lastIndex` state from one call to the
+ * next.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -120,6 +128,43 @@ test('the api export stays raw and un-notified', () => {
   );
 });
 
+test('the failure reporter is wired with closures over ui.notifications, not member values', () => {
+  const source = mainSource();
+  const reporterStart = source.indexOf(
+    'const reportManagerLoadFailure = createDeferredChunkFailureReporter({'
+  );
+  assert.notEqual(reporterStart, -1, 'main.js should build the manager load-failure reporter');
+  const reporterSource = source.slice(reporterStart);
+
+  // D3, and brace-bounded to this call's own argument object for the same reason as the dispatch
+  // assertions above. Both members touch `Notifications`' private fields, so a bare
+  // `notify: ui.notifications.error` loses its receiver and throws a TypeError on a private-field
+  // access AT CALL TIME — inside the failure branch that only a client with a stale entry script
+  // ever reaches. Nothing else in the repo can catch that: `createDeferredChunkFailureReporter`
+  // takes plain functions, so the unit suite's seams pass whatever receiver they are handed, and
+  // no lint rule or build step evaluates this object. A regression to a member value would
+  // reproduce the exact dead-button defect issue 1565 exists to remove, which is what makes the
+  // closure form load-bearing rather than stylistic.
+  assert.ok(
+    /^[^}]*notify: \(message, options\) => ui\.notifications\?\.error\?\.\(message, options\)/.test(
+      reporterSource
+    ),
+    'notify should be a closure that reads ui.notifications.error at call time'
+  );
+  assert.ok(
+    /^[^}]*hasNotice: \(notice\) => ui\.notifications\?\.has\?\.\(notice\)/.test(reporterSource),
+    'hasNotice should be a closure that reads ui.notifications.has at call time'
+  );
+  assert.ok(
+    !/^[^}]*notify: ui\.notifications/.test(reporterSource),
+    'not a bare member value, which loses the receiver and throws on a private-field access'
+  );
+  assert.ok(
+    !/^[^}]*hasNotice: ui\.notifications/.test(reporterSource),
+    'nor hasNotice, for the same reason'
+  );
+});
+
 test('both module console lines are written at a level the published build keeps', () => {
   const source = mainSource();
 
@@ -161,9 +206,10 @@ test('the stale-entry check is dispatched from the ready body, behind a typeof g
     'the stale-entry check should be dispatched from the ready body'
   );
 
-  // EVERY READ OF THE BUILD-TIME DEFINE IS GUARDED. The identifier is genuinely undeclared
-  // wherever the define is absent — the View Lab is served from a config that declares no
-  // `define`, and `node --test` has no build at all — so an unguarded read is a `ReferenceError`
+  // EVERY READ OF THE BUILD-TIME DEFINE IS GUARDED. `vite.config.js` declares it under `build`
+  // only, so no serve-mode config carries it and the identifier is genuinely undeclared in every
+  // non-build run — the dev server, each mounted suite's harness and the screenshot lab alike — as
+  // it is under `node --test`, which has no build at all. An unguarded read is a `ReferenceError`
   // during module evaluation. ESLint cannot catch it: the identifier is declared to it as a
   // readonly global, which satisfies `no-undef` for a bare read.
   //
