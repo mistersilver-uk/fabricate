@@ -414,7 +414,7 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
       'and it is the NOTE variant rather than the dashed hero, which is the shared treatment'
     );
     assert.match(
-      note.textContent.replace(/\s+/g, ' ').trim(),
+      note.textContent.replaceAll(/\s+/g, ' ').trim(),
       /NoComponentsAvailable/,
       'an unfiltered emptiness gets the sentence about the SYSTEM, through `emptyHint`'
     );
@@ -426,7 +426,7 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
 
     const note = panel.querySelector('.manager-travel-popover-empty');
     assert.ok(Boolean(note), 'a filtered-to-nothing grid renders the same note region');
-    const line = note.textContent.replace(/\s+/g, ' ').trim();
+    const line = note.textContent.replaceAll(/\s+/g, ' ').trim();
     assert.match(
       line,
       /NoMatchingComponents/,

@@ -100,6 +100,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
+    // THE shared picker both of the two above now render (issue 1503). `IconPicker` and
+    // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC
+    // import of this tree; omitting it throws in `before()` and reports `# cancelled`.
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
