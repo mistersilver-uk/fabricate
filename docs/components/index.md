@@ -455,7 +455,7 @@ A note beneath both groups states how many tags are in effect here and how many 
 
 Once this system has essences of its own, an **Essence contribution** card lists one tile per essence, each in that essence's own colour, with a stepper for how much of each this component contributes.
 These values are keyed to the essences this system currently uses, so a system that drops an essence drops its contribution with it.
-If this system currently offers no essence at all to this component, whether because every essence is disabled or the system defines none, the card says so instead of drawing an empty grid.
+If this system defines no essences, the card says so instead of drawing an empty grid.
 
 While the linked world component has authored essence values, the card also carries its own **Essence values** row with an **Inherited** or **Overridden** state and a switch, set separately from the category choice above.
 While it reads **Inherited**, every tile shows the world's own values and their steppers are locked, and a note beneath the row says this system is following the world values.

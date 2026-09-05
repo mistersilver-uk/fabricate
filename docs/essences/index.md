@@ -188,7 +188,7 @@ Edit those on the essence itself.
 
 **Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.
 An essence in use is never excluded: deleting it removes it from every component that carries it and rewrites every recipe that requires it.
-A component that only inherits the essence from the world Component catalogue is named in this impact too, so the confirmation states the delete's full reach rather than only the components that author the essence themselves.
+A component that only inherits the essence from the world Component catalogue is counted in this impact too, so the confirmation states the delete's full reach rather than only the components that author the essence themselves.
 Deleting a single essence from its inspector warns you the same way, stating how many components it is removed from and how many recipes are rewritten before you confirm.
 
 Deleting is a two-step action.
