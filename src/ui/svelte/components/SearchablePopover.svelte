@@ -160,6 +160,65 @@
                    World > Parties pickers use it, so the two stacked in one 210px column
                    read as one kind of control over two vocabularies. Existing popover
                    consumers are untouched.
+    trigger      — OPTIONAL snippet that REPLACES this component's own trigger button, rendered
+                   with `{ attributes, open }` (issue 1503). The caller writes its own element —
+                   its markup, its `class`, its `style`, its `oncontextmenu` — and spreads
+                   `attributes` onto it LAST, which is what keeps this component's `type`,
+                   `aria-haspopup`, `aria-expanded`, `onclick`, `onkeydown` and (in the
+                   search-suppressed shape) the whole combobox contract from being overridden by
+                   a caller that did not mean to. It exists because two shipped pickers draw a
+                   trigger this component cannot: a 28px preview tile plus a caret, and a
+                   drag-and-drop tile with its own clear button.
+
+                   THE SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and making that true takes
+                   TWO omissions rather than one. Svelte's `set_attributes` REMOVES an attribute
+                   whose spread value is `undefined`, so `attributes` omits every
+                   undefined-valued key — otherwise a spread-last `aria-label: undefined` would
+                   strip the very name the caller wrote on its own button, and eleven shipped
+                   trigger buttons would render UNNAMED. And `disabled` is `false` rather than
+                   absent whenever the caller does not pass `disabled`, which is not undefined
+                   and would therefore OVERRIDE a caller's own `disabled={true}`: three surfaces
+                   would render an ENABLED trigger mid-save. So `disabled` and `aria-disabled`
+                   are omitted TOO whenever a `trigger` snippet is supplied, and belong to the
+                   caller's own button. (The equally correct alternative is for every snippet
+                   caller to pass `disabled` THROUGH to this component so the spread value
+                   matches its own; it is recorded rather than taken because it makes each
+                   future caller responsible for remembering the pass-through, where the
+                   omission puts the invariant here. A caller that wants the `aria-disabled`
+                   shape — refuse the click, keep the tab stop — writes the attribute itself and
+                   passes `triggerAriaDisabled` so `toggle()` also refuses.)
+
+                   `attributes` also carries ONE symbol key, a `createAttachmentKey()` entry that
+                   hands this component the caller's trigger ELEMENT. `bind:this` cannot cross a
+                   snippet boundary, and without the element the popover would anchor to the
+                   picker ROOT — for a drag-and-drop shell, a box several times the trigger's —
+                   and focus would return to whatever button the root happened to hold first. The
+                   key is a symbol, so neither half of the omission rule touches it.
+
+                   A caller supplying a `trigger` snippet names the button IN the snippet and
+                   does NOT pass `triggerAriaLabel`; passing both is a conflict the spread-last
+                   rule resolves in favour of `triggerAriaLabel`, because it arrives through the
+                   spread. `triggerClass` becomes a declared NO-OP with a `trigger` snippet: it
+                   is a pass-through to this component's own button, which is then not rendered
+                   at all.
+    option       — OPTIONAL snippet that draws the row's CONTENT while this component keeps
+                   owning the row ELEMENT — its `id`, its `tabindex`, its
+                   `data-keyboard-focus`, its ARIA, its click and its keyboard-cursor marker
+                   (issue 1503). It is rendered with the option. When supplied it is the row's
+                   ONLY content: no `Chip`, no trailing marker, no label span. That is not
+                   parsimony — a picker's own suite reads its row label with `span:last-child`,
+                   and a trailing element appended after a caller's content would silently
+                   retarget every such reader onto the marker.
+    searchClass / listClass / optionClass — OPTIONAL extra classes on the search ROW, the
+                   `role="listbox"` element and every option row, beside this component's own
+                   (issue 1503). They are how an adopting picker keeps its own class family on
+                   elements this component now writes: `.essence-icon-picker-search input` and
+                   `.essence-source-picker-grid` are addressed by mounted suites, the View Lab
+                   case registry and the live Foundry smoke, so a re-platform that dropped them
+                   would edit a registry and ~30 assertions to change nothing a GM sees.
+                   An individual row may carry `option.class` as well, appended AFTER
+                   `optionClass` — a fact about the DATA (the icon picker's `pinned` resolved
+                   row) rather than about the caller's styling plumbing.
     header / footer — OPTIONAL snippets rendered inside the popover, above the option
                    list and below it. They remain for exceptional caller-owned content;
                    the standard title/count header should use the shared props above.
@@ -169,6 +228,60 @@
                    `options` array computes a number that can never change while the list
                    below it shrinks on every keystroke. A header snippet declaring no
                    parameters is unaffected.
+    as / columns — the list's own FORM: `'list'` (default) or `'grid'`, and how many cells a grid
+                   row holds (issue 1503). Both are EMITTED on the `role="listbox"` element as
+                   `data-picker-as` / `data-picker-columns` rather than written as an inline
+                   style, and that is a requirement rather than a preference: `anchoredPopover`
+                   writes the list's WHOLE `style` attribute on every measure, so a template
+                   riding an inline style would be erased the first time the panel repositioned.
+                   The sheet paints the grid from the attributes.
+
+                   `columns` also re-maps the keyboard cursor: in the grid form ArrowUp/ArrowDown
+                   move by `columns` and ArrowLeft/ArrowRight by one cell, over the FLAT rendered
+                   order so a ragged last row stays reachable. A grid with no `columns` is a
+                   single column, which is the list form's arithmetic — so a caller that draws two
+                   columns in CSS and forgets the prop gets a cursor that disagrees with what the
+                   GM can see.
+    filterOptions(options, query) — OPTIONAL replacement for this component's own filter, called
+                   with the raw option list and the normalized (trimmed, lower-cased) query and
+                   returning the rows to render, in order (issue 1503). The default is today's
+                   exact label-substring filter, so every shipped caller is unchanged.
+
+                   IT IS CALLED ON EVERY PASS, INCLUDING AN EMPTY QUERY, and the default
+                   short-circuits rather than the seam. The derivation this replaces returned the
+                   raw array untouched when the query was empty, and the icon picker's PINNED
+                   resolved row — the row above the alphabetical list showing what is currently
+                   chosen — is precisely a no-query behaviour, so a seam consulted only under a
+                   query would silently drop it. It is also the only place a caller can see the
+                   query this component owns, and the only place alias matching and result
+                   ranking can live: the icon picker matches `cog`, `potion` and `gold` through
+                   its own alias tables and RANKS what it returns, neither of which a substring
+                   filter can express. A seam may return NEW row objects rather than members of
+                   `options` — it must, when the caller's own data carries no `id`.
+    horizontalAlign — which of the panel's edges meets the trigger's, `'left'` (default, today's
+                   hard-coded value) or `'right'`. A trigger at the right of a narrow column
+                   wants the panel's right edge on its own, or the panel is laid out off the
+                   pane.
+    measureListMetrics({ popover, list, search }) — OPTIONAL callback returning
+                   `{ rowPitch, rowGap, chromeHeight }`, called on EVERY layout pass and spread
+                   into the layout's options (issue 1503). It is what floors the list to a WHOLE
+                   number of rows instead of slicing the last one against the panel's bottom
+                   inset, and it is a CALLBACK rather than three numbers because the numbers are
+                   measured from the rendered box — a row's height and the popover's chrome are
+                   tokens in the stylesheet, so a caller restating them here would be a second
+                   copy free to drift. The three elements are handed over because after adoption
+                   this component owns all three of them. A caller that passes nothing is
+                   unaffected: without a `rowPitch` the layout derives no list height, and this
+                   component then registers no secondary style target at all.
+    ignoreScrollWithin — drop viewport events that started INSIDE the panel (default false).
+                   The panel is anchored to the trigger and scrolling within it moves neither, so
+                   for a long list the re-measure recomputes the answer already applied.
+    triggerOnKeydown — OPTIONAL caller handler on the trigger, composed AFTER this component's
+                   own (issue 1503). It is a prop rather than something a caller could spread,
+                   because in the search-suppressed shape the TRIGGER is the focus holder and
+                   carries the key map: a caller that overrode `onkeydown` through the spread
+                   would silently delete the focus model. Composed, not chained — this component
+                   acts first and the caller sees an event that may already be prevented.
     maxHeight    — OPTIONAL px cap clamped against the computed layout height (0 = the
                    layout's own value). A picker anchored in a narrow column wants a
                    shorter panel than the viewport would allow.
@@ -214,6 +327,7 @@
 -->
 <script>
   import { tick } from 'svelte';
+  import { createAttachmentKey } from 'svelte/attachments';
   import Chip from '../apps/manager/Chip.svelte';
   import EmptyState from '../apps/manager/EmptyState.svelte';
   import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
@@ -242,6 +356,26 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  /**
+   * The filter this component has always applied, and now applies as `filterOptions`' default.
+   *
+   * It short-circuits on an empty query rather than filtering with an empty needle, which is the
+   * behaviour the derivation it replaces had: `''` is a substring of every label, so the two
+   * agree on the result and differ only in whether they allocate a new array.
+   *
+   * @param {Array<{label?: string}>} list The raw options.
+   * @param {string} query The normalized query — trimmed and lower-cased.
+   * @returns {Array<object>} The rows to render, in order.
+   */
+  function labelSubstringFilter(list, query) {
+    if (!query) return list;
+    return list.filter((option) =>
+      String(option.label || '')
+        .toLowerCase()
+        .includes(query)
+    );
+  }
+
   let {
     options = [],
     optionGroups = [],
@@ -262,6 +396,10 @@
     showFilteredCount = false,
     filteredCountTemplate = '{matched} of {total}',
     compactOptionRows = false,
+    as = 'list',
+    columns = 1,
+    trigger = undefined,
+    option: optionContent = undefined,
     header = undefined,
     footer = undefined,
     maxHeight = 0,
@@ -279,6 +417,17 @@
     emptyDetail = '',
     noMatchesHint = '',
     pickerClass = '',
+    searchClass = '',
+    listClass = '',
+    optionClass = '',
+    // The filter this component applies to `options`, defaulting to the label-substring match it
+    // has always applied. See the prop docs above for why the DEFAULT short-circuits on an empty
+    // query while the SEAM is still called with one.
+    filterOptions = labelSubstringFilter,
+    measureListMetrics = undefined,
+    ignoreScrollWithin = false,
+    triggerOnKeydown = undefined,
+    horizontalAlign = 'left',
     minWidth = 240,
     maxWidth = 340,
     // The clipping boundary the popover is clamped inside: a selector string for the nearest
@@ -311,19 +460,18 @@
   let activeIndex = $state(-1);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
+  let optionsList = $state(null);
   let triggerButton = $state(null);
   let searchInput = $state(null);
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
-  const filteredOptions = $derived(
-    normalizedSearch
-      ? options.filter((option) =>
-          String(option.label || '')
-            .toLowerCase()
-            .includes(normalizedSearch)
-        )
-      : options
-  );
+  const filteredOptions = $derived(filterOptions(options, normalizedSearch) ?? []);
+
+  // THE LIST'S FORM, resolved once. A grid with no usable `columns` is a single column, which is
+  // the list form's arithmetic — the horizontal axis exists only where there is more than one
+  // cell in a row for it to move between.
+  const isGrid = $derived(as === 'grid');
+  const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
 
   // Grouped rendering. Each declared group keeps its declared order; anything with no
   // (or an unknown) group falls into a trailing, heading-less bucket so an option can
@@ -453,7 +601,9 @@
       choose(active.id);
       return;
     }
-    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key);
+    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
+      columns: gridColumns,
+    });
     if (next === null) return;
     event.preventDefault();
     activeIndex = next;
@@ -521,12 +671,17 @@
     event.stopPropagation();
   }
 
-  // The trigger keeps its `stopPropagation` in BOTH shapes and gains the key map in the one where
-  // it is the holder. The two are composed rather than branched inside one handler so the
-  // search-bearing shape's behaviour is unchanged by inspection.
+  // The trigger keeps its `stopPropagation` in BOTH shapes, gains the key map in the one where it
+  // is the holder, and calls the CALLER'S handler last.
+  //
+  // Last is the whole point. In the search-suppressed shape the trigger is the focus holder and
+  // carries the key map, so a caller that took `onkeydown` for itself — the only route it would
+  // have, since it spreads `attributes` last — would delete the focus model without any way to
+  // notice. Composing here means a caller can add a key without being able to remove one.
   function onTriggerKeydown(event) {
-    onHolderKeydown(event);
+    if (!showSearch) onHolderKeydown(event);
     stop(event);
+    triggerOnKeydown?.(event);
   }
 
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
@@ -557,7 +712,51 @@
           'data-keyboard-focus': 'true',
         }),
     onclick: toggle,
-    onkeydown: showSearch ? stop : onTriggerKeydown,
+    onkeydown: onTriggerKeydown,
+  });
+
+  // WHAT A `trigger` SNIPPET IS ALLOWED TO SEE, and the two keys it must not.
+  //
+  // The caller spreads this LAST, so every key here beats the caller's own — which is the point
+  // for `type`, the ARIA and the handlers, and a defect for anything the caller owns. Svelte's
+  // `set_attributes` REMOVES an attribute whose spread value is `undefined`, so an undefined key
+  // would strip the caller's own `aria-label` and `title` rather than leaving them alone; and
+  // `disabled` is `false` rather than absent whenever the caller passes no `disabled`, which is
+  // not undefined and would therefore OVERRIDE a caller's own `disabled={true}`. One filter
+  // cannot answer both: hence a value filter AND a key list. See the `trigger` prop's docs.
+  const CALLER_OWNED_TRIGGER_KEYS = new Set(['disabled', 'aria-disabled']);
+
+  function spreadableTriggerAttributes(attributes) {
+    const spreadable = {};
+    for (const [key, value] of Object.entries(attributes)) {
+      if (value === undefined || CALLER_OWNED_TRIGGER_KEYS.has(key)) continue;
+      spreadable[key] = value;
+    }
+    return spreadable;
+  }
+
+  // THE ELEMENT, ACROSS A SNIPPET BOUNDARY. `bind:this` does not cross one, and this component
+  // needs the caller's trigger for two things a fallback gets wrong: `anchoredPopover` anchors
+  // the panel to it, and `restoreTriggerFocus` returns focus to it. `createAttachmentKey()` makes
+  // a symbol Svelte recognises on a SPREAD object, so the element arrives through the same
+  // `attributes` the caller already spreads.
+  //
+  // The key AND the function are created ONCE at component scope, deliberately: Svelte's
+  // attachment handling walks the spread object's symbols and guards against re-attaching the
+  // same function, so a key or a closure rebuilt on every `$derived` pass would detach and
+  // re-attach on every keystroke.
+  const triggerElementKey = createAttachmentKey();
+
+  function captureTrigger(node) {
+    triggerButton = node;
+    return () => {
+      triggerButton = null;
+    };
+  }
+
+  const triggerSnippetAttributes = $derived({
+    ...spreadableTriggerAttributes(triggerAttributes),
+    [triggerElementKey]: captureTrigger,
   });
 
   // ONE ATTRIBUTE SET FOR BOTH SEARCH SHAPES, for the same reason `triggerAttributes` is one
@@ -630,6 +829,12 @@
         <i class="fas fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
+  {:else if trigger}
+    <!-- The caller's own trigger. This component renders NO button of its own in this shape, so
+         `triggerClass` is a declared no-op here and the accessible name is the caller's
+         responsibility — enforced at the source by
+         `tests/components/searchable-popover-source-contract.test.js`. -->
+    {@render trigger({ attributes: triggerSnippetAttributes, open })}
   {:else if triggerChip}
     <Chip tag="button" bind:element={triggerButton} class={triggerClass} {...triggerAttributes}
       >{@render triggerBody()}</Chip
@@ -659,13 +864,36 @@
         // style and drift on scroll. Both are read EAGERLY, so the swap re-runs the measure.
         trigger: triggerButton ?? pickerRoot,
         layout: popoverLayout,
-        // `minWidth`/`maxWidth` are read INSIDE this closure, so they are not dependencies of the
-        // action's `update`: the action re-runs the closure on its next measure rather than when
-        // either prop changes. Both are fixed for the life of one open here, so nothing is owed;
-        // a caller that needed to change a width band mid-open would have to re-measure it.
-        layoutOptions: () => ({ horizontalAlign: 'left', minWidth, maxWidth }),
+        // `minWidth`, `maxWidth` and `horizontalAlign` are read INSIDE this closure, so they are
+        // not dependencies of the action's `update`: the action re-runs the closure on its next
+        // measure rather than when a prop changes. All three are fixed for the life of one open
+        // at every shipped call site, so nothing is owed; a caller that needed to change a width
+        // band mid-open would have to re-measure it. `measureListMetrics` is the opposite case
+        // and is why the closure exists at all — it MUST be re-read every pass.
+        layoutOptions: () => ({
+          horizontalAlign,
+          minWidth,
+          maxWidth,
+          // Spread LAST and re-measured on every pass, exactly as the caller's own copy of this
+          // did: the numbers come from the rendered box, so they are only right for the frame
+          // they were read in.
+          ...(measureListMetrics?.({
+            popover: popoverRoot,
+            list: optionsList,
+            search: searchInput,
+          }) ?? {}),
+        }),
         maxHeightCap: maxHeight,
         bounds,
+        // REGISTERED ONLY FOR A CALLER THAT MEASURES. `targets.list` is what the layout's
+        // `listMaxHeight` is written to, and without a `rowPitch` there is no such height — so
+        // for the callers that pass no `measureListMetrics` the action would write an empty
+        // `style` attribute onto a list it has nothing to say about. Read EAGERLY inside the
+        // ternary rather than behind a callback: the list binds one pass after this action first
+        // runs, and reading it here is what makes Svelte re-run the action's update, and
+        // therefore the measure, once it exists.
+        targets: measureListMetrics ? { list: optionsList } : undefined,
+        ignoreScrollWithin,
       }}
       onclick={stop}
       onkeydown={(event) => {
@@ -682,7 +910,7 @@
         <button
           {...option.data}
           type="button"
-          class="manager-travel-option"
+          class={`manager-travel-option ${optionClass} ${option.class || ''}`}
           role="option"
           id={activeOptionId(instanceId, index)}
           tabindex="-1"
@@ -695,29 +923,37 @@
           onclick={() => choose(option.id)}
           onmousedown={(event) => event.preventDefault()}
         >
-          {#if option.img}
-            <span class="manager-travel-portrait" aria-hidden="true"
-              ><img src={option.img} alt="" /></span
-            >
-          {:else if option.icon}
-            <i class={option.icon} aria-hidden="true"></i>
-          {/if}
-          {#if option.meta}
-            <!-- The two-line form. The wrapper is what carries the flex sizing the
-                 single-line `-name` carries on its own, so the label keeps ellipsising
-                 rather than pushing the trailing Chip out of the row. -->
-            <span class="manager-travel-option-lines">
-              <span class="manager-travel-option-name">{option.label}</span>
-              <span class="manager-travel-option-meta">{option.meta}</span>
-            </span>
+          {#if optionContent}
+            <!-- SOLE CONTENT, not additional content — which is why this is one branch around
+                 everything rather than a preamble in front of it. A picker's own suite reads its
+                 row label with `span:last-child`, so a marker appended after a caller's tile
+                 would silently retarget that reader onto the marker. -->
+            {@render optionContent(option)}
           {:else}
-            <span class="manager-travel-option-name">{option.label}</span>
+            {#if option.img}
+              <span class="manager-travel-portrait" aria-hidden="true"
+                ><img src={option.img} alt="" /></span
+              >
+            {:else if option.icon}
+              <i class={option.icon} aria-hidden="true"></i>
+            {/if}
+            {#if option.meta}
+              <!-- The two-line form. The wrapper is what carries the flex sizing the
+                   single-line `-name` carries on its own, so the label keeps ellipsising
+                   rather than pushing the trailing Chip out of the row. -->
+              <span class="manager-travel-option-lines">
+                <span class="manager-travel-option-name">{option.label}</span>
+                <span class="manager-travel-option-meta">{option.meta}</span>
+              </span>
+            {:else}
+              <span class="manager-travel-option-name">{option.label}</span>
+            {/if}
+            {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
+            {#if option.trailingIcon}<i
+                class={`manager-travel-option-marker ${option.trailingIcon}`}
+                aria-hidden="true"
+              ></i>{/if}
           {/if}
-          {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
-          {#if option.trailingIcon}<i
-              class={`manager-travel-option-marker ${option.trailingIcon}`}
-              aria-hidden="true"
-            ></i>{/if}
         </button>
       {/snippet}
 
@@ -745,7 +981,10 @@
            its value-bearing trigger (the realm-override picker) would otherwise read as a
            different control from the actor picker directly above it in the same column. -->
       {#if showSearch && !inlineSearchTrigger}
-        <div class="manager-travel-popover-search" class:is-compact={compactOptionRows}>
+        <div
+          class={`manager-travel-popover-search ${searchClass}`}
+          class:is-compact={compactOptionRows}
+        >
           {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
           <input bind:this={searchInput} bind:value={search} {...searchFieldAttributes} />
         </div>
@@ -762,10 +1001,13 @@
            nothing already falls out of `isGrouped` and into this same empty branch. -->
       {#if filteredOptions.length > 0}
         <div
-          class="manager-travel-popover-options"
+          bind:this={optionsList}
+          class={`manager-travel-popover-options ${listClass}`}
           role="listbox"
           id={listId}
           aria-label={dialogAriaLabel || undefined}
+          data-picker-as={as}
+          data-picker-columns={isGrid ? String(gridColumns) : undefined}
         >
           {#if isGrouped}
             {#each groupedOptions as bucket (bucket.id)}
