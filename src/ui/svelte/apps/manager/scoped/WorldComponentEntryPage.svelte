@@ -72,6 +72,7 @@
     componentWorldCategoryNote,
     componentWorldTagNote,
     offeredWorldComponentCategories,
+    worldVocabularyComponentCategories,
   } from './componentScoped.js';
   import { componentScopeValidationPresentation } from '../../../../../utils/componentScopeValidation.js';
   import {
@@ -310,17 +311,24 @@
     sourceLinked ? source.description : String(identity.description ?? '')
   );
 
-  // THE OFFERED CATEGORIES, WITH THE RESERVED BUCKET REFUSED. The store writes a section value
-  // opaquely and the normalizer coerces SHAPE rather than reserved-token membership, so no layer
-  // below this picker can refuse `general` — and since an inheriting section now really resolves
-  // from the world default, a world `general` would reset every inheriting system on the first
-  // read. The refusal is the shipped case-insensitive predicate, never string equality.
-  const categoryOptions = $derived(
-    offeredWorldComponentCategories([
-      ...(scope?.entries ?? []).map((candidate) => candidate?.defaults?.category),
-      worldCategory,
-    ])
-  );
+  // THE OFFERED CATEGORIES ARE THE WORLD VOCABULARY'S, AND NOTHING ELSE (issue 1371 r13-entry,
+  // maintainer ruling M18). This used to offer the corpus union of every entry's world default
+  // plus this record's own value, and on a migrated world that union IS the systems' category
+  // list — `Bespoke Items`, `Corpses`, `Flawed Gear`… — offered as if the world had authored
+  // them while the World rail read `Tags & Categories 0`. The vocabulary screen is where a
+  // category is minted, so it is the only source an offer may have; with none authored the
+  // picker offers the unset option alone, and `Edit world vocabulary ↗` is the way to mint one.
+  //
+  // THE RECORD'S OWN VALUE IS NOT RE-OFFERED. A persisted category outside the vocabulary — a
+  // migrated default — still paints the trigger, because the trigger reads the record rather
+  // than the offer; what the picker offers for it is the one edit that is honest, clearing it.
+  //
+  // THE RESERVED BUCKET IS REFUSED ON THE WAY THROUGH. The store writes a section value opaquely
+  // and the normalizer coerces SHAPE rather than reserved-token membership, so no layer below
+  // this picker can refuse `general` — and since an inheriting section really resolves from the
+  // world default, a world `general` would reset every inheriting system on the first read. The
+  // refusal is the shipped case-insensitive predicate, never string equality.
+  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
 
   const noCategoryLabel = $derived(
     text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category')

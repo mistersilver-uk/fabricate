@@ -771,5 +771,17 @@ export function buildWorldScopeState({ stores = {}, systems = [], recipes = [], 
     componentEntries: worldScope.component?.entries ?? [],
     componentDefaults: Array.isArray(componentCorpus?.defaults) ? componentCorpus.defaults : [],
   });
+  // THE COMPONENT LEG CARRIES THE VOCABULARY'S NAMES (issue 1371 r13-entry, maintainer ruling
+  // M18). The world Component entry offered its category picker from the corpus union of
+  // `defaults.category`, and on a migrated world every default was elected from a system that
+  // already carried it — so the picker listed the SYSTEMS' categories as if the world had
+  // authored them while the vocabulary held none. The shell hands a component screen only this
+  // leg (`componentScopeProps`), never `worldScope.vocabulary`, so the names are attached here,
+  // by the one function that has both legs in hand: bare strings, because that is all an offer
+  // needs, and the decorated rows with their usage counts stay the vocabulary screen's.
+  worldScope.component.worldVocabulary = {
+    categories: worldScope.vocabulary.componentCategories.map((entry) => entry.name),
+    tags: worldScope.vocabulary.componentTags.map((entry) => entry.name),
+  };
   return { worldScope };
 }

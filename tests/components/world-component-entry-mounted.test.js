@@ -17,12 +17,14 @@ import { fileURLToPath } from 'node:url';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  componentCorpus,
   componentScopeFor,
   createComponentScopeHarness,
   drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -139,7 +141,7 @@ const ENTRY_SYSTEMS = Object.freeze([
  * them. A mount that left them at their `() => {}` defaults could not tell a wired control from a
  * control wired to nothing, which is exactly the state all three shipped in.
  */
-async function open(entityId, overrides) {
+async function open(entityId, overrides, vocabulary = null) {
   const { calls, actions } = recordingComponentActions();
   const reports = {
     dirty: [],
@@ -150,7 +152,7 @@ async function open(entityId, overrides) {
     shell: [],
   };
   const target = await harness.mount({
-    scope: scopeFor(overrides),
+    scope: withVocabulary(scopeFor(overrides), vocabulary),
     actions,
     entityId,
     systemId: 'sys-forge',
@@ -182,6 +184,30 @@ async function open(entityId, overrides) {
  * @param {{requiredBy: object[], producedBy: object[]}} usage
  * @returns {object}
  */
+/**
+ * Attach the WORLD VOCABULARY's names to a component scope, as `buildWorldScopeState` does.
+ *
+ * `componentScopeFor` runs `projectWorldScopeEntity` alone, which never sees the vocabulary
+ * store: the names are attached one level up, by the function that assembles the whole
+ * `worldScope`, and that is the seam maintainer ruling M18 moved the category picker onto. A
+ * `null` vocabulary is the honest default — a world with none authored — and it is what most of
+ * this suite mounts, because it is the state the ruling was raised against.
+ *
+ * @param {object} scope
+ * @param {{categories?: string[], tags?: string[]}|null} vocabulary
+ * @returns {object}
+ */
+function withVocabulary(scope, vocabulary) {
+  if (!vocabulary) return scope;
+  return {
+    ...scope,
+    worldVocabulary: {
+      categories: [...(vocabulary.categories ?? [])],
+      tags: [...(vocabulary.tags ?? [])],
+    },
+  };
+}
+
 function withUsage(scope, entityId, usage) {
   return {
     ...scope,
@@ -285,8 +311,16 @@ describe('world Component entry editor (issue 1371)', () => {
       return [...target.querySelectorAll('[data-popover-option]')];
     }
 
+    /**
+     * THE VOCABULARY EVERY OFFER-ASSERTION BELOW MOUNTS WITH (maintainer ruling M18). The corpus
+     * fixture carries `Refined` and `Raw` as world DEFAULTS on two records — the shape a migrated
+     * world has, where every default was elected from a system — and the picker must not read
+     * those; it reads the names the world vocabulary store publishes, and this is that list.
+     */
+    const VOCABULARY = Object.freeze({ categories: ['Raw', 'Refined'] });
+
     it('forwards (entityId, "category", value)', async () => {
-      const { target, calls } = await open('ingot');
+      const { target, calls } = await open('ingot', undefined, VOCABULARY);
       const trigger = target.querySelector('[data-scoped-entry-category-input]');
       assert.ok(Boolean(trigger), 'the entry renders its category picker');
       assert.notEqual(
@@ -302,7 +336,7 @@ describe('world Component entry editor (issue 1371)', () => {
 
       const options = await openCategoryPicker(target);
       const raw = options.find((option) => option.textContent.trim() === 'Raw');
-      assert.ok(Boolean(raw), `the corpus vocabulary is offered; read ${options.length} options`);
+      assert.ok(Boolean(raw), `the world vocabulary is offered; read ${options.length} options`);
       raw.click();
       await drain();
 
@@ -322,17 +356,14 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(options[0].textContent.trim(), 'No world category');
     });
 
-    it('never OFFERS the reserved bucket, whatever the corpus already holds', async () => {
+    it('never OFFERS the reserved bucket, whatever the vocabulary already holds', async () => {
       // The picker is the enforcement point: nothing below it can refuse the token, and since
       // issue 1372 a world `general` really does reset every inheriting system on the next read.
       // The picker moves the refusal from the COMMIT to the OFFER — a value that is not an option
-      // cannot be chosen — so this is the assertion that carries it, driven from a corpus that
-      // really does hold the reserved bucket on a sibling record.
-      const { target } = await open('ingot', {
-        defaults: [
-          { id: 'ingot', category: 'Refined' },
-          { id: 'coal', category: ' GENERAL ' },
-        ],
+      // cannot be chosen — so this is the assertion that carries it, driven from a vocabulary
+      // that really does hold the reserved bucket beside a real name.
+      const { target } = await open('ingot', undefined, {
+        categories: ['Refined', ' GENERAL '],
       });
       const offered = (await openCategoryPicker(target)).map((option) =>
         option.getAttribute('data-popover-option')
@@ -358,6 +389,83 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
+    it('offers ONLY the world vocabulary: a world with none, over defaults migrated from three systems, offers one option', async () => {
+      // MAINTAINER RULING M18 (issue 1371, revision 13). On a migrated world every world default
+      // was elected from a system that already carried it, so the corpus union of
+      // `defaults.category` IS the systems' category list — and the picker offered it as if the
+      // world had authored `Bespoke Items`, `Corpses`, `Flawed Gear`… while the World rail read
+      // `Tags & Categories 0`. Only the vocabulary's names may be offered; with none, the picker
+      // offers the unset option alone, and `Edit world vocabulary ↗` is the way to mint one.
+      const { target } = await open('resin', {
+        defaults: [
+          { id: 'ingot', category: 'Bespoke Items' },
+          { id: 'coal', category: 'Corpses' },
+          { id: 'orphan', category: 'Flawed Gear' },
+        ],
+      });
+      const options = await openCategoryPicker(target);
+      assert.equal(
+        options.map((option) => option.textContent.trim()).join(' | '),
+        'No world category',
+        'three migrated defaults offer nothing: they are the systems’ categories, not the world’s'
+      );
+    });
+
+    it('and a world with two authored categories offers three', async () => {
+      // The positive control on the clause above: a picker that offered nothing at all would
+      // pass it. Two vocabulary names plus the unset option, in the vocabulary’s sorted order.
+      const { target } = await open('resin', undefined, { categories: ['Corpses', 'Bespoke Items'] });
+      const options = await openCategoryPicker(target);
+      assert.deepEqual(
+        options.map((option) => option.textContent.trim()),
+        ['No world category', 'Bespoke Items', 'Corpses']
+      );
+    });
+
+    it('and the names reach the page through the REAL projection, not only through this suite’s helper', async () => {
+      // `withVocabulary` mirrors what `buildWorldScopeState` attaches; a mirror that had drifted
+      // from the producer would keep every assertion above green while the shipped page offered
+      // nothing. So the seam is exercised end to end once: two fake stores, the real assembler,
+      // and the page mounted on the component leg it publishes.
+      const componentStore = {
+        corpus: () => componentCorpus(),
+        isSeeded: () => true,
+      };
+      const vocabularyStore = {
+        corpus: () => ({
+          componentCategories: [
+            { id: 'bespoke-items', name: 'Bespoke Items' },
+            { id: 'corpses', name: 'Corpses' },
+          ],
+          componentTags: [{ id: 'fuel', name: 'fuel' }],
+          recipeCategories: [],
+        }),
+        isSeeded: () => true,
+      };
+      const { worldScope } = buildWorldScopeState({
+        stores: { component: componentStore, vocabulary: vocabularyStore },
+        systems: ENTRY_SYSTEMS,
+      });
+      assert.deepEqual(
+        worldScope.component.worldVocabulary,
+        { categories: ['Bespoke Items', 'Corpses'], tags: ['fuel'] },
+        'the assembler publishes the vocabulary’s names on the component leg'
+      );
+      const target = await harness.mount({
+        scope: worldScope.component,
+        actions: recordingComponentActions().actions,
+        entityId: 'resin',
+        systemId: 'sys-forge',
+        systems: ENTRY_SYSTEMS,
+        worldItems: [],
+      });
+      const options = await openCategoryPicker(target);
+      assert.deepEqual(
+        options.map((option) => option.textContent.trim()),
+        ['No world category', 'Bespoke Items', 'Corpses']
+      );
+    });
+
     it('and the trigger reads the PERSISTED value, so a refusal needs no restore step', async () => {
       // What replaced `control.value = worldCategory`. The `<select>` held its own selection, so a
       // refused choice had to be pushed back onto the element; the trigger is painted from the
@@ -373,6 +481,17 @@ describe('world Component entry editor (issue 1371)', () => {
         unset.querySelector('[data-scoped-entry-category-input]').textContent.trim(),
         'No world category',
         'and a record with no world category says so on the control itself'
+      );
+      // AND THE PERSISTED VALUE STAYS ON THE TRIGGER WHEN THE VOCABULARY NO LONGER OFFERS IT
+      // (M18). `ingot` is mounted above with NO vocabulary, so `Refined` is not an option — and
+      // the trigger still reads it, because the control paints the record, not the offer. A
+      // migrated default is visible on its entry, and clearing it is the one edit the picker
+      // offers for it.
+      const options = await openCategoryPicker(target);
+      assert.deepEqual(
+        options.map((option) => option.textContent.trim()),
+        ['No world category'],
+        'a persisted value outside the vocabulary is shown, not re-offered'
       );
     });
   });

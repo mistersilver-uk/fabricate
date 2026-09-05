@@ -1136,11 +1136,15 @@ export function offeredWorldComponentCategories(vocabulary) {
 }
 
 /**
- * The world category vocabulary the corpus already carries, for the two pickers that offer it.
+ * The world category values the corpus already carries — the union of every entry's world
+ * default — for the catalogue's bulk panel.
  *
- * There is no world category ROSTER to read: the World Vocabulary store that will publish one is
- * PR 7's, and the narrowed `{id, name}` system roster cannot carry a vocabulary. The union of
- * what is actually authored is therefore the honest list, and free entry covers the rest.
+ * IT IS NOT THE WORLD VOCABULARY, and since maintainer ruling M18 (issue 1371, revision 13) the
+ * entry's picker no longer reads it: on a migrated world every world default was elected from a
+ * system that already carried it, so this union lists the SYSTEMS' categories while the World
+ * rail reads `Tags & Categories 0`. The entry offers {@link worldVocabularyComponentCategories}
+ * instead. This helper stands for its remaining caller, the catalogue bulk panel's category
+ * inset, which is named in the r13-entry handoff as the same root cause on another surface.
  *
  * @param {object|null} scope the component family's world-scope projection.
  * @returns {string[]}
@@ -1149,6 +1153,24 @@ export function authoredWorldComponentCategories(scope) {
   return offeredWorldComponentCategories(
     (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => entry?.defaults?.category)
   );
+}
+
+/**
+ * The world category NAMES the World Vocabulary store publishes, which is what a world-defaults
+ * picker may offer (issue 1371 r13-entry, maintainer ruling M18).
+ *
+ * `buildWorldScopeState` attaches them to the component leg as `scope.worldVocabulary.categories`,
+ * because a component screen is handed that leg alone. A scope without the field — an older
+ * publish, or a mounted test that builds its own — offers nothing, which is the truthful answer
+ * for a world whose vocabulary is unknown: the unset option is always offered by the picker
+ * itself, and `Edit world vocabulary ↗` is where a name is minted. The reserved bucket is refused
+ * on the way through, by the same case-insensitive predicate every other offer takes.
+ *
+ * @param {object|null} scope the component family's world-scope projection.
+ * @returns {string[]} sorted, de-duplicated, blank-free, bucket-free.
+ */
+export function worldVocabularyComponentCategories(scope) {
+  return offeredWorldComponentCategories(scope?.worldVocabulary?.categories);
 }
 
 /**
