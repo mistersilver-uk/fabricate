@@ -863,14 +863,24 @@ export function deadClassesIn(selector, liveSet) {
 }
 
 /**
- * Every rule in a stylesheet, as `{selector, line, endLine, start, end}`.
+ * Every rule in a stylesheet, as `{selector, atContext, line, endLine, start, end}`.
  *
  * At-rules are containers, not rules: their prelude is a query, not a selector, so a block whose
- * prelude starts with an at sign is walked into and never reported. Offsets are into the ORIGINAL
- * text, since `stripCssComments` blanks in place.
+ * prelude starts with an at sign is walked into and never reported. It IS reported as context,
+ * though: `atContext` is the ordered chain of enclosing at-rule preludes, outermost first, and is
+ * empty for the top-level rules that make up most of the sheet. Two rules in different at-contexts
+ * are not comparable — one can be conditional on a container query the other is not — so a caller
+ * arbitrating source order between them (`scripts/lib/stylesheetSelectorCensus.js`) needs the chain
+ * rather than a flag. It is exposed here, on the walk that already maintains the stack, rather than
+ * as a third CSS parser beside this one and `tests/helpers/styleBlockScan.js`.
+ *
+ * Offsets are into the ORIGINAL text, since `stripCssComments` blanks in place. Note that no BODY
+ * is returned: a caller wanting declaration text slices it out itself, and must run that slice
+ * through `stripCssComments` first or read a commented-out declaration as a live one.
  *
  * @param {string} css Raw stylesheet text.
- * @returns {Array<{selector: string, line: number, endLine: number, start: number, end: number}>}
+ * @returns {Array<{selector: string, atContext: string[], line: number, endLine: number,
+ *   start: number, end: number}>}
  */
 export function ruleBlocks(css) {
   const scan = stripCssComments(css);
@@ -896,7 +906,8 @@ export function ruleBlocks(css) {
       } else if (character === '}') {
         const open = stack.pop();
         if (open && !open.selector.startsWith('@')) {
-          rules.push({ ...open, endLine: line, end: index + 1 });
+          const atContext = stack.filter((f) => f.selector.startsWith('@')).map((f) => f.selector);
+          rules.push({ ...open, atContext, endLine: line, end: index + 1 });
         }
       }
       prelude = '';
