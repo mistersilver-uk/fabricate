@@ -1461,6 +1461,10 @@
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
 */
+
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class;
+   `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across
+   hundreds of unmarked manager text fields and selects. */
 .fabricate-manager input[type="text"],
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
@@ -1523,6 +1527,10 @@
   claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
   to `.fabricate-manager .manager-field select:disabled` (0,2,2).
 */
+
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class; its
+   (0,1,1) low-specificity fallback exists so ANY select nothing else claims still paints,
+   a guarantee a class-scoped skin does not reproduce. */
 .fabricate-manager select {
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
@@ -6266,6 +6274,9 @@
    select chrome. Give them the Fabricate surface + the theme-appropriate native
    chevron, matching the recipe-toolbar select treatment. The two-class-plus-element
    selector (0,2,1) outranks Foundry core's aggressive `select` rules (issue 643). */
+
+/* skin census (issue 1523): pinned by tests/components/tool-studio-mounted.test.js (a
+   mounted assertion at `:975`/`:977` closes on `.manager-recipe-field`). */
 .fabricate-manager .manager-recipe-field select {
   width: 100%;
   min-width: 0;
@@ -6595,6 +6606,12 @@
    `color-scheme: dark` — rather than Foundry core's default light select chrome, which
    they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
    outranks Foundry core's aggressive `select` rules. */
+
+/* skin census (issue 1523): pinned three ways — tests/components/manager-layout.test.js
+   (a selector-list lookup asserting `height: 34px`), tests/components/essence-studio-
+   fidelity.test.js (a sheet-text occurrence count), and tests/components/component-studio-
+   font-size.test.js / tests/components/recipe-studio-font-size.test.js (fixture markup
+   rendered against this sheet). */
 .fabricate-manager .manager-recipe-toolbar select,
 .fabricate-manager .manager-component-toolbar select,
 .fabricate-manager .manager-essence-toolbar select {
@@ -6955,6 +6972,8 @@
   min-width: 0;
 }
 
+/* skin census (issue 1523): pinned by tests/components/component-studio-font-size.test.js
+   (fixture markup rendered against this sheet, `:163`). */
 .fabricate-manager .manager-recipe-stat,
 .fabricate-manager .manager-component-stat,
 .fabricate-manager .manager-essence-stat {
@@ -9616,6 +9635,9 @@
   border-radius: 9px;
 }
 
+/* skin census (issue 1523): pinned by
+   tests/components/world-vocabulary-control-row-cascade.test.js (fixture markup rendered
+   against this sheet, `:159`, queried at `:295`). */
 .fabricate-manager .manager-scoped-list-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
@@ -10246,6 +10268,10 @@
    had been taken, which left a tile one rung above its card and nothing marking where it ends.
    A hairline is what makes a plate a plate once the fill is quiet enough to belong to the card.
    The 40px box is unchanged — every element in this app is `box-sizing: border-box`. */
+
+/* skin census (issue 1523): not an adopter — this tile's fill and border were taken
+   TOGETHER from the prototype under issue 1373 as a component treatment, not a shared
+   field/well rung; its tuple joins the card-skin census as a deferral. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -16154,6 +16180,10 @@
    (`border-radius: 9px` is its own literal), so the manager's rendering is unchanged and the
    popover is now self-sufficient — which is what `SearchablePopover`'s and the icon/source
    pickers' own search inputs already were. */
+
+/* skin census (issue 1523): not an adopter — this node is portaled
+   (`ManagerColorPopover.svelte`) and can fall back to `document.body` outside `.fabricate`,
+   where an ancestor-scoped skin would stop matching. */
 .fabricate-color-picker-popover .manager-color-custom input {
   appearance: none;
   -webkit-appearance: none;
@@ -17702,6 +17732,9 @@
   font-weight: 600;
 }
 
+/* skin census (issue 1523): the single unpinned carrier of the target tuple at this
+   tree — zero hits under tests/ or scripts/; its sole emitter is
+   `ToolBehaviorPreview.svelte:429`. */
 .fabricate-manager .manager-tool-actor-select {
   width: 100%;
   min-width: 0;
@@ -17968,6 +18001,9 @@
    still carries the sibling formula TEXT input, which is not a stepper and must keep this
    rule. Note that dropping the `manager-recipe-name-input` class does not help here — the
    rule keys on `.manager-recipe-field input`, not on that class. */
+
+/* skin census (issue 1523): not an adopter — its `:not(.fab-stepper-input)` guard is
+   rule-level and cannot be expressed by a stamped markup class. */
 .fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
