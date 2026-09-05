@@ -259,6 +259,32 @@ export default [
     },
   },
 
+  // 5a. BUILD-TIME DEFINES for shipped module code (issue 1565).
+  //
+  //     `__FABRICATE_BUILD_VERSION__` is substituted by Vite's `define` at build time, so it is
+  //     not a runtime global and does NOT belong in `foundryGlobals`, whose documented contract
+  //     is "globals FoundryVTT injects at runtime". Its own block keeps that contract honest and
+  //     keeps the declaration next to the reason it exists.
+  //
+  //     IT MUST BE DECLARED SOMEWHERE, and a `typeof` guard is not enough on its own:
+  //     `no-undef` exempts the operand of `typeof` but not the READ that follows it, and
+  //     `tests/main-undefined-identifiers.test.js` asserts zero `no-undef` reports across every
+  //     `src/**/*.js` file CI's lint glob does not reach — `src/main.js` above all, which is the
+  //     only file that reads this identifier.
+  //
+  //     `readonly` because nothing may assign it: the value is baked into the bundle, and an
+  //     assignment would be a syntax-level lie about where it comes from. Note also that the
+  //     define is ABSENT in the View Lab (served from its own config, which declares no
+  //     `define`) and under `node --test`, which is why every read in the source sits inside a
+  //     `typeof` guard — declaring the global here makes that guard invisible to lint, so the
+  //     guard is a correctness rule the source must keep rather than a lint requirement.
+  {
+    files: ['src/**/*.js'],
+    languageOptions: {
+      globals: { __FABRICATE_BUILD_VERSION__: 'readonly' },
+    },
+  },
+
   // 5b. The Scoped Entity Definitions dependency boundary (issue 1358).
   //
   //     `scopedDefinitions.js` is the generic three-layer primitive; `componentScope.js`,
