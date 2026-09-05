@@ -30,7 +30,7 @@
  * hosts equally — so a `<button>` in the bare host would inherit its font from core whether or not
  * the primitive declared anything, and the `font-family` / `font-size` / `line-height` comparisons
  * would agree for a reason that has nothing to do with this change. The one declaration this file
- * exists to prove — `font: inherit` on the family's own shared base rule, replacing the manager's
+ * exists to prove — `font: inherit` on the family's own baseline rule, replacing the manager's
  * `.fabricate-manager button, … { font: inherit }` at `fabricate.css:1310-1315` — would be
  * unobservable. Without core's sheet a bare `<button>` falls to the UA default button font, which
  * is NOT the inherited one, so deleting the primitive's declaration reds here. That is the whole
@@ -47,12 +47,19 @@
  *
  * Two things are read through the CSSOM instead, because a computed value cannot prove them:
  *
- *  1. DECLARATION ORDER. `font` is a shorthand that resets `line-height` to `normal` when it is
- *     not given one, and the family's shared base rule declares `line-height: 1` further down the
- *     same block. Written BELOW that line, `font: inherit` would silently delete the primitive's
- *     line-height in both apps. A computed `line-height` can only show the consequence in an
- *     engine that expands the shorthand; reading the rule's own declaration order shows the CAUSE,
- *     in any engine.
+ *  1. WHERE THE BASELINE IS ROOTED, AND IN WHAT ORDER. `font: inherit` is the family's
+ *     BARE-ELEMENT baseline, so it has to be a FLOOR: rooted at the family root ALONE, at
+ *     (0,1,0), high enough to beat the UA button font in a host that declares nothing and
+ *     deliberately too low to beat a caller's own per-site rule at (0,2,0). Written on the
+ *     family's own (0,2,0) shared base block it tied every such rule and won on source order
+ *     against each one declared earlier in the sheet, which is how it deleted
+ *     `.manager-recipe-lock`'s and `.manager-recipe-edit`'s 0.68rem and made both glyphs 28.7%
+ *     larger. `font` is also a shorthand that resets `line-height` to `normal` when it is not
+ *     given one, and the shared base block declares `line-height: 1`; being BOTH more specific
+ *     and later, that block is what resolves. A computed value can show the consequence only in
+ *     an engine that expands the shorthand and only for the properties the fixture happens to
+ *     measure; reading the two rules' rooting and order shows the CAUSE, in any engine. The
+ *     caller-override half is measured as well, on the two classes the regression moved.
  *  2. THE RINGS. Each primitive now declares its own `:focus-visible` outline, and a ring is only
  *     observable on a focused element in a browser that has decided `:focus-visible` applies. The
  *     rule's declared text is the thing under contract here — that it exists, that its
@@ -196,12 +203,43 @@ const CONTROLS = Object.freeze([
 /**
  * The family's shared base rule, as the browser serialises its prelude.
  *
- * This is the lowest-specificity (0,2,0) rule of BOTH button families — the one rule this issue
- * added `font: inherit` to, and the one whose declaration ORDER the whole `line-height` question
- * turns on. It is named once here because three assertions below ask about the same rule.
+ * This is the lowest-specificity (0,2,0) rule of BOTH button families — the one that declares the
+ * control contract and the `line-height: 1` the baseline above it must not reset. It is named
+ * once here because four assertions below ask about the same rule.
  */
 const BASE_RULE_SELECTOR =
   '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button';
+
+/**
+ * The family's bare-element type baseline, as the browser serialises its prelude.
+ *
+ * Rooted at the two family roots ALONE — (0,1,0) — which is the whole of the FLOOR property: it
+ * beats the UA button font in a host that declares nothing, and loses to every caller's per-site
+ * rule at (0,2,0) or above.
+ */
+const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
+
+/**
+ * A rule's specificity as (ids, classes, elements), counted off the browser-serialised prelude.
+ *
+ * Only the shapes this family actually writes are counted — class tokens, id tokens and element
+ * names — which is enough to separate (0,1,0) from (0,2,0) and is checked below against the two
+ * preludes it is asked about rather than trusted in the abstract. Every comma-separated compound
+ * must agree, because a selector list is only as specific as the compound that matched.
+ *
+ * @param {string} selectorText A browser-serialised selector list.
+ * @returns {string} `a,b,c` when every compound agrees, or a list of the disagreeing compounds.
+ */
+function specificity(selectorText) {
+  const each = selectorText.split(',').map((compound) => {
+    const one = compound.trim();
+    const ids = (one.match(/#[\w-]+/g) ?? []).length;
+    const classes = (one.match(/[.:][\w-]+/g) ?? []).length;
+    const elements = (one.match(/(?:^|[\s>+~])([a-z][\w-]*)/g) ?? []).length;
+    return `${ids},${classes},${elements}`;
+  });
+  return new Set(each).size === 1 ? each[0] : each.join(' | ');
+}
 
 /** The six properties acceptance 2 compares, computed, per control, across the three hosts. */
 const COMPARED = Object.freeze([
@@ -218,7 +256,7 @@ const COMPARED = Object.freeze([
  * a measured fact rather than a convenience.
  *
  * The button families declare `box-sizing: border-box` on their own shared base rule
- * (`fabricate.css:13529-13530`), so the comparison is live for them and reds if that declaration goes.
+ * (`fabricate.css:13540-13541`), so the comparison is live for them and reds if that declaration goes.
  * `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather than a
  * value the family owns: in the manager it picks `border-box` up from
  * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`), a UNIVERSAL rule that is the
@@ -457,9 +495,10 @@ test('the values the comparison holds over are the ones the family declares, not
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
   assert.equal(bare('icon-button')['border-radius'], '6px');
 
-  // `line-height: 1` — the declaration `font: inherit` would have deleted had it been written
-  // below it. Chromium reports a NUMERIC line-height as its used px value, so "is it 1" is asked
-  // as "does it equal the font size", which is what `1` means and is engine-independent.
+  // `line-height: 1` — the declaration the `font: inherit` baseline would delete wherever it
+  // outranked the block that declares it. Chromium reports a NUMERIC line-height as its used px
+  // value, so "is it 1" is asked as "does it equal the font size", which is what `1` means and is
+  // engine-independent.
   for (const control of ['manager-button', 'icon-button']) {
     const style = bare(control);
     assert.ok(
@@ -469,8 +508,8 @@ test('the values the comparison holds over are the ones the family declares, not
     assert.equal(
       Number.parseFloat(style['line-height']),
       Number.parseFloat(style['font-size']),
-      `${control} must compute line-height 1; \`font: inherit\` written below the ` +
-        '`line-height: 1` declaration would reset it to `normal`'
+      `${control} must compute line-height 1; the \`font: inherit\` baseline resets ` +
+        'line-height to `normal` wherever it outranks the `line-height: 1` declaration'
     );
   }
 
@@ -520,54 +559,269 @@ function readRules(tab) {
   });
 }
 
-test('the shared base rule declares `font` above `line-height`, so the shorthand cannot reset it', async () => {
+test('the `font: inherit` rule is above the `line-height: 1` rule, and the latter is more specific', async () => {
   const tab = await browser.newPage();
   try {
     await tab.setContent(document_(sheet));
     const rules = await readRules(tab);
     assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
 
-    // The SHARED BASE RULE by its exact prelude, not by "a rule in the family that declares
-    // both" — `.manager-checks-card-head-link` is a second such rule and matching loosely
-    // catches it too, which would make this assertion depend on which one sorted first.
+    // Both rules by their exact preludes, not by "a rule in the family that declares one" —
+    // `.manager-checks-card-head-link` also declares both properties, and matching loosely
+    // catches it too, which would make these assertions depend on which one sorted first.
+    const floorIndex = rules.findIndex((rule) => rule.selectorText === FLOOR_RULE_SELECTOR);
+    const floors = rules.filter((rule) => rule.selectorText === FLOOR_RULE_SELECTOR);
+    assert.equal(
+      floors.length,
+      1,
+      `\`${FLOOR_RULE_SELECTOR}\` must be declared exactly once; found ${floors.length}. It is ` +
+        "the family's bare-element type baseline and the only rule that carries `font: inherit`."
+    );
+    const baseIndex = rules.findIndex((rule) => rule.selectorText === BASE_RULE_SELECTOR);
     const base = rules.filter((rule) => rule.selectorText === BASE_RULE_SELECTOR);
     assert.equal(
       base.length,
       1,
       `\`${BASE_RULE_SELECTOR}\` must be declared exactly once; found ${base.length}. It is the ` +
-        "family's lowest-specificity rule and the one this issue added `font: inherit` to."
+        "family's shared control contract and the rule that declares `line-height: 1`."
+    );
+
+    // THE DECLARED VALUE IS `inherit`, on the FLOOR rule. The computed comparison can only ever
+    // show that the three hosts agree; this shows WHAT they agree on, which is the declaration
+    // acceptance 2 asks to be proved by reach rather than by a resolved value.
+    //
+    // EITHER SERIALISATION IS ACCEPTED, and the alternation is a measured fact rather than
+    // caution. Chromium round-trips `font: inherit` as the SHORTHAND on this rule, because every
+    // longhand the shorthand covers holds the same CSS-wide keyword and nothing else in the block
+    // disturbs that; on the shared base block, where it stood beside a dozen other declarations,
+    // the same engine serialised it into `font-family: inherit` and its siblings. Pinning one
+    // spelling would make this assertion a statement about the engine.
+    assert.match(
+      floors[0].cssText,
+      /font(?:-family)?:\s*inherit/,
+      'the family baseline must declare `font: inherit`, which is what frees the family from the ' +
+        `manager's bare-element baseline; declared: ${floors[0].cssText}`
     );
     assert.ok(
       base[0].properties.includes('line-height'),
       'the shared base rule must still declare the `line-height: 1` that the `font` shorthand ' +
-        `above it could reset; declared: ${base[0].properties.join(', ')}`
-    );
-    // AND THE DECLARED VALUE IS `inherit`. The computed comparison can only ever show that the
-    // three hosts agree; this shows WHAT they agree on, which is the declaration acceptance 2
-    // asks to be proved by reach rather than by a resolved value.
-    assert.match(
-      base[0].cssText,
-      /font-family:\s*inherit/,
-      'the shared base rule must declare `font: inherit`, which is what frees the family from the ' +
-        `manager's bare-element baseline; declared: ${base[0].cssText}`
+        `above it would otherwise reset; declared: ${base[0].properties.join(', ')}`
     );
 
-    // THE ORDER, read off the rule the browser parsed. `font` is a shorthand, and Chromium
-    // serialises it into its longhands — so the question is asked of the FIRST font longhand
-    // rather than of the literal `font`, which is the same question: every longhand the
-    // shorthand sets, `line-height` among them, is written at the shorthand's position.
-    const [rule] = base;
-    const firstFont = rule.properties.findIndex((property) => property.startsWith('font'));
-    const lineHeight = rule.properties.indexOf('line-height');
-    assert.ok(firstFont !== -1 && lineHeight !== -1, `neither index resolved in ${rule.cssText}`);
+    // ORDER. The baseline is written ABOVE the block that declares `line-height: 1`. Order alone
+    // does not decide this pair — the specificity below does — but the two together are what make
+    // the resolution independent of any engine's shorthand expansion, and a baseline that drifted
+    // BELOW the base block would be decided by order alone if the two ever tied again.
     assert.ok(
-      firstFont < lineHeight,
-      'the `font: inherit` shorthand must be the FIRST declaration of the family base block: ' +
-        'written below the `line-height: 1` at the end of it, it resets line-height to `normal` ' +
-        `and silently deletes it in both apps. Declared order: ${rule.properties.join(', ')}`
+      floorIndex !== -1 && baseIndex !== -1,
+      `neither rule index resolved: floor=${floorIndex}, base=${baseIndex}`
+    );
+    assert.ok(
+      floorIndex < baseIndex,
+      'the `font: inherit` baseline must be declared ABOVE the block that declares ' +
+        `\`line-height: 1\`; found floor at ${floorIndex} and base at ${baseIndex}`
+    );
+
+    // AND SPECIFICITY, which is the half that actually decides it and the half issue 1502's r2
+    // pass got wrong. The baseline is rooted at the family root ALONE at (0,1,0); the base block
+    // chains a per-app class onto it at (0,2,0). That gap is the FLOOR: it is why the base
+    // block's `line-height: 1` survives the shorthand, and — the same fact, measured on real
+    // controls in the test below — why a caller's own per-site `font-size` at (0,2,0) still
+    // beats the baseline instead of being silently deleted by it.
+    assert.equal(
+      specificity(FLOOR_RULE_SELECTOR),
+      '0,1,0',
+      'the family baseline must be rooted at the family root ALONE. At the base block`s own ' +
+        '(0,2,0) it TIES every caller per-site rule and wins on source order against each one ' +
+        'declared earlier in the sheet, which is the regression this rooting exists to prevent'
+    );
+    assert.equal(
+      specificity(BASE_RULE_SELECTOR),
+      '0,2,0',
+      'the shared base block must stay the more specific of the two, or its `line-height: 1` is ' +
+        'no longer what resolves'
+    );
+
+    // AND THE BASELINE HAS NOT CRAWLED BACK ONTO THE BASE BLOCK. This is the regression itself,
+    // stated as its own assertion so a re-added `font: inherit` there reds by name rather than
+    // as a font-size number in some other file.
+    assert.ok(
+      base[0].properties.every((property) => !property.startsWith('font')),
+      'the shared base block must declare no `font` longhand at all: the baseline belongs on the ' +
+        `family root alone, at (0,1,0). Declared: ${base[0].properties.join(', ')}`
     );
   } finally {
     await tab.close();
+  }
+});
+
+/*
+ * WHAT THE FLOOR IS FOR, MEASURED ON THE TWO CONTROLS THAT PROVED IT MATTERS.
+ *
+ * The specificity assertion above states the rooting; this states its CONSEQUENCE, on real
+ * classes, in the host that renders them. `.fabricate-manager .manager-recipe-lock` and
+ * `.manager-recipe-edit` size the recipe row's lock and pencil at 0.68rem — the deliberate
+ * compact scale of that row, beside `manager-recipe-io` at 0.68rem and
+ * `manager-recipe-table-head` at 0.72rem. They are app-rooted rules naming a class the CALLER
+ * passes through to `IconButton`, so no family gate in this repository can see them: the family
+ * detector keys on the literal `manager-icon-button` token, and these carry neither family class
+ * in their prelude.
+ *
+ * That is what made them the ones a baseline written at the family's own (0,2,0) deleted. It tied
+ * them and won on source order, and both glyphs rendered 28.7% larger — the only pixel change in
+ * the whole conversion, and one no gate in the tree could see. The floor rooting is what puts
+ * them back, so this measures the outcome rather than the rule.
+ */
+const CALLER_SIZED = Object.freeze([
+  Object.freeze({
+    id: 'recipe-lock',
+    passThrough: 'manager-recipe-lock',
+    markup:
+      '<button type="button" class="fabricate-icon-button manager-icon-button manager-recipe-lock" data-probe="caller-recipe-lock" aria-label="Lock"><i class="fas fa-lock"></i></button>',
+  }),
+  Object.freeze({
+    id: 'recipe-edit',
+    passThrough: 'manager-recipe-edit',
+    markup:
+      '<button type="button" class="fabricate-icon-button manager-icon-button manager-recipe-edit" data-probe="caller-recipe-edit" aria-label="Edit"><i class="fas fa-pen"></i></button>',
+  }),
+]);
+
+/** The compact scale those two rules declare, read out of the sheet rather than restated. */
+const CALLER_FONT_SIZE = '0.68rem';
+
+/**
+ * The two caller-sized controls in the manager host, plus a bare-host icon button beside them.
+ *
+ * @param {string} css The module sheet text to load.
+ * @returns {Promise<Record<string, {fontSize: string, lineHeight: string, fontFamily: string, box: string}>>} probe → measurement.
+ */
+async function measureCallerSized(css) {
+  const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  try {
+    await tab.setContent(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+        '<style>html, body { margin: 0; padding: 0; }' +
+        'body { font-family: "Signika", sans-serif; font-size: 14px; }</style>' +
+        `<style id="module-sheet">${css}</style></head><body>` +
+        `<div class="fabricate fabricate-manager"><div>${CALLER_SIZED.map((one) => one.markup).join('')}</div></div>` +
+        '<div><div><button type="button" class="fabricate-icon-button manager-icon-button" data-probe="caller-bare-icon" aria-label="Delete"><i class="fas fa-trash"></i></button></div></div>' +
+        '</body></html>'
+    );
+    return await tab.evaluate(() => {
+      const out = {};
+      for (const node of globalThis.document.querySelectorAll('[data-probe]')) {
+        const style = globalThis.getComputedStyle(node);
+        const box = node.getBoundingClientRect();
+        out[node.dataset.probe] = {
+          fontSize: style.fontSize,
+          lineHeight: style.lineHeight,
+          fontFamily: style.fontFamily,
+          box: `${Math.round(box.width)}x${Math.round(box.height)}`,
+        };
+      }
+      return out;
+    });
+  } finally {
+    await tab.close();
+  }
+}
+
+test('a caller`s per-site font rule still beats the family`s baseline', async () => {
+  // NON-VACUITY, BOTH WAYS. The rules must still declare the compact scale, and the components
+  // must still pass those classes through — a probe measuring a class the product stopped
+  // rendering, or a rule that stopped declaring a size, would pass while proving nothing.
+  const recipesBrowserSource = read('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  const declaredSize = CALLER_FONT_SIZE.replaceAll('.', String.raw`\.`);
+  for (const { id, passThrough } of CALLER_SIZED) {
+    assert.match(
+      sheet,
+      new RegExp(
+        String.raw`\.fabricate-manager \.${passThrough} \{[^}]*font-size: ${declaredSize}`
+      ),
+      `\`.fabricate-manager .${passThrough}\` must still declare \`font-size: ${CALLER_FONT_SIZE}\`, ` +
+        `or the ${id} measurement below holds over a value nothing states`
+    );
+    assert.ok(
+      recipesBrowserSource.includes(passThrough),
+      `RecipesBrowserView must still pass \`${passThrough}\` through to IconButton, or this ` +
+        'probe measures markup the product no longer renders'
+    );
+  }
+
+  const measured = await measureCallerSized(sheet);
+  // 0.68rem against the ROOT font size, which the harness leaves at the browser default while
+  // declaring 14px on the body — so a control that took the baseline instead reads the body's
+  // 14px and a control that took the caller's rule reads 10.88px. The two differ, which is the
+  // whole point, and the expected value is computed rather than hard-coded.
+  const expected = `${Number.parseFloat(CALLER_FONT_SIZE) * 16}px`;
+  for (const { id } of CALLER_SIZED) {
+    const probe = measured[`caller-${id}`];
+    assert.ok(probe, `the manager host rendered no ${id} probe`);
+    assert.equal(
+      probe.fontSize,
+      expected,
+      `\`.manager-${id}\` must compute the ${CALLER_FONT_SIZE} its own rule declares. A ` +
+        '`font: inherit` on the family`s (0,2,0) shared base block ties that rule and wins on ' +
+        'source order, which renders this glyph 28.7% larger in the recipe row'
+    );
+    assert.equal(
+      probe.lineHeight,
+      expected,
+      `\`.manager-${id}\` must keep line-height 1 against its own font size`
+    );
+  }
+
+  // AND THE FLOOR STILL REACHES A HOST THAT DECLARES NOTHING, which is the half a narrower fix
+  // would have kept while giving up. Without the baseline this button falls to the UA button
+  // font, which in Chromium is 13.3333px Arial rather than the ambient 14px Signika.
+  assert.equal(measured['caller-bare-icon'].fontSize, '14px');
+  assert.match(
+    measured['caller-bare-icon'].fontFamily,
+    /Signika/,
+    'a bare-host icon button must still inherit the ambient font, or the baseline is not a floor ' +
+      'but simply gone'
+  );
+});
+
+/*
+ * THE SECOND NEGATIVE CONTROL, ON THE FLOOR ITSELF.
+ *
+ * The measurement above is only evidence once it has been shown to break, and the way it breaks
+ * is the exact spelling this fix retired: the baseline written on the family's own (0,2,0) shared
+ * base block. This re-roots it there in the sheet TEXT, asserts the substitution applied, and
+ * requires the two caller-sized controls to leave 0.68rem.
+ */
+const FLOOR_RULE_PRELUDE = '.fabricate-button,\n.fabricate-icon-button {\n  font: inherit;\n}';
+const RE_FAMILY_ROOTED_FLOOR =
+  '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button {\n  font: inherit;\n}';
+
+test('the caller-override measurement reds when the baseline is written at the family`s own (0,2,0)', async () => {
+  assert.equal(
+    sheet.split(FLOOR_RULE_PRELUDE).length - 1,
+    1,
+    'the family baseline is not spelled as this control expects, so the control below would ' +
+      'perturb nothing and pass. Re-derive the prelude from `styles/fabricate.css`.'
+  );
+  const perturbed = sheet.replace(FLOOR_RULE_PRELUDE, RE_FAMILY_ROOTED_FLOOR);
+  assert.notEqual(
+    perturbed,
+    sheet,
+    'the substitution must apply before the run below means anything'
+  );
+
+  const measured = await measureCallerSized(perturbed);
+  const expected = `${Number.parseFloat(CALLER_FONT_SIZE) * 16}px`;
+  const kept = CALLER_SIZED.filter(({ id }) => measured[`caller-${id}`].fontSize === expected);
+  assert.deepEqual(
+    kept.map(({ id }) => id),
+    [],
+    'writing the baseline at the family`s own (0,2,0) left the caller-sized controls at ' +
+      `${expected}, so the measurement above is not actually testing the rooting`
+  );
+  // AND THE PERTURBATION IS THE REGRESSION, not merely A change: they take the ambient instead.
+  for (const { id } of CALLER_SIZED) {
+    assert.equal(measured[`caller-${id}`].fontSize, '14px');
   }
 });
 
