@@ -157,6 +157,9 @@ WHERE it is declared is part of the requirement rather than a formatting choice:
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
 The two area rings are bare-element selectors an area declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders outside either area — a control that is styled and unfocusable-looking, which is worse than one that is neither.
 `ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
+The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the two applications' area resets pair them and as CONTRIBUTING.md's area rule states.
+Foundry core paints every focused button with an outline and a glow of its own, and the area resets remove that only inside their own root; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying neither area class, rather than replacing it.
+The strip half is declared ABOVE the repaint, because the two tie on specificity and a keyboard-focused control matches both.
 Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
 
