@@ -303,7 +303,8 @@ function _createItemCard(item, systemId, options) {
     // and persisted the roster's ids alone, durably losing the rest.
     //
     // `essenceChips` is WHAT THE ROW DRAWS: the same map through the one shared chip model, in
-    // the world catalogue's order, with no chip for an id the roster does not list — which is
+    // this system's roster order (its stored essence definitions), with no chip for an id the
+    // roster does not list — which is
     // the id a deleted essence leaves behind, and a chip reading `3` under a fallback glyph and
     // no name states a count of nothing. The row, the inspector and the browser's essence filter
     // read this one; nothing that SEEDS an editor may.

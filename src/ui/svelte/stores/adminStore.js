@@ -11489,7 +11489,8 @@ export function createAdminStore(services) {
    * `baseline` is the essence map the CALLER's editor was seeded from (issue 1371 r20-store3).
    * The override rule uses it to tell a restatement of that seed from a real authored override
    * without assuming which of the two maps the editor drew; a caller that omits it is taken to
-   * have been seeded from the read union, which is what the in-page rules editor is.
+   * have been seeded from the read union, which both shipped editors now state explicitly, so
+   * the fallback stands for callers outside the manager rather than for either of them.
    *
    * @param {string} itemId
    * @param {object} [updates]
