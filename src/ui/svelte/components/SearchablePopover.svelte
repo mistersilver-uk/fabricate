@@ -8,6 +8,12 @@
   portaled popover is registered as an additional "inside" node so clicking
   within it does not dismiss).
 
+  KEYBOARD (issue 1503). DOM focus stays on ONE element for the whole life of the panel — the
+  query field where one is rendered, the trigger where it is not — and the arrow keys move an
+  `aria-activedescendant` cursor over the rows instead of moving focus onto them. The rows are
+  `tabindex="-1"` and never receive focus; the arithmetic lives in `util/listboxNavigation.js`.
+  See the focus-model block in the script below for what the two halves of that buy.
+
   Props:
     options      — [{ id, label, icon?, img?, meta?, trailing?, trailingIcon?,
                    addMarker?, dataId?, data?,
@@ -214,6 +220,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { activeOptionId, nextActiveIndex } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -289,7 +296,19 @@
     onChoose = () => {},
   } = $props();
 
+  // A PER-INSTANCE PREFIX for the option `id`s (issue 1503). `aria-activedescendant` points at a
+  // DOM id, so the ids have to be unique document-wide rather than merely within one panel: two
+  // pickers mounted on the same screen both indexing their rows from 0 would emit the same id and
+  // make the reference ambiguous. `$props.id()` is Svelte's own answer to exactly this.
+  const instanceId = $props.id();
+  const listId = `${instanceId}-listbox`;
+
   let search = $state('');
+  // THE KEYBOARD CURSOR, and -1 is not "the first row" (issue 1503). It means the GM has opened
+  // the panel and not yet pressed an arrow key, which is a different state from "row 0 is
+  // active": no row carries the active marker, and Enter is a NO-OP rather than a blind choice of
+  // whatever sits at the top of a list they have not looked through. See `util/listboxNavigation.js`.
+  let activeIndex = $state(-1);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
   let triggerButton = $state(null);
@@ -320,9 +339,27 @@
     }));
     const ungrouped = filteredOptions.filter((option) => !known.has(option.group));
     if (ungrouped.length > 0) buckets.push({ id: '__ungrouped', label: '', options: ungrouped });
-    return buckets.filter((bucket) => bucket.options.length > 0);
+    // EACH BUCKET CARRIES ITS OFFSET in the flat rendered order (issue 1503), because the keyboard
+    // cursor and the option `id`s are indexed over the CONCATENATION of the buckets rather than
+    // per bucket. A per-`each` index would restart at 0 in every group, so `id={optionId(i)}`
+    // would emit duplicate DOM ids, `aria-activedescendant` would be ambiguous between them, and
+    // a cursor indexed into `filteredOptions` would not match the order the rows are drawn in.
+    let offset = 0;
+    return buckets
+      .filter((bucket) => bucket.options.length > 0)
+      .map((bucket) => {
+        const positioned = { ...bucket, offset };
+        offset += bucket.options.length;
+        return positioned;
+      });
   });
   const isGrouped = $derived(groupedOptions.length > 0);
+  // THE FLAT RENDERED ORDER — what the cursor indexes and what the ids are numbered over. It is
+  // the concatenation of the buckets when grouped and `filteredOptions` otherwise, which is
+  // exactly the order the two branches below draw their rows in.
+  const renderedOptions = $derived(
+    isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
+  );
   const filteredCount = $derived(
     String(filteredCountTemplate)
       .replace('{matched}', String(filteredOptions.length))
@@ -348,6 +385,79 @@
   // actor bar is the site that proves it: rendered under `No character matches your search`,
   // its body still read `ask your GM to add its actor type`.
   const emptyBody = $derived(filteredToNothing ? '' : emptyDetail);
+
+  // ── THE LISTBOX FOCUS MODEL (issue 1503) ──────────────────────────────────────────────────
+  //
+  // `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
+  // the HOLDER — and drive selection with `aria-activedescendant`. The holder is the query
+  // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, four
+  // app surfaces plus `ModifierPillSelect`), and the option rows NEVER receive DOM focus. Roving
+  // focus onto them is what the prohibition forbids, because it re-arms Foundry's canvas
+  // bindings — and there is a second, independent reason: `styles/fabricate.css` rings any focused
+  // `[tabindex]` under `.fabricate` (`.fabricate [tabindex]:focus-visible`, a 2px accent outline
+  // at a POSITIVE offset), so a row that took focus would draw a competing ring around the
+  // keyboard cursor's own inset one.
+  //
+  // `aria-controls` and `aria-activedescendant` are OMITTED while the list itself is absent: the
+  // `role="listbox"` element renders only when `filteredOptions.length > 0`, and the empty branch
+  // below replaces it entirely. An `aria-controls` pointing at an id that resolves to no element
+  // is a defect, so both attributes are conditioned on the same predicate the list is.
+  const listRendered = $derived(open && filteredOptions.length > 0);
+  const controlledListId = $derived(listRendered ? listId : undefined);
+  const activeDescendantId = $derived(
+    listRendered ? activeOptionId(instanceId, activeIndex) : undefined
+  );
+
+  // A CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and two independent inputs rebuild that list.
+  // Opening starts a fresh pass over the options, and every query keystroke rebuilds
+  // `filteredOptions`, so index 3 names an unrelated option the moment either moves. Resetting to
+  // -1 rather than clamping is the point: the GM has not arrowed into the NEW list, so nothing in
+  // it is active and Enter stays a no-op until they do.
+  //
+  // Both inputs are read through one generation string because `open` is `$bindable` — the World
+  // Parties travel tile opens the picker without being the trigger, and a page-size change forces
+  // it shut — so neither direction reliably passes through `toggle` or `close`.
+  const optionListGeneration = $derived(`${open ? 'open' : 'closed'}/${normalizedSearch}`);
+  let cursorGeneration = '';
+  $effect(() => {
+    if (cursorGeneration === optionListGeneration) return;
+    cursorGeneration = optionListGeneration;
+    activeIndex = -1;
+  });
+
+  // KEEP THE CURSOR IN VIEW. The list scrolls, so the row the GM has arrowed to can be outside
+  // its window — and because nothing is FOCUSED, the browser will not scroll to it on its own.
+  // `$effect` runs after the DOM update, so the marked row is already rendered when this reads
+  // it. The call is optional because happy-dom's element does not implement `scrollIntoView`, and
+  // a bare call would throw inside every mounted picker suite.
+  $effect(() => {
+    if (activeIndex < 0 || !popoverRoot) return;
+    const active = popoverRoot.querySelector?.('[data-active-option="true"]');
+    active?.scrollIntoView?.({ block: 'nearest' });
+  });
+
+  // THE KEY MAP, on the holder. `nextActiveIndex` owns the arithmetic; this owns the wiring —
+  // which keys are CONSUMED, and what Enter chooses. A key the module does not own returns `null`
+  // and is left entirely alone, which is what keeps every printable character going to the query
+  // field. Escape is not handled here: `dismissOnOutsideClick` on the picker root takes it at the
+  // document's capture phase, which is the only place that reaches the inline search shape.
+  function onHolderKeydown(event) {
+    if (!open) return;
+    if (event.key === 'Enter') {
+      // Enter WITHOUT an active option is a no-op rather than a choice of the first row. On a
+      // trigger holder it must still be prevented from reaching the button's own click, or the
+      // panel would toggle shut — but only when there is a cursor to confirm.
+      const active = renderedOptions[activeIndex];
+      if (!active) return;
+      event.preventDefault();
+      choose(active.id);
+      return;
+    }
+    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key);
+    if (next === null) return;
+    event.preventDefault();
+    activeIndex = next;
+  }
 
   // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
   // mode the trigger is UNMOUNTED while open, so `bind:this` has already nulled
@@ -411,6 +521,14 @@
     event.stopPropagation();
   }
 
+  // The trigger keeps its `stopPropagation` in BOTH shapes and gains the key map in the one where
+  // it is the holder. The two are composed rather than branched inside one handler so the
+  // search-bearing shape's behaviour is unchanged by inspection.
+  function onTriggerKeydown(event) {
+    onHolderKeydown(event);
+    stop(event);
+  }
+
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
   // duplication gate counts and a place for the two shapes to drift apart.
   const triggerAttributes = $derived({
@@ -423,8 +541,39 @@
     'data-recipe-add': triggerAddMarker || undefined,
     title: triggerTitle || undefined,
     'aria-label': triggerAriaLabel || undefined,
+    // THE TRIGGER IS THE HOLDER when no query field is rendered (`spec.md`'s own case for the
+    // search-suppressed shape): `role="combobox"` plus the activedescendant pair, and
+    // `data-keyboard-focus="true"` because a `<button>` outside a `<form>` answers Foundry's
+    // `hasFocus` false — without it every keybinding stays live while the trigger holds focus,
+    // so Space pauses the game and the arrows pan the canvas behind the window. The attribute
+    // arrives through this SPREAD, which the source-reading keyboard-focus gate cannot see, so
+    // the trigger stays in that gate's baseline and nothing is accidentally paid down.
+    ...(showSearch
+      ? {}
+      : {
+          role: 'combobox',
+          'aria-controls': controlledListId,
+          'aria-activedescendant': activeDescendantId,
+          'data-keyboard-focus': 'true',
+        }),
     onclick: toggle,
-    onkeydown: stop,
+    onkeydown: showSearch ? stop : onTriggerKeydown,
+  });
+
+  // ONE ATTRIBUTE SET FOR BOTH SEARCH SHAPES, for the same reason `triggerAttributes` is one
+  // object: the inline field and the panel field are the same HOLDER rendered in two places, and
+  // writing the combobox contract twice is a copy that would let them drift apart. An `<input>`
+  // is one of the tags `hasFocus` recognises on its own, so unlike the trigger it needs no
+  // `data-keyboard-focus`.
+  const searchFieldAttributes = $derived({
+    type: 'text',
+    role: 'combobox',
+    'aria-expanded': open,
+    'aria-controls': controlledListId,
+    'aria-activedescendant': activeDescendantId,
+    placeholder: searchPlaceholder,
+    'aria-label': searchAriaLabel || undefined,
+    onkeydown: onHolderKeydown,
   });
 
   $effect(() => {
@@ -470,13 +619,7 @@
   {#if inlineSearchTrigger && open}
     <div class="manager-travel-picker-inline">
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <input
-        bind:this={searchInput}
-        bind:value={search}
-        type="text"
-        placeholder={searchPlaceholder}
-        aria-label={searchAriaLabel || undefined}
-      />
+      <input bind:this={searchInput} bind:value={search} {...searchFieldAttributes} />
       <button
         type="button"
         class="manager-travel-picker-inline-close"
@@ -532,17 +675,25 @@
         }
       }}
     >
-      {#snippet optionRow(option)}
+      <!-- `index` is the row's position in the FLAT rendered order, which is why the grouped
+           branch below adds its bucket's own offset rather than passing the `each` index: the
+           `id`s and the cursor are numbered over the concatenation of the buckets. -->
+      {#snippet optionRow(option, index)}
         <button
           {...option.data}
           type="button"
           class="manager-travel-option"
           role="option"
+          id={activeOptionId(instanceId, index)}
+          tabindex="-1"
+          data-keyboard-focus="true"
           aria-selected={option.id === value}
+          data-active-option={index === activeIndex ? 'true' : undefined}
           data-recipe-add={option.addMarker || undefined}
           data-popover-option={option.dataId || undefined}
           title={option.label}
           onclick={() => choose(option.id)}
+          onmousedown={(event) => event.preventDefault()}
         >
           {#if option.img}
             <span class="manager-travel-portrait" aria-hidden="true"
@@ -596,13 +747,7 @@
       {#if showSearch && !inlineSearchTrigger}
         <div class="manager-travel-popover-search" class:is-compact={compactOptionRows}>
           {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
-          <input
-            bind:this={searchInput}
-            bind:value={search}
-            type="text"
-            placeholder={searchPlaceholder}
-            aria-label={searchAriaLabel || undefined}
-          />
+          <input bind:this={searchInput} bind:value={search} {...searchFieldAttributes} />
         </div>
       {/if}
 
@@ -619,6 +764,7 @@
         <div
           class="manager-travel-popover-options"
           role="listbox"
+          id={listId}
           aria-label={dialogAriaLabel || undefined}
         >
           {#if isGrouped}
@@ -634,14 +780,14 @@
                     {bucket.label}
                   </p>
                 {/if}
-                {#each bucket.options as option (option.id)}
-                  {@render optionRow(option)}
+                {#each bucket.options as option, index (option.id)}
+                  {@render optionRow(option, bucket.offset + index)}
                 {/each}
               </div>
             {/each}
           {:else}
-            {#each filteredOptions as option (option.id)}
-              {@render optionRow(option)}
+            {#each renderedOptions as option, index (option.id)}
+              {@render optionRow(option, index)}
             {/each}
           {/if}
         </div>
