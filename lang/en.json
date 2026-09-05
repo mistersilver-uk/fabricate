@@ -3116,7 +3116,7 @@
           "AddFromCatalogue": "Add from catalogue",
           "AddFrom": {
             "Title": "Add from catalogue to {system}",
-            "Subtitle": "New rules start empty; the world category is inherited until this system overrides it.",
+            "Subtitle": "New rules inherit the world category and essence values until this system overrides them; nothing else is copied.",
             "Close": "Close",
             "SearchPlaceholder": "Search the catalogue…",
             "SearchLabel": "Search catalogue components",

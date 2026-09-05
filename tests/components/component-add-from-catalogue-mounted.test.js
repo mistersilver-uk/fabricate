@@ -396,12 +396,26 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     // It is a knowing divergence from `proto:6051`, which is verbatim the old sentence: the
     // prototype's fixture has no inheritance model, and parity authority does not license
     // shipping a false statement about a write.
+    //
+    // AND IT NAMES BOTH SECTIONS (issue 1371 r19-entry2). `1.32.0` made `essences` a second
+    // inheritable section, so `inherit: {}` now reads as inheriting BOTH — and the sentence that
+    // named only the category, and said the rules "start empty", fell to this requirement's own
+    // rule a second time in its denying direction. Both halves are asserted, because a sentence
+    // that names one section is the exact state this case was already written against.
     await open();
     const subtitle = panel().querySelector('.manager-modal-subtitle').textContent;
-    assert.match(subtitle, /world category is inherited/, 'it names the section that IS inherited');
+    assert.match(
+      subtitle,
+      /inherit the world category and essence values/,
+      'it names BOTH sections the adoption seed leaves inheriting'
+    );
     assert.ok(
       !/[Nn]othing is inherited/.test(subtitle),
       'and does not deny an inheritance the seed performs'
+    );
+    assert.ok(
+      !/start empty/.test(subtitle),
+      'nor claim the rules start empty, which two inherited sections make false'
     );
   });
 

@@ -352,7 +352,7 @@
   )}
   subtitle={text(
     'FABRICATE.Admin.Manager.Component.AddFrom.Subtitle',
-    'New rules start empty; the world category is inherited until this system overrides it.'
+    'New rules inherit the world category and essence values until this system overrides them; nothing else is copied.'
   )}
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
   rootAttributes={{ 'data-component-add-from-catalogue-dialog': '' }}
