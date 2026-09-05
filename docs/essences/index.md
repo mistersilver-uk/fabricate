@@ -28,6 +28,7 @@ Open the Crafting System Manager and select a crafting system.
 Choose the top-level **Essences** entry.
 
 Each library row shows the essence's icon, name, colour, an **Effects** pill and a **Macro** pill for the behaviours it carries, a **Disabled** marker when it is turned off, how many components carry it, how many recipes require it, and a per-row enable/disable switch.
+A component that carries this essence only because it inherits the value from the world Component catalogue counts here too, alongside one that authors it directly in this system.
 Choose **List** or **Grid** to change how the library is presented, search or filter by status to narrow it, and select a row to inspect it in the panel on the right.
 Choose **Edit** to open the essence editor.
 
@@ -178,14 +179,16 @@ From there you can:
 - stage an icon, a colour, or an enabled/disabled status across every selected essence, leaving anything you do not touch unchanged
 - see how many essences are currently selected before you apply
 
-The colour control is withheld, with a note in its place, for every essence the world Essence Catalogue already holds.
-Colour is authored once on the world essence, and this system's own copy is not what any screen draws, so the axis is offered only for an essence the world does not hold yet.
+The colour control is withheld, with a note in its place, whenever one or more of the selected essences already belongs to the world Essence Catalogue.
+Colour is authored once on the world essence, and this system's own copy is not what any screen draws, so the axis is offered only when every selected essence is one the world does not hold.
+Staging a colour and then adding a world-known essence to the selection clears the staged colour along with the control, so nothing you can no longer see is still applied.
 
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
 
 **Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.
 An essence in use is never excluded: deleting it removes it from every component that carries it and rewrites every recipe that requires it.
+A component that only inherits the essence from the world Component catalogue is named in this impact too, so the confirmation states the delete's full reach rather than only the components that author the essence themselves.
 Deleting a single essence from its inspector warns you the same way, stating how many components it is removed from and how many recipes are rewritten before you confirm.
 
 Deleting is a two-step action.
