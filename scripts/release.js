@@ -23,7 +23,7 @@
  *   gets the release version without touching source module.json.
  */
 
-import { readFile, writeFile, mkdir, rm, cp, access, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, cp, access, stat, readdir } from 'node:fs/promises';
 import { basename, join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 import { argv, exit } from 'node:process';
@@ -31,7 +31,9 @@ import { fileURLToPath } from 'node:url';
 import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
 import {
   ARCHIVE_GATE_SKIPPED_MESSAGE,
+  archiveNameMismatchMessage,
   assertArchiveChunkCompleteness,
+  isReleaseZipName,
   releaseZipName
 } from './lib/releaseZipChunks.js';
 
@@ -204,6 +206,12 @@ async function copyIfExists(src, dest) {
  * to check; it says so and still exits 0. Reporting "OK" there would be the vacuous pass the gate
  * exists to prevent.
  *
+ * NOR IS A NAME MISMATCH A SKIP, which is the failure the `--validate-only` branch can actually
+ * reach: the archive's name carries a version, and `--dist-version <next>` leaves the tracked
+ * `module.json` alone, so a bare `npm run release:validate` afterwards derives a DIFFERENT name,
+ * finds nothing at it, and would otherwise report a build that produced no archive while the real
+ * one sits in the same directory unproved. See archiveNameMismatchMessage.
+ *
  * @param {string} distDir - Absolute path to dist/
  * @param {object} builtManifest - The manifest inside the archive, whose esmodules name the entry
  * @param {string} version - The version whose archive name to look for
@@ -212,6 +220,11 @@ async function copyIfExists(src, dest) {
 async function runArchiveChunkGate(distDir, builtManifest, version) {
   const zipPath = join(distDir, releaseZipName(version));
   if (!(await fileExists(zipPath))) {
+    const present = (await readdir(distDir).catch(() => [])).filter(isReleaseZipName);
+    if (present.length > 0) {
+      console.error(archiveNameMismatchMessage(releaseZipName(version), present.sort()));
+      exit(1);
+    }
     console.log(`\n${ARCHIVE_GATE_SKIPPED_MESSAGE}`);
     return;
   }
@@ -220,8 +233,11 @@ async function runArchiveChunkGate(distDir, builtManifest, version) {
   try {
     const proved = assertArchiveChunkCompleteness({ zipPath, manifest: builtManifest });
     console.log(
+      // "reachable from", not "referenced from": the count is the TRANSITIVE closure, which
+      // includes chunks the entry never names itself (measured on a real dist/, one chunk is
+      // reachable only through another). "referenced from" would understate what was proved.
       `Archive chunk completeness OK: ${basename(zipPath)} carries all ` +
-      `${proved.referenced.length} file(s) referenced from ${proved.entryNames.join(', ')}.`
+      `${proved.referenced.length} file(s) reachable from ${proved.entryNames.join(', ')}.`
     );
   } catch (err) {
     console.error(err.message);

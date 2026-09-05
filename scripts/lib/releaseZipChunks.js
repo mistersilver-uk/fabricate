@@ -52,6 +52,42 @@ export const ARCHIVE_GATE_SKIPPED_MESSAGE =
   ' was not proved.';
 
 /**
+ * What a run refuses with when the archive name it derived is absent but `dist/` holds another.
+ *
+ * THE SKIP LINE WOULD BE A LIE HERE, and a maintainer-facing one. The archive name carries the
+ * version, and the two are derived independently: a `--dist-version <next>` build writes
+ * `fabricate-v<next>.zip` while a bare `npm run release:validate` afterwards re-derives the name
+ * from the TRACKED `module.json` (still `0.1.0`). It would then find no archive at that name,
+ * report that this build produced none, exit 0 — and silently skip the one check the maintainer
+ * ran the command for, over an archive sitting right there.
+ *
+ * @param {string} expectedName The archive name this run derived from its version.
+ * @param {string[]} foundNames The `fabricate-v*.zip` names `dist/` actually holds.
+ * @returns {string} The refusal, naming both sides and the remedy.
+ */
+export function archiveNameMismatchMessage(expectedName, foundNames) {
+  return (
+    `${ARCHIVE_CHUNK_GATE_LABEL}: ${expectedName} is absent, but dist/ holds` +
+    ` ${foundNames.join(', ')}. Refusing to report this as a build that produced no archive:` +
+    ' that would skip the completeness proof over an archive that is present. Re-run with the' +
+    ' same --version or --dist-version the build used, so the name matches.'
+  );
+}
+
+/**
+ * Does this file name look like a published Fabricate archive?
+ *
+ * Used to tell "no archive at all" from "an archive under a different version's name", which
+ * {@link archiveNameMismatchMessage} refuses.
+ *
+ * @param {string} name A file name from `dist/`.
+ * @returns {boolean} True when it is a `fabricate-v<version>.zip`.
+ */
+export function isReleaseZipName(name) {
+  return /^fabricate-v.+\.zip$/.test(name);
+}
+
+/**
  * A quoted RELATIVE specifier ending in `.js`, which is the only shape a bundled module uses to
  * name a sibling file.
  *
@@ -142,6 +178,8 @@ export function extractModuleReferences(memberName, source) {
  * @returns {{entriesAbsent: string[], missing: Array<{name: string, referencedBy: string}>,
  *   referenced: string[]}} What was absent, what was referenced but missing, and everything
  *   reached.
+ * @throws {Error} When the walk visits more members than the archive holds, which can only happen
+ *   if its own cycle guard stops working. See the bound in the loop.
  */
 export function findMissingChunkReferences({ entryNames, memberNames, readMember }) {
   const present = new Set(memberNames);
@@ -150,11 +188,31 @@ export function findMissingChunkReferences({ entryNames, memberNames, readMember
   const referenced = new Set();
   const missing = [];
   const visited = new Set();
-  const queue = entryNames.filter((name) => present.has(name));
-  for (const name of queue) visited.add(name);
+  const queue = [];
+  for (const name of entryNames) {
+    if (!present.has(name) || visited.has(name)) continue;
+    visited.add(name);
+    queue.push(name);
+  }
 
+  // A HARD BOUND ON THE WALK, and it is deliberately unreachable while the `visited` check below
+  // holds: every member is dequeued at most once, so the count cannot exceed the member set. It
+  // exists for the case where that check is REMOVED — by a regression or by a mutation control —
+  // where the walk otherwise spins synchronously and forever over a reference cycle, growing the
+  // queue without limit. A synchronous spin is the worst shape of failure available here: a test
+  // timeout is a timer and cannot interrupt it, so CI would hang to the job timeout while the
+  // process ate memory. Refusing instead turns that into a fast, named failure.
+  let dequeued = 0;
   while (queue.length > 0) {
     const current = queue.shift();
+    dequeued += 1;
+    if (dequeued > present.size) {
+      throw new Error(
+        `${ARCHIVE_CHUNK_GATE_LABEL}: the reference walk visited more members than the archive` +
+          ` holds (${dequeued} of ${present.size}), so it is not terminating. This is a bug in` +
+          ' the gate itself, not a fault in the archive.'
+      );
+    }
     for (const reference of extractModuleReferences(current, readMember(current))) {
       referenced.add(reference);
       if (!present.has(reference)) {
@@ -228,10 +286,15 @@ export function assertArchiveChunkCompleteness({
     );
   }
 
+  // READS THE ENTRY SCRIPTS BY NAME, not only members ending `.js`. An entry may legitimately be
+  // named `main.mjs`, and a `.js`-only predicate would leave it unread — which surfaces below as
+  // "was read but references nothing", a refusal that names the wrong cause and would send whoever
+  // has to fix it looking at the bundle instead of at this predicate.
+  const wanted = new Set(entryNames);
   const texts = new Map();
-  for (const [name, bytes] of readArchiveEntries(zipPath, (name) => {
-    const normalized = normalizeArchiveMemberName(name);
-    return normalized !== null && normalized.endsWith('.js');
+  for (const [name, bytes] of readArchiveEntries(zipPath, (member) => {
+    const normalized = normalizeArchiveMemberName(member);
+    return normalized !== null && (normalized.endsWith('.js') || wanted.has(normalized));
   })) {
     texts.set(normalizeArchiveMemberName(name), bytes.toString('utf8'));
   }
