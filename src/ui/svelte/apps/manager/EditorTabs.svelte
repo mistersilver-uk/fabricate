@@ -75,7 +75,7 @@
   needed is HERE, on this component, rather than left behind as a hand-rolled strip that
   happened to render the same classes: a chip accessible name (`name`, because a badge whose
   whole label is `✓` has no readable name at all without one), a chip modifier class
-  (`class`, because `fabricate.css:18183` writes a real shipped rule against
+  (`class`, because `fabricate.css:18193` writes a real shipped rule against
   `.manager-tool-editor-tabs > button > span.is-valid`), the `positive` tone spelling, and
   `hookAttribute=''` for the one caller that renders no tab hook.
 
@@ -249,7 +249,7 @@
 
   // The chip's modifier class, joined with the empties dropped. `badgeClass` is the site's
   // own class and `mark.class` is the per-mark modifier a shipped rule is written against
-  // (`.manager-tool-editor-tabs > button > span.is-valid`, `fabricate.css:18183`).
+  // (`.manager-tool-editor-tabs > button > span.is-valid`, `fabricate.css:18193`).
   function badgeClasses(mark) {
     return [badgeClass, mark.class].filter(Boolean).join(' ');
   }
