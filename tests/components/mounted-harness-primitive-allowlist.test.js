@@ -404,6 +404,12 @@ test('every inspected suite resolves at least one real component, so none passes
     const suite = readRepoFile(suitePath);
     if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
     if (suite.includes('createMountedComponentHarness')) continue;
+    // The scoped-screen factories (`tests/helpers/componentScopeMountModules.js`) hand a suite
+    // its `compiledModules` as a RETURN VALUE, not as a literal it declares, and they carry
+    // their own closure exactly as `createMountedComponentHarness` does — so a suite that only
+    // reads that manifest back (issue 1371's rendered catalogue suite walks it for scoped
+    // `<style>` blocks) names no path this parser can read, and is not vacuous for it.
+    if (suite.includes('componentScopeMountModules.js')) continue;
 
     const compiled = new Set(compiledPathsOf(suite));
     if (!componentPaths.some((path) => compiled.has(path))) unreadable.push(suitePath);
