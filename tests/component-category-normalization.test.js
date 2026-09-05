@@ -4,8 +4,9 @@
  *
  * Covers AC6 (partly), AC7, AC9 and AC10(c).
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
 
 // Minimal stubs so the module can load without a Foundry runtime
 let idCounter = 0;
@@ -160,6 +161,10 @@ test('a save payload that omits category preserves it (the REAL updateItem)', as
   // ONLY because `updateItem` spreads `{...existing, ...updates}`, so an omitted key is
   // preserved rather than dropped. The delta said "asserted, not assumed".
   //
+  // That app no longer reaches `updateItem` directly for its ESSENCE axis — see the
+  // r19-store2 block at the foot of this file — but it still reaches it for everything
+  // else, so this contract is unchanged and still load-bearing for it.
+  //
   // This calls the REAL `updateItem`. An earlier version hand-rebuilt the spread inline
   // and so asserted JS spread semantics rather than Fabricate's: mutating updateItem to
   // `{ ...updates, id: itemId }` — dropping the existing-spread, which is exactly the
@@ -225,4 +230,255 @@ test('updateSystem REPLACES the whole icon map (removal persists without -=)', a
   const persisted = manager.getSystem('sys1');
   assert.deepEqual(persisted.categories, ['Elixirs']);
   assert.deepEqual(persisted.categoryIcons, { elixirs: 'fas fa-vial' });
+});
+
+// ---------------------------------------------------------------------------
+// The standalone component editor's SAVE, and the essence override rule
+// (issue 1371 r19-store2)
+// ---------------------------------------------------------------------------
+//
+// `SvelteComponentEditorApp` used to call `manager.updateItem(...)` directly, so a GM editing a
+// component's essences from an item sheet wrote a map the read union SHADOWS for every pair whose
+// `inherit.essences` switch is on — which, after the `1.32.0` election, is every component in a
+// one-system world. The manager's own store had been put on the flag-before-values order; this
+// second entry point had not, and two entry points that disagree about what a write means is the
+// defect this closes.
+//
+// The app's save now delegates to `svelte/util/componentEditorSave.js`, which is what these tests
+// drive. The app module itself is not importable in a plain unit test — it builds a Foundry
+// `ApplicationV2` subclass at import time and statically imports a `.svelte` component, the same
+// reason `tests/import-folder-drop-wiring.test.js` gives for its sibling app — so the delegation
+// itself is pinned as SOURCE below, and the behaviour is driven for real through the seam.
+
+const { overrideAwareComponentWrite, saveComponentEditorDraft } = await import(
+  '../src/ui/svelte/util/componentEditorSave.js'
+);
+const { createComponentScopeStore } = await import('../src/systems/worldScopeStores.js');
+const { membershipKey } = await import('../src/systems/scopedDefinitions.js');
+
+/**
+ * A REAL component scope store over an in-memory setting, holding one world component whose
+ * `essences` section `sys1` INHERITS — the state the `1.32.0` pass leaves behind.
+ *
+ * @param {object} [inherit] the membership record's inherit map.
+ * @returns {{store: object, persisted: () => object}}
+ */
+function makeInheritingScopeStore(inherit = {}) {
+  let persisted = {
+    entities: { ingot: { id: 'ingot', name: 'Iron Ingot' } },
+    defaults: { ingot: { id: 'ingot', essences: { fire: 3 } } },
+    membership: {
+      [membershipKey('ingot', 'sys1')]: { entityId: 'ingot', systemId: 'sys1', inherit },
+    },
+  };
+  const store = createComponentScopeStore({
+    getSetting: (key) => (key === 'componentScope' ? persisted : undefined),
+    setSetting: async (_key, next) => {
+      persisted = next;
+    },
+  });
+  store.load();
+  return { store, persisted: () => persisted };
+}
+
+/**
+ * The manager the app writes through, with the read union wired the way the shipped one is.
+ *
+ * @param {object} scopeStore
+ * @param {object} [essences] the in-system row's own map.
+ * @returns {{manager: object, calls: object[]}}
+ */
+function makeEditorManager(scopeStore, essences = { iron: 2 }) {
+  const manager = makeLoadedManager([
+    {
+      id: 'sys1',
+      name: 'System One',
+      features: { essences: true },
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire' },
+        { id: 'iron', name: 'Iron' },
+      ],
+      items: [{ id: 'ingot', name: 'Iron Ingot', essences }],
+    },
+  ]);
+  manager._componentScopeStore = scopeStore;
+  const calls = [];
+  const updateItem = manager.updateItem.bind(manager);
+  manager.updateItem = async (systemId, itemId, updates) => {
+    calls.push({
+      systemId,
+      itemId,
+      updates,
+      // The pair's switch AS IT WAS when the values arrived — which is what "flag before values"
+      // is an assertion about.
+      switchOnArrival: scopeStore
+        .corpus()
+        .membership.find((record) => record.entityId === itemId)?.inherit?.essences,
+    });
+    return updateItem(systemId, itemId, updates);
+  };
+  return { manager, calls };
+}
+
+/**
+ * The draft the editor hands its save: one essence stepper, in `buildComponentEditorUpdates`'
+ * contract.
+ *
+ * @param {number} quantity
+ * @returns {object}
+ */
+function essenceDraft(quantity) {
+  return {
+    showEssences: true,
+    essenceOptions: [
+      { id: 'fire', quantity: 3 },
+      { id: 'iron', quantity },
+    ],
+  };
+}
+
+test('1371 r19: the editor save flips the essence switch BEFORE the values land on an inheriting pair', async () => {
+  const { store, persisted } = makeInheritingScopeStore();
+  const { manager, calls } = makeEditorManager(store);
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const saved = await saveComponentEditorDraft(essenceDraft(4), {
+    systemId: 'sys1',
+    componentId: 'ingot',
+    writeComponent,
+  });
+
+  assert.equal(saved, true);
+  assert.equal(calls.length, 1, 'the values were written exactly once');
+  assert.equal(
+    calls[0].switchOnArrival,
+    false,
+    'the switch was ALREADY off when the values arrived — flag before values'
+  );
+  assert.equal(
+    persisted().membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    false,
+    'and the override is persisted, so the union answers what the GM staged'
+  );
+  assert.deepEqual(manager.getSystem('sys1').components[0].essences, { fire: 3, iron: 4 });
+});
+
+test('1371 r19: a save that only RESTATES the resolved map writes no essences at all', async () => {
+  // The editor sends its essence axis on every save. Restating what the system already resolves
+  // has authored nothing, so it must not flip a switch the GM never touched, nor overwrite the
+  // system's dormant own map — the map an inheriting system falls back to if the world section is
+  // later cleared.
+  const { store, persisted } = makeInheritingScopeStore();
+  const { manager, calls } = makeEditorManager(store);
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const saved = await saveComponentEditorDraft(
+    { showEssences: true, essenceOptions: [{ id: 'fire', quantity: 3 }] },
+    { systemId: 'sys1', componentId: 'ingot', writeComponent }
+  );
+
+  assert.equal(saved, true);
+  assert.deepEqual(calls, [], 'no write at all: the only staged axis had nothing to say');
+  assert.equal(
+    persisted().membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'the switch is left exactly where it was'
+  );
+  assert.deepEqual(
+    manager.getSystem('sys1').components[0].essences,
+    { iron: 2 },
+    'and the dormant in-system map survives'
+  );
+});
+
+test('1371 r19: an OVERRIDING pair is written with no flag write, and a non-member unchanged', async () => {
+  const { store, persisted } = makeInheritingScopeStore({ essences: false });
+  const { manager, calls } = makeEditorManager(store);
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  await saveComponentEditorDraft(essenceDraft(4), {
+    systemId: 'sys1',
+    componentId: 'ingot',
+    writeComponent,
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].switchOnArrival, false, 'already overriding, so nothing had to move');
+  assert.equal(persisted().membership[membershipKey('ingot', 'sys1')].inherit.essences, false);
+});
+
+test('1371 r19: a REFUSED flag write refuses the whole editor save, and writes no values', async () => {
+  // A refused world-setting write REJECTS rather than answering false, so the stop must catch.
+  const { store } = makeInheritingScopeStore();
+  const { manager, calls } = makeEditorManager(store);
+  store.save = async () => {
+    throw new Error('The requested Setting update was refused');
+  };
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const saved = await saveComponentEditorDraft(essenceDraft(4), {
+    systemId: 'sys1',
+    componentId: 'ingot',
+    writeComponent,
+  });
+
+  assert.equal(saved, false, 'the app reports the failure rather than closing over it');
+  assert.deepEqual(calls, [], 'and no values were written');
+});
+
+test('1371 r19: an empty draft writes nothing and is not a failure', async () => {
+  const { store } = makeInheritingScopeStore();
+  const { manager, calls } = makeEditorManager(store);
+  const writeComponent = overrideAwareComponentWrite({
+    getCraftingSystemManager: () => manager,
+    getComponentScopeStore: () => store,
+  });
+
+  const saved = await saveComponentEditorDraft({}, {
+    systemId: 'sys1',
+    componentId: 'ingot',
+    writeComponent,
+  });
+
+  assert.equal(saved, true);
+  assert.deepEqual(calls, []);
+});
+
+// The app's own branch, pinned as source. The module cannot be imported (ApplicationV2 at import
+// time, plus a static `.svelte` import), so a mirror here would keep passing however the real
+// method is written — which is exactly how the direct `manager.updateItem` call survived.
+const EDITOR_APP_SOURCE = readFileSync(
+  new URL('../src/ui/SvelteComponentEditorApp.svelte.js', import.meta.url),
+  'utf8'
+);
+
+test('1371 r19: the editor app delegates its save and never writes a component itself', () => {
+  assert.ok(
+    EDITOR_APP_SOURCE.includes('saveComponentEditorDraft('),
+    'the save must delegate to the shared seam'
+  );
+  assert.ok(
+    !EDITOR_APP_SOURCE.includes('manager.updateItem('),
+    'and must not reach the manager write directly — that is the shadowed write this closed'
+  );
+  assert.ok(
+    EDITOR_APP_SOURCE.includes('overrideAwareComponentWrite('),
+    'the no-store path applies the override rule'
+  );
+  assert.ok(
+    EDITOR_APP_SOURCE.includes('store.updateComponent(componentId, updates)'),
+    'and the parent-store path routes through the override-aware store verb'
+  );
 });

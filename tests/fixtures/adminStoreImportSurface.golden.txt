@@ -20,6 +20,7 @@ import {
   normalizeCharacterPrerequisite,
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
+import { componentEssenceOverrideOn } from '../../../systems/componentEssenceOverride.js';
 import {
   buildExportPayload,
   validateImportData,

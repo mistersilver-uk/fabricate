@@ -16,6 +16,12 @@
  *    open files. The bound is that the COUNTING did not move into this file with the argument —
  *    and the sharpest mechanical statement of that is the IMPORT SURFACE, because computing the
  *    usage here would need `buildVocabularyUsage` imported.
+ *    The golden was re-recorded ONCE since, for issue 1371 r19-store2, which adds
+ *    `componentEssenceOverrideOn` — an import that takes the "is a system-scope essence write an
+ *    override" rule OUT of this gateway and into `systems/componentEssenceOverride.js`, so it
+ *    moves behaviour out rather than in and the bound above is unweakened. Re-recording is the
+ *    correct response to a lane that genuinely changes this surface; ADDING an import that pulls
+ *    work in is still what this guard exists to red.
  * 2. `CraftingSystemManager.js` is opened for a COMMENT ONLY. `_vocabularyBasis`'s docstring now
  *    records why the world half is deliberately not wired into the category-icon prune basis;
  *    its executable body, and `_scopeBasis`'s, are byte-identical to the lane base.
