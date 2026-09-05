@@ -55,9 +55,12 @@
   Props:
    - count: how many rows are ticked. Pre-counted by the frame; the panel only words it.
    - systems: `{id, name}[]`, the crafting-system roster.
-   - categoryOptions: the world categories already authored across the corpus, with the reserved
-     bucket already refused by the caller.
-   - tagOptions: the world tag vocabulary, derived from the records that carry it.
+   - categoryOptions: the world vocabulary's categories, with the reserved bucket already refused
+     by the caller (issue 1371 r14-cat, maintainer ruling M18) — never the union of what the
+     records carry, which on a migrated world is the systems' list.
+   - tagOptions: the world vocabulary's tags, from the same store. A tag authored there and
+     applied to no component yet is offered, and the empty sentence below is reached only when
+     the world has authored none.
    - applying: an in-flight write. Inerts every control and the Apply.
    - deleting: an in-flight bulk delete. Inerts the same set, and puts the danger control into its
      own busy state rather than into the Apply's.

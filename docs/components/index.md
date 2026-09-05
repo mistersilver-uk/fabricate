@@ -95,7 +95,7 @@ Adding gives every selected component fresh rules in each chosen system, inherit
 Removing drops those rules, rewrites every recipe in those systems that names the removed component, and disables a recipe left without a usable ingredient set or result because of it.
 The world record is untouched, and no other system is affected.
 - **World category.** Pick a category from the same kind of inline search card, leave it unchanged, or clear it.
-Unlike the entry's own category field, this card offers the categories already set on world components, which on an upgraded world are the ones your crafting systems authored, rather than the world vocabulary.
+Like the entry's own category field, this card offers the world vocabulary's categories and nothing else, so on an upgraded world it lists what you have authored in Tags & Categories rather than the categories your crafting systems carried across.
 The reserved **General** category is refused here too.
 - **World tags.** From the same kind of inline search card, click a tag to cycle it between leave unchanged, add, and remove across every selected component.
 Once you have staged at least one, the tags you touched appear as their own run of chips above the card, coloured by direction, so the whole staged change is visible without scrolling the list.

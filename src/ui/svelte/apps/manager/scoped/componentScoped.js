@@ -1136,26 +1136,6 @@ export function offeredWorldComponentCategories(vocabulary) {
 }
 
 /**
- * The world category values the corpus already carries — the union of every entry's world
- * default — for the catalogue's bulk panel.
- *
- * IT IS NOT THE WORLD VOCABULARY, and since maintainer ruling M18 (issue 1371, revision 13) the
- * entry's picker no longer reads it: on a migrated world every world default was elected from a
- * system that already carried it, so this union lists the SYSTEMS' categories while the World
- * rail reads `Tags & Categories 0`. The entry offers {@link worldVocabularyComponentCategories}
- * instead. This helper stands for its remaining caller, the catalogue bulk panel's category
- * inset, which is named in the r13-entry handoff as the same root cause on another surface.
- *
- * @param {object|null} scope the component family's world-scope projection.
- * @returns {string[]}
- */
-export function authoredWorldComponentCategories(scope) {
-  return offeredWorldComponentCategories(
-    (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => entry?.defaults?.category)
-  );
-}
-
-/**
  * The world category NAMES the World Vocabulary store publishes, which is what a world-defaults
  * picker may offer (issue 1371 r13-entry, maintainer ruling M18).
  *
@@ -1166,11 +1146,46 @@ export function authoredWorldComponentCategories(scope) {
  * itself, and `Edit world vocabulary ↗` is where a name is minted. The reserved bucket is refused
  * on the way through, by the same case-insensitive predicate every other offer takes.
  *
+ * THE CORPUS UNION IT REPLACED IS GONE (issue 1371 r14-cat). `authoredWorldComponentCategories`
+ * read every entry's world default, and on a migrated world each of those was elected from a
+ * system that already carried it, so the union listed the SYSTEMS' categories while the World
+ * rail read `Tags & Categories 0`. The entry's picker left it in revision 13 and the catalogue's
+ * bulk inset in revision 14, and a helper whose only remaining use was the defect is not kept as
+ * a temptation.
+ *
  * @param {object|null} scope the component family's world-scope projection.
  * @returns {string[]} sorted, de-duplicated, blank-free, bucket-free.
  */
 export function worldVocabularyComponentCategories(scope) {
   return offeredWorldComponentCategories(scope?.worldVocabulary?.categories);
+}
+
+// ── issue 1371 r14-cat ────────────────────────────────────────────────────────────────────────
+
+/**
+ * The world tag NAMES the World Vocabulary store publishes, which is what a world-tag stager may
+ * offer (issue 1371 r14-cat, maintainer ruling M18 on its second surface).
+ *
+ * The twin of {@link worldVocabularyComponentCategories}, read from `scope.worldVocabulary.tags`
+ * on the same leg for the same reason. It replaces the corpus union for the catalogue's bulk
+ * inset, whose two failure modes were opposite halves of one rule: a tag applied by a migrated
+ * record was offered as the world's, and a tag the world had authored but no record had applied
+ * yet was not offered at all — with the empty sentence then saying none was authored, a string
+ * denying a reach that exists. No bucket is reserved among tags, so nothing is refused here;
+ * trimmed, blank-free, de-duplicated and sorted so the inset's order does not follow authoring
+ * order.
+ *
+ * @param {object|null} scope the component family's world-scope projection.
+ * @returns {string[]} sorted, de-duplicated, blank-free.
+ */
+export function worldVocabularyComponentTags(scope) {
+  const seen = new Set();
+  const tags = scope?.worldVocabulary?.tags;
+  for (const raw of Array.isArray(tags) ? tags : []) {
+    const tag = typeof raw === 'string' ? raw.trim() : '';
+    if (tag) seen.add(tag);
+  }
+  return [...seen].sort((left, right) => left.localeCompare(right));
 }
 
 /**
@@ -1325,12 +1340,14 @@ export function componentBulkApplyLabel(
 // the DOM to see.
 
 /**
- * The world tag vocabulary the corpus already carries.
+ * The world tags the corpus already carries — the union of every entry's applied world tags.
  *
- * THE TWIN OF {@link authoredWorldComponentCategories}, and it exists for the same reason: there
- * is no world tag ROSTER to read. The World Vocabulary store that will publish one is PR 7's, so
- * the union of what is actually authored across every catalogue entry is the honest list, and it
- * is what the entry's classification card offers as toggles.
+ * IT IS NOT THE WORLD VOCABULARY. It predates the World Vocabulary store, when the union of what
+ * was applied across the catalogue was the only list there was, and it has ONE caller left: the
+ * entry's classification card offers it as toggles. That is the same reading the catalogue's
+ * bulk inset left in issue 1371 r14-cat for {@link worldVocabularyComponentTags} — on a fresh
+ * vocabulary with tags that no record has applied yet, this union is empty and the card says
+ * none is authored. The r14-cat handoff names the entry's read as the same defect.
  *
  * @param {object|null} scope the component family's world-scope projection.
  * @returns {string[]} sorted, de-duplicated, blank-free.

@@ -40,7 +40,6 @@
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
-    authoredWorldComponentCategories,
     componentAliasNote,
     componentBulkDeletePlan,
     componentGlobalTagNote,
@@ -53,6 +52,8 @@
     componentSourceLine,
     componentSourceType,
     componentWorldCategoryNote,
+    worldVocabularyComponentCategories,
+    worldVocabularyComponentTags,
   } from './componentScoped.js';
 
   let {
@@ -137,10 +138,10 @@
    * the search field. Nothing here depends on state, so it is built once.
    *
    * The reference tints the glyph per CATEGORY and this passes no `tint`. That is not an omission
-   * being deferred: a world category is a bare string in this corpus — `authoredWorldComponentCategories`
-   * reads `entry.defaults.category` and nothing carries a colour token for one — so there is no
-   * per-category colour to pass until the world vocabulary publishes one. The frame's own
-   * `thumbnailOf` still supplies the entity's colour token where a scope HAS one.
+   * being deferred: a world category is a bare string in this corpus — `entry.defaults.category`
+   * is a name, and the world vocabulary publishes names alone (`scope.worldVocabulary`) with no
+   * colour token for one — so there is no per-category colour to pass until it publishes one.
+   * The frame's own `thumbnailOf` still supplies the entity's colour token where a scope HAS one.
    */
   const COMPONENT_ROW_MEDALLION = Object.freeze({
     variant: 'glyph-chip',
@@ -168,18 +169,14 @@
   ]);
   const sorts = $derived(componentSorts(phrase));
 
-  const categoryOptions = $derived(authoredWorldComponentCategories(scope));
-  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. There is no world tag
-  // roster to read: the World Vocabulary store that will publish one is PR 7's. The union of what
-  // is actually authored is the honest list, sorted so the picker's order does not follow
-  // catalogue order.
-  const tagOptions = $derived(
-    [
-      ...new Set(
-        entries.flatMap((entry) => (Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []))
-      ),
-    ].sort((left, right) => String(left).localeCompare(String(right)))
-  );
+  // THE BULK INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (issue 1371 r14-cat, maintainer
+  // ruling M18 on its second surface). Both read the names `buildWorldScopeState` attaches to
+  // this leg as `scope.worldVocabulary`, never the union of what the records carry: on a
+  // migrated world every world default was elected from a system, so that union offered the
+  // systems' categories as the world's; and a tag the world had authored but no record had
+  // applied yet was missing from it, with the inset's empty sentence then denying it existed.
+  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
+  const tagOptions = $derived(worldVocabularyComponentTags(scope));
 
   // ── THE ONE WORLD-DEFAULT CARD, THROUGH THE SHELL RATHER THAN BESIDE IT ─────────────────
   // A component draws exactly one section, so the shell renders its count inline with no group

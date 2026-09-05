@@ -30,6 +30,7 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { componentBulkMembershipModes } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
+import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory, so the page-size case below states the SHIPPED
 // shape and changes with it rather than hand-rolling a second one.
 import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
@@ -41,10 +42,43 @@ const { harness } = createWorldComponentCatalogueHarness({
   tmpPrefix: 'fabricate-world-component-catalogue-',
 });
 
-// The projection wrapper and the microtask drain are SHARED with the entry suite; both suites
-// carried them verbatim. Aliased so every call site below reads unchanged.
-const scopeFor = componentScopeFor;
+// The microtask drain is SHARED with the entry suite; both suites carried it verbatim. Aliased
+// so every call site below reads unchanged.
 const drain = drainMicrotasks;
+
+/**
+ * The WORLD VOCABULARY the shared corpus' defaults were minted from (issue 1371 r14-cat).
+ *
+ * `componentCorpus` writes `Refined`, `Raw`, `fuel` and `bulk` onto its world defaults, and until
+ * maintainer ruling M18 reached the bulk panel that was where its two insets read their options.
+ * They read the vocabulary now, so a suite that wants `Refined` offered has to AUTHOR it here —
+ * the defaults alone are what a migrated world carries, and offering them is the defect.
+ */
+const CORPUS_VOCABULARY = Object.freeze({
+  categories: Object.freeze(['Raw', 'Refined']),
+  tags: Object.freeze(['bulk', 'fuel']),
+});
+
+/**
+ * The world-scope projection over the corpus, with the vocabulary's names attached as
+ * `buildWorldScopeState` attaches them (`scope.worldVocabulary`, bare names on the component leg).
+ *
+ * `componentScopeFor` runs `projectWorldScopeEntity` alone and never sees the vocabulary store.
+ * `null` publishes NO vocabulary at all — an older publish, or a world with none authored — which
+ * is the state the ruling was raised against, so it is a first-class argument rather than an
+ * empty object.
+ *
+ * @param {object} [overrides] passed straight to `componentCorpus`.
+ * @param {{categories?: readonly string[], tags?: readonly string[]}|null} [vocabulary]
+ * @returns {object}
+ */
+function scopeFor(overrides = {}, vocabulary = CORPUS_VOCABULARY) {
+  const scope = componentScopeFor(overrides);
+  if (!vocabulary) return scope;
+  const categories = [...(vocabulary.categories ?? [])];
+  const tags = [...(vocabulary.tags ?? [])];
+  return { ...scope, worldVocabulary: { categories, tags } };
+}
 
 describe('world Component Catalogue (issue 1371)', () => {
   before(async () => {
@@ -1097,9 +1131,10 @@ describe('world Component Catalogue (issue 1371)', () => {
       // `Global tags` exit already goes. A dead instruction is worse than none.
       const { calls, actions } = recordingComponentActions();
       const target = await harness.mount({
-        // `defaults: []` strips the world tags off the corpus, which is the only way this empty
-        // state is reachable at all — the shipped fixture authors two.
-        scope: scopeFor({ defaults: [] }),
+        // A vocabulary with NO tags is what reaches this state now (issue 1371 r14-cat, M18):
+        // the corpus is left carrying `fuel` and `bulk` on `coal`, so a panel that still read the
+        // records rather than the vocabulary would draw the inset here and never reach it.
+        scope: scopeFor({}, { categories: CORPUS_VOCABULARY.categories, tags: [] }),
         systems: COMPONENT_SYSTEMS,
         actions,
       });
@@ -1585,17 +1620,13 @@ describe('world Component Catalogue (issue 1371)', () => {
      */
     async function selectedWithSevenTags() {
       const { calls, actions } = recordingComponentActions();
-      const base = componentCorpus();
       const target = await harness.mount({
-        scope: componentScopeFor({
-          defaults: [
-            ...base.defaults.filter((row) => row.id !== 'coal'),
-            {
-              id: 'coal',
-              category: 'Raw',
-              tags: ['alloy', 'bulk', 'ceramic', 'dust', 'ember', 'fuel', 'glass'],
-            },
-          ],
+        // AUTHORED in the vocabulary, not applied to a record (issue 1371 r14-cat, M18): the
+        // inset pages over what the world has, and a tag no component carries yet is still a
+        // row a GM may stage.
+        scope: scopeFor({}, {
+          categories: CORPUS_VOCABULARY.categories,
+          tags: ['alloy', 'bulk', 'ceramic', 'dust', 'ember', 'fuel', 'glass'],
         }),
         systems: COMPONENT_SYSTEMS,
         actions,
@@ -1863,6 +1894,113 @@ describe('world Component Catalogue (issue 1371)', () => {
         false,
         'a second instruction can be staged and committed after the failed one'
       );
+    });
+
+    // ── THE TWO INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (issue 1371 r14-cat) ──────
+    // Maintainer ruling M18, extended from the entry's picker to the catalogue's bulk panel. The
+    // category inset read the corpus union of every entry's world default, and the tag inset the
+    // union of every entry's world tags. On a migrated world each world default was elected FROM
+    // a system, so the first list was the systems' categories offered as the world's; and a
+    // vocabulary tag no record had applied yet was not offered at all, with the empty sentence
+    // saying none was authored — a string denying a reach that exists (`brief-r11-common.md`
+    // rule 1). Both insets read `scope.worldVocabulary` now, which `buildWorldScopeState` publishes
+    // on the component leg.
+    describe('the two insets offer the WORLD VOCABULARY and nothing else (M18)', () => {
+      /** Mount with two rows ticked over a scope built from `vocabulary`, and read one inset. */
+      async function insetOver(vocabulary, overrides = {}) {
+        const target = await harness.mount({
+          scope: scopeFor(overrides, vocabulary),
+          systems: COMPONENT_SYSTEMS,
+          actions: recordingComponentActions().actions,
+        });
+        await selectTwo(target);
+        return target;
+      }
+
+      it('offers the category inset the unset row ALONE when the world has no vocabulary, over defaults migrated from systems', async () => {
+        const scope = scopeFor({}, null);
+        assert.ok(
+          scope.entries.some((entry) => entry.defaults?.category === 'Refined'),
+          'the corpus DOES carry a world default the systems minted — that is what must not be offered'
+        );
+        const target = await insetOver(null);
+        assert.deepEqual(
+          insetRows(target, 'category'),
+          ['none'],
+          'a migrated default is a system’s category, not the world’s'
+        );
+      });
+
+      it('and offers two authored categories in full, with the corpus’ own values absent', async () => {
+        const target = await insetOver({ categories: ['Corpses', 'Bespoke Items'], tags: [] });
+        assert.deepEqual(insetRows(target, 'category'), ['none', 'Bespoke Items', 'Corpses']);
+      });
+
+      it('offers the tag inset the vocabulary’s tags, not the tags applied across the corpus', async () => {
+        const target = await insetOver({ categories: [], tags: ['fuel', 'ash'] });
+        assert.deepEqual(
+          insetRows(target, 'tags'),
+          ['ash', 'fuel'],
+          '`bulk` is applied to `coal` and unauthored; `ash` is authored and applied nowhere'
+        );
+        // AND A TAG NO COMPONENT CARRIES IS STILL A ROW A GM CAN STAGE: the row acts.
+        stageTag(target, 'ash');
+        await drain();
+        assert.equal(
+          target
+            .querySelector(
+              ':scope [data-world-component-bulk-inset="tags"] [data-world-component-bulk-option="ash"]'
+            )
+            .getAttribute('data-world-component-bulk-option-state'),
+          'add'
+        );
+        assert.ok(
+          Boolean(target.querySelector('[data-world-component-bulk-tag-chip="ash"]')),
+          'and the staged run shows it'
+        );
+      });
+
+      it('draws the tag inset, NOT the `not authored yet` sentence, for a fresh vocabulary no component has applied', async () => {
+        // The case the r13-entry handoff named: tags authored, none applied. The corpus union
+        // is empty here, so the old panel said `No world tags are authored yet` over a world
+        // that had just authored one.
+        const target = await insetOver({ categories: [], tags: ['fuel'] }, { defaults: [] });
+        assert.ok(
+          !target.querySelector('[data-world-component-bulk-tags-empty]'),
+          'the sentence denies a reach that exists'
+        );
+        assert.deepEqual(insetRows(target, 'tags'), ['fuel']);
+      });
+
+      it('and both lists reach the panel through the REAL projection, not only through this suite’s wrapper', async () => {
+        // `scopeFor` mirrors what `buildWorldScopeState` attaches; a mirror that drifted from the
+        // producer would keep every assertion above green while the shipped panel offered
+        // nothing. So the seam runs end to end once: two fake stores, the real assembler, and
+        // the page mounted on the component leg it publishes.
+        const seeded = (corpus) => ({ corpus: () => corpus, isSeeded: () => true });
+        const { worldScope } = buildWorldScopeState({
+          stores: {
+            component: seeded(componentCorpus()),
+            vocabulary: seeded({
+              componentCategories: [{ id: 'reagents', name: 'Reagents' }],
+              componentTags: [
+                { id: 'ore', name: 'ore' },
+                { id: 'moss', name: 'moss' },
+              ],
+              recipeCategories: [],
+            }),
+          },
+          systems: COMPONENT_SYSTEMS,
+        });
+        const target = await harness.mount({
+          scope: worldScope.component,
+          systems: COMPONENT_SYSTEMS,
+          actions: recordingComponentActions().actions,
+        });
+        await selectTwo(target);
+        assert.deepEqual(insetRows(target, 'category'), ['none', 'Reagents']);
+        assert.deepEqual(insetRows(target, 'tags'), ['moss', 'ore']);
+      });
     });
   });
 
