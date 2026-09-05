@@ -1098,6 +1098,50 @@ test('no capture producer drives a converted select with Playwright’s <select>
   );
 });
 
+// THE REGISTRY DOES NOT CALL `.selectOption(`, SO THE BAN ABOVE CANNOT SEE ITS HALF. A View Lab
+// step names the verb as DATA — `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs`
+// is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
+// spelling of every converted step is a line the ban above reads and passes over, and reverting
+// one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
+// this PR's own screenshot evidence — not as a red unit test. Twelve steps converted here and
+// issues 1510/1511 will convert more, so the surface this covers is growing rather than closing.
+test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
+  const registry = CAPTURE_PRODUCERS.find(
+    ({ path }) => path === 'scripts/lib/viewLabCases.js'
+  ).source;
+  // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
+  // which is how every one of these steps is authored. Reading the pair together is what lets the
+  // clause tell WHICH control a native verb was aimed at.
+  const steps = [
+    ...registry.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g),
+  ];
+  const offenders = [];
+  for (const match of steps) {
+    const selector = match[2];
+    for (const hook of CONVERTED_SELECT_HOOKS) {
+      if (!selector.includes(hook)) continue;
+      offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
+    }
+  }
+  // NON-VACUITY, the same floor the ban above keeps: four `select:` steps survive on genuinely
+  // native selects (the recipe category filter, the world currency strategy twice, and the tool
+  // catalogue's sort), which issues 1510 and 1511 own. At zero the clause quantifies over nothing.
+  assert.ok(
+    steps.length >= 4,
+    `only ${steps.length} \`select:\` steps remain in the registry, against a floor of 4. If the ` +
+      'last native select has converted, delete this clause rather than leaving it green.'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these View Lab steps drive an app-drawn option list with the registry’s native `select:` ' +
+      'verb, which `scripts/view-lab-screenshots.mjs` turns into Playwright’s `<select>`-only ' +
+      '`selectOption` — and that throws on a `<button role="combobox">`. Use ' +
+      '`chooseSelectOption(selector, value)`, which clicks the trigger and then the row by its ' +
+      '`[data-popover-option="…"]` handle:\n  ' + offenders.join('\n  ')
+  );
+});
+
 test('the option list a capture producer clicks is rooted where the portal puts it', () => {
   const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
   const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
