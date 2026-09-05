@@ -24559,12 +24559,18 @@
   overflow: auto;
 }
 
+/* EVERY ROW SITS ON THE CARD'S OWN SURFACE, WITH A HAIRLINE BENEATH (issue 1371 r13-entry,
+   maintainer ruling M15). The reference draws its rows on one surface (`proto:931`), and the
+   surface is DECLARED here rather than left to fall through: this sheet loads at `layer(modules)`
+   and wins on any property it states, but a property it leaves unstated is the host's to paint,
+   and the banding the ruling names is exactly what an undeclared row background lets in. */
 .fabricate-manager .manager-component-entry-system {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4);
+  background: transparent;
   border-bottom: 1px solid var(--fab-border);
 }
 
@@ -24590,11 +24596,9 @@
   white-space: nowrap;
 }
 
-.fabricate-manager
-  .manager-component-entry-system.is-outsider
-  .manager-component-entry-system-name {
-  color: var(--fab-text-muted);
-}
+/* THE NAME IS FULL INK ON EVERY ROW, member or not (`proto:932` draws `var(--text)` with no
+   member branch). The without-rules row used to mute it, which is one of the two paints
+   maintainer ruling M15 names; the row's summary already says the system has no rules. */
 
 /* THE MODE SUB-LINE, which round 3 replaced with a warning-toned chip stating a different fact. */
 .fabricate-manager .manager-component-entry-system-mode {
@@ -25868,13 +25872,13 @@
   color: var(--fab-text);
 }
 
-/* A ROW WITH NO RULES IS RECESSED, NOT MERELY GREYED (`proto:5461`). The reference fills the
-   non-member row with `surface-soft` and leaves the member row transparent, so the two cohorts
-   separate at a glance on a roster where most systems are one or the other; the ink alone did
-   that work at 42% opacity on a single line of copy. */
-.fabricate-manager .manager-component-entry-system.is-outsider {
-  background: var(--fab-surface-soft);
-}
+/* A ROW WITH NO RULES SITS ON THE SAME SURFACE AS ONE WITH RULES (issue 1371 r13-entry,
+   maintainer ruling M15). `proto:5462` does tint the non-member row with a 5% `surface-soft`
+   wash; on the reference's own ramp that wash is invisible and the maintainer's reading of the
+   prototype frame is one uniform surface, while on this product's ramp — and under a host
+   theme — it drew the with-rules row as a dark band between lighter ones. The wash is retired
+   and the row rule above states `transparent` for every row; the cohorts still separate by the
+   summary's ink and by the dashed `Add to system` against the bordered `View system rules`. */
 
 /* ── A1. THE UNSAVED MARKER IN THE HEADER BAND (`proto:817`) ─────────────────────────────────
    A 7px warning dot and the words beside the action pair, shown only while the draft is dirty.

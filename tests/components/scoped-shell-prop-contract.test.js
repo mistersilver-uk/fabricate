@@ -1522,3 +1522,73 @@ describe('the world Component entry header wires the borderless medallion', () =
     }
   });
 });
+
+/**
+ * THE `Systems using this component` ROWS SHARE ONE SURFACE (issue 1371 r13-entry, maintainer
+ * ruling M15).
+ *
+ * The reference draws every row of that card on the card's own surface with a hairline beneath,
+ * and every system NAME in full ink (`proto:932`); its non-member wash (`proto:5462`) is a 5%
+ * tint the maintainer's own reading of the prototype frame calls one uniform surface. The
+ * subject painted the without-rules rows on `--fab-surface-soft` and muted their names, which in
+ * Foundry reads as a dark band for the with-rules row and lighter bands under the rest — the
+ * defect the ruling names. The parity oracle measures the with-rules row only, so the outsider
+ * paint could drift with no line to show it; this pins the sheet, which a reviewer can check
+ * from the diff alone.
+ *
+ * EVERY ROW DECLARES ITS OWN BACKGROUND, and that is a leak guard rather than a redundancy:
+ * `styles/fabricate.css` loads at `layer(modules)` and wins on any property it DECLARES, but a
+ * property it leaves undeclared falls through to whatever the host's own list styling says.
+ */
+describe('the entry’s per-system rows sit on one surface, with every name in full ink', () => {
+  const CSS_PATH = 'styles/fabricate.css';
+
+  /** `{ selector, body }` for every rule, comments stripped, selectors whitespace-normalised. */
+  function rulesOf(css) {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
+      selector: match[1].replace(/\s+/g, ' ').trim(),
+      body: match[2].replace(/\s+/g, ' ').trim(),
+    }));
+  }
+
+  const ROW = '.fabricate-manager .manager-component-entry-system';
+  const NAME = '.fabricate-manager .manager-component-entry-system-name';
+
+  it('declares the row’s own transparent surface and its hairline, so nothing outside the module can band it', () => {
+    const rule = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+      (candidate) => candidate.selector === ROW
+    );
+    assert.ok(Boolean(rule), 'NON-VACUITY: the row rule is still in the sheet');
+    assert.match(rule.body, /background: transparent;/, 'the row states its surface explicitly');
+    assert.match(rule.body, /border-bottom: 1px solid var\(--fab-border\);/, 'and its separator');
+  });
+
+  it('paints NO wash and re-inks NO name on the without-rules rows', () => {
+    // THE MUTATION THIS KILLS: restoring `.is-outsider { background: var(--fab-surface-soft) }`
+    // or `.is-outsider .manager-component-entry-system-name { color: var(--fab-text-muted) }`.
+    const outsiderRules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).filter(
+      (rule) =>
+        rule.selector.includes('manager-component-entry-system') &&
+        rule.selector.includes('.is-outsider')
+    );
+    for (const rule of outsiderRules) {
+      assert.ok(
+        !/(^|[\s;])background(-color)?:/.test(rule.body),
+        `\`${rule.selector}\` paints a wash on the without-rules row: ${rule.body}`
+      );
+      assert.ok(
+        !/(^|[\s;])color:/.test(rule.body),
+        `\`${rule.selector}\` re-inks the without-rules row: ${rule.body}`
+      );
+    }
+  });
+
+  it('and the system name is full ink on every row (`proto:932`)', () => {
+    const rule = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+      (candidate) => candidate.selector === NAME
+    );
+    assert.ok(Boolean(rule), 'NON-VACUITY: the name rule is still in the sheet');
+    assert.match(rule.body, /color: var\(--fab-text\);/);
+  });
+});
