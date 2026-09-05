@@ -1752,8 +1752,7 @@
           "PageOf": "Page {page} of {total}",
           "Previous": "Previous page",
           "Next": "Next page",
-          "PerPage": "Per page",
-          "PerPageLabel": "Rows per page"
+          "PerPage": "Per page"
         },
         "Create": "Create",
         "CreateSystem": "Create system",
