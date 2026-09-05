@@ -42,6 +42,8 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
+    // The issue-1036 essence offer projection the `Essence contribution` card applies (M31).
+    'src/utils/essenceValidation.js',
   ],
   compiledExtras: [
     // THE ENTRY'S OWN THREE CHILDREN (issue 1371, parity round 4). Each is imported STATICALLY by
@@ -695,6 +697,17 @@ describe('world Component entry editor (issue 1371)', () => {
         ],
         'the preview follows the draft before anything is saved'
       );
+    });
+
+    it('withholds a WORLD-DISABLED essence from the offer, but keeps one this record already contributes (issue 1036)', async () => {
+      // The world roster's `enabled` is the world master switch. `flame` is disabled and carried at
+      // 2, so it stays rendered and clearable; `earth` is disabled and absent, so it is withheld.
+      const { target } = await openEssences('ingot', AUTHORED, [
+        { ...WORLD_ESSENCES[0], enabled: false },
+        { ...WORLD_ESSENCES[1], enabled: false },
+        { id: 'tide', name: 'Tide', enabled: true },
+      ]);
+      assert.deepEqual(rowIds(target), ['flame', 'tide'], 'the carried disabled essence is retained; the uncarried one is withheld');
     });
 
     it('says so rather than drawing an empty grid when the world has no essences', async () => {

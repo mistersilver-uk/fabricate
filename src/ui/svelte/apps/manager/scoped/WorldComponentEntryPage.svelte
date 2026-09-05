@@ -79,6 +79,7 @@
     worldVocabularyComponentTags,
   } from './componentScoped.js';
   import { componentScopeValidationPresentation } from '../../../../../utils/componentScopeValidation.js';
+  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import {
     flushScopedEntryDraft,
     scopedEntryBaseline,
@@ -412,16 +413,25 @@
   // system's roster, here over the world's. A key the catalogue does not list draws no row (it has
   // no name and no glyph) and is CARRIED FORWARD untouched by every write, because a card that
   // never showed it must not delete it.
+  //
+  // THE OFFER IS THE ISSUE-1036 PROJECTION, as on every other essence-quantity grid: a WORLD-
+  // DISABLED essence (`enabled: false` off the world master switch) is withheld from the add
+  // offer, and one this record already contributes stays rendered and clearable — otherwise the
+  // surface that authored the value becomes the one place it cannot be cleared.
   const essenceRows = $derived(
-    (Array.isArray(worldEssences) ? worldEssences : [])
-      .filter((essence) => essence?.id)
-      .map((essence) => ({
-        id: String(essence.id),
-        name: String(essence.name ?? '').trim() || String(essence.id),
-        icon: String(essence.icon ?? ''),
-        colorToken: String(essence.colorToken ?? ''),
-        quantity: draftEssenceMap[String(essence.id)] ?? 0,
-      }))
+    visibleEssenceOptions(
+      (Array.isArray(worldEssences) ? worldEssences : [])
+        .filter((essence) => essence?.id)
+        .map((essence) => ({
+          id: String(essence.id),
+          name: String(essence.name ?? '').trim() || String(essence.id),
+          icon: String(essence.icon ?? ''),
+          colorToken: String(essence.colorToken ?? ''),
+          enabled: essence.enabled !== false,
+          quantity: draftEssenceMap[String(essence.id)] ?? 0,
+        })),
+      (row) => row.quantity > 0
+    )
   );
   const essenceNote = $derived(entry ? componentWorldEssenceNote(entry, phrase) : '');
   const railEssences = $derived(componentEssenceChips(draftEssenceMap, worldEssences));

@@ -45,6 +45,10 @@ const CONSUMERS = Object.freeze([
     'visibleEssenceOptions',
   ],
   ['src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte', 'visibleEssenceOptions'],
+  // The world Component entry's `Essence contribution` card (issue 1371 r18-entry, maintainer
+  // ruling M31): the same quantity grid over the WORLD essence catalogue, whose `enabled` is the
+  // world master switch — an offer and the editing surface for the world map at once.
+  ['src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte', 'visibleEssenceOptions'],
 ]);
 
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal
