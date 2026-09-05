@@ -1413,6 +1413,52 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
 });
 
 /**
+ * THIS SCREEN'S POINTER HIT-TESTS ARE IN THE CAPTURE REGISTRY, AND THAT IS A MIRROR
+ * (issue 1371 r11-entry, UX F-H).
+ *
+ * happy-dom computes no layout, so no mounted suite can hit-test anything — measured in
+ * `world-component-entry-mounted.test.js`, which reports a 0x0 box and a `null`
+ * `elementFromPoint` for a chip it plainly renders. The entry's three real pointer proofs
+ * therefore live in `scripts/lib/viewLabCases.js`, where they run against the real app in real
+ * Chromium on every push.
+ *
+ * A registry entry is a hand-maintained mirror of two selectors that live in two components, and
+ * nothing else fails when one of them is deleted: the case keeps capturing, the frame keeps
+ * publishing, and the proof is silently gone. So the pair is pinned here — the hook must be in
+ * the registry AND the component must still emit it.
+ */
+describe('the entry’s pointer proofs survive in the capture registry', () => {
+  const registry = () => sourceOf('scripts/lib/viewLabCases.js');
+
+  it('carries a centre-hit on the world tag chip, which the page still emits', () => {
+    assert.match(registry(), /expectCenterHit: '\[data-scoped-entry-tag="fuel"\]'/);
+    assert.match(
+      sourceOf(`${SCOPED_DIR}/WorldComponentEntryPage.svelte`),
+      /data-scoped-entry-tag=\{tag\}/,
+      'and the chip carries the attribute that selector addresses'
+    );
+  });
+
+  it('carries a centre-hit on the member row’s exit icon, whose token the card still mints', () => {
+    assert.match(registry(), /data-arm-token="scoped-membership-remove:sm-coal\|lab-smithing"/);
+    assert.match(
+      sourceOf(`${SCOPED_DIR}/WorldComponentEntrySystemsCard.svelte`),
+      /`scoped-membership-remove:\$\{entryId\}\|\$\{row\?\.systemId \?\? ''\}`/,
+      'the card still mints that token shape, so the registry selector can resolve'
+    );
+  });
+
+  it('and a real pointer CLICK on the armed delete, which is stronger than a hit-test', () => {
+    assert.match(registry(), /expectClick: '\[data-arm-token="world-component-delete:sm-coal"\]'/);
+    assert.match(
+      sourceOf(`${SCOPED_DIR}/WorldComponentEntryPage.svelte`),
+      /world-component-delete:/,
+      'and the page still mints that token'
+    );
+  });
+});
+
+/**
  * THE ENTRY HEADER'S IDENTITY CHIP IS BORDERLESS (issue 1371 r11-entry, UX F-B).
  *
  * The reference draws the world Component entry's header chip at `proto:5375` — 42px, radius 10,

@@ -22,6 +22,7 @@ import {
   drainMicrotasks,
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -78,6 +79,34 @@ const sourceCardHarness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
+  ],
+});
+
+/**
+ * `ItemDropZone` ON ITS OWN, for the DEFAULT half of `compact` (issue 1371 r11-entry, UX minor).
+ *
+ * `compact` is an opt-in this issue added to a primitive with eight other call sites, and the
+ * positive arm — the entry's identity zone IS `is-compact` — is proved through the page below.
+ * The negative arm is not reachable there: BOTH zones the entry renders opt in, so nothing on
+ * this screen can show that a zone which does NOT ask keeps the linked art, the name and the
+ * uuid. Every other opt-in this PR shipped carries that pair (`ManagerButton`, `ManagerSearchField`,
+ * `Medallion`, `ScopedEntityPreview`), and it is the pair that makes "byte-identical by default"
+ * a measurement rather than a claim.
+ *
+ * The manifest is three modules because that is the primitive's whole static graph.
+ */
+const dropZoneHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-world-component-entry-drop-zone-',
+  componentPath: 'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  rawModules: [
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/util/dropUtils.js',
+    'src/ui/svelte/util/foundryBridge.js',
+  ],
+  compiledModules: [
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
   ],
 });
 
@@ -586,6 +615,57 @@ describe('world Component entry editor (issue 1371)', () => {
    * moved into `ScopedValidationTab` and a page-level assertion on what the page passes could not
    * see a tab that dropped it.
    */
+  /**
+   * WHERE THIS SCREEN'S POINTER HIT-TESTS LIVE, AND WHY NOT HERE (issue 1371 r11-entry, UX F-H).
+   *
+   * The round-2 review looked for `elementFromPoint` in this file and found none. It is absent on
+   * purpose and the absence is measured below rather than asserted in prose: happy-dom computes
+   * NO layout, so every rendered node reports a 0x0 box and `document.elementFromPoint` answers
+   * `null` at any coordinate. A hit-test written here would therefore be one of two useless
+   * things — permanently red, or green over `null` — and neither can tell "the chip owns its
+   * centre" from "an overlay swallows it", which is the whole question.
+   *
+   * The four `elementFromPoint` sites that DO exist under `tests/components/` are all real-browser
+   * suites that stand up Chromium and a hand-built fixture page (`manager-layout`,
+   * `overlay-portal-host-position`, `theme-rendered-validation`, `tool-rules-list-parity`). This
+   * screen's are stronger than that: they run against the REAL app in the View Lab case registry,
+   * in real Chromium, on every push — `world-component-entry-tags` carries `expectCenterHit` on a
+   * world tag chip, and `world-component-entry-systems` carries one on the member row's 26px exit
+   * icon plus an `expectClick`, which is a real Playwright pointer click whose actionability pass
+   * is strictly stronger than `elementFromPoint`. `scoped-shell-prop-contract.test.js` guards that
+   * those three survive, because a registry entry is a hand-maintained mirror.
+   *
+   * THE DELTA'S FOURTH NAMED TARGET NO LONGER EXISTS. Issue body line 540 asks for a hit-test on
+   * "the entry's N-by-M mute chip grid"; the reference draws no per-system tag mute anywhere on
+   * this screen and revision 8 removed it, which `viewLabCases.js`'s own note records in terms.
+   * There is nothing to point at.
+   *
+   * This block is SELF-RETIRING: it reds the day happy-dom starts laying out, which is the day a
+   * mounted hit-test becomes worth writing.
+   */
+  describe('a pointer hit-test cannot be made in this harness, and here is the measurement', () => {
+    it('reports a zero box and a null hit for a chip the tree plainly renders', async () => {
+      const { target } = await open('coal');
+      const chip = target.querySelector('[data-scoped-entry-tag="fuel"]');
+      assert.ok(Boolean(chip), 'NON-VACUITY: the chip this would hit-test is really rendered');
+
+      const box = chip.getBoundingClientRect();
+      assert.equal(
+        `${box.width}x${box.height}`,
+        '0x0',
+        'happy-dom lays nothing out, so a rendered chip has no box to find a centre of'
+      );
+      const hit = window.document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2
+      );
+      assert.ok(
+        !hit,
+        'and nothing is at that point, so a mounted hit-test could only ever assert about `null`'
+      );
+    });
+  });
+
   describe('the Validation tab states the VERDICT, with no heading above it', () => {
     async function validationTab(entityId) {
       const { target } = await open(entityId);
@@ -1811,3 +1891,77 @@ describe('the world Component entry source card, mounted on its own (issue 1371)
   });
 });
 
+/**
+ * THE DEFAULT HALF OF `compact` (issue 1371 r11-entry, UX minor).
+ *
+ * The positive arm lives above, through the page: the entry's identity card draws its zone
+ * `is-compact`, which is M7's fourth clause. This is the arm the page cannot reach, because both
+ * of the entry's zones opt in — a `compact` that had quietly become the primitive's DEFAULT would
+ * pass every assertion on this screen while silently deleting the linked art, the name and the
+ * uuid from the eight sites that never asked for it.
+ */
+describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the compact one', () => {
+  const LINKED_ITEM = Object.freeze({
+    name: 'Iron Ingot',
+    img: 'icons/commodities/metal/ingot-worn-iron.webp',
+  });
+
+  before(async () => {
+    await dropZoneHarness.setup();
+  });
+
+  after(() => {
+    dropZoneHarness.teardown();
+  });
+
+  it('draws the art, the resolved name and the uuid with the prop unset', async () => {
+    const target = await dropZoneHarness.mount({
+      item: LINKED_ITEM,
+      title: 'Drop an item',
+      uuid: 'Item.ingot-source',
+      kind: 'component-source',
+    });
+    const zone = target.querySelector('[data-item-drop-zone="component-source"]');
+    assert.ok(Boolean(zone), 'the zone renders');
+    assert.ok(
+      zone.classList.contains('is-linked') && !zone.classList.contains('is-compact'),
+      `an unasked zone is the LINKED face; it read "${zone.className}"`
+    );
+    assert.equal(
+      zone.querySelector('.manager-item-drop-zone-icon img')?.getAttribute('src'),
+      LINKED_ITEM.img,
+      'the art is the resolved document’s, not the empty glyph'
+    );
+    assert.equal(
+      zone.querySelector('.manager-item-drop-zone-copy strong').textContent.trim(),
+      'Iron Ingot',
+      'the name is the document’s, not the caller’s prompt'
+    );
+    assert.equal(
+      zone.querySelector('[data-item-drop-zone-uuid]').textContent.trim(),
+      'Item.ingot-source',
+      'and the address is printed under it'
+    );
+  });
+
+  it('and the SAME props with `compact` on suppress all three, so the pair discriminates', async () => {
+    // The control on the control: without this arm an `is-compact` that had stopped suppressing
+    // anything would satisfy the assertions above and the negative would prove nothing.
+    const target = await dropZoneHarness.mount({
+      item: LINKED_ITEM,
+      title: 'Drop an item',
+      uuid: 'Item.ingot-source',
+      kind: 'component-source',
+      compact: true,
+    });
+    const zone = target.querySelector('[data-item-drop-zone="component-source"]');
+    assert.ok(zone.classList.contains('is-compact') && !zone.classList.contains('is-linked'));
+    assert.ok(!zone.querySelector('.manager-item-drop-zone-icon img'), 'the art is a glyph again');
+    assert.equal(
+      zone.querySelector('.manager-item-drop-zone-copy strong').textContent.trim(),
+      'Drop an item',
+      'the strong line is the caller’s prompt rather than the document’s name'
+    );
+    assert.ok(!zone.querySelector('[data-item-drop-zone-uuid]'), 'and the address is gone');
+  });
+});

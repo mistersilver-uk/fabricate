@@ -657,6 +657,27 @@
                       oninput={(event) => patchIdentity('description', event.currentTarget.value)}
                     ></textarea>
                   {/if}
+                  <!--
+                    THE SENTENCE IS THE REFERENCE'S OWN LITERAL (`proto:847`) AND STAYS VERBATIM,
+                    AND THE MECHANISM BEHIND IT IS HONEST FOR ONE OF THE TWO LINKED BRANCHES
+                    (issue 1371 r11-entry, round-2 Foundry review finding 3).
+
+                    A WORLD item refreshes: `source` below resolves the live document out of
+                    `worldItems`, which the shell fills from `game.items.contents`, so a rename
+                    in the sidebar reaches this card on the next publish. A COMPENDIUM item does
+                    NOT: a pack address is never in that collection, so the three values fall
+                    back to the stored snapshot permanently and are refreshed only by re-dropping
+                    the same item — while `componentSourceLine` correctly prints `Linked
+                    Compendium entry` beside them, so the state names itself.
+
+                    NOT PAPERED OVER IN THE COPY, and not fixed here either. The copy is the
+                    reference's and the brief makes the reference the authority for it; the fix
+                    is a `fromUuid` read, which is asynchronous and already written for the
+                    create and relink paths (`foundryBridge.resolveItemSourceSnapshot`), so
+                    routing the compendium branch through it is a store-side change with its own
+                    refusal and caching questions rather than a line in this card. It is carried
+                    as a named follow-up in this lane's handoff.
+                  -->
                   <p class="manager-component-entry-identity-note" data-scoped-entry-attribution>
                     {text(
                       'FABRICATE.Admin.Manager.Scoped.Component.Entry.IdentityNote',
