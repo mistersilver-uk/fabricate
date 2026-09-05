@@ -18158,10 +18158,12 @@
    M27 IS the entry's rail — painted by rules keyed on `.manager-component-entry-page`, which this
    route's `<main>` therefore carries itself, its form and rail as the two columns. What this rule
    keeps is the ROUTE's own job: one
-   `minmax(0, 1fr)` row, so the frame fills the pane and its rail's hairline runs the pane's
-   height. The base `.manager-main` template is `auto auto 1fr`, which sized the frame's row to
-   its content and left the rail's border ending in mid-air (the maintainer's M26 frame). The
-   narrow-container stacking is the page frame's own query, so this rule carries none.
+   `minmax(0, 1fr)` row in place of the base `.manager-main` template's `auto auto 1fr`, so the
+   frame fills the pane and its rail's hairline runs the pane's height (maintainer ruling M26: the
+   hairline ended part way down in the maintainer's Foundry; the View Lab did not reproduce it at
+   the base, so the fix is the structural one — this route now stands on the frame of the screen
+   whose rail ran full height in the same live test). The narrow-container stacking is the page
+   frame's own query, so this rule carries none.
 
    The selector gains `.manager-main` to reach (0,3,0): the route's own `.manager-main` rule is
    written EARLIER in this sheet at the same (0,2,0), so a bare
@@ -18171,18 +18173,6 @@
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-}
-
-/* `proto:1307`: the content column is `padding: 16px 22px 40px` with a 14px gap. The inline 22
-   and the 40 foot snap to the spacing scale at 24 and 40; the gap snaps to 12. */
-.fabricate-manager .manager-component-edit-view {
-  display: grid;
-  align-content: start;
-  gap: var(--fab-space-3);
-  min-width: 0;
-  min-height: 0;
-  padding: var(--fab-space-4) var(--fab-space-6) 40px;
-  overflow: auto;
 }
 
 /* ── The component editor's panel surface (issue 676) ──────────────────────────────
@@ -25369,24 +25359,6 @@
   background: var(--fab-bg-2);
 }
 
-/* D2. THE TAB STRIP'S OWN BAND (gap-list row 127, `proto:1302-1306`): 22px inline padding and a
-   22px gap on a bottom hairline, both snapped to `--fab-space-5` — padding and gap are
-   spacing-scale members and 22 is not a step. Measured drift before this rule:
-   `rules-tabstrip.padding{Left,Right} 0px` and `columnGap 4px` against the reference's 22.
-
-   WRITTEN EXACTLY AS THE WORLD ENTRY'S OWN STRIP IS (`.manager-component-entry-column >
-   .manager-editor-tabs`, above): the reference draws the two strips identically, so this is the
-   sibling rule rather than a second treatment. `flex: 0 0 auto` is load-bearing for the same
-   reason it is there — a flex item defaults to `flex-shrink: 1`, and on a short window the strip
-   would compress into the panel.
-
-   `>` rather than a descendant combinator so it cannot reach a strip a card nests later. */
-.fabricate-manager .manager-component-edit-view > .manager-editor-tabs {
-  flex: 0 0 auto;
-  gap: var(--fab-space-5);
-  padding: 0 var(--fab-space-5);
-}
-
 /* ══ ISSUE 1371 · PART D — THE COMPONENT RULES EDITOR ═══════════════════════════════════════════
    `rebuild-spec.md` Part D, `proto:1282-1501`. The standing rules stated at the head of the Part C
    block apply here unchanged: spacing snaps to the 4px scale, a 12px card radius snaps to 11, a
@@ -25847,45 +25819,6 @@
 }
 
 
-/* ══ issue 1371 r8-list — THE RULES EDITOR'S COLUMN STARTS WHERE ITS RAIL DOES ═══════════════
-   Lane GATES's alignment groups measured it: `profile-column-and-rail`.top reported the subject
-   insetting `rules-tabstrip` 16.0px below `rules-rail` (258.3 against 242.3) where the reference
-   starts them level.
-
-   THE REFERENCE PUTS THAT 16px BELOW THE TAB STRIP, NOT ABOVE IT. `proto:1301-1306` draws the
-   content column as a flex column whose FIRST child is the strip at `padding: 0 22px` — no top
-   padding at all, so the strip's box top IS the column's top and therefore the rail's — and gives
-   the 16px to the SCROLLING PANEL beneath it (`proto:1307`, `padding: 16px 22px 40px`). The
-   shipped column carried the whole `16px 24px 40px` on the FORM, which is the strip's ancestor,
-   so every child including the strip started 16px down.
-
-   Nothing measured it, and nothing could: the strip's own `box` group is its padding, which is
-   correct in both arrangements, and no region measures the form at all. An alignment group is
-   the only pass that can see an inset that moves a whole column and changes no property on it —
-   which is exactly the case `prototype-parity-measurement.md` names.
-
-   TWO DECLARATIONS, AND THE SECOND IS NOT COSMETIC. Dropping the column's top padding alone
-   would leave the strip-to-first-card distance at the grid's own 12px gap; the reference's is 16
-   (the panel's `padding-top`, immediately under a strip with no margin). `--fab-space-1` on the
-   strip's bottom margin composes with the 12px gap to make exactly that, and a margin is not in
-   the `box` group, so it moves no measured line on the strip either.
-
-   BOTH ARE APPENDED RATHER THAN EDITED IN PLACE, because this sheet is shared by five lanes this
-   revision. Both are chained through `.manager-component-edit-main` — (0,4,0) and (0,5,0) against
-   the base rules' (0,2,0) and (0,3,0) — so each wins on specificity rather than on order, and
-   neither repeats a selector the sheet already carries (`no-duplicate-selectors` refuses that,
-   and a duplicate would also be a second home for one rule). */
-.fabricate-manager .manager-main.manager-component-edit-main .manager-component-edit-view {
-  padding-top: 0;
-}
-
-.fabricate-manager
-  .manager-main.manager-component-edit-main
-  .manager-component-edit-view
-  > .manager-editor-tabs {
-  margin-bottom: var(--fab-space-1);
-}
-
 /* ── issue 1371 r8-cat: THE WORLD COMPONENT CATALOGUE'S REBUILT LIST AND INSPECTOR ────────────
    An APPENDED BLOCK. No rule above is edited: every selector below either names markup this
    revision introduced or re-states a route-scoped value LATER in this file than the rule it
@@ -26231,5 +26164,21 @@
 }
 
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-identity .manager-system-copy {
+  flex: 1 1 auto;
+}
+
+/* ── issue 1371 r18-list, maintainer ruling M26 — THE CONTENT COLUMN'S PANEL TAKES THE SLACK ──
+   The rules editor's form is the world entry's content column now (`.manager-component-entry-column`,
+   with the entry's own panel scrolling under a flush tab strip), and the maintainer's ruling is
+   that the form "must occupy the column's full width and height like the catalogue's list column".
+   The entry's panel rule declares `min-height: 0; overflow: auto` and no flex basis, so as a flex
+   item it is CONTENT-SIZED until its cards overflow: a short editor left the column's foot empty
+   below the last card, and the panel's box ended 288px above the pane's (measured in
+   `component-edit-frame-rendered.test.js`). The reference's panel is `flex:1;min-height:0;
+   overflow:auto` (`proto:1307`) — it fills the column and scrolls inside it — and this declares
+   that one missing third. Keyed on the column's child so it reaches the entry's panel too, whose
+   box also grows to the column; that paints nothing, because the panel has no fill or edge and
+   every card in it is `flex: 0 0 auto`. */
+.fabricate-manager .manager-component-entry-column > .manager-component-entry-panel {
   flex: 1 1 auto;
 }

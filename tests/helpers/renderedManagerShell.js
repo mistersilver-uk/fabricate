@@ -47,8 +47,11 @@ export function collectScopedCss({ repoRoot, compiledModules }) {
  *
  * Every mounted view's own root IS `main.manager-main`, so the wrappers here are only what sits
  * above it: the themed area root carrying the route attribute every `[data-manager-view=…]` rule
- * reads, `.manager-body`'s column grid, and the rail occupying its first track. `chrome` is a rule
- * set laid BEFORE the module sheet — the place Foundry's own stylesheet sits in the document — and
+ * reads, the root's title bar and header (EMPTY, but present — the root is an `auto auto 1fr`
+ * grid and the body fills the window only from its third row, so a body that arrived first would
+ * be sized to its content and every height measurement below it would be of nothing),
+ * `.manager-body`'s column grid, and the rail occupying its first track. `chrome` is a rule set
+ * laid BEFORE the module sheet — the place Foundry's own stylesheet sits in the document — and
  * `control` one laid AFTER it, for a suite's reddening arrangement.
  *
  * @param {object} options
@@ -85,6 +88,8 @@ export function managerShellPage({
     <body>
       <div class="probe-host">
         <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="${view}">
+          <div class="manager-titlebar"></div>
+          <header class="manager-header"></header>
           <div class="manager-body">
             <nav class="manager-rail"></nav>
             ${productMarkup}
