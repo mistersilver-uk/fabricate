@@ -557,8 +557,14 @@
   let importReportContent = $state(null);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere, so
-  // its open state is one boolean here beside the manager's two other dialogs. It cannot outlive
-  // its route: `ManagerModal` dismisses on an outside click, and every nav control is outside it.
+  // its open state is one boolean here beside the manager's two other dialogs.
+  //
+  // AN OUTSIDE CLICK IS NOT ENOUGH TO KEEP IT ON ITS ROUTE (issue 1371, r11). This comment used
+  // to claim the picker "cannot outlive its route: `ManagerModal` dismisses on an outside click,
+  // and every nav control is outside it". `dismissOnOutsideClick` listens on `mousedown` and on
+  // Escape — never on `click` — so a KEYBOARD activation of a rail or breadcrumb control fires no
+  // `mousedown` at all: it navigates, and the dialog was left standing over the new route. The
+  // route binding is now stated as code rather than asserted in prose, in the effect below.
   let componentAddFromCatalogueOpen = $state(false);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
@@ -885,6 +891,16 @@
     normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences)
   );
   const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
+
+  // THE `Add from catalogue` PICKER CANNOT OUTLIVE ITS ROUTE (issue 1371, r11). It is an IN-PLACE
+  // picker over the list behind it — the whole point of M9's ruling is that the GM stays on the
+  // list and watches the rows arrive — so a picker still standing over the crafting-systems
+  // library is offering to write rules into a system the GM has navigated away from. The dialog's
+  // own dismissal cannot cover this: `dismissOnOutsideClick` fires on `mousedown` and Escape, and
+  // a keyboard activation of a nav control fires neither.
+  $effect(() => {
+    if (currentView !== 'components') componentAddFromCatalogueOpen = false;
+  });
 
   // WHICH ROUTES NEED THE ITEM ROSTER, which is a WIDER set than the Tool Studio's own (issue
   // 1373). It was `isToolStudioRoute`, and that left both WORLD tool screens with an empty
@@ -11062,16 +11078,15 @@
                  not a route change at all: `proto:1046` binds `onAddFrom`, which at `proto:5545`
                  sets `modal: 'addFrom'`.
 
-                 `// r9-prim2: wire size` — `proto:1046` draws this action at 38px and it ships
-                 at 34. 38 IS a rung, so nothing licenses the gap. Revision 8's opt-in landed on
-                 `ManagerSearchField` and on a toolbar `<select>` (M12b), which is where the
-                 rung's other four sites are; `ManagerButton` has NO size prop yet, so there is
-                 nothing to pass here and a local `height: 38px` on one header action is the
-                 per-screen override the opt-in exists to prevent. The prop is lane PRIM2's to
-                 publish on the shared button base, and this is the one site waiting on it.
-                 Radius 9 is already global (M12a), so the corner is right at either height. -->
+                 `size="38"` IS THE RUNG THE REFERENCE DRAWS (`proto:1046`), and 38 is published
+                 on the ladder (26 / 28 / 30 / 34 / 38 / 44), so nothing licensed the 34 this
+                 shipped at. It is the SHARED opt-in rather than a local `height` — the same
+                 `is-size-38` token M12b gave `ManagerSearchField` and the toolbar selects, and
+                 the prop `ManagerButton`'s own doc block names this site for. Radius 9 is already
+                 global (M12a), so the corner is right at either height. -->
             <ManagerButton
               role="primary"
+              size="38"
               data-component-add-from-catalogue
               onclick={() => (componentAddFromCatalogueOpen = true)}
               disabled={!selectedSystemId}
@@ -16318,13 +16333,20 @@
     `joinComponentToSystem` — the verb that writes the membership record AND seeds the in-system
     row. The generic membership-only write would leave every adopted component invisible to the
     very list the GM adopted it into.
+
+    AND THE WIRE ANSWERS A STRICT BOOLEAN (issue 1371, r11). The optional chain is what makes an
+    unwired leg safe, and it is also what made this seam lie: `store?.…?.addToSystem?.(…)` answers
+    `undefined` — not `false` — when any link is absent, so the picker's refusal branch was
+    unreachable in exactly the case it exists for. `=== true` on the awaited answer collapses the
+    two into the one fact the dialog needs, which is whether the record was written.
   -->
   <ComponentAddFromCatalogueDialog
     open={componentAddFromCatalogueOpen}
     systemId={selectedSystemId || ''}
     systemName={selectedSystem?.name || ''}
     entries={worldScopeState.component?.entries ?? []}
-    onAdd={(entityId) => store?.worldScope?.component?.addToSystem?.(entityId, selectedSystemId)}
+    onAdd={async (entityId) =>
+      (await store?.worldScope?.component?.addToSystem?.(entityId, selectedSystemId)) === true}
     onClose={() => (componentAddFromCatalogueOpen = false)}
   />
 

@@ -378,12 +378,55 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
     assert.ok(mount, 'the gateway mounts the picker');
     assert.match(
       mount[1],
-      /onAdd=\{\(entityId\) => store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)\}/,
+      /await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)/,
       'wired to the COMPOSED adoption — the generic membership-only write would leave every ' +
         'adopted component invisible to the very list it was adopted into'
     );
+    // AND THE ANSWER IS A STRICT BOOLEAN (reviewer 5, r9). The optional chain that makes an
+    // unwired leg safe is the same one that answered `undefined` rather than `false`, so the
+    // picker's refusal branch could not fire on the one case it exists for. The `=== true` is on
+    // the AWAITED value, which is the half a `typeof` check cannot see.
+    assert.match(
+      mount[1],
+      /onAdd=\{async \(entityId\) =>\s*\(await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)\) === true\}/,
+      'the wire answers whether the record was WRITTEN, never `undefined`'
+    );
     assert.match(mount[1], /open=\{componentAddFromCatalogueOpen\}/);
     assert.match(mount[1], /systemId=\{selectedSystemId \|\| ''\}/);
+  });
+
+  it('and the picker is bound to its route rather than to an outside click', () => {
+    // FOUNDRY 2 (r9). The gateway's comment claimed the picker "cannot outlive its route" because
+    // `ManagerModal` dismisses on an outside click. `dismissOnOutsideClick` listens on `mousedown`
+    // and Escape and NEVER on `click` (`src/ui/svelte/actions/dismissOnOutsideClick.js`), so a
+    // keyboard activation of a rail control navigated and left the dialog standing over the new
+    // route. Asserted at SOURCE because reaching it in a mounted tree means standing up the whole
+    // 29,000-line gateway and driving a real route change through it.
+    assert.match(
+      body,
+      /\$effect\(\(\) => \{\s*if \(currentView !== 'components'\) componentAddFromCatalogueOpen = false;\s*\}\);/,
+      'leaving the components route closes the picker'
+    );
+    // NON-VACUITY, and it is the finding itself: the false claim is gone from the prose too.
+    assert.ok(
+      !rootSource.includes('dismisses on an outside click, and every nav control is outside it'),
+      'and the superseded dismissal claim is not left standing beside the effect that replaces it'
+    );
+  });
+
+  it('the header action is drawn at the rung the reference draws it at', () => {
+    // UX F-A (r9). `proto:1046` draws `+ Add from catalogue` at 38px and 38 is a published rung,
+    // so the 34 it shipped at was licensed by nothing. It is the SHARED opt-in — `ManagerButton`'s
+    // `size` prop, the same `is-size-38` token M12b gave the field and the selects — rather than a
+    // local height, which is the per-screen override the opt-in exists to prevent.
+    const action = /<ManagerButton\s([\s\S]*?)data-component-add-from-catalogue\b/.exec(body);
+    assert.ok(action, 'the gateway renders the header action through the shared button');
+    assert.match(action[1], /size="38"/, 'at the 38px rung');
+    // NON-VACUITY: the stale paragraph that said the prop did not exist is gone with it.
+    assert.ok(
+      !rootSource.includes('ManagerButton` has NO size prop yet'),
+      'and the note claiming there was no prop to pass does not outlive the prop'
+    );
   });
 });
 

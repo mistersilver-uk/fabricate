@@ -45,13 +45,55 @@
   membership half alone would leave every adopted component invisible to the list it was adopted
   into.
 
+  == A REFUSAL IS REPORTED, AND THE RUN CONTINUES (issue 1371, r11) =========================
+  `openspec/specs/ui-integration/spec.md` `### GM World Component Screens` requirement 6 is
+  explicit about this exact write: the refusal is REPORTED rather than thrown, so a bulk apply
+  continues through its remaining pairs instead of abandoning the run at the first collision.
+  `WorldComponentCataloguePage.applyBulk` already does that and this dialog did not — it returned
+  at the first `false`, so a GM who ticked eight rows and hit one duplicate-source collision got
+  one adoption, one notification and six rows silently skipped.
+
+  The reason the first draft gave — that "the next write would be issued against a payload the
+  failed one may have left" — is NOT TRUE of the shipped store. `joinComponentToSystem` catches
+  its own refusal, removes the membership record THAT CALL wrote, notifies, and only then answers
+  `false`; the refusal it catches (`_assertUniqueComponentSourcesForSystem`) is raised before the
+  system is persisted at all. So there is no half-written payload for the next target to land on,
+  and stopping the run cost the GM the other seven adoptions for nothing.
+
+  What a refusal leaves behind is therefore stated rather than guessed: the adopted records leave
+  the offer on the next projection, the refused ones stay TICKED so the GM can see which ones did
+  not land, the count of them is said in the dialog beside the notifications the store raised, and
+  the dialog stays OPEN. It closes only when every target succeeded — closing on a partial run
+  would hide the failures behind the screen the GM was returned to.
+
+  == ITS PER-OPEN STATE IS RE-SEEDED ON THE OPEN TRANSITION (issue 1371, r11) ===============
+  This dialog is mounted UNCONDITIONALLY at the manager root and takes `open` as a prop, and
+  `ManagerModal` gates only its CHROME behind `{#if open}` — so this component instance, and with
+  it `query`, `selectedIds` and `applying`, lives for the whole manager session. Cancel reset
+  none of them: ticking two rows in one system, cancelling, selecting another system and
+  reopening showed the same two rows ticked and an ENABLED `Add 2 to {the other system}`.
+
+  The fix is the shipped one from the sibling dialog mounted at the same level
+  (`ImportFolderMappingModal.svelte`): an `$effect` keyed on the open transition that re-seeds the
+  per-open state. The key carries `systemId` as well as `open`, because the offer and the
+  selection must not be able to disagree about which system is being added to, and a re-open
+  against a DIFFERENT system is the case that made this reachable at all.
+
+  The same effect lands focus inside the dialog, as the sibling's does. Without it the GM's focus
+  stays on the header button BEHIND an `aria-modal="true"` dialog, and a plain Tab walks the page
+  underneath it.
+
   Props:
-   - open: whether the dialog is mounted at all.
+   - open: whether the dialog's chrome is rendered. NOT whether this component is mounted — see
+     the re-seed note above.
    - systemId / systemName: which system is being added to. `systemName` is the title's subject.
    - entries: the world component scope's `entries` projection, unfiltered.
-   - onAdd(entityId): the composed adoption for ONE record. Awaited; a `false` return stops the
-     run, because the next write would be issued against a payload the failed one may have left.
-   - onClose(): dismiss. Called by the chrome's close control, by Cancel, and after a run.
+   - onAdd(entityId): the composed adoption for ONE record. Awaited. Anything other than `true` is
+     a REFUSAL: the run continues, the record stays ticked and the dialog stays open. `!== true`
+     rather than `=== false` because the composed verb answers "whether anything was written", and
+     a caller whose optional chain answers `undefined` has written nothing either.
+   - onClose(): dismiss. Called by the chrome's close control, by Cancel, and after a run in which
+     every target succeeded.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -73,6 +115,60 @@
   let query = $state('');
   let selectedIds = $state(new Set());
   let applying = $state(false);
+  // How many of the LAST run's targets the composed write refused. Zero at every other moment,
+  // because the sentence it drives is about a run that has just finished.
+  let refusedCount = $state(0);
+
+  /**
+   * The open transition this instance has already been seeded for.
+   *
+   * A PLAIN `let`, not `$state`: the effect below writes it, and a reactive value written by the
+   * effect that reads it re-runs that effect forever. `ImportFolderMappingModal` uses the same
+   * plain-key form for the same reason.
+   */
+  let seededOpenKey = '';
+
+  // RE-SEED ON THE OPEN TRANSITION, KEYED ON THE SUBJECT AS WELL AS THE FLAG (issue 1371, r11).
+  // See the "per-open state" note in the header: the instance outlives every open, so `Cancel`
+  // used to leave a selection armed against whichever system was chosen next. `systemId` is in
+  // the key because a re-open against a DIFFERENT system is exactly the case that made a stale
+  // selection dangerous rather than merely untidy.
+  $effect(() => {
+    const key = `${open ? 'open' : 'closed'}|${systemId}`;
+    if (key === seededOpenKey) return;
+    seededOpenKey = key;
+    if (!open) return;
+    query = '';
+    selectedIds = new Set();
+    applying = false;
+    refusedCount = 0;
+    focusIntoDialog();
+  });
+
+  /**
+   * Land keyboard focus on the picker's search field once the portaled panel has mounted.
+   *
+   * WHY IT IS A QUERY RATHER THAN A `bind:this`. `ManagerModal` owns the dialog root and
+   * `ManagerSearchField` owns the input, and neither publishes an element seam; wrapping the
+   * field in a `bind:this` element of this component's own is not free either, because
+   * `.manager-search` is `flex: 1 1 260px` and only behaves as a field while it is a FLEX ITEM of
+   * the panel. So the lookup goes through this dialog's own two stable hooks — the panel's root
+   * and the search input inside it — which is a narrower query than the `document.querySelector`
+   * for an application root that issue 1466 removed, and it cannot resolve into another dialog.
+   *
+   * `queueMicrotask` for the sibling's reason (`ImportFolderMappingModal.svelte`): the panel is
+   * PORTALED, so it is not in the document yet at the moment the effect runs.
+   *
+   * @returns {void}
+   */
+  function focusIntoDialog() {
+    queueMicrotask(() => {
+      const panel = globalThis.document?.querySelector?.(
+        '[data-component-add-from-catalogue-dialog]'
+      );
+      panel?.querySelector?.('[data-component-add-from-catalogue-search]')?.focus?.();
+    });
+  }
 
   function text(key, fallback) {
     if (!key) return fallback ?? '';
@@ -142,6 +238,10 @@
   // anything — but a row that has left the offer entirely (it was adopted, or the corpus changed
   // under the dialog) has to go, or the count and the Apply would both name a record this system
   // already holds.
+  // WHETHER THE WORLD HAS A CATALOGUE AT ALL, which is a different fact from an exhausted offer.
+  // Read off the raw `entries` rather than off `offered`, because `offered` is zero for both.
+  const catalogueIsEmpty = $derived((Array.isArray(entries) ? entries : []).length === 0);
+
   const selectedOffered = $derived(offered.filter((row) => selectedIds.has(row.id)));
   const selectedCount = $derived(selectedOffered.length);
 
@@ -163,24 +263,37 @@
   }
 
   /**
-   * Adopt every ticked record, one at a time, then close.
+   * Adopt every ticked record, one at a time, and close only if every one of them landed.
    *
    * The selection is read in the OFFER's order rather than in tick order, so two GMs ticking the
    * same rows in a different sequence produce the same sequence of writes.
+   *
+   * A REFUSAL DOES NOT ABANDON THE RUN. See the header note: requirement 6 of `### GM World
+   * Component Screens` states that the composed verb reports its refusal and a bulk apply carries
+   * on, which is what `WorldComponentCataloguePage.applyBulk` does with the same seam. The
+   * refused ids are the NEXT selection, so the adopted rows drop out of the offer and the refused
+   * ones stay ticked under a sentence saying how many there were.
+   *
+   * @returns {Promise<void>}
    */
   async function apply() {
     if (applying) return;
     const targets = selectedOffered.map((row) => row.id);
     if (targets.length === 0) return;
     applying = true;
+    const refused = [];
     try {
       for (const entityId of targets) {
-        if ((await onAdd(entityId)) === false) return;
+        // `!== true`, not `=== false`: the composed verb answers whether anything was WRITTEN, so
+        // a `false` refusal and an `undefined` from a seam that is not wired are the same fact.
+        if ((await onAdd(entityId)) !== true) refused.push(entityId);
       }
     } finally {
       applying = false;
     }
-    selectedIds = new Set();
+    selectedIds = new Set(refused);
+    refusedCount = refused.length;
+    if (refused.length > 0) return;
     query = '';
     onClose();
   }
@@ -202,7 +315,7 @@
   )}
   subtitle={text(
     'FABRICATE.Admin.Manager.Component.AddFrom.Subtitle',
-    'New rules start empty. Nothing is inherited from the catalogue.'
+    'New rules start empty; the world category is inherited until this system overrides it.'
   )}
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
   rootAttributes={{ 'data-component-add-from-catalogue-dialog': '' }}
@@ -223,18 +336,52 @@
       inputAttrs={{ 'data-component-add-from-catalogue-search': '' }}
     />
 
+    {#if refusedCount > 0}
+      <!-- THE RUN'S REFUSALS, COUNTED. The store raises one notification per refusal with the
+           reason in it; this says how many there were and why the ticks are still here, which a
+           transient toast cannot. `role="status"` rather than `alert`: the run finished, and the
+           GM is being told what it did rather than interrupted. -->
+      <p
+        class="manager-component-add-from-refused"
+        role="status"
+        data-component-add-from-catalogue-refused
+      >
+        {format(
+          refusedCount === 1
+            ? 'FABRICATE.Admin.Manager.Component.AddFrom.RefusedOne'
+            : 'FABRICATE.Admin.Manager.Component.AddFrom.Refused',
+          refusedCount === 1
+            ? '{count} component could not be added and is still selected here.'
+            : '{count} components could not be added and are still selected here.',
+          { count: refusedCount }
+        )}
+      </p>
+    {/if}
+
     {#if visible.length === 0}
       <p class="manager-muted" data-component-add-from-catalogue-empty>
-        {offered.length === 0
-          ? format(
-              'FABRICATE.Admin.Manager.Component.AddFrom.EmptyAll',
-              '{system} already has rules for every component in the catalogue.',
-              { system: systemName }
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Component.AddFrom.EmptySearch',
-              'No catalogue component matches that search.'
-            )}
+        <!-- THREE STATES, THREE SENTENCES. `EmptyAll` used to answer for two of them, so a world
+             with no world components at all was told this system "already has rules for every
+             component in the catalogue" — which on a fresh world is false in both halves. An
+             empty catalogue is a fact about the WORLD; an exhausted offer is a fact about this
+             system; an empty search is a fact about what the GM just typed. -->
+        {#if offered.length > 0}
+          {text(
+            'FABRICATE.Admin.Manager.Component.AddFrom.EmptySearch',
+            'No catalogue component matches that search.'
+          )}
+        {:else if catalogueIsEmpty}
+          {text(
+            'FABRICATE.Admin.Manager.Component.AddFrom.EmptyCatalogue',
+            'The world component catalogue is empty, so there is nothing to add from yet.'
+          )}
+        {:else}
+          {format(
+            'FABRICATE.Admin.Manager.Component.AddFrom.EmptyAll',
+            '{system} already has rules for every component in the catalogue.',
+            { system: systemName }
+          )}
+        {/if}
       </p>
     {:else}
       <ul class="manager-component-add-from-list" role="list">
@@ -368,6 +515,16 @@
 
   .manager-component-add-from-tag {
     flex: 0 0 auto;
+  }
+
+  /* The refusal line. Warning ink rather than danger: the run partly succeeded, and the records
+     that did not land are still on offer and still ticked. */
+  .manager-component-add-from-refused {
+    margin: 0;
+    color: var(--fab-warning-text);
+    font-weight: 500;
+    font-size: 0.69rem;
+    line-height: 1.45;
   }
 
   /* The footer note leads the rail; `ManagerModal`'s footer is `justify-content: flex-end`, so
