@@ -1254,6 +1254,8 @@ async function chooseSelectOption(page, trigger, option) {
   }
   await trigger.waitFor({ state: 'visible', timeout: 5_000 });
   await trigger.click();
+  // `.first()` is safe though it is not bound to this trigger the way `select-control.js` is:
+  // the click above fires `dismissOnOutsideClick`, so any other panel is already shut.
   const panel = page.locator('.fabricate-select-popover').first();
   await panel.waitFor({ state: 'visible', timeout: 5_000 });
   if (option.value !== undefined) {
