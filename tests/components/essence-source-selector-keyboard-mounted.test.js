@@ -21,9 +21,11 @@
  * Five items in two columns is deliberate: it leaves a RAGGED last row, which a rectangular wrap
  * would strand and a flat-order wrap reaches.
  *
- * `EssenceSourceSelector`'s panel appears in NO View Lab case (`scripts/lib/viewLabCases.js`
- * records that `.essence-source-trigger` is in no case's steps), so this suite is the only
- * instrument that sees the panel's DOM at all.
+ * `EssenceSourceSelector`'s panel has ONE View Lab case as of issue 1503 —
+ * `manager-essences-source-picker`, which opens it on the one lab essence with no linked source —
+ * and that frame is a photograph. This suite remains the only instrument that sees the panel's
+ * DOM: what a frame cannot show is an attribute, an id, an `aria-activedescendant` or which
+ * element holds focus, and every clause below is about one of those.
  *
  * ── WHAT THIS SUITE ANSWERS FOR AFTER THE RE-PLATFORM (issue 1503) ─────────────────────
  * The panel, the query field, the list and every tile are now `SearchablePopover`'s elements, and
@@ -535,11 +537,16 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
       String(columns),
       'and it declares the count the sheet draws, so one rung paints what the key map steps by'
     );
-    assert.equal(
-      list.getAttribute('style'),
-      null,
-      'nothing writes an inline style here: this caller measures no list metrics, so the ' +
-        'primitive registers no secondary style target at all'
+    // AND THE ATTRIBUTE ROUTE IS NOT A PRECAUTION AGAINST A THING THAT NEVER HAPPENS. Since this
+    // picker began measuring its own rows (issue 1503) the primitive registers the list as a
+    // secondary style target, so `anchoredPopover` rewrites this element's WHOLE `style`
+    // attribute on every measure — an inline `display: grid` or column template would survive
+    // exactly until the first one. What it writes here is empty, because happy-dom returns
+    // zero-sized rects and the layout refuses to derive a height from them.
+    assert.doesNotMatch(
+      list.getAttribute('style') ?? '',
+      /display|grid-template-columns/,
+      'the grid form must never be written inline: the positioning pass owns this attribute'
     );
   });
 
@@ -600,6 +607,60 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
       !source.includes('420'),
       'and the withdrawn number is gone rather than left beside the real one'
     );
+  });
+
+  it('measures its own rows, so the grid floors to whole tiles instead of slicing one', () => {
+    // A SOURCE READ PLUS A SHEET READ, and it is the only route there is in this harness:
+    // happy-dom returns zero-sized rects, so `getBoundingClientRect().height` is 0 here and the
+    // callback returns `{}` whatever it is written to do. The real-browser outcome — the pitch,
+    // the chrome and the floored height the panel actually resolves to — is measured in
+    // `tests/components/manager-layout.test.js`, which injects the sheet into Chromium.
+    //
+    // WHY IT MATTERS HERE AT ALL. Without a `measureListMetrics` the primitive derives no list
+    // height and registers no style target, so the grid fills a panel whose height came from the
+    // viewport and the last row is cut at whatever pixel the budget ran out on. On bordered tiles
+    // that reads as a rendering fault. The published `manager-essences-source-picker` frame
+    // showed exactly that: row seven clipped partway through its 44px box.
+    const source = readFileSync(resolve(repoRoot, SOURCE_SELECTOR), 'utf8');
+
+    assert.match(
+      source,
+      /measureListMetrics=\{measurePopoverMetrics\}/,
+      'the picker must hand the primitive a measurement, or its grid gets no floored height'
+    );
+    assert.match(
+      source,
+      /list\.querySelector\('\.essence-source-picker-option'\)/,
+      'the pitch is read from the caller`s own tile, which is the element the sheet gives the ' +
+        '44px floor and the border to — the primitive`s row element carries both classes'
+    );
+    assert.match(
+      source,
+      /rowPitch: rowHeight \+ rowGap/,
+      'a pitch is a row`s BORDER BOX plus the list`s own `row-gap`, measured rather than restated'
+    );
+    assert.match(
+      source,
+      /listExtra: 0/,
+      'and the fourth metric is stated as zero rather than omitted: this panel pins no row, so ' +
+        'it renders no margin inside its list, and saying so is what stops the key reading as ' +
+        'forgotten'
+    );
+
+    // THE MIRROR. The pitch the callback reads is only right while the sheet still draws these
+    // tiles at a fixed floor and this gap; a sheet that re-tiled the grid and a callback that
+    // kept measuring one tile would disagree silently.
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const tile = sheet.match(
+      /\.fabricate-source-picker-popover\.essence-source-picker-popover \.essence-source-picker-option \{([^}]*)\}/
+    );
+    assert.ok(tile, 'the sheet still carries this picker`s own tile box');
+    assert.match(tile[1], /min-height: 44px;/, 'at the 44px floor the measurement reads back');
+    const grid = sheet.match(
+      /\.fabricate-source-picker-popover\.essence-source-picker-popover \.essence-source-picker-grid \{([^}]*)\}/
+    );
+    assert.ok(grid, 'and the grid`s own pitch rule');
+    assert.match(grid[1], /gap: var\(--fab-space-chip\);/, 'which is the 6px dense unit');
   });
 
   it('marks the stored item as the current value without making it the cursor', async () => {
