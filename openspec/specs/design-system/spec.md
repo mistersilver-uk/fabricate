@@ -158,10 +158,11 @@ The `line-height` is not left to the shorthand either. `font` is a shorthand, so
 `box-sizing` needed nothing, because that same block already declared it.
 
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
-The two area rings are bare-element selectors an area declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders outside either area — a control that is styled and unfocusable-looking, which is worse than one that is neither.
+The module ring is a bare-element selector a Fabricate root declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders in a host carrying no Fabricate root at all — a control that is styled and unfocusable-looking, which is worse than one that is neither.
 `ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
-The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the two applications' area resets pair them and as CONTRIBUTING.md's area rule states.
-Foundry core paints every focused button with an outline and a glow of its own, and the area resets remove that only inside their own root; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying neither area class, rather than replacing it.
+The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the module root pairs them and as CONTRIBUTING.md's rule states.
+Foundry core paints every focused button with an outline and a glow of its own, and the module reset removes that only inside a Fabricate window; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying no Fabricate root, rather than replacing it.
+The module pair is (0,2,1) and a family pair is (0,2,0), so wherever a Fabricate root is an ancestor the module pair wins; because the declarations are copied from it verbatim, nothing moves, and what the family pair paints is the host that has no Fabricate root.
 The strip half is declared ABOVE the repaint, because the two tie on specificity and a keyboard-focused control matches both.
 Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
@@ -192,6 +193,7 @@ A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabr
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
+BOTH HALVES are held to that rooting, not the reset alone: a per-area copy of the RING half reaches the same elements at the same rank as the module ring, so which one paints is decided by source order rather than by anything a reader of either block can see.
 
 A SKIN is a utility whose declaration set is a shared visual treatment the design system already names — a border, a radius and a fill at published rungs — rather than a layout mechanic.
 A skin is rooted at `.fabricate` exactly as any other utility, and it is a shared treatment rather than a rename only where TWO OR MORE blocks already carry its exact values on every property it declares.
@@ -212,6 +214,9 @@ An adoption whose specificity DIFFERS from its donor's in either direction is de
 
 A utility or skin declared and not emitted is a dead rule, forbidden by the same gate that forbids any other.
 So a utility with no adopter is not declared, and one left with a single adopter is a rename rather than a shared treatment and is not declared either.
+
+The reverse direction is normative too, and it is the one no dead-rule gate can see: where a utility takes a VARIANT ATTRIBUTE, every value a call site writes MUST have a rule, and the utility's DEFAULT variant MUST be written as its own rule rather than left implicit.
+A value nothing declares renders at whatever the base rule happens to set, so the markup asserts a pin that is not there and every site naming it moves silently the day that base changes.
 
 `openspec/specs/design-system/library.html` carries no specimen for a utility or a skin and needs none.
 Membership of the primitive set is measured by independent Svelte importers through `scripts/lib/componentImporters.js`, which is a question a bare CSS class cannot be asked; the enumeration this document holds a utility to is `styles/fabricate.css` itself, through `tests/components/design-system-debt-ratchets.test.js`.
