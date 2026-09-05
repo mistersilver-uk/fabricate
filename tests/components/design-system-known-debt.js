@@ -299,9 +299,14 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * direction: they read `var(--fab-books-panel-radius)`, which resolves to a compliant 6px and
  * therefore never had one.
  *
+ * 315 → 314 with the same issue's alchemy conversion, and it is a third snap of the same kind.
+ * `apps/alchemy/Workbench.svelte | border-radius | 10px` falls 5 → 4: the last-brew banner's
+ * corner went with its scoped block, and the `<Notice>` it became takes the specimen's r11. The
+ * wrapper the caller keeps carries only its `margin-bottom`, so nothing brings the radius back.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 315;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 314;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

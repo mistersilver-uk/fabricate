@@ -40,6 +40,8 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
+    // The shared notice the inventory bulk report's banner composes (issue 1505).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',

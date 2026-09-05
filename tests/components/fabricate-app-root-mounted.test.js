@@ -235,6 +235,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
+    // The shared notice the inventory bulk report's banner composes (issue 1505).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // Issue 1505: the eyebrow nine crafting detail components render. A module missing from a
     // manifest does not fail this suite; it is reported as `# cancelled`, never `# fail`.

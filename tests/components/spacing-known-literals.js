@@ -179,8 +179,23 @@ export function isExemptSpacingPixels(pixels) {
  * line's `gap: 6px`, which the primitive re-states as `var(--fab-space-chip)` — the published
  * 6px token — so `| gap | 6` falls 2 to 1 against the file's other, unconverted occurrence.
  * The first is a deletion and the second is a tokenization, and neither leaves a slot open.
+ *
+ * It was 911 until the same issue converted the alchemy workbench's last-brew banner and the
+ * inventory bulk report's banner to the shared `<Notice>`. Five occurrences went, and they are
+ * two kinds. The workbench's banner block took its `gap: 9px` and its `padding: 11px 13px` with
+ * it, so three rows each fall 2 to 1 against the file's other, unconverted occurrence of the
+ * same literal — the primitive states the specimen's `var(--fab-space-3)` for both, so this is
+ * a tokenization. The bulk report's `gap: 2px` (the title/summary separation, which the
+ * specimen expresses as the detail's own `margin-top`) and `padding: 10px` were each that
+ * file's only occurrence, so both rows are DELETED.
+ *
+ * `…/Workbench.svelte | margin-bottom | 12` is deliberately UNCHANGED. That declaration is the
+ * caller's LAYOUT rather than the notice's geometry — `.alchemy-brew-area` is a plain block, so
+ * it is the only separation between the banner and the Brew button — so `.alchemy-banner`
+ * survives the conversion stripped to it, and a shrink there would be a defect rather than a
+ * re-bank.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 911;
+export const KNOWN_RAW_SPACING_TOTAL = 906;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

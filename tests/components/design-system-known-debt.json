@@ -157,7 +157,7 @@
     "src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte | border-radius | 8px | 2",
     "src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | border-radius | 8px | 3",
-    "src/ui/svelte/apps/alchemy/Workbench.svelte | border-radius | 10px | 5",
+    "src/ui/svelte/apps/alchemy/Workbench.svelte | border-radius | 10px | 4",
     "src/ui/svelte/apps/alchemy/Workbench.svelte | border-radius | 12px | 2",
     "src/ui/svelte/apps/alchemy/Workbench.svelte | border-radius | 13px | 1",
     "src/ui/svelte/apps/alchemy/Workbench.svelte | border-radius | 14px | 1",
