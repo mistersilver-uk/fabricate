@@ -13144,10 +13144,30 @@ test('every converted pager site paints its own trigger fill, and only the manag
         'journal',
         'manager',
       ];
+      // THE POINTER HIT-TEST, per converted site class. DOM presence is not enough for a
+      // control that opens an overlay: a stacking context, a global Foundry rule or a
+      // transparent wrapper can swallow the click while every computed style above still
+      // reads correctly. This asks the browser what is actually AT the trigger's centre, and
+      // names what intercepted it when the answer is wrong.
+      const hitOf = (name) => {
+        const element = at(name);
+        // `elementFromPoint` is VIEWPORT-relative, and this fixture stacks seven sites down one
+        // page, so anything below the fold reads as `null` — a false failure rather than a
+        // real one. Scroll each into view first, then take its box.
+        element.scrollIntoView({ block: 'center' });
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return {
+          own: hit?.closest?.('.fabricate-select-trigger') === element,
+          tag: hit?.tagName ?? 'none',
+          className: String(hit?.className ?? ''),
+        };
+      };
       return {
         tokens: { surface: fill('surface'), 'bg-2': fill('bg-2') },
         pagers: Object.fromEntries(probes.map((probe) => [probe, read(`pager-${probe}`)])),
         arrows: Object.fromEntries(probes.map((probe) => [probe, read(`arrow-${probe}`)])),
+        hits: Object.fromEntries(probes.map((probe) => [probe, hitOf(`pager-${probe}`)])),
       };
     });
 
@@ -13177,6 +13197,15 @@ test('every converted pager site paints its own trigger fill, and only the manag
         '7px',
         `${site.probe}: and so does the corner, which is the axis the pager matches its arrows on`
       );
+      const hit = report.hits[site.probe];
+      assert.ok(
+        hit.own,
+        `${site.probe}: the converted trigger owns its own pointer target — the click at its ` +
+          `centre landed on <${hit.tag} class="${hit.className}"> instead. A control that ` +
+          'opens an overlay has to receive the press that opens it, and neither the wrapper ' +
+          'this site hangs its fill off nor the picker root around it may intercept it'
+      );
+
       // THE PAIR, WHICH IS THE WHOLE POINT OF THE MOVE. This change takes the arrows' RADIUS
       // and nothing else, so the bar reads as one control on the axis the specimen matches it
       // on while every arrow keeps the box it shipped at.
@@ -13263,5 +13292,129 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
       'and it keeps a .fabricate-manager compound: the type half reads an area-scoped property ' +
         `and this sheet is page-global, so \`${prelude}\` would red two other gates without it`
     );
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE OTHER TWO CONVERTED SITE CLASSES OWN THEIR POINTER TARGETS (issue 1504)
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// The pager's seven sites are hit-tested in the clause above, inside the fixture that already
+// renders them. The other two converted controls sit in containers of their own and are tested
+// here for the same reason: DOM presence proves nothing for a control that opens an OVERLAY.
+// A stacking context, a global Foundry rule or a full-width wrapper can swallow the press that
+// opens the panel while every computed style still reads correctly.
+//
+//   - `.fab-bulk-edit-select` — the bulk panel's `form` rung, in a 300px rail whose sheet rule
+//     stretches the TRIGGER to `width: 100%`. The failure this guards is the rule landing on the
+//     picker ROOT instead: the root would fill the rail, the button would hug its value, and the
+//     right two thirds of what looks like the control would do nothing.
+//   - the scoped catalogue's `toolbar` rung, on a wrapping flex row beside a search field, a
+//     segmented control and a direction toggle, any of which could overlap it at a narrow width.
+test('the bulk-panel and toolbar triggers own their own pointer targets', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1100, height: 600 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: var(--button-size); }
+              input, select { width: 100%; }
+            }
+            @layer modules { ${css} }
+            :root { --button-size: 28px; font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fabricate { font-size: 14px; }
+            .fas::before { content: "x"; }
+            .rail { width: 300px; }
+          </style>
+        </head>
+        <body>
+          <div class="fabricate">
+            <main class="fabricate-manager">
+              <div class="rail">
+                <div class="fabricate-picker manager-travel-picker fabricate-select fab-bulk-edit-select">
+                  <button
+                    type="button"
+                    class="fabricate-select-trigger fabricate-select-trigger-form"
+                    data-recipe-bulk-category=""
+                    data-probe="bulk-trigger"
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-label="Category"
+                  ><span class="manager-travel-picker-value fabricate-select-value">Leave unchanged</span><i
+                    class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                </div>
+              </div>
+              <div class="manager-toolbar manager-scoped-list-toolbar">
+                <div class="manager-search"><input type="text" data-scoped-list-search></div>
+                <div class="fabricate-picker manager-travel-picker fabricate-select">
+                  <button
+                    type="button"
+                    class="fabricate-select-trigger fabricate-select-trigger-toolbar"
+                    data-scoped-list-sort=""
+                    data-probe="toolbar-trigger"
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-label="Sort by"
+                  ><span class="manager-travel-picker-value fabricate-select-value">Name</span><i
+                    class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                </div>
+                <button type="button" class="manager-scoped-list-direction"
+                  ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
+              </div>
+            </main>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const probe = (name) => {
+        const element = document.querySelector(`[data-probe="${name}"]`);
+        element.scrollIntoView({ block: 'center' });
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return {
+          own: hit?.closest?.('.fabricate-select-trigger') === element,
+          tag: hit?.tagName ?? 'none',
+          className: String(hit?.className ?? ''),
+          width: box.width,
+          railWidth: document.querySelector('.rail')?.getBoundingClientRect().width ?? 0,
+        };
+      };
+      return { bulk: probe('bulk-trigger'), toolbar: probe('toolbar-trigger') };
+    });
+
+    for (const [name, measured] of Object.entries(report)) {
+      assert.ok(
+        measured.own,
+        `${name}: the converted trigger owns its own pointer target — the press at its centre ` +
+          `landed on <${measured.tag} class="${measured.className}"> instead`
+      );
+    }
+
+    // AND THE BULK RAIL'S WIDTH RULE LANDS ON THE BUTTON, not on the picker root around it. A
+    // root-width rule looks identical in a screenshot and leaves two thirds of the apparent
+    // control inert, which is the exact defect a pointer hit-test alone would not name.
+    assert.ok(
+      Math.abs(report.bulk.width - report.bulk.railWidth) <= 1,
+      `the bulk trigger fills its 300px rail (measured ${report.bulk.width.toFixed(1)}px against ` +
+        `${report.bulk.railWidth.toFixed(1)}px), which is what the sheet rule hung off the ` +
+        'caller`s own class is for'
+    );
+  } finally {
+    await context.close();
   }
 });
