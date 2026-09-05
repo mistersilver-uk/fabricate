@@ -78,6 +78,18 @@ import { findMatchingComponent } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
+// Issue 1565: the deferred-chunk failure and stale-entry-script notices. Everything a semantic
+// mutation could break is in that module because nothing in THIS file can be executed by a unit
+// test; what stays here is the Foundry edge - the localizer, the channel and the console.
+import {
+  DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
+  STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
+  buildStaleEntryNotice,
+  createDeferredChunkFailureReporter,
+  openDeferredApp,
+  openDeferredAppRethrowing
+} from './utils/deferredEntryNotice.js';
+import { createMemoizedLoad } from './utils/memoizedModuleLoad.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -292,20 +304,97 @@ const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
 // non-GM players never download/parse its subtree at module init. The dynamic
 // import runs the module's bottom-of-file registerCraftingSystemManagerApp(...)
 // side effect exactly once; subsequent opens reuse the memoized promise.
-let _craftingSystemManagerAppLoad = null;
-
+//
+// THE MEMOIZATION MOVED OUT (issue 1565), to `src/utils/memoizedModuleLoad.js`, where a unit
+// test can execute it - the three lines it replaces were pinned by a source-text grep alone. It
+// also clears the memo when an attempt REJECTS, so the session does not retain a dead promise.
+// That is not a retry capability and must not be described as one: the host records a failed
+// module fetch in the realm's own module map, so a later import() of the same specifier resolves
+// to the recorded failure with no network request. Only a reload recovers.
 /**
  * Lazily load and register the GM crafting system manager app class.
- * Memoizes the dynamic import so repeated opens do not re-enter import().
  * @returns {Promise<Function>} the registered app class
  */
-function loadCraftingSystemManagerAppClass() {
-  if (!_craftingSystemManagerAppLoad) {
-    _craftingSystemManagerAppLoad = import('./ui/SvelteCraftingSystemManagerApp.svelte.js').then(
-      () => getCraftingSystemManagerAppClass()
-    );
-  }
-  return _craftingSystemManagerAppLoad;
+const loadCraftingSystemManagerAppClass = createMemoizedLoad(() =>
+  import('./ui/SvelteCraftingSystemManagerApp.svelte.js').then(() =>
+    getCraftingSystemManagerAppClass()
+  )
+);
+
+/** Open the GM manager: the deferred load, then the app class's own `show()`. */
+const showCraftingSystemManagerApp = () =>
+  loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
+
+/**
+ * Report a failed deferred load of the manager subtree to the user (issue 1565).
+ *
+ * NOT GM-GATED. The Items Directory button already sits behind an `isGM` check, but
+ * `openRecipeManager` does not, so a player invoking it from a macro must not get a silent
+ * failure. The condition itself is per client and role-independent.
+ *
+ * THE INJECTED FUNCTIONS ARE CLOSURES OVER `ui.notifications`, NOT BARE MEMBER VALUES, and that
+ * is load-bearing rather than stylistic: both members touch `Notifications`' private fields, so
+ * `notify: ui.notifications.error` throws a TypeError on a private-field access at call time.
+ * No gate can catch it - the unit suite's seams are plain functions, and this is the failure
+ * branch of a path only a stale client reaches - so a receiver bug here would reproduce the
+ * exact dead-button defect this change exists to remove.
+ */
+const reportManagerLoadFailure = createDeferredChunkFailureReporter({
+  notify: (message, options) => ui.notifications?.error?.(message, options),
+  hasNotice: (notice) => ui.notifications?.has?.(notice),
+  // `console.error`, pinned by `tests/release-build.test.js` matching THIS CALL in the built
+  // bundle - a spy in a unit test passes at any level, so only the artefact can hold that line.
+  // NOT pinned by the literal reaching the bundle: `vite.config.js` declares
+  // `console.log`/`info`/`debug` pure, but Rolldown may drop such a call only when its RETURN
+  // VALUE IS UNUSED, and this concise arrow returns it - so a level regression here would leave
+  // both the call and its argument in `dist/main.js`. Measured, after an earlier comment here
+  // claimed the opposite. The stale-entry write below IS a statement, and does strip.
+  log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
+  localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key))
+});
+
+/**
+ * Tell this client, once per session, that it is running a stale entry script (issue 1565).
+ *
+ * THE DIRECT DETECTION, as opposed to reacting to a rejected import: Foundry renders the
+ * `esmodules` entry as a plain `<script type="module" src="modules/fabricate/main.js">` with no
+ * cache-busting parameter, while the version a client REPORTS comes from server-injected package
+ * data read from `module.json` on disk. That asymmetry is what lets `game.modules` say 1.9.4
+ * while the running JavaScript is 1.9.3, and comparing the two is how a client finds out without
+ * having to click the one broken button first.
+ *
+ * EVERY READ OF `__FABRICATE_BUILD_VERSION__` IS INSIDE THE `typeof` GUARD BELOW, and there is
+ * no module-scope read anywhere. `vite.config.js` declares the define under `build` ONLY, so the
+ * general rule is that NO SERVE-MODE CONFIG CARRIES IT and the identifier is genuinely UNDECLARED
+ * in every non-build run - the dev server, each mounted suite's harness and the screenshot lab
+ * alike - as it is under `node --test`, which has no build at all. A bare read in any of them is
+ * a `ReferenceError` during module evaluation; the View Lab is the illustration that cost the
+ * most, because a throw there takes down the capture run and every suite that builds the lab
+ * world. ESLint cannot catch it, precisely because the identifier is declared to it as a readonly
+ * global.
+ *
+ * The comparison itself, and the decision to stay silent unless BOTH sides are known and they
+ * differ, is `buildStaleEntryNotice`'s - and is unit-tested there.
+ */
+function reportStaleEntryScript() {
+  const buildVersion =
+    typeof __FABRICATE_BUILD_VERSION__ === 'string' ? __FABRICATE_BUILD_VERSION__ : '';
+  const installedVersion = game.modules?.get('fabricate')?.version ?? '';
+  const message = buildStaleEntryNotice({ buildVersion, installedVersion }, (key, data) =>
+    data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+  );
+  if (!message) return;
+  // `warn`, not `error`: a baked-versus-installed divergence in the smoke's install path must not
+  // redden the smoke through core's own console mirror. `{ console: false }` because core mirrors
+  // every notification from inside its queue drain, so without it this writes two console lines -
+  // and that mirror cannot carry the detail INSTEAD: for a notice queued behind the five-notice
+  // cap it is deferred until the notice drains (`#fetch` is re-entered from `#remove`), and lost
+  // outright if `clear()`, a removal while queued, or an unload beats it. Hence Fabricate's own
+  // line - and at `console.warn` because this write is an expression STATEMENT, so the
+  // `console.log`/`info`/`debug` purity `vite.config.js` declares really would let Rolldown delete
+  // it and its literal from every published build. `tests/release-build.test.js` asserts both.
+  console.warn(STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE, { buildVersion, installedVersion });
+  ui.notifications?.warn?.(message, { console: false });
 }
 
 /**
@@ -4975,6 +5064,12 @@ Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
 
 // Hook into Foundry's ready event
 Hooks.once('ready', async () => {
+  // Issue 1565: FIRST, because it depends on nothing Fabricate has built yet and because a
+  // client running a stale entry script may well fail somewhere below. It stays in the `ready`
+  // body rather than moving into `initialize()` on purpose: the View Lab calls `initialize()`
+  // directly, so anything placed there also executes in the lab and in the six suites that
+  // build the lab world.
+  reportStaleEntryScript();
   // Backstop for a missed `init` (e.g. the Vite dev server evaluating the source
   // entry after Foundry's `init` event already fired, so the `init` hook callback
   // was registered for a spent event and never ran). Both helpers are idempotent, so
@@ -5780,7 +5875,10 @@ function addModuleButtonsToItemsDirectory() {
         'fas fa-book',
         'manage',
         () => {
-          void loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
+          // SWALLOWING (issue 1565): nothing awaits a click handler, so the wrapper reports the
+          // failure and absorbs it rather than leaving an unhandled rejection in the console as
+          // the user's only signal.
+          void openDeferredApp(showCraftingSystemManagerApp, reportManagerLoadFailure);
         }
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
@@ -5915,7 +6013,10 @@ globalThis.fabricate = {
    * Open the GM crafting system manager
    */
   openRecipeManager: () => {
-    return loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
+    // RETHROWING (issue 1565): this is a public API member, so it must keep returning a promise
+    // that rejects with the original error - a macro author's `await` has to see the failure -
+    // while the user still gets the notice. Core does the same at every equivalent site.
+    return openDeferredAppRethrowing(showCraftingSystemManagerApp, reportManagerLoadFailure);
   },
 
   /**

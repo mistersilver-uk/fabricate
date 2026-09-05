@@ -23,12 +23,19 @@
  *   gets the release version without touching source module.json.
  */
 
-import { readFile, writeFile, mkdir, rm, cp, access, stat } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { readFile, writeFile, mkdir, rm, cp, access, stat, readdir } from 'node:fs/promises';
+import { basename, join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
+import {
+  ARCHIVE_GATE_SKIPPED_MESSAGE,
+  archiveNameMismatchMessage,
+  assertArchiveChunkCompleteness,
+  isReleaseZipName,
+  releaseZipName
+} from './lib/releaseZipChunks.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -186,6 +193,59 @@ async function copyIfExists(src, dest) {
 }
 
 /**
+ * Prove the produced archive carries every module file its own entry script references, or say
+ * plainly that the proof did not run (issue 1565).
+ *
+ * SHARED BY BOTH BRANCHES of main(). The build path is the one that matters in CI — semantic
+ * release's `prepareCmd` goes through it and this is what fails the release job — but main() takes
+ * no `deps` and does `rm -rf dist` -> build -> zip in one pass, so no test can present it with a
+ * short archive. `--validate-only`, which returns before the build, is therefore the seam the
+ * negative proof uses, and it is a maintainer-facing check of an existing dist/ in its own right.
+ *
+ * A BUILD THAT PRODUCED NO ARCHIVE IS NOT A PASS. `npm run build` is `--no-zip`, so it has nothing
+ * to check; it says so and still exits 0. Reporting "OK" there would be the vacuous pass the gate
+ * exists to prevent.
+ *
+ * NOR IS A NAME MISMATCH A SKIP, which is the failure the `--validate-only` branch can actually
+ * reach: the archive's name carries a version, and `--dist-version <next>` leaves the tracked
+ * `module.json` alone, so a bare `npm run release:validate` afterwards derives a DIFFERENT name,
+ * finds nothing at it, and would otherwise report a build that produced no archive while the real
+ * one sits in the same directory unproved. See archiveNameMismatchMessage.
+ *
+ * @param {string} distDir - Absolute path to dist/
+ * @param {object} builtManifest - The manifest inside the archive, whose esmodules name the entry
+ * @param {string} version - The version whose archive name to look for
+ * @returns {Promise<void>}
+ */
+async function runArchiveChunkGate(distDir, builtManifest, version) {
+  const zipPath = join(distDir, releaseZipName(version));
+  if (!(await fileExists(zipPath))) {
+    const present = (await readdir(distDir).catch(() => [])).filter(isReleaseZipName);
+    if (present.length > 0) {
+      console.error(archiveNameMismatchMessage(releaseZipName(version), present.sort()));
+      exit(1);
+    }
+    console.log(`\n${ARCHIVE_GATE_SKIPPED_MESSAGE}`);
+    return;
+  }
+
+  console.log('\nVerifying archive chunk completeness...');
+  try {
+    const proved = assertArchiveChunkCompleteness({ zipPath, manifest: builtManifest });
+    console.log(
+      // "reachable from", not "referenced from": the count is the TRANSITIVE closure, which
+      // includes chunks the entry never names itself (measured on a real dist/, one chunk is
+      // reachable only through another). "referenced from" would understate what was proved.
+      `Archive chunk completeness OK: ${basename(zipPath)} carries all ` +
+      `${proved.referenced.length} file(s) reachable from ${proved.entryNames.join(', ')}.`
+    );
+  } catch (err) {
+    console.error(err.message);
+    exit(1);
+  }
+}
+
+/**
  * Parse `--flag <value>` from an argv slice. Returns the value or null.
  *
  * @param {string[]} args
@@ -262,9 +322,7 @@ async function main() {
   if (validateOnly) {
     console.log('Validating existing dist/...');
     const result = await validateDist(distDir, manifest);
-    if (result.valid) {
-      console.log('dist/ is valid.');
-    } else {
+    if (!result.valid) {
       if (result.missing.length > 0) {
         console.error('Missing files:');
         for (const f of result.missing) console.error(`  - ${f}`);
@@ -275,6 +333,12 @@ async function main() {
       }
       exit(1);
     }
+    console.log('dist/ is valid.');
+    // The archive gate reads the manifest that SHIPPED in dist/ rather than re-deriving one from
+    // the tracked source: the archive's own entry script is what has to be located inside it.
+    // validateDist above has already proved this file exists and parses.
+    const builtManifest = JSON.parse(await readFile(join(distDir, 'module.json'), 'utf8'));
+    await runArchiveChunkGate(distDir, builtManifest, version);
     return;
   }
 
@@ -291,6 +355,14 @@ async function main() {
   if (analyze) {
     process.env.ANALYZE = '1';
   }
+  // Bake THE VERSION THIS SCRIPT IS SHIPPING into the bundle (issue 1565), from the same `version`
+  // binding written into dist/module.json below, so the baked and shipped versions cannot
+  // disagree. Load-bearing on a release: semantic-release builds with `--dist-version <next>` and
+  // never writes the tracked module.json (still 0.1.0), so without this every release would bake a
+  // stale version and warn every user that their perfectly current client is out of date.
+  // vite.config.js reads it from the env this execSync inherits and falls back to the tracked
+  // manifest when it is unset, which is the `npm run dev` case.
+  process.env.FABRICATE_BUILD_VERSION = version;
   execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' });
 
   // 3. Copy static assets
@@ -320,7 +392,7 @@ async function main() {
 
   // 5. Create release zip (unless --no-zip)
   if (!noZip) {
-    const zipName = `fabricate-v${version}.zip`;
+    const zipName = releaseZipName(version);
     console.log(`Creating ${zipName}...`);
     if (process.platform === 'win32') {
       execSync(`tar -a -c -f "${zipName}" --exclude="*.zip" --exclude="*.map" .`, {
@@ -359,6 +431,11 @@ async function main() {
     for (const e of splitResult.errors) console.error(`  - ${e}`);
     exit(1);
   }
+
+  // Issue 1565: prove the ARCHIVE — not dist/, which the two checks above cover — carries every
+  // file its own entry script references. Runs last on purpose: a dist/ that is itself short or
+  // mis-split should be reported as that, not as an incomplete archive.
+  await runArchiveChunkGate(distDir, distManifest, version);
 }
 
 // Run main only when this file is invoked directly (not imported by tests)
