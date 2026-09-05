@@ -425,7 +425,11 @@ const EXPECTED = {
   // ORDERING is asserted below rather than only described here, so a later edit cannot quietly
   // put them back on one number and call it tidying.
   'bulk-segment-label': 11.52, // 0.72rem — SegmentedControl's own, not the select's
-  'bulk-callout': 11.2, // 0.7rem — the shared standing-statement strip
+  // 11.5px, the design system's own callout specimen, and a REAL change (issue 1505). It was
+  // 11.2 — the 0.7rem the shared strip carried while it drew the "taller treatment". The
+  // component converged onto `library.html:219`, whose body is 11.5px / 1.6 / `--fab-text-muted`
+  // over the surface fill, so the literal is written here because the specimen writes one.
+  'bulk-callout': 11.5,
   // ── The book axis's search-and-pick control (issue 1010), which replaced the tri-state
   // chip run this gate used to pin at the one chip scale. Three surfaces, three registers,
   // and the ordering between them is the design: the picked book's NAME is the loudest

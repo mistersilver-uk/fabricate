@@ -799,7 +799,10 @@ describe('RecipeBulkEditPanel blocked-enable forecast (issue 1010)', () => {
     // A bound with no authority behind it is a shrug. The write reports the real figure
     // (`AppliedBlocked`), so the strip says where the exact number comes from.
     assert.match(
-      warning.textContent,
+      // TRIMMED since issue 1505: the shared strip wraps its sentence in a body element so a
+      // title can sit above it, which puts the template's own whitespace after the text node.
+      // The anchor is still the assertion — the sentence must END here, not merely contain this.
+      warning.textContent.trim(),
       /applying reports the exact number\.$/,
       'the hedge names the post-apply report as the authority, making it a promise'
     );

@@ -194,8 +194,17 @@ export function isExemptSpacingPixels(pixels) {
  * it is the only separation between the banner and the Brew button — so `.alchemy-banner`
  * survives the conversion stripped to it, and a shrink there would be a defect rather than a
  * re-bank.
+ *
+ * It was 906 until the same issue widened `Callout` onto its own specimen. Five more occurrences
+ * went, from two deletions. The Checks studio's `[data-failure-salvage-note]` override — the
+ * caller rule whose content the primitive converged onto — took `gap: 11px` and
+ * `padding: 13px 14px` with it, so three `styles/fabricate.css` rows each fall by one against
+ * the sheet's other occurrences; and the inventory salvage banner's scoped block took its
+ * `padding: 10px` and its title/rule `gap: 2px`, each that file's only occurrence, so both rows
+ * are DELETED. Every one of the five is now `var(--fab-space-3)` or the specimen's own
+ * `margin-top` inside the primitive, so none of them left a slot open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 906;
+export const KNOWN_RAW_SPACING_TOTAL = 901;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

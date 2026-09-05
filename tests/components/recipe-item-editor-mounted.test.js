@@ -89,6 +89,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
+    // The salvage banner became the shared strip (issue 1505), which is what makes that
+    // primitive's first PLAYER importer. Omitting it CANCELS this suite rather than
+    // failing it.
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     // The multi-system participation selector InventoryComponentDetail imports (issue 766).
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',

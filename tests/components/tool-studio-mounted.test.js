@@ -1431,8 +1431,12 @@ describe('Tool Studio editor (mounted)', () => {
       props({ activeTab: 'requirements', systemName: 'The Herbalist' })
     );
     const strip = root.querySelector('[data-tool-requirements-intro]');
-    assert.ok(Boolean(strip), 'the system Requirements card opens with the info strip');
-    assert.equal(strip.dataset.calloutTone, 'info');
+    assert.ok(Boolean(strip), 'the system Requirements card opens with the scope strip');
+    // NEUTRAL since issue 1505, and the tone is the assertion rather than an incidental. The
+    // design system reserves the info tint for a note about LIVE state, and this sentence
+    // describes how system scope works — it is true of this card before the GM touches
+    // anything. It reads as the specimen's quiet standing statement, not as a signal.
+    assert.equal(strip.dataset.calloutTone, 'neutral');
     // The design's own sentence describes a model with no inheritance; ours inherits for real,
     // so the strip names the system it belongs to and says what following the world Tool means.
     assert.match(strip.textContent, /The Herbalist/);

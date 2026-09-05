@@ -1473,8 +1473,11 @@
      which is authored on the task and is cross-referenced here read-only. -->
 {#snippet gatheringOnFailureSection()}
   {@render failurePolicyCard()}
+  <!-- NEUTRAL, not info (issue 1505). The specimen reserves the info tint for a note about
+       LIVE state, and this sentence is true of every gathering system on every screen until
+       issue 683 lands — it reports the product, not this record. -->
   <Callout
-    tone="info"
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
       'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
@@ -1587,6 +1590,9 @@
 
       {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
         <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
+          <!-- The tone is DERIVED and both values stand (issue 1505): a readiness issue is a
+               statement about the live record, so `info` is the tint the specimen reserves for
+               exactly that, and a critical one is the conditional hazard `warning` names. -->
           {#each activeSectionIssues as issue (issue.id)}
             <Callout
               tone={issue.tone}
@@ -1881,8 +1887,12 @@
             <!-- The sentence the wrapper's description used to carry, restored to where the
                  prototype puts it: the last thing on the screen, and it says where the two
                  policies this screen does NOT govern actually live. -->
+            <!-- NEUTRAL, which is now the shared strip's own default (issue 1505). It is a
+                 pointer to two other screens rather than a note about live state, and the
+                 studio override that used to draw it quietly is deleted with this change: the
+                 quiet treatment IS the primitive. -->
             <Callout
-              tone="info"
+              tone="neutral"
               text={text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.FailureSalvageNote',
                 'Salvage failures follow their own separate policy on the Salvage check. An individual trigger can also break tools on its own — see Triggers.'

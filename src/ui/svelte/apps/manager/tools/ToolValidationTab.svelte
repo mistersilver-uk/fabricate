@@ -185,6 +185,20 @@
   });
 </script>
 
+<!-- Declared here rather than inline so the prop can be UNSET when the world record is
+     missing: an empty snippet is still truthy, and a `Callout` that took one would draw an
+     empty flex item and its gap after the sentence. -->
+{#snippet worldToolAction()}
+  <ManagerButton
+    data-tool-identity-route={String(tool?.id ?? '')}
+    aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
+    onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
+    ><i class="fas fa-globe" aria-hidden="true"></i><span
+      >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
+    ></ManagerButton
+  >
+{/snippet}
+
 <ScopedValidationTab
   stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
   hookAttribute="data-tool-validation-tab"
@@ -196,26 +210,20 @@
   blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE')}
 >
   {#if identityBroken}
-    <div class="manager-tool-identity-notice" data-tool-identity-notice>
-      <Callout
-        tone="warning"
-        icon="fas fa-link-slash"
-        text={text(
-          'FABRICATE.Admin.Manager.Tools.Editor.IdentityMissing',
-          'This Tool names no game-world Item. Its identity is set on the world Tool, not here, and it cannot be saved until that link is restored.'
-        )}
-      />
-      {#if worldRecordExists}
-        <ManagerButton
-          data-tool-identity-route={String(tool?.id ?? '')}
-          aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
-          onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
-          ><i class="fas fa-globe" aria-hidden="true"></i><span
-            >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
-          ></ManagerButton
-        >
-      {/if}
-    </div>
+    <!-- The note and the ONE control that answers it are one object (issue 1505). They used to
+         be two siblings inside a ruleless wrapper `<div>`, which is a shape the shared strip can
+         now hold itself: the button rides the `actions` snippet. No title is added — the site
+         carries one sentence today and inventing a headline would put `lang/en.json` in scope. -->
+    <Callout
+      tone="warning"
+      icon="fas fa-link-slash"
+      text={text(
+        'FABRICATE.Admin.Manager.Tools.Editor.IdentityMissing',
+        'This Tool names no game-world Item. Its identity is set on the world Tool, not here, and it cannot be saved until that link is restored.'
+      )}
+      dataAttr="data-tool-identity-notice"
+      actions={worldRecordExists ? worldToolAction : undefined}
+    />
   {/if}
   {#if saveError && saveError !== 'invalid'}
     <p class="manager-validation-error" role="alert" data-tool-save-error>

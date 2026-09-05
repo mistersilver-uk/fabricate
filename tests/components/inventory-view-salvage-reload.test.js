@@ -63,6 +63,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     // The shared notice the inventory bulk report's banner composes (issue 1505).
     'src/ui/svelte/components/Notice.svelte',
+    // The salvage banner became the shared standing-statement strip (issue 1505), which is
+    // that primitive's first player importer.
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryFilters.svelte',

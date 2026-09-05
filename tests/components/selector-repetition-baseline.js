@@ -29,7 +29,7 @@
  * rather than these 114, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 2,894 `(at-context, selector)` keys, of which 2,780 appear exactly
+ * Unfiltered, the sheet holds 2,891 `(at-context, selector)` keys, of which 2,777 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -40,8 +40,16 @@
  * MEASURED over this branch's own head, rebased onto issue 1502's final tree, by `the sheet's
  * cross-list selector repetition does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,397 rules at that head, 114 repeated keys and 234 appearances
+ * printed from. The sheet holds 2,394 rules at that head, 114 repeated keys and 234 appearances
  * between them; six keys appear three times and none appears four or more.
+ *
+ * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
+ * three rule blocks the shared `Callout` made redundant: the Checks studio's
+ * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive
+ * converged onto, and `.manager-recipe-info-strip`, whose two call sites became callouts. All
+ * three were singleton keys, so the rule count falls by three, the key count and the singleton
+ * count fall with it, and the repeated table is untouched — a deletion of unique authoring
+ * rather than a repetition being paid down.
  *
  * ISSUE 1504 MOVED FIVE OF THESE SIX FIGURES, through two different edits. The
  * `.fabricate-select*` family arrived — 32 new rules writing 33 new keys, every one a

@@ -304,9 +304,15 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * corner went with its scoped block, and the `<Notice>` it became takes the specimen's r11. The
  * wrapper the caller keeps carries only its `margin-bottom`, so nothing brings the radius back.
  *
+ * 314 → 312 with the same issue's `Callout` convergence, and both movers are the snap this
+ * number exists to reward. `apps/manager/Callout.svelte | border-radius | 8px | 1` is DELETED —
+ * the primitive's own corner takes the specimen's r11 — and `styles/fabricate.css |
+ * border-radius | 10px` falls 14 → 13, because the deleted `[data-failure-salvage-note]`
+ * override carried one of those fourteen. The key count falls 139 → 138 with the first.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 314;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 312;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
