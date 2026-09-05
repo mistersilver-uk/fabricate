@@ -140,20 +140,24 @@ function refusingAdd(refusedIds) {
  * `start end start end`. A fake recording only ids cannot tell those apart, and the whole reason
  * this loop is sequential is that every world-scope write reads-modifies-writes ONE setting.
  */
-function recordingAdd({ gated = false } = {}) {
+function recordingAdd({ gated = false, withSystem = false } = {}) {
   const events = [];
   let release = () => {};
   const gate = new Promise((resolve_) => {
     release = resolve_;
   });
+  // `withSystem` records the SECOND argument too (issue 1371 r17): a run pins the system it
+  // started against and hands it to every write, and a label that names only the entity cannot
+  // see a write re-targeted at a system the GM never ticked rows for.
+  const label = (entityId, system) => (withSystem ? `${entityId}->${system}` : entityId);
   return {
     events,
     release,
-    onAdd: async (entityId) => {
-      events.push(`start:${entityId}`);
+    onAdd: async (entityId, system) => {
+      events.push(`start:${label(entityId, system)}`);
       if (gated) await gate;
       else await Promise.resolve();
-      events.push(`end:${entityId}`);
+      events.push(`end:${label(entityId, system)}`);
       return true;
     },
   };
@@ -599,6 +603,72 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
       /already has rules for every component/,
       'an exhausted offer is a fact about this system'
     );
+  });
+
+  // ── issue 1371 r17 ──────────────────────────────────────────────────────────────────────
+  it('pins a run to the system it started against, and holds the re-seed until the run lands', async () => {
+    // FOUNDRY 1 (r13) and REVIEWER 3 (r13). `ManagerModal` draws no backdrop, so the rail's
+    // system `<select>` stays clickable under an open picker; its `mousedown` reaches the
+    // outside-click dismiss, which the dialog REFUSES while `applying` — and the root then
+    // changes `selectedSystemId` under a run that is still writing. The r11 re-seed effect,
+    // keyed on the system, answered that change by clearing the selection AND `applying`, so
+    // Cancel and every row came back to life mid-run, a second Apply could start a second run
+    // interleaved over the same world setting, and — because `onAdd` carried no system and the
+    // root's wire read the LIVE selection — every remaining write landed in the system the GM
+    // had just moved to, for rows they ticked against the old one.
+    //
+    // Driven exactly as the live root drives it: `setProps({ systemId })` BETWEEN a gated
+    // write's start and its release. `orphan` and `resin` are on offer to BOTH systems, so the
+    // count below is about the seed rather than about the offer filter pruning a held record.
+    const recorder = recordingAdd({ gated: true, withSystem: true });
+    const { closed } = await open({ recorder });
+    tick('orphan');
+    tick('resin');
+    applyButton().click();
+    await drainMicrotasks();
+    assert.deepEqual(recorder.events, ['start:orphan->sys-forge'], 'the first write is open');
+
+    await dialog.setProps({ systemId: 'sys-alchemy', systemName: 'Alchemy' });
+    await drainMicrotasks();
+
+    assert.equal(cancelButton().disabled, true, 'Cancel stays inert under the run');
+    assert.equal(applyButton().disabled, true, 'and so does Apply');
+    assert.ok(
+      [...document.querySelectorAll('[data-component-add-from-catalogue-select]')].every(
+        (box) => box.disabled
+      ),
+      'and every row: the subject changed, but the run has not finished, so nothing re-arms'
+    );
+    assert.match(countText(), /2 selected/, 'the selection is NOT re-seeded while a run is open');
+
+    applyButton().click();
+    await drainMicrotasks();
+    assert.deepEqual(
+      recorder.events,
+      ['start:orphan->sys-forge'],
+      'a second Apply issues no second `start:` — one run, one writer, one setting'
+    );
+
+    recorder.release();
+    await drainMicrotasks();
+    assert.deepEqual(
+      recorder.events,
+      [
+        'start:orphan->sys-forge',
+        'end:orphan->sys-forge',
+        'start:resin->sys-forge',
+        'end:resin->sys-forge',
+      ],
+      'every write carries the system captured at run START, never the one the root moved to'
+    );
+    assert.deepEqual(closed, [true], 'and the run closes the picker exactly once');
+
+    // AND ONLY THEN does the deferred re-seed fire, for the system now chosen: the ticks the
+    // run consumed are gone, the Apply is inert and the title names the new subject.
+    assert.match(countText(), /0 selected/, 'the re-seed landed once the run fell');
+    assert.deepEqual(pickedRowIds(), []);
+    assert.equal(applyButton().disabled, true);
+    assert.match(panel().querySelector('h3').textContent, /Add from catalogue to Alchemy/);
   });
 
   it('wears the shared modal chrome rather than a hand-rolled overlay', async () => {

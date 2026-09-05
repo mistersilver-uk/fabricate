@@ -16386,14 +16386,21 @@
     `undefined` — not `false` — when any link is absent, so the picker's refusal branch was
     unreachable in exactly the case it exists for. `=== true` on the awaited answer collapses the
     two into the one fact the dialog needs, which is whether the record was written.
+
+    AND THE WIRE WRITES TO THE SYSTEM THE RUN NAMES, NEVER THE LIVE SELECTION (issue 1371, r17).
+    The shared modal has no backdrop, so the rail's system select is clickable under an open
+    picker; `dismissOnOutsideClick` is refused while a run is in flight, and the selection then
+    moves under it. A wire reading `selectedSystemId` per call sent the rest of that run to the
+    system the GM had just moved to. The dialog pins its subject at run start and hands it down
+    as the second argument; this closure reads nothing of its own.
   -->
   <ComponentAddFromCatalogueDialog
     open={componentAddFromCatalogueOpen}
     systemId={selectedSystemId || ''}
     systemName={selectedSystem?.name || ''}
     entries={worldScopeState.component?.entries ?? []}
-    onAdd={async (entityId) =>
-      (await store?.worldScope?.component?.addToSystem?.(entityId, selectedSystemId)) === true}
+    onAdd={async (entityId, targetSystemId) =>
+      (await store?.worldScope?.component?.addToSystem?.(entityId, targetSystemId)) === true}
     onClose={() => (componentAddFromCatalogueOpen = false)}
   />
 

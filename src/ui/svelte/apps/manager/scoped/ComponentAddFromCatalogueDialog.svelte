@@ -40,10 +40,10 @@
   `Promise.all` over N adoptions would have N writers racing one setting and the last one home
   would carry only its own edit. The flag ALSO inerts the Apply, so the guard is reachable.
 
-  It calls ONE seam, `onAdd(entityId)`, which the root binds to the COMPOSED `addToSystem` — the
-  verb that writes both the membership record and the in-system row. A dialog that wrote the
-  membership half alone would leave every adopted component invisible to the list it was adopted
-  into.
+  It calls ONE seam, `onAdd(entityId, systemId)`, which the root binds to the COMPOSED
+  `addToSystem` — the verb that writes both the membership record and the in-system row. A
+  dialog that wrote the membership half alone would leave every adopted component invisible to
+  the list it was adopted into.
 
   == A REFUSAL IS REPORTED, AND THE RUN CONTINUES (issue 1371, r11) =========================
   `openspec/specs/ui-integration/spec.md` `### GM World Component Screens` requirement 6 is
@@ -83,15 +83,41 @@
   stays on the header button BEHIND an `aria-modal="true"` dialog, and a plain Tab walks the page
   underneath it.
 
+  == A RUN PINS ITS SUBJECT, AND THE RE-SEED WAITS FOR THE RUN (issue 1371, r17) ==============
+  The subject CAN change under an open run. `ManagerModal` draws no backdrop, so the rail's
+  system `<select>` is clickable while this dialog is open; its `mousedown` reaches the
+  outside-click dismiss, whose `dismiss()` REFUSES while `applying`; the root's system change
+  then goes through, and `systemId` moves while `apply()` is still awaiting writes. A run is N
+  sequential world-setting round-trips each followed by a full `refresh()`, so the window is
+  real for any multi-row selection.
+
+  The r11 effect above answered that change by re-seeding — clearing the selection AND
+  `applying` — which brought Cancel and every row back to life mid-run, let a second Apply start
+  a second run interleaved over the same world setting, and, because `onAdd` carried no system
+  and the root's wire read the LIVE selection, sent every remaining write to the system the GM
+  had just moved to, for rows ticked against the old one.
+
+  Two rules close it, and the choice between the two the review offered is stated:
+   1. `apply()` CAPTURES `systemId` at entry and hands it to every `onAdd(entityId, system)`; the
+      root's wire uses that argument and never its live selection. The writes go where the ticks
+      were made.
+   2. The re-seed effect never writes `applying`, and it DEFERS while a run is open rather than
+      stopping the run. Stopping — refusing the untried rows so they stay ticked — would leave
+      those ticks drawn under the NEW subject's title and offer, which is exactly the
+      "offer and selection disagree about the system" state the r11 key exists to prevent, and
+      the GM confirmed those rows with `Create rules`. Finishing the run against the pinned
+      subject honours that confirmation; re-seeding once it lands honours the subject change.
+
   Props:
    - open: whether the dialog's chrome is rendered. NOT whether this component is mounted — see
      the re-seed note above.
    - systemId / systemName: which system is being added to. `systemName` is the title's subject.
    - entries: the world component scope's `entries` projection, unfiltered.
-   - onAdd(entityId): the composed adoption for ONE record. Awaited. Anything other than `true` is
-     a REFUSAL: the run continues, the record stays ticked and the dialog stays open. `!== true`
-     rather than `=== false` because the composed verb answers "whether anything was written", and
-     a caller whose optional chain answers `undefined` has written nothing either.
+   - onAdd(entityId, systemId): the composed adoption for ONE record into ONE system — the system
+     the run was started against, not necessarily the current prop. Awaited. Anything other than
+     `true` is a REFUSAL: the run continues, the record stays ticked and the dialog stays open.
+     `!== true` rather than `=== false` because the composed verb answers "whether anything was
+     written", and a caller whose optional chain answers `undefined` has written nothing either.
    - onClose(): dismiss. Called by the chrome's close control, by Cancel, and after a run in which
      every target succeeded.
 -->
@@ -133,14 +159,20 @@
   // used to leave a selection armed against whichever system was chosen next. `systemId` is in
   // the key because a re-open against a DIFFERENT system is exactly the case that made a stale
   // selection dangerous rather than merely untidy.
+  //
+  // AND IT WAITS FOR A RUN TO LAND (issue 1371 r17). `applying` is read HERE, not written: the
+  // in-flight flag belongs to `apply()`'s own `try/finally` alone. While a run is open the key
+  // is left unrecorded, so the moment `applying` falls this effect runs again, sees the key it
+  // never seeded, and re-seeds for the subject the root moved to — after the run has written
+  // every one of its targets to the subject it started against.
   $effect(() => {
     const key = `${open ? 'open' : 'closed'}|${systemId}`;
     if (key === seededOpenKey) return;
+    if (applying) return;
     seededOpenKey = key;
     if (!open) return;
     query = '';
     selectedIds = new Set();
-    applying = false;
     refusedCount = 0;
     focusIntoDialog();
   });
@@ -280,13 +312,17 @@
     if (applying) return;
     const targets = selectedOffered.map((row) => row.id);
     if (targets.length === 0) return;
+    // THE SUBJECT IS PINNED AT ENTRY (issue 1371 r17), with the targets. `systemId` is a prop the
+    // root can change under an open run — see the header note — and a loop that read it live
+    // would land its remaining writes in a system the GM never ticked rows for.
+    const system = systemId;
     applying = true;
     const refused = [];
     try {
       for (const entityId of targets) {
         // `!== true`, not `=== false`: the composed verb answers whether anything was WRITTEN, so
         // a `false` refusal and an `undefined` from a seam that is not wired are the same fact.
-        if ((await onAdd(entityId)) !== true) refused.push(entityId);
+        if ((await onAdd(entityId, system)) !== true) refused.push(entityId);
       }
     } finally {
       applying = false;

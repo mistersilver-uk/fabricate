@@ -248,6 +248,7 @@ If one cannot be added, for example because another component in this system alr
 The picker closes on its own only when every ticked component was added, or when you press **Cancel**.
 It also closes if you move to another screen while it is open.
 Each time it opens it starts fresh, with no search text or ticks left over from an earlier visit, and it always offers against the crafting system currently selected in the rail.
+If you switch to another crafting system while the picker is still adding, the run finishes against the system it started with, and the picker then starts fresh for the system you moved to.
 When there is nothing to list, the picker says why.
 It tells you when the world catalogue has no components at all, when this system already has rules for every component in the catalogue, and when no component matches your search.
 

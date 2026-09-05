@@ -381,7 +381,7 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
     assert.ok(mount, 'the gateway mounts the picker');
     assert.match(
       mount[1],
-      /await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)/,
+      /await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, targetSystemId\)/,
       'wired to the COMPOSED adoption — the generic membership-only write would leave every ' +
         'adopted component invisible to the very list it was adopted into'
     );
@@ -389,10 +389,20 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
     // unwired leg safe is the same one that answered `undefined` rather than `false`, so the
     // picker's refusal branch could not fire on the one case it exists for. The `=== true` is on
     // the AWAITED value, which is the half a `typeof` check cannot see.
+    //
+    // AND THE SYSTEM IS THE DIALOG'S SECOND ARGUMENT, NEVER THE LIVE SELECTION (issue 1371 r17,
+    // reviewer 3 + Foundry 1). The rail's system select stays clickable under the backdrop-less
+    // modal and the dismiss is refused mid-run, so `selectedSystemId` can move under a run; the
+    // dialog pins its subject at run start and this wire must read only what it is handed.
     assert.match(
       mount[1],
-      /onAdd=\{async \(entityId\) =>\s*\(await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, selectedSystemId\)\) === true\}/,
-      'the wire answers whether the record was WRITTEN, never `undefined`'
+      /onAdd=\{async \(entityId, targetSystemId\) =>\s*\(await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, targetSystemId\)\) === true\}/,
+      'the wire answers whether the record was WRITTEN, never `undefined`, into the system the ' +
+        'run was started against'
+    );
+    assert.ok(
+      !/onAdd=\{[^}]*selectedSystemId/.test(mount[1]),
+      'and the wire reads no live selection of its own'
     );
     assert.match(mount[1], /open=\{componentAddFromCatalogueOpen\}/);
     assert.match(mount[1], /systemId=\{selectedSystemId \|\| ''\}/);
