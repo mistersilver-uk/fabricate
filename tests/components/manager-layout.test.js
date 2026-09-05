@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { computeIconPickerPopoverLayout } from '../../src/ui/svelte/util/iconPickerPopover.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 // ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
@@ -11451,10 +11452,18 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
 // specificity and its source order, and computes the winner per property. TWO THINGS PIN THAT
 // WINNER. Each of the ~40 properties the clauses below name is compared by SELECTOR against a
 // hard-coded expectation, which is what reds when the tie-break is inverted; and every winner
-// over a CONTESTED property whose declared value is a literal is compared with the browser's own
-// `getComputedStyle` as it is enumerated, which covers the properties no clause names. Without
-// the second, the report printed below — every property on eleven surfaces — was checked against
-// nothing, and a confident wrong report was a state this file could reach.
+// over a contested property WHOSE DECLARED VALUE IS A LITERAL is compared with the browser's own
+// `getComputedStyle` as it is enumerated. Without the second, the report printed below — every
+// property on eleven surfaces — was checked against nothing, and a confident wrong report was a
+// state this file could reach.
+//
+// THE SECOND IS NARROWER THAN IT SOUNDS, and the number is measured rather than estimated: of
+// the ~175 contested (probe, property) pairs, 33 are compared, on five of the eleven probes.
+// `var()`, `calc()`, `min()`, `max()`, `inherit`, a percentage and an unsubstituted shorthand
+// longhand are all skipped, because for those a declared value and a computed one are different
+// strings by construction rather than by disagreement. This sheet is heavily tokenised, so
+// ordinary design-token work moves properties OUT of that set — which is why the count itself is
+// returned and floored below rather than left implicit.
 //
 // The report itself is printed under `FABRICATE_CASCADE_REPORT=1`, which is how the PR's
 // acceptance evidence is produced. The assertions run either way.
@@ -11577,6 +11586,11 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       // property on eleven surfaces, and none of those was checked against anything at all. This
       // list is what makes the enumerator's own claim testable rather than asserted.
       const mismatches = [];
+      // HOW MANY WINNERS THE CROSS-CHECK ACTUALLY COMPARED. `mismatches` being empty means
+      // nothing on its own: it is empty both when every winner agrees with the browser and when
+      // no winner was eligible to be asked. The count is what tells the two apart, and it is
+      // returned so the assertion can floor it.
+      let crossChecked = 0;
 
       const enumerateFor = (element, probeName) => {
         const byProperty = {};
@@ -11633,6 +11647,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
           if (declaredText === '' || computedValue.trim() === '') continue;
           if (/\b(?:var|calc|min|max|clamp|env)\(/.test(declaredText)) continue;
           if (declaredText === 'inherit' || declaredText.includes('%')) continue;
+          crossChecked += 1;
           if (declaredText === computedValue.trim()) continue;
           mismatches.push(
             `${probeName}: ${property} — the enumerator picked \`${best.selector}\` declaring ` +
@@ -11718,6 +11733,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       return {
         surfaces,
         mismatches,
+        crossChecked,
         colours,
         chipRemedy,
         band,
@@ -11748,25 +11764,26 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       console.log(JSON.stringify(report, null, 2));
     }
 
-    // ── THE ENUMERATOR IS PINNED ON THE PROPERTIES THIS FILE DOES NOT NAME ──────────────
+    // ── THE ENUMERATOR IS PINNED ON THE LITERAL-VALUED CONTESTED WINNERS ────────────────
     // The named clauses below compare each winner's SELECTOR against a hard-coded expectation,
     // which is what makes a wrong enumerator red — but only over the ~40 properties they name.
     // The report covers every property on eleven surfaces and was checked against nothing, so a
-    // confident wrong report was a state this file could reach. Every literal-valued winner over
-    // a contested property is now compared with the browser's own answer as it is enumerated.
+    // confident wrong report was a state this file could reach. Every contested winner whose
+    // declared value is a LITERAL is now compared with the browser's own answer as it is
+    // enumerated — 33 of the ~175 contested pairs today, on five of the eleven probes.
     assert.deepEqual(
       report.mismatches,
       [],
       'the enumerator resolved a cascade the browser resolves differently, so the report it ' +
-        'prints under `FABRICATE_CASCADE_REPORT=1` cannot be trusted on the properties this ' +
-        `file does not name:\n  ${report.mismatches.join('\n  ')}`
+        'prints under `FABRICATE_CASCADE_REPORT=1` cannot be trusted on the literal-valued ' +
+        `contested properties it was able to check:\n  ${report.mismatches.join('\n  ')}`
     );
     assert.ok(
-      Object.values(report.surfaces).some((winners) =>
-        Object.values(winners).some((winner) => winner.contenders > 1)
-      ),
-      'no probe has a property more than one rule declares, so the clause above quantifies over ' +
-        'nothing and would report clean against any enumerator at all'
+      report.crossChecked >= 30,
+      `only ${report.crossChecked} winners were compared with the browser's own answer, so the ` +
+        'clause above quantifies over almost nothing and would report clean against any ' +
+        'enumerator at all. A sheet that moved its literal values behind `var()` reaches this ' +
+        'state silently.'
     );
 
     // ── PAIR 1: THE PANEL BOX GOES SHARED, WHOLE ────────────────────────────────────────
@@ -12008,6 +12025,235 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       ['.fabricate-color-picker-popover.manager-color-picker-popover { z-index: 120 }'],
       'the set of rules stacking between the picker panel`s old rung and its new one has ' +
         `changed:\n  ${report.band.join('\n  ')}`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── THE SOURCE PICKER'S TRIGGER, MEASURED AT BOTH SHIPPED SITES (issue 1503) ────────────────
+//
+// `computeIconPickerPopoverLayout` sizes the panel to `clamp(max(triggerWidth, minWidth),
+// minWidth, maxWidth)`, so a CEILING above the floor binds only for a trigger WIDER than it.
+// This picker's band moved from 280-420 to the shared 280-340, and whether that is a no-op or a
+// real narrowing is a question about a RENDERED width — which no source read and no prose
+// derivation can answer, because the trigger fills whatever column its drop zone sits in.
+//
+// The two shipped sites put that column at very different widths, and the register entry for
+// this component quotes the two numbers this test measures.
+//
+//   THE INSPECTOR RAIL (`EssenceBrowserInspector`), inside the shell's 300px third track.
+//   THE ESSENCE EDITOR (`EssenceOnCraftTab`), inside a `.manager-edit-card` that declares no
+//   `max-width` at all and fills the editor pane of the same 1280px window.
+//
+// Both are built from the real ancestor chains rather than from a bare drop zone: the width is
+// entirely a question of what the ancestors are, so a fixture that dropped one of them would
+// measure a number the product never renders. The scoped blocks in `EssenceBrowserInspector`,
+// `EssenceEditView` and `EssenceOnCraftTab` declare no horizontal padding, so the global sheet
+// this file injects is the whole of what sizes these two.
+const SOURCE_TRIGGER_SHELL = (view, main, inspector) => `
+  <div style="width:1280px;height:800px">
+    <div class="fabricate-manager" data-manager-view="${view}" style="display:grid;grid-template-rows:minmax(0,1fr);height:100%">
+      <div class="manager-body">
+        <aside class="manager-rail">Rail</aside>
+        ${main}
+        <aside class="manager-inspector">${inspector}</aside>
+      </div>
+    </div>
+  </div>`;
+
+/** The picker as both callers render it: the shell, the drop-target tile, no stored value. */
+const SOURCE_TRIGGER_MARKUP = (probe) => `
+  <div class="fabricate-picker manager-travel-picker fabricate-source-picker essence-source-selector">
+    <div class="essence-source-selector-shell">
+      <button type="button" class="essence-source-trigger" data-probe="${probe}">
+        <span class="essence-source-trigger-empty"><i class="fas fa-download"></i><span>Drop or pick a source item</span></span>
+        <span class="essence-source-trigger-corner"><i class="fas fa-search"></i></span>
+      </button>
+    </div>
+  </div>`;
+
+const SOURCE_TRIGGER_SITES = [
+  // The BROWSER route, whose inspector holds the unlinked drop zone. Its own class rides beside
+  // the shared one, which is the pair the sheet's `width: 100%` override is keyed on.
+  SOURCE_TRIGGER_SHELL(
+    'essences',
+    '<main class="manager-main">Browser</main>',
+    `<section class="manager-essence-inspector-section" data-essence-section="source">
+       <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
+         ${SOURCE_TRIGGER_MARKUP('inspector-trigger')}
+       </div>
+     </section>`
+  ),
+  // The EDITOR route, which keeps all three tracks — it is in neither aside-releasing list in the
+  // sheet — so the editor pane is `minmax(0, 1fr)` between the 220px rail and the 300px column.
+  SOURCE_TRIGGER_SHELL(
+    'essence-edit',
+    `<main class="manager-main manager-essence-edit-main">
+       <div class="manager-essence-edit-head">Tabs</div>
+       <form class="manager-essence-edit-view">
+         <div class="manager-essence-tab-panel">
+           <div class="manager-essence-tab-stack">
+             <section class="manager-edit-card" data-essence-section="effect-source">
+               <div class="manager-edit-card-heading"><h3 class="manager-card-title">Active effect source</h3></div>
+               <div class="manager-essence-source-drop-zone">
+                 ${SOURCE_TRIGGER_MARKUP('editor-trigger')}
+               </div>
+             </section>
+           </div>
+         </div>
+       </form>
+     </main>`,
+    '<section class="manager-inspector-card">Inspector</section>'
+  ),
+  // THE PICKER'S OWN RULE, outside any drop zone: the 140px square the component ships with
+  // wherever a caller does not override it. Both sites above DO override it, so without this
+  // third probe the 140 in the register entry would be a figure read off the sheet rather than
+  // one anything renders.
+  `<div style="width:1280px;height:200px">
+     <div class="fabricate-manager" data-manager-view="essences">
+       ${SOURCE_TRIGGER_MARKUP('own-rule-trigger')}
+     </div>
+   </div>`,
+  // THE PANEL ITSELF, at the inline 380px ceiling `computeIconPickerPopoverLayout` writes, so the
+  // chrome and the tile pitch the caller's `measureListMetrics` reads can be measured off the
+  // composed box rather than restated from the sheet's own figures.
+  `<div style="width:1280px;height:800px">
+     <div class="fabricate-manager" data-manager-view="essences">
+       <div class="fabricate-picker-popover manager-travel-popover fabricate-source-picker-popover essence-source-picker-popover"
+            role="dialog" data-probe="measured-panel" style="width:340px;max-height:380px">
+         <div class="manager-travel-popover-search essence-source-picker-search"><input type="text"></div>
+         <div class="manager-travel-popover-options essence-source-picker-grid" role="listbox" data-picker-as="grid" data-picker-columns="2">
+           ${Array.from(
+             { length: 16 },
+             (item, index) =>
+               `<button type="button" class="manager-travel-option essence-source-picker-option" role="option" tabindex="-1"><img alt=""><span>Component ${index}</span></button>`
+           ).join('')}
+         </div>
+       </div>
+     </div>
+   </div>`,
+].join('');
+
+test('the source picker`s trigger fills its column, and only one of its two sites reached 420', async () => {
+  const context = await sharedBrowser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style>${SOURCE_TRIGGER_SITES}`
+    );
+
+    const measured = await page.evaluate(() => {
+      const probe = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const widthOf = (name) => probe(name).getBoundingClientRect().width;
+      const px = (value) => Number.parseFloat(value) || 0;
+
+      const panel = probe('measured-panel');
+      const list = panel.querySelector(':scope [role="listbox"]');
+      const tile = list.querySelector(':scope .essence-source-picker-option');
+      const search = panel.querySelector(':scope .manager-travel-popover-search input');
+      const panelStyles = globalThis.getComputedStyle(panel);
+      const listStyles = globalThis.getComputedStyle(list);
+
+      return {
+        inspector: widthOf('inspector-trigger'),
+        editor: widthOf('editor-trigger'),
+        ownRule: widthOf('own-rule-trigger'),
+        // Exactly what `EssenceSourceSelector.measurePopoverMetrics` reads, read the same way, so
+        // the floored height below is the product's own arithmetic on the product's own numbers.
+        metrics: {
+          rowHeight: tile.getBoundingClientRect().height,
+          rowGap: px(listStyles.rowGap),
+          chromeHeight:
+            px(panelStyles.paddingTop) +
+            px(panelStyles.paddingBottom) +
+            px(panelStyles.rowGap) +
+            search.getBoundingClientRect().height,
+        },
+      };
+    });
+
+    if (process.env.FABRICATE_CASCADE_REPORT) {
+      console.log(JSON.stringify(measured, null, 2));
+    }
+
+    // ── THE THREE TRIGGER WIDTHS ───────────────────────────────────────────────────────
+    assert.equal(measured.ownRule, 140, 'the component`s own square, wherever no drop zone overrides it');
+    assert.equal(
+      measured.inspector,
+      275,
+      'the inspector rail`s trigger fills the shell`s 300px third track less its 1px left border ' +
+        `and its 12px insets: 300 - 1 - 24 (got ${measured.inspector}px)`
+    );
+    assert.equal(
+      measured.editor,
+      710,
+      'the essence editor`s card declares no max-width, so its trigger fills the editor pane: ' +
+        '1280 less the 220px rail and the 300px inspector track is 760, less the form`s 12px ' +
+        `insets and the card's 12px insets and 1px edges (got ${measured.editor}px)`
+    );
+
+    // ── WHAT THE WITHDRAWN CEILING BOUND, DERIVED THROUGH THE SHIPPED LAYOUT ───────────
+    // Not asserted in prose: the two bands are run through the real module on the two measured
+    // widths. The floor is this picker's own 280 and is unchanged by the withdrawal.
+    const panelWidthAt = (triggerWidth, maxWidth) =>
+      computeIconPickerPopoverLayout(
+        { top: 200, bottom: 284, left: 100, right: 100 + triggerWidth, width: triggerWidth, height: 84 },
+        { width: 1280, height: 900 },
+        { minWidth: 280, maxWidth }
+      ).width;
+
+    assert.equal(
+      panelWidthAt(measured.inspector, 420),
+      panelWidthAt(measured.inspector, 340),
+      'the inspector rail never reached the old ceiling: its trigger is narrower than the 280px ' +
+        'floor, so the width resolved from the floor under either band and the withdrawal is a ' +
+        'no-op there'
+    );
+    assert.equal(panelWidthAt(measured.inspector, 340), 280, 'and that resolved width is the floor');
+    assert.equal(
+      panelWidthAt(measured.editor, 420),
+      420,
+      'the essence editor DID reach it: a trigger this wide resolves the panel to the ceiling, ' +
+        'whatever the ceiling is'
+    );
+    assert.equal(
+      panelWidthAt(measured.editor, 340),
+      340,
+      'so the panel at that site narrows from 420 to the shared 340 — a real change, licensed ' +
+        'here rather than asserted away as a no-op'
+    );
+
+    // ── AND THE GRID FLOORS TO WHOLE TILES ────────────────────────────────────────────
+    // `EssenceSourceSelector` registers `measureListMetrics` as of issue 1503. Before it, the
+    // list simply filled the panel and the last row of BORDERED tiles was cut partway through —
+    // which the published `manager-essences-source-picker` frame shows.
+    const { rowHeight, rowGap, chromeHeight } = measured.metrics;
+    const rowPitch = rowHeight + rowGap;
+    const floored = computeIconPickerPopoverLayout(
+      { top: 200, bottom: 284, left: 100, right: 380, width: 280, height: 84 },
+      { width: 1280, height: 900 },
+      { minWidth: 280, maxWidth: 340, rowPitch, rowGap, chromeHeight, listExtra: 0 }
+    );
+
+    assert.equal(rowHeight, 44, 'the tile is the 44px border box the sheet floors it at');
+    assert.equal(rowGap, 6, 'at the 6px dense pitch');
+    assert.equal(chromeHeight, 46, 'and the panel`s own chrome is 6 + 6 padding, a 4px gap and a 30px field');
+    assert.equal(
+      floored.maxHeight,
+      380,
+      'the panel ceiling this is measured inside, which is what the picker renders at'
+    );
+    assert.equal(
+      floored.listMaxHeight,
+      6 * rowPitch - rowGap,
+      'six whole grid rows and no seventh sliver: 380 of panel less 46 of chrome leaves 334, ' +
+        'which is six 50px pitches with 34 left over — and those 34 stay as panel slack, where ' +
+        'a reader expects it, rather than as two thirds of a bordered tile against the inset'
+    );
+    assert.ok(
+      floored.listMaxHeight + chromeHeight <= floored.maxHeight,
+      'and the floored list still fits the panel it is measured inside'
     );
   } finally {
     await context.close();
