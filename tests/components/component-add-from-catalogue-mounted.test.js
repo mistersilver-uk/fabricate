@@ -315,13 +315,22 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     );
   });
 
-  it('the Apply is inert with nothing ticked, and names the count and the system when it is not', async () => {
+  it('the Apply is inert with nothing ticked, and reads the reference’s `Create rules` when it is not', async () => {
+    // issue 1371 r12-list. `proto:6052` is the modal builder's `applyLabel`, and for this modal it
+    // is the bare `Create rules` (`proto:3754` draws the label alone, no glyph). The shipped
+    // `+ Add {n} to {system}` restated two facts the dialog already draws — the count is the foot
+    // note (`proto:6053`, `{n} selected`) and the system is the title — so the action names the ACT.
     await open();
     assert.equal(applyButton().disabled, true, 'nothing ticked writes nothing');
     tick('coal');
     tick('resin');
     assert.equal(applyButton().disabled, false);
-    assert.match(applyButton().textContent, /Add 2 to Forge/);
+    assert.equal(applyButton().textContent.trim(), 'Create rules');
+    assert.ok(
+      !applyButton().querySelector('i'),
+      'and at rest it draws no leading glyph, as the reference draws none'
+    );
+    assert.match(countText(), /2 selected/, 'the count is the foot note’s, not the action’s');
   });
 
   it('search narrows the offer without dropping a row the GM already ticked', async () => {
@@ -431,7 +440,12 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     assert.deepEqual(pickedRowIds(), [], 'the reopened picker carries no tick from the last one');
     assert.match(countText(), /0 selected/);
     assert.equal(applyButton().disabled, true, 'and its Apply is inert rather than armed');
-    assert.match(applyButton().textContent, /Add 0 to Alchemy/, 'against the system now chosen');
+    // The action no longer names the system (r12-list); the TITLE is where that fact is drawn.
+    assert.match(
+      panel().querySelector('h3').textContent,
+      /Add from catalogue to Alchemy/,
+      'against the system now chosen'
+    );
   });
 
   it('and the re-seed is keyed on the SYSTEM too, not on the open flag alone', async () => {

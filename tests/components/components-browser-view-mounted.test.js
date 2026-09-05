@@ -1211,6 +1211,26 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
       'and the other three commands are behind the shared overflow trigger, not lost'
     );
   });
+
+  it('heads the salvage block with `Salvage in` and the system name as its OWN node (issue 1371 r12-list)', async () => {
+    // `proto:1263` draws `Salvage in {{ d.sysName }}`: the caption and the name are two text nodes
+    // of one line, and the parity inventory keys the caption on its own. The subject folded both
+    // into one string, so its normalised key never matched. The name is wrapped, and the whole
+    // line is byte-identical to what it read before, so a screen reader hears the same sentence.
+    const root = await mountCoal();
+    const label = root.querySelector('[data-component-salvage-label]');
+    assert.ok(Boolean(label), 'the heading renders');
+    assert.equal(label.textContent.trim(), 'Salvage in Forge', 'the sentence is unchanged');
+    const name = label.querySelector('[data-component-salvage-system]');
+    assert.ok(Boolean(name), 'and the system name is its own node');
+    assert.equal(name.textContent, 'Forge');
+    const caption = [...label.childNodes]
+      .filter((node) => node.nodeType === 3)
+      .map((node) => node.textContent)
+      .join('')
+      .trim();
+    assert.equal(caption, 'Salvage in', 'so the caption is the text the reference keys on');
+  });
 });
 
 describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
@@ -1342,5 +1362,131 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       bar.classList.contains('manager-component-toolbar'),
       'and its own, so the extra class is still appended rather than replacing the primitive’s'
     );
+  });
+});
+
+// ── issue 1371 r12-list ──────────────────────────────────────────────────────────────────────
+describe('ComponentsBrowserView toolbar — the reference’s essence predicates, Tags sort and sort glyph (issue 1371 r12-list)', () => {
+  /**
+   * The first complete parity `inventory` pass on the `system` screen (`handoff-r11-gates.md` §1)
+   * reported four structural lines on this bar that were real: the reference's essence filter
+   * offers `Carries any essence` and `No essences` besides the per-essence entries (`proto:5533`,
+   * predicates at `proto:5477-5479`); its sort-by list is `Name | Category | Essences | Tags`
+   * (`proto:5536`, the `Tags` comparator at `proto:5485`); and its direction toggle draws
+   * `fa-arrow-down-a-z` / `fa-arrow-up-a-z` (`proto:5538`) where the subject drew
+   * `fa-arrow-down-short-wide`. Each control below is ACTED on, not merely found, and the state it
+   * changes is the row order the body draws.
+   */
+  function toolbarRows() {
+    return [
+      makeComponent({ id: 'ash', name: 'Ash', tags: ['fuel', 'bulk'] }),
+      makeComponent({
+        id: 'brimstone',
+        name: 'Brimstone',
+        tags: [],
+        essences: [{ id: 'fire', name: 'Fire', quantity: 1 }],
+      }),
+      makeComponent({
+        id: 'cinder',
+        name: 'Cinder',
+        tags: ['fuel'],
+        essences: [
+          { id: 'fire', name: 'Fire', quantity: 1 },
+          { id: 'air', name: 'Air', quantity: 1 },
+        ],
+      }),
+      makeComponent({ id: 'dust', name: 'Dust', tags: [] }),
+    ];
+  }
+
+  function rowIds(root) {
+    return [...root.querySelectorAll(':scope .manager-component-row')].map(
+      (row) => row.dataset.componentId
+    );
+  }
+
+  function choose(select, value) {
+    select.value = value;
+    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+  }
+
+  async function mountToolbar() {
+    return browser.mount({
+      itemCards: toolbarRows(),
+      categoryVocabulary: [],
+      selectedSystemId: 'sys-1',
+    });
+  }
+
+  it('offers `Carries any essence` and `No essences` after `All essences`, and each one FILTERS', async () => {
+    const root = await mountToolbar();
+    const filter = root.querySelector('[data-component-essence-filter]');
+    assert.ok(Boolean(filter), 'the essence filter renders, because a row carries an essence');
+    assert.deepEqual(
+      [...filter.options].map((option) => [option.value, option.textContent.trim()]),
+      [
+        ['all', 'All essences'],
+        ['__any', 'Carries any essence'],
+        ['__none', 'No essences'],
+        ['Air', 'Air'],
+        ['Fire', 'Fire'],
+      ],
+      'the reference’s order: the three predicates, then the per-essence entries'
+    );
+    assert.deepEqual(rowIds(root), ['ash', 'brimstone', 'cinder', 'dust'], 'unfiltered, by name');
+
+    choose(filter, '__any');
+    assert.deepEqual(rowIds(root), ['brimstone', 'cinder'], 'any essence at all keeps the row');
+
+    choose(filter, '__none');
+    assert.deepEqual(rowIds(root), ['ash', 'dust'], 'no essence keeps only the bare rows');
+
+    choose(filter, 'Fire');
+    assert.deepEqual(rowIds(root), ['brimstone', 'cinder'], 'and a named essence still works');
+  });
+
+  it('offers `Tags` as the fourth sort key, and it orders by tag count then name', async () => {
+    const root = await mountToolbar();
+    const sort = root.querySelector('[data-component-sort]');
+    assert.deepEqual(
+      [...sort.options].map((option) => [option.value, option.textContent.trim()]),
+      [
+        ['name', 'Name'],
+        ['category', 'Category'],
+        ['essences', 'Essences'],
+        ['tags', 'Tags'],
+        ['salvage', 'Salvage'],
+      ],
+      'the reference’s four keys in its order, with the subject-only Salvage kept last'
+    );
+
+    choose(sort, 'tags');
+    assert.deepEqual(
+      rowIds(root),
+      ['brimstone', 'dust', 'cinder', 'ash'],
+      'ascending: the two untagged rows by name, then one tag, then two'
+    );
+
+    root.querySelector('[data-component-sort-direction]').click();
+    flushSync();
+    assert.deepEqual(
+      rowIds(root),
+      ['ash', 'cinder', 'brimstone', 'dust'],
+      'descending: the count reverses, the name tiebreak does not'
+    );
+  });
+
+  it('draws the direction toggle with the reference’s alphabetical glyphs', async () => {
+    const root = await mountToolbar();
+    const toggle = root.querySelector('[data-component-sort-direction]');
+    const glyph = () => toggle.querySelector('i').className;
+    assert.match(glyph(), /\bfa-arrow-down-a-z\b/, 'ascending is `fa-arrow-down-a-z` (`proto:5538`)');
+    assert.doesNotMatch(glyph(), /short-wide|wide-short/, 'and not the amount glyphs it drew');
+
+    toggle.click();
+    flushSync();
+    assert.match(glyph(), /\bfa-arrow-up-a-z\b/, 'descending is `fa-arrow-up-a-z`');
+    assert.doesNotMatch(glyph(), /short-wide|wide-short/);
   });
 });

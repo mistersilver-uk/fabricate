@@ -41,6 +41,7 @@
     componentAttributionNote,
     componentCategorySourceText,
     componentInspectorSubline,
+    componentSalvageInLabel,
     componentSalvageSummary,
     componentTagSplitText,
   } from '../scoped/componentScoped.js';
@@ -81,6 +82,7 @@
     return result;
   }
 
+  const salvageHeading = $derived(componentSalvageInLabel(systemName, text));
   const systemTags = $derived(Array.isArray(selectedComponent?.tags) ? selectedComponent.tags : []);
   const essences = $derived(
     Array.isArray(selectedComponent?.essences) ? selectedComponent.essences : []
@@ -336,10 +338,12 @@
       {/if}
 
       <div class="manager-component-inspector-block">
+        <!-- `Salvage in` and the name as TWO nodes, as `proto:1263` draws them (issue 1371
+             r12-list). No whitespace between the parts: the lead carries its own trailing
+             space, so the sentence is byte-identical to the one-string form it replaces. -->
         <p class="manager-micro-label" data-component-salvage-label>
-          {format('FABRICATE.Admin.Manager.Component.SalvageIn', 'Salvage in {system}', {
-            system: systemName,
-          })}
+          {salvageHeading.lead}<span data-component-salvage-system>{salvageHeading.name}</span
+          >{salvageHeading.trail}
         </p>
         <p
           class="manager-component-inspector-well manager-component-inspector-note"

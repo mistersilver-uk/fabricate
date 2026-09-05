@@ -1701,6 +1701,32 @@ export function componentCategorySourceText(systemRow, phrase) {
 }
 
 /**
+ * The inspector's `Salvage in {system}` heading, split around its token so the view can wrap the
+ * system name as its own node (issue 1371 r12-list).
+ *
+ * `proto:1263` draws `Salvage in {{ d.sysName }}` -- the caption and the name as two text nodes
+ * of one line -- and the parity inventory keys the caption alone. The subject folded both into
+ * one localized string, so its normalised key never matched. The three parts JOIN to the very
+ * string the single-string form produced, so a screen reader hears the same sentence; a
+ * translation that puts the name first, or that carries no token at all, is honoured rather than
+ * assumed away.
+ *
+ * @param {string} systemName
+ * @param {(key: string, fallback: string) => string} text the non-interpolating localizer.
+ * @returns {{lead: string, name: string, trail: string}}
+ */
+export function componentSalvageInLabel(systemName, text) {
+  const template = text('FABRICATE.Admin.Manager.Component.SalvageIn', 'Salvage in {system}');
+  const at = template.indexOf('{system}');
+  if (at < 0) return { lead: `${template} `, name: systemName, trail: '' };
+  return {
+    lead: template.slice(0, at),
+    name: systemName,
+    trail: template.slice(at + '{system}'.length),
+  };
+}
+
+/**
  * The inspector's `Salvage in {system}` note -- the one sentence that says what this component's
  * salvage rules ARE here, without opening the editor.
  *

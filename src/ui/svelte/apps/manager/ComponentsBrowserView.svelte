@@ -20,6 +20,8 @@
   } from '../../../../utils/componentBulkEditModel.js';
   import {
     COMPONENT_DEFAULT_PAGE_SIZE,
+    COMPONENT_ESSENCE_FILTER_ANY,
+    COMPONENT_ESSENCE_FILTER_NONE,
     COMPONENT_SORT_KEYS,
     buildComponentBrowserModel,
     componentCategoryOptions,
@@ -382,6 +384,7 @@
       name: text('FABRICATE.Admin.Manager.Component.SortName', 'Name'),
       category: text('FABRICATE.Admin.Manager.Component.SortCategory', 'Category'),
       essences: text('FABRICATE.Admin.Manager.Component.SortEssences', 'Essences'),
+      tags: text('FABRICATE.Admin.Manager.Component.SortTags', 'Tags'),
       salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage'),
     };
     return labels[key] || key;
@@ -728,6 +731,14 @@
           <option value="all"
             >{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option
           >
+          <!-- The reference's two PREDICATES ahead of the per-essence entries (`proto:5533`;
+               issue 1371 r12-list). Their values are the model's sentinels, not names. -->
+          <option value={COMPONENT_ESSENCE_FILTER_ANY}
+            >{text('FABRICATE.Admin.Manager.Component.EssenceAny', 'Carries any essence')}</option
+          >
+          <option value={COMPONENT_ESSENCE_FILTER_NONE}
+            >{text('FABRICATE.Admin.Manager.Component.EssenceNone', 'No essences')}</option
+          >
           {#each componentEssenceOptions as essence (essence)}
             <option value={essence}>{essence}</option>
           {/each}
@@ -828,10 +839,10 @@
           )}
           onclick={toggleSortDirection}
         >
+          <!-- The alphabetical pair the reference draws (`proto:5538`) and the sibling lists
+               already draw; this bar drew the AMOUNT pair (issue 1371 r12-list). -->
           <i
-            class={ui.sortDirection === 'asc'
-              ? 'fas fa-arrow-down-short-wide'
-              : 'fas fa-arrow-down-wide-short'}
+            class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-up-a-z'}
             aria-hidden="true"
           ></i>
           <span

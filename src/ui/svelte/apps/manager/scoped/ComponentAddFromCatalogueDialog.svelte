@@ -298,11 +298,12 @@
     onClose();
   }
 
+  // The reference's apply reads `Create rules` (`proto:6052`, the modal builder's `applyLabel`;
+  // drawn bare at `proto:3754`). The shipped `+ Add {n} to {system}` restated two facts this
+  // dialog already draws — the count is the foot note and the system is the title — so the action
+  // names the ACT instead (issue 1371 r12-list).
   const applyLabel = $derived(
-    format('FABRICATE.Admin.Manager.Component.AddFrom.Apply', 'Add {count} to {system}', {
-      count: selectedCount,
-      system: systemName,
-    })
+    text('FABRICATE.Admin.Manager.Component.AddFrom.Apply', 'Create rules')
   );
 </script>
 
@@ -447,7 +448,11 @@
       disabled={applying || selectedCount === 0}
       onclick={apply}
     >
-      <i class={applying ? 'fas fa-spinner fa-spin' : 'fas fa-plus'} aria-hidden="true"></i>
+      <!-- At rest the label stands alone, as `proto:3754` draws it; the spinner is the one
+           in-flight state the reference's fixture cannot reach. -->
+      {#if applying}
+        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+      {/if}
       <span>{applyLabel}</span>
     </ManagerButton>
   {/snippet}

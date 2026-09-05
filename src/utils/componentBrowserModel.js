@@ -24,11 +24,33 @@ import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 import { paginateRows } from './browserPagination.js';
 import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
-/** @typedef {'name' | 'category' | 'essences' | 'salvage'} ComponentSortKey */
+/** @typedef {'name' | 'category' | 'essences' | 'tags' | 'salvage'} ComponentSortKey */
 /** @typedef {'asc' | 'desc'} SortDirection */
 
-/** Sort keys offered by the library toolbar, in menu order. */
-export const COMPONENT_SORT_KEYS = Object.freeze(['name', 'category', 'essences', 'salvage']);
+/**
+ * Sort keys offered by the library toolbar, in menu order.
+ *
+ * The first four are the reference's own list in its order (`proto:5536`: Name, Category,
+ * Essences, Tags — issue 1371 r12-list). `salvage` is a subject-only extra the reference does not
+ * draw, kept LAST so the shared prefix reads the same on both sides.
+ */
+export const COMPONENT_SORT_KEYS = Object.freeze([
+  'name',
+  'category',
+  'essences',
+  'tags',
+  'salvage',
+]);
+
+/**
+ * The essence filter's two PREDICATE values (issue 1371 r12-list): the reference offers
+ * `Carries any essence` and `No essences` ahead of the per-essence entries (`proto:5533`), and
+ * `proto:5477-5479` is the predicate each applies. The per-essence values are NAMES, so these two
+ * take a form no GM-authored essence can spell — `all` predates them, is the lifted view-state's
+ * persisted default, and stays as it is.
+ */
+export const COMPONENT_ESSENCE_FILTER_ANY = '__any';
+export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
 
 /**
  * Default page size. It must EXCEED the smoke fixture's component count: the harness
@@ -103,6 +125,18 @@ function essenceNames(component) {
 }
 
 /**
+ * The essence filter's predicate: the neutral `all`, the two reference predicates, or a
+ * named essence (`proto:5477-5479`, issue 1371 r12-list).
+ */
+function essenceMatches(component, essence) {
+  if (essence === 'all') return true;
+  const names = essenceNames(component);
+  if (essence === COMPONENT_ESSENCE_FILTER_ANY) return names.length > 0;
+  if (essence === COMPONENT_ESSENCE_FILTER_NONE) return names.length === 0;
+  return names.includes(essence);
+}
+
+/**
  * Filter the projected rows by category and essence.
  *
  * Note there is deliberately no TAG filter: tags are a many-valued field that was
@@ -119,8 +153,7 @@ export function filterComponents(components, filters = {}) {
 
   return (Array.isArray(components) ? components : []).filter((component) => {
     if (category !== 'all' && componentCategoryOf(component) !== category) return false;
-    if (essence !== 'all' && !essenceNames(component).includes(essence)) return false;
-    return true;
+    return essenceMatches(component, essence);
   });
 }
 
@@ -137,6 +170,11 @@ function compareCategories(left, right) {
 
 const SORT_VALUES = Object.freeze({
   essences: (component) => essenceNames(component).length,
+  // The reference's `Tags` key orders by the count of tags in effect (`proto:5485`). The row
+  // carries this system's OWN list — which IS the set in effect, because the world-tag merge is
+  // consumed by the resolver alone and the read union discards it — and the projection blanks the
+  // field where the system hides tags, so an absent array counts as zero (issue 1371 r12-list).
+  tags: (component) => (Array.isArray(component?.tags) ? component.tags.length : 0),
   salvage: (component) => numeric(component?.salvageSummary?.resultGroupCount),
 });
 

@@ -25,6 +25,7 @@ import {
   componentCategoryNote,
   componentDeleteNote,
   componentRowStats,
+  componentSalvageInLabel,
   componentWorldCategoryNote,
   componentWorldTagNote,
   offeredWorldComponentCategories,
@@ -486,5 +487,40 @@ describe('the entry validation check set renders at its declared severity', () =
     assert.equal(counts.warnings, 0);
     assert.equal(counts.blocking, 0);
     assert.equal(counts.passing, 6);
+  });
+});
+
+// ── issue 1371 r12-list ──────────────────────────────────────────────────────────────────────
+describe('the inspector’s `Salvage in` heading names the system as its own node', () => {
+  // `proto:1263` draws `Salvage in {{ d.sysName }}` — the caption and the name as two text nodes
+  // of one line — where the subject folded both into one localized string. The helper splits the
+  // localized template at its token so the view can wrap the name, and the JOIN of the three
+  // parts is byte-identical to the single string a screen reader used to hear.
+  const text = (_key, fallback) => fallback;
+
+  it('splits the shipped template into a lead, the name and an empty trail', () => {
+    assert.deepEqual(componentSalvageInLabel('Forge', text), {
+      lead: 'Salvage in ',
+      name: 'Forge',
+      trail: '',
+    });
+  });
+
+  it('keeps a translation that puts the name FIRST, so the token is honoured wherever it sits', () => {
+    const leading = (_key, fallback) =>
+      _key === 'FABRICATE.Admin.Manager.Component.SalvageIn' ? '{system}: salvage' : fallback;
+    const parts = componentSalvageInLabel('Forge', leading);
+    assert.deepEqual(parts, { lead: '', name: 'Forge', trail: ': salvage' });
+    assert.equal(parts.lead + parts.name + parts.trail, 'Forge: salvage');
+  });
+
+  it('and a template with no token still draws the name, after the caption', () => {
+    const tokenless = (_key, fallback) =>
+      _key === 'FABRICATE.Admin.Manager.Component.SalvageIn' ? 'Salvage in' : fallback;
+    assert.deepEqual(componentSalvageInLabel('Forge', tokenless), {
+      lead: 'Salvage in ',
+      name: 'Forge',
+      trail: '',
+    });
   });
 });
