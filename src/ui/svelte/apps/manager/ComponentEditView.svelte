@@ -6,6 +6,7 @@
   import EditorTabs from './EditorTabs.svelte';
   import EditorValidationSurface from './EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
+  import InheritRow from './scoped/InheritRow.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
@@ -55,7 +56,11 @@
   import {
     componentCategoryInheritOffered,
     componentCategoryNote,
+    componentEssenceChips,
+    componentEssenceInheritOffered,
+    componentEssenceNote,
     componentTagMergeNote,
+    componentWorldEssenceMap,
   } from './scoped/componentScoped.js';
 
   /**
@@ -228,6 +233,39 @@
     )
   );
 
+  // ── THE ESSENCE SECTION'S INHERIT CHOICE (issue 1371 r18-entry, maintainer ruling M31) ──────
+  // The world record carries an `essences` SECTION beside `category`, on the category model
+  // exactly, so this is the category machinery above over the other section: the persisted switch
+  // off the world join, the OFFER withheld while the world authored nothing, a three-valued staged
+  // flag (`null` untouched), and a LOCK that draws the steppers read-only over the WORLD map while
+  // the staged choice is inherit. `worldEssenceMap` is the world section normalized positive-only
+  // — the same read the world catalogue's rows make — and it is what a locked card shows and what
+  // an override is SEEDED from, so flipping the switch moves no tile.
+  const worldEssences = $derived(worldEntry?.defaults?.essences);
+  const worldEssenceMap = $derived(componentWorldEssenceMap(worldEntry, []));
+  const essenceInheriting = $derived(worldSystemRow?.inherited?.essences !== false);
+  const essenceInheritOffered = $derived(
+    worldMember && componentEssenceInheritOffered(worldEssences)
+  );
+  let essenceInheritDraft = $state(null);
+  const essenceInheritStaged = $derived(
+    essenceInheritDraft === null ? essenceInheriting : essenceInheritDraft
+  );
+  const essenceInheritDirty = $derived(
+    essenceInheritDraft !== null && essenceInheritDraft !== essenceInheriting
+  );
+  const essenceLocked = $derived(essenceInheritOffered && essenceInheritStaged);
+  const essenceNote = $derived(
+    componentEssenceNote(
+      {
+        worldEssences,
+        inheriting: essenceInheritStaged,
+        systemName: String(worldSystemRow?.systemName ?? systemId),
+      },
+      format
+    )
+  );
+
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
@@ -286,6 +324,8 @@
       // one rather than a boolean: `null` (untouched) and a staged value equal to the persisted
       // one are different states, and only one of them is dirty.
       String(categoryInheritDraft),
+      // And the essence switch's staged half, three-valued for the same reason (M31).
+      String(essenceInheritDraft),
       essenceDraft
         .map((opt) => `${opt.id}:${opt.quantity}`)
         .sort()
@@ -307,6 +347,7 @@
     // Reset with the drafts it belongs to. Left standing, a staged inherit choice would be
     // re-applied to the NEXT component opened in this editor.
     categoryInheritDraft = null;
+    essenceInheritDraft = null;
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
     complicationsDraft = cloneComplications(component?.complications);
@@ -402,11 +443,15 @@
       : []
   );
 
+  // THE EFFECTIVE CONTRIBUTION: the world map's total while the section is (staged) inheriting,
+  // the draft's otherwise — what the validation check and the rail both answer for (M31).
   const essenceTotal = $derived(
-    essenceDraft.reduce(
-      (total, option) => total + (clampComponentEssenceQuantity(option?.quantity) || 0),
-      0
-    )
+    essenceLocked
+      ? Object.values(worldEssenceMap).reduce((total, quantity) => total + quantity, 0)
+      : essenceDraft.reduce(
+          (total, option) => total + (clampComponentEssenceQuantity(option?.quantity) || 0),
+          0
+        )
   );
 
   const validation = $derived(
@@ -525,6 +570,28 @@
     setCategory(value);
   }
 
+  /**
+   * Stage the essence switch (issue 1371 r18-entry, maintainer ruling M31). NOTHING IS WRITTEN
+   * HERE, for the reason `setCategorySelection` gives: both halves land in `handleSave`.
+   *
+   * Going to OVERRIDE seeds the value draft from the WORLD map the locked card was showing, so no
+   * tile moves and the first Save writes the values the GM was already looking at — the same seed
+   * `setSectionInheritance` makes on the membership record. Going back to INHERIT leaves the value
+   * draft standing as the dormant override, exactly as the category draft stands behind the
+   * `Inherit from world` option; the locked card shows the world map over it.
+   *
+   * @param {boolean} nextInherit `InheritRow` reports the NEXT inherit value, never a toggle.
+   */
+  function setEssenceInheritance(nextInherit) {
+    essenceInheritDraft = nextInherit === true;
+    if (nextInherit === false) {
+      essenceDraft = essenceDraft.map((entry) => ({
+        ...entry,
+        quantity: worldEssenceMap[entry.id] ?? 0,
+      }));
+    }
+  }
+
   // ── D4.2 THE TAG CARD'S TWO GROUPS ─────────────────────────────────────────────────────
   const worldTagsApplied = $derived(worldTags.filter((tag) => !worldMutedTags.includes(tag)));
   const ownTagLabel = $derived(
@@ -613,6 +680,21 @@
       .filter((option) => option.checked && !worldTagsApplied.includes(option.tag))
       .map((option) => option.tag),
   ]);
+  // THE ESSENCES THIS SYSTEM RESOLVES, as the rail draws them (M31): the world map while the
+  // staged choice is inherit, the draft otherwise, named and coloured off the editor's own roster.
+  const railEssences = $derived(
+    componentEssenceChips(
+      essenceLocked
+        ? worldEssenceMap
+        : Object.fromEntries(
+            essenceDraft.map((option) => [
+              option.id,
+              clampComponentEssenceQuantity(option.quantity),
+            ])
+          ),
+      essenceOptions
+    )
+  );
 
   function categoryLabel(category) {
     return getComponentCategoryLabel(category, localize);
@@ -829,6 +911,7 @@
     // is the issue-651 / issue-676 one verbatim: the GM flips the switch, nothing is ever dirty,
     // Save never enables, and the choice is silently discarded on exit.
     if (categoryInheritDirty) return true;
+    if (essenceInheritDirty) return true;
     if (categoryDraft !== normalizeComponentCategory(component?.category)) return true;
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
@@ -1372,6 +1455,21 @@
         // snap back one publish later. Left staged, it stops being dirty the moment the persisted
         // flag catches up with it, which is the same condition and no flicker.
       }
+      // THE ESSENCE SWITCH, SAME ORDER, SAME REASONS (issue 1371 r18-entry, M31): the flag before
+      // the values, so a flag-only landing leaves the system overriding with the map it was already
+      // resolving, and a refusal stops the value write. Not cleared here either.
+      if (essenceInheritDirty) {
+        const inherited = await actions?.setSectionInherited?.(
+          component.id,
+          systemId,
+          'essences',
+          essenceInheritDraft
+        );
+        if (inherited === false) {
+          saveFailed = true;
+          return;
+        }
+      }
       const result = await onSave(component.id, updates);
       if (result === false) saveFailed = true;
     } catch {
@@ -1777,6 +1875,33 @@
                 </p>
               </div>
             </div>
+            <!--
+              THE INHERIT-OR-OVERRIDE CHOICE (issue 1371 r18-entry, maintainer ruling M31), which
+              the reference does not draw: its essence card (`proto:1343-1356`) predates the world
+              section, so this row is M31's extra on the card, measured against that reference. The
+              control is the shared `InheritRow` — the primitive that owns "this system sets its
+              own" — filtered to the one section this card governs, drawn INSIDE the card beside
+              the values it locks, as the essence rules editor draws its own. ON is overridden. The
+              note under it is the category note's own three-branch shape over the other section.
+              Both are withheld while the world authored no map, when the switch would change
+              nothing while looking as though it did.
+            -->
+            {#if essenceInheritOffered}
+              <InheritRow
+                entityType="component"
+                section="essences"
+                inherited={{ essences: essenceInheritStaged }}
+                disabled={saving}
+                onToggle={(_section, nextInherit) => setEssenceInheritance(nextInherit)}
+              />
+            {/if}
+            <p
+              class={`manager-component-cat-note is-${essenceNote.tone}`}
+              data-component-edit-essence-note={essenceNote.state}
+            >
+              <i class={essenceNote.icon} aria-hidden="true"></i>
+              <span>{essenceNote.text}</span>
+            </p>
             {#if essenceDraft.length > 0}
               <div class="manager-component-essence-grid">
                 {#each offeredEssences as option (option.id)}
@@ -1790,12 +1915,14 @@
                      `adjustEssence` is no longer called from here: `Stepper` emits the
                      already-clamped ABSOLUTE value for both its adjuncts and its typed
                      input, so one `setEssenceQuantity` covers every path. -->
+                  <!-- LOCKED WHILE INHERITING (M31): the tile shows the WORLD value and its stepper
+                     is inert, exactly as the category select is pinned to the inherit option. -->
                   <EssenceQuantityCard
                     id={option.id}
                     name={option.name}
                     icon={option.icon}
-                    quantity={option.quantity}
-                    disabled={saving}
+                    quantity={essenceLocked ? (worldEssenceMap[option.id] ?? 0) : option.quantity}
+                    disabled={saving || essenceLocked}
                     ariaLabel={text(
                       'FABRICATE.Admin.Items.Editor.QuantityLabel',
                       'Quantity for {name}'
@@ -2790,6 +2917,7 @@
     icon="fas fa-cube"
     categoryLabel={categoryLabel(categoryLocked ? worldCategory : categoryDraft)}
     tags={railTagChips}
+    essences={railEssences}
     linked={worldEntry?.hasSourceLink === true}
     factGroups={railFactGroups}
     {text}

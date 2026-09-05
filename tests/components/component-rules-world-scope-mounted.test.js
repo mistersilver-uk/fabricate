@@ -71,10 +71,13 @@ function componentRecord(id, name, category) {
 
 async function openEditor(
   component,
-  { scope, systemId = 'sys-forge', showTags = false, saveResult = true } = {}
+  { scope, systemId = 'sys-forge', showTags = false, saveResult = true, ...mountExtras } = {}
 ) {
   const { calls, actions } = recordingComponentActions();
   const opened = [];
+  // THE DIRTY REPORTS, in order (issue 1371 r18-entry): the header's Save is disabled from this
+  // flag, so "the control lights Save" is an assertion on the last value reported here.
+  const dirty = [];
   // THE SAVE IS RECORDED THROUGH THE SAME `calls` LIST as the world-scope writes, and that is the
   // point rather than a convenience: since revision 8 the category's two halves — the in-system
   // VALUE through `onSave` and the membership INHERIT FLAG through `setSectionInherited` — both
@@ -101,8 +104,10 @@ async function openEditor(
     ],
     categoryOptions: ['Refined', 'Raw'],
     onOpenWorldEntry: (route, entityId) => opened.push([route, entityId]),
+    onDirtyChange: (flag) => dirty.push(flag),
+    ...mountExtras,
   });
-  return { target, calls, opened };
+  return { target, calls, opened, dirty };
 }
 
 /** Choose one option on the category control, exactly as a GM does. */
@@ -184,6 +189,207 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         'the issue body named `world-component-edit`, which resolves to nothing — and no shipped ' +
           'test would have said so'
       );
+    });
+  });
+
+  // ── THE ESSENCE CARD'S INHERIT-OR-OVERRIDE CHOICE (issue 1371 r18-entry, maintainer ruling M31) ──
+  // The world record carries an `essences` SECTION beside `category` now, so the rules editor's
+  // `Essence contribution` card carries the same choice the category select does: while the system
+  // INHERITS, the steppers show the WORLD map read-only under the inherited note with one control
+  // to override; overriding reveals the editable steppers seeded from the world map. Both halves
+  // stage until Save, and Save writes the FLAG first through `setSectionInherited`, then the values
+  // through the existing in-system write — exactly the category flow (D-46).
+  describe('the essence card carries the category’s inherit-or-override choice (M31)', () => {
+    // THE WORLD MAP AND THE TWO SWITCHES: `ingot` carries `flame: 2` on its world section; the
+    // forge membership OMITS the essences switch (inheriting), the alchemy one overrides it.
+    const ESSENCE_CORPUS = Object.freeze({
+      defaults: [
+        { id: 'ingot', category: 'Refined', essences: { flame: 2 } },
+        { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+      ],
+      membership: [
+        { entityId: 'ingot', systemId: 'sys-forge', inherit: { category: true } },
+        { entityId: 'ingot', systemId: 'sys-alchemy', inherit: { category: false, essences: false } },
+        { entityId: 'coal', systemId: 'sys-forge', inherit: { category: false }, mutedTags: ['bulk'] },
+        { entityId: 'orphan', systemId: 'sys-forge', inherit: { category: true } },
+      ],
+    });
+    /** The editor's essence options as the root hands them: the RESOLVED map over the roster. */
+    const options = (flame, earth = 0) => [
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember', quantity: flame },
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: '', quantity: earth },
+    ];
+    const openEssences = (id, systemId, essenceOptions, extra = {}) =>
+      openEditor(componentRecord(id, id === 'coal' ? 'Coal' : 'Iron Ingot', 'Refined'), {
+        scope: scopeFor(ESSENCE_CORPUS),
+        systemId,
+        showEssences: true,
+        essenceOptions,
+        ...extra,
+      });
+    const toggle = (target) => target.querySelector('[data-scoped-inherit-toggle="essences"]');
+    const stepper = (target, id, direction) =>
+      target.querySelector(`[data-component-edit-essence="${id}"] [data-stepper-${direction}]`);
+    const activeOf = (target, id) =>
+      target
+        .querySelector(`[data-component-edit-essence="${id}"]`)
+        .getAttribute('data-component-essence-active');
+    async function flip(target) {
+      toggle(target).click();
+      await drain();
+    }
+    async function step(target, id, direction) {
+      stepper(target, id, direction).click();
+      await drain();
+    }
+    const railChips = (target) =>
+      [...target.querySelectorAll('[data-scoped-entry-preview-essences] [data-essence-chip]')].map(
+        (chip) => [chip.getAttribute('data-essence-chip'), chip.querySelector('.fab-essence-chip-count')?.textContent.trim() ?? null]
+      );
+
+    it('while INHERITING, shows the WORLD map read-only under the inherited note, with ONE control to override', async () => {
+      const { target } = await openEssences('ingot', 'sys-forge', options(2));
+      const control = toggle(target);
+      assert.ok(Boolean(control), 'the card carries the shared inherit switch');
+      assert.equal(
+        target.querySelector('[data-scoped-inherit-state]').getAttribute('data-scoped-inherit-state'),
+        'inherited'
+      );
+      assert.ok(
+        control.closest('[data-component-edit-section="essences"]'),
+        'the control lives INSIDE the essence card, beside the values it governs'
+      );
+      const note = target.querySelector('[data-component-edit-essence-note]');
+      assert.equal(note.getAttribute('data-component-edit-essence-note'), 'inherited');
+      assert.ok(note.classList.contains('is-info'), `the inheriting note carries the info family; it carried "${note.className}"`);
+      assert.match(note.textContent, /Following the world values/);
+      assert.equal(activeOf(target, 'flame'), 'true', 'the world map is what the tiles show');
+      assert.ok(stepper(target, 'flame', 'increment').disabled, 'and the steppers are read-only while inheriting');
+      assert.ok(stepper(target, 'earth', 'increment').disabled);
+      assert.deepEqual(railChips(target), [['flame', '2']], 'the rail draws the essences THIS system resolves');
+    });
+
+    it('flipping to OVERRIDE writes NOTHING, unlocks the steppers seeded from the world map, and lights Save', async () => {
+      const { target, calls, dirty } = await openEssences('ingot', 'sys-forge', options(2));
+      assert.notEqual(dirty.at(-1), true, 'the editor opens clean');
+      await flip(target);
+      assert.deepEqual(calls, [], 'a flip is a DRAFT; nothing is written until Save');
+      assert.equal(
+        target.querySelector('[data-scoped-inherit-state]').getAttribute('data-scoped-inherit-state'),
+        'overridden',
+        'the whole card previews the staged choice'
+      );
+      assert.equal(target.querySelector('[data-component-edit-essence-note]').getAttribute('data-component-edit-essence-note'), 'overridden');
+      assert.ok(!stepper(target, 'flame', 'increment').disabled, 'the steppers are editable now');
+      assert.equal(activeOf(target, 'flame'), 'true', 'seeded from the world map, so nothing visibly jumps');
+      assert.equal(dirty.at(-1), true, 'and Save lights on the flag alone');
+    });
+
+    it('and Save lands BOTH halves, the flag FIRST, then the values through the in-system write', async () => {
+      const { target, calls } = await openEssences('ingot', 'sys-forge', options(2));
+      await flip(target);
+      await step(target, 'earth', 'increment');
+      save(target);
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => call.verb),
+        ['setSectionInherited', 'onSave'],
+        'the membership flag is cleared BEFORE the value is written (D-46)'
+      );
+      assert.deepEqual(calls[0].args, ['ingot', 'sys-forge', 'essences', false]);
+      assert.deepEqual(calls[1].args[1].essences, { flame: 2, earth: 1 }, 'the world map plus the GM’s step');
+    });
+
+    it('from an OVERRIDING system, flipping back to inherit stages `true`, shows the WORLD map again, and Save writes it first', async () => {
+      // The alchemy record overrides with an EMPTY in-system map, so its options read zero for
+      // everything; flipping back to inherit shows the world's `flame: 2` while the draft rests.
+      const { target, calls } = await openEssences('ingot', 'sys-alchemy', options(0));
+      assert.equal(
+        target.querySelector('[data-scoped-inherit-state]').getAttribute('data-scoped-inherit-state'),
+        'overridden'
+      );
+      assert.ok(!stepper(target, 'flame', 'increment').disabled, 'an overriding system edits its own values');
+      assert.equal(activeOf(target, 'flame'), 'false', 'and its own map is what the tiles show');
+      await flip(target);
+      assert.deepEqual(calls, [], 'still a draft');
+      assert.equal(activeOf(target, 'flame'), 'true', 'the WORLD map is previewed while the staged choice is inherit');
+      assert.ok(stepper(target, 'flame', 'increment').disabled, 'and it is read-only');
+      assert.deepEqual(railChips(target), [['flame', '2']]);
+      // AND BACK: overriding again SEEDS the editable draft from the world map the locked card was
+      // showing, so no tile moves at the flip — observable here because this system's own map is
+      // empty, where an inheriting system's options already equal the world's.
+      await flip(target);
+      assert.ok(!stepper(target, 'flame', 'increment').disabled, 'editable again');
+      assert.equal(activeOf(target, 'flame'), 'true', 'seeded from the WORLD map, not from the empty in-system row');
+      await flip(target);
+      assert.equal(
+        target.querySelector('[data-scoped-inherit-state]').getAttribute('data-scoped-inherit-state'),
+        'inherited'
+      );
+      save(target);
+      await drain();
+      assert.deepEqual(calls.map((call) => call.verb), ['setSectionInherited', 'onSave']);
+      assert.deepEqual(calls[0].args, ['ingot', 'sys-alchemy', 'essences', true]);
+      assert.deepEqual(
+        calls[1].args[1].essences,
+        { flame: 2 },
+        'the seeded draft stands as the dormant override the in-system record keeps (the category precedent)'
+      );
+    });
+
+    it('a REFUSED flag write stops the save rather than writing the values alone', async () => {
+      const { target, calls } = await openEssences('ingot', 'sys-forge', options(2));
+      await flip(target);
+      calls.length = 0;
+      await editor.setProps({
+        actions: {
+          setSectionInherited: async () => {
+            calls.push({ verb: 'setSectionInherited', args: [] });
+            return false;
+          },
+        },
+      });
+      save(target);
+      await drain();
+      assert.deepEqual(calls.map((call) => call.verb), ['setSectionInherited'], 'the refusal short-circuits');
+    });
+
+    it('a category choice and an essence choice in ONE save write both flags, then the value', async () => {
+      const { target, calls } = await openEssences('ingot', 'sys-forge', options(2));
+      const select = target.querySelector('[data-component-edit-category]');
+      const concrete = [...select.options].find((option) => option.value !== '__inherit');
+      chooseCategory(target, concrete.value);
+      await drain();
+      await flip(target);
+      save(target);
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => [call.verb, call.args[2] ?? null]),
+        [
+          ['setSectionInherited', 'category'],
+          ['setSectionInherited', 'essences'],
+          ['onSave', null],
+        ],
+        'every flag before the one value write'
+      );
+    });
+
+    it('an untouched switch writes NOTHING on Save, and the rail follows the draft once overriding', async () => {
+      const { target, calls } = await openEssences('ingot', 'sys-alchemy', options(0));
+      await step(target, 'earth', 'increment');
+      assert.deepEqual(railChips(target), [['earth', '1']], 'an overriding system’s rail is its own draft');
+      save(target);
+      await drain();
+      assert.deepEqual(calls.map((call) => call.verb), ['onSave'], 'the value half alone: the switch was never touched');
+    });
+
+    it('is WITHHELD when the world authored no essence map, and the steppers stay editable', async () => {
+      const { target } = await openEssences('coal', 'sys-forge', options(0));
+      assert.ok(!toggle(target), 'no switch over absence: flipping it would resolve the in-system map either way');
+      const note = target.querySelector('[data-component-edit-essence-note]');
+      assert.equal(note.getAttribute('data-component-edit-essence-note'), 'unset');
+      assert.match(note.textContent, /No world essence values are set/);
+      assert.ok(!stepper(target, 'flame', 'increment').disabled);
     });
   });
 
