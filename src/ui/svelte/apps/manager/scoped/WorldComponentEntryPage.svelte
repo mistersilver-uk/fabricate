@@ -58,6 +58,7 @@
   import StatusPill from '../../../components/StatusPill.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import EssenceQuantityCard from '../components/EssenceQuantityCard.svelte';
   import WorldComponentEntryPreviewRail from './WorldComponentEntryPreviewRail.svelte';
   import WorldComponentEntrySourceCard from './WorldComponentEntrySourceCard.svelte';
   import WorldComponentEntrySystemsCard from './WorldComponentEntrySystemsCard.svelte';
@@ -66,9 +67,12 @@
     componentDuplicateSourceCount,
     componentEntryHeaderSubtitle,
     componentEntryPreviewGroups,
+    componentEssenceChips,
     componentSourceLine,
     componentSystemRowSummary,
     componentWorldCategoryNote,
+    componentWorldEssenceNote,
+    componentWorldEssencesAuthored,
     componentWorldTagNote,
     offeredWorldComponentCategories,
     worldVocabularyComponentCategories,
@@ -80,6 +84,7 @@
     scopedEntryBaseline,
     scopedEntryDirty,
     scopedEntryWrites,
+    withScopedEntryDefault,
     withScopedEntryIdentity,
   } from './scopedEntryDraft.js';
 
@@ -93,6 +98,11 @@
     systems = [],
     entityId = '',
     worldItems = [],
+    // THE WORLD ESSENCE CATALOGUE, for the `Essence contribution` card's rows (issue 1371
+    // r18-entry, maintainer ruling M31): `{id, name, icon?, colorToken?}[]`, the root's
+    // `worldEssenceOptions`, in the catalogue's order. The card draws one row per entry here and
+    // nothing for a key the catalogue does not list; with none, it says so.
+    worldEssences = [],
     onBackToCatalogue = () => {},
     // THE WORLD VOCABULARY EXIT. NULL BY DEFAULT and the control is withheld without it, so a
     // call site that has no route to offer renders no dead affordance — the same rule
@@ -164,7 +174,23 @@
     (scope?.entries ?? []).find((candidate) => candidate.id === entityId) ?? null
   );
   const entity = $derived(entry?.entity ?? null);
-  const shape = $derived({ identityFields: IDENTITY_FIELDS, sections: [] });
+  /**
+   * THE WORLD-DEFAULT SECTIONS THIS EDITOR BUFFERS (issue 1371 r18-entry, maintainer ruling M31).
+   *
+   * `essences` and not `category`: the category picker and the tag run WRITE ON CHOICE, as they
+   * always have, while the essence steppers are draft-buffered like the identity fields — a stepper
+   * is pressed many times to reach one value, and a write per press would be a settings round trip
+   * per click. So this is the FIRST draft-buffered field a LINKED record has: its identity is the
+   * Item's and read-only here, so until now its `Save entry` could never light.
+   *
+   * A mirror of one member of `COMPONENT_SECTIONS`, stated here for the reason `IDENTITY_FIELDS`
+   * gives; `updateWorldDefaultSection` refuses a name outside that list before it writes.
+   *
+   * @type {readonly string[]}
+   */
+  const DRAFT_SECTIONS = Object.freeze(['essences']);
+
+  const shape = $derived({ identityFields: IDENTITY_FIELDS, sections: DRAFT_SECTIONS });
   const persisted = $derived(scopedEntryBaseline(entry, shape));
 
   /**
@@ -365,6 +391,68 @@
 
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');
   const tagNote = $derived(entry ? componentWorldTagNote(entry, phrase) : '');
+
+  // ── THE `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31) ────────────
+  //
+  // THE MAP THE CARD AND THE RAIL SHOW is the DRAFT's section — the persisted world map until the
+  // GM steps something, the staged one after — read positive-only, because a stepper draws a
+  // quantity and the normalizer keeps only positive ones. `null` (the baseline's spelling of an
+  // unauthored section) reads as an empty map here.
+  const draftEssenceMap = $derived.by(() => {
+    const raw = draft?.defaults?.essences ?? persisted.defaults.essences;
+    const map = {};
+    if (!componentWorldEssencesAuthored(raw)) return map;
+    for (const [id, value] of Object.entries(raw)) {
+      const quantity = Number(value);
+      if (Number.isFinite(quantity) && quantity > 0) map[String(id)] = quantity;
+    }
+    return map;
+  });
+  // ONE ROW PER WORLD ESSENCE, IN THE CATALOGUE'S ORDER — the rules editor's card over the
+  // system's roster, here over the world's. A key the catalogue does not list draws no row (it has
+  // no name and no glyph) and is CARRIED FORWARD untouched by every write, because a card that
+  // never showed it must not delete it.
+  const essenceRows = $derived(
+    (Array.isArray(worldEssences) ? worldEssences : [])
+      .filter((essence) => essence?.id)
+      .map((essence) => ({
+        id: String(essence.id),
+        name: String(essence.name ?? '').trim() || String(essence.id),
+        icon: String(essence.icon ?? ''),
+        colorToken: String(essence.colorToken ?? ''),
+        quantity: draftEssenceMap[String(essence.id)] ?? 0,
+      }))
+  );
+  const essenceNote = $derived(entry ? componentWorldEssenceNote(entry, phrase) : '');
+  const railEssences = $derived(componentEssenceChips(draftEssenceMap, worldEssences));
+
+  /**
+   * Stage one essence quantity into the draft's `essences` section.
+   *
+   * ZERO STRIPS THE KEY, never writes a `0`: the normalizer drops non-positive quantities on load,
+   * so a `0` would be a value that reads back as absence. The next map is the whole positive map
+   * with this key set or removed, because `updateWorldDefaultSection` REPLACES the section.
+   *
+   * ── AN EMPTY MAP OVER AN UNAUTHORED WORLD IS NO EDIT ───────────────────────────────────────
+   * `{}` is an authored "no essences" and IS applied to every inheriting system, shadowing their
+   * own values. A GM who steps a value up and back down over a record the world says nothing
+   * about has not asked for that: the draft returns to `null`, the record reads clean and nothing
+   * is written. Over an AUTHORED map, stripping the last value really does author `{}`, which is
+   * how a world essence contribution is cleared.
+   *
+   * @param {string} essenceId
+   * @param {unknown} rawValue the clamped integer the shared stepper committed.
+   * @returns {void}
+   */
+  function setWorldEssence(essenceId, rawValue) {
+    const quantity = Math.max(0, Math.trunc(Number(rawValue) || 0));
+    const next = { ...draftEssenceMap };
+    if (quantity > 0) next[essenceId] = quantity;
+    else delete next[essenceId];
+    const authored = componentWorldEssencesAuthored(baseline.defaults.essences);
+    const value = Object.keys(next).length === 0 && !authored ? null : next;
+    draft = withScopedEntryDefault(draft ?? persisted, 'essences', value);
+  }
   const deleteNote = $derived(componentDeleteNote(memberNames, phrase));
   const previewGroups = $derived(entry ? componentEntryPreviewGroups(entry, text) : []);
 
@@ -907,6 +995,80 @@
               </div>
             </InspectorCard>
 
+            <!--
+              THE `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31), on the
+              shape the rules editor's card takes (`proto:1343-1356`, the reference's ONLY essence
+              card — its entry screen draws none, so this is M31's extra measured against that one):
+              a glyph-led head, then the 4-up grid of the shared quantity card, one per WORLD
+              essence in the catalogue's order, tinted by the essence's own colour (M29). It
+              follows `World classification` because it authors the record's OTHER inheritable
+              section, and its note counts the section's inheritors as that card's does.
+
+              THE STEPPERS ARE DRAFT-BUFFERED, unlike the picker and the tag run beside them: see
+              `DRAFT_SECTIONS`. Nothing here writes; `Save entry` flushes the section.
+            -->
+            <InspectorCard
+              class="manager-component-entry-card manager-component-entry-essences"
+              data-scoped-entry-essences={entry.id}
+            >
+              <div class="manager-component-entry-card-head">
+                <i class="fas fa-flask-vial manager-card-glyph is-info" aria-hidden="true"></i>
+                <div class="manager-component-entry-card-head-copy">
+                  <h3 class="manager-card-heading">
+                    {text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.Entry.EssencesTitle',
+                      'Essence contribution'
+                    )}
+                  </h3>
+                  <p class="manager-subtitle">
+                    {text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.Entry.EssencesSubtitle',
+                      'World values, keyed to the world essence catalogue. Every system that has rules for this component follows them unless it overrides.'
+                    )}
+                  </p>
+                </div>
+              </div>
+              {#if essenceRows.length > 0}
+                <div class="manager-component-essence-grid" data-scoped-entry-essence-grid>
+                  {#each essenceRows as row (row.id)}
+                    <EssenceQuantityCard
+                      id={row.id}
+                      name={row.name}
+                      icon={row.icon}
+                      colorToken={row.colorToken}
+                      quantity={row.quantity}
+                      ariaLabel={phrase(
+                        'FABRICATE.Admin.Items.Editor.QuantityLabel',
+                        'Quantity for {name}',
+                        { name: row.name }
+                      )}
+                      decrementLabel={phrase(
+                        'FABRICATE.Admin.Items.Editor.DecrementEssence',
+                        'Decrement {name}',
+                        { name: row.name }
+                      )}
+                      incrementLabel={phrase(
+                        'FABRICATE.Admin.Items.Editor.IncrementEssence',
+                        'Increment {name}',
+                        { name: row.name }
+                      )}
+                      onChange={(quantity) => setWorldEssence(row.id, quantity)}
+                    />
+                  {/each}
+                </div>
+              {:else}
+                <p class="manager-component-entry-note" data-scoped-entry-essences-empty>
+                  {text(
+                    'FABRICATE.Admin.Manager.Scoped.Component.Entry.EssencesEmpty',
+                    'No world essences are defined yet. Create them in the Essence catalogue first.'
+                  )}
+                </p>
+              {/if}
+              <p class="manager-component-entry-note" data-scoped-entry-essence-note>
+                {essenceNote}
+              </p>
+            </InspectorCard>
+
             <WorldComponentEntrySystemsCard
               entryId={entry.id}
               entityName={shownName}
@@ -1036,6 +1198,7 @@
         categoryLabel={worldCategory ||
           text('FABRICATE.Admin.Manager.Scoped.Component.Entry.NoWorldCategoryTile', 'No category')}
         tags={worldTags}
+        essences={railEssences}
         linked={sourceLinked}
         factGroups={previewGroups}
         {text}

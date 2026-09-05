@@ -12570,6 +12570,7 @@
         {...componentScopeProps}
         entityId={worldScopedEntryId}
         worldItems={worldItemOptions}
+        worldEssences={worldEssenceOptions}
         onBackToCatalogue={() => setView('world-components')}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onOpenWorldVocabulary={() => setView('world-vocabulary')}

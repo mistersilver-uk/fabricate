@@ -36,6 +36,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import EssenceChip from '../components/EssenceChip.svelte';
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
 
   let {
@@ -44,6 +45,12 @@
     icon = 'fas fa-cube',
     categoryLabel = '',
     tags = [],
+    // THE ESSENCES A PLAYER MEETS (issue 1371 r18-entry, maintainer ruling M31): chip rows
+    // `{id, name, icon?, colorToken?, quantity}[]` from `componentEssenceChips`, over the map each
+    // screen states — the world entry passes its draft's world map, the rules editor the map this
+    // system resolves. Empty by default, so a caller that passes nothing renders byte for byte
+    // what it did.
+    essences = [],
     linked = true,
     factGroups = [],
     text = (key, fallback) => fallback,
@@ -125,6 +132,18 @@
           <div class="manager-component-entry-preview-tags" data-scoped-entry-preview-tags>
             {#each tags as tag (tag)}
               <Chip tone="tag">{tag}</Chip>
+            {/each}
+          </div>
+        {/if}
+        <!-- THE ESSENCE RUN, under the tags, on the tag run's own layout rule: one shared essence
+             chip per contributed essence, named and counted, in the essence's colour (M29). It is
+             the one behaviour fact a player-facing tile states — a recipe's essence requirement is
+             what these values satisfy — and it is drawn from the same map the card beside it
+             authors, so the preview follows the draft. -->
+        {#if essences.length > 0}
+          <div class="manager-component-entry-preview-tags" data-scoped-entry-preview-essences>
+            {#each essences as essence (essence.id)}
+              <EssenceChip {essence} showName />
             {/each}
           </div>
         {/if}

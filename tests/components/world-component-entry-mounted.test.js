@@ -49,6 +49,11 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
+    // THE `Essence contribution` CARD'S TWO LEAVES (issue 1371 r18-entry, maintainer ruling M31):
+    // the shared essence quantity card and the shared `Stepper` it renders. Both are STATIC
+    // imports of the page now, so an omission here HANGS this suite (`# cancelled`).
+    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
@@ -141,7 +146,7 @@ const ENTRY_SYSTEMS = Object.freeze([
  * them. A mount that left them at their `() => {}` defaults could not tell a wired control from a
  * control wired to nothing, which is exactly the state all three shipped in.
  */
-async function open(entityId, overrides, vocabulary = null) {
+async function open(entityId, overrides, vocabulary = null, mountExtras = {}) {
   const { calls, actions } = recordingComponentActions();
   const reports = {
     dirty: [],
@@ -167,6 +172,7 @@ async function open(entityId, overrides, vocabulary = null) {
     onUnlinkSource: (...args) => reports.shell.push(['unlink', ...args]),
     onCopySourceUuid: (uuid) => reports.shell.push(['copy', uuid]),
     onBackToCatalogue: () => reports.shell.push(['back']),
+    ...mountExtras,
   });
   return { target, calls, actions, reports };
 }
@@ -512,6 +518,193 @@ describe('world Component entry editor (issue 1371)', () => {
         ['No world category'],
         'a persisted value outside the vocabulary is shown, not re-offered'
       );
+    });
+  });
+
+  // ── THE `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31) ─────────────
+  // "The essence editor UI elements that are present in the system rules component editor are
+  // missing from the world catalogue component editor, making world essence uneditable." The
+  // world record carries an `essences` SECTION beside `category` now, and this card authors it on
+  // the shape the rules editor's `Essence contribution` card uses — the same shared quantity card
+  // per WORLD essence, in the catalogue's order, tinted by the essence's own colour — buffered into
+  // the page's draft and flushed on `Save entry`. THIS IS THE FIRST DRAFT-BUFFERED FIELD A LINKED
+  // RECORD HAS: a linked record's identity is the Item's, so until now its `Save entry` could
+  // never light (D-BW's observation), and `ingot` below is linked.
+  describe('the `Essence contribution` card authors the WORLD essence section (M31)', () => {
+    const WORLD_ESSENCES = Object.freeze([
+      { id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' },
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
+    ]);
+    // `ingot`'s world map carries `flame: 2` and a `ghost` the world catalogue no longer lists;
+    // its forge membership inherits the section (the switch is OMITTED, which reads as inheriting)
+    // and its alchemy membership overrides it — so the note has one of each to count.
+    const AUTHORED = Object.freeze({
+      defaults: [
+        { id: 'ingot', category: 'Refined', essences: { flame: 2, ghost: 5 } },
+        { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+      ],
+      membership: [
+        { entityId: 'ingot', systemId: 'sys-forge', inherit: { category: true } },
+        { entityId: 'ingot', systemId: 'sys-alchemy', inherit: { category: false, essences: false } },
+        { entityId: 'coal', systemId: 'sys-forge', inherit: { category: false }, mutedTags: ['bulk'] },
+        { entityId: 'orphan', systemId: 'sys-forge', inherit: { category: true } },
+      ],
+    });
+    const openEssences = (entityId, overrides = AUTHORED, worldEssences = WORLD_ESSENCES) =>
+      open(entityId, overrides, null, { worldEssences });
+    const card = (target) => target.querySelector('[data-scoped-entry-essences]');
+    const rowIds = (target) =>
+      [...target.querySelectorAll('[data-scoped-entry-essences] [data-component-edit-essence]')].map(
+        (node) => node.getAttribute('data-component-edit-essence')
+      );
+    const activeOf = (target, id) =>
+      target
+        .querySelector(`[data-scoped-entry-essences] [data-component-edit-essence="${id}"]`)
+        .getAttribute('data-component-essence-active');
+    async function step(target, id, direction) {
+      target
+        .querySelector(
+          `[data-scoped-entry-essences] [data-component-edit-essence="${id}"] [data-stepper-${direction}]`
+        )
+        .click();
+      await drain();
+    }
+    const sectionWrites = (calls) =>
+      calls.filter((call) => call.verb === 'updateWorldDefaultSection').map((call) => call.args);
+    const railChips = (target) =>
+      [...target.querySelectorAll('[data-scoped-entry-preview-essences] [data-essence-chip]')].map(
+        (chip) => [
+          chip.getAttribute('data-essence-chip'),
+          chip.querySelector('.fab-essence-chip-count')?.textContent.trim() ?? null,
+          chip.getAttribute('data-chip-tint'),
+        ]
+      );
+
+    it('renders the card AFTER `World classification`: one tinted row per WORLD essence, in the catalogue’s order, seeded from the world map', async () => {
+      const { target } = await openEssences('ingot');
+      const essences = card(target);
+      assert.ok(Boolean(essences), 'the entry renders its essence card');
+      assert.equal(essences.getAttribute('data-scoped-entry-essences'), 'ingot');
+      assert.ok(
+        essences.previousElementSibling?.hasAttribute('data-scoped-entry-classification-card'),
+        'the card follows the classification card, as the rules editor’s follows its category card'
+      );
+      assert.equal(essences.querySelector('h3').textContent.trim(), 'Essence contribution');
+      assert.deepEqual(rowIds(target), ['flame', 'earth'], 'the world catalogue’s essences, in its order — `ghost` draws no row');
+      assert.equal(activeOf(target, 'flame'), 'true', '`flame: 2` is drawn as a contributing tile');
+      assert.equal(activeOf(target, 'earth'), 'false', 'an essence the map lacks is the receding control to add one');
+      assert.equal(
+        target
+          .querySelector('[data-scoped-entry-essences] [data-component-edit-essence="flame"] [data-medallion="glyph"]')
+          .getAttribute('data-medallion-tint'),
+        'ember',
+        'the tile is tinted by the essence’s own colour (M29, through the shared medallion)'
+      );
+      assert.ok(
+        !target
+          .querySelector('[data-scoped-entry-essences] [data-component-edit-essence="earth"] [data-medallion="glyph"]')
+          .hasAttribute('data-medallion-tint'),
+        'an unauthored colour leaves the tile untinted rather than inventing one'
+      );
+      assert.equal(
+        target.querySelector('[data-scoped-entry-essence-note]').textContent.trim(),
+        '1 of 2 systems inherit it · 1 overrides locally.',
+        'the note counts the section’s inheritors off `inheritCounts.essences`, as the category card does'
+      );
+    });
+
+    it('stepping a value WRITES NOTHING and lights `Save entry` — on a LINKED record, its first draft-buffered field', async () => {
+      const { target, calls, reports } = await openEssences('ingot');
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-linked-pill]')),
+        'NON-VACUITY: `ingot` is a linked record, whose identity is read-only'
+      );
+      assert.notEqual(reports.dirty.at(-1), true, 'a freshly opened entry is clean');
+      await step(target, 'earth', 'increment');
+      assert.deepEqual(sectionWrites(calls), [], 'a step writes NOTHING; the section is buffered like every other draft field');
+      assert.equal(reports.dirty.at(-1), true, 'and the shell is told, which is what lights the header’s `Save entry`');
+      assert.equal(activeOf(target, 'earth'), 'true', 'the tile shows the staged value at once');
+    });
+
+    it('and the handle’s save writes exactly ONE world section, dropping zero keys and carrying an unlisted key forward', async () => {
+      const { target, calls, reports } = await openEssences('ingot');
+      await step(target, 'earth', 'increment');
+      await step(target, 'flame', 'decrement');
+      await step(target, 'flame', 'decrement');
+      assert.equal(activeOf(target, 'flame'), 'false', 'NON-VACUITY: flame is stepped to zero');
+      const handle = reports.handles.filter(Boolean).at(-1);
+      assert.equal(await handle.save(), true);
+      await drain();
+      assert.deepEqual(
+        sectionWrites(calls),
+        [['ingot', 'essences', { ghost: 5, earth: 1 }]],
+        'one write: the zero is DROPPED (the normalizer’s rule), `ghost` is carried forward because this card never saw it, and nothing else is restated'
+      );
+      assert.deepEqual(
+        calls.filter((call) => call.verb !== 'updateWorldDefaultSection'),
+        [],
+        'the identity is NOT re-sent: a linked record’s identity is the Item’s'
+      );
+      assert.equal(reports.dirty.at(-1), false, 'the flushed draft is clean again before the projection round-trips');
+    });
+
+    it('stripping the LAST value of an authored map writes an authored EMPTY map, which every inheriting system follows', async () => {
+      const { target, calls, reports } = await openEssences('ingot', {
+        ...AUTHORED,
+        defaults: [{ id: 'ingot', category: 'Refined', essences: { flame: 1 } }],
+      });
+      await step(target, 'flame', 'decrement');
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
+      assert.deepEqual(sectionWrites(calls), [['ingot', 'essences', {}]], '`{}` is an authored "no essences", not absence');
+    });
+
+    it('but over an UNAUTHORED world, stepping up and back down leaves the record clean and writes nothing', async () => {
+      // `coal`'s world default carries no `essences`. An empty map over absence would be an
+      // authored "no essences" that shadows every inheriting system's own values, so a draft that
+      // ends empty over an unauthored world is NO EDIT rather than a clearing write.
+      const { target, calls, reports } = await openEssences('coal');
+      await step(target, 'earth', 'increment');
+      assert.equal(reports.dirty.at(-1), true, 'NON-VACUITY: the step up is an edit');
+      await step(target, 'earth', 'decrement');
+      assert.equal(reports.dirty.at(-1), false, 'and stepping back down is not one');
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
+      assert.deepEqual(sectionWrites(calls), []);
+    });
+
+    it('a discard puts the steppers back without writing anything', async () => {
+      const { target, calls, reports } = await openEssences('ingot');
+      await step(target, 'earth', 'increment');
+      reports.handles.filter(Boolean).at(-1).discard();
+      await drain();
+      assert.equal(activeOf(target, 'earth'), 'false');
+      assert.equal(activeOf(target, 'flame'), 'true', 'the persisted value is what comes back');
+      assert.deepEqual(calls, []);
+    });
+
+    it('the rail draws the essences a player meets, LIVE from the draft, as tinted chips', async () => {
+      const { target } = await openEssences('ingot');
+      assert.deepEqual(railChips(target), [['flame', '2', 'ember']], 'the world map, through the shared essence chip');
+      await step(target, 'earth', 'increment');
+      assert.deepEqual(
+        railChips(target),
+        [
+          ['flame', '2', 'ember'],
+          ['earth', '1', null],
+        ],
+        'the preview follows the draft before anything is saved'
+      );
+    });
+
+    it('says so rather than drawing an empty grid when the world has no essences', async () => {
+      const { target } = await openEssences('ingot', AUTHORED, []);
+      assert.ok(Boolean(card(target)), 'the card is still drawn, because the section exists');
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-essences-empty]')),
+        'and its body names the catalogue where an essence is minted'
+      );
+      assert.deepEqual(rowIds(target), []);
     });
   });
 

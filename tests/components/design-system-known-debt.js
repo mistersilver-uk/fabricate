@@ -445,4 +445,12 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // `ComponentEditView.svelte` joined `WorldComponentEntryPage.svelte`. Whether a component-specific
 // preview rail is a manifest row with a `library.html` specimen, or a `notAPrimitive` row beside the
 // deferred `EssenceBehaviorPreview`, is the outstanding decision this register records.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;
+// 49 -> 50 (issue 1371 r18-entry): `components/EssenceQuantityCard` is BACK over the bar. Maintainer
+// ruling M31 gave the world record an `essences` section and the world Component entry an `Essence
+// contribution` card on the shape the rules editor's card takes — the same quantity card over the
+// world essence catalogue instead of a system's roster. Measured 1 importer → 2:
+// `scoped/WorldComponentEntryPage.svelte` joined `ComponentEditView.svelte`. It left this register at
+// r16-list by dropping BELOW the bar, never by adjudication, so the decision it records is the same
+// one as then: a manifest row with a `library.html` specimen, or a `notAPrimitive` row with this
+// measurement behind it.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 50;

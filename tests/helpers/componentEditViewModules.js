@@ -168,5 +168,9 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // scope, in place of a rail of its own — so it is a static import of `ComponentEditView` and an
   // omission here HANGS every suite built on this list.
   'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
+  // THE RAIL'S ESSENCE RUN (issue 1371 r18-entry, maintainer ruling M31) is the shared essence chip
+  // (M29), a static import of the rail and so two rungs down from this tree's root. Omit it and
+  // every suite built on this list HANGS as `# cancelled`.
+  'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

@@ -26182,3 +26182,17 @@
 .fabricate-manager .manager-component-entry-column > .manager-component-entry-panel {
   flex: 1 1 auto;
 }
+
+/* ══ issue 1371 r18-entry, maintainer ruling M31 — THE ENTRY'S ESSENCE GRID BREAKS AS THE EDITOR'S ═══
+   The world Component entry's `Essence contribution` card renders the shared 4-up
+   `.manager-component-essence-grid`, the same grid the rules editor's card renders (D5,
+   `proto:1343`). The editor's copy narrows to 2-up under 960px through the rule keyed on
+   `.manager-component-rules-card`; the entry's card is an `InspectorCard` on the entry's own
+   class family, so it needs the same break stated on its own key or four tiles squeeze where the
+   editor's would already have wrapped. One declaration, the editor's, copied rather than
+   re-derived. */
+@container (max-width: 960px) {
+  .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
