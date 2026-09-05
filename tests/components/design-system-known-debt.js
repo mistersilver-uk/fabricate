@@ -438,4 +438,11 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // is a manifest row with a `library.html` specimen is the outstanding decision this register records.
 // 49 -> 48 (issue 1371 r17-b): that decision was taken — `BulkStagingInset` LEFT by gaining its manifest
 // row (`shipped`, `targeted`) and its `library.html` specimen beside `<BulkEditPanel>`'s.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+// 48 -> 49 (issue 1371 r18-list): `scoped/WorldComponentEntryPreviewRail` gained its SECOND importer
+// when maintainer ruling M27 made the system Component Rules editor render the world entry's `How
+// players see it` rail at the system scope in place of a rail of its own — the same object over
+// different data, which is what the ruling asked for. Measured 1 importer → 2:
+// `ComponentEditView.svelte` joined `WorldComponentEntryPage.svelte`. Whether a component-specific
+// preview rail is a manifest row with a `library.html` specimen, or a `notAPrimitive` row beside the
+// deferred `EssenceBehaviorPreview`, is the outstanding decision this register records.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;

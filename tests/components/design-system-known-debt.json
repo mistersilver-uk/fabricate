@@ -479,6 +479,7 @@
     "src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte | 1",
     "src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte | 1",
     "src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte | 1",
+    "src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte | 1",
