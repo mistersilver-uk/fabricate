@@ -48,11 +48,12 @@
 
   It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s reason: the
   control is painted by `styles/fabricate.css` — the base block it shares with
-  `.manager-button` (`:13492-13493`), its own 34px box (`:13666`), the 28px box the
-  pager gives it (`:13685`) and its own focus ring (`:13680`) — and a scoped block here
-  would be a second source of truth for the same control and would begin to disagree
-  with the sheet. Those four are LOCATORS: the sheet is 20k lines and every number in
-  it rots, so find them by selector.
+  `.manager-button` (`:13529-13530`), its own 34px box (`:13745`), the 28px box the
+  pager gives it (`:13782`) and its own focus pair, the `:focus` strip at `:13756` and
+  the `:focus-visible` repaint at `:13769` — and a scoped block here would be a second
+  source of truth for the same control and would begin to disagree with the sheet.
+  Those four are LOCATORS: the sheet is 20k lines and every number in it rots, so find
+  them by selector.
 
   It USED to be a MANAGER primitive as well as a manager-shaped one: every one of those
   rules was rooted at `.fabricate-manager`, so the control rendered unstyled anywhere
