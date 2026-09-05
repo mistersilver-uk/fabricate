@@ -729,6 +729,85 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
     'manager-recipe-edit-crafting-modifier-cap-reached',
   ]),
+  // THE UPPERCASE MICRO-LABEL (issue 1505), on fourteen converted eyebrow sites across ten files.
+  // Neither representative frame draws one it renders: `manager-components-normal` is the
+  // component browser and `fabricate-app-shell` is the player shell, and every converted site is
+  // inside a crafting recipe detail or the recipe-item editor.
+  //
+  // TWO entries, because the two callers are in different windows and the conversion is a
+  // different act in each. `player-crafting-slot-rail` is the crafting one: its own comment
+  // records that the requirement rail draws three slot states in that frame, and the rail renders
+  // its header eyebrow whenever it renders at all — so it is a frame the registry already
+  // ASSERTS contains one. `manager-recipe-item-overview` is the manager one, and it is where the
+  // conversion moves the most: three field labels go from `0.66rem / .1em` to the ladder's
+  // `8.5px / .11em`, and the nested "from linked item" note goes with them because it declares no
+  // size of its own.
+  //
+  // Still uncovered, and named rather than left to be discovered: `tone="accent"`. It is
+  // specimen-mandated — `library.html` declares the rule, draws the example and states when to
+  // reach for it — but no converted site passes it, so no frame in the registry contains an
+  // accent kicker and a change to that ink publishes two frames without one.
+  'src/ui/svelte/components/Kicker.svelte': Object.freeze([
+    'player-crafting-slot-rail',
+    'manager-recipe-item-overview',
+  ]),
+  // THE AT-A-GLANCE FIGURE (issue 1505). Neither representative frame draws a stat grid, and the
+  // reason is structural rather than incidental: the component has exactly two callers, the
+  // player crafting app's Shopping list and the manager's Books & Scrolls inspector aside.
+  //
+  // ONE entry, and the OTHER caller is recorded here as unphotographed rather than named.
+  // `player-crafting-essence-shopping` is the frame: its steps press a recipe row's cart button,
+  // so the list is non-empty and its three summary cards are in the picture — and the recipe it
+  // adds can never be funded, which puts one of the three cards in the `danger` tone, so the frame
+  // carries the tone model as well as the box. The manager caller is NOT here because no case
+  // draws it: `manager-books-scrolls-normal` renders the inspector's EMPTY branch, since nothing
+  // in the registry clicks `[data-books-scrolls-select]`, and the two recipe-item cases route
+  // past the aside into the editor. That conversion is held by
+  // `tests/components/item-page-inspector-mounted.test.js` and by `manager-mounted`, which pin all
+  // six of its `data-*` hooks, and a case selecting a Books & Scrolls row is what would close it.
+  'src/ui/svelte/components/StatBox.svelte': Object.freeze(['player-crafting-essence-shopping']),
+  // THE SURFACE THAT REPORTS SOMETHING THAT JUST HAPPENED (issue 1505), on two callers.
+  // `manager-components-normal` and `fabricate-app-shell` are both resting browse surfaces, so
+  // neither can contain a notice at all — a notice exists because something happened.
+  //
+  // ONE entry, and the other caller is recorded here as unphotographed rather than named.
+  // `player-inventory-bulk-report` is the frame: its `expectSelector` already requires
+  // `[data-inventory-bulk-panel="report"]` with a populated subject list, and the report's own
+  // root renders this component unconditionally above those subjects. The alchemy caller is NOT
+  // here, and cannot be: `lastBrew` initialises null and is set only inside the brew flow, no
+  // published case clicks `[data-alchemy-brew]`, and the smoke's alchemy walk does not brew
+  // either — so that conversion is UNPHOTOGRAPHED and is held instead by
+  // `tests/components/alchemy-workbench-mounted.test.js`, which acts on every one of its four
+  // tones. A case that drives a brew is what would close it.
+  //
+  // Still uncovered, and named rather than left to be discovered: `action`, `dismissable` and
+  // `blocking`. Neither shipped caller reaches any of the three, so `tests/components/
+  // notice-mounted.test.js` ACTS on them rather than a frame showing them.
+  'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
+  // THE STANDING STATEMENT (issue 1505), widened onto its specimen and re-authored at 14
+  // importing files. It reached this table through `MANAGER_PRIMITIVES` long before it had an
+  // entry, and it was in `PRIMITIVES_WITH_NO_FRAME` for exactly that reason: neither
+  // representative frame draws one. `manager-components-normal` is the component browser, whose
+  // rail holds no callout, and `fabricate-app-shell` is the player window, which had no importer
+  // of this component at all until this change.
+  //
+  // TWO entries, because the widening moved two different things and one frame holds neither
+  // pair. `manager-tool-parity-04-requirements-1280x720` is the DEFAULT treatment: the Tool
+  // Studio's Requirements tab opens with a system-scope introduction, which is documentation and
+  // so takes the specimen's neutral chrome — the radius, the fill, the type and the glyph ink all
+  // move there, because the shipped component was info-tinted by default. `player-salvage` is the
+  // TINTED, TITLE-BEARING form and the first player frame this primitive has ever had: the salvage
+  // banner passes a title, so it exercises the `role="note"` rooting, the per-tone title ink and
+  // the tinted glyph ink in one picture.
+  //
+  // Still uncovered, and named rather than left to be discovered: the `actions` snippet's only
+  // caller. It renders on `identityBroken`, which no published frame reaches, so the control now
+  // nested inside the callout body is held by `tests/components/manager-layout.test.js`'s pointer
+  // hit-test rather than by a frame.
+  'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
+    'manager-tool-parity-04-requirements-1280x720',
+    'player-salvage',
+  ]),
 });
 
 /**
@@ -4095,6 +4174,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      // The inspector aside this route mounts (issue 1505). It was claimed by no case that
+      // renders it: `mapChangedFilesToCases` answered `manager-system-edit-normal` alone, which
+      // DECLARES the file and does not draw it, so an inspector change published a frame it is
+      // not in. This frame draws the aside's EMPTY branch — no case selects a row — so it is
+      // honest evidence about the aside's chrome and not about its stat tiles.
+      /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
       // The manager router and the Crafting entry model (issue 1151). Both decide which
       // mode-conditional entries this frame's submenu shows and which route survives a
       // system change, and neither is reachable from the view components above — so
@@ -4114,6 +4199,44 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'crafting-settings',
     kinds: ['manager', 'crafting-settings'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSettingsView\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-overview',
+    label: 'Manager — Recipe item overview',
+    // THE TAB NO FRAME LANDED ON (issue 1505). Both `manager-recipe-item-validation*` cases step
+    // straight through to `[data-recipe-item-tab-button="validation"]`, so the editor's OPENING
+    // tab — the one a GM sees first — was drawn by nothing, and the three eyebrow labels on it
+    // could not move a frame.
+    //
+    // Reached WITHOUT a tab click, which is the whole shape of the case: `RecipeItemEditorTabs`
+    // defaults `activeTab = 'overview'` and the root seeds `recipeItemActiveTab = 'overview'` when
+    // it opens the editor, so this is `manager-recipe-item-validation`'s steps MINUS its final
+    // click. Fewer steps is also what makes it the surface's resting state, and therefore the
+    // representative frame for `recipe-item-edit` in the coverage set — a swap that is the
+    // mechanism working rather than a side effect: an editor's own opening tab is a better
+    // photograph of that screen than its fourth tab is.
+    //
+    // `beyond` with NO smoke label, on the same measurement decision 1362's tab strip records:
+    // the smoke walk clicks through to validation and captures only the two validation frames, so
+    // an `exact` claim here would name a counterpart that does not exist.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    // The panel, not the tab BUTTON: a strip that kept its buttons while the panel stopped
+    // rendering would leave every other claim here true.
+    expectSelector: '[data-recipe-item-tab="overview"]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
   }),
   managerCase({
     id: 'manager-recipe-item-validation',
