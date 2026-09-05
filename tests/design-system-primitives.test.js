@@ -303,7 +303,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // 47 / 12 as of issue 1371 r16-list: `apps/manager/BulkEditSelect.svelte` moved from the member
   // table to `notAPrimitive` when maintainer ruling M23 rebuilt the system Component Rules bulk
   // panel's category axis as an inline inset and left the Recipe Studio as its one caller.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
+  // 48 as of issue 1371 r17-b: `apps/manager/BulkStagingInset.svelte` was promoted from the
+  // unregistered-shared register, where r16-cat recorded it at its second caller, to a member
+  // row with a `library.html` specimen.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 48, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

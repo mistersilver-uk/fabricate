@@ -436,4 +436,6 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // extracted — the same object over different data, which is the maximum reuse the maintainer asked
 // for. It crosses the bar beside `BulkSelectionToolbar` and `BulkEditPanelShell`'s family; whether it
 // is a manifest row with a `library.html` specimen is the outstanding decision this register records.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;
+// 49 -> 48 (issue 1371 r17-b): that decision was taken — `BulkStagingInset` LEFT by gaining its manifest
+// row (`shipped`, `targeted`) and its `library.html` specimen beside `<BulkEditPanel>`'s.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;

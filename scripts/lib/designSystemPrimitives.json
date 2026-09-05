@@ -36,6 +36,13 @@
       "why": "The bulk selection toolbar (3 callers, issue 1010). Named at `library.html:1058`. Targeted for the same reason as its shell."
     },
     {
+      "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+      "library": "<BulkStagingInset>",
+      "status": "shipped",
+      "evidence": "targeted",
+      "why": "The staging inset INSIDE the bulk panel (2 callers, issue 1371 rulings M23-M25): a recessed card holding a 28px search well, a fixed five-row window and a pager, drawing a row in one of four kinds. The system Component Rules list's panel and the world Component catalogue's panel are the same object over different data, which is the membership bar. Its specimen sits beside `<BulkEditPanel>`'s and its Svelte API was read from the shipped `$props()`, so it is shipped rather than a target. Targeted: both panels are claimed by `sourceMatches` through `BULK_EDIT_CHROME_PATTERN`, and the `*-bulk-edit*` frames photograph it."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/Callout.svelte",
       "library": "<Callout>",
       "status": "target",

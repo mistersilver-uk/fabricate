@@ -155,7 +155,7 @@
       type="search"
       value={query}
       {placeholder}
-      aria-label={placeholder}
+      aria-label={placeholder || undefined}
       {disabled}
       data-bulk-inset-search={id}
       oninput={(event) => onQuery(event.currentTarget.value)}
