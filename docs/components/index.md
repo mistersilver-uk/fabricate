@@ -32,8 +32,8 @@ The source filter offers **Any source**, **World items**, **Compendium**, and **
 **Sort by** offers **Name**, **System count**, and **Source type**.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
-The list itself opens with a drop zone for dragging in items, so it scrolls with the rows rather than sitting fixed above the toolbar.
-A **+ Register item** button sits beside it and opens a searchable picker of world items not yet registered, so you can add one without leaving the sidebar or a compendium browser open first.
+The list itself opens with a drop zone for dragging in items, spanning the full width of the row, so it scrolls with the rows rather than sitting fixed above the toolbar.
+It is the one way to create a component from this screen.
 
 Each row starts with a checkbox, then the component's icon and name.
 A pill beside the name states what kind of source it has, **Foundry item**, **Compendium**, or **No source item**, and a second **Broken link** pill appears when a linked world item's address no longer resolves to anything.
@@ -49,7 +49,9 @@ A compendium link is never reported broken here, because the catalogue checks ad
 
 ### Inspecting a component
 
-Select a row to inspect it on the right.
+The catalogue opens with the first row on the page already selected, so the inspector on the right is never empty while there is something to show.
+Select any other row to inspect it instead.
+Changing the search, the filters, the sort, or the page never moves your selection to a different row.
 The inspector opens with a **Catalogue entry** heading, the component's name over a caption naming its source, a **Source identity** card, and a **Global tags** card.
 
 The **Source identity** card states the source item's identifying address and any aliases recorded for it.
@@ -92,7 +94,8 @@ Each group is its own inline card with a search field, a scrollable list of rows
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
 Removing drops those rules, rewrites every recipe in those systems that names the removed component, and disables a recipe left without a usable ingredient set or result because of it.
 The world record is untouched, and no other system is affected.
-- **World category.** Pick a category already used elsewhere in the corpus, leave it unchanged, or clear it, from the same kind of inline search card.
+- **World category.** Pick a category from the same kind of inline search card, leave it unchanged, or clear it.
+Unlike the entry's own category field, this card offers the categories already set on world components, which on an upgraded world are the ones your crafting systems authored, rather than the world vocabulary.
 The reserved **General** category is refused here too.
 - **World tags.** From the same kind of inline search card, click a tag to cycle it between leave unchanged, add, and remove across every selected component.
 Once you have staged at least one, the tags you touched appear as their own run of chips above the card, coloured by direction, so the whole staged change is visible without scrolling the list.
@@ -132,7 +135,7 @@ Two tabs sit below it, **Catalogue entry** and **Validation**.
 For a component linked to a Foundry item, the name and description are shown as read-only text under a **Linked Foundry item** pill, and a note explains that they refresh from the linked item and that every system shows the same three.
 You cannot type over them here.
 For a component linked to a compendium entry, the pill reads **Linked Compendium entry** instead, and the name and description shown are the ones taken when the item was linked, not read live from the compendium.
-Dropping the item onto the source area again takes a fresh snapshot.
+Dropping the item onto the **Source identity** card again takes a fresh snapshot.
 Only a component with no linked source item takes typed **Name** and **Description** fields instead, held until you press **Save entry**.
 Those two fields are the only ones held for **Save entry**, so on a linked component that button stays inactive and the **Unsaved changes** marker never lights.
 Everything else on this screen, including the linked item, the world category, world tags, membership, and delete, takes effect immediately.
@@ -141,7 +144,8 @@ If you leave with an unsaved name or description, Fabricate asks whether to save
 
 ### Source identity
 
-Drop an item onto the source area to link or replace it, or choose **Unlink** to remove the link.
+Drop an item onto this card's drop zone to link or replace it, or choose **Unlink** to remove the link.
+It is the only drop zone on the entry, and the identity card above it carries none.
 Replacing the link takes a fresh name, image, and description snapshot from the new item.
 **Copy** copies the linked item's identifying address.
 
@@ -154,6 +158,9 @@ One **World classification** card holds both the component's category and its wo
 
 Pick the **Category** from the field, or leave it at **No world category**.
 It opens as Fabricate's own themed list rather than your browser's native drop-down, to match the rest of the screen.
+The options are the world's own category vocabulary and nothing else, so a category that exists only in one crafting system's rules is not offered here.
+While the world has no categories of its own, **No world category** is the only option, and **Edit world vocabulary** on the same card is where you add one.
+A category set on this record before the vocabulary held it stays shown in the field, but is not offered again once you clear it.
 The reserved **General** category is never offered as an option here, whatever capitalisation or spacing another system used to author it, because it is the fallback every component uses already.
 A note beneath the field tells you what is actually happening, stating how many systems currently inherit this world category and how many override it locally, once at least one system has rules for it.
 
@@ -211,7 +218,7 @@ A system that inherits an unset world category simply supplies its own.
 
 ### How players see it
 
-A rail on the right, present on both tabs, shows the same preview a player sees: the component drawn as an inventory tile, its world tags, and a short note on its scope.
+A rail on the right, present on both tabs, shows the same preview a player sees: the component drawn as an inventory tile with its art filling the square, just as in a player's inventory, its world tags, and a short note on its scope.
 Below that, **Used by** lists the recipes that consume it, and **Produced by** lists what yields it.
 The rail updates live as you edit the entry.
 
@@ -232,6 +239,8 @@ Each time it opens it starts fresh, with no search text or ticks left over from 
 When there is nothing to list, the picker says why.
 It tells you when the world catalogue has no components at all, when this system already has rules for every component in the catalogue, and when no component matches your search.
 
+The list opens with its first component already selected, and a component you reached by a link from its world entry, or had selected before, is kept instead.
+Changing the sort, a filter, or the cohort never moves the selection, and a dimmed ghost row from the world catalogue is never selected for you.
 Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
 
