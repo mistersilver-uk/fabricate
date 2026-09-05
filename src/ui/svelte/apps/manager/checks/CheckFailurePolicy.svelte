@@ -124,6 +124,9 @@
     )}
   </p>
   {#if inertNote}
+    <!-- INFO stands (issue 1505): this sentence exists only because the CURRENT configuration
+         makes the policy inert, which is exactly the live state the specimen reserves the tint
+         for. -->
     <Callout tone="info" text={inertNote} dataAttr="data-failure-result-policy-inert" />
   {/if}
   <RadioCardGroup

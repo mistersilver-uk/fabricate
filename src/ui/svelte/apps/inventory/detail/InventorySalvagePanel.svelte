@@ -24,6 +24,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Callout from '../../manager/Callout.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';
   import SalvageProgressiveBody from './salvage/SalvageProgressiveBody.svelte';
   import SalvageRollSummary from './salvage/SalvageRollSummary.svelte';
@@ -181,13 +182,14 @@
        which contradicts the misconfigured body sitting directly beneath it. The
        misconfigured body IS the banner in that state. -->
   {#if !misconfigured}
-    <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
-      <i class={banner.icon} aria-hidden="true"></i>
-      <span class="salvage-banner-text">
-        <span class="salvage-banner-title">{bannerTitle}</span>
-        <span class="salvage-banner-rule">{bannerRule}</span>
-      </span>
-    </p>
+    <Callout
+      tone={banner.tone}
+      icon={banner.icon}
+      title={bannerTitle}
+      text={bannerRule}
+      dataAttr="data-inventory-salvage-banner"
+      dataValue={mode}
+    />
   {/if}
 
   <!-- Required-tool disclosure (issue 777), positioned after the banner and before the
@@ -302,68 +304,6 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  .salvage-banner.is-info {
-    border-color: var(--fab-info-border);
-    background: var(--fab-info-soft);
-    color: var(--fab-info);
-  }
-
-  .salvage-banner.is-accent {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-  }
-
-  .salvage-banner.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
-  }
-
-  .salvage-banner-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  /* The title takes its TONE's text colour, not a flat one: a tinted box whose headline
-     is the same grey in every state throws the ramp away. */
-  .salvage-banner-title {
-    font-size: 11.5px;
-    font-weight: 700;
-  }
-
-  .salvage-banner.is-info .salvage-banner-title {
-    color: var(--fab-info-text);
-  }
-
-  .salvage-banner.is-accent .salvage-banner-title {
-    color: var(--fab-accent);
-  }
-
-  .salvage-banner.is-success .salvage-banner-title {
-    color: var(--fab-success-text);
-  }
-
-  .salvage-banner-rule {
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 

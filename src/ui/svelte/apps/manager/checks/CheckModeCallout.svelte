@@ -11,10 +11,12 @@
   the three facts come from `checkModeCallout.js`, which is pure and is proven exhaustive
   against the reachable (activity, mode) pairs.
 
-  Not the shared `Callout`: that primitive is one glyph plus one sentence, and this is a
-  titled block with a paragraph and a fact row. Widening `Callout` to carry a title, a body
-  and a list would make one component two shapes wearing one name, which is the drift that
-  primitive was extracted to end. This one states its own geometry from the prototype.
+  Not the shared `Callout`, and the reason has narrowed rather than gone (issue 1505). That
+  primitive now carries a title and an actions slot, so "one glyph plus one sentence" is no
+  longer what separates the two. What still does is the FACT ROW: a run of label/value facts
+  is an `InfoStrip`, which is deferred to issue 1521 because it has only one qualifying
+  caller in the tree — and a paragraph plus a fact list under one title is still two shapes
+  wearing one name. When the strip ships, this block is a `Callout` composing one.
 
   DORMANT modes (gathering's routed and progressive, disabled pending issue 683) render the
   same shape with the shipped dormancy sentence and a clock glyph, so a GM whose world already
