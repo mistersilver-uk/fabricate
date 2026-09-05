@@ -101,6 +101,14 @@ export function isReleaseZipName(name) {
  * The `.js` suffix is load-bearing in the other direction too. The same bundle carries the
  * literal `"../library/LibraryCard.svelte"` as data, and a host never fetches that; accepting
  * every relative string would make the gate demand a member that was never meant to ship.
+ *
+ * IT IS ALSO DELIBERATELY ASYMMETRIC WITH THE ENTRY READER. {@link assertArchiveChunkCompleteness}
+ * reads an entry member BY NAME, so an entry declared `main.mjs` is read; this pattern still
+ * requires a `.js` suffix, so an `.mjs` REFERENCE inside that entry would not be extracted and the
+ * member it names would go unchecked. Nothing goes unproved today — Rolldown emits only `.js`
+ * chunks, and `module.json`'s `esmodules` is `main.js` — so widening the suffix now would only
+ * cost the `LibraryCard.svelte` protection above and buy no coverage. Widen it the day an `.mjs`
+ * chunk actually ships.
  */
 const RELATIVE_MODULE_SPECIFIER = /(["'`])(\.{1,2}\/[^"'`\n]*?\.js)\1/g;
 
