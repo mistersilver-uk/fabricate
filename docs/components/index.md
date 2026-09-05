@@ -87,12 +87,12 @@ Every crafting system whose Component Rules currently inherit the world category
 
 ### Bulk editing components
 
-Tick more than one row's checkbox to open the bulk panel in place of the single-component inspector.
-It opens with a **Bulk edit** heading, a **Clear selection** control, a count such as **3 components selected**, and a hint to pick the systems to add them to, stage a category, tags, or essence values, then commit below.
+Tick a row's checkbox to open the bulk panel in place of the single-component inspector.
+It opens with a **Bulk edit** heading, a **Clear** control in that heading that empties the whole selection, a count such as **3 components selected**, and a hint to pick the systems to add them to, stage a category, tags, or essence values, then commit below.
 From there you can stage four kinds of change, across five groups:
 
 - **Membership change** and **Systems.** Choose **Add to** or **Remove from** for the direction, then tick one or more crafting systems in the **Systems** group beside it.
-Every group is the same kind of inset: a search field, a list of rows shown five at a time, a pager, and a note beneath, so you can see and search the whole set without a separate popup, and each group's heading carries a **Clear** that returns it to leave unchanged.
+Every group is the same kind of inset: a search field, a list of rows shown five at a time, a pager, and a note beneath, so you can see and search the whole set without a separate popup, and each group's heading carries its own **Clear** that returns only that group to leave unchanged, keeping the rows you ticked.
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
 Removing drops those rules, rewrites every recipe in those systems that names the removed component, and disables a recipe left without a usable ingredient set or result because of it.
 The world record is untouched, and no other system is affected.
@@ -114,7 +114,7 @@ If the world has no essences yet, the group says so and points you to the Essenc
 | Name, description, linked item and aliases | Which crafting systems have this component |
 | | Its world category |
 | | Its world tags |
-| | Its essence values, in every system that has rules for it |
+| | Its essence values, in every system that has rules for it, for the essences that system holds |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -353,8 +353,8 @@ Your filters, sort, grouping, and page survive opening a component and coming ba
 
 ### Bulk editing rules in this system
 
-Tick the checkbox on two or more rows, or use **Select all**, and the inspector on the right becomes a bulk panel with the same anatomy as the world catalogue's.
-It opens with a **Bulk edit** heading, a **Clear selection** control, a count such as **3 components selected**, and a reminder that staged changes are written to this system only.
+Tick the checkbox on a row, or use **Select all**, and the inspector on the right becomes a bulk panel with the same anatomy as the world catalogue's.
+It opens with a **Bulk edit** heading, a **Clear** control in that heading that empties the whole selection, a count such as **3 components selected**, and a reminder that staged changes are written to this system only.
 A note explains that names, art, and source links are world catalogue data and stay per component, and that what you change here is this system's own rules: its category, its tags, and its essence values.
 Three insets follow, each with a search field, rows shown five at a time, a pager, and on every row a count of how many of the selected components already carry that value, such as **2/3**:
 
