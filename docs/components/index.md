@@ -30,6 +30,7 @@ No crafting system needs to be selected.
 A search field and a source filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
 The source filter offers **Any source**, **World items**, **Compendium**, and **Broken link**.
 **Sort by** offers **Name**, **System count**, and **Source type**.
+The list column runs edge to edge across the middle of the screen, so the toolbar, the rows, and the pager at the foot share the same left and right edges with nothing wasted around them.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
 The list itself opens with a drop zone for dragging in items, spanning the full width of the row, so it scrolls with the rows rather than sitting fixed above the toolbar.
@@ -87,18 +88,24 @@ Every crafting system whose Component Rules currently inherit the world category
 ### Bulk editing components
 
 Tick more than one row's checkbox to open the bulk panel in place of the single-component inspector.
-From there you can stage three kinds of change, across four groups:
+It opens with a **Bulk edit** heading, a **Clear selection** control, a count such as **3 components selected**, and a hint to pick the systems to add them to, stage a category, tags, or essence values, then commit below.
+From there you can stage four kinds of change, across five groups:
 
-- **System membership.** Choose **Add to** or **Remove from** for the direction, then use the **Systems** group beside it to search for and pick one or more crafting systems to apply it to.
-Each group is its own inline card with a search field, a scrollable list of rows to pick from, and a pager, so you can see and search the whole set without a separate popup.
+- **Membership change** and **Systems.** Choose **Add to** or **Remove from** for the direction, then tick one or more crafting systems in the **Systems** group beside it.
+Every group is the same kind of inset: a search field, a list of rows shown five at a time, a pager, and a note beneath, so you can see and search the whole set without a separate popup, and each group's heading carries a **Clear** that returns it to leave unchanged.
 Adding gives every selected component fresh rules in each chosen system, inheriting the world category.
 Removing drops those rules, rewrites every recipe in those systems that names the removed component, and disables a recipe left without a usable ingredient set or result because of it.
 The world record is untouched, and no other system is affected.
-- **World category.** Pick a category from the same kind of inline search card, leave it unchanged, or clear it.
+- **World category.** The rows are a single choice: pick one to set it on every selected component, or pick **No world category** to clear the category itself.
 Like the entry's own category field, this card offers the world vocabulary's categories and nothing else, so on an upgraded world it lists what you have authored in Tags & Categories rather than the categories your crafting systems carried across.
 The reserved **General** category is refused here too.
-- **World tags.** From the same kind of inline search card, click a tag to cycle it between leave unchanged, add, and remove across every selected component.
-Once you have staged at least one, the tags you touched appear as their own run of chips above the card, coloured by direction, so the whole staged change is visible without scrolling the list.
+- **World tags.** Each row cycles between leave unchanged, add, and remove across every selected component, and the heading counts how many you have staged in each direction.
+Once you have staged at least one, the tags you touched appear as their own run of chips above the inset, coloured by direction, so the whole staged change is visible without scrolling the list.
+The rows are the world vocabulary's tags, so a world with none yet says so and points you to Tags & Categories.
+- **Essence values.** One row per essence in the world Essence catalogue, each with its glyph, a count of how many of the selected components already carry it, and a stepper that reads as unchanged until you step it.
+Stepping a value up writes that value on every selected component in every crafting system that has rules for it, and stepping back down to 0 strips the essence from them instead, which the staged chip above the inset shows as **removed**.
+A system that does not hold an essence skips it, and a component with no rules in a system is untouched there.
+If the world has no essences yet, the group says so and points you to the Essence catalogue.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -107,15 +114,18 @@ Once you have staged at least one, the tags you touched appear as their own run 
 | Name, description, linked item and aliases | Which crafting systems have this component |
 | | Its world category |
 | | Its world tags |
+| | Its essence values, in every system that has rules for it |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-The panel states how many changes it is about to make before you apply them, and applies every staged change one at a time, so a large selection across several systems takes a moment.
+The dock at the foot of the panel spans the whole inspector.
+Its commit button reads **Stage a change to write it to 3 components** until something is staged, then names the write it is about to make, such as **Set the world category on 3 components**, **Update world tags on 3 components**, or **Set essence values on 3 components**, or counts the records when several kinds of change are staged at once.
+Fabricate applies every staged change one at a time, so a large selection across several systems takes a moment.
 A change that is refused, such as adding a component to a system where another component already claims the same source item, is reported as it happens and does not stop the run.
 A change that fails outright is counted instead, and once the run has finished a notice says how many components could not be updated.
 The selection clears when the run finishes either way, and nothing is said when every change landed.
 
-A separate **Delete** control at the foot of the panel deletes every selected component that no crafting system currently has rules for, along with each one's world defaults.
+A delete control sits in the same dock, full width beneath the commit button, and deletes every selected component that no crafting system currently has rules for, along with each one's world defaults.
 A selected component any crafting system still has rules for is left alone, and the confirmation names which systems are holding it back, the same refusal the single entry's own delete makes for one component at a time.
 Recipes that reference a component this control does delete stop resolving.
 It is a two-step control, and both labels count only the deletable ones, the selected components no system holds.
@@ -165,6 +175,8 @@ The reserved **General** category is never offered as an option here, whatever c
 A note beneath the field tells you what is actually happening, stating how many systems currently inherit this world category and how many override it locally, once at least one system has rules for it.
 
 Click a tag pill to apply or clear that world tag on the record.
+The pills are the world vocabulary's tags, whether or not any component applies them yet.
+A tag set on this record from before the vocabulary held it is not shown as a pill, though the note beneath still counts it.
 A note beneath them states how many world tags are set on this record, and, if any are muted for a crafting system, how many.
 **Edit world vocabulary** opens the world Tags & Categories screen, where the tag list itself is authored.
 A new world tag cannot be minted from this card.
@@ -324,7 +336,7 @@ The toolbar above the list gives you:
 
 - a **Category** filter, defaulting to **All categories**
 - an essence filter, defaulting to **All essences**
-- a **Select all** checkbox, which opens bulk actions in the inspector once anything is selected
+- a **Select all** checkbox, which opens the bulk panel in the inspector once anything is selected, described under [Bulk editing rules in this system](#bulk-editing-rules-in-this-system) below
 - a **Group by category** switch, on by default
 - a **Sort by** control offering **Name**, **Category**, **Essences**, and **Salvage**, with a button to flip between ascending and descending
 
@@ -337,6 +349,33 @@ A component's category here is this system's own resolved value.
 See [Category](#category) below for how that relates to the world category.
 
 Your filters, sort, grouping, and page survive opening a component and coming back, so working through a long list does not reset your place each time.
+
+### Bulk editing rules in this system
+
+Tick the checkbox on two or more rows, or use **Select all**, and the inspector on the right becomes a bulk panel with the same anatomy as the world catalogue's.
+It opens with a **Bulk edit** heading, a **Clear selection** control, a count such as **3 components selected**, and a reminder that staged changes are written to this system only.
+A note explains that names, art, and source links are world catalogue data and stay per component, and that what you change here is this system's own rules: its category, its tags, and its essence values.
+Three insets follow, each with a search field, rows shown five at a time, a pager, and on every row a count of how many of the selected components already carry that value, such as **2/3**:
+
+- **Category here.** Pick one row to set it as this system's category on every selected component, or pick it again to leave the category unchanged.
+The note beneath says the value is written as this system's own and that the components' world classification is untouched.
+There is no row for switching components back to inheriting the world category in bulk.
+Do that on a component's own Component Rules page.
+- **Tags here.** Each row cycles between leave unchanged, add, and remove, the heading counts the additions and removals staged, and the staged tags appear as chips above the inset.
+These rows change this system's own tag list only.
+World tags are shown on each record and are not touched here.
+- **Essence values.** One row per essence this system defines, each with its glyph and a stepper that reads as unchanged until you step it.
+Once any row is stepped, applying writes the whole set of values shown on every selected component, so a row left at 0 strips that essence from them.
+A **Will overwrite** chip and a warning state how many of the selected components have authored values that will change.
+
+When the system resolves progressively, a **Progressive DC** group also appears for setting one difficulty on every selected component.
+There is no bulk control for salvage.
+
+The commit button in the dock reads **Stage a change to apply to 3 components** until something is staged, then names what it will write, such as **Apply category + tags to 3 components**, or **Edit 3 components** once more than two kinds of change are staged.
+Beneath it, **Remove 3 components from Mythwright Forge…** is a two-step control that removes the selected components from this system only, dropping their rules here while their catalogue entries and every other system stay untouched.
+Arming it switches the label to a confirm state that names the count and the system again, and the note beneath counts how many recipes will be rewritten and how many enabled recipes will be disabled.
+Both labels count only the selected components that have rules in this system.
+When none of them does, the label reads **Remove from Mythwright Forge…** with no number, arming it reads **Cannot remove**, and confirming writes nothing.
 
 ### Bringing in world components this system has not adopted
 
