@@ -1242,6 +1242,16 @@ function selectRecipeRowsByName(...names) {
  * @param {{value?: string, index?: number}} option The row to choose.
  */
 async function chooseSelectOption(page, trigger, option) {
+  // NAMING NEITHER ROW IS A CALLER'S DEFECT, and it is refused here rather than carried into
+  // Playwright. `option.index` of `undefined` fails the positional bounds check below (every
+  // comparison with `undefined` is false), so the call fell through to `rows.nth(undefined)` and
+  // surfaced as a Playwright type error whose text says nothing about the step that wrote it.
+  if (option.value === undefined && !Number.isInteger(option.index)) {
+    throw new Error(
+      'chooseSelectOption was given neither a `value` nor an integer `index`, so it names no row. '
+      + 'Address the row by its own `data-popover-option` handle, or positionally by index.'
+    );
+  }
   await trigger.waitFor({ state: 'visible', timeout: 5_000 });
   await trigger.click();
   const panel = page.locator('.fabricate-select-popover').first();
