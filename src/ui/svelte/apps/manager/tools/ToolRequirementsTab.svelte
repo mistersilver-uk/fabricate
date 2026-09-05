@@ -443,7 +443,9 @@
        exactly this: one semantic glyph beside one sentence in the `--info-soft` strip, at the
        `--info-border` edge. Nothing bespoke is minted for it. -->
   {#if intro}
-    <Callout text={intro} dataAttr="data-tool-requirements-intro" />
+    <!-- NEUTRAL (issue 1505): the tab's own introduction is documentation, and the specimen
+         reserves the info tint for a note about live state. -->
+    <Callout tone="neutral" text={intro} dataAttr="data-tool-requirements-intro" />
   {/if}
 
   <ToolInheritCard

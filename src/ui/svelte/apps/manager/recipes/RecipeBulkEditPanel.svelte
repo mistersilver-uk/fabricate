@@ -1039,6 +1039,8 @@
       onChange={(value) => setCheckTier(value)}
     />
   {:else}
+    <!-- INFO stands (issue 1505): the message reports why THIS selection has no check tier
+         to set, which is live state rather than documentation. -->
     <Callout
       tone="info"
       text={checkTierMessage}
