@@ -251,3 +251,47 @@ test('the grid form is EMITTED by the sheet, not by an inline style', () => {
     'the two-column rung must state the template the source picker`s panel had before it moved'
   );
 });
+
+test('the whole-row flooring counts every box the sheet puts between the rows', () => {
+  // A HAND-MAINTAINED MIRROR, and this is the gate that stops it rotting (issue 1503).
+  //
+  // `IconPicker.measurePopoverMetrics` promises the shared panel a `rowPitch` and a
+  // `chromeHeight` such that `computeIconPickerPopoverLayout` can floor the list to a WHOLE
+  // number of rows. `rowPitch` is a row's BORDER BOX (`getBoundingClientRect`) plus the list's
+  // `row-gap`, so any box the sheet puts between the rows that is OUTSIDE a border box — a
+  // margin — is height the list needs and the pitch cannot see. Unfolded into the chrome it is
+  // height nothing counts, and the panel clips the last row by exactly that many pixels: the
+  // published AFTER frame sliced 8 of row seven's 38, which is `--fab-space-2` to the pixel.
+  //
+  // The two facts live in different files and neither is derived from the other, so this reads
+  // both: every outer margin the sheet declares on a row inside the list must appear in the
+  // component's chrome sum. Adding a margin rung to the sheet without folding it in reds here.
+  const marginRules = [
+    ...css.matchAll(
+      /\.fabricate-icon-picker-popover\.essence-icon-picker-popover \.essence-icon-picker-option[^{]*\{([\s\S]*?)\}/g
+    ),
+  ].filter((rule) => /\bmargin(-block-end|-bottom|-block|\b)/.test(rule[1]));
+
+  assert.ok(
+    marginRules.length > 0,
+    'the pinned resolved row carries the extra gap that separates it from the alphabetical list, ' +
+      'so this clause has something to be about; a sheet with no such margin has silently ' +
+      'removed the very thing the fold below exists for'
+  );
+
+  const source = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/IconPicker.svelte'),
+    'utf8'
+  );
+  const measure = source.slice(source.indexOf('function measurePopoverMetrics'));
+  const chromeSum = measure.match(/const chromeHeight =[\s\S]*?;/);
+  assert.ok(chromeSum, '`measurePopoverMetrics` still composes a `chromeHeight`');
+  assert.ok(
+    /getComputedStyle\([^)]*\)\.marginBottom/.test(measure) &&
+      /pinnedMargin/.test(chromeSum[0]),
+    'the sheet gives a row inside the list an outer MARGIN, and `measurePopoverMetrics` does not ' +
+      'read it into `chromeHeight`. `rowPitch` is a border box plus `row-gap` and cannot see a ' +
+      'margin, so the layout floors the list to less height than its content needs and the panel ' +
+      'clips the last row by the margin'
+  );
+});
