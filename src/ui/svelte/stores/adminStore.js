@@ -6040,6 +6040,13 @@ export function createAdminStore(services) {
    * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
    * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
    *
+   * THE FAILURE SENTENCE IS LOCALIZED AND NAMES THE SYSTEM (issue 1371 r17). Foundry's
+   * `SocketInterface` toasts a refused world-setting write's `error.message` verbatim before it
+   * rejects, so a catch that re-posted that same message put one sentence on screen twice. This
+   * one goes through the membership twins' key-echo guard with its own key and says WHICH
+   * system did not take the rules — the write is per system, and a GM staging essences across
+   * several needs that half — with the reason after it, as the join and removal sentences do.
+   *
    * @param {string} systemId the crafting system whose rules are written.
    * @param {Iterable<string>} componentIds the components, all of which have rules there.
    * @param {object} edit the staged axes, in `applyBulkEditToComponents`' contract.
@@ -6059,9 +6066,31 @@ export function createAdminStore(services) {
       };
     } catch (error) {
       console.error('Fabricate | Failed to apply component rules bulk edit:', error);
-      services.notify?.error?.(error?.message || 'Failed to apply component rules bulk edit');
+      services.notify?.error?.(
+        _componentBulkEditFailureMessage(error, systemManager.getSystem?.(system)?.name || system)
+      );
       return false;
     }
+  }
+
+  /**
+   * The message a FAILED per-system rules bulk edit puts in front of the GM (issue 1371 r17).
+   *
+   * "Did not complete" for the removal twin's reason: `applyBulkEditToComponents` mutates the
+   * live system before its one `save()`, so a refused persist leaves the manager's in-memory
+   * system and the saved setting disagreeing, and "was not written" would be false of it.
+   *
+   * @param {unknown} error the failure thrown by the set-apply primitive.
+   * @param {string} systemName the system the rules were being written to, by name.
+   * @returns {string}
+   */
+  function _componentBulkEditFailureMessage(error, systemName) {
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.BulkEditRulesFailed',
+      'Writing the staged rules to {system} did not complete.',
+      error,
+      { system: systemName }
+    );
   }
 
   /**
@@ -6104,18 +6133,26 @@ export function createAdminStore(services) {
    * So the KEY and the FLOOR are arguments and the guard is written once.
    *
    * THE DETAIL IS PASSED AS `{error}` EITHER WAY, so a translation can state the reason too
-   * rather than only the English floor being able to.
+   * rather than only the English floor being able to. Any OTHER parameter the sentence names
+   * (`{system}` for the per-system bulk write, issue 1371 r17) is handed to the localizer with
+   * it and substituted into the floor by the same token rule, so the floor and the translation
+   * cannot differ in which facts they can state.
    *
    * @param {string} key the lang key for this sentence.
-   * @param {string} fallback the English sentence, used verbatim when the key echoes.
+   * @param {string} fallback the English sentence, used with `{token}`s filled when the key echoes.
    * @param {unknown} error the failure to state the reason from.
+   * @param {Record<string, string>} [data] the sentence's other parameters, by token name.
    * @returns {string}
    */
-  function _componentMembershipFailureMessage(key, fallback, error) {
+  function _componentMembershipFailureMessage(key, fallback, error, data = {}) {
     const detail = error?.message ? String(error.message) : '';
-    const localized = services.localize?.(key, { error: detail });
+    const localized = services.localize?.(key, { ...data, error: detail });
     if (localized && localized !== key) return localized.trim();
-    return `${fallback} ${detail}`.trim();
+    let floor = fallback;
+    for (const [token, value] of Object.entries(data)) {
+      floor = floor.replaceAll(`{${token}}`, String(value ?? ''));
+    }
+    return `${floor} ${detail}`.trim();
   }
 
   /**

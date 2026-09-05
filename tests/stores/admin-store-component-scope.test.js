@@ -863,3 +863,105 @@ test('1371: and a world that does NOT reads the English floor, never the key', a
       'skip localization, which is the difference a rename on the key has to be able to expose'
   );
 });
+
+// ── issue 1371 r17 ──────────────────────────────────────────────────────────────────────────
+//
+// THE M25 WRITE'S FAILURE SENTENCE IS LOCALIZED, NOT FOUNDRY'S TOAST TWICE (Foundry 4, r13).
+// `SocketInterface.#handleError` already posts `ui.notifications.error(error.message)` before it
+// rejects a refused world-setting write, and `bulkEditComponentRules`' catch posted the SAME
+// `error.message` verbatim — so a server-refused essence write toasted one sentence twice. The
+// join and removal verbs add a localized sentence with the reason in it, through the shared
+// key-echo guard, and read as a second, different toast; this verb now does the same under its
+// own key, with the SYSTEM named because the write is per system and a GM staging essences
+// across several needs to know which one did not land. BOTH branches are pinned, as the removal
+// twin's are: a world with the key reads the translation, one without reads the English floor,
+// and neither ever reads the raw key.
+
+/** The key the M25 write's failure sentence is asked for under. */
+const BULK_EDIT_FAILED_KEY = 'FABRICATE.Admin.Manager.Component.BulkEditRulesFailed';
+
+/**
+ * Drive one `bulkEditRules` whose set-apply primitive throws.
+ *
+ * `translations` installs a world that HAS the key, on `driveRemovalFailure`'s pattern; the
+ * table here substitutes `{system}` as well as `{error}`, because this sentence carries both.
+ *
+ * @param {{translations?: Record<string, string>}} [options]
+ * @returns {Promise<{answer: unknown, errors: string[], localizations: Array<{key: string, data: object}>}>}
+ */
+async function driveBulkEditFailure({ translations } = {}) {
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store } = await openStore(harness, [LINKED]);
+  harness.systemManager.applyBulkEditToComponents = async () => {
+    throw new Error('The crafting systems setting could not be saved.');
+  };
+  if (translations) {
+    const echoing = harness.services.localize;
+    harness.services.localize = (key, data) => {
+      const echoed = echoing(key, data);
+      const translated = translations[key];
+      return translated
+        ? translated
+            .replaceAll('{system}', String(data?.system ?? ''))
+            .replaceAll('{error}', String(data?.error ?? ''))
+        : echoed;
+    };
+  }
+  // The catch logs through `console.error` on the store's `Fabricate |` idiom; captured so the
+  // suite's output is the assertions', and so a silenced log would be noticed here.
+  const logged = [];
+  const consoleError = console.error;
+  console.error = (...args) => logged.push(args.map(String).join(' '));
+  let answer;
+  try {
+    answer = await store.worldScope.component.bulkEditRules('sys1', ['ingot'], {
+      essences: { fire: 1 },
+    });
+  } finally {
+    console.error = consoleError;
+  }
+  assert.equal(logged.length, 1, 'the failure is logged once, on the shipped idiom');
+  return {
+    answer,
+    errors: [...harness.notifications.error],
+    localizations: [...harness.localizations],
+  };
+}
+
+test('1371 r17: a refused M25 write reads the English floor with the system and the reason, never the key or the bare message', async () => {
+  const outcome = await driveBulkEditFailure();
+
+  assert.equal(outcome.answer, false, 'nothing was written, so no re-projection is spent');
+  assert.equal(outcome.errors.length, 1, 'the GM is told once by the store');
+  assert.equal(
+    outcome.errors[0],
+    'Writing the staged rules to System One did not complete. ' +
+      'The crafting systems setting could not be saved.',
+    'the floor is a sentence naming the SYSTEM the write was for, with the reason after it — ' +
+      'not the bare `error.message` Foundry has already toasted verbatim'
+  );
+  assert.ok(!outcome.errors[0].startsWith('FABRICATE.'), 'and never the raw key');
+  const request = outcome.localizations.find((entry) => entry.key === BULK_EDIT_FAILED_KEY);
+  assert.ok(Boolean(request), 'the key was ASKED for — the floor is a fallback from a real lookup');
+  assert.equal(request.data?.system, 'System One', 'handed the system by NAME');
+  assert.ok(
+    String(request.data?.error ?? '').includes('The crafting systems setting could not be saved.'),
+    'and the reason as `{error}`'
+  );
+});
+
+test('1371 r17: and a world that HAS the key reads the translation, system and reason interpolated', async () => {
+  const outcome = await driveBulkEditFailure({
+    translations: {
+      [BULK_EDIT_FAILED_KEY]: 'L’écriture des règles vers {system} ne s’est pas terminée. {error}',
+    },
+  });
+
+  assert.equal(
+    outcome.errors[0],
+    'L’écriture des règles vers System One ne s’est pas terminée. ' +
+      'The crafting systems setting could not be saved.',
+    'the translated sentence is what the GM reads, with BOTH parameters carried through the ' +
+      'localizer rather than only reaching the English floor'
+  );
+});
