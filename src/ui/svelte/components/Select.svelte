@@ -114,7 +114,10 @@
     ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
                  required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
                  a label wherever both are present, so the string would be dead text free to drift
-                 from the caption it duplicates.
+                 from the caption it duplicates. ALL THREE NAME THE OPEN PANEL as well as the
+                 trigger: `label`/`ariaLabel` reach it as the primitive's `dialogAriaLabel` and
+                 `ariaLabelledBy` as its `dialogAriaLabelledBy`, so a control named by a caption
+                 it already renders no longer opens a dialog and a listbox with no name at all.
     id / name  — the specimen marks both required because a `<label for>` and an error message
                  reference them. Neither is required here and the reason is structural: the
                  labelled form names its trigger with `aria-labelledby`, so there is no `for`/`id`
@@ -323,11 +326,25 @@
   });
 
   $effect(() => {
-    if (labelled || labelledByTarget || ariaLabel) return;
-    console.warn(
-      'Fabricate | Select: rendered with no `label`, no `ariaLabel` and no `ariaLabelledBy`, so ' +
-        'the trigger has no accessible name at all.'
-    );
+    if (!labelled && !labelledByTarget && !ariaLabel) {
+      console.warn(
+        'Fabricate | Select: rendered with no `label`, no `ariaLabel` and no `ariaLabelledBy`, ' +
+          'so the trigger has no accessible name at all.'
+      );
+    }
+    // THE PANEL IS NAMED SEPARATELY FROM THE TRIGGER, and this is the second clause because the
+    // two resolve from the same three props through DIFFERENT routes: the trigger can be named
+    // by the caption id this component mints for its own `label`, while the portaled panel is
+    // named by the caller's string (`label`/`ariaLabel`) or by the caller's own pointer
+    // (`ariaLabelledBy`). A control given only a `hint` or an `error` therefore satisfies
+    // neither, and used to open an unnamed dialog wrapping an unnamed list in silence.
+    if (!label && !ariaLabel && !ariaLabelledBy) {
+      console.warn(
+        'Fabricate | Select: the panel it opens, and the option list inside it, have no ' +
+          'accessible name: neither `dialogAriaLabel` nor `dialogAriaLabelledBy` resolves to ' +
+          'anything. Pass a `label`, an `ariaLabel` or an `ariaLabelledBy`.'
+      );
+    }
   });
 
   const triggerAttributeData = $derived({
@@ -413,6 +430,7 @@
     triggerAriaLabelledBy={labelledByTarget}
     triggerAriaDisabled={readonly}
     dialogAriaLabel={label || ariaLabel}
+    dialogAriaLabelledBy={ariaLabelledBy}
     minWidth={minWidth || band.minWidth}
     maxWidth={maxWidth || band.maxWidth}
     {disabled}
