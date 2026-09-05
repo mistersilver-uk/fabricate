@@ -2062,8 +2062,10 @@ export function componentRulesSubtitle({ systemName, category, salvageModeLabel 
 // written through `updateWorldDefaultSection(entityId, 'essences', map)`, which by the
 // `category` precedent lands on the world default record the projection publishes as
 // `entry.defaults` — so {@link componentWorldEssenceMap} reads `entry.defaults.essences` FIRST
-// and the screen is live the moment STORE integrates. The driver re-points that one read if
-// STORE publishes the map under another name.
+// and the screen is live the moment STORE integrates. STORE's contract
+// (`artifacts/r18-essence-section-contract.md`) names that exact field — `undefined` when
+// unauthored, `{}` as an authored "no essences" — so nothing needs re-pointing; the marker
+// stays for the driver to strip when the two lanes integrate.
 //
 // UNTIL THE WORLD SECTION EXISTS ON A RECORD, the map is the UNION of the record's per-system
 // essence values read off a raw system roster carrying `components[].essences` (the shape the
