@@ -23,6 +23,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
+  import StatBox from '../../components/StatBox.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -188,31 +189,29 @@
     </p>
 
     <div class="manager-books-scrolls-stat-grid" data-item-page-stats>
-      <div class="manager-books-scrolls-stat" data-item-page-stat="recipes">
-        <div class="manager-books-scrolls-stat-value" data-item-page-recipe-count>
-          {recipeCount}
-        </div>
-        <div class="manager-books-scrolls-stat-label">
-          {text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
-        </div>
-      </div>
-      <div
-        class="manager-books-scrolls-stat"
-        data-item-page-stat={isItemMode ? 'uses' : 'learning'}
-      >
-        <div class="manager-books-scrolls-stat-value is-accent" data-item-page-mid-value>
-          {midValue}
-        </div>
-        <div class="manager-books-scrolls-stat-label" data-item-page-mid-label>{midLabel}</div>
-      </div>
-      <div class="manager-books-scrolls-stat" data-item-page-stat="learned-by">
-        <div class="manager-books-scrolls-stat-value" data-item-page-learned-by>
-          {item.learnedByCount || 0}
-        </div>
-        <div class="manager-books-scrolls-stat-label">
-          {text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
-        </div>
-      </div>
+      <StatBox
+        value={recipeCount}
+        label={text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
+        dataAttr="data-item-page-stat"
+        dataValue="recipes"
+        valueDataAttr="data-item-page-recipe-count"
+      />
+      <StatBox
+        value={midValue}
+        label={midLabel}
+        tone="info"
+        dataAttr="data-item-page-stat"
+        dataValue={isItemMode ? 'uses' : 'learning'}
+        valueDataAttr="data-item-page-mid-value"
+        labelDataAttr="data-item-page-mid-label"
+      />
+      <StatBox
+        value={item.learnedByCount || 0}
+        label={text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
+        dataAttr="data-item-page-stat"
+        dataValue="learned-by"
+        valueDataAttr="data-item-page-learned-by"
+      />
     </div>
 
     <div class="manager-books-scrolls-recipes-inside" data-item-page-recipes-inside>
@@ -342,31 +341,6 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--fab-space-2);
-  }
-
-  .manager-books-scrolls-stat {
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: var(--fab-books-panel-radius);
-    background: var(--fab-bg-1);
-    text-align: center;
-  }
-
-  .manager-books-scrolls-stat-value {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--fab-text);
-  }
-
-  .manager-books-scrolls-stat-value.is-accent {
-    color: var(--fab-info-text);
-  }
-
-  .manager-books-scrolls-stat-label {
-    margin-top: var(--fab-space-2xs);
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--fab-text-subtle);
   }
 
   .manager-books-scrolls-recipes-inside {

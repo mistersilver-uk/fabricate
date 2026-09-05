@@ -168,7 +168,7 @@
     "src/ui/svelte/apps/crafting/RecipeBrowser.svelte | border-radius | 8px | 3",
     "src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte | border-radius | 8px | 2",
     "src/ui/svelte/apps/crafting/RecipeListRow.svelte | border-radius | 8px | 1",
-    "src/ui/svelte/apps/crafting/ShoppingList.svelte | border-radius | 8px | 2",
+    "src/ui/svelte/apps/crafting/ShoppingList.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte | border-radius | 10px | 1",
