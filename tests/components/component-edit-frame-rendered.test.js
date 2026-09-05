@@ -41,7 +41,7 @@ import {
   harvestedFoundryChromeCss,
   harvestedFoundryVersion,
   measureEntryFrameUnderHarvestedChrome,
-  skipWithoutHarvest,
+  registerHarvestedChromeFrameArms,
 } from '../helpers/harvestedFoundryChrome.js';
 import {
   ENTRY_FRAME_CHECKS,
@@ -167,26 +167,15 @@ describe('the rules editor’s rendered frame (issue 1371 r18-list M26, r18-fram
 
   for (const [name, check] of ENTRY_FRAME_CHECKS) it(name, () => check(frames));
 
-  it('really laid Foundry’s own sheet over this frame, not an empty string', { skip: skipWithoutHarvest(harvestedChrome) }, () => {
-    // Non-vacuity for every arm below. The frame's geometry is chrome-INVARIANT today, which is
-    // the finding's own good news and also the reason a chrome arm could quietly measure nothing:
-    // pass `''` instead of the sheet and every sentence still passes. What Foundry does move is
-    // the tab's LABEL METRICS — it declares `--font-sans` and the tab inherits it — so the first
-    // tab's box is measurably wider under it. That is the fact that says the sheet arrived.
-    const width = (box) => box.right - box.left;
-    assert.ok(
-      Math.abs(width(chromeFrames.honest.firstTab) - width(frames.honest.firstTab)) > 1,
-      `the first tab measured ${width(chromeFrames.honest.firstTab)}px under Foundry ${harvestedFoundryVersion(repoRoot)} and ${width(frames.honest.firstTab)}px without it — the sheet did not reach the page`
-    );
-  });
-
-  // AND EVERY ONE OF THE FRAME'S OWN SENTENCES AGAIN UNDER THAT SHEET. See
+  // AND EVERY ONE OF THE FRAME'S OWN SENTENCES AGAIN UNDER FOUNDRY'S OWN SHEET. See
   // `harvestedFoundryChrome.js` for why it matters here: the frame's tabs are
   // `<button role="tab">` and the strip's rule never declares `justify-content`, so Foundry's
   // `a.button, button { justify-content: center }` still arbitrates them.
-  for (const [name, check] of ENTRY_FRAME_CHECKS) {
-    it(`${name} — under Foundry ${harvestedFoundryVersion(repoRoot)}’s own sheet`, { skip: skipWithoutHarvest(harvestedChrome) }, () =>
-      check(chromeFrames)
-    );
-  }
+  registerHarvestedChromeFrameArms({
+    chrome: harvestedChrome,
+    version: harvestedFoundryVersion(repoRoot),
+    honestFrames: () => frames,
+    chromeFrames: () => chromeFrames,
+    checks: ENTRY_FRAME_CHECKS,
+  });
 });

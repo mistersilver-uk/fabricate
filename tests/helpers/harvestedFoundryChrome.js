@@ -15,8 +15,10 @@
  * taken, so `VIEWLAB_REQUIRE_CHROME=1` turns it into a failure and `pr-screenshots.yml`'s
  * chrome-dependent step sets exactly that. Each consuming suite records its own placement.
  */
+import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { it } from 'node:test';
 
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
@@ -79,4 +81,43 @@ export async function measureEntryFrameUnderHarvestedChrome({ chrome, pageFor, v
   if (!chrome) return null;
   const arrangements = await measureEntryFrameArrangements(pageFor, viewport);
   return { hostHeight: viewport.height, ...arrangements };
+}
+
+/**
+ * Hold a frame suite's shared contract a SECOND time, under Foundry's own harvested sheet.
+ *
+ * Registered from here rather than written out in each suite: the two frame suites are already
+ * held to one list of sentences precisely so they cannot drift apart, and a per-suite copy of the
+ * arms that lay Foundry's sheet would reintroduce that drift — and would be the near-identical
+ * block SonarCloud's new-code duplication gate refuses.
+ *
+ * THE FIRST ARM IS NON-VACUITY FOR EVERY ARM AFTER IT. The frame's geometry is chrome-INVARIANT
+ * today, which is the good news and also the reason a chrome arm could quietly measure nothing:
+ * pass `''` instead of the sheet and every sentence still passes. What Foundry does move is the
+ * tab's LABEL METRICS — it declares `--font-sans` and the tab inherits it — so the first tab's box
+ * is measurably wider under it. That is the fact that says the sheet arrived.
+ *
+ * The frames are taken as thunks because a suite measures them in `before()`, after registration.
+ *
+ * @param {object} options
+ * @param {string} options.chrome the sheet, or `''` for no harvest.
+ * @param {string} options.version the harvested build, for the arms' names.
+ * @param {() => object} options.honestFrames the arrangements measured without the sheet.
+ * @param {() => object|null} options.chromeFrames the same arrangements measured under it.
+ * @param {ReadonlyArray<[string, (frames: object) => void]>} options.checks the shared contract.
+ */
+export function registerHarvestedChromeFrameArms({ chrome, version, honestFrames, chromeFrames, checks }) {
+  const skip = skipWithoutHarvest(chrome);
+  it('really laid Foundry’s own sheet over this frame, not an empty string', { skip }, () => {
+    const width = (box) => box.right - box.left;
+    const under = width(chromeFrames().honest.firstTab);
+    const bare = width(honestFrames().honest.firstTab);
+    assert.ok(
+      Math.abs(under - bare) > 1,
+      `the first tab measured ${under}px under Foundry ${version} and ${bare}px without it — the sheet did not reach the page`
+    );
+  });
+  for (const [name, check] of checks) {
+    it(`${name} — under Foundry ${version}’s own sheet`, { skip }, () => check(chromeFrames()));
+  }
 }
