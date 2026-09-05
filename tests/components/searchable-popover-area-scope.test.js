@@ -75,8 +75,36 @@ import {
 } from '../helpers/managerButtonFixtureAllowlist.js';
 import { collectWorkingTreeSources, repoRoot, stripComments } from '../helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../helpers/styleBlockScan.js';
+import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 
 const STYLESHEET = 'styles/fabricate.css';
+
+/**
+ * THE COMPONENT A CLASS PROP IS PASSED TO (issue 1503).
+ *
+ * `IconPicker` and `EssenceSourceSelector` no longer own the elements their family paints. The
+ * picker root, the panel, the search row, the list and every option row are `SearchablePopover`'s
+ * elements now, and each caller's own classes reach them by being handed to the primitive as
+ * `pickerClass` / `popoverClass` / `searchClass` / `listClass` / `optionClass`, which the
+ * primitive writes into the `class` attribute it emits.
+ *
+ * So a declared class prop is checked against the component it is PASSED TO — this one — and not
+ * against the entry's own component, which merely supplies the value. A renamed primitive prop
+ * then reds here rather than silently reading nothing.
+ *
+ * `triggerClass` is deliberately absent. It is a pass-through to the primitive's OWN trigger
+ * button, which is not rendered at all when a caller supplies a `trigger` snippet — so it lands
+ * on no element either component owns, and reading it as emission would credit a class nothing
+ * writes.
+ */
+const SEARCHABLE_POPOVER = 'src/ui/svelte/components/SearchablePopover.svelte';
+const CLASS_PROPS = Object.freeze([
+  'pickerClass',
+  'popoverClass',
+  'searchClass',
+  'listClass',
+  'optionClass',
+]);
 
 /**
  * Eight shared primitives, each with the namespace roots it writes and the class family it owns.
@@ -109,8 +137,14 @@ const PRIMITIVES = Object.freeze([
       'manager-travel-option',
       'manager-travel-portrait',
     ]),
-    // Measured today: 18 written, 32 family selectors, 26 owned. Thirty rules were re-rooted by
-    // issue 1464 and six are caller overrides.
+    // Measured today (issue 1503): 21 written, 38 family selectors, 30 owned, 8 caller overrides.
+    // Thirty rules were re-rooted by issue 1464; three more selectors arrived with issue 1503 —
+    // the `[data-picker-as='grid']` display rung, its `[data-picker-columns='2']` template and
+    // the keyboard cursor's outline. The markup writes 19 raw `class="…"` attributes
+    // and 8 `` class={`…`} `` templates — 27 values, 21 distinct `manager-travel-*` names — and
+    // this entry DECLARES NO `classProps`: it reads its family entirely out of those attributes,
+    // because it is the component the other two PASS class props to rather than one that passes
+    // any. That is why the class-prop floor below is scoped to entries that declare a list.
     writtenFloor: 12,
     familyFloor: 25,
     ownedFloor: 25,
@@ -132,12 +166,28 @@ const PRIMITIVES = Object.freeze([
       'essence-icon-picker-trigger',
       'essence-icon-picker-option',
     ]),
-    // Measured today: 10 written, 29 family selectors, 14 owned. Fifteen are caller overrides —
-    // the vocabulary tile, the two condition chips and the essence icon actions all re-shape the
-    // trigger from their own markup.
+    // Measured today (issue 1503): 9 written, 26 family selectors, 12 owned. Fourteen are caller
+    // overrides — the vocabulary tile, the two condition chips and the essence icon actions all
+    // re-shape the trigger from their own markup. `written` was 10 before the picker rendered
+    // through `SearchablePopover`; `essence-icon-picker-empty` retired with the caller's own
+    // empty branch.
+    //
+    // THE FAMILY SHRANK BY THREE AND THE FLOORS FOLLOW IT DOWN, which is a population that got
+    // smaller rather than a reader that stopped finding one: the caller's own panel block and
+    // its own search-field block are DELETED (the shared primitive supplies both, whole), and
+    // the six-member state list lost its two `:focus-visible` members — an option row never
+    // takes DOM focus now — against one new caller-rooted chip override. These floors exist to
+    // red when the extractor goes quiet, so they are re-set under the measured counts by the
+    // same margin they carried before rather than left where a deletion would trip them.
+    //
+    // ONLY SIX of this component's class values are now raw `class="…"` attributes (it was 12):
+    // the picker root, the panel, the search row, the list and every option row belong to the
+    // PRIMITIVE's elements and arrive there through the class props below.
     writtenFloor: 8,
-    familyFloor: 24,
-    ownedFloor: 12,
+    familyFloor: 22,
+    ownedFloor: 10,
+    classProps: CLASS_PROPS,
+    classPropsOwner: SEARCHABLE_POPOVER,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'essence-icon-picker', root: 'fabricate-icon-picker' }),
       Object.freeze({
@@ -157,10 +207,21 @@ const PRIMITIVES = Object.freeze([
       'essence-source-trigger',
       'essence-source-picker-option',
     ]),
-    // Measured today: 12 written, 26 family selectors, 20 owned, 6 caller overrides.
+    // Measured today (issue 1503): 11 written, 21 family selectors, 16 owned, 5 caller overrides.
+    // `written` was 12 before the picker rendered through `SearchablePopover`;
+    // `essence-source-picker-empty` retired with the caller's own empty branch. The family lost
+    // FIVE selectors and the floors follow it down for the reason the `IconPicker` entry states
+    // above, plus one more that is this picker's alone: its two-column `grid-template-columns`
+    // rule is gone, because the shared list rule's `display: flex` would have made a caller-side
+    // template inert — the primitive emits `data-picker-columns` and the shared sheet paints it.
+    // Nine raw
+    // `class="…"` attributes are left and all nine are trigger-side; neither namespace root is in
+    // one any more, so both arrive through the class props below.
     writtenFloor: 10,
-    familyFloor: 22,
-    ownedFloor: 17,
+    familyFloor: 18,
+    ownedFloor: 13,
+    classProps: CLASS_PROPS,
+    classPropsOwner: SEARCHABLE_POPOVER,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'essence-source-selector', root: 'fabricate-source-picker' }),
       Object.freeze({
@@ -375,13 +436,55 @@ function composedClassLiteralValues(file) {
 }
 
 /**
+ * Every DECLARED class-prop VALUE in a markup region — `pickerClass="…"` and
+ * `` pickerClass={`…`} `` alike, the same two forms `classAttributeValues` reads for a `class`
+ * attribute, because a caller writes a class prop exactly as it writes a class (issue 1503).
+ *
+ * Named-error discipline, matching `markupRegion` and `composedClassRegion`: a declared prop that
+ * the reader cannot find is an EXTRACTOR failure, not an empty result. Falling silent there is how
+ * the emission clause below would go on passing while the value it is reading had moved to a form
+ * this regex does not see — an interpolated `` {`${base} ${extra}`} ``, say — and the caller's
+ * namespace root stopped being credited to anything.
+ *
+ * @param {{name: string, classProps?: readonly string[]}} primitive The entry being read.
+ * @param {string} file Repository-relative component path, for the error message.
+ * @param {string} markup That component's markup region.
+ * @returns {string[]} One value per declared class prop.
+ */
+function classPropValues(primitive, file, markup) {
+  const values = [];
+  for (const name of primitive.classProps ?? []) {
+    const found = [...markup.matchAll(new RegExp(`\\b${name}=(?:"([^"]*)"|\\{\`([^\`]*)\`\\})`, 'g'))].map(
+      (match) => match[1] ?? match[2] ?? ''
+    );
+    assert.ok(
+      found.length > 0,
+      `${file} no longer passes \`${name}\`, which ${primitive.name} declares as a class prop, in ` +
+        'a form this gate can read. Either the call site has dropped it — in which case the ' +
+        'classes it carried are on no element and the rules naming them match nothing — or the ' +
+        'value has moved to a shape the reader does not see, in which case retarget the extractor ' +
+        'rather than deleting the declaration.'
+    );
+    values.push(...found);
+  }
+  return values;
+}
+
+/**
  * Every class-attribute-shaped VALUE a primitive writes for itself in `file`: real
  * `class="…"` / `class={`…`}` markup values, plus — for a `composesClasses` primitive — each
  * unconditional literal of its composed array, treated as its own value so the existing
- * whitespace-split reduction downstream (one token in, one token out) needs no branch for it.
+ * whitespace-split reduction downstream (one token in, one token out) needs no branch for it,
+ * plus — for an entry declaring `classProps` — the value of each of those props.
+ *
+ * A class prop is EMISSION even though this component is not the one that writes it: the class
+ * reaches the DOM through a class the PRIMITIVE writes, using the value declared here, so the
+ * area-scope guarantee is unchanged. What moved is who holds the string, not whether it is
+ * rendered.
  */
 function classValuesFor(primitive, file) {
-  const values = classAttributeValues(markupRegion(file));
+  const markup = markupRegion(file);
+  const values = [...classAttributeValues(markup), ...classPropValues(primitive, file, markup)];
   return primitive.composesClasses ? [...values, ...composedClassLiteralValues(file)] : values;
 }
 
@@ -526,6 +629,27 @@ test('every primitive writes the namespace roots its rules are anchored on', () 
         'holds over nothing'
     );
 
+    // THE CLASS-PROP FLOOR, SCOPED TO ENTRIES THAT DECLARE A LIST (issue 1503). The control
+    // below deletes a root from a class-prop VALUE, which proves the reader is consulted — but it
+    // cannot tell "the reader found nothing" apart from "the value is absent", because both leave
+    // the root unemitted. This floor separates them. It is scoped because the `SearchablePopover`
+    // entry declares no `classProps` at all and an unscoped floor would red on a correct entry:
+    // that component is the one the props are passed TO, and it reads its family entirely out of
+    // its own 27 class attributes.
+    if (primitive.classProps) {
+      const propValues = primitive.components.flatMap((file) =>
+        classPropValues(primitive, file, markupRegion(file))
+      );
+      assert.equal(
+        propValues.length,
+        primitive.classProps.length * primitive.components.length,
+        `${primitive.name} declares ${primitive.classProps.length} class prop(s) and this gate ` +
+          `read ${propValues.length} value(s) for them. A class prop is how this component's ` +
+          'namespace roots reach the DOM now, so a value the reader cannot see is a root nothing ' +
+          'emits.'
+      );
+    }
+
     for (const root of primitive.roots) {
       assert.ok(
         emitted.has(root),
@@ -536,6 +660,103 @@ test('every primitive writes the namespace roots its rules are anchored on', () 
       );
     }
   }
+});
+
+test('a declared class prop is a prop of the component it is passed to', () => {
+  // CLAUSE (c). A `classProps` name is resolved against `classPropsOwner` — the component the
+  // value is HANDED TO — not against the entry's own component, which only supplies it. Checking
+  // it against the entry would check nothing: `IconPicker` does not declare `pickerClass`,
+  // `SearchablePopover` does. Rename the primitive's prop and this clause reds; without it the
+  // reader above would go on matching a `pickerClass="…"` attribute that Svelte now discards.
+  let checked = 0;
+  for (const primitive of PRIMITIVES) {
+    if (!primitive.classProps) {
+      assert.ok(
+        !primitive.classPropsOwner,
+        `${primitive.name} names a \`classPropsOwner\` without declaring any \`classProps\`, so ` +
+          'the owner is resolved against nothing'
+      );
+      continue;
+    }
+    assert.ok(
+      primitive.classPropsOwner,
+      `${primitive.name} declares class props without naming the component they are passed to, ` +
+        'so this clause cannot tell whether the primitive still declares them'
+    );
+    const declared = new Set(declaredPropNames(read(primitive.classPropsOwner)));
+    for (const name of primitive.classProps) {
+      assert.ok(
+        declared.has(name),
+        `${primitive.classPropsOwner} no longer declares \`${name}\`, which ${primitive.name} ` +
+          'passes as a class prop. Svelte silently discards an unknown prop, so the classes that ' +
+          'value carries would reach no element and every rule naming them would match nothing — ' +
+          'while the emission clause above went on reading the value out of the call site.'
+      );
+      checked += 1;
+    }
+  }
+  assert.ok(
+    checked >= 10,
+    `only ${checked} declared class props were resolved against their owner, against a floor of ` +
+      '10 — five each for the two pickers. A lower number means the entries have lost their ' +
+      'declarations and this clause is holding over nothing.'
+  );
+});
+
+test('the class-prop reader is what credits a caller root, and it fires', () => {
+  // TWO POSITIVE CONTROLS, both run against MUTATED SOURCE TEXT rather than against a stubbed
+  // reader, because a stub proves only that the assertion is wired to something.
+  const iconPicker = PRIMITIVES.find((entry) => entry.name === 'IconPicker');
+  const file = iconPicker.components[0];
+  const markup = markupRegion(file);
+
+  // CONTROL 1 — the emission route. Delete `fabricate-icon-picker` from the `pickerClass` VALUE
+  // and the root must stop being emitted. This is the whole reason the reader exists: before it,
+  // the root arrived only through that prop and `classAttributeValues` could not see it, which is
+  // exactly how the re-platform red the emission clause above.
+  const withoutRoot = markup.replace(
+    'pickerClass="fabricate-icon-picker essence-icon-picker"',
+    'pickerClass="essence-icon-picker"'
+  );
+  assert.notEqual(
+    withoutRoot,
+    markup,
+    'the control did not perturb anything — `IconPicker` no longer passes its root through ' +
+      '`pickerClass` in the form this control edits, so the mutation proved nothing and the ' +
+      'clause below is vacuous'
+  );
+  const emittedWithout = new Set(
+    [...classAttributeValues(withoutRoot), ...classPropValues(iconPicker, file, withoutRoot)]
+      .flatMap((value) => value.split(/\s+/))
+  );
+  assert.ok(
+    !emittedWithout.has('fabricate-icon-picker'),
+    'deleting `fabricate-icon-picker` from the `pickerClass` value left the root still emitted, ' +
+      'so the emission clause above would pass over a picker whose panel rules root at nothing'
+  );
+  const emitted = new Set(
+    classValuesFor(iconPicker, file).flatMap((value) => value.split(/\s+/))
+  );
+  assert.ok(
+    emitted.has('fabricate-icon-picker'),
+    'the unmutated reading does not find the root either, so control 1 measured a reader that ' +
+      'never works rather than one that stops working'
+  );
+
+  // CONTROL 2 — the ownership route. A class prop the primitive does not declare must red clause
+  // (c) above, so a renamed primitive prop cannot leave this gate reading a value Svelte discards.
+  const renamed = { ...iconPicker, classProps: Object.freeze(['pickerClassName']) };
+  const declared = new Set(declaredPropNames(read(renamed.classPropsOwner)));
+  assert.ok(
+    !declared.has(renamed.classProps[0]),
+    'the control name is a real prop of the primitive, so it proves nothing about a prop that is ' +
+      'not'
+  );
+  assert.ok(
+    declared.has('pickerClass'),
+    'the primitive does not declare `pickerClass` either, so control 2 measured a reader that ' +
+      'never resolves rather than one that stops resolving'
+  );
 });
 
 test('the application-root detector fires', () => {

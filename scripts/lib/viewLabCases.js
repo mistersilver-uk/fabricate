@@ -637,6 +637,31 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-recipe-edit-ingredients-or-menu',
+    // AN EIGHTH, and it is the primitive's GRID LIST FORM (issue 1503). `as="grid"` has exactly
+    // one caller in `src/` — `EssenceSourceSelector` — so `manager-essences-source-picker` is the
+    // only frame in the registry that draws a two-column panel, the `data-picker-columns` the
+    // keyboard cursor reads its step from, and a caller-supplied `option` snippet inside the
+    // primitive's own row element. The seven frames above are all flex-column lists of the
+    // primitive's own rows, so a change to the grid rung or to the snippet seam published nothing
+    // that could contain it.
+    'manager-essences-source-picker',
+  ]),
+  // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
+  // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
+  // and the shared two-column template in place of a caller rule. Neither representative frame can
+  // contain it: `manager-components-normal` is the component browser and `fabricate-app-shell` is
+  // the PLAYER window, and this control exists only in an essence inspector.
+  //
+  // ONE entry, because the panel is visible only while OPEN and exactly one frame opens it.
+  // `manager-essences-source-picker` selects `mote` — the lab corpus's only essence with no
+  // `sourceComponentId`, and so the only one whose inspector draws this control instead of the
+  // linked-source card — and clicks `.essence-source-trigger`. That case declares no
+  // `sourceMatches` pattern for this file and cannot: the directory leg of `BROAD_SIGNAL_PATTERN`
+  // claims it, so `selectRenderFileCases` `continue`s before reading any case's patterns. This
+  // entry is the seam for exactly that condition, and the case records the same fact beside its
+  // own `sourceMatches`.
+  'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
+    'manager-essences-source-picker',
   ]),
   // THE overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
   // the environment editor and one `SearchablePopover` in the component editor that was announcing
@@ -1003,8 +1028,10 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  *   `SearchablePopover`  `manager-recipe-edit-tag-picker`, `manager-recipe-edit-ingredients-or-menu`,
  *                        `manager-gathering-task-availability-menu`, `manager-world-parties-actor-picker`,
  *                        `manager-world-parties-realm-override-picker`, `player-actor-picker`,
- *                        `world-tool-entry-on-break-repair-tag-picker-empty` and
- *                        `manager-recipes-bulk-edit-picker`
+ *                        `world-tool-entry-on-break-repair-tag-picker-empty`,
+ *                        `manager-recipes-bulk-edit-picker` and
+ *                        `manager-essences-source-picker`, whose panel is drawn by
+ *                        `EssenceSourceSelector` THROUGH this primitive (issue 1503)
  *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
  *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
  *                        row menu and whose selector names an item inside the portaled panel
@@ -1020,10 +1047,20 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * `RECIPE_BULK_EDIT_MATCHES` and none of them opens a panel, so putting the seam in there would
  * publish four frames that cannot show a regression in it.
  *
- * FOUR POSITIONED PANELS ARE IN NO FRAME AT ALL, and none of those gaps is this array's to close.
- * No case opens `EssenceSourceSelector`'s panel, `ManagerColorPicker`'s popover, or
- * `RecipeDurationEditor`'s — their triggers (`.essence-source-trigger`,
- * `.manager-color-picker-trigger`, `[data-recipe-duration-trigger]`) appear in no case's steps,
+ * `EssenceSourceSelector`'S PANEL JOINED THAT ROSTER AT ISSUE 1503, and what it took is worth
+ * recording because the gap had stood for four rounds while reading as mere inattention. That
+ * panel renders only for an essence with NO linked source — `EssenceBrowserInspector` draws it in
+ * the `{:else}` of `essence.associatedItem`, and `EssenceOnCraftTab` in the `{:else}` of
+ * `sourceLinked` — and `mote` is the lab corpus's ONLY sourceless essence, selected by no case
+ * into an inspector. So no step could be added to an existing frame: every essence case sits on
+ * an essence that renders the LINKED card instead, and repointing one would have traded the state
+ * it was built for. `manager-essences-source-picker` selects `mote` and opens the panel, which is
+ * what this change's re-platform of that panel — a new backdrop, shadow, radius, search row, list
+ * and empty note — needed and did not have.
+ *
+ * THREE POSITIONED PANELS ARE IN NO FRAME AT ALL, and none of those gaps is this array's to close.
+ * No case opens `ManagerColorPicker`'s popover or `RecipeDurationEditor`'s — their triggers
+ * (`.manager-color-picker-trigger`, `[data-recipe-duration-trigger]`) appear in no case's steps,
  * and the one colour control a case does click is the essence entry's `layout="inline"`
  * `ManagerColorPopover`, which is neither positioned nor portaled. And no case CAN open the biome
  * colour popover in `EnvironmentsBrowserView` — its trigger is a right-click, and the capture
@@ -6060,6 +6097,72 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-source-picker',
+    label: 'Manager — Essences source picker open',
+    // BEYOND the smoke: the walk selects no essence row, so there is no counterpart frame.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OTHER PICKER THIS EPIC RE-PLATFORMED, and the one that had no frame at all (issue 1503).
+    // `EssenceSourceSelector`'s panel moved wholesale onto `SearchablePopover`: its backdrop went
+    // from the lightest background rung to the darkest, it took `--fab-shadow-lg` and a 10px
+    // radius, its search row and list became the primitive's elements, its two-column template
+    // moved from a caller rule to the shared `[data-picker-columns='2']` rung, and its empty note
+    // was replaced. `IconPicker`'s panel has `manager-system-edit-lists`; this one had nothing, so
+    // one of the two re-platformed panels shipped with visual evidence and the other with none.
+    //
+    // `mote` RATHER THAN ANY OTHER ESSENCE, and it is the only possible choice: the inspector
+    // draws this control in the `{:else}` of `essence.associatedItem`, so an essence with a linked
+    // source renders the summary card and the two source actions instead, and `mote` is the lab
+    // corpus's only essence with no `sourceComponentId`. It is also the ZERO-CARRIER essence, so
+    // the inspector around the open panel is the sparsest one the screen draws — which keeps the
+    // frame's subject the panel rather than the rail behind it.
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="mote"] .manager-essence-identity' },
+      { selector: '.essence-source-trigger' },
+    ],
+    expectView: 'essences',
+    // NAMED ON THE PANEL'S OWN CLASS PAIR, which is what the caller keeps through the
+    // re-platform: `fabricate-source-picker-popover essence-source-picker-popover` rides
+    // `popoverClass` onto the node the primitive portals. A trigger click that opened nothing
+    // would publish the inspector under a case whose whole subject is the panel.
+    expectSelector: '.essence-source-picker-popover',
+    // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
+    // root and not the inspector column: it is deliberately outside that scroller, and containment
+    // against the column would be a claim about a box it does not sit in.
+    expectContained: [
+      { container: '.fabricate-manager', target: '.essence-source-picker-popover' },
+    ],
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // Deliberately NO pattern for the two components that DRAW this frame's subject.
+      // `EssenceSourceSelector.svelte` and `SearchablePopover.svelte` both sit under
+      // `components/`, which `BROAD_SIGNAL_PATTERN`'s directory leg claims, and
+      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it consults any case's
+      // `sourceMatches` — so a pattern naming either would be configuration that can never fire.
+      // `tests/design-system-primitives.test.js` reports exactly that shape as shadowed.
+      //
+      // THIS CASE IS NONETHELESS `EssenceSourceSelector`'S EVIDENCE (issue 1503), through the
+      // other seam: `BROAD_SIGNAL_CASE_OVERRIDES` is keyed on the file rather than declared by the
+      // case, and its entry for that caller names this id. That is additive — a change to the
+      // caller publishes the representative pair AND this frame.
+      //
+      // `SearchablePopover` REACHES THIS FRAME THROUGH ITS OWN OVERRIDE ENTRY, for the same
+      // reason and by the same seam: measured across `src/`, this caller is the primitive's ONLY
+      // `as="grid"` site, so without that entry the grid list form and its `data-picker-columns`
+      // cursor were drawn by no frame the primitive selected. That is a routing decision about
+      // the primitive rather than about this case, so it is made where the primitive is keyed and
+      // pinned in `tests/view-lab-cases.test.js`, not restated as a pattern here.
+      //
+      // The patterns above and below are not duplicates of the override: it selects this case when
+      // the COMPONENT changes, they select it when the view or the positioning seam does.
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({

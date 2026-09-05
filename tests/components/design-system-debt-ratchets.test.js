@@ -57,6 +57,7 @@
  * whose own filter had stopped matching.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
@@ -1394,9 +1395,97 @@ test('a withdrawn utility or skin class is not declared, and issue 1523 owns eac
 const repetitionKey = (entry) =>
   rowKey(entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)', entry.selector);
 
+/**
+ * The six contextual figures `selector-repetition-baseline.js` publishes about the sheet.
+ *
+ * Each is `[the label the docblock writes it under, how to measure it]`. They are read out of the
+ * docblock's SOURCE TEXT because that is where they are stated: a figure quoted in prose and
+ * derived nowhere is exactly the mirror that rots, and this is the file that can measure it.
+ */
+const PUBLISHED_REPETITION_FIGURES = Object.freeze([
+  ['keyed on the selector alone', /ALONE the sheet holds ([\d,]+) repeated selectors/],
+  // THE COPY IN THIS FILE, which the first shape of this gate exempted (issue 1503, review r2).
+  // The clause below reads the ledger AND this file, because the ratchet's own comment restates
+  // two of the ledger's figures and was therefore the one unguarded copy left: changed to 2,999 /
+  // 2,111 it kept the suite green, which is the finding this gate exists for reproduced one file
+  // over. The patterns match across the `//` line break the comment wraps at.
+  [
+    'every (at-context, selector) key',
+    /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n  \/\/ keys under this very keying/,
+  ],
+  [
+    'keys appearing exactly once',
+    /keys under this very keying, of which ([\d,]+) appear exactly once/,
+  ],
+  ['repeated keys, keyed on (at-context, selector)', /rather than these ([\d,]+),/],
+  ['every (at-context, selector) key', /Unfiltered, the sheet holds ([\d,]+) `\(at-context, selector\)` keys/],
+  ['keys appearing exactly once', /of which ([\d,]+) appear exactly\n \* once/],
+  ['rules in the sheet', /The sheet holds ([\d,]+) rules at that head/],
+  ['repeated keys, keyed on (at-context, selector)', /rules at that head, ([\d,]+) repeated keys/],
+  ['appearances between the repeated keys', /repeated keys and ([\d,]+) appearances/],
+  ['appearances between the repeated keys', /measured commit it is ([\d,]+) across/],
+  ['repeated keys, keyed on (at-context, selector)', /it is [\d,]+ across ([\d,]+) rows/],
+]);
+
+test("the repetition ledger publishes the figures the sheet actually produces", () => {
+  // WHY THIS IS A GATE AND NOT A CAREFUL READER. `selector-repetition-baseline.js` publishes six
+  // contextual figures about the sheet, and its own docblock records that an earlier draft's went
+  // stale after a rebase and that "no gate could see it because none of them is pinned". None was
+  // — so when issue 1503 re-banked the table from 119 keys / 244 appearances to 116 / 238, the
+  // prose kept stating the old numbers and every suite stayed green over four wrong figures. The
+  // one it calls "the one figure a reviewer can check against the issue without reading the
+  // table" was among them.
+  const rules = sheetRules();
+  const entries = [...selectorAppearances(rules).values()];
+  const repeated = entries.filter((entry) => entry.appearances.length > 1);
+  const bare = [...selectorAppearances(rules, { keyByAtContext: false }).values()];
+
+  const measured = new Map([
+    ['keyed on the selector alone', bare.filter((entry) => entry.appearances.length > 1).length],
+    ['repeated keys, keyed on (at-context, selector)', repeated.length],
+    ['every (at-context, selector) key', entries.length],
+    ['keys appearing exactly once', entries.length - repeated.length],
+    ['rules in the sheet', rules.length],
+    [
+      'appearances between the repeated keys',
+      repeated.reduce((sum, entry) => sum + entry.appearances.length, 0),
+    ],
+  ]);
+
+  // BOTH FILES THAT PUBLISH THESE FIGURES, joined. The ledger's docblock is where they are
+  // stated for a reader; this file's own ratchet comment restates two of them to explain why it
+  // filters, and a figure restated and derived nowhere is exactly the mirror this gate exists to
+  // catch. Reading the union means either copy going stale reds, and the labels above say which
+  // measurement each pattern is a copy of.
+  const source = ['./selector-repetition-baseline.js', './design-system-debt-ratchets.test.js']
+    .map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
+    .join('\n');
+  const wrong = [];
+  for (const [label, pattern] of PUBLISHED_REPETITION_FIGURES) {
+    const found = source.match(pattern);
+    assert.ok(
+      found,
+      `the docblock no longer states ${label} in the shape ${pattern}, so this clause has stopped ` +
+        'reading the figure it was written to pin rather than found it correct'
+    );
+    const published = Number(found[1].replaceAll(',', ''));
+    if (published !== measured.get(label)) {
+      wrong.push(`${label}: the docblock says ${found[1]}, the sheet produces ${measured.get(label)}`);
+    }
+  }
+
+  assert.deepEqual(
+    wrong.sort(byCodePoint),
+    [],
+    'these figures are published in `selector-repetition-baseline.js` as facts about the sheet ' +
+      'and are now false of it. Re-derive them with `node scripts/stylesheet-selector-census.mjs` ' +
+      `and say in the pull request which rule moved:\n  ${wrong.join('\n  ')}`
+  );
+});
+
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,863 `(at-context, selector)`
-  // keys under this very keying, of which 2,744 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,861 `(at-context, selector)`
+  // keys under this very keying, of which 2,745 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

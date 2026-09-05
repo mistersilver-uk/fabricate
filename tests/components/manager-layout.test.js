@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { computeIconPickerPopoverLayout } from '../../src/ui/svelte/util/iconPickerPopover.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 // ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
@@ -6803,11 +6804,22 @@ test('the Tags & Categories route names one grid track per section and grows the
 // emitting it — the `<div role="tablist">` host and both container classes are unchanged, so the
 // copy is faithful again rather than merely still green.
 //
-// Issue 1470 added the `<div class="fabricate-icon-picker essence-icon-picker">` the picker
-// actually renders around its trigger. That element was missing here from the start, which cost
-// nothing while every trigger rule hung off `.fabricate-manager` and costs the whole block once
-// they hang off the picker's own namespace root: without it this row measures an unstyled button
-// and still reports on the vocabulary row's height by name.
+// Issue 1470 added the picker root element the component actually renders around its trigger.
+// That element was missing here from the start, which cost nothing while every trigger rule hung
+// off `.fabricate-manager` and costs the whole block once they hang off the picker's own
+// namespace root: without it this row measures an unstyled button and still reports on the
+// vocabulary row's height by name.
+//
+// Issue 1503 added the two SHARED picker classes beside them. The picker renders through
+// `SearchablePopover` now, so the root element the product writes carries the primitive's own
+// pair as well as the caller's, which arrives through `pickerClass`. No area-scope clause reds
+// on the shorter form — the shared `mirrored` pair keys on `manager-travel-picker`, which this
+// copy did not carry — so nothing forced this edit; it is here because the copy would otherwise
+// mirror a root the product no longer emits, which is exactly the failure mode a hand-written
+// mirror has. It pulls `.fabricate-picker.manager-travel-picker`'s `position: relative;
+// min-width: 0` onto the fixture, and the measurement was RE-RUN rather than assumed: the row
+// height is unchanged, because what is measured is the trigger inside the wrapper and the
+// wrapper is a containing block for nothing in this copy.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
   const page = await context.newPage();
@@ -6818,7 +6830,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
     </div>`;
     const customRow = `<div class="manager-vocabulary-row">
-      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
+      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
       <button type="button" class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>
@@ -9710,14 +9722,18 @@ test('the modifier row gives every field room for its longest content at every m
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
       `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
-    // The icon field's `<div class="fabricate-icon-picker essence-icon-picker">` is the picker's
-    // own root element, which this copy omitted until issue 1470. The trigger's geometry rules are
-    // rooted at it now, so without it the field measures a bare button rather than the 38px combo
-    // the row is being asserted to have room for.
+    // The icon field's picker root element, which this copy omitted until issue 1470. The
+    // trigger's geometry rules are rooted at it now, so without it the field measures a bare
+    // button rather than the 38px combo the row is being asserted to have room for. Since issue
+    // 1503 the product writes the SHARED primitive's pair on that element too, because the
+    // picker renders through `SearchablePopover` and the caller's own pair arrives through
+    // `pickerClass` — so this copy carries all four. The measurement was re-run and is
+    // unchanged: the extra classes add `position: relative; min-width: 0`, and the field's width
+    // comes from its grid track.
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
           <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
@@ -11413,5 +11429,833 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       new RegExp(`\\.manager-chip\\.${retired}`),
       `the discarded chip-bound rules for \`${retired}\` are retired rather than left reading as live`
     );
+  }
+});
+
+// ── THE COMPOSED PICKER CASCADE, ENUMERATED IN A REAL BROWSER (issue 1503) ──────────────────
+//
+// `IconPicker` and `EssenceSourceSelector` render through `SearchablePopover` now, so the panel,
+// the search row, the list and every option row carry the PRIMITIVE's class AND the caller's on
+// one element. Four rules then tie at (0,2,0), and in every one the shared rule is thousands of
+// lines further down this sheet and wins on source order. Which declarations the callers had to
+// keep, and at what specificity, is not something to reason about in prose: it is a cascade, and
+// this is the only instrument in the repository that can resolve one.
+//
+// WHY HERE AND NOT IN A MOUNTED SUITE. `styles/fabricate.css` is a GLOBAL sheet. No mounted
+// harness ever loads it — they compile components with `css: 'injected'`, and
+// `tests/helpers/scoped-component-css.js` records that happy-dom cannot compute a cascade at
+// all. A `document.styleSheets` walk in a mounted test sees Svelte's scoped blocks and nothing
+// else. This file launches Chromium, injects the real sheet, and asks the browser.
+//
+// WHAT IT ENUMERATES. For each element of the composed panel it walks every rule in the sheet,
+// keeps the ones the element MATCHES, records each declaration with its selector, its
+// specificity and its source order, and computes the winner per property. TWO THINGS PIN THAT
+// WINNER. Each of the ~40 properties the clauses below name is compared by SELECTOR against a
+// hard-coded expectation, which is what reds when the tie-break is inverted; and every winner
+// over a contested property WHOSE DECLARED VALUE IS A LITERAL is compared with the browser's own
+// `getComputedStyle` as it is enumerated. Without the second, the report printed below — every
+// property on eleven surfaces — was checked against nothing, and a confident wrong report was a
+// state this file could reach.
+//
+// THE SECOND IS NARROWER THAN IT SOUNDS, and the number is measured rather than estimated: of
+// the ~175 contested (probe, property) pairs, 33 are compared, on five of the eleven probes.
+// `var()`, `calc()`, `min()`, `max()`, `inherit`, a percentage and an unsubstituted shorthand
+// longhand are all skipped, because for those a declared value and a computed one are different
+// strings by construction rather than by disagreement. This sheet is heavily tokenised, so
+// ordinary design-token work moves properties OUT of that set — which is why the count itself is
+// returned and floored below rather than left implicit.
+//
+// The report itself is printed under `FABRICATE_CASCADE_REPORT=1`, which is how the PR's
+// acceptance evidence is produced. The assertions run either way.
+
+/** The composed panel, as the two pickers now render it through the shared primitive. */
+const PICKER_CASCADE_FIXTURE = `
+  <div class="fabricate-manager" data-manager-view="world-essences">
+    <div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker" data-probe="icon-root">
+      <button type="button" class="essence-icon-picker-trigger" data-probe="icon-trigger">
+        <span class="essence-icon-picker-preview" data-probe="trigger-chip"><i class="fas fa-cog"></i></span>
+        <span class="essence-icon-picker-trigger-label">Cog</span>
+        <span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span>
+      </button>
+    </div>
+    <div class="fabricate-picker-popover manager-travel-popover fabricate-icon-picker-popover essence-icon-picker-popover" role="dialog" data-probe="icon-panel">
+      <div class="manager-travel-popover-search essence-icon-picker-search" data-probe="icon-search-row">
+        <input type="text" data-probe="icon-search-input">
+      </div>
+      <div class="manager-travel-popover-options essence-icon-picker-options" role="listbox" data-picker-as="list" data-probe="icon-list">
+        <button type="button" class="manager-travel-option essence-icon-picker-option pinned" role="option" tabindex="-1" data-keyboard-focus="true" aria-selected="true" data-active-option="true" data-probe="icon-row-active-selected">
+          <span class="essence-icon-picker-preview" data-probe="row-chip"><i class="fas fa-cog"></i></span><span>Cog</span>
+        </button>
+        <button type="button" class="manager-travel-option essence-icon-picker-option" role="option" tabindex="-1" data-keyboard-focus="true" aria-selected="false" data-probe="icon-row-resting">
+          <span class="essence-icon-picker-preview"><i class="fas fa-flask"></i></span><span>Flask</span>
+        </button>
+      </div>
+    </div>
+    <div class="fabricate-picker manager-travel-picker fabricate-source-picker essence-source-selector" data-probe="source-root">
+      <div class="essence-source-selector-shell">
+        <button type="button" class="essence-source-trigger has-value" data-probe="source-trigger"><img class="essence-source-trigger-image" alt=""></button>
+      </div>
+    </div>
+    <div class="fabricate-picker-popover manager-travel-popover fabricate-source-picker-popover essence-source-picker-popover" role="dialog" data-probe="source-panel">
+      <div class="manager-travel-popover-search essence-source-picker-search"><input type="text" data-probe="source-search-input"></div>
+      <div class="manager-travel-popover-options essence-source-picker-grid" role="listbox" data-picker-as="grid" data-picker-columns="2" data-probe="source-list">
+        <button type="button" class="manager-travel-option essence-source-picker-option" role="option" tabindex="-1" data-keyboard-focus="true" aria-selected="true" data-probe="source-row-selected"><img alt=""><span>Linen Cloth</span></button>
+        <button type="button" class="manager-travel-option essence-source-picker-option" role="option" tabindex="-1" data-keyboard-focus="true" aria-selected="false" data-probe="source-row-resting"><img alt=""><span>Iron Ore</span></button>
+      </div>
+    </div>
+  </div>`;
+
+/**
+ * The four RETAINED declarations whose token is TRANSLUCENT, so a value being unchanged does not
+ * mean the rendered colour is (issue 1503). The panel's backdrop moves `--fab-bg-3` →
+ * `--fab-bg-0`, and a translucent fill composites against whatever is behind it. A chip sits on
+ * a ROW, so its ground is the row's own composited fill rather than the panel's — which is
+ * exactly why it is the one that stops working.
+ */
+const TRANSLUCENT_RETENTIONS = Object.freeze([
+  Object.freeze({ what: 'option row fill', token: '--fab-overlay-light-06', over: 'panel' }),
+  Object.freeze({ what: 'option row border', token: '--fab-border', over: 'panel' }),
+  Object.freeze({ what: 'selected/hover fill', token: '--fab-success-soft', over: 'panel' }),
+  Object.freeze({ what: 'preview chip', token: '--fab-overlay-dark-16', over: 'row' }),
+]);
+
+const CALLER_ROW =
+  '.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option';
+const SHARED_PANEL = '.fabricate-picker-popover.manager-travel-popover';
+const SHARED_ROW = '.fabricate-picker-popover .manager-travel-option';
+// CSSOM normalises an attribute selector's quoting to double quotes when it re-serialises
+// `selectorText`, so these two constants spell what the BROWSER reports rather than what the
+// sheet is authored with. `icon-picker-layout.test.js` reads the sheet's own text and asserts
+// the authored single-quoted form there.
+const ACTIVE_OUTLINE = `${SHARED_PANEL} .manager-travel-option[data-active-option="true"]`;
+
+test('the composed picker cascade resolves to the shared panel and the callers own boxes', async () => {
+  // 900 tall on purpose: the shared panel caps at `min(50vh, 360px)`, so a viewport under
+  // 720px would resolve that to 50vh and the residual below would read a viewport rather than
+  // the sheet's own ceiling.
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`<style>${css}</style>${PICKER_CASCADE_FIXTURE}`);
+
+    const report = await page.evaluate((translucent) => {
+      // ── THE ENUMERATOR ──────────────────────────────────────────────────────────────────
+      // Specificity is counted the way the spec counts it: ids, then classes AND attribute
+      // selectors AND pseudo-classes, then element names and pseudo-elements. `:hover` and
+      // `[data-active-option='true']` both land in the middle bucket, which is why the caller's
+      // deepened state rule and the shared outline are both (0,4,0) and settle on source order.
+      const specificityOf = (selector) => {
+        const attributes = (selector.match(/\[[^\]]*\]/g) || []).length;
+        const withoutAttributes = selector.replaceAll(/\[[^\]]*\]/g, ' ');
+        const pseudoElements = (withoutAttributes.match(/::[\w-]+/g) || []).length;
+        const withoutPseudoElements = withoutAttributes.replaceAll(/::[\w-]+/g, ' ');
+        const pseudoClasses = (withoutPseudoElements.match(/:[\w-]+(\([^)]*\))?/g) || []).length;
+        const bare = withoutPseudoElements.replaceAll(/:[\w-]+(\([^)]*\))?/g, ' ');
+        const ids = (bare.match(/#[\w-]+/g) || []).length;
+        const classes = (bare.match(/\.[\w-]+/g) || []).length;
+        const elements = (bare.match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) || []).length;
+        return [ids, classes + attributes + pseudoClasses, elements + pseudoElements];
+      };
+      const beats = (left, right) => {
+        if (left.important !== right.important) return left.important;
+        for (let index = 0; index < 3; index += 1) {
+          if (left.specificity[index] !== right.specificity[index]) {
+            return left.specificity[index] > right.specificity[index];
+          }
+        }
+        return left.order > right.order;
+      };
+
+      // Every style rule in the sheet, flattened, in source order, with media queries that do
+      // not currently apply dropped: a rule that cannot match at this viewport is not in the
+      // cascade and would misreport the winner if it were counted.
+      const rules = [];
+      const collect = (list) => {
+        for (const rule of list) {
+          if (rule.type === CSSRule.STYLE_RULE) rules.push(rule);
+          else if (rule.type === CSSRule.MEDIA_RULE) {
+            if (globalThis.matchMedia(rule.conditionText).matches) collect(rule.cssRules);
+          } else if (rule.cssRules) collect(rule.cssRules);
+        }
+      };
+      for (const sheet of document.styleSheets) collect(sheet.cssRules);
+
+      // EVERY PROPERTY WHOSE WINNER THE BROWSER DISAGREES WITH, across every probe. The named
+      // assertions below pin ~40 properties by SELECTOR; the report printed under
+      // `FABRICATE_CASCADE_REPORT=1` — which is this change's acceptance evidence — covers every
+      // property on eleven surfaces, and none of those was checked against anything at all. This
+      // list is what makes the enumerator's own claim testable rather than asserted.
+      const mismatches = [];
+      // HOW MANY WINNERS THE CROSS-CHECK ACTUALLY COMPARED. `mismatches` being empty means
+      // nothing on its own: it is empty both when every winner agrees with the browser and when
+      // no winner was eligible to be asked. The count is what tells the two apart, and it is
+      // returned so the assertion can floor it.
+      let crossChecked = 0;
+
+      const enumerateFor = (element, probeName) => {
+        const byProperty = {};
+        let order = -1;
+        for (const rule of rules) {
+          order += 1;
+          for (const selector of rule.selectorText.split(',')) {
+            const trimmed = selector.trim();
+            let matched;
+            try {
+              matched = element.matches(trimmed);
+            } catch {
+              matched = false;
+            }
+            if (!matched) continue;
+            for (const property of rule.style) {
+              byProperty[property] ||= [];
+              byProperty[property].push({
+                selector: trimmed,
+                value: rule.style.getPropertyValue(property),
+                important: rule.style.getPropertyPriority(property) === 'important',
+                specificity: specificityOf(trimmed),
+                order,
+              });
+            }
+          }
+        }
+        const winners = {};
+        const style = globalThis.getComputedStyle(element);
+        for (const [property, entries] of Object.entries(byProperty)) {
+          let best = entries[0];
+          for (const entry of entries) if (beats(entry, best)) best = entry;
+          const computedValue = style.getPropertyValue(property);
+          winners[property] = {
+            selector: best.selector,
+            declared: best.value,
+            specificity: best.specificity.join(','),
+            computed: computedValue,
+            contenders: entries.length,
+            beat: entries
+              .filter((entry) => entry !== best)
+              .map((entry) => `${entry.selector} (${entry.specificity.join(',')}) = ${entry.value}`),
+          };
+
+          // THE CROSS-CHECK, and it is deliberately narrow rather than clever. A declared value
+          // and a computed one are the same string only for LITERALS: `var()`, `calc()`, `min()`
+          // and `max()` are substituted, `inherit` resolves to the parent's value, a percentage
+          // resolves against a box, and a shorthand's longhand text is empty when a custom
+          // property could not be substituted per-longhand. Everything else the browser echoes
+          // back verbatim — so where more than one rule matched and the value is a literal, a
+          // winner the enumerator picked wrongly says one thing and `getComputedStyle` another.
+          if (entries.length < 2) continue;
+          const declaredText = best.value.trim();
+          if (declaredText === '' || computedValue.trim() === '') continue;
+          if (/\b(?:var|calc|min|max|clamp|env)\(/.test(declaredText)) continue;
+          if (declaredText === 'inherit' || declaredText.includes('%')) continue;
+          crossChecked += 1;
+          if (declaredText === computedValue.trim()) continue;
+          mismatches.push(
+            `${probeName}: ${property} — the enumerator picked \`${best.selector}\` declaring ` +
+              `\`${declaredText}\`, the browser computed \`${computedValue.trim()}\``
+          );
+        }
+        return winners;
+      };
+
+      const probe = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const surfaces = {};
+      for (const name of [
+        'icon-panel',
+        'icon-search-input',
+        'icon-list',
+        'icon-row-active-selected',
+        'icon-row-resting',
+        'trigger-chip',
+        'row-chip',
+        'icon-root',
+        'source-panel',
+        'source-list',
+        'source-row-selected',
+      ]) {
+        surfaces[name] = enumerateFor(probe(name), name);
+      }
+
+      // ── COMPOSITED COLOUR, MEASURED RATHER THAN ARGUED ──────────────────────────────────
+      // The layers are stacked on a canvas with the browser's own colour parser and source-over
+      // compositing, and the pixel is read back — the same arithmetic the compositor does, done
+      // by the same engine, rather than a formula written out in prose.
+      const root = globalThis.getComputedStyle(document.documentElement);
+      const tokenValue = (name) => root.getPropertyValue(name).trim();
+      const canvas = document.createElement('canvas');
+      canvas.width = 4;
+      canvas.height = 4;
+      const context2d = canvas.getContext('2d');
+      const composite = (layers) => {
+        context2d.clearRect(0, 0, 4, 4);
+        context2d.globalCompositeOperation = 'source-over';
+        for (const layer of layers) {
+          context2d.fillStyle = layer;
+          context2d.fillRect(0, 0, 4, 4);
+        }
+        const pixel = context2d.getImageData(1, 1, 1, 1).data;
+        return [pixel[0], pixel[1], pixel[2]];
+      };
+
+      const bg3 = tokenValue('--fab-bg-3');
+      const bg0 = tokenValue('--fab-bg-0');
+      const rowFill = tokenValue('--fab-overlay-light-06');
+      const colours = {};
+      for (const entry of translucent) {
+        const value = tokenValue(entry.token);
+        const groundBefore = entry.over === 'row' ? [bg3, rowFill] : [bg3];
+        const groundAfter = entry.over === 'row' ? [bg0, rowFill] : [bg0];
+        colours[entry.token] = {
+          what: entry.what,
+          value,
+          groundBefore: composite(groundBefore),
+          groundAfter: composite(groundAfter),
+          before: composite([...groundBefore, value]),
+          after: composite([...groundAfter, value]),
+        };
+      }
+      // The chip remedy, judged on the same arithmetic: `--fab-surface-soft` on the AFTER ground.
+      const chipRemedy = composite([bg0, rowFill, tokenValue('--fab-surface-soft')]);
+
+      // ── THE z-index BAND ───────────────────────────────────────────────────────────────
+      // The panel's stacking rung moved 120 → 4000, so anything in this sheet declaring a
+      // z-index in `[120, 4000)` is something whose relationship to the panel changed.
+      const band = [];
+      for (const rule of rules) {
+        const declared = rule.style.getPropertyValue('z-index');
+        const numeric = Number.parseInt(declared, 10);
+        if (!Number.isFinite(numeric) || numeric < 120 || numeric >= 4000) continue;
+        band.push(`${rule.selectorText} { z-index: ${declared} }`);
+      }
+
+      const computed = (name, property) =>
+        globalThis.getComputedStyle(probe(name)).getPropertyValue(property);
+
+      return {
+        surfaces,
+        mismatches,
+        crossChecked,
+        colours,
+        chipRemedy,
+        band,
+        tokens: { bg3, bg0 },
+        residuals: {
+          panelMaxHeightFromSheet: computed('icon-panel', 'max-height'),
+          iconRootPosition: computed('icon-root', 'position'),
+          iconRootZIndex: computed('icon-root', 'z-index'),
+        },
+        activeAndSelected: {
+          outline: computed('icon-row-active-selected', 'outline'),
+          outlineOffset: computed('icon-row-active-selected', 'outline-offset'),
+          background: computed('icon-row-active-selected', 'background-color'),
+          borderColor: computed('icon-row-active-selected', 'border-top-color'),
+        },
+        restingRow: {
+          outline: computed('icon-row-resting', 'outline-style'),
+          background: computed('icon-row-resting', 'background-color'),
+        },
+        chips: {
+          trigger: computed('trigger-chip', 'background-color'),
+          row: computed('row-chip', 'background-color'),
+        },
+      };
+    }, TRANSLUCENT_RETENTIONS);
+
+    if (process.env.FABRICATE_CASCADE_REPORT) {
+      console.log(JSON.stringify(report, null, 2));
+    }
+
+    // ── THE ENUMERATOR IS PINNED ON THE LITERAL-VALUED CONTESTED WINNERS ────────────────
+    // The named clauses below compare each winner's SELECTOR against a hard-coded expectation,
+    // which is what makes a wrong enumerator red — but only over the ~40 properties they name.
+    // The report covers every property on eleven surfaces and was checked against nothing, so a
+    // confident wrong report was a state this file could reach. Every contested winner whose
+    // declared value is a LITERAL is now compared with the browser's own answer as it is
+    // enumerated — 33 of the ~175 contested pairs today, on five of the eleven probes.
+    assert.deepEqual(
+      report.mismatches,
+      [],
+      'the enumerator resolved a cascade the browser resolves differently, so the report it ' +
+        'prints under `FABRICATE_CASCADE_REPORT=1` cannot be trusted on the literal-valued ' +
+        `contested properties it was able to check:\n  ${report.mismatches.join('\n  ')}`
+    );
+    assert.ok(
+      report.crossChecked >= 30,
+      `only ${report.crossChecked} winners were compared with the browser's own answer, so the ` +
+        'clause above quantifies over almost nothing and would report clean against any ' +
+        'enumerator at all. A sheet that moved its literal values behind `var()` reaches this ' +
+        'state silently.'
+    );
+
+    // ── PAIR 1: THE PANEL BOX GOES SHARED, WHOLE ────────────────────────────────────────
+    const panel = report.surfaces['icon-panel'];
+    for (const property of [
+      'z-index',
+      'position',
+      'row-gap',
+      'min-width',
+      'max-width',
+      'padding-left',
+      'border-top-left-radius',
+      'background-color',
+      'box-shadow',
+      'max-height',
+    ]) {
+      assert.equal(
+        panel[property].selector,
+        SHARED_PANEL,
+        `the panel's ${property} must be the SHARED primitive's: the caller retained nothing of ` +
+          `the box, so its own block is deleted. Winner: ${panel[property].selector}`
+      );
+    }
+    assert.equal(panel['z-index'].computed, '4000');
+    // `--fab-bg-0`, resolved. The DECLARED value is unreadable at the longhand level — CSSOM
+    // expands `background: var(--fab-bg-0)` into a `background-color` whose declared text is
+    // empty because the custom property cannot be substituted per-longhand — so the token is
+    // proved by the colour it resolves to rather than by its name.
+    assert.equal(panel['background-color'].computed, 'rgb(17, 26, 35)');
+    assert.equal(
+      report.tokens.bg0.toLowerCase(),
+      '#111a23',
+      'and that IS `--fab-bg-0` in the default theme, read off the same document'
+    );
+    assert.equal(panel['border-top-left-radius'].computed, '10px');
+    assert.equal(panel['padding-left'].computed, '6px');
+    assert.equal(panel['max-width'].computed, '340px');
+    assert.equal(panel['row-gap'].computed, '4px');
+    assert.match(panel['box-shadow'].declared, /--fab-shadow-lg/);
+
+    // ── PAIR 2: THE SEARCH FIELD GOES SHARED, WHOLE ─────────────────────────────────────
+    const search = report.surfaces['icon-search-input'];
+    const sharedField = '.fabricate-picker-popover .manager-travel-popover-search input';
+    for (const property of ['height', 'border-top-left-radius', 'background-color']) {
+      assert.equal(
+        search[property].selector,
+        sharedField,
+        `the search field's ${property} must be the SHARED field's. Winner: ${search[property].selector}`
+      );
+    }
+    assert.equal(search.height.computed, '30px');
+    assert.equal(search['border-top-left-radius'].computed, '7px');
+
+    // ── PAIR 3: THE LIST — SHARED BOX, CALLER'S PITCH ───────────────────────────────────
+    const list = report.surfaces['icon-list'];
+    assert.equal(
+      list['overflow-y'].selector,
+      '.fabricate-picker-popover .manager-travel-popover-options',
+      'the list scrolls from the shared rule'
+    );
+    assert.equal(
+      list['row-gap'].selector,
+      `${CALLER_ROW}s`,
+      'the 6px row pitch is the CALLER`s and is the one thing it retains here'
+    );
+    assert.equal(list['row-gap'].specificity, '0,3,0');
+    assert.equal(list['row-gap'].computed, '6px');
+    assert.equal(list.display.computed, 'flex', 'the icon list is the shared flex column');
+
+    const sourceList = report.surfaces['source-list'];
+    assert.equal(sourceList.display.computed, 'grid', 'the source list is a grid');
+    assert.equal(
+      sourceList.display.selector,
+      '.fabricate-picker-popover .manager-travel-popover-options[data-picker-as="grid"]',
+      'the grid form is the shared rung keyed on the attribute the primitive emits'
+    );
+    assert.equal(
+      sourceList['grid-template-columns'].selector,
+      '.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns="2"]',
+      'and its template is the shared two-column rung, also keyed on an emitted attribute, ' +
+        'because `anchoredPopover` replaces the list`s whole inline style on every measure'
+    );
+    assert.equal(
+      sourceList['row-gap'].computed,
+      '6px',
+      'the source list keeps the caller`s pitch too'
+    );
+
+    // ── PAIR 4: THE OPTION ROW — SHARED FRAME, CALLER'S BOX ─────────────────────────────
+    const row = report.surfaces['icon-row-resting'];
+    for (const property of [
+      'display',
+      'grid-template-columns',
+      'min-height',
+      'padding-left',
+      'border-top-width',
+      'border-top-left-radius',
+      'background-color',
+      'appearance',
+      'align-items',
+      'min-width',
+      'column-gap',
+      'text-align',
+    ]) {
+      assert.equal(
+        row[property].selector,
+        CALLER_ROW,
+        `the icon row's ${property} must be the CALLER's retained declaration — the shared row ` +
+          `would otherwise strip the box. Winner: ${row[property].selector}`
+      );
+      assert.equal(row[property].specificity, '0,3,0');
+    }
+    assert.equal(row.display.computed, 'grid');
+    assert.equal(row['min-height'].computed, '38px');
+    assert.equal(row['border-top-left-radius'].computed, '6px');
+    assert.equal(
+      row.color.selector,
+      SHARED_ROW,
+      'the row takes its text colour from the SHARED rule, which is why the caller does not ' +
+        'restate it and why `color` stayed behind in the trigger-side appearance list'
+    );
+    assert.equal(row['box-sizing'].selector, SHARED_ROW, 'and its box-sizing');
+
+    // ── THE COMPOSITION: OUTLINE OVER FILL, ON ONE ROW ──────────────────────────────────
+    // Not "active beats selected". The two occupy different PROPERTIES and both render, which
+    // is the whole reason the cursor is an outline rather than a fourth fill rung. Proved on a
+    // row that is simultaneously the cursor and the current value.
+    const marked = report.surfaces['icon-row-active-selected'];
+    for (const property of ['outline-style', 'outline-color', 'outline-width', 'outline-offset']) {
+      assert.equal(
+        marked[property].selector,
+        ACTIVE_OUTLINE,
+        'the cursor outline is the shared, primitive-owned rule'
+      );
+      assert.equal(marked[property].specificity, '0,4,0');
+    }
+    assert.equal(
+      marked['background-color'].selector,
+      `${CALLER_ROW}[aria-selected="true"]`,
+      'and the fill on that same row is still the CALLER`s selected face'
+    );
+    assert.equal(marked['background-color'].specificity, '0,4,0');
+    assert.match(report.activeAndSelected.outline, /solid/, 'the outline resolves on that row');
+    assert.equal(report.activeAndSelected.outlineOffset, '-2px', 'and it is INSET');
+    assert.notEqual(
+      report.activeAndSelected.background,
+      report.restingRow.background,
+      'the selected fill survives underneath the cursor rather than being replaced by it'
+    );
+    assert.equal(
+      report.restingRow.outline,
+      'none',
+      'and a row that is not the cursor draws no outline, so the marker is not decoration'
+    );
+
+    // ── THE TRANSLUCENT RETENTIONS ─────────────────────────────────────────────────────
+    // Each is reported as a composited before/after colour rather than as an unchanged
+    // declaration. Three stay legible; the fourth is the chip.
+    const separation = (left, right) =>
+      Math.max(Math.abs(left[0] - right[0]), Math.abs(left[1] - right[1]), Math.abs(left[2] - right[2]));
+    for (const entry of TRANSLUCENT_RETENTIONS) {
+      const measured = report.colours[entry.token];
+      assert.ok(measured, `${entry.token} was not measured, so this clause reports nothing`);
+      assert.notDeepEqual(
+        measured.before,
+        measured.after,
+        `${entry.token} composites identically before and after, so either the backdrop did not ` +
+          'move or the measurement is not reading it — and the licence this clause grants would ' +
+          'be granted over nothing'
+      );
+    }
+    // THE CHIP, AT BOTH ROOTS. The popover member takes a caller-rooted override; the TRIGGER
+    // member must not, because that chip is in the closed-state frame of every importer.
+    assert.equal(
+      report.surfaces['row-chip']['background-color'].selector,
+      '.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-preview',
+      'the ROW chip takes the caller-rooted (0,3,0) override, because a 16% dark overlay has ' +
+        'almost nothing left to darken once the panel is on the darkest background rung'
+    );
+    assert.equal(
+      report.surfaces['trigger-chip']['background-color'].selector,
+      '.fabricate-icon-picker .essence-icon-picker-preview',
+      'and the TRIGGER chip keeps the shared pair, untouched — its ground did not move, and it ' +
+        'is in the closed-state frame of all nine of this picker`s importers'
+    );
+    assert.equal(
+      report.chips.trigger,
+      'rgba(17, 26, 35, 0.16)',
+      'the trigger chip`s own colour is unchanged, which is what makes the override safe'
+    );
+    assert.notEqual(report.chips.row, report.chips.trigger, 'the two chips have parted');
+
+    const chip = report.colours['--fab-overlay-dark-16'];
+    assert.ok(
+      separation(chip.after, chip.groundAfter) < separation(chip.before, chip.groundBefore),
+      'the chip is asserted to LOSE separation against its row once the panel darkens. If it ' +
+        'gained separation, the caller-rooted remedy in the sheet would be unnecessary and this ' +
+        `gate would be licensing a change that did not happen: ${JSON.stringify(chip)}`
+    );
+    assert.ok(
+      separation(report.chipRemedy, chip.groundAfter) > separation(chip.after, chip.groundAfter),
+      'the `--fab-surface-soft` remedy must separate the chip from its row BETTER than the ' +
+        'retained dark overlay does, or it is not a remedy'
+    );
+
+    // ── THE TWO RECORDED RESIDUALS, READ FROM THE RUN ──────────────────────────────────
+    assert.equal(
+      report.residuals.panelMaxHeightFromSheet,
+      '360px',
+      'the sheet resolves `min(50vh, 360px)` at this viewport. The product still writes an ' +
+        'inline `max-height: 380px` from `computeIconPickerPopoverLayout`, which out-ranks any ' +
+        'rule here — so no MEASURED height changes and only the pre-measure frame differs.'
+    );
+    assert.equal(
+      report.residuals.iconRootPosition,
+      'relative',
+      '`.fabricate-picker.manager-travel-picker` now reaches the icon picker`s root'
+    );
+    assert.equal(
+      report.residuals.iconRootZIndex,
+      'auto',
+      'and it creates no stacking context — which, with the panel portaled out of the root and ' +
+        'no other positioned descendant left inside it, is why that rule is inert here'
+    );
+
+    // ── THE z-index BAND, MEASURED RATHER THAN ASSERTED EMPTY IN PROSE ─────────────────
+    // The panel's stacking rung moved 120 → 4000, so every rule in this sheet declaring a
+    // z-index in [120, 4000) is one whose relationship to the panel changed. The delta expected
+    // that set to be EMPTY. Measured, it is not: `ManagerColorPicker`'s panel is the one other
+    // popover still on the old rung.
+    //
+    // Recorded rather than resolved, and pinned so it cannot grow. The two panels are opened by
+    // different triggers and each closes on an outside click, so they are not co-open in any
+    // reachable state, and no frame or case shows both. What the pin buys is that the NEXT rule
+    // parked in this band reds here and has to be reasoned about, instead of quietly landing
+    // underneath a panel that used to be its peer.
+    assert.deepEqual(
+      report.band,
+      ['.fabricate-color-picker-popover.manager-color-picker-popover { z-index: 120 }'],
+      'the set of rules stacking between the picker panel`s old rung and its new one has ' +
+        `changed:\n  ${report.band.join('\n  ')}`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── THE SOURCE PICKER'S TRIGGER, MEASURED AT BOTH SHIPPED SITES (issue 1503) ────────────────
+//
+// `computeIconPickerPopoverLayout` sizes the panel to `clamp(max(triggerWidth, minWidth),
+// minWidth, maxWidth)`, so a CEILING above the floor binds only for a trigger WIDER than it.
+// This picker's band moved from 280-420 to the shared 280-340, and whether that is a no-op or a
+// real narrowing is a question about a RENDERED width — which no source read and no prose
+// derivation can answer, because the trigger fills whatever column its drop zone sits in.
+//
+// The two shipped sites put that column at very different widths, and the register entry for
+// this component quotes the two numbers this test measures.
+//
+//   THE INSPECTOR RAIL (`EssenceBrowserInspector`), inside the shell's 300px third track.
+//   THE ESSENCE EDITOR (`EssenceOnCraftTab`), inside a `.manager-edit-card` that declares no
+//   `max-width` at all and fills the editor pane of the same 1280px window.
+//
+// Both are built from the real ancestor chains rather than from a bare drop zone: the width is
+// entirely a question of what the ancestors are, so a fixture that dropped one of them would
+// measure a number the product never renders. The scoped blocks in `EssenceBrowserInspector`,
+// `EssenceEditView` and `EssenceOnCraftTab` declare no horizontal padding, so the global sheet
+// this file injects is the whole of what sizes these two.
+const SOURCE_TRIGGER_SHELL = (view, main, inspector) => `
+  <div style="width:1280px;height:800px">
+    <div class="fabricate-manager" data-manager-view="${view}" style="display:grid;grid-template-rows:minmax(0,1fr);height:100%">
+      <div class="manager-body">
+        <aside class="manager-rail">Rail</aside>
+        ${main}
+        <aside class="manager-inspector">${inspector}</aside>
+      </div>
+    </div>
+  </div>`;
+
+/** The picker as both callers render it: the shell, the drop-target tile, no stored value. */
+const SOURCE_TRIGGER_MARKUP = (probe) => `
+  <div class="fabricate-picker manager-travel-picker fabricate-source-picker essence-source-selector">
+    <div class="essence-source-selector-shell">
+      <button type="button" class="essence-source-trigger" data-probe="${probe}">
+        <span class="essence-source-trigger-empty"><i class="fas fa-download"></i><span>Drop or pick a source item</span></span>
+        <span class="essence-source-trigger-corner"><i class="fas fa-search"></i></span>
+      </button>
+    </div>
+  </div>`;
+
+const SOURCE_TRIGGER_SITES = [
+  // The BROWSER route, whose inspector holds the unlinked drop zone. Its own class rides beside
+  // the shared one, which is the pair the sheet's `width: 100%` override is keyed on.
+  SOURCE_TRIGGER_SHELL(
+    'essences',
+    '<main class="manager-main">Browser</main>',
+    `<section class="manager-essence-inspector-section" data-essence-section="source">
+       <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
+         ${SOURCE_TRIGGER_MARKUP('inspector-trigger')}
+       </div>
+     </section>`
+  ),
+  // The EDITOR route, which keeps all three tracks — it is in neither aside-releasing list in the
+  // sheet — so the editor pane is `minmax(0, 1fr)` between the 220px rail and the 300px column.
+  SOURCE_TRIGGER_SHELL(
+    'essence-edit',
+    `<main class="manager-main manager-essence-edit-main">
+       <div class="manager-essence-edit-head">Tabs</div>
+       <form class="manager-essence-edit-view">
+         <div class="manager-essence-tab-panel">
+           <div class="manager-essence-tab-stack">
+             <section class="manager-edit-card" data-essence-section="effect-source">
+               <div class="manager-edit-card-heading"><h3 class="manager-card-title">Active effect source</h3></div>
+               <div class="manager-essence-source-drop-zone">
+                 ${SOURCE_TRIGGER_MARKUP('editor-trigger')}
+               </div>
+             </section>
+           </div>
+         </div>
+       </form>
+     </main>`,
+    '<section class="manager-inspector-card">Inspector</section>'
+  ),
+  // THE PICKER'S OWN RULE, outside any drop zone: the 140px square the component ships with
+  // wherever a caller does not override it. Both sites above DO override it, so without this
+  // third probe the 140 in the register entry would be a figure read off the sheet rather than
+  // one anything renders.
+  `<div style="width:1280px;height:200px">
+     <div class="fabricate-manager" data-manager-view="essences">
+       ${SOURCE_TRIGGER_MARKUP('own-rule-trigger')}
+     </div>
+   </div>`,
+  // THE PANEL ITSELF, at the inline 380px ceiling `computeIconPickerPopoverLayout` writes, so the
+  // chrome and the tile pitch the caller's `measureListMetrics` reads can be measured off the
+  // composed box rather than restated from the sheet's own figures.
+  `<div style="width:1280px;height:800px">
+     <div class="fabricate-manager" data-manager-view="essences">
+       <div class="fabricate-picker-popover manager-travel-popover fabricate-source-picker-popover essence-source-picker-popover"
+            role="dialog" data-probe="measured-panel" style="width:340px;max-height:380px">
+         <div class="manager-travel-popover-search essence-source-picker-search"><input type="text"></div>
+         <div class="manager-travel-popover-options essence-source-picker-grid" role="listbox" data-picker-as="grid" data-picker-columns="2">
+           ${Array.from(
+             { length: 16 },
+             (item, index) =>
+               `<button type="button" class="manager-travel-option essence-source-picker-option" role="option" tabindex="-1"><img alt=""><span>Component ${index}</span></button>`
+           ).join('')}
+         </div>
+       </div>
+     </div>
+   </div>`,
+].join('');
+
+test('the source picker`s trigger fills its column, and only one of its two sites reached 420', async () => {
+  const context = await sharedBrowser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style>${SOURCE_TRIGGER_SITES}`
+    );
+
+    const measured = await page.evaluate(() => {
+      const probe = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const widthOf = (name) => probe(name).getBoundingClientRect().width;
+      const px = (value) => Number.parseFloat(value) || 0;
+
+      const panel = probe('measured-panel');
+      const list = panel.querySelector(':scope [role="listbox"]');
+      const tile = list.querySelector(':scope .essence-source-picker-option');
+      const search = panel.querySelector(':scope .manager-travel-popover-search input');
+      const panelStyles = globalThis.getComputedStyle(panel);
+      const listStyles = globalThis.getComputedStyle(list);
+
+      return {
+        inspector: widthOf('inspector-trigger'),
+        editor: widthOf('editor-trigger'),
+        ownRule: widthOf('own-rule-trigger'),
+        // Exactly what `EssenceSourceSelector.measurePopoverMetrics` reads, read the same way, so
+        // the floored height below is the product's own arithmetic on the product's own numbers.
+        metrics: {
+          rowHeight: tile.getBoundingClientRect().height,
+          rowGap: px(listStyles.rowGap),
+          chromeHeight:
+            px(panelStyles.paddingTop) +
+            px(panelStyles.paddingBottom) +
+            px(panelStyles.rowGap) +
+            search.getBoundingClientRect().height,
+        },
+      };
+    });
+
+    if (process.env.FABRICATE_CASCADE_REPORT) {
+      console.log(JSON.stringify(measured, null, 2));
+    }
+
+    // ── THE THREE TRIGGER WIDTHS ───────────────────────────────────────────────────────
+    assert.equal(measured.ownRule, 140, 'the component`s own square, wherever no drop zone overrides it');
+    assert.equal(
+      measured.inspector,
+      275,
+      'the inspector rail`s trigger fills the shell`s 300px third track less its 1px left border ' +
+        `and its 12px insets: 300 - 1 - 24 (got ${measured.inspector}px)`
+    );
+    assert.equal(
+      measured.editor,
+      710,
+      'the essence editor`s card declares no max-width, so its trigger fills the editor pane: ' +
+        '1280 less the 220px rail and the 300px inspector track is 760, less the form`s 12px ' +
+        `insets and the card's 12px insets and 1px edges (got ${measured.editor}px)`
+    );
+
+    // ── WHAT THE WITHDRAWN CEILING BOUND, DERIVED THROUGH THE SHIPPED LAYOUT ───────────
+    // Not asserted in prose: the two bands are run through the real module on the two measured
+    // widths. The floor is this picker's own 280 and is unchanged by the withdrawal.
+    const panelWidthAt = (triggerWidth, maxWidth) =>
+      computeIconPickerPopoverLayout(
+        { top: 200, bottom: 284, left: 100, right: 100 + triggerWidth, width: triggerWidth, height: 84 },
+        { width: 1280, height: 900 },
+        { minWidth: 280, maxWidth }
+      ).width;
+
+    assert.equal(
+      panelWidthAt(measured.inspector, 420),
+      panelWidthAt(measured.inspector, 340),
+      'the inspector rail never reached the old ceiling: its trigger is narrower than the 280px ' +
+        'floor, so the width resolved from the floor under either band and the withdrawal is a ' +
+        'no-op there'
+    );
+    assert.equal(panelWidthAt(measured.inspector, 340), 280, 'and that resolved width is the floor');
+    assert.equal(
+      panelWidthAt(measured.editor, 420),
+      420,
+      'the essence editor DID reach it: a trigger this wide resolves the panel to the ceiling, ' +
+        'whatever the ceiling is'
+    );
+    assert.equal(
+      panelWidthAt(measured.editor, 340),
+      340,
+      'so the panel at that site narrows from 420 to the shared 340 — a real change, licensed ' +
+        'here rather than asserted away as a no-op'
+    );
+
+    // ── AND THE GRID FLOORS TO WHOLE TILES ────────────────────────────────────────────
+    // `EssenceSourceSelector` registers `measureListMetrics` as of issue 1503. Before it, the
+    // list simply filled the panel and the last row of BORDERED tiles was cut partway through —
+    // which the published `manager-essences-source-picker` frame shows.
+    const { rowHeight, rowGap, chromeHeight } = measured.metrics;
+    const rowPitch = rowHeight + rowGap;
+    const floored = computeIconPickerPopoverLayout(
+      { top: 200, bottom: 284, left: 100, right: 380, width: 280, height: 84 },
+      { width: 1280, height: 900 },
+      { minWidth: 280, maxWidth: 340, rowPitch, rowGap, chromeHeight, listExtra: 0 }
+    );
+
+    assert.equal(rowHeight, 44, 'the tile is the 44px border box the sheet floors it at');
+    assert.equal(rowGap, 6, 'at the 6px dense pitch');
+    assert.equal(chromeHeight, 46, 'and the panel`s own chrome is 6 + 6 padding, a 4px gap and a 30px field');
+    assert.equal(
+      floored.maxHeight,
+      380,
+      'the panel ceiling this is measured inside, which is what the picker renders at'
+    );
+    assert.equal(
+      floored.listMaxHeight,
+      6 * rowPitch - rowGap,
+      'six whole grid rows and no seventh sliver: 380 of panel less 46 of chrome leaves 334, ' +
+        'which is six 50px pitches with 34 left over — and those 34 stay as panel slack, where ' +
+        'a reader expects it, rather than as two thirds of a bordered tile against the inset'
+    );
+    assert.ok(
+      floored.listMaxHeight + chromeHeight <= floored.maxHeight,
+      'and the floored list still fits the panel it is measured inside'
+    );
+  } finally {
+    await context.close();
   }
 });

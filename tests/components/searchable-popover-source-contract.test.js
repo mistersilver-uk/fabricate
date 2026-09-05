@@ -49,7 +49,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { definePrimitiveAdoptionContract } from '../helpers/primitiveAdoptionContract.js';
+import { parse } from 'svelte/compiler';
+
+import {
+  definePrimitiveAdoptionContract,
+  walkTemplate,
+} from '../helpers/primitiveAdoptionContract.js';
 
 const POPOVER_PATH = 'src/ui/svelte/components/SearchablePopover.svelte';
 
@@ -120,8 +125,9 @@ const popover = definePrimitiveAdoptionContract({
   primitive: POPOVER_PATH,
   contractClass: 'manager-travel-picker',
   allowlist: RAW_ALLOWLIST,
-  // 24 call sites in 20 components as this lands. 16 and 13 leave headroom for a conversion
-  // that merges two sites without letting a third of the corpus vanish unnoticed.
+  // 22 call sites in 21 components as issue 1503 lands (20 in 19 before it; the two pickers
+  // joined). 16 and 13 leave headroom for a conversion that merges two sites without letting a
+  // third of the corpus vanish unnoticed.
   callSiteFloor: 16,
   fileFloor: 13,
   // Declared boolean props with a `false` default, so a bare attribute correctly sets them to
@@ -134,6 +140,12 @@ const popover = definePrimitiveAdoptionContract({
     'compactOptionRows',
     'disabled',
     'triggerAriaDisabled',
+    // Issue 1503. `IconPicker` writes it as `ignoreScrollWithin={true}` rather than bare, which
+    // is identical at runtime — but the omission was forced by this list rather than chosen, and
+    // a list of the primitive's boolean props that is missing one is a trap for the next caller.
+    // The loop below still reads the primitive's own source and refuses a name it does not
+    // declare with a `false` default, so this is a declaration being recorded, not a widening.
+    'ignoreScrollWithin',
   ]),
   detectorFixture: {
     source: DETECTOR_FIXTURE,
@@ -157,6 +169,101 @@ const popover = definePrimitiveAdoptionContract({
     'an option`s `data` map: spell the value `\'\'`',
 });
 
+/**
+ * The accessible name a `trigger` SNIPPET writes on the element that receives the primitive's
+ * spread, or null (issue 1503).
+ *
+ * WHY THE SPREAD TARGET AND NOT "SOMEWHERE IN THE SNIPPET". The snippet may draw a whole shell
+ * around the button — `EssenceSourceSelector`'s is a drop zone with an image tile and a clear
+ * button beside it — and an `aria-label` on any of those names something that is not the
+ * trigger. The element carrying `{...attributes}` IS the trigger, because that is the object
+ * holding the primitive's `onclick`, its `aria-expanded` and the attachment that anchors the
+ * panel to it.
+ *
+ * The snippet's source is re-parsed rather than pattern-matched. A tag-span regex cannot be
+ * trusted here: these buttons carry template-literal `class` values and expression attributes,
+ * and the `>` that ends the tag is not the first `>` in its text.
+ *
+ * @param {{snippetSource: (name: string) => string|null}} site an adoption call site.
+ * @returns {string|null} the verbatim `aria-label` attribute source, or null.
+ */
+function snippetTriggerName(site) {
+  const snippet = site.snippetSource('trigger');
+  if (!snippet) return null;
+  let found = null;
+  walkTemplate(parse(snippet, { modern: true, filename: 'trigger-snippet.svelte' }).fragment, (node) => {
+    if (found || node.type !== 'RegularElement') return;
+    const attributes = node.attributes ?? [];
+    if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
+    const label = attributes.find(
+      (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
+    );
+    if (label) found = snippet.slice(label.start, label.end);
+  });
+  return found;
+}
+
+test('the snippet-trigger naming route reads the element the spread lands on', () => {
+  // NON-VACUITY, and it is the whole reason this route can be trusted: the two pickers are the
+  // only sites that take it, so a reader that silently found nothing would push them into the
+  // `unnamed` list — the failing direction, which cannot hide — while a reader that returned a
+  // constant would let a nameless snippet pass. This clause pins the reader against both.
+  const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
+  assert.equal(
+    snippetSites.length,
+    2,
+    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; two do — ` +
+      '`IconPicker` and `EssenceSourceSelector`. A different number means the route has gained ' +
+      'or lost a caller and the figures in this file need re-measuring.'
+  );
+
+  for (const site of snippetSites) {
+    assert.ok(
+      snippetTriggerName(site),
+      `${site.file} hands the primitive a \`trigger\` snippet and writes no \`aria-label\` on ` +
+        'the element the primitive`s attributes are spread onto, so the button it renders in ' +
+        'place of the primitive`s own has no accessible name'
+    );
+    assert.ok(
+      !site.attribute('triggerAriaLabel'),
+      `${site.file} passes BOTH a \`trigger\` snippet and \`triggerAriaLabel\`. The primitive ` +
+        'renders no button of its own in that shape, and the prop rides the spread — so it ' +
+        'would silently override the name the snippet writes rather than naming anything.'
+    );
+    // THE TWIN, for the quieter of the two overriding props. `triggerTitle` reaches the caller's
+    // own button by the same route — non-empty, it rides the spread and lands on the element the
+    // snippet wrote its own `title` on — and it is the tooltip rather than the accessible name,
+    // so nothing reports it: the button still has a name, still renders, and the GM simply reads
+    // a different sentence on hover. Neither shipped picker passes it, which is what makes this a
+    // guard for the NEXT snippet caller rather than a fix.
+    assert.ok(
+      !site.attribute('triggerTitle'),
+      `${site.file} passes BOTH a \`trigger\` snippet and \`triggerTitle\`. The prop rides the ` +
+        'spread, so it would override the tooltip the snippet writes rather than adding one.'
+    );
+  }
+
+  // THE READER DISCRIMINATES. A label on an element that is NOT the spread target names some
+  // other part of the caller's shell, and must not be accepted as the trigger's name.
+  const decoy =
+    '{#snippet trigger({ attributes })}' +
+    '<div aria-label="the shell, not the button">' +
+    '<button {...attributes}>go</button>' +
+    '</div>{/snippet}';
+  assert.ok(
+    !snippetTriggerName({ snippetSource: () => decoy }),
+    'the reader accepts an `aria-label` on an element that does not receive the spread, so a ' +
+      'nameless trigger inside a labelled wrapper would pass'
+  );
+  const named = decoy.replace('<button {...attributes}>', '<button aria-label="Go" {...attributes}>');
+  assert.notEqual(named, decoy, 'the discrimination control did not perturb the fixture');
+  assert.ok(
+    snippetTriggerName({ snippetSource: () => named }),
+    'the reader does not find an `aria-label` on the spread target either, so the control above ' +
+      'measured a reader that never works rather than one that discriminates'
+  );
+});
+
 test('every popover names its trigger and the panel that opens', () => {
   // NON-VACUITY first, read through a different accessor than the factory's own floors: a
   // broken `attribute()` would report every site as unnamed, which is the failing direction and
@@ -173,7 +280,26 @@ test('every popover names its trigger and the panel that opens', () => {
     // enough: a button with text has an accessible name from its content. `triggerTitle` is
     // deliberately NOT accepted — a `title` is a tooltip that some assistive technology reads
     // as a name and some does not, so accepting it would let a site pass on a maybe.
-    const triggerName = site.attribute('triggerAriaLabel') ?? site.attribute('triggerLabel');
+    //
+    // THE THIRD ROUTE (issue 1503): a site that hands the primitive a `trigger` SNIPPET renders
+    // its own button, and the primitive renders none — so `triggerAriaLabel` cannot name
+    // anything and would in fact be harmful, because it rides the spread and would override the
+    // name the snippet writes. Such a site names the button INSIDE the snippet, on the element
+    // the primitive's attributes are spread onto, and this clause asserts that rather than
+    // accepting the snippet's mere presence.
+    //
+    // A SOURCE READ IS NOT SUFFICIENT ON ITS OWN, and this file does not pretend otherwise. The
+    // spread runs LAST, so an `aria-label: undefined` key in the object the primitive hands the
+    // snippet would REMOVE the very attribute read here and this clause would still pass. The
+    // runtime half lives where it can be run: `icon-picker-mounted.test.js` and
+    // `essence-source-selector-keyboard-mounted.test.js` mount each picker and assert the
+    // RENDERED trigger's `aria-label`, its `title` and that a caller-set `disabled` survived —
+    // and `manager-mounted.test.js` has asserted `.essence-icon-picker-trigger`'s `title` since
+    // long before this route existed, which is the standing regression net for exactly this.
+    const triggerName =
+      site.attribute('triggerAriaLabel') ??
+      site.attribute('triggerLabel') ??
+      snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
     // The PANEL is named only by `dialogAriaLabel`, which the primitive passes to BOTH the
     // portaled `role="dialog"` and the `role="listbox"` inside it. Present AND non-empty:
@@ -234,6 +360,42 @@ test('a popover announcing a listbox does not render a search field', () => {
       'promises a control the GM never gets. Either pass `showSearch={false}`, which is the ' +
       'shape the four converted menus have, or drop `triggerHasPopup` and take the truthful ' +
       `\`dialog\` default:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+test('a popover that renders no search field announces a listbox', () => {
+  // THE CONVERSE OF THE CLAUSE ABOVE, and it is a separate test rather than a second loop in it
+  // because it quantifies over a different population: that one reads the sites that DECLARE
+  // `triggerHasPopup`, this one reads the sites that suppress the search field. Checking only the
+  // first direction is what let one site ship the contradiction — `RecipeIngredientGroupCard`'s
+  // row-level `or…` menu passed `showSearch={false}` and no `triggerHasPopup`, so it took the
+  // `dialog` default while rendering the primitive's bare-listbox shape, and under the focus
+  // model its trigger announces `aria-haspopup="dialog"` beside `role="combobox"` and an
+  // `aria-controls` naming a `role="listbox"`. The other four search-suppressed sites all
+  // declare it, so the odd one out was invisible to every reader that looked at the four.
+  const suppressed = popover.callSites.filter(
+    (site) => site.attribute('showSearch') === 'showSearch={false}'
+  );
+  // A floor rather than a count, and above zero: at zero this clause quantifies over nothing and
+  // reports clean. Five sites suppress the field as issue 1503 lands.
+  assert.ok(
+    suppressed.length >= 5,
+    `only ${suppressed.length} call sites suppress the search field, so this clause is vacuous`
+  );
+
+  const offenders = suppressed
+    .filter((site) => site.attribute('triggerHasPopup') !== 'triggerHasPopup="listbox"')
+    .map((site) => `${site.file}: ${site.attribute('triggerHasPopup') ?? 'no triggerHasPopup'}`);
+
+  assert.deepEqual(
+    offenders.sort((left, right) => left.localeCompare(right)),
+    [],
+    '`aria-haspopup` states what activating the trigger OPENS, and with `showSearch={false}` ' +
+      'this primitive opens a bare list of choices with no query field in it. The `dialog` ' +
+      'default is truthful only for the searchable shape, so a suppressed-search site that ' +
+      'takes it promises assistive technology a panel the GM never gets — while the same ' +
+      'trigger already carries `role="combobox"` and an `aria-controls` naming a ' +
+      `\`role="listbox"\`:\n  ${offenders.join('\n  ')}`
   );
 });
 

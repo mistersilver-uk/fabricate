@@ -25,6 +25,19 @@ const ICON_PICKER = 'src/ui/svelte/components/IconPicker.svelte';
  */
 const STORED_BUT_NOT_OFFERED = 'fas fa-folder';
 
+/**
+ * The picker's own no-matches sentence, as a KEY.
+ *
+ * The harness's `game.i18n.localize` returns the key for anything it does not carry
+ * (`tests/helpers/svelte-component-harness.js`), so a rendered key is what proves which localized
+ * string reached the panel. That is the whole point here: the primitive draws its own
+ * `No matches` default whenever a caller wires this sentence to `emptyHint` instead of
+ * `noMatchesHint`, and only the branch that carries the picker's OWN words is correct — the
+ * unfiltered branch is unreachable in this component, because a no-query panel always pins the
+ * resolved row.
+ */
+const NO_ICONS_FOUND = 'FABRICATE.Admin.Features.Essences.NoIconsFound';
+
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-icon-picker-',
@@ -35,13 +48,29 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
   ],
-  compiledModules: [ICON_PICKER],
+  // THE PICKER RENDERS THROUGH THE SHARED PRIMITIVE (issue 1503), so its panel, its search row,
+  // its option rows and its empty note are `SearchablePopover`'s elements — and `SearchablePopover`
+  // renders `Chip` and `EmptyState`. A `.svelte` the mounted tree renders but this list omits does
+  // NOT fail the suite: `validateMountedComponentDependencies` throws in `before()` and
+  // `node --test` reports every test here as `# cancelled`, never `# fail`.
+  //
+  // This suite is invisible to `mounted-harness-primitive-allowlist.test.js` by construction: it
+  // names the picker through a const, and that gate's bare-identifier reader resolves one only
+  // through a `for (const X of …)` binding, which this file has none of. So the omission would
+  // surface nowhere but here.
+  compiledModules: [
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    ICON_PICKER,
+  ],
   componentPath: ICON_PICKER,
 });
 
@@ -198,15 +227,40 @@ describe('IconPicker pinned resolved row', () => {
     assert.equal(rowIconClass(optionRows(root)[0]), 'fas fa-gear');
   });
 
-  it('still renders the empty state when a query matches nothing', async () => {
+  it('says NO ICONS MATCHED when a query matches nothing, in the primitive`s own empty branch', async () => {
     const { root } = await openPicker('fas fa-cog');
     await search(root, 'zzzznotaglyph');
 
     assert.equal(optionRows(root).length, 0, 'nothing matched');
     assert.equal(pinnedRows(root).length, 0, 'and no pinned row masks that');
+
+    // The `<p class="hint">` this picker used to draw is gone, and so is the defect it carried:
+    // `hint` is only painted by `.fabricate-manager .hint`, so the sentence rendered UNSTYLED
+    // anywhere outside the manager. The shared primitive's own empty branch replaces it, as a
+    // SIBLING of the listbox rather than a child of it — a listbox's only valid children are its
+    // options.
+    const empty = root.querySelector('.manager-travel-popover-empty');
+    assert.ok(Boolean(empty), 'the shared empty branch renders in the list`s place');
+    assert.equal(empty.getAttribute('role'), 'status');
+    assert.equal(empty.getAttribute('aria-live'), 'polite');
     assert.ok(
-      root.querySelector('.essence-icon-picker-empty'),
-      'the no-results message survives the pinned-row split'
+      !root.querySelector('[role="listbox"]'),
+      'the list is REPLACED, not filled: an empty listbox with a sentence inside it is what the ' +
+        'shared branch exists to stop'
+    );
+
+    // WHICH EMPTINESS. `NoIconsFound` is the FILTERED sentence and belongs to `noMatchesHint`:
+    // the only reachable route into this branch is "a query matched nothing", because a panel with
+    // no active query always pins the resolved row. Wired to `emptyHint` instead, the primitive
+    // would answer with its own `No matches` default here and the picker's own words would never
+    // render at all.
+    const line = empty.textContent.replaceAll(/\s+/g, ' ').trim();
+    assert.match(line, new RegExp(NO_ICONS_FOUND));
+    assert.doesNotMatch(
+      line,
+      /No matches/,
+      'the picker`s own sentence reaches `noMatchesHint`, so the primitive`s generic default is ' +
+        'never the one a GM reads here'
     );
   });
 
@@ -219,6 +273,88 @@ describe('IconPicker pinned resolved row', () => {
       rows.some((row) => (row.getAttribute('title') ?? '').includes('(')),
       false,
       'no row implies the weight choice the picker no longer offers'
+    );
+  });
+});
+
+describe('IconPicker trigger, across the primitive`s spread', () => {
+  /**
+   * WHAT A SPREAD MAY DO TO A CALLER'S OWN BUTTON, and what it must never do (issue 1503).
+   *
+   * The trigger is the caller's own markup inside a `trigger` snippet, and the attribute object
+   * the primitive hands that snippet is spread LAST — deliberately, so the primitive keeps
+   * `type`, the ARIA pair and the handlers that carry the focus model. That order is also the
+   * hazard: Svelte's `set_attributes` REMOVES an attribute whose spread value is `undefined`, and
+   * a spread `disabled: false` OVERRIDES a caller's own `disabled={true}` because it is not
+   * undefined. Both are answered in the primitive rather than here — an undefined-value filter
+   * and a caller-owned key list — and these are the assertions that prove it on the rendered DOM,
+   * which a source read cannot: the erasure happens at runtime.
+   *
+   * `manager-mounted.test.js` already asserts this trigger's `title` on a real manager screen and
+   * must stay green with no edit; these cases are the component-level net beneath it.
+   */
+  it('keeps the caller`s own name, class, style and context menu, and gains the primitive`s contract', async () => {
+    const root = await harness.mount({
+      value: 'fas fa-cog',
+      buttonTitle: 'Change icon',
+      iconOnly: true,
+      triggerClass: 'manager-vocabulary-icon-trigger',
+      triggerStyle: 'color: rgb(1, 2, 3)',
+    });
+    const trigger = root.querySelector('.essence-icon-picker-trigger');
+    assert.ok(Boolean(trigger), 'the picker trigger renders');
+
+    assert.equal(
+      trigger.getAttribute('aria-label'),
+      'Change icon',
+      'the accessible name is the CALLER`s localized string; the primitive renders no button of ' +
+        'its own in this shape, so nothing else can name it'
+    );
+    assert.equal(trigger.getAttribute('title'), 'Change icon');
+    assert.ok(
+      trigger.classList.contains('manager-vocabulary-icon-trigger'),
+      '`triggerClass` still lands on this button — it is a no-op only for the primitive`s own'
+    );
+    assert.ok(trigger.classList.contains('icon-only'), 'and so does the icon-only variant');
+    assert.match(trigger.getAttribute('style') ?? '', /rgb\(1, 2, 3\)/);
+
+    assert.equal(trigger.getAttribute('type'), 'button');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(
+      trigger.getAttribute('aria-expanded'),
+      'false',
+      'the spread ADDS the primitive`s contract, which is why it goes last'
+    );
+  });
+
+  it('names the trigger from the picker`s own vocabulary when the caller passes no title', async () => {
+    const root = await harness.mount({ value: 'fas fa-cog' });
+    const trigger = root.querySelector('.essence-icon-picker-trigger');
+
+    assert.equal(
+      trigger.getAttribute('aria-label'),
+      'FABRICATE.Admin.Features.Essences.ChooseIcon'
+    );
+    assert.equal(trigger.getAttribute('title'), 'FABRICATE.Admin.Features.Essences.ChooseIcon');
+  });
+
+  it('keeps a caller`s disabled trigger disabled, so no panel opens mid-save', async () => {
+    const root = await harness.mount({ value: 'fas fa-cog', disabled: true });
+    const trigger = root.querySelector('.essence-icon-picker-trigger');
+
+    assert.equal(
+      trigger.disabled,
+      true,
+      'three shipped surfaces disable this trigger while a save is in flight ' +
+        '(`disabled={saving}`, `disabled={inert}`), and the refusal is the native attribute on ' +
+        'the caller`s own button'
+    );
+    trigger.click();
+    await settle();
+    assert.ok(
+      !root.querySelector('.fabricate-icon-picker-popover'),
+      'so the click opens nothing: a spread that overrode `disabled` with its own `false` would ' +
+        'give the GM an editable picker over a saving essence'
     );
   });
 });
