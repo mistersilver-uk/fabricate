@@ -28909,6 +28909,137 @@ describe('CraftingSystemManager mounted behavior', () => {
         );
       });
     });
+
+    // ── issue 1371 r17 ──────────────────────────────────────────────────────────────────
+    describe('world component entry → system rules deep link, through the root (issue 1371 r17)', () => {
+      // REVIEWER 6 (r13). `openSystemComponentRules(entityId, systemId)` seeds the id through
+      // `resetComponentSelectionFor` inside `selectSystem`'s guarded callback, and its proof was
+      // a source regex plus a VIEW-level case that mounted the rules list with the id already
+      // set. Nothing exercised the wiring — `selectSystem` resolving, the switch effect stamping
+      // its sentinel, the view receiving the seeded id — and wiring is covered only when it is
+      // exercised. This walks it through the root: the world rail, the catalogue row's open
+      // action, the entry's member-row `View system rules`, and the rules list's
+      // `aria-current` row.
+      //
+      // ITS OWN MOUNT, on `mountWithRealStore`'s shape, because that helper seeds neither a
+      // membership record nor an in-system row: the member-row link is drawn only for a
+      // membership record, and `aria-current` lives on a MEMBER row of the rules list, which
+      // needs the system's own `components` entry. This suite is append-only for the lane, so
+      // the two knobs are not added to the shared helper.
+      //
+      // TWO MEMBERS, AND THE ORDER IS THE NON-VACUITY. M14 (r13-list) selects the FIRST drawn
+      // row whenever nothing this system holds is selected, and `Ash` sorts before `Coal` — so a
+      // deep link that dropped its entity id would land the GM on Ash with a row marked, and an
+      // assertion that "some row is current" would pass. The assertion is which row.
+      const worldRecord = (id, name) =>
+        Object.freeze({
+          id,
+          name,
+          originItemUuid: `Item.${id}`,
+          registeredItemUuid: `Item.${id}`,
+          aliasItemUuids: [],
+        });
+      const inSystemRow = (id, name) => ({
+        id,
+        name,
+        img: null,
+        description: '',
+        originItemUuid: `Item.${id}`,
+        registeredItemUuid: `Item.${id}`,
+        aliasItemUuids: [],
+      });
+      const ASH = worldRecord('ash', 'Ash');
+      const COAL = worldRecord('coal', 'Coal');
+
+      async function settleRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+      async function mountWithTwoMembers() {
+        scopeStores = {
+          component: scopeStore([{ ...ASH }, { ...COAL }], {
+            membership: [
+              { entityId: 'ash', systemId: 'sys1', inherit: { category: true } },
+              { entityId: 'coal', systemId: 'sys1', inherit: { category: true } },
+            ],
+          }),
+          essence: scopeStore(worldEntities(2, 'ess')),
+          tool: scopeStore(worldEntities(1, 'tool')),
+          vocabulary: null,
+        };
+        const forge = makeSystem({
+          id: 'sys1',
+          name: 'Forge',
+          components: [inSystemRow('ash', 'Ash'), inSystemRow('coal', 'Coal')],
+        });
+        const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
+        const systems = [forge, alchemy];
+        const services = createServices(forge, [], [], {
+          getCraftingSystemManager: () => ({
+            getSystems: () => systems,
+            getSystem: (id) => systems.find((system) => system.id === id) || null,
+            // THE RULES LIST'S ROWS COME FROM HERE, not from `system.components` directly:
+            // `buildItemCards` asks `getItems(systemId, search)`, and the shared helper's `[]`
+            // is why it never had a rules row to mark. The shipped manager answers the
+            // system's own array; so does this.
+            getItems: (id) => systems.find((system) => system.id === id)?.components ?? [],
+          }),
+          getComponentScopeStore: () => scopeStores.component,
+          getEssenceScopeStore: () => scopeStores.essence,
+          getToolScopeStore: () => scopeStores.tool,
+          getVocabularyScopeStore: () => scopeStores.vocabulary,
+        });
+        const store = createAdminStore(services);
+        await store.refresh();
+        target = document.createElement('div');
+        document.body.appendChild(target);
+        mounted = mount(Component, { target, props: { store, services: {} } });
+        flushSync();
+        await tick();
+        flushSync();
+        return store;
+      }
+
+      it('marks the linked component current on the rules list, not the first-sorted row', async () => {
+        await mountWithTwoMembers();
+        worldNavItem('component-catalogue').click();
+        await settleRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="coal"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(Boolean(open), 'the catalogue drew Coal with its open-entry action');
+        open.click();
+        await settleRoute();
+        assert.equal(managerView(), 'world-component-entry', 'the GM is on the world entry');
+
+        const link = target.querySelector(
+          '[data-scoped-entry-systems="coal"] [data-scoped-entry-system-rules="sys1"]'
+        );
+        assert.ok(Boolean(link), 'the member row draws `View system rules` for Forge');
+        link.click();
+        await settleRoute();
+
+        assert.equal(managerView(), 'components', 'the link lands on the rules list');
+        const rows = [...target.querySelectorAll('.manager-component-row')].map((row) =>
+          row.getAttribute('data-component-id')
+        );
+        assert.deepEqual(rows, ['ash', 'coal'], 'both members are drawn, Ash first');
+        const current = [...target.querySelectorAll('.manager-component-row[aria-current="true"]')];
+        assert.equal(current.length, 1, 'exactly one row is current');
+        assert.equal(
+          current[0].getAttribute('data-component-id'),
+          'coal',
+          'and it is the component whose entry the GM came from — not Ash, which M14 would ' +
+            'have marked had the deep link dropped its id'
+        );
+      });
+    });
   });
 
   // ---------------------------------------------------------------------------
