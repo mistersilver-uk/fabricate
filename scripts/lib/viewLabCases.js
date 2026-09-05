@@ -1051,7 +1051,7 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * frame, which draws no popover at all — and a regression in the pass that places every floating
  * surface in the product would have published one frame that could not contain it.
  *
- * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is TEN — not the seven
+ * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is THIRTEEN — not the seven
  * `SearchablePopover` frames alone. The seam is the positioning pass, so the component the panel
  * happens to be is not the question a frame answers; whether the frame's own `expectSelector`
  * requires a panel to be measured, placed and portaled is:
@@ -1063,6 +1063,10 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  *                        `manager-recipes-bulk-edit-picker` and
  *                        `manager-essences-source-picker`, whose panel is drawn by
  *                        `EssenceSourceSelector` THROUGH this primitive (issue 1503)
+ *   `Select`             `manager-recipes-bulk-edit-check-tier` and `player-inventory-page-size`
+ *                        (issue 1504), the two frames that rest on a `<Select>`'s option list —
+ *                        also drawn THROUGH this primitive, and one of them in the PLAYER window,
+ *                        where the seam clamps against a different application root
  *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
  *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
  *                        row menu and whose selector names an item inside the portaled panel
@@ -3893,6 +3897,66 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-recipe-bulk-book-remove][disabled])',
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  // ── The check-tier list, open (issue 1504) ────────────────────────────────────────
+  //
+  // THE THIRD SURFACE THIS PANEL CANNOT HOLD, and the first frame in the registry that draws a
+  // `<Select>`'s option list at all. The two frames above open the BOOK picker — a
+  // search-and-pick control over a flat list — and every other bulk-edit frame draws its selects
+  // CLOSED, where the whole conversion is a trigger and a chevron.
+  //
+  // The check tier is the composition the specimen does not draw and no other caller reaches: a
+  // GROUPED list, a per-option hint under each label, `(DC n)` on the authored tiers to tell them
+  // apart from the two instruction rows, and the TICK COLUMN present — so the gutter, the group
+  // heading's inset against the labels beside it and the two-line row are in one photograph. The
+  // player pager below is its pair, and the half that reads at `showTick={false}`.
+  //
+  // Karrun Forgecraft is the only lab system that authors check tiers, which is what makes the
+  // control reachable at all: every other system renders the info Callout in its place, as the
+  // staged case above records.
+  //
+  // `reaches: 'beyond'` with no smoke labels, for the reason the picker pair records — the
+  // smoke's bulk-edit walk drives THROUGH this state to the staged one and never rests on it, so
+  // there is no counterpart to fall short of and no label to claim.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier',
+    label: 'Manager — Recipes bulk edit check tier list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    // The staged case's own walk, stopped one step into its fourth axis: the same two ordinary
+    // Weaponsmithing recipes, then the check-tier trigger and no row click — so the frame is the
+    // open list rather than what choosing from it stages.
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+    ],
+    expectView: 'recipes',
+    // FOUR claims, and the trigger-only frame satisfies none of them: the panel exists, it is
+    // portaled onto the manager ROOT (the whole reason it escapes the rail's `overflow: hidden`),
+    // it is the TICKED configuration, and the row this frame is named for carries a tick element
+    // of its own. Asserting the panel alone would pass over a tickless run of single-line rows,
+    // which is the frame this one exists to be read against.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="sm-tier-masterwork"]:has(.fabricate-select-tick)',
+    // The two affordances the frame is FOR, asserted geometrically because both are things a
+    // reviewer reads off the picture: a group heading and a per-option hint, each inside the
+    // panel's own box rather than clipped by it. The primitive draws neither unless the caller
+    // authors `group` and `hint` on its options, so this is also where a conversion that
+    // flattened the list to bare labels fails instead of publishing a frame that looks right.
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      { container: '.fabricate-select-popover', target: '.manager-travel-popover-group-label' },
+      { container: '.fabricate-select-popover', target: '.fabricate-select-hint' },
+    ],
+    kinds: ['manager', 'recipes'],
+    // SPREAD, not the shared array, for the reason `manager-recipes-bulk-edit-picker` records:
+    // this and that frame are the two bulk-edit frames that rest on an OPEN panel, so they are the
+    // two that must answer for the positioning seam.
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   // ── The Recipe Studio's set delete (issue 1132) ────────────────────────────────────
   //
@@ -9261,6 +9325,46 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+    ],
+  }),
+  playerCase({
+    id: 'player-inventory-page-size',
+    label: 'Player app — Inventory page size list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE PAIR TO `manager-recipes-bulk-edit-check-tier` (issue 1504), and the half that proves an
+    // ABSENCE: this list is drawn at `showTick={false}`, and the ticked frame beside it is the only
+    // way to read that the gutter is GONE rather than merely empty. It is also the narrowest panel
+    // the primitive draws — a two-digit list is all a per-page control has to offer — so it is
+    // the frame that shows the shared panel's 240px floor overridden rather than inherited.
+    //
+    // And it is the only frame that draws an app-drawn option list in the PLAYER window. The panel
+    // is portaled onto `.fabricate-app` rather than `.fabricate-manager`: a different host, a
+    // different set of per-site trigger rules, and the one place a manager-only cascade repair is
+    // invisible.
+    //
+    // ONE STEP, and it is the trigger. Five inventory cases raise the page size to reach a card,
+    // so each of them drives straight THROUGH this state; this case stops in it, which is also why
+    // it claims `beyond` and no smoke label — the smoke never rests on an open list either.
+    query: { tab: 'inventory' },
+    steps: [{ selector: '.inventory-grid-pagination [data-pagination-size]' }],
+    // THREE claims, in the shape `player-actor-picker` uses for the same mechanism: the panel is a
+    // CHILD OF THE APPLICATION FRAME (a portal that failed to land would leave it in the pager row,
+    // under the grid's own overflow), it is the UNTICKED configuration, and it holds the option
+    // rows. The `:not()` is the half that matters — a caller that lost `showTick={false}` draws a
+    // tick gutter with every other claim here still true.
+    expectSelector:
+      '.fabricate-app > .fabricate-select-popover:not(.fabricate-select-popover-ticked) ' +
+      '[data-popover-option="75"]',
+    // Inside the captured window rather than merely in the document: the frame photographs
+    // `[data-view-lab-frame]`, which IS the `.fabricate-app` window, so a panel clamped outside
+    // that box would be evidence of nothing.
+    expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   playerCase({
