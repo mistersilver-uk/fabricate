@@ -22,6 +22,9 @@ const harness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
     'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
+    // The shared notice the last-brew banner composes (issue 1505). A compiled component
+    // missing from this list does not fail the suite, it HANGS it (# cancelled).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/alchemy/Workbench.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/alchemy/Workbench.svelte'
@@ -241,5 +244,79 @@ describe('Workbench (mounted)', () => {
     const essence = target.querySelector('[data-alchemy-result] [data-alchemy-essence="fire"]');
     assert.ok(essence, 'the Produces result surfaces essence chips');
     assert.ok(essence.textContent.includes('×2'));
+  });
+  // THE LAST-BREW BANNER, ALL FOUR TONES (issue 1505). No published View Lab case reaches
+  // `{#if lastBrew}` — `lastBrew` initialises null and is set only inside the brew flow, none
+  // of the three alchemy cases clicks `[data-alchemy-brew]`, and the smoke's alchemy walk does
+  // not brew — so the conversion of this banner onto the shared `Notice` is UNPHOTOGRAPHED and
+  // these assertions are its stated substitute. They act on the tone, the glyph and both root
+  // hooks, which is the whole of what the conversion moved.
+  describe('the last-brew banner', () => {
+    const BANNER_STATES = [
+      { status: 'success', tone: 'success', glyph: 'fa-circle-check' },
+      { status: 'tiered-tier', tone: 'success', glyph: 'fa-circle-check' },
+      { status: 'produced-on-failure', tone: 'warning', glyph: 'fa-triangle-exclamation' },
+      { status: 'brewing', tone: 'info', glyph: 'fa-hourglass-half' },
+      { status: 'no-match-fizzle', tone: 'danger', glyph: 'fa-circle-xmark' }
+    ];
+
+    for (const { status, tone, glyph } of BANNER_STATES) {
+      it(`paints ${status} as the ${tone} notice, with its own glyph`, async () => {
+        const target = await harness.mount({
+          mode: 'ready',
+          targetName: 'Elixir',
+          benchEmpty: false,
+          benchChips: BENCH,
+          brewEnabled: true,
+          lastBrew: { status, discovered: null, message: 'Banner copy' }
+        });
+        const banner = target.querySelector('[data-alchemy-banner]');
+        assert.ok(Boolean(banner), 'the banner renders whenever a brew has resolved');
+        assert.equal(banner.getAttribute('data-notice-tone'), tone, `${status} takes ${tone}`);
+        assert.ok(
+          Boolean(banner.querySelector(`i.${glyph}`)),
+          'the state keeps its own glyph — a per-tone default could not tell these apart'
+        );
+        assert.equal(
+          banner.getAttribute('data-alchemy-banner-status'),
+          status,
+          'the status hook carries the state verbatim'
+        );
+        assert.equal(
+          banner.getAttribute('data-alchemy-banner'),
+          '',
+          'and the bare hook stays bare rather than becoming data-alchemy-banner="true"'
+        );
+      });
+    }
+
+    it('states the brew message, and keeps the notice out of the DOM before any brew', async () => {
+      const withBrew = await harness.mount({
+        mode: 'ready',
+        targetName: 'Elixir',
+        benchEmpty: false,
+        benchChips: BENCH,
+        brewEnabled: true,
+        lastBrew: { status: 'success', discovered: null, message: 'Two doses brewed' }
+      });
+      assert.match(
+        withBrew.querySelector('[data-alchemy-banner]').textContent,
+        /Two doses brewed/,
+        'the resolved brew copy is the notice title'
+      );
+
+      harness.remount();
+      const withoutBrew = await harness.mount({
+        mode: 'ready',
+        targetName: 'Elixir',
+        benchEmpty: false,
+        benchChips: BENCH,
+        brewEnabled: true
+      });
+      assert.ok(
+        !withoutBrew.querySelector('[data-alchemy-banner]'),
+        'nothing has happened yet, so there is nothing for a notice to report'
+      );
+    });
   });
 });

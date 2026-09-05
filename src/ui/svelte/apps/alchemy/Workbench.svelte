@@ -26,6 +26,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
+  import Notice from '../../components/Notice.svelte';
 
   let {
     benchChips = [],
@@ -112,10 +113,10 @@
   // (issue 966).
   const bannerStatus = $derived(lastBrew?.status ?? null);
   const bannerTone = $derived.by(() => {
-    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'is-success';
-    if (bannerStatus === 'produced-on-failure') return 'is-warning';
-    if (bannerStatus === 'brewing') return 'is-info';
-    return 'is-danger';
+    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'success';
+    if (bannerStatus === 'produced-on-failure') return 'warning';
+    if (bannerStatus === 'brewing') return 'info';
+    return 'danger';
   });
   const bannerIcon = $derived.by(() => {
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'fa-circle-check';
@@ -333,13 +334,19 @@
 
   <div class="alchemy-brew-area">
     {#if lastBrew}
-      <div
-        class="alchemy-banner {bannerTone}"
-        data-alchemy-banner
-        data-alchemy-banner-status={bannerStatus}
-      >
-        <i class="fas {bannerIcon}" aria-hidden="true"></i>
-        <span>{bannerText}</span>
+      <!-- The wrapper survives the conversion carrying ONE property, and it is the
+           caller's own layout rather than the notice's geometry: `.alchemy-brew-area` is
+           a plain block, so this 12px is the only separation between the banner and the
+           52px Brew button beneath it. -->
+      <div class="alchemy-banner">
+        <Notice
+          tone={bannerTone}
+          icon="fas {bannerIcon}"
+          title={bannerText}
+          dataAttr="data-alchemy-banner"
+          stateDataAttr="data-alchemy-banner-status"
+          stateDataValue={bannerStatus}
+        />
       </div>
     {/if}
     <button
@@ -796,36 +803,12 @@
     padding-top: 18px;
   }
 
+  /* Stripped to the one property that is this caller's LAYOUT (issue 1505). The tint,
+     the edge, the radius, the padding, the gap and the type are the notice's geometry and
+     are now the primitive's; what is left is the separation between this banner and the
+     Brew button, which `.alchemy-brew-area` does not provide. */
   .alchemy-banner {
-    display: flex;
-    align-items: center;
-    gap: 9px;
     margin-bottom: 12px;
-    padding: 11px 13px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--fab-danger-soft);
-    border: 1px solid var(--fab-danger-border);
-    color: var(--fab-danger-text);
-  }
-
-  .alchemy-banner.is-success {
-    background: var(--fab-success-soft);
-    border-color: var(--fab-success-border);
-    color: var(--fab-success-text);
-  }
-
-  .alchemy-banner.is-warning {
-    background: var(--fab-warning-soft);
-    border-color: var(--fab-warning-border);
-    color: var(--fab-warning-text);
-  }
-
-  .alchemy-banner.is-info {
-    background: var(--fab-info-soft);
-    border-color: var(--fab-info-border);
-    color: var(--fab-info-text);
   }
 
   .alchemy-brew {
