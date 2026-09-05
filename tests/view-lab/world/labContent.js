@@ -4182,7 +4182,14 @@ export function buildLabContent() {
       ],
       defaults: {
         'sm-iron-ingot': { id: 'sm-iron-ingot', category: 'Refined' },
-        'sm-coal': { id: 'sm-coal', category: 'Raw Materials', tags: ['fuel', 'bulk'] },
+        // `moss` IS APPLIED HERE TOO (issue 1371 r17, UX F-N2). Under M18 the entry's tag run is
+        // the world VOCABULARY (`ingot` / `moss` / `ore`), and `fuel` / `bulk` sit outside it — so
+        // with those two alone no chip on the lab entry was LIT, and the parity region for a lit
+        // chip measured an unlit one against the prototype's lit `Reclaimed`. `moss` is the one
+        // tag the world both authors and applies, and applying it on `sm-coal` gives the entry
+        // frame its lit chip. `fuel` and `bulk` STAY, so the applied-but-unauthored state is
+        // still photographable and the note beneath the run still counts them (three now).
+        'sm-coal': { id: 'sm-coal', category: 'Raw Materials', tags: ['fuel', 'bulk', 'moss'] },
         'lab-world-component-curio': {
           id: 'lab-world-component-curio',
           category: 'Curios',
@@ -4332,9 +4339,10 @@ export function buildLabContent() {
     //    nothing on deletion — the world corpus holds no recipe record — so it renders the muted
     //    `Unused` chip under the destructive delete and goes in one click.
     //
-    // `moss` sits between the first two: its only reference is the world default's tag, so it
-    // reads `1 reference` and is confirm-gated. If the count ever excluded the defaults' tags it
-    // would read `Unused` and offer a one-click delete that silently rewrites a world component.
+    // `moss` sits between the first two: its only references are world defaults' tags — the
+    // curio's and, since issue 1371 r17, `sm-coal`'s — so it reads `2 references` and is
+    // confirm-gated. If the count ever excluded the defaults' tags it would read `Unused` and
+    // offer a one-click delete that silently rewrites two world components.
     //
     // Entry ids are the trimmed lowercased names, which is what the store derives and what
     // `buildVocabularyUsage` keys its maps on. Authoring them here rather than letting the

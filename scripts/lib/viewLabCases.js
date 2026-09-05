@@ -1752,6 +1752,17 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag-note]',
       },
+      // ONE LIT CHIP, AND IT IS THE FRAME'S POINT (issue 1371 r17, UX F-N2). Under M18 the run
+      // offers the world vocabulary alone, and `sm-coal`'s migrated `fuel` / `bulk` sit outside
+      // it — so until the lab applied `moss` on this record too, EVERY chip here was unlit and
+      // the parity region for a lit chip measured an unlit one against the prototype's lit
+      // `Reclaimed`. This claim is the lit state: a vocabulary tag the record applies, pressed.
+      // It reds if the lab stops applying `moss` on `sm-coal`, if the run stops drawing
+      // `aria-pressed`, or if the chip leaves the card.
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag="moss"][aria-pressed="true"]',
+      },
     ],
     // THE TAG CHIP OWNS ITS OWN CENTRE (issue 1371, revision 8 — UX F13). The world tag run is a
     // wrapping row of 999-radius chips inside a two-column grid column, and a chip is a real
@@ -1766,6 +1777,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // and was only ever drawn by the corpus union this ruling struck. `moss` is drawn on either
     // side of the change, a world default carrying it as well as the vocabulary authoring it, so
     // this hit-test resolves on both; a selector the run no longer draws aborts the whole capture.
+    // Since issue 1371 r17 `sm-coal` applies `moss` as well, so the chip hit here is the LIT one
+    // the claim above pins.
     expectCenterHit: '[data-scoped-entry-tag="moss"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
