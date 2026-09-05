@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 253,
+  "pinnedTotal": 247,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -19,10 +19,6 @@
     },
     {
       "key": "(top level) | .fabricate-icon-picker .essence-icon-picker-trigger",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-icon-picker-popover .essence-icon-picker-option",
       "count": 2
     },
     {
@@ -451,14 +447,6 @@
     },
     {
       "key": "(top level) | .fabricate-source-picker .essence-source-trigger",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-grid",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-source-picker-popover .essence-source-picker-option",
       "count": 2
     },
     {
