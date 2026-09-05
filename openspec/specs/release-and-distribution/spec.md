@@ -8,8 +8,8 @@ Two of those audiences are private, and privacy here is a property of the artefa
 
 ## Scope
 
-In scope: distribution channels and their ordering; who may obtain which artefact; version authority; promotion between stages; hotfixing the current public version; the contract with the Foundry package registry.
-Out of scope: what the module does; the CI checks a change must pass; the branch and workflow mechanics that implement this specification.
+In scope: distribution channels and their ordering; who may obtain which artefact; version authority; promotion between stages; hotfixing the current public version; the contract with the Foundry package registry; how a client is told about a stale entry script left behind by this capability's own hashed, code-split chunks.
+Out of scope: what the module does, except that one narrow recovery; the CI checks a change must pass; the branch and workflow mechanics that implement this specification.
 
 ## Terminology
 
@@ -37,6 +37,8 @@ It identifies the bytes, as distinct from the cohort that receives them.
 - **build provenance** — the recorded identity of the build an artefact came from: its version, its source commit, and its build profile.
 - **change provenance** — evidence that a commit reaching the release or prerelease line is attributable to a specific reviewed change, as distinct from **build provenance**, which is the recorded identity of a build.
 - **resolution** — the content chosen where the two lines a forward-port combines cannot be combined automatically.
+- **entry script** — the module's unhashed bootstrap file, fetched by a URL that does not change between versions, whose code performs the dynamic imports that fetch the module's other files.
+- **chunk** — a code-split file an entry script requests by name; a chunk's name MAY carry a content hash that changes across versions.
 
 A release artefact exists, and is not publicly obtainable, from the moment its version is minted.
 It becomes publicly obtainable only at release promotion.
@@ -442,6 +444,23 @@ Concurrent publishes to one channel MUST NOT interleave, and a manifest write MU
 - **WHEN** a publish would write a manifest whose head has changed since the publish read it
 - **THEN** the write fails rather than overwriting the newer head
 
+### Requirement: Archive completeness
+
+Every target's published archive MUST contain every module file the module's entry script references, including a code-split chunk whose name carries a content hash.
+Completeness MUST be proved mechanically against the produced archive itself before publication, on every path that produces one, rather than against the build directory the archive was made from.
+The proof MUST fail when the entry script cannot be located in the archive, and MUST fail when it can be located but yields no chunk references at all, because a proof that cannot distinguish a complete archive from an unread one reports success forever.
+
+#### Scenario: an archive is missing a referenced chunk
+
+- **WHEN** an archive is produced whose entry script references a chunk the archive does not contain
+- **THEN** the producing command fails and publishes nothing
+
+#### Scenario: a build produces no archive
+
+- **WHEN** a build produces no archive
+- **THEN** the completeness proof reports that it did not run rather than reporting success
+- **AND** the build itself still succeeds
+
 ### Requirement: One build per publish
 
 A publish MUST produce every one of its targets from a single build.
@@ -453,3 +472,28 @@ A publish whose targets do not all share one build profile MUST fail before any 
 
 - **WHEN** a publish's targets do not all share one build profile
 - **THEN** the publish fails and no object is written
+
+### Requirement: Reporting a stale entry script to the client
+
+A client MAY hold a cached copy of the module's entry script from an earlier version while the installed package is newer, because the entry script's URL does not change between versions, so any cache that serves it without revalidating can hold an earlier build.
+When such a client requests a chunk the installed version no longer contains, the module MUST report the condition to the user as one a browser reload resolves, and MUST NOT fail silently.
+The module MUST additionally detect the condition directly, by comparing the version its running build was made from against the installed module version, and MUST report a difference once.
+A report MUST NOT be repeated while an earlier report is still on screen, because the host's notification surface holds a fixed number of undismissed notices.
+The module MUST NOT claim that reopening the failed surface will succeed: the host caches a failed module fetch for the lifetime of the page, so only a reload recovers.
+
+#### Scenario: a deferred window is opened from a stale entry script
+
+- **WHEN** a deferred window is opened from a stale entry script
+- **THEN** the user is told the module was updated and that reloading the browser completes the update
+- **AND** the console carries the underlying error
+
+#### Scenario: the same window is opened repeatedly
+
+- **WHEN** a deferred window that fails to load is opened repeatedly in one session
+- **THEN** the console carries each failure
+- **AND** the user is not notified again while an earlier notice is still on screen
+
+#### Scenario: the running build matches the installed version
+
+- **WHEN** the running build's version matches the installed version
+- **THEN** nothing is reported
