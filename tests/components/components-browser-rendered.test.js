@@ -51,14 +51,19 @@
  * instead of silently disarming the arm that carries the claim in CI.
  */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { before, describe, it, test } from 'node:test';
 
 import { chromium } from 'playwright';
 
-import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 import { createComponentsBrowserViewHarness } from '../helpers/componentScopeMountModules.js';
+import {
+  HARVEST_HINT,
+  harvestedFoundryChromeCss,
+  harvestedFoundryVersion,
+  skipWithoutHarvest,
+} from '../helpers/harvestedFoundryChrome.js';
 import { collectScopedCss, managerShellPage } from '../helpers/renderedManagerShell.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -120,16 +125,8 @@ const NO_COPY_GROW_CONTROL = `
 /** Both causes alive — the M28 fix re-declared away, so the identity floats again under the same chrome. */
 const CENTRED_CONTROL = NO_IDENTITY_ALIGNMENT_CONTROL + NO_COPY_GROW_CONTROL;
 
-/** The harvested Foundry chrome, when a local harvest exists; `''` otherwise (CI runs no harvest). */
-function harvestedChromeCss() {
-  const cache = resolveChromeCache(repoRoot);
-  const sheet = cache ? join(cache.dir, 'css', 'foundry2.css') : '';
-  return sheet && existsSync(sheet) ? readFileSync(sheet, 'utf8') : '';
-}
-
-const HARVEST_HINT = 'run: npm run viewlab:chrome:harvest';
 /** Resolved ONCE, so the skipped arm, the mirror check and the CI guard all read one fact. */
-const harvestedChrome = harvestedChromeCss();
+const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 
 // See the SKIP POLICY block at the head of this file: on the runner that harvests, the skip is a
 // failure rather than a quietly green run that measured nothing.
@@ -477,19 +474,19 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
     );
   });
 
-  it('THE MIRROR: and Foundry’s own harvested sheet agrees with it, where a local harvest exists', { skip: !chrome && 'no local Foundry chrome harvest (.foundry-chrome)' }, () => {
+  it('THE MIRROR: and Foundry’s own harvested sheet agrees with it, where a local harvest exists', { skip: skipWithoutHarvest(chrome) }, () => {
     // The drift this catches is a Foundry release that stops centring a button's content: the
     // stand-in would then describe a chrome nobody ships, and the CI arm below would be measuring
     // a defect that no longer exists. Compared rather than restated, so one fact is pinned once.
     assert.equal(
       foundryBareButton.justifyContent,
       standInBareButton.justifyContent,
-      `Foundry ${resolveChromeCache(repoRoot)?.version} resolves a bare button to justify-content: ${foundryBareButton.justifyContent}, the stand-in to ${standInBareButton.justifyContent} — the transcription has drifted from the sheet`
+      `Foundry ${harvestedFoundryVersion(repoRoot)} resolves a bare button to justify-content: ${foundryBareButton.justifyContent}, the stand-in to ${standInBareButton.justifyContent} — the transcription has drifted from the sheet`
     );
     assert.equal(
       foundryBareButton.alignItems,
       standInBareButton.alignItems,
-      `Foundry ${resolveChromeCache(repoRoot)?.version} resolves a bare button to align-items: ${foundryBareButton.alignItems}, the stand-in to ${standInBareButton.alignItems}`
+      `Foundry ${harvestedFoundryVersion(repoRoot)} resolves a bare button to align-items: ${foundryBareButton.alignItems}, the stand-in to ${standInBareButton.alignItems}`
     );
   });
 
@@ -498,8 +495,8 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
     assertBothCausesClosed(honest, 'chrome stand-in');
   });
 
-  it('and under the harvested Foundry sheet itself, where a local harvest exists', { skip: !chrome && 'no local Foundry chrome harvest (.foundry-chrome)' }, () => {
-    const label = `foundry chrome ${resolveChromeCache(repoRoot)?.version}`;
+  it('and under the harvested Foundry sheet itself, where a local harvest exists', { skip: skipWithoutHarvest(chrome) }, () => {
+    const label = `foundry chrome ${harvestedFoundryVersion(repoRoot)}`;
     assertFlush(underFoundry, label);
     assertBothCausesClosed(underFoundry, label);
   });

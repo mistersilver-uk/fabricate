@@ -29,6 +29,12 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import {
+  harvestedFoundryChromeCss,
+  harvestedFoundryVersion,
+  measureEntryFrameUnderHarvestedChrome,
+  skipWithoutHarvest,
+} from '../helpers/harvestedFoundryChrome.js';
+import {
   ENTRY_FRAME_CHECKS,
   collectScopedCss,
   managerShellPage,
@@ -37,6 +43,8 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+/** Foundry's own stylesheet, where a harvest exists; `''` in CI, where the arms below skip. */
+const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 
 const componentPath = 'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte';
 // THE ENTRY'S STATIC TREE beyond the shared scoped tier — the same closure
@@ -91,7 +99,7 @@ const ENTRY_SYSTEMS = Object.freeze([
   Object.freeze({ id: 'sys-alchemy', name: 'Alchemy', resolutionMode: 'simple' }),
 ]);
 
-function page(productMarkup, scopedCss, control = '') {
+function page(productMarkup, scopedCss, control = '', chrome = '') {
   return managerShellPage({
     fabricateCss,
     // The entry's OWN route attribute, because its `.manager-main` is padded by the world-route
@@ -100,6 +108,7 @@ function page(productMarkup, scopedCss, control = '') {
     view: 'world-component-entry',
     productMarkup,
     scopedCss,
+    chrome,
     control,
     hostWidth: HOST_WIDTH_PX,
     hostHeight: HOST_HEIGHT_PX,
@@ -109,6 +118,9 @@ function page(productMarkup, scopedCss, control = '') {
 describe('the world component entry’s rendered frame (issue 1371 r18-frame, M32)', () => {
   const rendered = { markup: '', scoped: null };
   const frames = { hostHeight: HOST_HEIGHT_PX, honest: null, inset: null, unstretched: null };
+  // The same three arrangements re-measured under FOUNDRY'S OWN sheet, where one is harvested
+  // (issue 1371 r19-gates2, Foundry review round 5 finding 7). `null` where none is.
+  let chromeFrames = null;
 
   before(async () => {
     rendered.scoped = collectScopedCss({ repoRoot, compiledModules });
@@ -140,6 +152,11 @@ describe('the world component entry’s rendered frame (issue 1371 r18-frame, M3
         }
       )
     );
+    chromeFrames = await measureEntryFrameUnderHarvestedChrome({
+      chrome: harvestedChrome,
+      pageFor: (control) => page(rendered.markup, rendered.scoped.css, control, harvestedChrome),
+      viewport: { width: HOST_WIDTH_PX, height: HOST_HEIGHT_PX },
+    });
   });
 
   it('lays the entry out with its real content, so the measurement is of the product', () => {
@@ -156,4 +173,27 @@ describe('the world component entry’s rendered frame (issue 1371 r18-frame, M3
   });
 
   for (const [name, check] of ENTRY_FRAME_CHECKS) it(name, () => check(frames));
+
+  it('really laid Foundry’s own sheet over this frame, not an empty string', { skip: skipWithoutHarvest(harvestedChrome) }, () => {
+    // Non-vacuity for every arm below. The frame's geometry is chrome-INVARIANT today, which is
+    // the finding's own good news and also the reason a chrome arm could quietly measure nothing:
+    // pass `''` instead of the sheet and every sentence still passes. What Foundry does move is
+    // the tab's LABEL METRICS — it declares `--font-sans` and the tab inherits it — so the first
+    // tab's box is measurably wider under it. That is the fact that says the sheet arrived.
+    const width = (box) => box.right - box.left;
+    assert.ok(
+      Math.abs(width(chromeFrames.honest.firstTab) - width(frames.honest.firstTab)) > 1,
+      `the first tab measured ${width(chromeFrames.honest.firstTab)}px under Foundry ${harvestedFoundryVersion(repoRoot)} and ${width(frames.honest.firstTab)}px without it — the sheet did not reach the page`
+    );
+  });
+
+  // AND EVERY ONE OF THE FRAME'S OWN SENTENCES AGAIN UNDER THAT SHEET. See
+  // `harvestedFoundryChrome.js` for why it matters here: the frame's tabs are
+  // `<button role="tab">` and the strip's rule never declares `justify-content`, so Foundry's
+  // `a.button, button { justify-content: center }` still arbitrates them.
+  for (const [name, check] of ENTRY_FRAME_CHECKS) {
+    it(`${name} — under Foundry ${harvestedFoundryVersion(repoRoot)}’s own sheet`, { skip: skipWithoutHarvest(harvestedChrome) }, () =>
+      check(chromeFrames)
+    );
+  }
 });
