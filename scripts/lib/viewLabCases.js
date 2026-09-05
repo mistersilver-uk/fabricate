@@ -637,6 +637,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-recipe-edit-ingredients-or-menu',
+    // AN EIGHTH, and it is the primitive's GRID LIST FORM (issue 1503). `as="grid"` has exactly
+    // one caller in `src/` — `EssenceSourceSelector` — so `manager-essences-source-picker` is the
+    // only frame in the registry that draws a two-column panel, the `data-picker-columns` the
+    // keyboard cursor reads its step from, and a caller-supplied `option` snippet inside the
+    // primitive's own row element. The seven frames above are all flex-column lists of the
+    // primitive's own rows, so a change to the grid rung or to the snippet seam published nothing
+    // that could contain it.
+    'manager-essences-source-picker',
   ]),
   // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
   // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
@@ -6145,12 +6153,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       // case, and its entry for that caller names this id. That is additive — a change to the
       // caller publishes the representative pair AND this frame.
       //
-      // `SearchablePopover` is NOT repointed here, and what that leaves uncovered is named rather
-      // than left to be discovered: measured across `src/`, this caller is the primitive's ONLY
-      // `as="grid"` site, so the grid list form and its `data-picker-columns` cursor are drawn by
-      // no frame that primitive's own override selects. Adding this id there is a routing decision
-      // about a different component — `tests/view-lab-cases.test.js` pins that selection exactly —
-      // so it belongs to whoever adjudicates the grid form, not to this case's `sourceMatches`.
+      // `SearchablePopover` REACHES THIS FRAME THROUGH ITS OWN OVERRIDE ENTRY, for the same
+      // reason and by the same seam: measured across `src/`, this caller is the primitive's ONLY
+      // `as="grid"` site, so without that entry the grid list form and its `data-picker-columns`
+      // cursor were drawn by no frame the primitive selected. That is a routing decision about
+      // the primitive rather than about this case, so it is made where the primitive is keyed and
+      // pinned in `tests/view-lab-cases.test.js`, not restated as a pattern here.
       //
       // The patterns above and below are not duplicates of the override: it selects this case when
       // the COMPONENT changes, they select it when the view or the positioning seam does.
