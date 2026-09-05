@@ -104,15 +104,32 @@ function isThenable(value) {
  * A section the world defaults do not carry snapshots as `null`, which is the value
  * `updateWorldDefaultSection` is given to CLEAR one — so "unset" is one value here, not two.
  *
+ * ## A SECTION MAY NAME ITS OWN READER AND WRITER (issue 1371 r18-entry, maintainer ruling M34)
+ *
+ * "Every component edit on the world entry stages and lands on `Save entry`" — and two of the
+ * entry's edits are not world-default sections: its tags land through `setWorldTags` and its
+ * aliases through `updateEntity`'s `aliasItemUuids`, off the entity record. Rather than a second
+ * draft beside this one (two dirty flags, two saves, two guards — the shape this module exists to
+ * end), a shape may hand a `readers[section]` for where the persisted value lives and the flush a
+ * `writers[section]` for how it lands. A section naming neither keeps the world-default reading
+ * and writing it always had, so the essence and tool entries are unchanged by construction.
+ *
  * @param {{entity?: object, defaults?: object}|null|undefined} entry a projected entry.
- * @param {{identityFields?: readonly string[], sections?: readonly string[]}} shape
+ * @param {{identityFields?: readonly string[], sections?: readonly string[],
+ *   readers?: Record<string, (entry: object|null|undefined) => unknown>}} shape
  * @returns {{identity: Record<string, unknown>, defaults: Record<string, unknown>}}
  */
-export function scopedEntryBaseline(entry, { identityFields = [], sections = [] } = {}) {
+export function scopedEntryBaseline(
+  entry,
+  { identityFields = [], sections = [], readers = {} } = {}
+) {
   const identity = {};
   for (const field of identityFields) identity[field] = entry?.entity?.[field] ?? '';
   const defaults = {};
-  for (const section of sections) defaults[section] = entry?.defaults?.[section] ?? null;
+  for (const section of sections) {
+    const read = readers?.[section];
+    defaults[section] = (read ? read(entry) : entry?.defaults?.[section]) ?? null;
+  }
   return { identity, defaults };
 }
 
@@ -207,20 +224,28 @@ export function scopedEntryDirty(draft, persisted) {
  * here — which is what the route-exit guard gates navigation on. A GM whose Save did not land
  * stays on the screen with the edit still in front of them.
  *
+ * A section with a `writers[section]` lands through it instead (M34, see
+ * {@link scopedEntryBaseline}); the writer is handed the action family, the entity id and the
+ * staged value, and answers `false` to refuse exactly as the family's own verbs do.
+ *
  * @param {object} options
  * @param {string} options.entityId
  * @param {{identity: Record<string, unknown>|null, sections: Array<{section: string, value: unknown}>}} options.writes
  * @param {object|null} options.actions the entity type's world-scope action family.
+ * @param {Record<string, (actions: object|null, entityId: string, value: unknown) => unknown>} [options.writers]
  * @returns {Promise<boolean>} whether every write landed.
  */
-export async function flushScopedEntryDraft({ entityId, writes, actions }) {
+export async function flushScopedEntryDraft({ entityId, writes, actions, writers = {} }) {
   if (!entityId) return false;
   if (writes.identity !== null) {
     const patched = await actions?.updateEntity?.(entityId, writes.identity);
     if (patched === false) return false;
   }
   for (const { section, value } of writes.sections) {
-    const written = await actions?.updateWorldDefaultSection?.(entityId, section, value);
+    const write = writers?.[section];
+    const written = write
+      ? await write(actions, entityId, value)
+      : await actions?.updateWorldDefaultSection?.(entityId, section, value);
     if (written === false) return false;
   }
   return true;

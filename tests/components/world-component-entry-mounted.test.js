@@ -339,8 +339,8 @@ describe('world Component entry editor (issue 1371)', () => {
      */
     const VOCABULARY = Object.freeze({ categories: ['Raw', 'Refined'] });
 
-    it('forwards (entityId, "category", value)', async () => {
-      const { target, calls } = await open('ingot', undefined, VOCABULARY);
+    it('forwards (entityId, "category", value) on Save', async () => {
+      const { target, calls, reports } = await open('ingot', undefined, VOCABULARY);
       const trigger = target.querySelector('[data-scoped-entry-category-input]');
       assert.ok(Boolean(trigger), 'the entry renders its category picker');
       assert.notEqual(
@@ -360,6 +360,21 @@ describe('world Component entry editor (issue 1371)', () => {
       raw.click();
       await drain();
 
+      // STAGED, NOT WRITTEN (issue 1371 r18-entry, maintainer ruling M34): the pick is a draft the
+      // header's `Save entry` flushes, exactly as the identity fields and the essence steppers are.
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
+        [],
+        'a pick writes NOTHING until Save'
+      );
+      assert.equal(
+        trigger.textContent.trim(),
+        'Raw',
+        'the trigger previews the staged pick'
+      );
+      assert.equal(reports.dirty.at(-1), true, 'and `Save entry` lights');
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
         [{ verb: 'updateWorldDefaultSection', args: ['ingot', 'category', 'Raw'] }]
@@ -398,9 +413,12 @@ describe('world Component entry editor (issue 1371)', () => {
     it('but the BLANK option still clears it, because that is a real edit', async () => {
       // The positive control on the refusal: the empty option is a GM removing the world category
       // deliberately, and a guard that refused every non-offered value would break it.
-      const { target, calls } = await open('ingot');
+      const { target, calls, reports } = await open('ingot');
       const options = await openCategoryPicker(target);
       options[0].click();
+      await drain();
+      assert.deepEqual(calls, [], 'staged (M34)');
+      await reports.handles.filter(Boolean).at(-1).save();
       await drain();
 
       assert.deepEqual(
@@ -721,6 +739,136 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
+  // ── EVERY COMPONENT EDIT STAGES AND LANDS ON `Save entry` (issue 1371 r18-entry, maintainer
+  // ruling M34) ────────────────────────────────────────────────────────────────────────────────
+  // The category picker, the tag run and the alias row wrote through the instant they were
+  // touched, while the identity fields and (since M31) the essence steppers were buffered — one
+  // screen, two save models. Under M34 the four sections are ONE draft: `Save entry` lights when
+  // any differs, Save writes each changed section through its own action in a stated order, the
+  // shell's discard/back guard reads the same handle, and a refused write stops the sequence.
+  describe('every section of the entry stages, and Save writes them in ONE stated order (M34)', () => {
+    const VOCAB = Object.freeze({ categories: ['Raw'], tags: ['moss'] });
+    const ESSENCES = Object.freeze([{ id: 'flame', name: 'Flame', icon: 'fas fa-fire' }]);
+    async function stageAll(target) {
+      // category → Raw
+      target.querySelector('[data-scoped-entry-category-input]').click();
+      await drain();
+      [...target.querySelectorAll('[data-popover-option]')]
+        .find((option) => option.textContent.trim() === 'Raw')
+        .click();
+      await drain();
+      // tags → + moss
+      target.querySelector('[data-scoped-entry-tag="moss"]').click();
+      await drain();
+      // essences → flame 1
+      target
+        .querySelector('[data-scoped-entry-essences] [data-component-edit-essence="flame"] [data-stepper-increment]')
+        .click();
+      await drain();
+      // aliases → + Item.second-source
+      const field = target.querySelector('[data-scoped-entry-alias-input]');
+      field.value = 'Item.second-source';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await drain();
+      target.querySelector('[data-scoped-entry-alias-add]').click();
+      await drain();
+    }
+
+    it('writes nothing while staging, then category, tags, essences, aliases — each through its own action', async () => {
+      const { target, calls, reports } = await open('ingot', undefined, VOCAB, { worldEssences: ESSENCES });
+      await stageAll(target);
+      assert.deepEqual(calls, [], 'four edits, zero writes');
+      assert.equal(reports.dirty.at(-1), true);
+      assert.equal(await reports.handles.filter(Boolean).at(-1).save(), true);
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => [call.verb, ...call.args]),
+        [
+          ['updateWorldDefaultSection', 'ingot', 'category', 'Raw'],
+          ['setWorldTags', 'ingot', ['moss']],
+          ['updateWorldDefaultSection', 'ingot', 'essences', { flame: 1 }],
+          ['updateEntity', 'ingot', { aliasItemUuids: ['Item.ingot-legacy', 'Item.second-source'] }],
+        ],
+        'THE ORDER IS THE ASSERTION: category, tags, essences, aliases, and the identity patch is not re-sent on a linked record'
+      );
+      assert.equal(reports.dirty.at(-1), false, 'clean again once the flush lands');
+    });
+
+    it('lights `Save entry` on ANY one section, and a discard puts every section back', async () => {
+      const { target, calls, reports } = await open('ingot', undefined, VOCAB, { worldEssences: ESSENCES });
+      target.querySelector('[data-scoped-entry-tag="moss"]').click();
+      await drain();
+      assert.equal(reports.dirty.at(-1), true, 'one staged tag is enough — the marker reads the union');
+      await stageAll(target);
+      reports.handles.filter(Boolean).at(-1).discard();
+      await drain();
+      assert.equal(target.querySelector('[data-scoped-entry-category-input]').textContent.trim(), 'Refined');
+      assert.equal(target.querySelector('[data-scoped-entry-tag="moss"]').getAttribute('aria-pressed'), 'false');
+      assert.equal(
+        target
+          .querySelector('[data-scoped-entry-essences] [data-component-edit-essence="flame"]')
+          .getAttribute('data-component-essence-active'),
+        'false'
+      );
+      assert.ok(!target.querySelector('[data-scoped-entry-alias="Item.second-source"]'));
+      assert.equal(reports.dirty.at(-1), false);
+      assert.deepEqual(calls, [], 'discarding writes nothing at all');
+    });
+
+    it('a control used and PUT BACK reads clean: an emptied list over an absent one is no edit', async () => {
+      // `ingot` carries no tags; applying `moss` and clearing it again must not leave `Save entry`
+      // lit over a write of `[]` against nothing, and the same holds for the alias row.
+      const { target, calls, reports } = await open('ingot', undefined, VOCAB);
+      target.querySelector('[data-scoped-entry-tag="moss"]').click();
+      await drain();
+      assert.equal(reports.dirty.at(-1), true, 'NON-VACUITY: the apply is an edit');
+      target.querySelector('[data-scoped-entry-tag="moss"]').click();
+      await drain();
+      assert.equal(reports.dirty.at(-1), false, 'and clearing it again is not one');
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
+      assert.deepEqual(calls, [], 'nothing to write');
+    });
+
+    it('a REFUSED write stops the sequence where it refused, and Save answers false', async () => {
+      const { target, calls, reports, actions } = await open('ingot', undefined, VOCAB, { worldEssences: ESSENCES });
+      await stageAll(target);
+      actions.setWorldTags = async (...args) => {
+        calls.push({ verb: 'setWorldTags', args });
+        return false;
+      };
+      assert.equal(await reports.handles.filter(Boolean).at(-1).save(), false);
+      await drain();
+      assert.deepEqual(
+        calls.map((call) => call.verb),
+        ['updateWorldDefaultSection', 'setWorldTags'],
+        'the category landed, the tags refused, and neither the essences nor the aliases were attempted'
+      );
+      assert.equal(reports.dirty.at(-1), true, 'the edit is still in front of the GM');
+    });
+
+    it('a staged pick that equals the record is NOT an edit, and the picker previews the staged value everywhere the screen reads it', async () => {
+      const { target, reports } = await open('coal', undefined, VOCAB);
+      target.querySelector('[data-scoped-entry-category-input]').click();
+      await drain();
+      [...target.querySelectorAll('[data-popover-option]')]
+        .find((option) => option.textContent.trim() === 'Raw')
+        .click();
+      await drain();
+      assert.notEqual(reports.dirty.at(-1), true, '`coal` already reads Raw, so re-picking it is clean');
+      target.querySelector('[data-scoped-entry-category-input]').click();
+      await drain();
+      target.querySelector('[data-popover-option="__no-world-category"]').click();
+      await drain();
+      assert.equal(reports.dirty.at(-1), true);
+      assert.equal(
+        target.querySelector('[data-scoped-entry-preview-category]').textContent.trim(),
+        'No category',
+        'the rail follows the staged category'
+      );
+    });
+  });
+
   describe('the world tags are a TOGGLE RUN over the vocabulary, not an add field', () => {
     // `proto:899-901` draws the world tag list as click-to-toggle chips over the world
     // vocabulary, with no add field and no remove glyph on this card: authoring the vocabulary
@@ -729,11 +877,21 @@ describe('world Component entry editor (issue 1371)', () => {
     it('applies an unlit tag by writing the WHOLE list, not a delta', async () => {
       // `setWorldTags` replaces the array. A screen that forwarded only the tag it touched would
       // clear every other tag on the record, and the projection would agree with it.
-      const { target, calls } = await open('coal', undefined, CORPUS_TAGS);
+      const { target, calls, reports } = await open('coal', undefined, CORPUS_TAGS);
       const unlit = target.querySelector('[data-scoped-entry-tag="fuel"]');
       assert.ok(Boolean(unlit), 'the run offers every tag the world vocabulary holds');
 
       target.querySelector('[data-scoped-entry-tag="bulk"]').click();
+      await drain();
+      // STAGED (M34): the chip flips at once, the write waits for Save.
+      assert.deepEqual(calls, [], 'a toggle writes NOTHING until Save');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tag="bulk"]').getAttribute('aria-pressed'),
+        'false',
+        'the run previews the staged clear'
+      );
+      assert.equal(reports.dirty.at(-1), true);
+      await reports.handles.filter(Boolean).at(-1).save();
       await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'setWorldTags'),
@@ -744,10 +902,13 @@ describe('world Component entry editor (issue 1371)', () => {
 
     it('and lights an unapplied one, so the toggle runs both ways', async () => {
       // The positive control: a run wired only to removal passes the assertion above.
-      const { target, calls } = await open('ingot', undefined, CORPUS_TAGS);
+      const { target, calls, reports } = await open('ingot', undefined, CORPUS_TAGS);
       const chip = target.querySelector('[data-scoped-entry-tag="fuel"]');
       assert.ok(Boolean(chip), 'a record with no tags of its own still sees the vocabulary');
       chip.click();
+      await drain();
+      assert.equal(chip.getAttribute('aria-pressed'), 'true', 'lit at once (M34: a staged apply)');
+      await reports.handles.filter(Boolean).at(-1).save();
       await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'setWorldTags'),
@@ -835,7 +996,7 @@ describe('world Component entry editor (issue 1371)', () => {
       // denying a reach that exists. The run offers the vocabulary; the corpus' own `fuel` and
       // `bulk`, applied by a migrated default and authored nowhere, are NOT offered, because
       // those are what a migrated world carried across rather than what it authored.
-      const { target, calls } = await open('ingot', undefined, { tags: ['moss'] });
+      const { target, calls, reports } = await open('ingot', undefined, { tags: ['moss'] });
       const chip = target.querySelector('[data-scoped-entry-tag="moss"]');
       assert.ok(Boolean(chip), 'the vocabulary tag is offered though no record applies it');
       assert.equal(chip.getAttribute('aria-pressed'), 'false');
@@ -850,10 +1011,12 @@ describe('world Component entry editor (issue 1371)', () => {
 
       chip.click();
       await drain();
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
       assert.deepEqual(
         calls.filter((call) => call.verb === 'setWorldTags'),
         [{ verb: 'setWorldTags', args: ['ingot', ['moss']] }],
-        'and the offered chip ACTS: a click applies it by writing the whole list'
+        'and the offered chip ACTS: a click stages it and Save writes the whole list'
       );
     });
 
@@ -2107,12 +2270,20 @@ describe('world Component entry editor (issue 1371)', () => {
     // state and stops there, so a button that enabled correctly and committed nothing — or
     // committed the wrong list shape — passed it.
     it('Add alias appends the TYPED uuid to the list already on the record', async () => {
-      const { target, calls } = await open('ingot');
+      const { target, calls, reports } = await open('ingot');
       const field = target.querySelector('[data-scoped-entry-alias-input]');
       field.value = 'Item.second-source';
       field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
       await drain();
       target.querySelector('[data-scoped-entry-alias-add]').click();
+      await drain();
+      // STAGED (M34): the chip appears at once; the write waits for Save.
+      assert.deepEqual(calls, [], 'an alias add writes NOTHING until Save');
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-entry-alias="Item.second-source"]')),
+        'the staged alias is drawn on the row'
+      );
+      await reports.handles.filter(Boolean).at(-1).save();
       await drain();
 
       // THE WHOLE LIST, NOT A DELTA. `updateEntity` replaces the field it is given, so a write of
@@ -2132,7 +2303,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and Enter commits it too, which is what the placeholder promises', async () => {
-      const { target, calls } = await open('ingot');
+      const { target, calls, reports } = await open('ingot');
       const field = target.querySelector('[data-scoped-entry-alias-input]');
       assert.match(field.getAttribute('placeholder'), /then Enter/);
       field.value = 'Item.typed-then-entered';
@@ -2145,6 +2316,8 @@ describe('world Component entry editor (issue 1371)', () => {
           cancelable: true,
         })
       );
+      await drain();
+      await reports.handles.filter(Boolean).at(-1).save();
       await drain();
       assert.deepEqual(calls, [
         {

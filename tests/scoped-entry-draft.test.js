@@ -90,6 +90,26 @@ describe('the persisted snapshot a draft is seeded from and measured against', (
     assert.deepEqual(baseline.defaults, { effectSource: null, macro: null });
   });
 
+  it('lets a shape name a READER per section, for a buffered field that is not under `defaults` (M34)', () => {
+    // The entry's aliases live on the ENTITY record, so the baseline reads them through a reader;
+    // a section with no reader keeps the `defaults[section] ?? null` snapshot.
+    const entry = { entity: { name: 'Coal', aliasItemUuids: ['Item.a'] }, defaults: { category: 'Raw' } };
+    const baseline = scopedEntryBaseline(entry, {
+      identityFields: ['name'],
+      sections: ['category', 'aliases'],
+      readers: { aliases: (record) => record?.entity?.aliasItemUuids ?? null },
+    });
+    assert.deepEqual(baseline, {
+      identity: { name: 'Coal' },
+      defaults: { category: 'Raw', aliases: ['Item.a'] },
+    });
+    assert.deepEqual(
+      scopedEntryBaseline({ entity: {} }, { sections: ['aliases'], readers: { aliases: (record) => record?.entity?.aliasItemUuids ?? null } }).defaults,
+      { aliases: null },
+      'an absent buffered field is null, exactly as an absent section is'
+    );
+  });
+
   it('answers a shape for a MISSING entry rather than throwing', () => {
     // Reached on every mount before the world corpus publishes, and again when the record the
     // route is open on is deleted from under it.
@@ -238,6 +258,54 @@ describe('flushing a draft through the world-scope write family', () => {
       ['updateEntity'],
       'the section write ran after the identity patch had already refused'
     );
+  });
+
+  // ── issue 1371 r18-entry, maintainer ruling M34 ──────────────────────────────────────────────
+  it('lets a shape name a WRITER per section, so a buffered field that is not a world default lands through its own action, in the declared order', async () => {
+    // The world Component entry buffers its tags (`setWorldTags`) and its aliases (`updateEntity`'s
+    // `aliasItemUuids`) beside its two real sections; without a writer map the flush would hand
+    // `updateWorldDefaultSection` a name it refuses before it writes, silently.
+    const actions = actionsOf();
+    actions.setWorldTags = async (...args) => {
+      actions.calls.push(['setWorldTags', ...args]);
+      return true;
+    };
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: {
+        identity: null,
+        sections: [
+          { section: 'category', value: 'Raw' },
+          { section: 'tags', value: ['fuel'] },
+          { section: 'essences', value: { flame: 2 } },
+          { section: 'aliases', value: ['Item.a'] },
+        ],
+      },
+      actions,
+      writers: {
+        tags: (family, entityId, value) => family.setWorldTags(entityId, value ?? []),
+        aliases: (family, entityId, value) => family.updateEntity(entityId, { aliasItemUuids: value ?? [] }),
+      },
+    });
+    assert.equal(landed, true);
+    assert.deepEqual(actions.calls, [
+      ['updateWorldDefaultSection', 'coal', 'category', 'Raw'],
+      ['setWorldTags', 'coal', ['fuel']],
+      ['updateWorldDefaultSection', 'coal', 'essences', { flame: 2 }],
+      ['updateEntity', 'coal', { aliasItemUuids: ['Item.a'] }],
+    ]);
+  });
+
+  it('and a writer’s refusal stops the flush like any other', async () => {
+    const actions = actionsOf();
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: null, sections: [{ section: 'tags', value: [] }, { section: 'essences', value: {} }] },
+      actions,
+      writers: { tags: async () => false },
+    });
+    assert.equal(landed, false);
+    assert.deepEqual(actions.calls, [], 'the essence write after the refused tag write never ran');
   });
 
   it('refuses an empty entity id rather than writing against nothing', async () => {

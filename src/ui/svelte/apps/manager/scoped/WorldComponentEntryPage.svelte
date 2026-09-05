@@ -176,22 +176,44 @@
   );
   const entity = $derived(entry?.entity ?? null);
   /**
-   * THE WORLD-DEFAULT SECTIONS THIS EDITOR BUFFERS (issue 1371 r18-entry, maintainer ruling M31).
+   * EVERY SECTION THIS EDITOR BUFFERS, IN THE ORDER A SAVE WRITES THEM (issue 1371 r18-entry,
+   * maintainer rulings M31 and M34).
    *
-   * `essences` and not `category`: the category picker and the tag run WRITE ON CHOICE, as they
-   * always have, while the essence steppers are draft-buffered like the identity fields — a stepper
-   * is pressed many times to reach one value, and a write per press would be a settings round trip
-   * per click. So this is the FIRST draft-buffered field a LINKED record has: its identity is the
-   * Item's and read-only here, so until now its `Save entry` could never light.
+   * M34: "every component edit on the world entry stages and lands on `Save entry`". The category
+   * picker, the tag run and the alias row used to write through the instant they were touched
+   * while the identity fields and the essence steppers were buffered — one screen, two save
+   * models, and a `Save entry` that a LINKED record (whose identity is the Item's) could never
+   * light (D-BW). All four are ONE draft now: `Save entry` lights when any differs, the shell's
+   * back/discard guard reads the same handle, and a Save writes each changed section through its
+   * own action in THIS order — category, tags, essences, aliases.
    *
-   * A mirror of one member of `COMPONENT_SECTIONS`, stated here for the reason `IDENTITY_FIELDS`
-   * gives; `updateWorldDefaultSection` refuses a name outside that list before it writes.
+   * Two of the four are not world-default sections and say so through `readers`/`writers` below:
+   * `tags` lands through `setWorldTags` (tags are not a `COMPONENT_SECTIONS` member and the
+   * section write refuses the name), `aliases` through `updateEntity`'s `aliasItemUuids` off the
+   * ENTITY record. The other two are the `COMPONENT_SECTIONS` mirror, stated here for the reason
+   * `IDENTITY_FIELDS` gives.
+   *
+   * NOT IN HERE: the source link's replace/unlink (a Foundry document drop the SHELL resolves and
+   * performs) and membership (another record, armed per action) — see `scopedEntryDraft.js`.
    *
    * @type {readonly string[]}
    */
-  const DRAFT_SECTIONS = Object.freeze(['essences']);
+  const DRAFT_SECTIONS = Object.freeze(['category', 'tags', 'essences', 'aliases']);
 
-  const shape = $derived({ identityFields: IDENTITY_FIELDS, sections: DRAFT_SECTIONS });
+  const shape = $derived({
+    identityFields: IDENTITY_FIELDS,
+    sections: DRAFT_SECTIONS,
+    readers: {
+      aliases: (record) => record?.entity?.aliasItemUuids ?? null,
+    },
+  });
+
+  /** How the two non-section fields land (M34). `null` — a cleared list — writes as empty. */
+  const DRAFT_WRITERS = Object.freeze({
+    tags: (family, id, value) => family?.setWorldTags?.(id, Array.isArray(value) ? value : []),
+    aliases: (family, id, value) =>
+      family?.updateEntity?.(id, { aliasItemUuids: Array.isArray(value) ? value : [] }),
+  });
   const persisted = $derived(scopedEntryBaseline(entry, shape));
 
   /**
@@ -250,6 +272,7 @@
       entityId: entry?.id ?? '',
       writes: scopedEntryWrites(pending, baseline),
       actions,
+      writers: DRAFT_WRITERS,
     });
     if (landed) flushed = pending;
     return landed;
@@ -301,11 +324,42 @@
   const memberNames = $derived(
     memberRows.map((row) => String(row?.systemName || row?.systemId || ''))
   );
-  const worldCategory = $derived(String(entry?.defaults?.category ?? '').trim());
-  const worldTags = $derived(Array.isArray(entry?.defaults?.tags) ? entry.defaults.tags : []);
+  // THE STAGED VALUES, WHICH THE WHOLE SCREEN READS (M34): the picker's trigger, the tag run, the
+  // alias row, the validation tab, the systems card and the rail all preview the draft — the
+  // persisted value until the GM touches a control, the staged one after — exactly as the rules
+  // editor previews its own drafts. `null` (the baseline's spelling of an absent value) reads as
+  // empty here.
+  const stagedDefault = (section) => draft?.defaults?.[section] ?? persisted.defaults[section];
+  const worldCategory = $derived(String(stagedDefault('category') ?? '').trim());
+  const worldTags = $derived.by(() => {
+    const value = stagedDefault('tags');
+    return Array.isArray(value) ? value : [];
+  });
   const sourceLinked = $derived(entry?.hasSourceLink === true);
   const sourceUuid = $derived(String(entity?.registeredItemUuid || entity?.originItemUuid || ''));
-  const aliasUuids = $derived(Array.isArray(entity?.aliasItemUuids) ? entity.aliasItemUuids : []);
+  const aliasUuids = $derived.by(() => {
+    const value = stagedDefault('aliases');
+    return Array.isArray(value) ? value : [];
+  });
+
+  /**
+   * Stage one section's next value, normalising "nothing" against what is on disk.
+   *
+   * A section the record does not carry snapshots as `null`, and a control that has been used and
+   * put back — every tag cleared, the category unset again, the last alias removed — must read
+   * CLEAN rather than as a write of `''`/`[]` over `null`. So an empty next value over an absent
+   * persisted one stages `null`; over a present one it stages the empty value, which IS the edit
+   * (the same rule `setWorldEssence` states for its map).
+   *
+   * @param {string} section
+   * @param {string|unknown[]} next
+   * @returns {void}
+   */
+  function stageSection(section, next) {
+    const empty = Array.isArray(next) ? next.length === 0 : String(next ?? '') === '';
+    const absent = baseline.defaults[section] === null || baseline.defaults[section] === undefined;
+    draft = withScopedEntryDefault(draft ?? persisted, section, empty && absent ? null : next);
+  }
   const sourceLabel = $derived(entry ? componentSourceLine(entry, text) : '');
   const duplicateCount = $derived(componentDuplicateSourceCount(entry, scope));
 
@@ -391,7 +445,15 @@
   const tagVocabulary = $derived(worldVocabularyComponentTags(scope));
 
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');
-  const tagNote = $derived(entry ? componentWorldTagNote(entry, phrase) : '');
+  // The tag note counts the STAGED list (M34) over the record's own mutes, so it follows the run.
+  const tagNote = $derived(
+    entry
+      ? componentWorldTagNote(
+          { ...entry, defaults: { ...entry.defaults, tags: worldTags } },
+          phrase
+        )
+      : ''
+  );
 
   // ── THE `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31) ────────────
   //
@@ -597,33 +659,37 @@
       );
       return;
     }
-    actions?.updateWorldDefaultSection?.(entry?.id ?? '', 'category', offered[0] ?? '');
+    // STAGED, NOT WRITTEN (M34): `Save entry` lands it through `updateWorldDefaultSection`.
+    stageSection('category', offered[0] ?? '');
   }
 
   /**
    * Apply or clear one world tag. The chip run is a TOGGLE over the vocabulary rather than a run
-   * of removable chips beside an add field (`proto:899-901`).
+   * of removable chips beside an add field (`proto:899-901`). STAGED (M34): `Save entry` writes
+   * the whole list through `setWorldTags`.
    *
    * @param {string} tag
    * @returns {void}
    */
   function toggleWorldTag(tag) {
     const applied = worldTags.includes(tag);
-    actions?.setWorldTags?.(
-      entry?.id ?? '',
+    stageSection(
+      'tags',
       applied ? worldTags.filter((candidate) => candidate !== tag) : [...worldTags, tag]
     );
   }
 
+  // The alias list is STAGED too (M34); `Save entry` writes it whole through `updateEntity`.
   function addAlias(uuid) {
     if (aliasUuids.includes(uuid)) return;
-    actions?.updateEntity?.(entry?.id ?? '', { aliasItemUuids: [...aliasUuids, uuid] });
+    stageSection('aliases', [...aliasUuids, uuid]);
   }
 
   function removeAlias(uuid) {
-    actions?.updateEntity?.(entry?.id ?? '', {
-      aliasItemUuids: aliasUuids.filter((candidate) => candidate !== uuid),
-    });
+    stageSection(
+      'aliases',
+      aliasUuids.filter((candidate) => candidate !== uuid)
+    );
   }
 
   /**
