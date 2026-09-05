@@ -139,6 +139,27 @@
   const stagedStatus = $derived(draft?.status || ESSENCE_BULK_STATUS_VALUES[0]);
   const canApply = $derived(bulkEssenceDraftHasChanges(draft) && !inert);
 
+  // WITHHOLDING THE CONTROL MUST ALSO DISARM THE INSTRUCTION (issue 1371 r20-store3, reviewer
+  // round 6 finding 3).
+  //
+  // The gate is a property of the SELECTION, and the selection moves under a staged draft: stage a
+  // colour on a system-local essence, then tick a world-known one as well, and the axis, its
+  // palette and its `Leave unchanged` reset all vanish — while `colorTokenStaged` stays true. So
+  // `Apply to N` stayed enabled on the strength of an axis the panel no longer showed, and the
+  // write carried `colorToken` to every selected essence, including the ones the note had just
+  // promised are not edited here.
+  //
+  // Clearing the DRAFT rather than filtering the write is what makes the screen and the write
+  // agree: `canApply`, the Apply label, the staged sub-hints and `toBulkEssenceEdit` all read the
+  // same draft, so one of them would otherwise still be speaking for a control that is gone. It
+  // settles in one pass — the cleared draft has `colorTokenStaged: false`, so the guard is false
+  // on the next run.
+  $effect(() => {
+    if (worldOwnsColour && draft?.colorTokenStaged === true) {
+      onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED));
+    }
+  });
+
   const headingLabel = $derived(
     count === 1
       ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.HeadingOne', '1 essence selected')
@@ -342,7 +363,7 @@
       tone="info"
       text={text(
         'FABRICATE.Admin.Manager.Essence.BulkEdit.ColourWorldNote',
-        'Colour comes from the Essence Catalogue and is shared by every system, so it is not edited here.'
+        'One or more of the selected essences takes its colour from the Essence Catalogue, where it is shared by every system, so colour is not edited here.'
       )}
       dataAttr="data-essence-bulk-colour-world"
     />

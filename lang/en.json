@@ -3616,7 +3616,7 @@
             "Disable": "Disable",
             "IconStaged": "Every selected essence",
             "ColourStaged": "Every selected essence",
-            "ColourWorldNote": "Colour comes from the Essence Catalogue and is shared by every system, so it is not edited here.",
+            "ColourWorldNote": "One or more of the selected essences takes its colour from the Essence Catalogue, where it is shared by every system, so colour is not edited here.",
             "PerEssenceNote": "Names, descriptions, linked sources and property macros stay per-essence — edit those individually.",
             "DeleteHeading": "Delete selected essences",
             "ImpactEssences": "{count} essence definitions will be deleted.",

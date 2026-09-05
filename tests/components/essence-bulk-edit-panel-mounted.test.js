@@ -17,7 +17,7 @@ import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { createEssenceBulkDraft } from '../../src/utils/essenceBulkEditModel.js';
+import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/utils/essenceBulkEditModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -133,6 +133,8 @@ const impactRow = (root, name) => impactRowEl(root, name).textContent.trim();
 
 const deleteButton = (root) =>
   root.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+
+const applyButton = (root) => root.querySelector('[data-essence-bulk-apply]');
 
 before(async () => {
   await harness.setup();
@@ -563,6 +565,69 @@ describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalo
 
     assert.ok(!root.querySelector('[data-essence-bulk-colour]'));
     assert.ok(root.querySelector('[data-essence-bulk-colour-world]'));
+    harness.remount();
+  });
+
+  it('names the CONDITION rather than the whole selection, because the gate is ANY', async () => {
+    // UX round 6, finding 5. The gate is `some(worldDefined)`, so on a mixed selection the old
+    // copy — "Colour comes from the Essence Catalogue and is shared by every system" — made a
+    // false statement about most of the set and told the GM nothing about which essence caused
+    // the axis to go.
+    const root = await harness.mount(
+      props([{ ...SELECTION[0], worldDefined: true }, SELECTION[1]])
+    );
+
+    const note = root.querySelector('[data-essence-bulk-colour-world]').textContent;
+    assert.match(note, /One or more of the selected essences/);
+    assert.ok(note.includes('Essence Catalogue'), 'and it still names where colour IS edited');
+    harness.remount();
+  });
+
+  it('CLEARS a colour staged before the selection grew, so Apply and the write agree with the screen', async () => {
+    // Reviewer round 6, finding 3. Withholding the control did not disarm the instruction: stage a
+    // colour on a system-local essence, tick a world-known one as well, and the axis vanished while
+    // `colorTokenStaged` stayed true — so `Apply to 2` stayed enabled on the strength of an axis
+    // the panel no longer showed, and the write carried `colorToken` to every selected essence.
+    //
+    // The draft is fed back through `onDraftChange` exactly as the manager root feeds it back, so
+    // this drives the real loop rather than a description of it.
+    // The report is RECORDED and the prop fed back from the test body, never from inside the
+    // callback: `setProps` flushes, and flushing from inside an effect's own run re-enters
+    // Svelte's batch scheduler and throws. The manager root's own assignment is asynchronous in
+    // exactly the same way.
+    const drafts = [];
+    let live = createEssenceBulkDraft();
+    const root = await harness.mount({
+      ...props([SELECTION[0]]),
+      draft: live,
+      onDraftChange: (next) => {
+        drafts.push(next);
+        live = next;
+      },
+    });
+
+    root.querySelector('[data-essence-bulk-colour] [data-manager-color-token="rose"]').click();
+    flushSync();
+    await harness.setProps({ draft: live });
+    assert.equal(live.colorTokenStaged, true, 'the colour is staged while the axis is offered');
+    assert.equal(toBulkEssenceEdit(live).colorToken, 'rose', 'and the write would carry it');
+    assert.ok(applyButton(root) && !applyButton(root).disabled, 'Apply is armed');
+
+    // The GM extends the selection to a world-known essence.
+    await harness.setProps({
+      selectedRows: [SELECTION[0], { ...SELECTION[1], worldDefined: true }],
+      count: 2,
+    });
+    await harness.setProps({ draft: live });
+
+    assert.ok(!root.querySelector('[data-essence-bulk-colour]'), 'the axis is withheld');
+    assert.equal(live.colorTokenStaged, false, 'and the staged instruction went with the control');
+    assert.equal(
+      Object.hasOwn(toBulkEssenceEdit(live), 'colorToken'),
+      false,
+      'so the write carries no colour at all — the key is ABSENT, not null'
+    );
+    assert.ok(applyButton(root).disabled, 'and Apply is no longer armed by an invisible axis');
     harness.remount();
   });
 });
