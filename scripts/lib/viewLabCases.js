@@ -638,6 +638,23 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-recipe-edit-ingredients-or-menu',
   ]),
+  // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
+  // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
+  // and the shared two-column template in place of a caller rule. Neither representative frame can
+  // contain it: `manager-components-normal` is the component browser and `fabricate-app-shell` is
+  // the PLAYER window, and this control exists only in an essence inspector.
+  //
+  // ONE entry, because the panel is visible only while OPEN and exactly one frame opens it.
+  // `manager-essences-source-picker` selects `mote` — the lab corpus's only essence with no
+  // `sourceComponentId`, and so the only one whose inspector draws this control instead of the
+  // linked-source card — and clicks `.essence-source-trigger`. That case declares no
+  // `sourceMatches` pattern for this file and cannot: the directory leg of `BROAD_SIGNAL_PATTERN`
+  // claims it, so `selectRenderFileCases` `continue`s before reading any case's patterns. This
+  // entry is the seam for exactly that condition, and the case records the same fact beside its
+  // own `sourceMatches`.
+  'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
+    'manager-essences-source-picker',
+  ]),
   // THE overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
   // the environment editor and one `SearchablePopover` in the component editor that was announcing
   // two commands as selectable options. NEITHER representative frame can contain it, and that is
@@ -6116,10 +6133,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
-      // The two components that DRAW this frame's subject. `EssenceSourceSelector` was claimed by
-      // no case at all before this one, and the primitive it now renders through is claimed here
-      // because this is the frame that shows its panel over that caller's grid.
-      /^src\/ui\/svelte\/components\/(?:EssenceSourceSelector|SearchablePopover)\.svelte$/,
+      // Deliberately NO pattern for the two components that DRAW this frame's subject.
+      // `EssenceSourceSelector.svelte` and `SearchablePopover.svelte` both sit under
+      // `components/`, which `BROAD_SIGNAL_PATTERN`'s directory leg claims, and
+      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it consults any case's
+      // `sourceMatches` — so a pattern naming either would be configuration that can never fire.
+      // `tests/design-system-primitives.test.js` reports exactly that shape as shadowed.
+      //
+      // THIS CASE IS NONETHELESS `EssenceSourceSelector`'S EVIDENCE (issue 1503), through the
+      // other seam: `BROAD_SIGNAL_CASE_OVERRIDES` is keyed on the file rather than declared by the
+      // case, and its entry for that caller names this id. That is additive — a change to the
+      // caller publishes the representative pair AND this frame.
+      //
+      // `SearchablePopover` is NOT repointed here, and what that leaves uncovered is named rather
+      // than left to be discovered: measured across `src/`, this caller is the primitive's ONLY
+      // `as="grid"` site, so the grid list form and its `data-picker-columns` cursor are drawn by
+      // no frame that primitive's own override selects. Adding this id there is a routing decision
+      // about a different component — `tests/view-lab-cases.test.js` pins that selection exactly —
+      // so it belongs to whoever adjudicates the grid form, not to this case's `sourceMatches`.
+      //
+      // The patterns above and below are not duplicates of the override: it selects this case when
+      // the COMPONENT changes, they select it when the view or the positioning seam does.
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
