@@ -23,16 +23,21 @@
  * AND EVERY ASSERTION IS `assert.ok(regex.test(...))` RATHER THAN `assert.match`, for
  * READABILITY. The actual value here is the whole of `src/main.js`, over 300,000 characters, and
  * `node:assert` inspects the actual to build its failure report: one `assert.match` failure
- * against this file prints roughly 23,000 characters of the module's import block (Node truncates
- * it with a `... N more characters` tail) and never says which dispatch moved. Testing the regex
- * and putting the diagnosis in the assertion message keeps a real regression legible.
+ * against this file makes `node --test` emit a FAILURE REPORT of roughly 23,000 characters that
+ * still never says which dispatch moved. The 23,000 is the size of the REPORT, not of the printed
+ * module: Node caps the printed excerpt at the first 10,000 characters of the actual and closes it
+ * with a `... N more characters` tail, and the runner prints that capped excerpt twice — once in
+ * the assertion message, once in the AssertionError dump — each about 11,000 characters once
+ * escaped. Report size is therefore near-independent of actual size. Testing the regex and putting
+ * the diagnosis in the assertion message keeps a real regression legible.
  *
  * That is a local choice for the two files whose actual is a whole file — this one and
  * `tests/release-build.test.js`, which reads the built bundle — and NOT a rule about
- * `assert.match`, which the rest of the suite uses freely: `tests/` holds some 2,400 of them,
- * four against this very `src/main.js` (`tests/setting-change-bridge.test.js` among them). Every
- * regex below is `g`-flag-free, so `.test()` carries no `lastIndex` state from one call to the
- * next.
+ * `assert.match`, which the rest of the suite uses freely: `tests/` holds more than 2,400 of
+ * them, more than a dozen against this very `src/main.js` (`tests/setting-change-bridge.test.js`
+ * among them), counting every `assert.match`/`assert.doesNotMatch` whose actual is an identifier
+ * bound to a `readFileSync` of `src/main.js`. Every regex below is `g`-flag-free, so `.test()`
+ * carries no `lastIndex` state from one call to the next.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -353,10 +353,15 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
   );
   // `assert.ok(regex.test(...))` rather than `assert.match(bundle, ...)`, for READABILITY. The
   // actual value is `dist/main.js` — 1.7 MB of minified bundle — and `node:assert` inspects the
-  // actual to build its failure report, so one `assert.match` failure here prints roughly 23,000
-  // characters of minified JavaScript (Node truncates it with a `... N more characters` tail) and
-  // still never names the console level it found. The message below carries that instead. A local
-  // choice for a whole-bundle actual, not a rule about `assert.match`.
+  // actual to build its failure report, so one `assert.match` failure here makes `node --test`
+  // emit a FAILURE REPORT of roughly 23,000 characters that still never names the console level it
+  // found. That size belongs to the REPORT, not to the printed bundle: Node caps the printed
+  // excerpt at the first 10,000 characters of the actual and closes it with a `... N more
+  // characters` tail, and the runner prints that capped excerpt twice — once in the assertion
+  // message, once in the AssertionError dump. This 1.7 MB actual and the 300 KB `src/main.js`
+  // actual guarded by `tests/item-directory-manager-launch.test.js` therefore produce reports of
+  // much the same size. The message below carries the diagnosis instead. A local choice for a
+  // whole-bundle actual, not a rule about `assert.match`.
   assert.ok(
     new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
     `${what}: must be written at console.${level} in the built bundle`
