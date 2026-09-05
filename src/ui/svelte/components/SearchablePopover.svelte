@@ -16,7 +16,7 @@
 
   Props:
     options      — [{ id, label, icon?, img?, meta?, trailing?, trailingIcon?,
-                   addMarker?, dataId?, data?,
+                   addMarker?, dataId?, data?, disabled?, disabledReason?,
                    group? }] (consumer builds the full list, including any leading
                    "special" option such as Auto).
                    `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
@@ -51,6 +51,24 @@
                    `trailingIcon` marks an option that IS the current value with a
                    glyph rather than a word — the travel-actor picker checks the
                    linked actor, and `trailing` renders a Chip, which is a label.
+                   `disabled` gates the row (issue 1504): it renders
+                   `aria-disabled="true"`, refuses its own click, and the keyboard
+                   cursor steps OVER it rather than landing on it. It is
+                   `aria-disabled` rather than a native `disabled` attribute
+                   because an option is not a control the GM tabs to — the rows are
+                   already `tabindex="-1"` and the HOLDER owns focus — so the only
+                   thing `disabled` would add is removing the row from the
+                   accessibility tree, which is exactly where its reason has to be
+                   announced from. `openspec/specs/design-system/library.html:661`
+                   is the requirement in one line: opacity alone is not a reason.
+                   `disabledReason` is that reason, rendered as the row's trailing
+                   badge and therefore inside the button and inside its accessible
+                   name, so a screen-reader user is told WHY as well as THAT. It is
+                   rendered only for a gated row, because a reason for being
+                   unavailable on an available row is a lie; and only in this
+                   component's OWN row content — a caller supplying an `option`
+                   snippet draws the whole row, this badge included, which is the
+                   same rule that snippet's own note states.
     optionGroups — OPTIONAL [{ id, label }]. When non-empty the options are bucketed
                    by `option.group` and each bucket renders under its own heading as
                    an ARIA `role="group"` with that label. This exists because a menu
@@ -544,6 +562,14 @@
   const renderedOptions = $derived(
     isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
   );
+  // WHAT THE CURSOR SKIPS (issue 1504), over the FLAT rendered order because that is the order
+  // `util/listboxNavigation.js` indexes. It is a FUNCTION rather than a derived array so the
+  // module stays off the option shape: a caller whose rows spell availability differently answers
+  // the same question here.
+  function optionIsDisabled(index) {
+    return Boolean(renderedOptions[index]?.disabled);
+  }
+
   const filteredCount = $derived(
     String(filteredCountTemplate)
       .replace('{matched}', String(filteredOptions.length))
@@ -690,7 +716,7 @@
       const active = renderedOptions[activeIndex];
       if (!active) return;
       event.preventDefault();
-      choose(active.id);
+      chooseOption(active);
       return;
     }
     // A MODIFIED KEY IS NEVER THIS WIDGET'S. `Shift+End` selects to the end of the query,
@@ -705,8 +731,14 @@
     // picker instead of confirming the row the GM had arrowed to.
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (caretOwnsKey(event)) return;
+    // THE PREDICATE IS PASSED UNCONDITIONALLY, and that IS the compatibility contract rather
+    // than a widening of it: a predicate that gates nothing returns the same number as no
+    // predicate at all, which `tests/util/listbox-navigation.test.js` pins directly against a
+    // bare call. Branching on "does this list hold a gated row" would be a second code path for
+    // the arithmetic to differ on, bought with nothing.
     const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
       columns: gridColumns,
+      isDisabled: optionIsDisabled,
     });
     if (next === null) return;
     event.preventDefault();
@@ -778,6 +810,23 @@
   function choose(id) {
     onChoose(id);
     close();
+  }
+
+  /**
+   * Choose an option, unless it is gated (issue 1504).
+   *
+   * `aria-disabled` is advisory to the browser exactly as it is on the trigger: it neither blocks
+   * the click nor removes the row from the pointer's reach, so the refusal has to be stated. Both
+   * routes to a choice go through here — the row's own click and the Enter that confirms the
+   * keyboard cursor — because the cursor's skip scan is not a guarantee: a caller can gate the
+   * row the cursor is already sitting on, and the arrows would then have nothing to do with the
+   * next Enter.
+   *
+   * @param {{id: string, disabled?: boolean}} option The row the GM acted on.
+   */
+  function chooseOption(option) {
+    if (option?.disabled) return;
+    choose(option.id);
   }
 
   function stop(event) {
@@ -1058,11 +1107,12 @@
           tabindex="-1"
           data-keyboard-focus="true"
           aria-selected={option.id === value}
+          aria-disabled={option.disabled ? 'true' : undefined}
           data-active-option={index === activeIndex ? 'true' : undefined}
           data-recipe-add={option.addMarker || undefined}
           data-popover-option={option.dataId || undefined}
           title={option.label}
-          onclick={() => choose(option.id)}
+          onclick={() => chooseOption(option)}
           onmousedown={(event) => event.preventDefault()}
         >
           {#if optionContent}
@@ -1095,6 +1145,17 @@
                 class={`manager-travel-option-marker ${option.trailingIcon}`}
                 aria-hidden="true"
               ></i>{/if}
+            <!-- WHY THE REASON IS A CHIP AND NOT A SECOND LABEL SPAN (issue 1504). The design
+                 draws a gated row as dimmed text with a trailing badge, and this component
+                 already draws exactly that badge for `option.trailing`, through the primitive
+                 that owns it — `Chip`'s `disabled` tone IS the "unavailable" family. A second
+                 hand-rolled span would be a copy of a shipped treatment. It renders LAST so it
+                 sits at the row's trailing edge, and inside the button so the reason is part of
+                 the row's accessible name rather than a tooltip a keyboard user never reaches. -->
+            {#if option.disabled && option.disabledReason}<Chip
+                tone="disabled"
+                data-popover-option-reason="">{option.disabledReason}</Chip
+              >{/if}
           {/if}
         </button>
       {/snippet}
