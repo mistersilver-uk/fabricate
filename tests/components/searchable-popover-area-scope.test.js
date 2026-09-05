@@ -13,7 +13,9 @@
  * 1466 had already given them a correctly resolved portal host, which made the remaining half of
  * the defect louder rather than quieter: the panel now landed in the right host and still drew
  * `position: static`, because the rule that positions it was rooted at an application the panel
- * was no longer inside. So this gate covers four primitives, not one.
+ * was no longer inside. So this gate covered four primitives, not one — and then eight (issues
+ * 1477 and 1502), and now nine (issue 1504). The table below is the population; this paragraph
+ * is the history of how it grew, and neither number in it is a figure to copy.
  *
  * THE ROOT COULD NOT SIMPLY BE DROPPED, and that is the constraint this gate encodes rather
  * than the one the issue anticipated. `styles/fabricate.css` is loaded page-wide into the Foundry
@@ -350,6 +352,128 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-pagination', root: 'fabricate-pagination' }),
     ]),
   }),
+  Object.freeze({
+    // ── THE NINTH ENTRY, AND THE FIRST WHOSE FAMILY IS ITSELF `fabricate-`-PREFIXED (issue 1504).
+    //
+    // Six mechanics a later reader would otherwise "fix" by deleting an assertion, each recorded
+    // because it is the reason a line here is shaped the way it is:
+    //
+    // 1. `isApplicationRoot` reads a NAMESPACE root apart from an APPLICATION root BY NAME, not
+    //    by shape — every class in this file's world starts with `fabricate-`, so the only thing
+    //    separating `.fabricate-select-trigger` from `.fabricate-manager` is which list it is on.
+    //    Every other family here is named for the manager (`manager-travel-*`, `essence-*`) and
+    //    gets that separation for free. This one does not, so it declares its own membership:
+    //    every class the component writes as a whole token is in `roots`, and the three per-size
+    //    rungs it composes by interpolation are covered by `namespacedFamily`. Without both, the
+    //    `gated` clause reds on correct code — it did, measured, on all four trigger rules and
+    //    the panel's.
+    // 2. `anchors[0]` MUST be a root, because the detector clause asserts
+    //    `!isApplicationRoot(anchors[0])`. Note what that assertion is worth HERE: for the eight
+    //    entries above, `anchors[0]` is a non-`fabricate-` class and the assertion is a real probe
+    //    of an over-matching predicate. For this entry it holds by construction and proves
+    //    nothing, which is why the `fabricate-manager` half of that same clause is the one doing
+    //    the work.
+    // 3. `mirrored` pairs each anchor with an INHERITED class rather than with itself. `Select`
+    //    renders through `SearchablePopover`'s own root and panel, so a fixture writing
+    //    `fabricate-select` alone measures none of the `.fabricate-picker*` paint the shipped
+    //    control actually wears — the mirror defect this file's own docblock records, in the very
+    //    files this change re-authors. A self-referential pair (`fabricate-select` →
+    //    `fabricate-select`) would be satisfied by construction and protect nothing. Because the
+    //    anchors are the ROOT and the PANEL, a fixture writes the composed root element with the
+    //    trigger nested inside it; a trigger-only fixture matches no pair at all.
+    // 4. `.fabricate-select .manager-travel-picker-value` — `Select` styling the primitive's own
+    //    inner span — is NOT exempt here, which is where the plan's decision E was wrong as
+    //    measured. Its reasoning was that the selector names a class `Select` does not write, so
+    //    `isPrimitiveOwned` classes it as a caller override; but for an all-`fabricate-` family
+    //    every own class is filtered out as an application root first, leaving the selector owned
+    //    by `SearchablePopover` and `gated` firing on it. The shipped exemption depends on the
+    //    caller's class NOT carrying the prefix. So `Select` passes `valueClass` and styles
+    //    `.fabricate-select-value`, and the two heading rules address `[data-popover-group] > p`
+    //    by attribute rather than by the inherited class name.
+    // 5. The `rootless` clause cannot fire on a selector whose first compound names a family
+    //    class, because `namespacedFamily` makes every one of them a namespace class. Its job —
+    //    keeping a family rooted rather than page-global — is discharged for this family by the
+    //    `fabricate-` prefix itself, and `tests/styles-namespacing.test.js` enforces that prefix
+    //    independently. `gated` is the clause that carries this entry. `rootless` would still
+    //    fire on a leading class-less compound such as `[data-x] .fabricate-select-trigger`.
+    // 6. The ancestry half of the fixture gate is self-satisfied for a root element (an element's
+    //    own classes are in its own ancestry, and `fabricate-select` is a root), so the clause
+    //    that does the work on this family is the ATTRIBUTE half, through `mirrored` above.
+    name: 'Select',
+    components: Object.freeze(['src/ui/svelte/components/Select.svelte']),
+    // The nineteen family classes `Select` writes as WHOLE tokens: the picker root, the trigger,
+    // the three value states, the panel and its ticked variant, the list, the option row, the
+    // row's five content elements, and the labelled form's four. The per-size rungs
+    // (`fabricate-select-trigger-form|inline|toolbar`,
+    // `fabricate-select-popover-form|inline|toolbar`) are deliberately absent: they are composed
+    // by interpolation from the `size` prop, so no reader can see them as literals and listing
+    // them here would red the root-emission clause on classes the component genuinely emits.
+    // `namespacedFamily` covers them by pattern, which is also what keeps a FOURTH rung from
+    // quietly falling outside this gate the day one is added.
+    roots: Object.freeze([
+      'fabricate-select',
+      'fabricate-select-trigger',
+      'fabricate-select-value',
+      'fabricate-select-value-placeholder',
+      'fabricate-select-value-mono',
+      'fabricate-select-popover',
+      'fabricate-select-popover-ticked',
+      'fabricate-select-options',
+      'fabricate-select-option',
+      'fabricate-select-tick',
+      'fabricate-select-lines',
+      'fabricate-select-label',
+      'fabricate-select-hint',
+      'fabricate-select-badge',
+      'fabricate-select-reason',
+      'fabricate-select-field',
+      'fabricate-select-caption',
+      'fabricate-select-note',
+      'fabricate-select-error',
+    ]),
+    // `SearchablePopover`'s two roots, which this primitive COMPOSES rather than writes — its
+    // panel rules are `.fabricate-picker-popover.fabricate-select-popover*`, two namespace
+    // classes and no application. Cross-checked against that entry's own `roots` below, so
+    // renaming one there reds here instead of silently exempting a class from the application
+    // test.
+    inheritedRoots: Object.freeze(['fabricate-picker', 'fabricate-picker-popover']),
+    namespacedFamily: true,
+    family: 'fabricate-select[\\w-]*',
+    anchors: Object.freeze([
+      'fabricate-select',
+      'fabricate-select-trigger',
+      'fabricate-select-popover',
+      'fabricate-select-option',
+    ]),
+    // Measured at this head: 19 written, 33 family selectors, 32 owned. The one exemption is
+    // `.fabricate-manager .fab-bulk-edit-select .fabricate-select-trigger`, the bulk panel's own
+    // full-width rule — a caller's override of the caller's own wrapper class, which is what the
+    // exemption is for. The floors sit a little under those counts, as the entries above do.
+    writtenFloor: 16,
+    familyFloor: 30,
+    ownedFloor: 29,
+    // Six props, three of them passed by SHORTHAND (`{triggerClass}`, `{popoverClass}`,
+    // `{valueClass}`) because `Select` composes them per size in `<script>`. `triggerClass` and
+    // `valueClass` are on this list where the two pickers above omit them, and the difference is
+    // real rather than a drift: those two hand the primitive a `trigger` SNIPPET, so its own
+    // button is never rendered and the class lands on no element. `Select` supplies no snippet,
+    // so both classes are on elements the primitive writes and both carry rules in the sheet.
+    classProps: Object.freeze([
+      'pickerClass',
+      'triggerClass',
+      'valueClass',
+      'popoverClass',
+      'listClass',
+      'optionClass',
+    ]),
+    classPropsOwner: SEARCHABLE_POPOVER,
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'fabricate-select', root: 'fabricate-picker' }),
+      Object.freeze({ anchor: 'fabricate-select', root: 'manager-travel-picker' }),
+      Object.freeze({ anchor: 'fabricate-select-popover', root: 'fabricate-picker-popover' }),
+      Object.freeze({ anchor: 'fabricate-select-popover', root: 'manager-travel-popover' }),
+    ]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -363,8 +487,38 @@ const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
  * @param {{roots: readonly string[]}} primitive The primitive whose rules are being judged.
  * @returns {boolean} True when `cls` roots the rule at an application rather than at the primitive.
  */
+/**
+ * A NAMESPACE class, from one primitive's point of view: a `fabricate-`-prefixed class that
+ * belongs to the primitive rather than to a Foundry application window.
+ *
+ * Three ways to be one, and the last two arrived with issue 1504's `Select` (both optional, both
+ * absent from every entry written before it, so this predicate is byte-equivalent to
+ * `primitive.roots.includes(cls)` for the eight entries above `Select`):
+ *
+ *   - `roots` — a namespace class the component writes ITSELF, which the root-emission clause
+ *     below proves it still writes;
+ *   - `inheritedRoots` — a namespace class of a primitive this one COMPOSES. `Select` renders
+ *     through `SearchablePopover`'s own root and panel, so `.fabricate-picker-popover
+ *     .fabricate-select-popover` is rooted at two namespace classes and at no application. It is
+ *     deliberately NOT in `roots`: `Select` does not write it, and the emission clause would red
+ *     truthfully if it did. The guarantee is discharged by the `SearchablePopover` entry in this
+ *     same array instead, and cross-checked below so a rename cannot quietly widen the exemption;
+ *   - `namespacedFamily` — the entry's whole family carries the `fabricate-` prefix, so the
+ *     family PATTERN is itself the namespace test. `Select`'s family is `fabricate-select*`, and
+ *     three of its classes are composed per SIZE by interpolation (`…-trigger-${rung}`), so they
+ *     cannot be hand-listed as roots without either duplicating the size enum here or forcing the
+ *     component to write nine literals it does not need. This is the mechanical form of the
+ *     plan's decision E — "a wholly `fabricate-`-prefixed family declares every member a
+ *     namespace root" — stated as one pattern rather than as a list that a new rung would
+ *     silently fall out of.
+ */
+const isNamespaceClass = (cls, primitive) =>
+  primitive.roots.includes(cls) ||
+  (primitive.inheritedRoots ?? []).includes(cls) ||
+  Boolean(primitive.namespacedFamily && new RegExp(`^(?:${primitive.family})$`).test(cls));
+
 const isApplicationRoot = (cls, primitive) =>
-  cls.startsWith('fabricate-') && !primitive.roots.includes(cls);
+  cls.startsWith('fabricate-') && !isNamespaceClass(cls, primitive);
 
 /**
  * The markup region of a component: after its `<script>`, before any scoped `<style>`.
@@ -451,12 +605,68 @@ function composedClassLiteralValues(file) {
  * @param {string} markup That component's markup region.
  * @returns {string[]} One value per declared class prop.
  */
+/**
+ * The value of a class prop passed in Svelte's SHORTHAND form — `` {triggerClass} `` — resolved
+ * out of the `const <name> = $derived(…)` declaration the identifier names (issue 1504).
+ *
+ * `Select` composes its trigger, panel and value classes per SIZE, so those three props are
+ * computed in `<script>` and passed by shorthand rather than written as a literal beside the
+ * component. The two literal forms `classPropValues` reads cannot see them, and this gate's own
+ * rule for that case is stated in its message: retarget the extractor rather than delete the
+ * declaration. Falling silent instead would leave the trigger's, the panel's and the value's
+ * whole class set uncredited — every rule naming one of them outside the family this gate reads.
+ *
+ * A token carrying an INTERPOLATION is dropped rather than half-read: `` `…-trigger-${rung}` ``
+ * is not the class `…-trigger-`, and a partial name in the emitted set would satisfy the
+ * root-emission clause for a class no element ever carries. The per-size rungs are covered
+ * instead by `namespacedFamily`, which is what that field exists for.
+ *
+ * @param {string} file Repository-relative component path.
+ * @param {string} name The class prop's name, which is also the identifier's.
+ * @returns {string|null} A space-joined class value, or null when there is no such declaration.
+ */
+function derivedClassPropValue(file, name) {
+  const source = read(file);
+  const at = source.indexOf(`const ${name} = $derived(`);
+  if (at === -1) return null;
+  const open = source.indexOf('(', at);
+  let depth = 0;
+  let end = -1;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '(') depth += 1;
+    else if (source[index] === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        end = index;
+        break;
+      }
+    }
+  }
+  assert.ok(
+    end !== -1,
+    `${file}'s \`const ${name} = $derived(\` never closes, so the shorthand class-prop reader ` +
+      'cannot locate its value. Retarget the extractor rather than deleting the declaration.'
+  );
+  const INTERPOLATED = '\u{0}';
+  return [...source.slice(open, end + 1).matchAll(/`([^`]*)`|'([^']*)'/g)]
+    .map((match) => (match[1] ?? match[2]).replaceAll(/\$\{[^}]*\}/g, INTERPOLATED))
+    .flatMap((value) => value.split(/\s+/))
+    .filter((token) => token && !token.includes(INTERPOLATED))
+    .join(' ');
+}
+
 function classPropValues(primitive, file, markup) {
   const values = [];
   for (const name of primitive.classProps ?? []) {
     const found = [...markup.matchAll(new RegExp(`\\b${name}=(?:"([^"]*)"|\\{\`([^\`]*)\`\\})`, 'g'))].map(
       (match) => match[1] ?? match[2] ?? ''
     );
+    // The SHORTHAND form is one value like the two literal forms, so the per-entry count below
+    // stays "one value per declared prop" and a reader that stops resolving still reds.
+    if (found.length === 0 && new RegExp(String.raw`\{${name}\}`).test(markup)) {
+      const resolved = derivedClassPropValue(file, name);
+      if (resolved) found.push(resolved);
+    }
     assert.ok(
       found.length > 0,
       `${file} no longer passes \`${name}\`, which ${primitive.name} declares as a class prop, in ` +
@@ -488,13 +698,25 @@ function classValuesFor(primitive, file) {
   return primitive.composesClasses ? [...values, ...composedClassLiteralValues(file)] : values;
 }
 
-/** Every family class the primitive puts on an element of its own. */
+/**
+ * Every family class the primitive puts on an element of its own.
+ *
+ * The class-prop VALUES join the region (issue 1504) for the same reason `classValuesFor` counts
+ * them as emission: a class that reaches the DOM through a prop is on an element of the
+ * primitive's just as surely as one written beside it. For the two literal forms this is a no-op,
+ * because the value is already text inside the markup region — it matters only for a prop passed
+ * by SHORTHAND, whose value lives in `<script>` and would otherwise leave the whole trigger,
+ * panel and value class set out of the family this gate reads.
+ */
 function classesWrittenBy(primitive) {
   const written = new Set();
   for (const file of primitive.components) {
-    const region = primitive.composesClasses
-      ? markupRegion(file) + composedClassRegion(file)
-      : markupRegion(file);
+    const markup = markupRegion(file);
+    const region = [
+      markup,
+      primitive.composesClasses ? composedClassRegion(file) : '',
+      ...classPropValues(primitive, file, markup),
+    ].join(' ');
     for (const cls of region.match(new RegExp(primitive.family, 'g')) ?? []) {
       written.add(cls);
     }
@@ -531,9 +753,19 @@ const classesOf = (compound) => [...compound.matchAll(/\.([\w-]+)/g)].map((entry
 let stylesheetSelectors = null;
 const allSelectors = () => (stylesheetSelectors ??= selectorsIn(read(STYLESHEET)));
 
-/** Selectors that name at least one class the primitive writes. */
-function pickerSelectors(written) {
+/**
+ * Selectors that name at least one class the primitive writes.
+ *
+ * A `namespacedFamily` entry adds its family PATTERN as a second reader (issue 1504), because the
+ * per-size rungs it composes by interpolation are real family classes that no `written` name
+ * matches: without it `.fabricate-picker-popover.fabricate-select-popover-form` would fall
+ * outside the population entirely and could be re-rooted at an application with nothing noticing.
+ */
+function pickerSelectors(written, primitive) {
   const patterns = [...written].map((cls) => new RegExp(`\\.${cls}(?![\\w-])`));
+  if (primitive.namespacedFamily) {
+    patterns.push(new RegExp(String.raw`\.(?:${primitive.family})(?![\w-])`));
+  }
   return allSelectors().filter((selector) => patterns.some((pattern) => pattern.test(selector)));
 }
 
@@ -580,7 +812,7 @@ function isPrimitiveOwned(selector, written, primitive) {
   }
   return classesOf(selector)
     .filter((cls) => !isApplicationRoot(cls, primitive))
-    .every((cls) => written.has(cls) || primitive.roots.includes(cls) || cls.startsWith('is-'));
+    .every((cls) => written.has(cls) || isNamespaceClass(cls, primitive) || cls.startsWith('is-'));
 }
 
 test('the class set this gate reads is the one each primitive actually writes', () => {
@@ -778,7 +1010,75 @@ test('the application-root detector fires', () => {
       `the detector matches the plain family class \`${primitive.anchors[0]}\`, so it is deciding ` +
         'on the wrong population'
     );
+    for (const inherited of primitive.inheritedRoots ?? []) {
+      assert.ok(
+        !isApplicationRoot(inherited, primitive),
+        `the detector treats \`${inherited}\` as an application root for ${primitive.name}, which ` +
+          'composes it. Its panel rules would be reported as app-rooted and would be "fixed" by ' +
+          'deleting the composed primitive’s own root from them.'
+      );
+    }
   }
+});
+
+test('a composed root is another primitive’s, and both new exemptions stay entry-scoped', () => {
+  // CLAUSE FOR `inheritedRoots` AND `namespacedFamily` (issue 1504). Both widen the set of
+  // classes that are NOT application roots, which is the one direction that can make this whole
+  // file pass over the regression it exists to catch. So both are proved to be scoped to the
+  // entry that declares them, and the inherited names are proved to be real roots of a real
+  // sibling entry rather than a free-text exemption.
+  const roots = new Map(PRIMITIVES.map((entry) => [entry.name, new Set(entry.roots)]));
+  let inheritedChecked = 0;
+  for (const primitive of PRIMITIVES) {
+    for (const inherited of primitive.inheritedRoots ?? []) {
+      const owner = PRIMITIVES.find(
+        (entry) => entry !== primitive && roots.get(entry.name).has(inherited)
+      );
+      assert.ok(
+        owner,
+        `${primitive.name} names \`${inherited}\` as an inherited namespace root, but no other ` +
+          'entry in this table declares it. An inherited root is exempt from the emission clause ' +
+          'because a SIBLING entry proves the composed primitive still writes it — with no such ' +
+          'sibling the exemption proves nothing and any class could be spelled into it.'
+      );
+      inheritedChecked += 1;
+    }
+  }
+  assert.equal(
+    inheritedChecked,
+    2,
+    `${inheritedChecked} inherited roots were resolved against their owner, against the two ` +
+      '`Select` declares. A different number means an entry gained or lost a composed root ' +
+      'without this clause being read.'
+  );
+
+  const select = PRIMITIVES.find((entry) => entry.name === 'Select');
+  const searchablePopover = PRIMITIVES.find((entry) => entry.name === 'SearchablePopover');
+  const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
+
+  // `namespacedFamily` covers an interpolated per-size rung FOR ITS OWN ENTRY ONLY.
+  assert.ok(
+    !isApplicationRoot('fabricate-select-trigger-toolbar', select),
+    'a per-size rung of `Select`’s own family is read as an application root, so the four ' +
+      'trigger rules would be reported as manager-rooted and "fixed" by deleting the size'
+  );
+  assert.ok(
+    isApplicationRoot('fabricate-select-trigger-toolbar', searchablePopover),
+    '`namespacedFamily` is exempting `Select`’s classes for OTHER primitives too, so a rule ' +
+      'putting one of them in front of another family would stop being gated'
+  );
+
+  // An inherited root is exempt for the composer and an application root for everyone else.
+  assert.ok(
+    !isApplicationRoot('fabricate-picker-popover', select),
+    '`Select`’s panel rules name `SearchablePopover`’s panel root, which it composes; reading it ' +
+      'as an application root reds every one of them on correct code'
+  );
+  assert.ok(
+    isApplicationRoot('fabricate-picker-popover', pagination),
+    'the inherited-root exemption has leaked past the entry that declares it, so any primitive ' +
+      'could root its rules at another’s namespace and this gate would allow it'
+  );
 });
 
 test('the composed-class region is read from the actual array literal, not the markup', () => {
@@ -857,7 +1157,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   // NON-VACUITY: the clause actually reaches Pagination's four shipped per-view overrides in
   // `styles/fabricate.css`, not just the synthetic control above.
   const written = classesWrittenBy(pagination);
-  const family = pickerSelectors(written);
+  const family = pickerSelectors(written, pagination);
   const callerContainerSelectors = family.filter((selector) =>
     compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, pagination))
   );
@@ -873,7 +1173,7 @@ test('the application-root-attribute clause names a caller’s own container', (
 test('every rule a primitive owns is rooted at the primitive, not at an application', () => {
   for (const primitive of PRIMITIVES) {
     const written = classesWrittenBy(primitive);
-    const family = pickerSelectors(written);
+    const family = pickerSelectors(written, primitive);
 
     assert.ok(
       family.length >= primitive.familyFloor,
@@ -909,7 +1209,7 @@ test('every rule a primitive owns is rooted at the primitive, not at an applicat
 
     const rootless = owned.filter(
       (selector) =>
-        !primitive.roots.some((root) => classesOf(compoundsOf(selector)[0]).includes(root))
+        !classesOf(compoundsOf(selector)[0]).some((cls) => isNamespaceClass(cls, primitive))
     );
     assert.deepEqual(
       rootless,
