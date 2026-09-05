@@ -995,11 +995,39 @@
   overflow: hidden;
 }
 
-.fabricate-app button:focus,
-.fabricate-app input:focus,
-.fabricate-app select:focus,
-.fabricate-app textarea:focus,
-.fabricate-app [tabindex]:focus {
+/* THE MODULE'S FOCUS-RING CONTRACT, and it is a PAIR: this half suppresses whatever ring
+   Foundry's core or the browser would draw, and the `:focus-visible` block below supplies
+   Fabricate's own on keyboard focus only. The two element lists must therefore match, or an
+   element type is stripped of a ring by the first half and given none by the second.
+
+   `a` and `textarea` are in both lists from issue 1118. Twelve manager buttons are anchors
+   now - docs links, the premium unlock, the explainer card's links - and an anchor matched
+   neither list, so those twelve were the only manager buttons with no accent ring on keyboard
+   focus; `textarea` was in the suppressing half and absent from the supplying one, so a
+   focused manager textarea drew NO ring at all.
+
+   ROOTED AT `.fabricate`, the class every Fabricate application root emits, so the pair is
+   written ONCE rather than once per app area (issue 1501). It replaces the `.fabricate-app`
+   pair that stood here and the byte-identical `.fabricate-manager` pair that stood ~590 lines
+   below. `.fabricate-manager` is a <div> INSIDE the manager window rather than an application
+   root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2 frame's own
+   header controls - the one asymmetry in the widening, and the same accent ring those controls
+   already carry in the player app and the three interactables windows.
+
+   WRITTEN FLAT, and that is prescribed rather than stylistic. `.fabricate a:focus` is (0,2,1),
+   the rank both donor blocks held, so per-component focus rings still win. The `:is()` form
+   `.fabricate :is(a, button, input, select, textarea, [tabindex]):focus` would be (0,3,0) -
+   `:is()` takes its most specific argument, here `[tabindex]` - and would newly beat every
+   component ring in the sheet.
+
+   Written at the EARLIER of the two donor positions, which is what keeps
+   `.fabricate-app select:focus-visible` below following the ring and still winning. */
+.fabricate a:focus,
+.fabricate button:focus,
+.fabricate input:focus,
+.fabricate select:focus,
+.fabricate textarea:focus,
+.fabricate [tabindex]:focus {
   outline: none;
   box-shadow: none;
 }
@@ -1034,12 +1062,16 @@
    keyboard users. The :focus rule above strips the orange on mouse click; this
    restores an intentional ring on :focus-visible (which is also the state a nav
    button lands in after the tab panel re-renders on click). Kept at single-class
-   specificity so per-component focus rings (e.g. gathering rows) still win. */
-.fabricate-app button:focus-visible,
-.fabricate-app input:focus-visible,
-.fabricate-app select:focus-visible,
-.fabricate-app textarea:focus-visible,
-.fabricate-app [tabindex]:focus-visible {
+   specificity so per-component focus rings (e.g. gathering rows) still win.
+
+   The SUPPLYING half of the module-rooted pair described above (issue 1501): its element list
+   must stay identical to the suppressing half's, for the reason that comment gives. */
+.fabricate a:focus-visible,
+.fabricate button:focus-visible,
+.fabricate input:focus-visible,
+.fabricate select:focus-visible,
+.fabricate textarea:focus-visible,
+.fabricate [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
@@ -1573,38 +1605,6 @@
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
-}
-
-/* THE MANAGER'S FOCUS-RING CONTRACT, and it is a PAIR: the first half suppresses whatever
-   ring Foundry's core or the browser would draw, and the second supplies the manager's own on
-   keyboard focus only. The two element lists must therefore match, or an element type is
-   stripped of a ring by the first half and given none by the second.
-
-   `a` joins both lists in issue 1118. Twelve manager buttons are anchors now — docs links,
-   the premium unlock, the explainer card's links — and an anchor matched neither list, so
-   those twelve were the only manager buttons with no accent ring on keyboard focus.
-
-   `textarea` joins the second list in the same edit, and it is a repair rather than a
-   symmetry tidy-up: it was in the suppressing half and absent from the supplying one, so a
-   focused manager textarea drew NO ring at all. */
-.fabricate-manager a:focus,
-.fabricate-manager button:focus,
-.fabricate-manager input:focus,
-.fabricate-manager select:focus,
-.fabricate-manager textarea:focus,
-.fabricate-manager [tabindex]:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-manager a:focus-visible,
-.fabricate-manager button:focus-visible,
-.fabricate-manager input:focus-visible,
-.fabricate-manager select:focus-visible,
-.fabricate-manager textarea:focus-visible,
-.fabricate-manager [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
 }
 
 /*
@@ -20460,6 +20460,18 @@
   opacity: 1;
 }
 
+/* The close control rests at `opacity: 0.6`, and `opacity` composites an element's OUTLINE
+   with the element, so the accent focus ring the module-rooted `:focus-visible` block now
+   paints on this toast (issue 1501) would render at 60% - measured 2.79:1 against the toast's
+   `--fab-bg-2` fill in `ironblood-forge` and 2.85:1 in `hearth-herb`, below the 3:1 floor
+   WCAG 2.1 SC 1.4.11 sets for a focus indicator. Restoring full opacity on `:focus-visible`
+   is the shipped pattern from `ComponentSourcesBar.svelte:295-304`, where the same dimmed
+   icon button restores opacity in the rule set that paints its ring. Written at the sheet's
+   own two-class shape here so it matches its `:hover` sibling's specificity. */
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close:focus-visible {
+  opacity: 1;
+}
+
 /* ==========================================
    Interactable config panel (rich GM behaviour sheet)
    ==========================================
@@ -20468,7 +20480,12 @@
    this block carries only the area-level focus-ring override (Foundry core paints
    an orange ring that must be stripped on :focus and repainted on :focus-visible
    per app surface) plus the Tile-HUD discoverability button. All selectors are
-   namespaced under the app root / HUD button class so nothing bleeds. */
+   namespaced under the app root / HUD button class so nothing bleeds.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactable-config-app button:focus,
 .fabricate-interactable-config-app input:focus,
 .fabricate-interactable-config-app select:focus,
@@ -20497,7 +20514,12 @@
    body lives in InteractableBrowserRoot.svelte; this block strips Foundry core's
    orange :focus ring and repaints the accent ring on :focus-visible per app
    surface (mirroring the config app block above), kept at single area-class
-   specificity so the component-scoped focus rings still win. */
+   specificity so the component-scoped focus rings still win.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactable-browser-app button:focus,
 .fabricate-interactable-browser-app input:focus,
 .fabricate-interactable-browser-app select:focus,
@@ -20526,7 +20548,12 @@
    repaint the accent ring on :focus-visible — single area-class specificity so the
    per-element rings still win), the custom-content button layout override (the
    panel renders icon+label and icon-only buttons), and the panel layout. All
-   colours use `var(--fab-*)` theme tokens. */
+   colours use `var(--fab-*)` theme tokens.
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
+   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
+   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
+   which owns these copies and is named by the gate's own message. */
 .fabricate-interactables-manager button:focus,
 .fabricate-interactables-manager input:focus,
 .fabricate-interactables-manager select:focus,
@@ -22304,7 +22331,12 @@
 }
 
 /* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
-   The app-scoped focus rules elsewhere don't match this DialogV2 root. */
+
+   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): the
+   dialog root emits `fabricate` too, so `.fabricate` now reaches this DialogV2 body at the
+   same (0,2,1) rank and with a wider element list. This block still follows it in source and
+   so still wins for the three targets it names. Left in place because deleting it belongs to
+   issue 1520, which owns these copies and is named by the gate's own message. */
 .fabricate-roll-prompt-dialog button:focus,
 .fabricate-roll-prompt-dialog input:focus,
 .fabricate-roll-prompt-dialog select:focus {

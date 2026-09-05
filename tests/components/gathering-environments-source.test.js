@@ -290,8 +290,9 @@ describe('EnvironmentCard markup contracts', () => {
       cardSource.includes('border-color: var(--fab-accent)'),
       'selected card gets an accent-coloured border outline'
     );
-    // The host rule `.fabricate-app button:focus:not(:focus-visible)` clears
-    // box-shadow on mouse-click focus, so selection must not rely on one.
+    // The host rule `.fabricate button:focus` clears box-shadow on mouse-click
+    // focus, so selection must not rely on one. (Rooted at `.fabricate-app`
+    // until issue 1501 collapsed it onto the module root.)
     assert.equal(
       cardSource.includes('box-shadow: inset 3px 0 0 var(--fab-accent)'),
       false,

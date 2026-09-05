@@ -425,9 +425,11 @@
      written as a bare `:global(.fab-bulk-edit-apply:focus-visible)` under a comment claiming
      nothing else in the sheet states an `outline` for a manager button, so it needed no
      chain. Both halves of that were wrong. `styles/fabricate.css` states
-     `.fabricate-manager button:focus-visible` — (0,2,1), against this selector's (0,2,0) —
-     with byte-identical declarations, so the ring this rule claimed to be the only source of
-     is the manager's own standing contract, and this rule was carrying no weight. Chained, it
+     `.fabricate button:focus-visible` — (0,2,1), against this selector's (0,2,0) — with
+     byte-identical declarations, so the ring this rule claimed to be the only source of is
+     the module's own standing contract, and this rule was carrying no weight. (It was rooted
+     at `.fabricate-manager` until issue 1501 collapsed it onto the module root; the rank is
+     unchanged, so the argument is.) Chained, it
      wins on specificity rather than on which sheet was injected last, and it is the only one
      of Apply's four rules that does not restate the ancestor its siblings all name. */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {

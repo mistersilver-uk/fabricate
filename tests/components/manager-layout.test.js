@@ -345,55 +345,71 @@ test('manager root defines a scoped responsive app container', () => {
 });
 
 test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
-  const managerFocusBlock = blockFor(
-    '.fabricate-manager a:focus,\n.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus'
+  // ONE PAIR, at the module root (issue 1501). The `.fabricate-app` pair and the byte-identical
+  // `.fabricate-manager` pair this test used to read separately are collapsed onto `.fabricate`,
+  // the class every Fabricate application root emits, at the same (0,2,1) rank and at the app
+  // pair's earlier position. Both areas are covered by this one block because `.fabricate` is
+  // the player app's own root and the manager `<div>`'s ancestor.
+  const moduleFocusBlock = blockFor(
+    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate select:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
   );
-  const managerFocusVisibleBlock = blockFor(
-    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
-  );
-  const shellFocusBlock = blockFor(
-    '.fabricate-app button:focus,\n.fabricate-app input:focus,\n.fabricate-app select:focus,\n.fabricate-app textarea:focus,\n.fabricate-app [tabindex]:focus'
-  );
-  const shellFocusVisibleBlock = blockFor(
-    '.fabricate-app button:focus-visible,\n.fabricate-app input:focus-visible,\n.fabricate-app select:focus-visible,\n.fabricate-app textarea:focus-visible,\n.fabricate-app [tabindex]:focus-visible'
+  const moduleFocusVisibleBlock = blockFor(
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
-    managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'),
-    'manager controls should clear host click focus outlines'
+    moduleFocusBlock.includes('outline: none;') && moduleFocusBlock.includes('box-shadow: none;'),
+    'module-rooted controls should clear host click focus outlines'
   );
   assert.ok(
-    shellFocusBlock.includes('outline: none;') && shellFocusBlock.includes('box-shadow: none;'),
-    'unified Fabricate shell controls should clear host click focus outlines'
+    moduleFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
+    'module-rooted keyboard focus should remain visible'
   );
-  assert.ok(
-    managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
-    'manager keyboard focus should remain visible'
+  assert.equal(
+    css.includes('.fabricate-app button:focus,'),
+    false,
+    'the app-area copy of the reset is collapsed into the module-rooted pair, not left beside it'
   );
-  assert.ok(
-    shellFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
-    'unified shell keyboard focus should remain visible'
+  assert.equal(
+    css.includes('.fabricate-manager a:focus,'),
+    false,
+    'and so is the manager copy — two roots restating one pair is the duplication 1501 ends'
   );
 
   // THE TWO HALVES ARE A PAIR AND MUST NAME THE SAME ELEMENTS (issue 1118). The suppressing
-  // half strips whatever ring Foundry's core or the browser draws; the supplying half puts the
-  // manager's own back on keyboard focus. An element in the first list and not the second gets
+  // half strips whatever ring Foundry's core or the browser draws; the supplying half puts
+  // Fabricate's own back on keyboard focus. An element in the first list and not the second gets
   // NO ring at all, which is what a focused manager `textarea` did, and an element in neither
   // keeps the host's, which is what the twelve anchor manager buttons did. Both were live and
   // both were invisible to the two blocks read above, because each of those only asks whether
   // its own block declares an outline.
+  //
+  // The root token is OPTIONALLY hyphenated, and that is load-bearing rather than tidy: the
+  // collapsed pair is rooted at the bare `.fabricate`, so the `\.fabricate-\w+` this matched
+  // before finds nothing in it and the comparison below degrades to `deepEqual([], [])` — a
+  // green test that has stopped checking the pairing it exists to check.
   const elementsIn = (prelude) => [
     ...new Set(
-      [...prelude.matchAll(/\.fabricate-\w+\s+([a-z]+|\[tabindex])(?=:)/g)].map(([, one]) => one)
+      [...prelude.matchAll(/\.fabricate(?:-\w+)?\s+([a-z]+|\[tabindex])(?=:)/g)].map(
+        ([, one]) => one
+      )
     ),
   ];
   for (const [area, suppressing, supplying] of [
-    ['manager', managerFocusBlock, managerFocusVisibleBlock],
-    ['app shell', shellFocusBlock, shellFocusVisibleBlock],
+    ['module root', moduleFocusBlock, moduleFocusVisibleBlock],
   ]) {
+    const suppressed = elementsIn(suppressing).sort();
+    // NON-EMPTY, asserted rather than assumed, for the reason the note above gives: an empty
+    // pair of lists satisfies the `deepEqual` below without comparing anything.
+    assert.deepEqual(
+      suppressed,
+      ['[tabindex]', 'a', 'button', 'input', 'select', 'textarea'],
+      `the ${area}'s :focus list must name the six element targets the pair is written for, ` +
+        'or the comparison below is between two empty lists'
+    );
     assert.deepEqual(
       elementsIn(supplying).sort(),
-      elementsIn(suppressing).sort(),
+      suppressed,
       `the ${area}'s focus-visible list must name exactly the elements its :focus list ` +
         'suppresses, or one element type is stripped of a ring and given none'
     );
@@ -809,8 +825,9 @@ test('the rail crafting-system card selects a system and links back to the libra
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
   );
+  // The manager's keyboard ring is the module-rooted pair's supplying half (issue 1501).
   const focusBlock = blockFor(
-    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(

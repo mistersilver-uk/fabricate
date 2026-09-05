@@ -25,7 +25,7 @@
  * ── EVERY ALLOW-LIST HAS BOTH POLARITIES PROVED ─────────────────────────────────────────
  * Three of these gates carry an exemption, and an exemption proved only by the tree passing is an
  * exemption that can silently widen to everything. So each is exercised against a SYNTHETIC
- * fixture asserting both directions inside `npm test`: the `:focus` reset shape admits the six
+ * fixture asserting both directions inside `npm test`: the `:focus` reset shape admits the five
  * real blocks and rejects a seventh that merely mentions a root; the native-select marker comment
  * admits an element and its absence fails; and a `var()` radius resolves rather than being skipped
  * for being indirection. A red-proof in a PR description proves a gate fired once, on one day; a
@@ -163,16 +163,17 @@ const BARE_FOCUS = /:focus(?!-(?:visible|within))(?![\w-])/u;
 /**
  * The element targets a Foundry-core focus reset names, and the three shapes those blocks take.
  *
- * The allow-list is by ROOT PLUS SHAPE, never by line. Six blocks in the sheet suppress core's
+ * The allow-list is by ROOT PLUS SHAPE, never by line. FIVE blocks in the sheet suppress core's
  * orange focus ring so the Fabricate accent can be drawn by the `:focus-visible` block beneath
  * them, and every one of them is written as one root class crossed with this target list. A
  * line-range allow-list would need re-measuring on every edit to a 20,000-line file — and worse,
  * would silently start exempting whatever moved into the range.
  *
- * The three shapes are the whole permission. `.fabricate-manager` includes `a` because the
- * manager renders links; `.fabricate-roll-prompt-dialog` is a DialogV2 body with no textarea and
- * no `[tabindex]` target, so it names three. A block that suppressed the ring for one more
- * element than its shape allows is NOT this pattern and is not exempt.
+ * The three shapes are the whole permission. `.fabricate` — the module root, which issue 1501
+ * collapsed the app and manager pairs onto — includes `a` because the manager renders links;
+ * `.fabricate-roll-prompt-dialog` is a DialogV2 body with no textarea and no `[tabindex]` target,
+ * so it names three. A block that suppressed the ring for one more element than its shape allows
+ * is NOT this pattern and is not exempt.
  */
 const RESET_SHAPES = Object.freeze(
   [
@@ -230,7 +231,7 @@ const FOCUS_STRIP_DECLARATIONS = Object.freeze({ outline: 'none', 'box-shadow': 
  * The primitive family compound a rule strips core focus chrome for, or `null` when it is not one.
  *
  * A SECOND exemption beside the area resets above, and it exists for the same reason they do.
- * Foundry core paints `a.button, button:focus` with an outline and a 4px glow. The six reset
+ * Foundry core paints `a.button, button:focus` with an outline and a 4px glow. The five reset
  * blocks remove that inside an application root; a family rooted at a class the primitive emits
  * renders in hosts carrying no application root at all, where the repaint half alone would draw
  * the accent ring ON TOP of core's treatment rather than in place of it. `design-system/spec.md`
@@ -282,28 +283,28 @@ function bareFocusSelectors() {
   return { gated, exempt, strips };
 }
 
-test('the six Foundry-core focus resets are recognised, and a look-alike is not', () => {
-  // BOTH POLARITIES OF THE ONLY EXEMPTION THIS GATE HAS. The positive half is the live corpus: six
-  // roots, named, so a block being renamed or split shows up here rather than as 29 rows arriving
-  // in the baseline at once. The negative half is synthetic, because the tree contains no
+test('the five Foundry-core focus resets are recognised, and a look-alike is not', () => {
+  // BOTH POLARITIES OF THE ONLY EXEMPTION THIS GATE HAS. The positive half is the live corpus:
+  // five roots, named, so a block being renamed or split shows up here rather than as 24 rows
+  // arriving in the baseline at once. The negative half is synthetic, because the tree contains no
   // look-alike today — and a permission with no counterexample is a permission nobody has tested.
   const { exempt } = bareFocusSelectors();
 
   assert.deepEqual(
     [...new Set(exempt.map((entry) => entry.reset))].sort(byCodePoint),
     [
-      '.fabricate-app',
+      '.fabricate',
       '.fabricate-interactable-browser-app',
       '.fabricate-interactable-config-app',
       '.fabricate-interactables-manager',
-      '.fabricate-manager',
       '.fabricate-roll-prompt-dialog',
     ],
-    'the set of roots suppressing core focus has changed. Issue 1501 collapses the app/manager ' +
-      'pair and issue 1520 deletes the three interactables copies, so this list is expected to ' +
-      'shrink — but each of those is a deliberate edit here, not a silent one.'
+    'the set of roots suppressing core focus has changed. Issue 1501 has collapsed the ' +
+      'app/manager pair onto the module root `.fabricate` and issue 1520 deletes the three ' +
+      'interactables copies, so this list is expected to shrink again — but each of those is a ' +
+      'deliberate edit here, not a silent one.'
   );
-  assert.equal(exempt.length, 29, 'the six blocks name 29 selectors between them');
+  assert.equal(exempt.length, 24, 'the five blocks name 24 selectors between them');
 
   // A rule that merely CONTAINS a reset compound is not a reset. This is the cheapest way to
   // launder a finding: append the offending selector to the block that is already exempt.
@@ -419,7 +420,7 @@ test('no bare :focus selector survives outside a Foundry-core reset', () => {
       'primitive declares its full state set" requirement. Bare `:focus` draws the ring for a ' +
       'MOUSE click as well as for the keyboard, which is the state the rule exists to keep apart. ' +
       "Write `:focus-visible`. There are two exceptions, both suppressing Foundry core's own " +
-      'ring and both recognised by SHAPE rather than by line: the six allow-listed area reset ' +
+      'ring and both recognised by SHAPE rather than by line: the five allow-listed root reset ' +
       "blocks, and a primitive family's focus STRIP half — a single-compound rule on the class " +
       'the primitive emits, declaring exactly `outline: none; box-shadow: none`. That second one ' +
       'is REQUIRED CHROME rather than debt: `design-system/spec.md` says the chrome a primitive ' +
