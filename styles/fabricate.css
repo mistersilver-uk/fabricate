@@ -21987,6 +21987,350 @@
   text-align: center;
 }
 
+/* ══════════════════════════════════════════
+   THE APP'S ONE SELECT (issue 1504)
+   ══════════════════════════════════════════
+   `components/Select.svelte` composes `SearchablePopover` with the query field suppressed, so
+   every element these rules paint is one THAT primitive renders and every class they hang from
+   is one `Select` hands it through a `*Class` prop. The family lives HERE rather than in the
+   component's own scoped block, for three reasons in order of force. (i)
+   `openspec/specs/design-system/spec.md` roots a shared primitive's family at the primitive,
+   and the programme that is re-rooting families INTO this sheet would otherwise have had one
+   member nobody could gate. (ii) `searchable-popover-area-scope.test.js` reads THIS FILE, so a
+   scoped-style family gives that gate no written selectors to quantify over. (iii)
+   `tests/helpers/scoped-component-css.js` records that a scoped rule compiles to TWO classes
+   and is injected AFTER this sheet, unlayered — so it silently out-ranks every global rule,
+   which is a hazard to remove rather than a mechanism to build a primitive on.
+
+   THE POSITION IN THIS FILE IS LOAD-BEARING. This sheet imports at `layer(modules)`, so the
+   eleven rules that reach `Select`'s elements — enumerated mechanically by matching every
+   selector in this file against the rendered DOM, not argued in prose — are ordinary
+   same-layer contests. Two cannot be won at the shape the family would naturally take, and
+   both are answered by specificity:
+
+     `:1435 .fabricate-manager button { font: inherit }` at (0,1,1) beats a bare
+     `.fabricate-select-trigger-<rung>` at (0,1,0), and would leave every trigger inside the
+     manager at whatever the manager root inherits. So the three rung rules are written
+     through the picker root the component already owns, at (0,2,0).
+
+     `:1071 .fabricate button:focus-visible` at (0,2,1) is the SUPPLYING half of the area's
+     focus pair. The focus rule below is written at (0,3,0), which beats it outright.
+
+   The rest are TIES this block wins on SOURCE ORDER, which is why it sits immediately after
+   the `.fabricate-picker*` family and before the roll prompt: `:21720` the panel's
+   `min-width: 240px` / `max-width: 340px` / `border-radius: 10px` at (0,2,0), `:21846` the
+   group heading's inset at (0,2,0), `:21871` the option row's `align-items: center` at (0,2,0)
+   and `:21889` its `:hover` fill at (0,3,0). That is exactly how the shipped
+   `.fabricate-picker-popover.manager-recipe-or-popover` variant above releases the same 240px
+   floor, and every resulting number is MEASURED in a real browser by
+   `tests/components/manager-layout.test.js` rather than inferred here.
+
+   Every class in this family carries the `fabricate-` namespace prefix, so the area-scope
+   gate's entry declares each one as a namespace ROOT rather than reading it as an application
+   root. And no rule here reads an area-scoped custom property: the `toolbar` rung's type is
+   the LITERAL `0.72rem`, because `--fab-recipe-control-font` is declared only inside the
+   `.fabricate-manager` block and would fall back to inheritance on a player surface. */
+
+/* THE FOUNDRY HOST RESET IS THE FIRST DECLARATIONS, and each answers a core rule rather than a
+   preference. `foundry2.css` declares `button { display: flex; justify-content: center }` in
+   `@layer elements.forms`, so without `justify-content: flex-start` every value in every
+   select centres; and `button { height: var(--button-size) }` is a FIXED height rather than a
+   floor, so `height: auto` is what lets `min-height` be a floor at all. Both are what
+   `.fabricate-picker .manager-travel-picker-trigger` and
+   `.fabricate-app .fabricate-app-primary-button` already write for the same reason.
+
+   There is no `width` and no `min-width` here, deliberately. The specimen says a select "sets
+   its own width against core's `input{width:100%}`", and a `<button>` hugs its content by
+   default; the manager pager's 64px floor and the player pagers' fills are PER-SITE skin
+   stated at those sites, because the trigger's box is the one thing this API does not
+   address. */
+.fabricate-select-trigger {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  height: auto;
+  padding: 0 var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* THE THREE RUNGS, AND WHY EACH IS TWO COMPOUNDS. Each names a height, a corner, a type size,
+   a weight AND a fill, because the fill is its own axis: the specimen puts the form control on
+   surface-soft "in cards" and the inline one on bg-2 "inside bg-1 rows", and the toolbar rung
+   is the scoped-catalogue control line's own 34px band on bg-1.
+
+   The leading `.fabricate-select` is not decoration. `.fabricate-manager button { font:
+   inherit }` is (0,1,1) and declares the same font-size and font-weight these rules do, so a
+   one-class rung rule would lose inside the manager and the same control would render two
+   different ways in the two areas — the exact claim a shared primitive makes and the one this
+   family exists to keep. */
+.fabricate-select .fabricate-select-trigger-form {
+  min-height: 38px;
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.fabricate-select .fabricate-select-trigger-inline {
+  min-height: 30px;
+  border-radius: 7px;
+  background: var(--fab-bg-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* THE LITERAL IS THE POINT. `--fab-recipe-control-font` has exactly one declaration site,
+   inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it
+   is undefined and the size falls back to inheritance. `0.72rem` is the same number in both
+   areas, and the weight is a published ramp numeral rather than the `normal` the shipped
+   toolbar select computes today. */
+.fabricate-select .fabricate-select-trigger-toolbar {
+  min-height: 34px;
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* THE FOCUS TREATMENT, and why it is written at three compounds. `.fabricate button:focus` and
+   `.fabricate button:focus-visible` reach this button at (0,2,1) — the first strips Foundry's
+   orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus
+   state is "border to accent-border, no glow". So this rule has to beat the SUPPLYING half,
+   which (0,3,0) does outright. Because the winning rule draws no outset ring, the clipped-edge
+   defect that `.fabricate-app select:focus-visible`'s INSET ring exists for cannot arise for a
+   converted player control: there is no ring to clip. */
+.fabricate-select .fabricate-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-select-trigger[aria-invalid='true'] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+/* `aria-disabled` is the READONLY shape — the button keeps its tab stop and refuses to open —
+   and `:disabled` is the whole control off. They differ in the ink they take and in nothing
+   else, so both are stated rather than one being made to answer for the other. */
+.fabricate-select-trigger[aria-disabled='true'] {
+  color: var(--fab-text-muted);
+  cursor: default;
+}
+
+.fabricate-select-trigger:disabled {
+  color: var(--fab-text-disabled);
+  cursor: default;
+}
+
+/* The value takes the row's slack, which is what pushes the chevron to the trailing edge
+   without a margin of its own — and what makes the label ellipsise instead of widening the
+   trigger past its column. */
+.fabricate-select-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-select-value-placeholder {
+  color: var(--fab-text-subtle);
+}
+
+/* Tabular figures are part of the mono contract, not an extra: a value change must not shift
+   the width of the control beside it. */
+.fabricate-select-value-mono {
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The leading glyph and the chevron are both quiet, as the specimen draws them. The chevron is
+   the last one, and `auto` is what keeps it on the trailing edge for a trigger with no value
+   span at all. */
+.fabricate-select-trigger > i {
+  flex: none;
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-select-trigger > i:last-child {
+  margin-inline-start: auto;
+}
+
+/* THE PANEL. The specimen corners the option list at 11px;
+   `.fabricate-picker-popover.manager-travel-popover` corners it at 10 and floors it at 240px.
+   Both rules are (0,2,0) on ONE element — the panel is portaled out of the picker root, so
+   there is no descendant form available — so this variant is written in the same shape and
+   wins on source order, exactly as `.manager-recipe-or-popover` above does for the same two
+   declarations. `tests/components/manager-layout.test.js` measures the result. */
+.fabricate-picker-popover.fabricate-select-popover {
+  border-radius: 11px;
+}
+
+/* THE BAND IS RESTATED HERE BECAUSE THE PROP ALONE IS NOT ENOUGH. `anchoredPopover` writes the
+   panel's width as an inline style computed inside `[minWidth, maxWidth]`, and the shared
+   box's own `min-width: 240px` then FLOORS that result — so a 96px band would still open a
+   240px panel over a list of two-digit numbers. These figures mirror `SIZES` in
+   `Select.svelte`, and a mounted case reads both out of the two files and pins them equal. */
+.fabricate-picker-popover.fabricate-select-popover-form {
+  min-width: 240px;
+  max-width: 340px;
+}
+
+.fabricate-picker-popover.fabricate-select-popover-inline {
+  min-width: 96px;
+  max-width: 240px;
+}
+
+.fabricate-picker-popover.fabricate-select-popover-toolbar {
+  min-width: 160px;
+  max-width: 320px;
+}
+
+/* THE ROW. `align-items: flex-start` rather than the shared row's `center`, and that is the
+   whole geometry of a ticked-and-hinted row: with a hint the row is two lines, and a centred
+   tick would float between them instead of sitting on the line it marks. The tick's own box
+   below is matched to the label's first-line height, which is what puts it on line one. */
+.fabricate-select-popover .fabricate-select-option {
+  align-items: flex-start;
+}
+
+/* The selected row keeps a FILL as well as the tick, because the tick is an 11px glyph in a
+   scanned column and the fill is what the eye finds first. It is written at (0,3,0) so it
+   beats `.fabricate-picker-popover .manager-travel-option:hover` on order rather than losing
+   to it — hovering the current value must not read as deselecting it. */
+.fabricate-select-popover .fabricate-select-option[aria-selected='true'] {
+  background: var(--fab-surface-active);
+}
+
+/* Opacity alone is not a reason, which is why `disabledReason` renders beside this. The state
+   hook is the primitive's own `aria-disabled` attribute rather than a class, because an
+   attribute cannot drift from the behaviour it describes. */
+.fabricate-select-option[aria-disabled='true'] {
+  color: var(--fab-text-disabled);
+  cursor: default;
+}
+
+/* THE GROUP HEADING'S INSET. A heading aligns with the option LABELS, not with the tick
+   column. Equal insets would put it over the ticks, so the inset is the row's own padding PLUS
+   the tick box PLUS the row gap — 8 + 12 + 8 = 28px on this tree's figures, all three of them
+   published spacing steps. Without a tick column there is nothing to clear and the heading
+   falls back to the row's own inset.
+
+   The specimen's arithmetic is 10 + 11 + 8 = 29 against a 10px row inset and an 11px check;
+   this tree's option row is inset by `--fab-space-2` and the spacing scale publishes no 10px
+   step, so the same RULE lands on a different number and the tick box takes the
+   `--fab-space-3` rung.
+
+   THE HEADING IS ADDRESSED BY `[data-popover-group] > p` AND NOT BY ITS CLASS, and that is
+   forced rather than stylistic. `searchable-popover-area-scope.test.js` reads any `fabricate-*`
+   class outside a primitive's own `roots` as an APPLICATION root, so a selector naming both
+   `.fabricate-select-popover` and `SearchablePopover`'s own `.manager-travel-popover-group-label`
+   is classified as a rule that primitive OWNS and app-rooted, and the gate reds — measured, not
+   predicted. The shipped exemption for a caller styling the primitive's markup depends on the
+   caller's class NOT carrying the `fabricate-` prefix (`.manager-salvage-component-trigger
+   .manager-travel-portrait` is the pattern), and every class in this family carries it by
+   design. `data-popover-group` is the primitive's own group hook, so this reaches the same
+   element through the contract rather than through the class. It tests the attribute's PRESENCE
+   only: its value is the localized group heading and nothing may key off that. */
+.fabricate-select-popover [data-popover-group] > p {
+  margin: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2) var(--fab-space-2xs);
+}
+
+.fabricate-select-popover-ticked [data-popover-group] > p {
+  padding-inline-start: calc(var(--fab-space-2) * 2 + var(--fab-space-3));
+}
+
+/* THE ROW'S CONTENT, which is the only markup `Select` writes itself — and therefore the only
+   part of this family that satisfies the area-scope gate's `emitted` precondition from the
+   component's own `class="…"` attributes.
+
+   `em` rather than a pixel figure for the tick's height, so the box IS the label's first line
+   however the rung's type size moves: the tick sits on line one of a two-line row by
+   construction rather than by two numbers that have to be kept equal. */
+.fabricate-select-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fab-space-3);
+  height: 1.4em;
+  color: var(--fab-accent);
+  font-size: 11px;
+  opacity: 0;
+}
+
+.fabricate-select-option[aria-selected='true'] .fabricate-select-tick {
+  opacity: 1;
+}
+
+.fabricate-select-lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-select-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A label ABOVE a description is the louder of the two, which is the specimen's own grouped
+   row: 600 over a hint rather than 500 beside nothing. */
+.fabricate-select-lines .fabricate-select-label {
+  font-weight: 600;
+}
+
+.fabricate-select-hint {
+  min-width: 0;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+/* The badge and the reason both sit at the row's trailing edge, which is where the specimen
+   draws them — the badge on an available row, the reason on a gated one. */
+.fabricate-select-badge,
+.fabricate-select-reason {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+/* THE LABELLED FORM. `.manager-field` and its `> span` caption are already declared in this
+   sheet, so the column, its gap and the caption's kicker treatment are inherited rather than
+   restated. Only the two trailing lines are this component's, and they are the specimen's
+   `k-hint` and `k-err` exactly. Both are declared DIRECTLY on the span, which is why they beat
+   the 0.82rem/700 `.fabricate-manager .manager-field` hands its children by inheritance
+   whatever the two selectors' specificities are. */
+.fabricate-select-note {
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.fabricate-select-error {
+  color: var(--fab-danger-text);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
 /* ==========================================
    Interactive roll prompt (DialogV2)
    ==========================================

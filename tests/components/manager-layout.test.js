@@ -12274,18 +12274,21 @@ test('the source picker`s trigger fills its column, and only one of its two site
 //      subtle-but-wrong, it is a control that renders at Foundry's 14px app base with core's own
 //      fixed button height. So the same fixture is measured with NO `.fabricate-manager` ancestor
 //      and again inside one, and the two are asserted IDENTICAL rung for rung.
-//   2. WHETHER THE COMPONENT'S OWN RULES BEAT THE 29 `.fabricate-picker*` RULES IT INHERITS.
+//   2. WHETHER THE FAMILY'S OWN RULES BEAT THE `.fabricate-picker*` RULES IT INHERITS.
 //      `<Select>` renders inside `SearchablePopover`'s own root and panel, so
 //      `.fabricate-picker-popover.manager-travel-popover` — (0,2,0) ON ONE ELEMENT — reaches its
 //      panel and declares `min-width: 240px`, `max-width: 340px` and `border-radius: 10px`. The
-//      component wins on the LAYER axis (this sheet imports at `layer(modules)`; a `css:
-//      'injected'` block lands unlayered), and these are the two declarations that prove it: an
-//      inline panel opening at 240px over a list of two-digit numbers is the defect.
+//      `.fabricate-select*` family lives in THIS SHEET, in the same `layer(modules)` (issue
+//      1504), so there is no layer axis to win on: the panel variant is written in the same
+//      two-compound shape and wins on SOURCE ORDER, exactly as the shipped
+//      `.manager-recipe-or-popover` variant does for the same two declarations. These are the
+//      declarations that prove it landed: an inline panel opening at 240px over a list of
+//      two-digit numbers is the defect.
 //   3. WHETHER FOUNDRY'S OWN FOCUS RING IS REPLACED RATHER THAN JOINED. Core paints a burnt-orange
 //      outline plus a 4px glow on `button:focus`; `.fabricate button:focus` strips both and
 //      `.fabricate button:focus-visible` restores a 2px accent OUTSET outline at (0,2,1). The
-//      specimen's focus state is "border to accent-border, no glow", so the component's own rule
-//      has to beat the SUPPLYING half — and because the winning rule draws no outset ring at all,
+//      specimen's focus state is "border to accent-border, no glow", so the family's own rule
+//      has to beat the SUPPLYING half on specificity alone — and because the winning rule draws no outset ring at all,
 //      the clipped-edge defect that `.fabricate-app select:focus-visible`'s INSET ring exists for
 //      cannot arise once the player's page-size control moves off `select` and onto `button`.
 //
@@ -12294,7 +12297,6 @@ test('the source picker`s trigger fills its column, and only one of its two site
 // difference is exactly this: a rule reading that property computes the INHERITED size outside
 // `.fabricate-manager`, so the player half of clause 1 would fail there. The fixture therefore
 // gives the player area Foundry's own 14px app base, so "inherited" and "11.52px" cannot coincide.
-const selectPath = resolve(__dirname, '../../src/ui/svelte/components/Select.svelte');
 const framePath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'
@@ -12369,7 +12371,7 @@ function selectPanelFixture(area, rung, { ticked }) {
       role="dialog"
     >
       <div class="manager-travel-popover-options fabricate-select-options" role="listbox">
-        <div class="manager-travel-popover-group" role="group">
+        <div class="manager-travel-popover-group" role="group" data-popover-group="instructions">
           <p class="manager-travel-popover-group-label" data-probe="${area}-heading-${rung}">Instructions</p>
           <button
             type="button"
@@ -12384,18 +12386,15 @@ function selectPanelFixture(area, rung, { ticked }) {
 }
 
 test('the shared Select paints identically in both areas, and beats the paint it inherits', async () => {
-  const selectScoped = scopedComponentCss(selectPath);
   const frameScoped = scopedComponentCss(framePath);
 
-  // ONLY the classes `Select.svelte` itself writes take its hash. Its trigger, its value span, its
-  // panel, its list, its rows and the group heading all belong to `SearchablePopover`, so those
-  // rules are `:global(…)` and are already unhashed in the emitted CSS — stamping them would make
-  // the fixture MORE specific than the product.
+  // `Select.svelte` has NO scoped block to compile: issue 1504 lifted the whole
+  // `.fabricate-select*` family into `styles/fabricate.css`, so every selector below — the row
+  // content included — is already in the `${css}` the fixture loads at `layer(modules)`, at the
+  // specificity the product ships. Only the frame's direction toggle is still scoped, and only it
+  // is stamped.
   const stamp = (markup) =>
-    ['fabricate-select-tick', 'fabricate-select-label', 'fabricate-select-hint'].reduce(
-      (html, className) => withScopeHash(html, className, selectScoped.hashClass),
-      withScopeHash(markup, 'manager-scoped-list-direction', frameScoped.hashClass)
-    );
+    withScopeHash(markup, 'manager-scoped-list-direction', frameScoped.hashClass);
 
   const areaBody = (area, panels) =>
     `${`<button type="button" data-probe="${area}-anchor">anchor</button>`}
@@ -12430,7 +12429,6 @@ test('the shared Select paints identically in both areas, and beats the paint it
             }
             @layer modules { ${css} }
             ${frameScoped.css}
-            ${selectScoped.css}
             :root { --button-size: 28px; --button-focus-outline-color: #ff6400; font-size: 16px; }
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
             /* Foundry's own application base, which is what "inherited" means outside the manager
@@ -12682,8 +12680,6 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
   // Programmatic `.focus()` on a `<button>` does NOT match `:focus-visible` in Chromium, so the
   // keyboard half focuses a preceding anchor and presses Tab — a real keyboard interaction, which
   // is what sets the focus-visible modality.
-  const selectScoped = scopedComponentCss(selectPath);
-
   const context = await sharedBrowser.newContext({
     viewport: { width: 900, height: 400 },
     deviceScaleFactor: 1,
@@ -12706,7 +12702,6 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
               }
             }
             @layer modules { ${css} }
-            ${selectScoped.css}
             :root { --button-size: 28px; --button-focus-outline-color: #ff6400; font-size: 16px; }
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
             .fabricate { font-size: 14px; }
@@ -12786,8 +12781,8 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
       assert.equal(
         tabbed.outlineStyle,
         'none',
-        `${area}: "no glow" — so the component's rule beats \`.fabricate button:focus-visible\`'s ` +
-          '2px accent outset outline at (0,2,1), which it does on the layer axis and again at (0,3,0)'
+        `${area}: "no glow" — so the family's rule beats \`.fabricate button:focus-visible\`'s ` +
+          '2px accent outset outline at (0,2,1), which it does at (0,3,0) in the same layer'
       );
       assert.equal(
         tabbed.boxShadow,
@@ -12802,6 +12797,108 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
         `${area}: nor is the accent outline merely recoloured — it is gone`
       );
     }
+  } finally {
+    await context.close();
+  }
+});
+
+// THE ONE LIFTED CONTEST THAT ONLY A HOVER CAN SETTLE (issue 1504).
+//
+// `.fabricate-picker-popover .manager-travel-option:hover { background: var(--fab-surface-raised) }`
+// is (0,3,0) and, since the `.fabricate-select*` family moved out of a scoped block and into this
+// sheet, it sits in the SAME `layer(modules)` as the family's selected-row fill. So the fill is
+// written at (0,3,0) too and wins on source order; at (0,2,0) — the shape it would naturally
+// take — a hovered current value would take the shared row's hover fill instead, which reads as
+// deselecting the very row a GM is pointing at.
+//
+// It gets its own fixture rather than a clause in the paint test above because that fixture stacks
+// two absolutely-positioned panels per area, so nothing in it is hoverable: Playwright's
+// actionability check reports the sibling panel intercepting pointer events. One panel, one row.
+test('a hovered SELECTED option row keeps the shared Select`s own fill', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 320 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: var(--button-size); }
+            }
+            @layer modules { ${css} }
+            :root { --button-size: 28px; font-size: 16px; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fabricate { font-size: 14px; }
+            .fas::before { content: "x"; }
+            /* The panel is portaled in the product; here it is simply static, so the row it holds
+               is the topmost element at its own coordinates and a real hover can reach it. */
+            .fabricate-picker-popover.manager-travel-popover { position: static; }
+            .probe { width: 10px; height: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="fabricate fabricate-app">
+            <div
+              class="fabricate-picker-popover manager-travel-popover fabricate-select-popover fabricate-select-popover-inline fabricate-select-popover-ticked"
+              role="dialog"
+            >
+              <div class="manager-travel-popover-options fabricate-select-options" role="listbox">
+                <button
+                  type="button"
+                  class="manager-travel-option fabricate-select-option"
+                  role="option"
+                  aria-selected="true"
+                  data-probe="selected-row"
+                ><span class="fabricate-select-label">25</span></button>
+                <button
+                  type="button"
+                  class="manager-travel-option fabricate-select-option"
+                  role="option"
+                  aria-selected="false"
+                  data-probe="other-row"
+                ><span class="fabricate-select-label">50</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="probe" data-probe="surface-active" style="background: var(--fab-surface-active)"></div>
+          <div class="probe" data-probe="surface-raised" style="background: var(--fab-surface-raised)"></div>
+        </body>
+      </html>
+    `);
+
+    const fillOf = (probe) =>
+      page.evaluate(
+        (name) =>
+          getComputedStyle(document.querySelector(`[data-probe="${name}"]`)).backgroundColor,
+        probe
+      );
+    const tokens = {
+      active: await fillOf('surface-active'),
+      raised: await fillOf('surface-raised'),
+    };
+    assert.notEqual(tokens.active, tokens.raised, 'the two fills are distinguishable at all');
+
+    await page.hover('[data-probe="other-row"]');
+    assert.equal(
+      await fillOf('other-row'),
+      tokens.raised,
+      'an unselected row still takes the shared row hover fill, so the family did not blanket it'
+    );
+
+    await page.hover('[data-probe="selected-row"]');
+    assert.equal(
+      await fillOf('selected-row'),
+      tokens.active,
+      'and the SELECTED row keeps its own fill under the pointer, which a rule written below ' +
+        '(0,3,0) would have lost to the shared row`s hover fill in the same layer'
+    );
   } finally {
     await context.close();
   }
