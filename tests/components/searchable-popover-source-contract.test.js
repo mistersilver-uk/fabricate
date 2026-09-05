@@ -332,7 +332,7 @@ test('every popover names its trigger and the panel that opens', () => {
       'caller has a caption rather than a string. With neither, a GM using a screen reader ' +
       'is told a dialog opened and is not told what it is for, then lands in a list with no ' +
       'name either. Nothing else reports this: it is invisible in a frame, it is not a ' +
-      'compiler error and no lint rule covers it. `ComponentIdentityStrip``s source-actions ' +
+      "compiler error and no lint rule covers it. `ComponentIdentityStrip`'s source-actions " +
       `menu shipped in exactly that state:\n  ${unnamed.join('\n  ')}`
   );
 });
