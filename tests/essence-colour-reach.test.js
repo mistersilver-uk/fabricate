@@ -7,8 +7,10 @@
  * 1. THE PROJECTIONS NEVER LIFTED THE FIELD. `buildItemCards` resolved an essence's name and icon
  *    from the definition and stopped there, and `buildEditableEssenceOptions` is a whitelist rebuild
  *    that named `enabled` and not `colorToken` — so the rules editor's card took a `color` prop that
- *    nothing ever fed. Both now carry `colorToken`, and the memo signature carries it too, or a
- *    recoloured essence would serve a stale card until some unrelated field moved.
+ *    nothing ever fed. Both now carry `colorToken`. The item-card MEMO SIGNATURE does not, and the
+ *    claim that it must (r18-colour) was false as written: that memo guards only the async source
+ *    resolution, and a card's `essences` — colour included — is rebuilt on every projection call,
+ *    so no recolour can be served stale from it (issue 1371 r19-store2, QE round 5).
  * 2. THE WORLD EDITOR'S COLOUR NEVER REACHED A SYSTEM ROW. The world essence entry writes identity
  *    onto the world entity alone; the in-system row keeps the explicit `colorToken: null` the
  *    normalizer emits; and the read union answers identity from the in-system row first. So the

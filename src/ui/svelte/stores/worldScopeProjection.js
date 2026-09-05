@@ -535,7 +535,16 @@ function indexDefaults(defaults) {
  * is on and the world authored one, this system's own in-system row otherwise. It is named for
  * what it is so no world editor writes it back — the world entry authors `defaults.essences`, and
  * the rules editor authors the in-system row; this row only says which of the two the system
- * reads, which is what the entry's per-system rows and the rules editor's inherit choice state.
+ * reads.
+ *
+ * NO SCREEN CONSUMES IT YET, and the docblock said otherwise until r19-store2. The entry's
+ * systems card draws no essence surface, and the rules editor reads `inherited.essences` and the
+ * world entry's `defaults.essences` directly. It is published ahead of its consumer — the
+ * per-system essence run on `WorldComponentEntrySystemsCard`, which is not this lane's file — and
+ * `tests/world-scope-projection.test.js` and `tests/stores/admin-store-component-scope.test.js`
+ * pin the fact it states. The system rules LIST answers the same question from the read union
+ * instead (`adminComponentRowProjection`'s `_resolvedEssencesBySystemComponent`), because that
+ * projection is per SYSTEM and already holds the manager.
  *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system

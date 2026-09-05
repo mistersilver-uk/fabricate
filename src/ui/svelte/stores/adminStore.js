@@ -45,6 +45,10 @@ import {
   normalizeCharacterPrerequisite,
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
+// THE ESSENCE MAP'S EQUALITY, from the module that owns its shape (issue 1371 r19-store2): a
+// system-scope save that restates the map the system already resolves has authored nothing,
+// and must not be turned into an override. Same comparison the `1.32.0` marker decides on.
+import { componentEssenceMapsEqual } from '../../../systems/componentScope.js';
 import {
   buildExportPayload,
   validateImportData,
@@ -5974,6 +5978,153 @@ export function createAdminStore(services) {
     return byId;
   }
 
+  // ── A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE ────────────────────────────────────────────
+  //
+  // Issue 1371 r19-store2, the driver's ruling on the reviewer's round-5 finding 3, under the M31
+  // model. The world component record carries an `essences` SECTION and every system inherits it
+  // unless its membership record overrides, so the read union OVERWRITES an inheriting system's
+  // own row with the world map (`scopedDefinitionStore`'s `applyInheritedSections`). A write made
+  // on a SYSTEM screen — the Component Studio's bulk `Essence values` axis, or the component
+  // editor's own card — therefore landed on a field nothing resolves, while the panel counted it
+  // and said `N updated`. After the `1.32.0` election that is EVERY component in a one-system
+  // world, which is where the maintainer works.
+  //
+  // The answer is the rules editor's own: `ComponentEditView`'s `setEssenceInheritance` writes the
+  // FLAG first through `setSectionInherited` and the VALUES second, so a flag-only landing leaves
+  // the system overriding rather than persisting a map the union masks. These three helpers put
+  // every other system-scope essence writer on that same order.
+  //
+  // ONE FLAG WRITE PER PAIR, not one per batch, and that is deliberate: refusal is per pair, so a
+  // pair whose flag will not move is dropped from the value write instead of taking the batch down
+  // with it. The world catalogue's own bulk essence group already writes one world-section write
+  // per record, so a per-record write is the established shape of this change rather than a new
+  // cost. And a REFUSED world-setting write REJECTS rather than answering `false` — Foundry's
+  // `SocketInterface.dispatch` toasts `error.message` and then rejects — so the stop catches as
+  // well as testing the answer.
+
+  /**
+   * The components whose `essences` section this system INHERITS, so a value write here would be
+   * shadowed by the world map until the switch moves.
+   *
+   * A pair with NO membership record is absent from the answer: nothing shadows a component the
+   * world corpus does not hold for this system, and the write is what it always was.
+   *
+   * @param {string} systemId
+   * @returns {Set<string>}
+   */
+  function _componentEssenceInheritingIn(systemId) {
+    const inheriting = new Set();
+    let memberships;
+    try {
+      // OFF THE PUBLISHED CORPUS, as `_worldComponentEntities` reads the roster: the corpus is the
+      // normalized array shape, and `listMemberships()` is that same array by another name.
+      memberships = services.getComponentScopeStore?.()?.corpus?.()?.membership;
+    } catch {
+      return inheriting;
+    }
+    for (const record of Array.isArray(memberships) ? memberships : []) {
+      if (record?.systemId !== systemId) continue;
+      if (isSectionInherited(record, 'essences')) inheriting.add(record.entityId);
+    }
+    return inheriting;
+  }
+
+  /**
+   * Flip ONE pair's `essences` switch off ahead of a value write.
+   *
+   * The UNWRAPPED family verb, because every caller here already refreshes once for the whole
+   * write; the wrapped one would re-project per component.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether the pair may now be written.
+   */
+  async function _overrideComponentEssences(entityId, systemId) {
+    try {
+      const flipped = await worldScopeFamilies.component.setSectionInherited(
+        entityId,
+        systemId,
+        'essences',
+        false
+      );
+      return flipped !== false;
+    } catch (error) {
+      console.error('Fabricate | Failed to override a component essence section:', error);
+      return false;
+    }
+  }
+
+  /**
+   * The subset of a set-apply cohort a staged `essences` axis may be written to, having flipped
+   * each inheriting pair to OVERRIDE first.
+   *
+   * An edit with no `essences` axis is returned untouched: `category` and `tags` are answered from
+   * the same row and are not shadowed by this section.
+   *
+   * @param {string} systemId
+   * @param {string[]} componentIds
+   * @param {object} edit the staged axes.
+   * @returns {Promise<string[]>}
+   */
+  async function _essenceOverrideCohort(systemId, componentIds, edit) {
+    if (!Object.hasOwn(edit ?? {}, 'essences')) return componentIds;
+    const inheriting = _componentEssenceInheritingIn(systemId);
+    if (inheriting.size === 0) return componentIds;
+    const writable = [];
+    // ONE FLAG WRITE PER PAIR, in selection order and awaited one at a time, so a refusal stops
+    // that pair rather than the batch. See this block's note.
+    for (const id of componentIds) {
+      if (!inheriting.has(id) || (await _overrideComponentEssences(id, systemId))) writable.push(id);
+    }
+    return writable;
+  }
+
+  /**
+   * The `updates` a SINGLE component write may make, having settled its `essences` axis.
+   *
+   * THREE ANSWERS, and the first is the one that protects authored data. The component editor
+   * seeds its steppers from the item card — which draws what the system RESOLVES — and sends
+   * `essences` on every save whether or not the GM touched the card, which is locked while the
+   * section inherits. A save that merely restates the resolved map has authored nothing, so the
+   * key is DROPPED: writing it would replace the system's dormant own map, which is exactly what
+   * it falls back to if the world section is later cleared. A map that DIFFERS is a real authored
+   * override and takes the flag-then-values order. A refused flag write answers `null`, which
+   * refuses the whole save.
+   *
+   * @param {string} systemId
+   * @param {string} itemId
+   * @param {object} updates
+   * @returns {Promise<object|null>}
+   */
+  async function _componentUpdatesAfterEssenceOverride(systemId, itemId, updates) {
+    if (!Object.hasOwn(updates, 'essences')) return updates;
+    if (!_componentEssenceInheritingIn(systemId).has(itemId)) return updates;
+    if (componentEssenceMapsEqual(updates.essences, _resolvedComponentEssences(systemId, itemId))) {
+      const next = { ...updates };
+      delete next.essences;
+      return next;
+    }
+    return (await _overrideComponentEssences(itemId, systemId)) ? updates : null;
+  }
+
+  /**
+   * What one system resolves for one component's essences, through the read union.
+   *
+   * @param {string} systemId
+   * @param {string} itemId
+   * @returns {unknown}
+   */
+  function _resolvedComponentEssences(systemId, itemId) {
+    let rows;
+    try {
+      rows = services.getCraftingSystemManager?.()?.getComponentsForSystem?.(systemId);
+    } catch {
+      return;
+    }
+    return (Array.isArray(rows) ? rows : []).find((row) => String(row?.id ?? '') === itemId)
+      ?.essences;
+  }
+
   /**
    * The in-system component record adoption creates: the world entity's IDENTITY and its THREE
    * SOURCE-LINK FIELDS, and nothing else.
@@ -6105,8 +6256,13 @@ export function createAdminStore(services) {
     const ids = Array.from(componentIds || [], String).filter(Boolean);
     if (!systemManager || !system || ids.length === 0) return false;
     if (!edit || typeof edit !== 'object' || Object.keys(edit).length === 0) return false;
+    // THE SAME OVERRIDE RULE AS THE STUDIO'S OWN BULK EDIT (issue 1371 r19-store2). This verb
+    // writes the same rows through the same primitive with the system named by the caller, so it
+    // cannot take a different view of what an essence write on an inheriting pair means.
+    const writable = await _essenceOverrideCohort(system, ids, edit);
+    if (writable.length === 0) return false;
     try {
-      const result = await systemManager.applyBulkEditToComponents(system, ids, edit);
+      const result = await systemManager.applyBulkEditToComponents(system, writable, edit);
       return {
         updated: Number(result?.updated) || 0,
         componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
@@ -11253,8 +11409,15 @@ export function createAdminStore(services) {
     if (!updates || typeof updates !== 'object') return false;
     if (Object.keys(updates).length === 0) return true;
 
+    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2). See
+    // `_componentUpdatesAfterEssenceOverride`: the flag moves first, an untouched restatement of
+    // the resolved map writes nothing, and a refused flag write refuses the save.
+    const staged = await _componentUpdatesAfterEssenceOverride(sysId, String(itemId), updates);
+    if (staged === null) return false;
+    if (Object.keys(staged).length === 0) return true;
+
     try {
-      await systemManager.updateItem(sysId, itemId, updates);
+      await systemManager.updateItem(sysId, itemId, staged);
       await refresh();
       return true;
     } catch (error) {
@@ -11301,8 +11464,14 @@ export function createAdminStore(services) {
     if (!edit || typeof edit !== 'object') return null;
     if (Object.keys(edit).length === 0) return null;
 
+    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2): every inheriting pair
+    // in the cohort has its switch flipped FIRST, and a pair whose flag write is refused is
+    // dropped from the value write rather than counted as updated.
+    const writable = await _essenceOverrideCohort(sysId, ids, edit);
+    if (writable.length === 0) return null;
+
     try {
-      const result = await systemManager.applyBulkEditToComponents(sysId, ids, edit);
+      const result = await systemManager.applyBulkEditToComponents(sysId, writable, edit);
       await refresh();
       return {
         updated: Number(result?.updated) || 0,

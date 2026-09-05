@@ -23,6 +23,7 @@ import { get } from 'svelte/store';
 
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
 import { membershipKey } from '../../src/systems/scopedDefinitions.js';
+import { resolveScopedEntityRead } from '../../src/systems/scopedEntityReads.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { recipeReferencesComponent } from '../../src/utils/recipeComponentReferences.js';
@@ -1035,4 +1036,361 @@ test('1371 r18: flipping the essences switch OFF makes the system resolve its OW
     'an overriding system answers its IN-SYSTEM rules, not the seeded membership copy'
   );
   assert.deepEqual(entry.inheritCounts, { category: 1, essences: 0 });
+});
+
+// ── THE SYSTEM RULES LIST READS WHAT THE SYSTEM RESOLVES (r19-store2) ─────────────────────────
+//
+// `getItems` is the AUTHORING accessor and answers the persisted row by design, so the row
+// projection was drawing each component's OWN essence map while the rules editor and every engine
+// reader answered the world map the pair inherits. After the `1.32.0` election that is every
+// component in a one-system world, so the first world essence edit left the list stale and
+// contradicting its own editor.
+
+/**
+ * Give the harness's manager the read union, through the seam the shipped manager delegates to.
+ *
+ * `CraftingSystemManager#getComponentsForSystem` is `resolveScopedComponents`, which is
+ * `resolveScopedEntityRead(system, corpus, 'components')`. The corpus is passed explicitly rather
+ * than probed off `game.fabricate`, which is the same call the manager makes with its injected
+ * store resolved.
+ *
+ * @param {object} harness
+ * @param {object} scope
+ * @returns {void}
+ */
+function installReadUnion(harness, scope) {
+  harness.services.getCraftingSystemManager().getComponentsForSystem = (systemId) =>
+    resolveScopedEntityRead(
+      harness.system.id === systemId ? harness.system : null,
+      scope.store.corpus(),
+      'components'
+    );
+}
+
+test('1371 r19: an item card draws the RESOLVED essence map, so a world edit reaches the rules list', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      { id: 'fire', name: 'Fire' },
+      { id: 'iron', name: 'Iron' },
+    ],
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+
+  const [card] = get(store.viewState).itemCards;
+  assert.deepEqual(
+    card.essences.map((essence) => [essence.id, essence.quantity, essence.name]),
+    [['fire', 3, 'Fire']],
+    'the row and the inspector draw the world map the pair inherits, not the stale in-system row'
+  );
+});
+
+test('1371 r19: and an OVERRIDING pair still draws its own map', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      { id: 'fire', name: 'Fire' },
+      { id: 'iron', name: 'Iron' },
+    ],
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: { essences: false },
+  };
+  await store.refresh();
+
+  const [card] = get(store.viewState).itemCards;
+  assert.deepEqual(
+    card.essences.map((essence) => [essence.id, essence.quantity]),
+    [['iron', 2]],
+    'the switch is what decides, exactly as it does for the editor and the engine'
+  );
+});
+
+test('1371 r19: a manager with no read union at all still draws the persisted row', async () => {
+  // The union accessor is optional on this path: the direct-projection suites and every caller
+  // that hands `buildItemCards` a bare `getItems` fake must keep working unchanged.
+  const harness = makeEssenceStoreHarness({
+    essences: [{ id: 'iron', name: 'Iron' }],
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+  const { store } = await openStore(harness, [LINKED]);
+  await store.refresh();
+  const [card] = get(store.viewState).itemCards;
+  assert.deepEqual(card.essences.map((essence) => [essence.id, essence.quantity]), [['iron', 2]]);
+});
+
+// ── A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (r19-store2) ──────────────────────────────────
+//
+// The driver's ruling on reviewer round 5 finding 3, under the M31 model: the world record owns
+// the map and every system inherits it unless it overrides, so a write made on a SYSTEM screen —
+// the Component Studio's bulk `Essence values` axis, or the component editor's own card — is an
+// OVERRIDE. It flips `inherit.essences → false` for the pair FIRST and then writes the values, on
+// the rules editor's own flag-before-values order (`ComponentEditView.setEssenceInheritance`),
+// because the other order persists a map the union shadows and reports `N updated` for a write no
+// system resolves. A refused flag write stops that pair.
+
+/**
+ * A component-set write primitive over the harness's live system, recording the pair's switch
+ * state AS IT WAS WHEN THE VALUES ARRIVED — which is what "flag before values" is an assertion
+ * about.
+ *
+ * @param {object} harness
+ * @param {object} scope
+ * @returns {Array<object>} the recorded calls.
+ */
+function installBulkComponentWrite(harness, scope) {
+  const calls = [];
+  harness.services.getCraftingSystemManager().applyBulkEditToComponents = async (
+    systemId,
+    componentIds,
+    edit
+  ) => {
+    const ids = [...componentIds];
+    calls.push({
+      systemId,
+      componentIds: ids,
+      edit,
+      switchesOnArrival: ids.map(
+        (id) => scope.payload.membership[membershipKey(id, systemId)]?.inherit?.essences
+      ),
+    });
+    for (const component of harness.system.components) {
+      if (ids.includes(component.id) && Object.hasOwn(edit, 'essences')) {
+        component.essences = edit.essences;
+      }
+    }
+    return { updated: ids.length, componentIds: ids };
+  };
+  return calls;
+}
+
+/**
+ * The world corpus with one inheriting pair: the world authors `{fire: 3}`, the system's own row
+ * says `{iron: 2}`, and its switch is omitted — which is what the `1.32.0` pass leaves behind in
+ * a one-system world, and therefore the commonest pair there is.
+ *
+ * @returns {object} the harness.
+ */
+function makeInheritingPair() {
+  return makeEssenceStoreHarness({
+    essences: [
+      { id: 'fire', name: 'Fire' },
+      { id: 'iron', name: 'Iron' },
+      { id: 'ash', name: 'Ash' },
+    ],
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+}
+
+/**
+ * Seed the inheriting pair onto a store fake and republish.
+ *
+ * @param {object} store
+ * @param {object} scope
+ * @returns {Promise<void>}
+ */
+async function seedInheritingPair(store, scope) {
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+}
+
+/**
+ * What the system RESOLVES for `ingot` right now, through the shipped union.
+ *
+ * @param {object} harness
+ * @param {object} scope
+ * @returns {object|undefined}
+ */
+function resolvedIngotEssences(harness, scope) {
+  const rows = resolveScopedEntityRead(harness.system, scope.store.corpus(), 'components');
+  return rows.find((row) => row.id === 'ingot')?.essences;
+}
+
+test('1371 r19: a bulk essence write over an INHERITING pair flips the switch FIRST, then writes', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+
+  const result = await store.applyComponentBulkEdit(['ingot'], { essences: { ash: 4 } });
+
+  assert.deepEqual(
+    calls.map((call) => call.switchesOnArrival),
+    [[false]],
+    'the switch was ALREADY off when the values arrived — flag before values'
+  );
+  assert.equal(scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences, false);
+  assert.equal(result.updated, 1);
+  assert.deepEqual(
+    resolvedIngotEssences(harness, scope),
+    { ash: 4 },
+    'and the union answers what the GM staged, rather than shadowing it with the world map'
+  );
+});
+
+test('1371 r19: a REFUSED flag write stops that pair, and the values are not written', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+  // A refused world-setting write REJECTS rather than answering false (Foundry integrator round
+  // 5): `SocketInterface.dispatch` toasts and then rejects, so the stop must catch as well as test.
+  scope.store.save = async () => {
+    throw new Error('The requested Setting update was refused');
+  };
+
+  const result = await store.applyComponentBulkEdit(['ingot'], { essences: { ash: 4 } });
+
+  assert.equal(calls.length, 0, 'no value write was made for a pair whose flag would not move');
+  assert.equal(result, null, 'and the verb reports that nothing was written');
+  assert.deepEqual(
+    resolvedIngotEssences(harness, scope),
+    { fire: 3 },
+    'the pair still inherits, and the union still answers the world map'
+  );
+});
+
+test('1371 r19: an OVERRIDING pair is written with no flag write at all', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: { essences: false },
+  };
+  await store.refresh();
+  let saves = 0;
+  const save = scope.store.save;
+  scope.store.save = async (next) => {
+    saves += 1;
+    return save(next);
+  };
+
+  await store.applyComponentBulkEdit(['ingot'], { essences: { ash: 4 } });
+
+  assert.equal(saves, 0, 'nothing to flip, so the componentScope setting is not written at all');
+  assert.deepEqual(calls.map((call) => call.switchesOnArrival), [[false]]);
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { ash: 4 });
+});
+
+test('1371 r19: a component the world corpus does not hold is written unchanged', async () => {
+  // Nothing shadows a pair with no membership record, so the override machinery must not touch it.
+  const harness = makeEssenceStoreHarness({
+    essences: [{ id: 'ash', name: 'Ash' }],
+    components: [{ id: 'loose', name: 'Loose Rock', essences: { ash: 1 } }],
+  });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await store.refresh();
+
+  const result = await store.applyComponentBulkEdit(['loose'], { essences: { ash: 4 } });
+
+  assert.equal(result.updated, 1);
+  assert.deepEqual(calls.map((call) => call.componentIds), [['loose']]);
+  assert.equal(
+    membershipKey('loose', 'sys1') in scope.payload.membership,
+    false,
+    'and no membership record was minted for it'
+  );
+});
+
+/**
+ * A single-component write primitive over the harness's live system.
+ *
+ * @param {object} harness
+ * @returns {Array<object>} the recorded calls.
+ */
+function installSingleComponentWrite(harness) {
+  const calls = [];
+  harness.services.getCraftingSystemManager().updateItem = async (systemId, itemId, updates) => {
+    calls.push({ systemId, itemId, updates });
+    const component = harness.system.components.find((row) => row.id === itemId);
+    if (component) Object.assign(component, updates);
+    return true;
+  };
+  return calls;
+}
+
+test('1371 r19: an untouched save on an inheriting pair writes NO essence map, so the dormant row survives', async () => {
+  // The rules editor seeds its steppers from the item card, which now draws the RESOLVED map, and
+  // `buildUpdates` sends `essences` on every save whether or not the GM touched the locked card.
+  // Restating what the system already resolves is not an authored override, so the key is dropped
+  // — otherwise an unrelated save would overwrite the row an override later comes back to.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  await seedInheritingPair(store, scope);
+
+  const saved = await store.updateComponent('ingot', { category: 'ore', essences: { fire: 3 } });
+
+  assert.equal(saved, true);
+  assert.deepEqual(calls, [{ systemId: 'sys1', itemId: 'ingot', updates: { category: 'ore' } }]);
+  assert.equal(
+    scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'and the switch is left exactly where it was'
+  );
+  assert.deepEqual(
+    harness.system.components[0].essences,
+    { iron: 2 },
+    'the dormant in-system map — what the system falls back to if the world section is cleared'
+  );
+});
+
+test('1371 r19: but an EDITED map on an inheriting pair flips the switch first, then writes', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  await seedInheritingPair(store, scope);
+
+  const saved = await store.updateComponent('ingot', { essences: { fire: 3, ash: 1 } });
+
+  assert.equal(saved, true);
+  assert.equal(scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences, false);
+  assert.deepEqual(calls, [
+    { systemId: 'sys1', itemId: 'ingot', updates: { essences: { fire: 3, ash: 1 } } },
+  ]);
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { fire: 3, ash: 1 });
+});
+
+test('1371 r19: and a refused flag write refuses the whole component save', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  await seedInheritingPair(store, scope);
+  scope.store.save = async () => {
+    throw new Error('The requested Setting update was refused');
+  };
+
+  const saved = await store.updateComponent('ingot', { essences: { fire: 3, ash: 1 } });
+
+  assert.equal(saved, false, 'a refusal is reported, never swallowed as a success');
+  assert.deepEqual(calls, [], 'and no value write was made');
 });

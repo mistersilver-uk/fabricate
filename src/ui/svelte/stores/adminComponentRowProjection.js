@@ -177,6 +177,13 @@ function _stableStringify(value) {
 // toggle is a system-level change that is neither an item field nor a system-id
 // change, so it MUST live in the signature to invalidate) and the resolved
 // essence name/icon per essence id (an essence-catalog edit is system-level).
+//
+// IT CARRIES NO ESSENCE COLOUR AND NO RESOLVED ESSENCE MAP, and that is not an omission
+// (issue 1371 r19-store2). This memo guards ONLY the async source resolution — the uuid
+// display and the enriched description — which no essence field feeds. The card's own
+// `essences` array is rebuilt on every `_createItemCard` call, so a recolour or a world
+// map edit cannot be served stale from here, and a term for either would cost a
+// serialization per essence per card and buy nothing.
 export function itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
   const essenceResolution = Object.keys(item?.essences || {})
     .sort((a, b) => a.localeCompare(b))
@@ -184,14 +191,7 @@ export function itemCardSignature(item, showTags, showEssences, showSalvage, ess
       // ONE catalogue read per essence, not one per field (issue 1371 r18-colour): the scale guard
       // in `admin-browser-page-scope-guards.test.js` counts these reads as the signature's cost.
       const definition = essenceDefinitionById.get(id);
-      return [
-        id,
-        definition?.name || id,
-        definition?.icon,
-        // The colour is part of the resolution too (M29): a recoloured essence would otherwise
-        // serve a stale card until an unrelated field moved.
-        definition?.colorToken,
-      ];
+      return [id, definition?.name || id, definition?.icon];
     });
   return _stableStringify({
     item,
@@ -260,8 +260,19 @@ async function _resolveItemCardSource(uuid, storedDescription, enrichToHtml) {
  * @returns {object} the projected card.
  */
 function _createItemCard(item, systemId, options) {
-  const { showTags, showEssences, showSalvage, essenceDefinitionById, enrichToHtml, cache } =
-    options;
+  const {
+    showTags,
+    showEssences,
+    showSalvage,
+    essenceDefinitionById,
+    resolvedEssencesById,
+    enrichToHtml,
+    cache,
+  } = options;
+  // WHAT THE SYSTEM RESOLVES, not what its own row stores (issue 1371 r19-store2). See
+  // `_resolvedEssencesBySystemComponent`. The persisted row is the fallback, for a card built
+  // from a manager with no read union and for a row the union does not answer for.
+  const essenceMap = resolvedEssencesById?.get(item.id) ?? item.essences;
   const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
   const storedDescription = _plainTextDescription(item.description);
 
@@ -277,7 +288,7 @@ function _createItemCard(item, systemId, options) {
     hasDescription: storedDescription.length > 0,
     tags: showTags ? item.tags || [] : [],
     essences: showEssences
-      ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
+      ? Object.entries(essenceMap || {}).map(([id, quantity]) => ({
           id,
           name: essenceDefinitionById.get(id)?.name || id,
           icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
@@ -372,6 +383,46 @@ function _createItemCard(item, systemId, options) {
 // there is no world-item-delete refresh hook (foundryBridge ignores non-actor items), so
 // today such a change is already reflected only on the next unrelated refresh. No
 // USER-edited field goes stale — a user edit mutates the stored item → signature miss.
+/**
+ * Each component's RESOLVED essence map for one system, keyed by component id (issue 1371
+ * r19-store2, reviewer round 5).
+ *
+ * ── WHY THE ROW CANNOT READ `getItems` FOR THIS ────────────────────────────────────────────
+ * `essences` became a component world-default SECTION at r18: a world record carries the map and
+ * every system inherits it unless its membership record overrides. `getItems` is the AUTHORING
+ * accessor and answers the PERSISTED in-system row by design — repointing it would hand the
+ * manager a merged row no writer can save back, which its own docblock says. So the row set, the
+ * search filter and every other field still come from `getItems`, and the essence map alone is
+ * overlaid from the read union, exactly as the world essence COLOUR is overlaid onto the essence
+ * definitions. Without it the rules list drew each component's own stale numbers while the rules
+ * editor and every engine reader answered the world map — and after the `1.32.0` election that is
+ * every component in a one-system world.
+ *
+ * OPTIONAL BY CONSTRUCTION. `getComponentsForSystem` is absent from the direct-projection
+ * fixtures, and a manager without it (or one that throws) answers `null`, which leaves every card
+ * reading its persisted row exactly as before.
+ *
+ * @param {object} systemManager
+ * @param {string} systemId
+ * @returns {Map<string, object>|null} component id → the resolved map, or `null` when there is no
+ *   read union to ask.
+ */
+function _resolvedEssencesBySystemComponent(systemManager, systemId) {
+  let resolved;
+  try {
+    resolved = systemManager?.getComponentsForSystem?.(systemId);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(resolved)) return null;
+  const byId = new Map();
+  for (const component of resolved) {
+    const id = typeof component?.id === 'string' ? component.id : String(component?.id ?? '');
+    if (id) byId.set(id, component.essences);
+  }
+  return byId;
+}
+
 export async function buildItemCards(
   systemManager,
   selectedSystem,
@@ -386,6 +437,9 @@ export async function buildItemCards(
     showEssences,
     showSalvage,
     essenceDefinitionById,
+    resolvedEssencesById: showEssences
+      ? _resolvedEssencesBySystemComponent(systemManager, selectedSystem.id)
+      : null,
     enrichToHtml,
     cache,
     onHydrated,
