@@ -168,7 +168,8 @@
    * @param {Element|null} elements.popover The portaled panel.
    * @param {Element|null} elements.list The `role="listbox"` element.
    * @param {Element|null} elements.search The query field.
-   * @returns {{rowPitch?: number, rowGap?: number, chromeHeight?: number}} The measured metrics.
+   * @returns {{rowPitch?: number, rowGap?: number, chromeHeight?: number, listExtra?: number}}
+   *   The measured metrics.
    */
   function measurePopoverMetrics({ popover, list, search }) {
     if (!popover || !list) return {};
@@ -179,14 +180,22 @@
     const rowGap = Number.parseFloat(listStyles.rowGap) || 0;
     if (!rowHeight) return {};
 
-    // THE PINNED ROW'S OUTER MARGIN IS CHROME, NOT PITCH (issue 1503). `rowPitch` is a row's
-    // BORDER BOX plus the list's `row-gap`, and a margin sits outside the border box — so the
-    // extra gap the sheet puts under the pinned resolved row, which separates it from the
-    // alphabetical list, is height the list needs and the flooring never counted. Unfolded, the
+    // THE PINNED ROW'S OUTER MARGIN IS NEITHER PITCH NOR CHROME (issue 1503). `rowPitch` is a
+    // row's BORDER BOX plus the list's `row-gap`, and a margin sits outside the border box — so
+    // the extra gap the sheet puts under the pinned resolved row, which separates it from the
+    // alphabetical list, is height the list needs and the flooring never counted. Uncounted, the
     // list is floored to `rows x pitch` while its content is that plus the margin, and the panel
     // clips the last row by exactly the margin: the whole-row guarantee this callback exists to
-    // make is false by 8px at the shipped `--fab-space-2`. Read from the row rather than restated
-    // here for the same reason every other figure in this function is measured.
+    // make is false by 8px at the shipped `--fab-space-2`.
+    //
+    // It is returned as `listExtra` rather than added to `chromeHeight`, and the distinction is
+    // the whole fix. Chrome is height OUTSIDE the list: subtracting it shrinks the budget the
+    // floor divides, so folding the margin in can change the row COUNT, but the list's own
+    // max-height comes back as `rows * pitch - trailingGap`, which has no term for it. The 8px
+    // then re-appears as panel slack rather than as list height and the last row is clipped
+    // exactly as before. `floorListToWholeRows` takes `listExtra` off the budget AND puts it back
+    // on the height, which is the pair of statements the margin needs. Read from the row rather
+    // than restated here for the same reason every other figure in this function is measured.
     const pinnedRow = list.querySelector('.essence-icon-picker-option.pinned');
     const pinnedMargin = pinnedRow
       ? Number.parseFloat(getComputedStyle(pinnedRow).marginBottom) || 0
@@ -196,10 +205,9 @@
       (Number.parseFloat(popoverStyles.paddingTop) || 0) +
       (Number.parseFloat(popoverStyles.paddingBottom) || 0) +
       (Number.parseFloat(popoverStyles.rowGap) || 0) +
-      pinnedMargin +
       (search?.getBoundingClientRect?.().height ?? 0);
 
-    return { rowPitch: rowHeight + rowGap, rowGap, chromeHeight };
+    return { rowPitch: rowHeight + rowGap, rowGap, chromeHeight, listExtra: pinnedMargin };
   }
 
   function handleTriggerContextMenu(event) {

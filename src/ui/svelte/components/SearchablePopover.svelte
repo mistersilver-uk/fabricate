@@ -282,8 +282,13 @@
                    wants the panel's right edge on its own, or the panel is laid out off the
                    pane.
     measureListMetrics({ popover, list, search }) — OPTIONAL callback returning
-                   `{ rowPitch, rowGap, chromeHeight }`, called on EVERY layout pass and spread
-                   into the layout's options (issue 1503). It is what floors the list to a WHOLE
+                   `{ rowPitch, rowGap, chromeHeight, listExtra }`, called on EVERY layout pass
+                   and spread into the layout's options (issue 1503). The fourth key is height
+                   rendered INSIDE the list that no pitch can see — an outer margin on a row,
+                   which is how the icon picker separates its pinned resolved row from the
+                   alphabetical list. It is not chrome: chrome is subtracted from the budget the
+                   floor divides, whereas this is subtracted from that budget AND added back to
+                   the list's own height, because the list's box has to contain it. It is what floors the list to a WHOLE
                    number of rows instead of slicing the last one against the panel's bottom
                    inset, and it is a CALLBACK rather than three numbers because the numbers are
                    measured from the rendered box — a row's height and the popover's chrome are

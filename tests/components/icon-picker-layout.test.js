@@ -255,17 +255,27 @@ test('the grid form is EMITTED by the sheet, not by an inline style', () => {
 test('the whole-row flooring counts every box the sheet puts between the rows', () => {
   // A HAND-MAINTAINED MIRROR, and this is the gate that stops it rotting (issue 1503).
   //
-  // `IconPicker.measurePopoverMetrics` promises the shared panel a `rowPitch` and a
-  // `chromeHeight` such that `computeIconPickerPopoverLayout` can floor the list to a WHOLE
-  // number of rows. `rowPitch` is a row's BORDER BOX (`getBoundingClientRect`) plus the list's
-  // `row-gap`, so any box the sheet puts between the rows that is OUTSIDE a border box — a
-  // margin — is height the list needs and the pitch cannot see. Unfolded into the chrome it is
-  // height nothing counts, and the panel clips the last row by exactly that many pixels: the
-  // published AFTER frame sliced 8 of row seven's 38, which is `--fab-space-2` to the pixel.
+  // `IconPicker.measurePopoverMetrics` promises the shared panel measurements from which
+  // `computeIconPickerPopoverLayout` can floor the list to a WHOLE number of rows. `rowPitch` is
+  // a row's BORDER BOX (`getBoundingClientRect`) plus the list's `row-gap`, so any box the sheet
+  // puts between the rows that is OUTSIDE a border box — a margin — is height the list renders
+  // and the pitch cannot see. Uncounted it is height nothing knows about, and the panel clips the
+  // last row by exactly that many pixels: the published AFTER frame sliced 8 of row seven's 38,
+  // which is `--fab-space-2` to the pixel.
   //
   // The two facts live in different files and neither is derived from the other, so this reads
-  // both: every outer margin the sheet declares on a row inside the list must appear in the
-  // component's chrome sum. Adding a margin rung to the sheet without folding it in reds here.
+  // both: every outer margin the sheet declares on a row inside the list must be measured by the
+  // component AND handed over as `listExtra`. Adding a margin rung to the sheet without measuring
+  // it reds here.
+  //
+  // WHAT THIS CLAUSE DOES NOT DO, and why the arithmetic is not here. A text-presence check
+  // proves a term is mentioned, never that the sum is right: folding the margin into
+  // `chromeHeight` mentions it, and leaves the list exactly one margin too short, because chrome
+  // is subtracted from the budget the floor divides while the list's height comes back as
+  // `rows * pitch - trailingGap` with no term for it. That is the defect this file's earlier
+  // shape was green over. The OUTCOME is pinned numerically in `tests/iconPickerPopover.test.js`
+  // ("the shipped pinned-row panel resolves to seven whole rows plus the margin, exactly"), on
+  // the real measured inputs, where a sign inversion in either half reds on the value 310.
   const marginRules = [
     ...css.matchAll(
       /\.fabricate-icon-picker-popover\.essence-icon-picker-popover \.essence-icon-picker-option[^{]*\{([\s\S]*?)\}/g
@@ -276,7 +286,7 @@ test('the whole-row flooring counts every box the sheet puts between the rows', 
     marginRules.length > 0,
     'the pinned resolved row carries the extra gap that separates it from the alphabetical list, ' +
       'so this clause has something to be about; a sheet with no such margin has silently ' +
-      'removed the very thing the fold below exists for'
+      'removed the very thing the metric below exists for'
   );
 
   const source = readFileSync(
@@ -287,11 +297,23 @@ test('the whole-row flooring counts every box the sheet puts between the rows', 
   const chromeSum = measure.match(/const chromeHeight =[\s\S]*?;/);
   assert.ok(chromeSum, '`measurePopoverMetrics` still composes a `chromeHeight`');
   assert.ok(
-    /getComputedStyle\([^)]*\)\.marginBottom/.test(measure) &&
-      /pinnedMargin/.test(chromeSum[0]),
+    /getComputedStyle\([^)]*\)\.marginBottom/.test(measure),
     'the sheet gives a row inside the list an outer MARGIN, and `measurePopoverMetrics` does not ' +
-      'read it into `chromeHeight`. `rowPitch` is a border box plus `row-gap` and cannot see a ' +
-      'margin, so the layout floors the list to less height than its content needs and the panel ' +
-      'clips the last row by the margin'
+      'read it at all. `rowPitch` is a border box plus `row-gap` and cannot see a margin, so the ' +
+      'layout floors the list to less height than its content needs and the panel clips the last ' +
+      'row by the margin'
+  );
+  assert.match(
+    measure,
+    /listExtra:\s*pinnedMargin\b/,
+    'the measured margin must be handed over as `listExtra`, positively and by itself: that is ' +
+      'the key `floorListToWholeRows` takes off the budget AND adds back to the list`s own height'
+  );
+  assert.doesNotMatch(
+    chromeSum[0],
+    /pinnedMargin/,
+    'and it must NOT be summed into `chromeHeight` as well, which counts it against the row ' +
+      'budget without ever giving the list the height to render it — the panel then keeps the ' +
+      'margin as slack and clips the last row by it, exactly as it did before the metric existed'
   );
 });
