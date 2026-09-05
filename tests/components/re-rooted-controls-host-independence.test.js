@@ -219,10 +219,18 @@ const COMPARED = Object.freeze([
  *
  * The button families declare `box-sizing: border-box` on their own shared base rule
  * (`fabricate.css:13496`), so the comparison is live for them and reds if that declaration goes.
- * `Pagination`'s root `<section>` declares none, and in the manager it picks one up from
- * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`) — a UNIVERSAL rule that is the
- * manager area's own chrome and belongs to no primitive family. Outside the manager the section
- * therefore computes `content-box`.
+ * `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather than a
+ * value the family owns: in the manager it picks `border-box` up from
+ * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`), a UNIVERSAL rule that is the
+ * manager area's own chrome and belongs to no primitive family, and everywhere else it takes
+ * whatever the host declares.
+ *
+ * The `content-box` this harness measures outside the manager is a PROPERTY OF THIS HARNESS, not
+ * of the product. This file loads `styles/fabricate.css` and nothing else, deliberately (see the
+ * header), and Foundry core's own `@layer reset` declares `*, *::before, *::after { box-sizing:
+ * border-box }` — so in Foundry every host computes `border-box` and the keyword does not differ
+ * by host at all. What is asserted below is therefore the dependence itself, in the one
+ * environment that can expose it, plus the guard that keeps it inert.
  *
  * That difference is RENDERED-INERT, and the test below proves it rather than assuming it: no rule
  * anywhere declares an explicit `width` or `height` on that section outside the manager, and for a
@@ -371,16 +379,27 @@ test('each re-rooted control computes the same geometry and type in all three ho
 });
 
 test('the pager’s box-sizing keyword differs by host, and nothing in the sheet lets that render', async () => {
-  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away. `Pagination`'s root section
-  // takes `border-box` from the manager area's universal rule and computes `content-box`
-  // everywhere else. It is inert only while no rule gives that section an explicit `width` or
-  // `height` — the moment one does, the two keywords produce two different boxes and the
+  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away: the pager root DEPENDS on
+  // host chrome for its `box-sizing` rather than declaring one, taking `border-box` from the
+  // manager area's universal rule and whatever the host supplies elsewhere. The `content-box`
+  // below is a property of THIS HARNESS, which loads the module sheet alone; in Foundry core's
+  // `@layer reset` universal rule gives every host `border-box`, so the keyword does not differ
+  // by host there. The dependence is inert while no rule gives that section an explicit `width`
+  // or `height` — the moment one does, the two keywords produce two different boxes and the
   // `rendered-size` equality above becomes the thing that reds. This states both halves so the
   // exclusion from `COMPARED_PAGINATION` cannot quietly outlive its reason.
   const measured = await measure(sheet);
-  assert.equal(measured.pagination.bare['box-sizing'], 'content-box');
-  assert.equal(measured.pagination.app['box-sizing'], 'content-box');
-  assert.equal(measured.pagination.manager['box-sizing'], 'border-box');
+  const declaresNone =
+    'the pager root declares no `box-sizing` of its own and takes it from host chrome; in this ' +
+    'core-less harness that means `content-box` outside the manager, and a change here means ' +
+    'the family has started declaring one';
+  assert.equal(measured.pagination.bare['box-sizing'], 'content-box', declaresNone);
+  assert.equal(measured.pagination.app['box-sizing'], 'content-box', declaresNone);
+  assert.equal(
+    measured.pagination.manager['box-sizing'],
+    'border-box',
+    'the manager area`s universal rule must still be what supplies the pager root its border-box'
+  );
 
   const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   try {
@@ -414,7 +433,9 @@ test('the pager’s box-sizing keyword differs by host, and nothing in the sheet
       sized,
       [],
       'a rule now gives the pager root an explicit width or height outside the manager, which is ' +
-        'the condition that turns its `content-box` keyword into a different rendered box. Give ' +
+        'the condition that turns its host-supplied `box-sizing` into a different rendered box. ' +
+        'That is invisible in Foundry, where core`s `@layer reset` universal rule gives every ' +
+        'host `border-box`, and visible in any host without it — including this harness. Give ' +
         '`.fabricate-pagination.manager-pagination` its own `box-sizing: border-box` and add the ' +
         'property back to `COMPARED_PAGINATION`.'
     );
@@ -559,22 +580,57 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     // `getComputedStyle` returns `''` for `outline` in a non-focused element and cannot be asked
     // "which rule said so" at all, so the ring is read as a DECLARED rule — the same route
     // `import-folder-mapping-modal-focus.test.js` takes for the same reason.
-    for (const selector of [
-      '.fabricate-button:focus-visible',
-      '.fabricate-icon-button:focus-visible',
-      '.fabricate-pagination button:focus-visible',
+    //
+    // THE CHROME A FAMILY DECLARES IS A PAIR, and only the pair is host-independent. Foundry core
+    // paints every focused button with an orange outline and a 4px glow (`a.button:focus,
+    // button:focus` in core's `elements` layer), and the two AREA resets strip it only inside
+    // `.fabricate-app` and `.fabricate-manager`. A control rooted at a class the primitive emits
+    // renders in hosts carrying neither, where the repaint half alone would lay the accent ring
+    // OVER core's glow instead of replacing it. So each family declares the strip at `:focus` as
+    // well as the repaint at `:focus-visible` — the same pairing CONTRIBUTING.md states for an
+    // area — and the strip must be declared FIRST, because the two halves tie on specificity and
+    // a `:focus-visible` element matches both.
+    for (const [strip, repaint] of [
+      ['.fabricate-button:focus', '.fabricate-button:focus-visible'],
+      ['.fabricate-icon-button:focus', '.fabricate-icon-button:focus-visible'],
+      ['.fabricate-pagination button:focus', '.fabricate-pagination button:focus-visible'],
     ]) {
-      const ring = rules.filter((rule) => rule.selectorText === selector);
-      assert.equal(ring.length, 1, `${selector} must be declared exactly once`);
+      const ring = rules.filter((rule) => rule.selectorText === repaint);
+      assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
       assert.match(
         ring[0].cssText,
         /outline:\s*2px solid var\(--fab-accent\)/,
-        `${selector} must carry the same outline the two area rings declare`
+        `${repaint} must carry the same outline the two area rings declare`
       );
       assert.match(
         ring[0].cssText,
         /outline-offset:\s*2px/,
-        `${selector} must carry the area rings' outline offset`
+        `${repaint} must carry the area rings' outline offset`
+      );
+
+      const reset = rules.filter((rule) => rule.selectorText === strip);
+      assert.equal(
+        reset.length,
+        1,
+        `${strip} must be declared exactly once: without the strip half, a control in a host ` +
+          "carrying neither area class keeps Foundry core's orange focus outline and 4px glow " +
+          'under the accent ring instead of having it replaced'
+      );
+      assert.match(
+        reset[0].cssText,
+        /outline:\s*none/,
+        `${strip} must strip core's focus outline, as the two area resets do`
+      );
+      assert.match(
+        reset[0].cssText,
+        /box-shadow:\s*none/,
+        `${strip} must strip core's 4px focus glow, which is a box-shadow rather than an outline`
+      );
+      assert.ok(
+        rules.findIndex((rule) => rule.selectorText === strip) <
+          rules.findIndex((rule) => rule.selectorText === repaint),
+        `${strip} and ${repaint} tie on specificity, so the strip must be declared above the ` +
+          'repaint or source order deletes the accent ring it exists to supply'
       );
     }
 
