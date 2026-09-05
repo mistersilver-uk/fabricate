@@ -563,7 +563,9 @@ function declarationsBetween(text, from, to, lineAt) {
  * Every rule of a stylesheet with the parts the merge predicate arbitrates on.
  *
  * `selectors` is the normalised list, order preserved; `listKey` is (a)+(b) as one string, so two
- * rules are candidates exactly when their `listKey`s are equal.
+ * rules are candidates exactly when their `listKey`s are equal. Its separator is a NUL, which no
+ * selector or at-prelude can contain, and it is spelled as the escape `\u{0}` rather than written
+ * as a raw byte: one raw control character makes the whole file binary to `grep`, `rg` and `file`.
  *
  * @param {string} css Raw stylesheet text.
  * @returns {Array<{index: number, selector: string, selectors: string[], listKey: string,
@@ -582,7 +584,7 @@ export function censusRules(css) {
       index,
       selector: rule.selector,
       selectors,
-      listKey: `${atKey} ${selectors.join(', ')}`,
+      listKey: `${atKey}\u{0}${selectors.join(', ')}`,
       atContext: rule.atContext,
       atKey,
       line: rule.line,
@@ -615,7 +617,7 @@ export function selectorAppearances(rules, { keyByAtContext = true } = {}) {
   const appearances = new Map();
   for (const rule of rules) {
     for (const selector of rule.selectors) {
-      const key = keyByAtContext ? `${rule.atKey} ${selector}` : selector;
+      const key = keyByAtContext ? `${rule.atKey}\u{0}${selector}` : selector;
       if (!appearances.has(key)) {
         appearances.set(key, {
           selector,
@@ -777,7 +779,9 @@ function mergedDeclarations(first, second) {
  * @param {number} earlier Index of R1.
  * @param {number} later Index of R2.
  * @returns {{verdict: 'MERGED'|'BLOCKED', reason: string, at: number,
- *   blockers: Array<object>, declarations: Array<{property: string, value: string}>}}
+ *   blockers: Array<object>,
+ *   declarations?: Array<{property: string, value: string}>}} `declarations` is the merged block,
+ *   present on MERGED only: a BLOCKED verdict has no block to propose.
  */
 export function mergeVerdict(rules, earlier, later) {
   const first = rules[earlier];
