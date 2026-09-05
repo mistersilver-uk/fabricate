@@ -375,9 +375,10 @@
     )
   );
   const counts = $derived(validation.counts);
-  // THE WORST THING THE ROWS SAY, which is what the hero exists to state. Written as an
-  // early-return chain rather than a nested ternary, which SonarCloud reports as S3358.
-  const validationStatus = $derived(worstValidationStatus(counts));
+  // NO `validationStatus` HERE ANY MORE (r11-entry, UX F-D). "The worst thing the rows say" was
+  // derived twice on this screen — once for the tab badge below and once for the hero — and the
+  // hero's copy of it is now `ScopedValidationTab`'s `verdictSummary`, where the words that
+  // state a verdict live with the surface that states them.
 
   const TABS = [
     { id: 'definition', icon: 'fas fa-cube' },
@@ -394,18 +395,6 @@
       label: tab.id === 'definition' ? 'Catalogue entry' : 'Validation',
     }))
   );
-
-  /**
-   * The overall status the validation hero paints, from the same counts the rows are grouped by.
-   *
-   * @param {{blocking: number, warnings: number}} current
-   * @returns {'block'|'warn'|'pass'}
-   */
-  function worstValidationStatus(current) {
-    if (current.blocking > 0) return 'block';
-    if (current.warnings > 0) return 'warn';
-    return 'pass';
-  }
 
   /**
    * The Validation tab's badge, in the shape `EditorTabs` takes.
@@ -970,40 +959,36 @@
             </InspectorCard>
           {:else}
             <!--
-              THE HERO IS DERIVED, NOT DEFAULTED. `EditorValidationSurface` falls through to
-              `'pass'` and renders two empty strings when no `summary` is passed, so this tab once
-              drew a blank hero with a GREEN TICK over `Blocking 2`.
+              NO `title` AND NO `intro`, AND THE HERO STATES THE VERDICT (r11-entry, UX F-D).
+              `proto:957-960`: the Validation body's first child is the two-column grid. There is
+              no heading and no intro paragraph — the tab is reached through a labelled tab strip
+              inside a titled editor, so an `Entry validation` heading names it a fourth time and
+              pushes the grid down. The pair is SUPPRESSED BY OMISSION: `ScopedValidationTab`
+              defaults both to `''` and `EditorValidationSurface` draws no head block at all when
+              both are empty, so there is no prop to pass here and none to invent.
 
-              THE BLOCK LABEL IS THIS FAMILY'S OWN. It reached the recipe key, which localises to
-              "Blocks enable" — on an entity that HAS no enable switch, because epic decision 10
-              says component membership is binary.
+              `verdictSummary` replaces the static hero this screen shipped. It read `World
+              record` over "What every system inheriting this component resolves from it." — a
+              description of the SUBJECT, on a record whose own tab badge said `Blocking 2`, under
+              a fixed clipboard glyph. `proto:4577-4579` derives all three from the counts, and
+              the derivation is the shared tab's because the words are its vocabulary rather than
+              this entity type's.
+
+              THE BLOCK LABEL IS STILL THIS FAMILY'S OWN, and it is `Blocking` (`proto:4573`,
+              the tone table, which gives the three badges as `Blocking` / `Warning` / `Pass`).
+              It reached the recipe key first, which localises to "Blocks enable" — on an entity
+              that HAS no enable switch, because epic decision 10 says component membership is
+              binary — and then `INCOMPLETE`, which is on no vocabulary the reference draws. The
+              other two badges already read `Warning` and `Pass` from the shared keys, so this
+              one word is the whole difference between the shipped run and the reference's.
             -->
             <ScopedValidationTab
-              title={text(
-                'FABRICATE.Admin.Manager.Scoped.Component.ValidationTitle',
-                'Entry validation'
-              )}
-              intro={text(
-                'FABRICATE.Admin.Manager.Scoped.Component.ValidationIntro',
-                'What this world record states, and what every system inheriting it will resolve.'
-              )}
-              summary={{
-                status: validationStatus,
-                icon: 'fas fa-clipboard-check',
-                title: text(
-                  'FABRICATE.Admin.Manager.Scoped.Component.ValidationSummaryTitle',
-                  'World record'
-                ),
-                sub: text(
-                  'FABRICATE.Admin.Manager.Scoped.Component.ValidationSummarySub',
-                  'What every system inheriting this component resolves from it.'
-                ),
-              }}
+              verdictSummary
               {counts}
               groups={validation.groups}
               blockLabel={text(
                 'FABRICATE.Admin.Manager.Scoped.Component.ValidationStatusBlock',
-                'INCOMPLETE'
+                'Blocking'
               )}
               rowDataAttr="data-scoped-entry-check"
               hookAttribute="data-scoped-entry-validation"

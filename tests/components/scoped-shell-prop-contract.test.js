@@ -1251,3 +1251,164 @@ describe('each remove sentence discloses what that removal actually does', () =>
     }
   });
 });
+
+/**
+ * THE SHARED VALIDATION TAB'S ENTRY FACE, AS OPT-IN PROPS (issue 1371 r11-entry, UX F-D).
+ *
+ * `ScopedValidationTab` is rendered by five call sites across four entity screens. Revision 11
+ * gives the world Component entry the reference's own Validation tab — no in-pane heading, and a
+ * hero derived from the counts — and the whole risk of that is the four OTHER sites: an opt-in
+ * that defaults on, or a `summary` the tab starts rewriting for everyone, moves four screens on a
+ * finding raised against one.
+ *
+ * Three facts, and each fails differently:
+ *
+ *  - the prop is DECLARED and defaults OFF (`recessed`/`searchWell` on the roster above are the
+ *    precedent, and the same one-regex form);
+ *  - the caller's `summary` still reaches `EditorValidationSurface` UNCHANGED when it is off —
+ *    a tab that derived unconditionally would satisfy a declaration pin and repaint everything;
+ *  - the four other call sites pass NEITHER the new prop nor a `verdict*` spelling of it, which
+ *    is what makes the rendered-DOM default proof in the handoff a statement about the shipped
+ *    tree rather than about a synthetic prop shape.
+ *
+ * The tab's SUPPRESSED heading is pinned as an absence at the one call site that wants it, and
+ * as a presence at the four that do not, because "the prop that suppresses the heading" is
+ * deliberately not a prop: `title`/`intro` already default to `''`.
+ */
+describe('the shared validation tab states its entry face as an opt-in prop', () => {
+  const TAB = `${SCOPED_DIR}/ScopedValidationTab.svelte`;
+  const ENTRY = `${SCOPED_DIR}/WorldComponentEntryPage.svelte`;
+  const OTHER_CALLERS = Object.freeze([
+    `${SCOPED_DIR}/WorldEssenceEntryPage.svelte`,
+    `${SCOPED_DIR}/WorldToolEntryPage.svelte`,
+    'src/ui/svelte/apps/manager/essences/EssenceValidationTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
+  ]);
+
+  it('declares `verdictSummary` and defaults it OFF', () => {
+    const source = sourceOf(TAB);
+    assert.ok(
+      declaredProps(source).includes('verdictSummary'),
+      'the tab declares the opt-in as a real prop rather than reading a caller class'
+    );
+    assert.match(
+      source,
+      /\n\s*verdictSummary = false,/,
+      'and it defaults to false, so four other screens are unchanged by a finding raised against one'
+    );
+  });
+
+  it('passes the caller’s own summary through untouched while it is off', () => {
+    const source = sourceOf(TAB);
+    assert.match(
+      source,
+      /const shownSummary = \$derived\(verdictSummary \? verdictOf\(counts\) : summary\);/,
+      'the derivation is GATED on the prop; an ungated one repaints every consumer'
+    );
+    assert.match(
+      source,
+      /summary=\{shownSummary\}/,
+      'and the surface is handed that gated value rather than a second one'
+    );
+  });
+
+  it('derives all three verdicts from the counts, worst first', () => {
+    // `proto:4577-4578`, the reference's own three-way chain. Pinned as the KEY SET rather than
+    // as the sentences: the English lives in `lang/en.json` and the fallbacks, and a key that
+    // stopped being read is what makes a translated string silently unreachable.
+    const source = sourceOf(TAB);
+    for (const key of [
+      'VerdictBlocking',
+      'VerdictBlockingOne',
+      'VerdictBlockingSub',
+      'VerdictWarning',
+      'VerdictWarningSub',
+      'VerdictWarningSubOne',
+      'VerdictPass',
+      'VerdictPassSub',
+    ]) {
+      assert.match(
+        source,
+        new RegExp(String.raw`FABRICATE\.Admin\.Manager\.Scoped\.Validation\.${key}\b`),
+        `the tab reads \`${key}\``
+      );
+    }
+    assert.ok(
+      source.indexOf('blocking > 0') < source.indexOf('warnings > 0'),
+      'blocking is answered before warnings, so a record with both is headed by the worse one'
+    );
+  });
+
+  it('the entry opts in, and passes NO title, intro or summary of its own', () => {
+    const source = sourceOf(ENTRY);
+    const call = source.slice(
+      source.indexOf('<ScopedValidationTab'),
+      source.indexOf('/>', source.indexOf('<ScopedValidationTab'))
+    );
+    assert.ok(call.length > 0, 'NON-VACUITY: the entry really renders the shared tab');
+    assert.match(call, /\bverdictSummary\b/);
+    for (const absent of ['title=', 'intro=', 'summary=']) {
+      assert.equal(
+        call.includes(absent),
+        false,
+        `\`${absent}\` is suppressed by omission (proto:957-960 draws no head block): ${call}`
+      );
+    }
+    assert.match(
+      call,
+      /blockLabel=/,
+      'and it still names its own block word, which is the one badge that differs by entity type'
+    );
+  });
+
+  it('and the four other call sites take the shipped defaults', () => {
+    // Scanned over the WHOLE file rather than over a sliced call, because the three multi-line
+    // call sites end at different tokens and a slice that guessed wrong would be a criterion
+    // that reads as strict and matches nothing. `verdict` appears nowhere else in any of them.
+    for (const path of OTHER_CALLERS) {
+      const source = sourceOf(path);
+      assert.ok(
+        source.includes('<ScopedValidationTab'),
+        `NON-VACUITY: ${path} renders the shared tab`
+      );
+      assert.equal(
+        /verdict/i.test(source),
+        false,
+        `${path} must not opt into the entry's hero, and must not spell it any other way`
+      );
+    }
+  });
+
+  it('the three row badges are the reference’s tone table in the shipped English', () => {
+    // `proto:4573-4575` gives `Blocking` / `Warning` / `Pass`. The block word is the only one a
+    // call site chooses; the other two are shared recipe keys, and this pins that all three agree
+    // rather than leaving the run reading `Blocking / WARNING / PASS`.
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const recipe = lang.FABRICATE.Admin.Manager.Recipe.Validation;
+    const component = lang.FABRICATE.Admin.Manager.Scoped.Component;
+    assert.equal(component.ValidationStatusBlock, 'Blocking');
+    assert.equal(recipe.StatusWarn, 'Warning');
+    assert.equal(recipe.StatusPass, 'Pass');
+  });
+
+  it('the entry’s superseded hero keys are GONE, not merely unread', () => {
+    // `lang-keys-no-orphans` would catch a key nothing reads, but only once nothing reads it.
+    // These four were this screen's alone and their sentences are the finding, so they are
+    // pinned absent here where the reason is written down.
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const component = lang.FABRICATE.Admin.Manager.Scoped.Component;
+    for (const key of [
+      'ValidationTitle',
+      'ValidationIntro',
+      'ValidationSummaryTitle',
+      'ValidationSummarySub',
+    ]) {
+      assert.equal(
+        Object.hasOwn(component, key),
+        false,
+        `\`Scoped.Component.${key}\` described the subject where the reference states the verdict`
+      );
+    }
+  });
+});
+

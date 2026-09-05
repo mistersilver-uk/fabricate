@@ -6257,9 +6257,7 @@
             "GlobalTags": "Global tags",
             "EditShort": "Edit",
             "NoGlobalTags": "No global tags",
-            "ValidationSummaryTitle": "World record",
-            "ValidationSummarySub": "What every system inheriting this component resolves from it.",
-            "ValidationStatusBlock": "INCOMPLETE",
+            "ValidationStatusBlock": "Blocking",
             "CategoryReserved": "General is the reserved bucket every component falls back to, so it cannot be a world category. Leave it blank instead.",
             "SharedNoteEntry": "Shared by the {count} systems that have rules for this component.",
             "SharedNoteEntryOne": "Shared by the {count} system that has rules for this component.",
@@ -6299,8 +6297,6 @@
             "UnlinkItemTitle": "Detach the source item from this entry",
             "OpenSystemRulesAria": "Open this component in {system}",
             "PreviewLabel": "How this component reaches the world",
-            "ValidationTitle": "Entry validation",
-            "ValidationIntro": "What this world record states, and what every system inheriting it will resolve.",
             "Validation": {
               "GroupSource": "Source item",
               "GroupIdentity": "Identity",
@@ -6660,6 +6656,16 @@
             "RemoveConfirm": "Confirm?",
             "Removing": "Removing…",
             "RemoveConsequence": "Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched."
+          },
+          "Validation": {
+            "VerdictBlocking": "{count} blocking issues",
+            "VerdictBlockingOne": "{count} blocking issue",
+            "VerdictBlockingSub": "Clear these before saving.",
+            "VerdictWarning": "Passing with warnings",
+            "VerdictWarningSub": "{count} warnings will not stop a save.",
+            "VerdictWarningSubOne": "{count} warning will not stop a save.",
+            "VerdictPass": "All clear",
+            "VerdictPassSub": "Every check passes. Ready to save."
           }
         },
         "Knowledge": {

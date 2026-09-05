@@ -568,6 +568,135 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
+  /**
+   * THE VALIDATION TAB IS THE REFERENCE'S (issue 1371 r11-entry, UX finding F-D).
+   *
+   * Three separate claims, and each was a different kind of wrong before this revision:
+   *
+   *  - the tab drew an `Entry validation` heading and an intro paragraph where `proto:957-960`
+   *    puts the two-column grid as the body's FIRST child;
+   *  - the hero read `World record` over "What every system inheriting this component resolves
+   *    from it." — a description of the SUBJECT — on a record whose own tab badge said `Blocking
+   *    2`, under a fixed `fa-clipboard-check` glyph. `proto:4577-4579` derives all three from the
+   *    counts;
+   *  - the block badge read `INCOMPLETE`, which is on no vocabulary the reference draws;
+   *    `proto:4573`'s tone table gives `Blocking` / `Warning` / `Pass`.
+   *
+   * The hero copy is read off the RENDERED text rather than off a prop, because the derivation
+   * moved into `ScopedValidationTab` and a page-level assertion on what the page passes could not
+   * see a tab that dropped it.
+   */
+  describe('the Validation tab states the VERDICT, with no heading above it', () => {
+    async function validationTab(entityId) {
+      const { target } = await open(entityId);
+      target.querySelector('[data-scoped-entry-tab="validation"]').click();
+      await drain();
+      const tab = target.querySelector('[data-scoped-entry-validation]');
+      assert.ok(Boolean(tab), 'the validation tab renders');
+      return tab;
+    }
+
+    const heroCopy = (tab) => ({
+      title: tab.querySelector('.manager-recipe-rail-summary-title').textContent.trim(),
+      sub: tab.querySelector('.manager-recipe-rail-summary-sub').textContent.trim(),
+      glyph: tab.querySelector('.manager-recipe-rail-summary-medallion i').className,
+    });
+
+    it('draws NO in-pane heading and no intro, so the grid is the first thing in the body', async () => {
+      const tab = await validationTab('orphan');
+      assert.ok(
+        !tab.querySelector('.manager-recipe-tab-intro'),
+        'the head block is absent entirely, not an empty one holding open a row of space'
+      );
+      assert.ok(
+        !/Entry validation/.test(tab.textContent),
+        'and the heading string is gone from the tab rather than merely unstyled'
+      );
+      const surface = tab.querySelector('[data-editor-validation-surface]');
+      assert.equal(
+        surface.firstElementChild.className.replaceAll(/ ?svelte-[a-z0-9]+/g, ''),
+        'manager-recipe-validation-summary-row',
+        'the two-column grid is the body’s first child, which is what `proto:958-959` draws'
+      );
+    });
+
+    it('heads a BLOCKED record with the count, SINGULAR, over the sentence that says why', async () => {
+      // `resin` is linked and named but no system has rules for it, so `systemRules` is the ONE
+      // blocking check it fails — which is what makes it the fixture for the singular key.
+      const copy = heroCopy(await validationTab('resin'));
+      assert.equal(copy.title, '1 blocking issue');
+      assert.equal(copy.sub, 'Clear these before saving.');
+      assert.match(
+        copy.glyph,
+        /fa-circle-exclamation/,
+        'and the glyph is the surface’s own blocking icon, not the tab strip’s clipboard'
+      );
+    });
+
+    it('and the count MOVES when another blocking check fails, in the plural spelling', async () => {
+      // ACTS on the control rather than reading a third fixture. `orphan` fails two blocking
+      // checks at rest — no source Item, and no category resolves in the system in view — and
+      // emptying its name is the third. A headline hard-wired to either spelling, or one reading
+      // a snapshot rather than the live counts, fails one half of this pair.
+      const { target } = await open('orphan');
+      target.querySelector('[data-scoped-entry-tab="validation"]').click();
+      await drain();
+      assert.equal(
+        heroCopy(target.querySelector('[data-scoped-entry-validation]')).title,
+        '2 blocking issues'
+      );
+
+      target.querySelector('[data-scoped-entry-tab="definition"]').click();
+      await drain();
+      const name = target.querySelector('[data-scoped-entry-name]');
+      name.value = '   ';
+      name.dispatchEvent(new window.Event('input', { bubbles: true }));
+      await drain();
+      target.querySelector('[data-scoped-entry-tab="validation"]').click();
+      await drain();
+      assert.equal(
+        heroCopy(target.querySelector('[data-scoped-entry-validation]')).title,
+        '3 blocking issues',
+        'the hero reads the counts the rows are grouped by, live'
+      );
+    });
+
+    it('heads a WARNING record with the reference’s own two sentences', async () => {
+      // `ingot` is linked and categorised, and carries no world tags — one warning, no blocker.
+      const copy = heroCopy(await validationTab('ingot'));
+      assert.equal(copy.title, 'Passing with warnings');
+      assert.equal(copy.sub, '1 warning will not stop a save.');
+      assert.match(copy.glyph, /fa-triangle-exclamation/);
+    });
+
+    it('and heads a CLEAN record with All clear, so all three verdicts are measured', async () => {
+      // `coal` carries a world category and two world tags and is a member of the system in
+      // view, so every check passes. Without this arm a hero that answered `warn` for anything
+      // short of a blocker would pass both of the assertions above.
+      const copy = heroCopy(await validationTab('coal'));
+      assert.equal(copy.title, 'All clear');
+      assert.equal(copy.sub, 'Every check passes. Ready to save.');
+      assert.match(copy.glyph, /fa-circle-check/);
+    });
+
+    it('badges a blocking row `Blocking`, which is the reference’s own word for it', async () => {
+      // `proto:4573`'s tone table gives the three badges as `Blocking` / `Warning` / `Pass`. Only
+      // the block word is this family's to choose — the other two come from the shared recipe
+      // keys and already read the reference's words in `lang/en.json`, which is asserted at the
+      // source level in `scoped-shell-prop-contract.test.js` because this harness's `localize`
+      // answers with the key and every mounted badge therefore renders a FALLBACK.
+      const tab = await validationTab('orphan');
+      const badges = [...tab.querySelectorAll('.manager-recipe-val-pill')].map((pill) =>
+        pill.textContent.trim()
+      );
+      assert.ok(badges.includes('Blocking'), `the blocking badge reads Blocking; read ${badges}`);
+      assert.ok(
+        !badges.includes('INCOMPLETE') && !badges.includes('BLOCKS ENABLE'),
+        `neither superseded word survives anywhere in the run; read ${badges}`
+      );
+    });
+  });
+
   describe('the delete control names its consequence in BOTH faces', () => {
     // E.3 / AC-16 and WCAG 2.5.3 Label in Name: a control whose accessible name omits its visible
     // string is unactivatable by speech input, and `ArmedDangerButton` states that requirement
@@ -1681,3 +1810,4 @@ describe('the world Component entry source card, mounted on its own (issue 1371)
     assert.ok(!target.querySelector('[data-scoped-entry-duplicate-review]'));
   });
 });
+
