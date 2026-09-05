@@ -695,7 +695,13 @@
     // A MODIFIED KEY IS NEVER THIS WIDGET'S. `Shift+End` selects to the end of the query,
     // `Ctrl+Home` jumps to its start, and both are the ordinary way a GM fixes a typo in a long
     // search — none of them is a cursor movement, and consuming them would take the field's
-    // selection keys away with no listbox behaviour offered in exchange.
+    // selection keys away with no listbox behaviour offered in exchange. It governs the ARROWS
+    // too, not only the four caret keys below it: a modified press is the control's own.
+    //
+    // THE ORDER OF THESE TWO BLOCKS IS LOAD-BEARING, and `Enter` above is deliberately outside
+    // this test rather than accidentally so. On a TRIGGER holder an `Enter` this widget declines
+    // reaches the button's own activation and shuts the panel, so `Shift+Enter` would close the
+    // picker instead of confirming the row the GM had arrowed to.
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (caretOwnsKey(event)) return;
     const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
@@ -790,8 +796,15 @@
   //
   // The exception list is every element that has its OWN reason to take focus — the query field
   // above all, whose caret placement and text selection are exactly what a suppressed `mousedown`
-  // would break. Native scrollbar drags are unaffected, because a scrollbar interaction
-  // dispatches no `mousedown` to the element at all.
+  // would break.
+  //
+  // A native scrollbar drag DOES reach this handler — Chromium dispatches `mousedown` for a
+  // scrollbar press with the SCROLLING ELEMENT as its target, so the list matches no entry in the
+  // exception list and its default is prevented. Measured rather than assumed, and the drag is
+  // unaffected: thumb tracking is not the mousedown default action, so the scroll distance is
+  // identical with the guard and without it. It is not merely tolerated either — without the
+  // guard, dragging the list's scrollbar moved focus onto the panel exactly as clicking the inset
+  // did, so the scrollbar was a second, quieter route to the same broken keyboard model.
   const FOCUSABLE_PANEL_CHROME = 'input, button, textarea, select, [href]';
 
   function keepFocusOnHolder(event) {

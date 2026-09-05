@@ -367,6 +367,37 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       harness.remount();
     });
 
+    it('refuses a modified ARROW too, which no caret rule would have saved', async () => {
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      // THE MODIFIER GUARD IS GENERAL, and the caret boundary cannot stand in for it: ArrowUp and
+      // ArrowDown are not caret keys at all, so `caretOwnsKey` returns false for them at every
+      // offset and a widget that only consulted the boundary would take `Shift+ArrowDown` and
+      // move the cursor. `Shift+ArrowDown` in a text field extends the selection to the end of
+      // the value in every browser, and `Ctrl+ArrowUp` is a paragraph jump — neither is anything
+      // this list has an answer for. The spec states the rule over EVERY key the holder consumes
+      // for exactly this reason, `Enter` alone excepted.
+      for (const [key, modifiers] of [
+        ['ArrowDown', { shiftKey: true }],
+        ['ArrowUp', { ctrlKey: true }],
+        ['ArrowDown', { altKey: true }],
+        ['ArrowDown', { metaKey: true }],
+      ]) {
+        const pressed = pressKey(key, modifiers);
+        const name = `${Object.keys(modifiers)[0].replace('Key', '')}+${key}`;
+        assert.ok(!pressed.defaultPrevented, `${name} belongs to the field`);
+        assert.equal(activeDescendant(holder), null, `${name} moved the cursor`);
+      }
+
+      // AND THE CONTROL IS THE SAME KEY UNMODIFIED, so the loop above cannot be passing because
+      // the arrows stopped working altogether.
+      assert.ok(pressKey('ArrowDown').defaultPrevented);
+      assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
+      harness.remount();
+    });
+
     it('suppresses the pointer default so a click chooses without moving focus', async () => {
       chosen.length = 0;
       await mountPicker({});
