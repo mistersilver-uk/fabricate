@@ -279,7 +279,7 @@ function managerFixture(theme, width, height) {
                node. The fab-on-accent token fails 4.5:1 against fab-danger in
                foundry-native and is marginal in ironblood-forge, which is why
                fab-on-danger exists at all. -->
-          <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          <button type="button" class="fabricate-button manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
           <!-- The two QUIET roles (issue 1118). Both paint muted ink on no fill at all -
                is-ghost and is-dashed both take fab-text-muted, is-dashed at 11px -
                and between them they are now the treatment for every navigational verb and

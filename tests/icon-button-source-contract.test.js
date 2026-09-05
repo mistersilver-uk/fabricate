@@ -187,40 +187,50 @@ test('every deferred hand-rolled carrier writes the root class the sheet paints 
   // `data-*` selector and every geometry probe that resolves it keeps passing. The count clause
   // above cannot see that: it counts the OTHER class, which is exactly what such a site would
   // still have.
-  const carrier = CLASS_EXCEPTIONS.find((entry) => entry.file !== PRIMITIVE);
-  assert.ok(carrier, 'the deferred-carrier exemption is gone, so this clause holds over nothing');
-
-  const source = contract.components[carrier.file] ?? '';
-  assert.ok(source.length > 0, `${carrier.file} is not in the corpus`);
-
-  // TOKEN-AWARE, and ORDER-aware, rather than a leading-substring search over the `class` attribute. Two
-  // reasons, and the second is why the prefix form was rejected outright.
   //
-  // The order is part of the contract — the root leads, exactly as `IconButton.svelte` composes
-  // it — so a token-set check would let the two spellings drift apart between the primitive and
-  // its carriers, and a prefix check reads the order but cannot see a third token inserted
-  // between them.
-  //
-  // And a prefix needle is an UNTERMINATED class-attribute literal, which is the shape
-  // `searchable-popover-area-scope.test.js`'s fixture-attribute clause reads with
-  // `/class="([^"]*)"/g`: its `[^"]*` runs past the end of the line and swallows hundreds of
-  // characters, producing a phantom offender in this file that no class could repair. Written as
-  // a balanced regex the quote closes on its own line, so this clause costs that gate nothing.
-  const attributes = [...source.matchAll(/class="([^"]*)"/g)].map((match) =>
-    match[1].split(/\s+/).filter(Boolean)
+  // EVERY deferred carrier, iterated rather than the first one `find` returns. There is one
+  // today, and a second deferral added later would be skipped in silence: the clause would still
+  // pass, and the new carrier would render unpainted with nothing anywhere saying so.
+  const carriers = CLASS_EXCEPTIONS.filter((entry) => entry.file !== PRIMITIVE);
+  assert.ok(
+    carriers.length > 0,
+    'the deferred-carrier exemption is gone, so this clause holds over nothing'
   );
-  const rooted = attributes.filter(
-    (tokens) => tokens[0] === ROOT_CLASS && tokens[1] === CONTRACT_CLASS
-  ).length;
 
-  assert.equal(
-    rooted,
-    carrier.count,
-    `${carrier.file} holds ${carrier.count} deferred hand-rolled icon buttons and leads ` +
-      `${rooted} class attributes with \`${ROOT_CLASS}\` then \`${CONTRACT_CLASS}\`, in that ` +
-      'order. Each one must, or it loses every rule in `styles/fabricate.css` that paints it, ' +
-      'silently — the control keeps its shape in the DOM and loses it on screen'
-  );
+  for (const carrier of carriers) {
+    const source = contract.components[carrier.file] ?? '';
+    assert.ok(source.length > 0, `${carrier.file} is not in the corpus`);
+
+    // TOKEN-AWARE, and ORDER-aware, rather than a leading-substring search over the `class`
+    // attribute. Two reasons, and the second is why the prefix form was rejected outright.
+    //
+    // The order is part of the contract — the root leads, exactly as `IconButton.svelte`
+    // composes it — so a token-set check would let the two spellings drift apart between the
+    // primitive and its carriers, and a prefix check reads the order but cannot see a third
+    // token inserted between them.
+    //
+    // And a prefix needle is an UNTERMINATED class-attribute literal, which is the shape
+    // `searchable-popover-area-scope.test.js`'s fixture-attribute clause reads with
+    // `/class="([^"]*)"/g`: its `[^"]*` runs past the end of the line and swallows hundreds of
+    // characters, producing a phantom offender in this file that no class could repair. Written
+    // as a balanced regex the quote closes on its own line, so this clause costs that gate
+    // nothing.
+    const attributes = [...source.matchAll(/class="([^"]*)"/g)].map((match) =>
+      match[1].split(/\s+/).filter(Boolean)
+    );
+    const rooted = attributes.filter(
+      (tokens) => tokens[0] === ROOT_CLASS && tokens[1] === CONTRACT_CLASS
+    ).length;
+
+    assert.equal(
+      rooted,
+      carrier.count,
+      `${carrier.file} holds ${carrier.count} deferred hand-rolled icon buttons and leads ` +
+        `${rooted} class attributes with \`${ROOT_CLASS}\` then \`${CONTRACT_CLASS}\`, in ` +
+        'that order. Each one must, or it loses every rule in `styles/fabricate.css` that ' +
+        'paints it, silently — the control keeps its shape in the DOM and loses it on screen'
+    );
+  }
 });
 
 test('every icon button is given an accessible name', () => {

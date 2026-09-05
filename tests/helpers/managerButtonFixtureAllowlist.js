@@ -62,13 +62,24 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
   Object.freeze({
     file: 'tests/components/manager-layout.test.js',
     classes: 'manager-button is-danger',
-    count: 2,
+    count: 1,
     why:
-      'Two controls, one reason each. `data-probe="card-unconverted"` is the negative control ' +
-      'in the authority-equivalence test — the class string the Modifiers card shipped before ' +
-      'the conversion, kept so that "the primitive changes nothing" would fail rather than ' +
-      'pass. The other is the Delete in the knowledge-row geometry fixture, which is an ' +
-      '`ArmedDangerButton` and writes this string in the product too.',
+      '`data-probe="card-unconverted"`, the negative control in the authority-equivalence ' +
+      'test: the class string the Modifiers card shipped before the conversion, kept without ' +
+      'the family root AND without the primitive class so that "the primitive changes ' +
+      'nothing" would fail rather than pass. Giving it either class is what would make that ' +
+      'test measure the converted control twice and pass vacuously.',
+  }),
+  Object.freeze({
+    file: 'tests/components/manager-layout.test.js',
+    classes: 'fabricate-button manager-button is-danger',
+    count: 1,
+    why:
+      'The Delete in the knowledge-row geometry fixture, which models an `ArmedDangerButton`. ' +
+      'That component writes `fabricate-button manager-button is-danger` since issue 1502, so ' +
+      'the fixture carries the family root as well — root-less it matched no rule in the ' +
+      'family and the row clipped an action cluster shorter and narrower than the shipped ' +
+      'one. Still unconverted, so it stays listed.',
   }),
   // (`manager-layout.test.js: manager-button is-subtle manager-recipe-tag-trigger` was booked
   // here as population B. Issue 1373's maintainer round 5 made `+ Tag` a CHIP trigger — the
@@ -115,12 +126,14 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
   }),
   Object.freeze({
     file: 'tests/components/theme-rendered-validation.test.js',
-    classes: 'manager-button is-danger is-armed',
+    classes: 'fabricate-button manager-button is-danger is-armed',
     count: 1,
     why:
-      'The armed half of `ArmedDangerButton`, which is held out of the conversion and writes ' +
-      'this exact string. It carries its own solid-contrast probe because it is the product`s ' +
-      'first solid danger surface.',
+      'The armed half of `ArmedDangerButton`, which is held out of the conversion. The ' +
+      'component writes the family root plus `manager-button is-danger` and adds `is-armed` ' +
+      'when armed, and this fixture spells that exactly. Root-less it matched nothing in the ' +
+      'family, so its solid-contrast probe read the browser default button chrome — the same ' +
+      'ratio in all seven themes — instead of `--fab-on-danger` on `--fab-danger`.',
   }),
 ]);
 
