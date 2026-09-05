@@ -20,6 +20,7 @@
   import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
   import CraftingThumb from '../CraftingThumb.svelte';
   import QuantityTag from '../QuantityTag.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let { choices = [], onChoose = null } = $props();
 
@@ -65,9 +66,9 @@
 
 {#if groups.length > 0}
   <section class="crafting-alt" data-recipe-section="alternatives">
-    <p class="crafting-detail-section-title">
+    <Kicker as="p">
       {localize('FABRICATE.App.Crafting.Io.AlternativesTitle')}
-    </p>
+    </Kicker>
     <p class="crafting-alt-hint">{localize('FABRICATE.App.Crafting.Io.AlternativesHint')}</p>
 
     {#each groups as choice (choice.kind + ':' + choice.groupId + ':' + (choice.optionIndex ?? ''))}
@@ -260,18 +261,5 @@
     flex: 0 0 auto;
     font-size: 13px;
     color: var(--fab-accent);
-  }
-
-  /* Matches the sibling IO section headers (IoTable / IngredientSetSelector /
-     CraftingCheckCard / OutcomeTierTable). Svelte scopes CSS per component and this
-     class is not global, so the rule is redefined here to stay consistent with the
-     "Ingredients / Essences / Tools / Output" headers above the Alternatives block. */
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>

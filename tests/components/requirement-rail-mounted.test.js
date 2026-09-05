@@ -118,6 +118,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+    // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`, so
+    // omitting it HANGS this suite (# cancelled), never fails it.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
   ],
   componentPath: RAIL_PATH,

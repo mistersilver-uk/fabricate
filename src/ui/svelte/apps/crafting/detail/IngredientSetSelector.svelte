@@ -10,6 +10,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import { ingredientOptionStatus } from '../../../util/ingredientOptionStatus.js';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let { sets = [], selectedSetId = null, onChoose = null } = $props();
 
@@ -38,9 +39,9 @@
 
 {#if multiple}
   <section class="crafting-set-selector" data-recipe-section="ingredient-sets">
-    <p class="crafting-detail-section-title">
+    <Kicker as="p">
       {localize('FABRICATE.App.Crafting.Detail.IngredientSetsTitle')}
-    </p>
+    </Kicker>
     <div class="crafting-option-cards" role="group">
       {#each options as set (set.id)}
         {@const status = statusOf(set)}
@@ -257,14 +258,5 @@
     line-height: 1;
     font-variant-numeric: tabular-nums;
     box-shadow: var(--fab-shadow-sm);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>
