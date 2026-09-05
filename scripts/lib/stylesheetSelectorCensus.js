@@ -667,8 +667,8 @@ export function identicalListPairs(rules) {
  *
  * @param {object} interval
  * @param {ReturnType<typeof censusRules>} interval.rules
- * @param {number} interval.from Index of the earlier endpoint, exclusive.
- * @param {number} interval.to Index of the later endpoint, exclusive.
+ * @param {number} interval.from One endpoint, exclusive; order against `to` does not matter.
+ * @param {number} interval.to The other endpoint, exclusive.
  * @param {Map<string, {property: string}>} interval.wanted Longhands the endpoints set.
  * @param {(rule: object) => boolean} interval.admits Whether a conflicting rule can reach them.
  * @returns {{blocked: boolean, blockers: Array<{ruleIndex: number, line: number, selector: string,
@@ -677,7 +677,13 @@ export function identicalListPairs(rules) {
  */
 function walkInterval({ rules, from, to, wanted, admits }) {
   const blockers = [];
-  for (let index = from + 1; index < to; index += 1) {
+  // AN INTERVAL HAS NO DIRECTION. A caller naming the donor first and the utility second writes
+  // the endpoints in sheet order only when the donor precedes the utility; when it does not, an
+  // ascending loop examines nothing and returns `{blocked: false}` — a clean bill of health that
+  // reads exactly like a walk that examined everything and found nothing.
+  const low = Math.min(from, to);
+  const high = Math.max(from, to);
+  for (let index = low + 1; index < high; index += 1) {
     const rule = rules[index];
     for (const declaration of rule.declarations) {
       const longhand = longhandsOf(declaration.property).find((name) => wanted.has(name));
@@ -726,13 +732,25 @@ function withinBand(specificity, band) {
   return compareSpecificity(specificity, low) >= 0 && compareSpecificity(specificity, high) <= 0;
 }
 
-function subjectCanMatch(rule, element) {
-  return rule.selectors.some((selector) => {
-    const subject = subjectOf(selector);
-    const classes = compoundClasses(subject);
-    if (classes.length === 0) return true;
-    return classes.every((name) => element.classes.includes(name));
-  });
+function subjectMatches(selector, element) {
+  const classes = compoundClasses(subjectOf(selector));
+  if (classes.length === 0) return true;
+  return classes.every((name) => element.classes.includes(name));
+}
+
+/**
+ * Whether any ONE member of a rule both sits in the band and can style the adopting element.
+ *
+ * Both clauses are asked of the SAME member. A rule's `specificity` is the highest of its list, so
+ * banding on it while testing the subject per member asks the two questions of different selectors:
+ * `.fabricate-manager .donor, .fabricate-manager .panel .card .other.is-open` bands as (0,5,0) and
+ * is skipped, though its (0,2,0) member is in the band and its subject is a class the donor
+ * element carries. That is an under-approximation in a walk whose whole job is soundness.
+ */
+function scopedAdmits(rule, band, element) {
+  return rule.selectors.some(
+    (selector) => withinBand(specificityOf(selector), band) && subjectMatches(selector, element)
+  );
 }
 
 /**
@@ -745,8 +763,8 @@ function subjectCanMatch(rule, element) {
  *
  * @param {object} walk
  * @param {ReturnType<typeof censusRules>} walk.rules
- * @param {number} walk.from Index of the earlier endpoint, exclusive.
- * @param {number} walk.to Index of the later endpoint, exclusive.
+ * @param {number} walk.from One endpoint, exclusive; order against `to` does not matter.
+ * @param {number} walk.to The other endpoint, exclusive.
  * @param {Array<{property: string}>} walk.declarations The declarations being moved.
  * @param {number[][]} walk.band The donor's and the utility's specificities, in either order.
  * @param {{classes: string[]}} walk.element The adopting element's class list, read as the UNION of
@@ -760,7 +778,7 @@ export function scopedBlockerWalk({ rules, from, to, declarations, band, element
     from,
     to,
     wanted,
-    admits: (rule) => withinBand(rule.specificity, band) && subjectCanMatch(rule, element),
+    admits: (rule) => scopedAdmits(rule, band, element),
   });
 }
 
