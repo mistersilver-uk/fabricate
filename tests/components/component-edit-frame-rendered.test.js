@@ -21,6 +21,18 @@
  * place. What is this suite's own is the MOUNT: the editor with every section on, so its cards
  * overflow a 720px host and "the panel scrolls and the column does not" is a measurement rather
  * than an assumption.
+ * ── SKIP POLICY, AND WHERE THE SKIPPED ARM RUNS IN CI ────────────────────────────────────
+ * (issue 1371 r20-entry3; Foundry review round 6 finding 3, quality review round 6 R2.)
+ * The arms that lay FOUNDRY'S OWN harvested sheet under this frame skip where no harvest exists,
+ * because `npm test` must stay runnable without a Foundry licence and `.foundry-chrome/` is a
+ * licensed local artefact that `ci.yml`'s runner never holds. r19 added those arms, wrote that
+ * policy in `harvestedFoundryChrome.js` — and named this file in no workflow at all, so with the
+ * harvest moved aside it reported `tests 40, pass 20, skipped 20` and stayed GREEN even under
+ * `VIEWLAB_REQUIRE_CHROME=1`: half its contract executed on a maintainer's machine and nowhere
+ * else. `registerChromeRunnerGuards` below closes both halves — it FAILS when the harvest is
+ * missing and `VIEWLAB_REQUIRE_CHROME=1`, and it asserts against `pr-screenshots.yml` that this
+ * file is still named on the chrome-dependent step that sets it. The step's name is spelled once,
+ * as `CHROME_STEP_NAME` in that helper; open it to find the runner where the skip cannot be taken.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -41,6 +53,7 @@ import {
   harvestedFoundryChromeCss,
   harvestedFoundryVersion,
   measureEntryFrameUnderHarvestedChrome,
+  registerChromeRunnerGuards,
   registerHarvestedChromeFrameArms,
 } from '../helpers/harvestedFoundryChrome.js';
 import {
@@ -55,6 +68,15 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 /** Foundry's own stylesheet, where a harvest exists; `''` in CI, where the arms below skip. */
 const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
+
+// See the SKIP POLICY block at the head of this file: on the runner that harvests, a missing
+// harvest is a FAILURE rather than a quietly green run whose chrome arms were all skipped —
+// and this file's presence on that runner's step is asserted against the workflow itself.
+registerChromeRunnerGuards({
+  repoRoot,
+  suitePath: 'tests/components/component-edit-frame-rendered.test.js',
+  chrome: harvestedChrome,
+});
 
 const compiledModules = [...COMPONENT_EDIT_VIEW_COMPILED_MODULES];
 const harness = createMountedComponentHarness({

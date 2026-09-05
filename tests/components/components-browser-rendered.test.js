@@ -35,13 +35,15 @@
  * `npm test` must stay runnable without a Foundry licence — and `.foundry-chrome/` is a licensed
  * local artefact, so `ci.yml`'s `npm test` runner never holds one. A skip policy without a place
  * the skip cannot be taken is a guard that executes nowhere: the runner that DOES harvest is
- * `pr-screenshots.yml`'s capture job, and this file is named on its "Verify the harvested chrome
- * still matches, and every lab asset path resolves in it" step, beside
- * `view-lab-chrome-drift.test.js` and `view-lab-fixture-assets.test.js`, under that step's
- * `VIEWLAB_REQUIRE_CHROME=1`. Moving or renaming that step without moving this file leaves the
- * real-sheet arm running nowhere again.
- * `VIEWLAB_REQUIRE_CHROME=1` turns the skip into a failure, so a machine that is supposed to hold
- * a cache cannot report a green run that measured nothing.
+ * `pr-screenshots.yml`'s capture job, and this file is named on its chrome-dependent step, beside
+ * `view-lab-chrome-drift.test.js`, `view-lab-fixture-assets.test.js` and the two entry-frame
+ * suites, under that step's `VIEWLAB_REQUIRE_CHROME=1`.
+ * BOTH HALVES OF THAT POLICY COME FROM `harvestedFoundryChrome.js` SINCE r20 (issue 1371
+ * r20-entry3): `registerChromeRunnerGuards` fails loudly when the harvest is absent and
+ * `VIEWLAB_REQUIRE_CHROME=1`, and asserts against the workflow that this file is still named on
+ * the step — so moving or renaming it reddens here at test time rather than silently disarming
+ * the arm. The step's name is NOT transcribed here any more: `CHROME_STEP_NAME` in that helper is
+ * the one place the test tree spells it, which is what a reader of a skipped arm should open.
  * AND THE STAND-IN IS ITSELF MEASURED. `FOUNDRY_BUTTON_CHROME` below is a hand transcription of
  * one line of Foundry's sheet, and until r19 nothing checked it against the real thing: emptied,
  * the whole suite stayed green, because the test that claimed to guard it was reading the
@@ -53,15 +55,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { before, describe, it, test } from 'node:test';
+import { before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
 import { createComponentsBrowserViewHarness } from '../helpers/componentScopeMountModules.js';
 import {
-  HARVEST_HINT,
   harvestedFoundryChromeCss,
   harvestedFoundryVersion,
+  registerChromeRunnerGuards,
   skipWithoutHarvest,
 } from '../helpers/harvestedFoundryChrome.js';
 import { collectScopedCss, managerShellPage } from '../helpers/renderedManagerShell.js';
@@ -128,38 +130,15 @@ const CENTRED_CONTROL = NO_IDENTITY_ALIGNMENT_CONTROL + NO_COPY_GROW_CONTROL;
 /** Resolved ONCE, so the skipped arm, the mirror check and the CI guard all read one fact. */
 const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 
-// See the SKIP POLICY block at the head of this file: on the runner that harvests, the skip is a
-// failure rather than a quietly green run that measured nothing.
-if (!harvestedChrome && process.env.VIEWLAB_REQUIRE_CHROME === '1') {
-  test('a harvested Foundry chrome is present (VIEWLAB_REQUIRE_CHROME=1)', () => {
-    assert.fail(`no css/foundry2.css under .foundry-chrome/, but VIEWLAB_REQUIRE_CHROME=1; ${HARVEST_HINT}`);
-  });
-}
-
-const WORKFLOW_PATH = '.github/workflows/pr-screenshots.yml';
-const SUITE_PATH = 'tests/components/components-browser-rendered.test.js';
-/** The step this file's SKIP POLICY names, quoted verbatim from the workflow. */
-const CHROME_STEP_NAME = 'Verify the harvested chrome still matches, and every lab asset path resolves in it';
-
-/**
- * That step's own YAML, sliced out by indentation.
- *
- * A docblock saying "and it runs HERE in CI" is a hand-maintained mirror of another file, and the
- * defect it exists to prevent — round-3 F2, a chrome-dependent guard that executed on no runner —
- * is exactly what a stale mirror re-opens. Read rather than asserted, so a step that is renamed,
- * deleted or emptied of this file fails here at test time.
- *
- * The workflow is read as TEXT: `js-yaml` is a transitive dependency of this repo's toolchain
- * rather than a declared one, and a guard is not worth a new npm dependency.
- */
-function chromeDependentStep() {
-  const lines = readFileSync(resolve(repoRoot, WORKFLOW_PATH), 'utf8').split('\n');
-  const start = lines.findIndex((line) => line.trim() === `- name: ${CHROME_STEP_NAME}`);
-  if (start === -1) return null;
-  const marker = lines[start].indexOf('- ');
-  const after = lines.findIndex((line, index) => index > start && line.indexOf('- ') === marker && line.trim().startsWith('- '));
-  return lines.slice(start, after === -1 ? lines.length : after).join('\n');
-}
+// See the SKIP POLICY block at the head of this file. BOTH halves — the fail-loud arm on the
+// runner that is supposed to harvest, and the assertion that this file is still named on that
+// runner's step — live in `harvestedFoundryChrome.js` since r20, so all three chrome-dependent
+// rendered suites get them from one place rather than from three transcriptions.
+registerChromeRunnerGuards({
+  repoRoot,
+  suitePath: 'tests/components/components-browser-rendered.test.js',
+  chrome: harvestedChrome,
+});
 
 /**
  * A BARE `<button>` under one chrome sheet and NOTHING else — no module sheet, no scoped blocks.
@@ -271,22 +250,6 @@ function measureRows() {
     };
   });
 }
-
-describe('this suite runs on the one CI runner that harvests a chrome (issue 1371 r19-gates2, Q2)', () => {
-  it('is named on pr-screenshots.yml’s chrome-dependent step, under VIEWLAB_REQUIRE_CHROME and --conditions=browser', () => {
-    const step = chromeDependentStep();
-    assert.ok(
-      step,
-      `${WORKFLOW_PATH} no longer carries a step named "${CHROME_STEP_NAME}" — this file's SKIP POLICY quotes it, and the harvested-sheet arm now runs nowhere in CI`
-    );
-    assert.ok(
-      step.includes(SUITE_PATH),
-      `${WORKFLOW_PATH}'s "${CHROME_STEP_NAME}" step no longer runs ${SUITE_PATH}, so its M28 claim is carried in CI by the hand-written stand-in alone`
-    );
-    assert.match(step, /VIEWLAB_REQUIRE_CHROME: '1'/, `that step no longer sets VIEWLAB_REQUIRE_CHROME=1, so a missing harvest would skip rather than fail`);
-    assert.match(step, /--conditions=browser/, `that step no longer passes --conditions=browser, so every mount in this file fails with "mount(...) is not available on the server"`);
-  });
-});
 
 describe('the rules list toolbar’s rendered geometry (issue 1371 r16-list, M22)', () => {
   const rendered = { markup: '', scoped: null };

@@ -155,6 +155,13 @@ export function measureEntryFrame() {
     strip: box(strip),
     firstTab: box(firstTab),
     firstTabContent: box(firstTab.firstElementChild),
+    // THE CASCADE FACT the harvested-chrome arms are non-vacuous on (issue 1371 r20-entry3,
+    // Foundry review round 6). The tab is a `<button role="tab">` and `.manager-editor-tab-button`
+    // declares no `justify-content`, so Foundry's own `a.button, button { justify-content: center }`
+    // arbitrates it: `center` under the harvested sheet, `normal` without one. It is a DECLARATION
+    // that resolved rather than a width that happened to differ, which is why it is read here and
+    // not derived from a box.
+    firstTabJustify: getComputedStyle(firstTab).justifyContent,
     panel: box(panel),
     panelInner: {
       left: panelRect.left + panel.clientLeft,

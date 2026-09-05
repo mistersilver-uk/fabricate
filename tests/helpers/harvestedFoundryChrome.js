@@ -13,12 +13,21 @@
  * a local artefact that `npm test` must be able to run without: on a machine with no harvest the
  * arms that need one SKIP. A skip policy is only honest with a runner where the skip cannot be
  * taken, so `VIEWLAB_REQUIRE_CHROME=1` turns it into a failure and `pr-screenshots.yml`'s
- * chrome-dependent step sets exactly that. Each consuming suite records its own placement.
+ * chrome-dependent step sets exactly that.
+ *
+ * AND THAT POLICY IS ENFORCED FROM HERE, not recorded per suite (issue 1371 r20-entry3; Foundry
+ * review round 6 finding 3, quality review round 6 R2). Revision 19 wrote the sentence above and
+ * left the two frame suites off the step and without the fail-loud arm, so with the harvest moved
+ * aside they reported `tests 40, pass 20, skipped 20` and stayed GREEN under
+ * `VIEWLAB_REQUIRE_CHROME=1` — the exact gap the step exists to close, reintroduced for two of
+ * the three consumers by the revision that added them. {@link registerChromeRunnerGuards} now
+ * carries the fail-loud arm AND the "named on the step" source assertion for every consumer, and
+ * {@link CHROME_STEP_NAME} is the ONE place in the test tree that spells the step's name.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { it } from 'node:test';
+import { join, resolve } from 'node:path';
+import { describe, it, test } from 'node:test';
 
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
@@ -27,6 +36,94 @@ import { measureEntryFrameArrangements } from './renderedManagerShell.js';
 /** What a skipped arm says, so every suite gives a reader the same next step. */
 export const NO_HARVEST_SKIP_REASON = 'no local Foundry chrome harvest (.foundry-chrome)';
 export const HARVEST_HINT = 'run: npm run viewlab:chrome:harvest';
+
+/** The workflow that owns the one CI runner holding a harvest. */
+const WORKFLOW_PATH = '.github/workflows/pr-screenshots.yml';
+
+/**
+ * The step every chrome-dependent suite runs on, quoted verbatim from that workflow — and quoted
+ * ONCE, here.
+ *
+ * Until r20 this literal was transcribed into `components-browser-rendered.test.js` and prose-quoted
+ * in two docblocks besides, so the step could not be renamed without a hand-search: `gates2` left
+ * it under-describing what it runs for exactly that reason. One constant, read by the assertion
+ * below, is the mirror this repository asks for everywhere else — rename the step and precisely
+ * one test file has to change with it.
+ *
+ * @type {string}
+ */
+export const CHROME_STEP_NAME =
+  'Run every chrome-dependent suite, where a missing harvest fails instead of skipping';
+
+/**
+ * That step's own YAML, sliced out by indentation, or `null` where no such step exists.
+ *
+ * The workflow is read as TEXT: `js-yaml` is a transitive dependency of this repo's toolchain
+ * rather than a declared one, and a guard is not worth a new npm dependency.
+ *
+ * @param {string} repoRoot Absolute repository root.
+ * @returns {string|null}
+ */
+function chromeDependentStep(repoRoot) {
+  const lines = readFileSync(resolve(repoRoot, WORKFLOW_PATH), 'utf8').split('\n');
+  const start = lines.findIndex((line) => line.trim() === `- name: ${CHROME_STEP_NAME}`);
+  if (start === -1) return null;
+  const marker = lines[start].indexOf('- ');
+  const after = lines.findIndex(
+    (line, index) => index > start && line.indexOf('- ') === marker && line.trim().startsWith('- ')
+  );
+  return lines.slice(start, after === -1 ? lines.length : after).join('\n');
+}
+
+/**
+ * The two guards that make a suite's SKIP POLICY true, registered together.
+ *
+ * A suite whose chrome arms skip without a harvest needs BOTH halves or it guards nothing:
+ *
+ *  - the FAIL-LOUD arm, so the runner that is supposed to hold a harvest cannot report a green
+ *    run in which every chrome arm was skipped;
+ *  - the SOURCE assertion, because "and it runs HERE in CI" is a hand-maintained mirror of
+ *    another file, and a step that is renamed, deleted or emptied of this file re-opens the gap
+ *    silently. Read from the workflow rather than asserted in prose, so it fails at test time.
+ *
+ * Called from the suite's own module scope, before its `describe`s, exactly where each consumer
+ * used to write its own copy.
+ *
+ * @param {object} options
+ * @param {string} options.repoRoot Absolute repository root.
+ * @param {string} options.suitePath the suite's own repo-relative path, as the workflow names it.
+ * @param {string} options.chrome the sheet from {@link harvestedFoundryChromeCss}, or `''`.
+ */
+export function registerChromeRunnerGuards({ repoRoot, suitePath, chrome }) {
+  if (!chrome && process.env.VIEWLAB_REQUIRE_CHROME === '1') {
+    test(`a harvested Foundry chrome is present for ${suitePath} (VIEWLAB_REQUIRE_CHROME=1)`, () => {
+      assert.fail(`no css/foundry2.css under .foundry-chrome/, but VIEWLAB_REQUIRE_CHROME=1; ${HARVEST_HINT}`);
+    });
+  }
+  describe(`${suitePath} runs on the one CI runner that harvests a chrome`, () => {
+    it('is named on pr-screenshots.yml’s chrome-dependent step, under VIEWLAB_REQUIRE_CHROME and --conditions=browser', () => {
+      const step = chromeDependentStep(repoRoot);
+      assert.ok(
+        step,
+        `${WORKFLOW_PATH} no longer carries a step named "${CHROME_STEP_NAME}" — every chrome-dependent suite's harvested-sheet arms now run nowhere in CI`
+      );
+      assert.ok(
+        step.includes(suitePath),
+        `${WORKFLOW_PATH}'s "${CHROME_STEP_NAME}" step no longer runs ${suitePath}, so its harvested-sheet arms skip silently in the only place they run`
+      );
+      assert.match(
+        step,
+        /VIEWLAB_REQUIRE_CHROME: '1'/,
+        'that step no longer sets VIEWLAB_REQUIRE_CHROME=1, so a missing harvest would skip rather than fail'
+      );
+      assert.match(
+        step,
+        /--conditions=browser/,
+        `that step no longer passes --conditions=browser, so every mount in ${suitePath} fails with "mount(...) is not available on the server"`
+      );
+    });
+  });
+}
 
 /**
  * The newest harvested `foundry2.css`, or `''` where nothing is harvested.
@@ -93,9 +190,17 @@ export async function measureEntryFrameUnderHarvestedChrome({ chrome, pageFor, v
  *
  * THE FIRST ARM IS NON-VACUITY FOR EVERY ARM AFTER IT. The frame's geometry is chrome-INVARIANT
  * today, which is the good news and also the reason a chrome arm could quietly measure nothing:
- * pass `''` instead of the sheet and every sentence still passes. What Foundry does move is the
- * tab's LABEL METRICS — it declares `--font-sans` and the tab inherits it — so the first tab's box
- * is measurably wider under it. That is the fact that says the sheet arrived.
+ * pass `''` instead of the sheet and every sentence still passes. Two facts say the sheet arrived,
+ * and the second is the one that matters:
+ *
+ *  - the tab's LABEL METRICS move — Foundry declares `--font-sans` and the tab inherits it — so
+ *    the first tab's box is measurably wider under it. True, but it is a METRIC, and a future
+ *    Foundry release that shipped the same font would retire it silently;
+ *  - the tab's `justify-content` RESOLVES DIFFERENTLY: `center` under the sheet, `normal` without
+ *    it. That is the CASCADE fact M28 is about — `a.button, button { justify-content: center }`
+ *    against a `.manager-editor-tab-button` that declares the property nowhere — measured on the
+ *    very strip M32 rules about, and it is the one that says Foundry's own arbitration reached
+ *    this frame rather than merely its typography (issue 1371 r20-entry3, Foundry review round 6).
  *
  * The frames are taken as thunks because a suite measures them in `before()`, after registration.
  *
@@ -115,6 +220,16 @@ export function registerHarvestedChromeFrameArms({ chrome, version, honestFrames
     assert.ok(
       Math.abs(under - bare) > 1,
       `the first tab measured ${under}px under Foundry ${version} and ${bare}px without it — the sheet did not reach the page`
+    );
+    assert.equal(
+      chromeFrames().honest.firstTabJustify,
+      'center',
+      `the tab resolved justify-content: ${chromeFrames().honest.firstTabJustify} under Foundry ${version} — its own \`a.button, button { justify-content: center }\` did not arbitrate this strip, so the sheet did not reach the cascade`
+    );
+    assert.equal(
+      honestFrames().honest.firstTabJustify,
+      'normal',
+      `without the sheet the tab already resolved justify-content: ${honestFrames().honest.firstTabJustify} — the module sheet now declares it, so the arm above no longer measures Foundry's arbitration`
     );
   });
   for (const [name, check] of checks) {

@@ -23,11 +23,18 @@
  * `ci.yml`'s `npm test` runner harvests no chrome — the cache is a licensed local artefact — so
  * this file skips there on every run, which is one skipped test and zero assertions. The runner
  * that DOES hold a cache is `pr-screenshots.yml`'s capture job, and this suite is named on its
- * "Verify the harvested chrome still matches, and every lab asset path resolves in it" step,
- * beside `view-lab-chrome-drift.test.js` and under that step's `VIEWLAB_REQUIRE_CHROME=1`. That
- * is the only place in CI where the skip cannot be taken, and it is the same job whose capture
- * run a missing path would abort. Moving or renaming that step without moving this file leaves
- * the guard executing nowhere again (issue 1371, quality review r9 F2).
+ * "Run every chrome-dependent suite, where a missing harvest fails instead of skipping" step,
+ * beside `view-lab-chrome-drift.test.js` and the three rendered component suites, under that
+ * step's `VIEWLAB_REQUIRE_CHROME=1`. That is the only place in CI where the skip cannot be taken,
+ * and it is the same job whose capture run a missing path would abort. Moving or renaming that
+ * step without moving this file leaves the guard executing nowhere again (issue 1371, quality
+ * review r9 F2).
+ * THIS QUOTE IS THE LAST HAND-HELD ONE, and it is deliberate (issue 1371 r20-entry3). The three
+ * rendered component suites read the step's name from `CHROME_STEP_NAME` in
+ * `tests/helpers/harvestedFoundryChrome.js` and assert their own presence on it; this is a ROOT
+ * suite that mounts nothing, so importing that helper would drag Playwright and the mounted-shell
+ * machinery into `npm test`'s cheapest tier for a sentence. The rename in r20 moved four
+ * transcriptions to one constant plus this quotation.
  *
  * ONE THING IT DOES NOT COVER, and it is worth knowing before trusting a green run:
  * `resolveChromeCache` selects the NEWEST harvest (`scripts/lib/foundryChromeCache.js`), so with

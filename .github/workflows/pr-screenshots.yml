@@ -278,18 +278,30 @@ jobs:
       # under each chrome and asserts the two agree, which is the drift check the mirror never had —
       # and that check is likewise real only where a harvest exists.
       #
-      # `--conditions=browser` because this third suite MOUNTS Svelte components (`npm test` sets
-      # the same condition); without it every mount fails with "mount(...) is not available on the
-      # server". `--test-timeout` matches `npm test` rather than leaving the default of none, so a
-      # hung Chromium fails the step instead of running out the job's clock.
+      # AND THE TWO ENTRY-FRAME SUITES JOINED IN r20 (issue 1371, Foundry review round 6 finding 3,
+      # quality review round 6 R2). Revision 19 gave both of them arms that re-measure the frame's
+      # whole contract under the harvested sheet, wrote a shared skip policy saying those arms run
+      # on THIS step — and named neither file here. With the harvest moved aside both reported
+      # `tests 40, pass 20, skipped 20` and stayed green even under VIEWLAB_REQUIRE_CHROME=1, so
+      # the arms executed on a maintainer's machine and nowhere else. All three now register
+      # `registerChromeRunnerGuards` from `tests/helpers/harvestedFoundryChrome.js`, which both
+      # fails loudly on a missing harvest and asserts, against this file, that the calling suite is
+      # named on the step below.
       #
-      # THE STEP'S NAME IS LOAD-BEARING and is deliberately left as it was. Both chrome-dependent
-      # suites quote it verbatim in their own SKIP-POLICY docblocks — that quotation is how a
-      # reader of a skipped test finds the one runner where the skip cannot be taken — so renaming
-      # it here without rewriting those docblocks in the same commit re-opens the gap this step
-      # exists to close. It reads narrower than the three suites it now runs; the comment above is
-      # where the third one is accounted for.
-      - name: Verify the harvested chrome still matches, and every lab asset path resolves in it
+      # `--conditions=browser` because all three rendered suites MOUNT Svelte components (`npm test`
+      # sets the same condition); without it every mount fails with "mount(...) is not available on
+      # the server". `--test-timeout` matches `npm test` rather than leaving the default of none, so
+      # a hung Chromium fails the step instead of running out the job's clock.
+      #
+      # THE STEP'S NAME IS LOAD-BEARING, and it is now spelled in exactly two places: here, and
+      # `CHROME_STEP_NAME` in `tests/helpers/harvestedFoundryChrome.js`, which every chrome-dependent
+      # component suite asserts this step against. `tests/view-lab-fixture-assets.test.js` quotes it
+      # in prose as well, because it is a root suite that does not mount and so does not import that
+      # helper. Rename it here and those two change with it — the r19 name ("Verify the harvested
+      # chrome still matches, and every lab asset path resolves in it") was left in place precisely
+      # because it was transcribed in more places than that, which is the mirror rot this collapse
+      # ends. No colon inside the name: a plain YAML scalar cannot carry one.
+      - name: Run every chrome-dependent suite, where a missing harvest fails instead of skipping
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
@@ -297,7 +309,9 @@ jobs:
           node --conditions=browser --test --test-timeout=300000 \
             tests/view-lab-chrome-drift.test.js \
             tests/view-lab-fixture-assets.test.js \
-            tests/components/components-browser-rendered.test.js
+            tests/components/components-browser-rendered.test.js \
+            tests/components/component-edit-frame-rendered.test.js \
+            tests/components/world-component-entry-frame-rendered.test.js
 
       - name: Render the selected frames
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'
