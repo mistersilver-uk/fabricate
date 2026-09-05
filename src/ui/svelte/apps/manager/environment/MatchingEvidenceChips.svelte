@@ -165,7 +165,7 @@
       'Matching evidence'
     )}
   >
-    <div class="manager-environment-evidence-chips">
+    <div class="fab-cluster" data-gap="1">
       {#each shown as row (row.field.key)}
         <span
           class={`manager-environment-evidence-chip ${row.tone}`}

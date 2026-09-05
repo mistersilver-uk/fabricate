@@ -467,7 +467,7 @@
 
 <section class="manager-essence-inspector-section" data-essence-section="usage">
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</p>
-  <div class="manager-requirements-list">
+  <div class="fab-stack" data-gap="2">
     <div class="manager-requirement-row">
       <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
       <strong>{componentUsageSentence}</strong>

@@ -14144,7 +14144,7 @@
                 </div>
               </div>
 
-              <div class="manager-rules-stack">
+              <div class="fab-stack" data-gap="2">
                 <div class="manager-rule-row">
                   <span class="manager-rule-icon" aria-hidden="true"
                     ><i class="fas fa-gift"></i></span

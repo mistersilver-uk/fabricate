@@ -1076,6 +1076,78 @@
   outline-offset: 2px;
 }
 
+/* ══════════════════════════════════════════
+   MODULE UTILITIES (issue 1501)
+   ══════════════════════════════════════════
+   A class that carries no meaning beyond a repeated declaration set — truncation, a column
+   stack, a wrapping cluster — is a UTILITY. It is declared ONCE and rooted at `.fabricate`,
+   the class every Fabricate application root emits, rather than once per app area, and its
+   callers carry it in markup.
+
+   THE POSITION IS LOAD-BEARING RATHER THAN INCIDENTAL. `.fabricate .fab-stack` is (0,2,0), the
+   same rank as every rule it replaces, so each adoption's paint is decided entirely by source
+   order. These are declared HERE, above every donor, and each adoption shipped with a blocker
+   walk over the interval between this position and its donor's.
+
+   A utility ships only where TWO OR MORE rules already declared its set property for property
+   and value for value; one adopter is a rename rather than a shared treatment. `.fab-list-reset`
+   is NOT declared for that reason — all 20 list-reset rules in this sheet carry other
+   declarations too, so none of them could adopt it (issue 1523).
+
+   The `data-gap` mapping declares only the rungs the actual adopters use. The dead-class gate
+   fires on a declared-and-unemitted CLASS and cannot see an unused `[data-gap='4']` variant
+   while the class itself is live, so an unused rung would be dead weight nothing catches. A
+   further rung is added with the adopter that needs it. */
+
+.fabricate .fab-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate .fab-stack {
+  /* The rung default is set HERE rather than as a `var()` fallback, so every `.fab-stack`
+     writes its own and none inherits a nested ancestor's rung. */
+  --fab-stack-gap: var(--fab-space-2);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-stack-gap);
+  min-width: 0;
+}
+
+.fabricate .fab-cluster {
+  --fab-cluster-gap: var(--fab-space-2);
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-cluster-gap);
+}
+
+/* The rungs, written as (0,3,0) rules that set a CUSTOM PROPERTY rather than `gap` itself. That
+   indirection is what keeps the three rules above the only ones competing on `gap`, and keeps
+   that contest at the donors' own (0,2,0). */
+.fabricate .fab-stack[data-gap='2xs'] {
+  --fab-stack-gap: var(--fab-space-2xs);
+}
+
+.fabricate .fab-stack[data-gap='1'] {
+  --fab-stack-gap: var(--fab-space-1);
+}
+
+.fabricate .fab-stack[data-gap='3'] {
+  --fab-stack-gap: var(--fab-space-3);
+}
+
+.fabricate .fab-cluster[data-gap='1'] {
+  --fab-cluster-gap: var(--fab-space-1);
+}
+
+.fabricate .fab-cluster[data-gap='3'] {
+  --fab-cluster-gap: var(--fab-space-3);
+}
+
 /* Focus ring for <select> controls. A select can sit flush against the edge of
    an overflow-clipped container (the Journal left column's two 50% list halves),
    where an OUTSET outline (offset 2px) is clipped on that side and reads as a
@@ -4263,12 +4335,6 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-checks-breakage-tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
 /* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
    Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the
    suggestion chips. Every value is the prototype's, authored in px for the reason the
@@ -4934,13 +5000,6 @@
   font-size: 0.72rem;
 }
 
-.fabricate-manager .manager-modifier-expression-suggestion > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .fabricate-manager .manager-character-modifier-actions {
   display: flex;
   gap: var(--fab-space-chip);
@@ -5338,12 +5397,6 @@
 
 .fabricate-manager .manager-character-modifier-row-reference-delete {
   margin-left: auto;
-}
-
-.fabricate-manager .manager-character-modifier-row-bounds {
-  display: flex;
-  gap: var(--fab-space-3);
-  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-character-modifier-row-bounds .manager-field {
@@ -5778,13 +5831,6 @@
   flex-shrink: 0;
   place-items: center;
   margin-left: auto;
-}
-
-.fabricate-manager .manager-recipe-head-cell {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Explicit column placement so the labels sit over the RIGHT cells. At the WIDEST band
@@ -6771,14 +6817,6 @@
   display: flex;
   gap: var(--fab-space-3);
   align-items: flex-start;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-browser-inspector-identity,
-.fabricate-manager .manager-component-browser-inspector-identity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
   min-width: 0;
 }
 
@@ -9102,14 +9140,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-requirements-list,
-.fabricate-manager .manager-inspector-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
 }
 
 .fabricate-manager .manager-requirement-row {
@@ -16201,13 +16231,6 @@
   background: var(--fab-overlay-light-08);
 }
 
-.fabricate-manager .manager-rules-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-rule-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -16279,7 +16302,7 @@
 }
 
 /* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a
-   SIBLING of its `.manager-rule-row` inside the flex `.manager-rules-stack`, not a child of
+   SIBLING of its `.manager-rule-row` inside the rules `.fab-stack`, not a child of
    it, so `padding-left` is what lines it up under the description column: the row's icon
    track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
    did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
@@ -17295,28 +17318,6 @@
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-tool-overview-source,
-.fabricate-manager .manager-tool-on-break {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-/* THE REQUIREMENTS SECTIONS RUN ON THE REFERENCE'S OWN STEP (issue 1373, round 5). Every gap
-   inside one of these two sections is 8px or 9px in the reference — `proto:2334`'s `margin: 9px
-   0` around the standing sentence, `proto:2355`'s `margin-bottom: 8px` under the bonus eyebrow,
-   `proto:2367`'s `margin-top: 8px` above the bonus note — and 9px rounds to the 4px scale's
-   `--fab-space-2`. This column carried `--fab-space-3`, half again as much, on every one of
-   them. Split out of the block above because the Overview and On-break stacks are different
-   surfaces with their own frames. */
-.fabricate-manager .manager-tool-requirements-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 /* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared
    `ExplainerCard.svelte`, which wears the manager's own `.manager-inspector-card` shell
    and `.manager-card-title` heading instead of restating a bordered card and a fourth
@@ -17699,14 +17700,6 @@
   color: var(--fab-text);
   font-size: 0.7rem;
   font-weight: 600;
-}
-
-.fabricate-manager .manager-tool-actor-preview,
-.fabricate-manager .manager-tool-required-for {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
 }
 
 .fabricate-manager .manager-tool-actor-select {
@@ -18797,13 +18790,6 @@
   align-items: start;
 }
 
-.fabricate-manager .manager-environment-context-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-environment-context-hint {
   margin: 0;
   font-size: 0.8em;
@@ -19056,12 +19042,6 @@
 }
 
 /* Recipe editor tab shell + validation helpers built on the shared primitives. */
-.fabricate-manager .manager-recipe-edit-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
 
 /* Recipe editor header identity block (issue 643): medallion + name + the
    "<category> · <mode>" subline. `min-width: 0` on the copy column is what keeps a
@@ -19651,12 +19631,6 @@
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
-}
-
-.fabricate-manager .manager-environment-evidence-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-evidence-chip {
@@ -21894,13 +21868,6 @@
   border-radius: 6px;
   object-fit: cover;
   background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt__titles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
 }
 
 .fabricate-roll-prompt__title {
