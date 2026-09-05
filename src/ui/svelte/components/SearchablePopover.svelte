@@ -331,6 +331,19 @@
     popoverClass — optional extra class on the portaled popover element (the
                    pickerClass lands on the trigger's root, which the portaled
                    popover escapes, so a popover-scoped style needs its own hook)
+    triggerAriaLabelledBy — OPTIONAL id (or id list) of the element or elements that NAME the
+                   trigger, emitted as `aria-labelledby` beside `aria-label` (issue 1504). It is
+                   a second prop rather than a spelling of `triggerAriaLabel` because the two are
+                   different facts and `aria-labelledby` WINS over `aria-label` wherever both are
+                   present: a label is a string this component is handed, while a labelledby is a
+                   POINTER at a caption the GM can already see. A labelled field is the case it
+                   exists for — a `<Field>`'s kicker caption above the control is the control's
+                   name, and duplicating that text into an `aria-label` makes the name a second
+                   copy free to drift from the caption beside it.
+
+                   Omitted entirely when empty, so every caller that passes nothing renders the
+                   trigger it renders today. It rides `triggerAttributes`, so a `trigger` snippet
+                   caller receives it through the same spread as the rest of the contract.
     *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` feeds
                    `EmptyState`'s `title` slot (its `<h3>`) HERE, so it must stay short:
                    the panel renders it as ONE quiet line (`EmptyState note`, issue 1373),
@@ -453,6 +466,7 @@
     triggerHasPopup = 'dialog',
     triggerAriaDisabled = false,
     triggerAriaLabel = '',
+    triggerAriaLabelledBy = '',
     dialogAriaLabel = '',
     searchPlaceholder = '',
     searchAriaLabel = '',
@@ -886,6 +900,11 @@
     'data-recipe-add': triggerAddMarker || undefined,
     title: triggerTitle || undefined,
     'aria-label': triggerAriaLabel || undefined,
+    // BESIDE the label rather than instead of it, and omitted when empty so the attribute is
+    // absent rather than pointing at no element. Where a caller passes both, `aria-labelledby`
+    // is the one the accessibility tree uses — which is the point: the visible caption wins over
+    // a string, and a caller that has a caption should be naming the control with it.
+    'aria-labelledby': triggerAriaLabelledBy || undefined,
     // THE TRIGGER IS THE HOLDER when no query field is rendered (`spec.md`'s own case for the
     // search-suppressed shape): `role="combobox"` plus the activedescendant pair, and
     // `data-keyboard-focus="true"` because a `<button>` outside a `<form>` answers Foundry's

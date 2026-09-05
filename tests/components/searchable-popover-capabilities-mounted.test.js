@@ -851,6 +851,41 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
+  // ── `triggerAriaLabelledBy` (issue 1504) ──────────────────────────────────────────────────
+  describe('`triggerAriaLabelledBy`', () => {
+    it('lands as `aria-labelledby` beside `aria-label`, and is absent when nothing is passed', async () => {
+      await mountPicker({ triggerAriaLabelledBy: 'field-caption', triggerAriaLabel: 'Resolution' });
+      assert.equal(trigger().getAttribute('aria-labelledby'), 'field-caption');
+      assert.equal(
+        trigger().getAttribute('aria-label'),
+        'Resolution',
+        'the two coexist: a labelledby POINTS at a caption the GM can see, and the tree prefers ' +
+          'it, which is the whole reason a labelled field passes one'
+      );
+
+      await mountPicker({ triggerAriaLabel: 'Resolution' });
+      assert.ok(
+        !trigger().hasAttribute('aria-labelledby'),
+        'a caller that passes nothing renders the trigger it renders today, with the attribute ' +
+          'ABSENT rather than pointing at no element'
+      );
+      harness.remount();
+    });
+
+    it('reaches a `trigger` snippet`s own button through the same spread as the rest', async () => {
+      await mountPicker({ useTriggerSnippet: true, triggerAriaLabelledBy: 'field-caption' });
+      const button = trigger();
+      assert.ok(button.classList.contains('caller-trigger'), 'the caller drew this button');
+      assert.equal(
+        button.getAttribute('aria-labelledby'),
+        'field-caption',
+        'the prop rides `triggerAttributes`, so it is part of the contract a snippet caller ' +
+          'spreads rather than something only the primitive`s own button can have'
+      );
+      harness.remount();
+    });
+  });
+
   describe('`triggerOnKeydown`', () => {
     it('runs AFTER the primitive’s own handler, so a caller cannot delete the focus model', async () => {
       const seen = [];
