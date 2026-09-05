@@ -71,6 +71,9 @@
         "IdentityDriftOverflow": "…and {count} more — the full list is in the console (F12)"
       }
     },
+    "Update": {
+      "StaleEntryScript": "Fabricate {installedVersion} is installed, but this browser is still running Fabricate {buildVersion}. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS."
+    },
     "Canvas": {
       "Interactable": {
         "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas.",
@@ -1587,6 +1590,8 @@
       "Manager": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
+        "LoadFailed": "Fabricate could not open the crafting system manager. The browser console has the error.",
+        "LoadFailedStaleEntry": "Fabricate could not open the crafting system manager because this browser is still running an earlier version of the module. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS.",
         "Done": "Done",
         "Economy": {
           "GatheringResolutionMode": "Gathering resolution mode",
