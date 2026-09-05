@@ -1097,7 +1097,14 @@
    The `data-gap` mapping declares only the rungs the actual adopters use. The dead-class gate
    fires on a declared-and-unemitted CLASS and cannot see an unused `[data-gap='4']` variant
    while the class itself is live, so an unused rung would be dead weight nothing catches. A
-   further rung is added with the adopter that needs it. */
+   further rung is added with the adopter that needs it.
+
+   The base rung is `2`, and it is written as a `[data-gap='2']` rule rather than left implicit —
+   seven call sites name that rung, and a call site naming a rung no rule reads renders at
+   whatever the base happens to be rather than at what its markup says. The other direction of
+   that mirror is gated: every emitted `data-gap` value must have a declared rung, and both
+   defaults are named there, so the base rung cannot be changed without meeting the gate
+   (issue 1501). */
 
 .fabricate .fab-truncate {
   min-width: 0;
@@ -1136,12 +1143,20 @@
   --fab-stack-gap: var(--fab-space-1);
 }
 
+.fabricate .fab-stack[data-gap='2'] {
+  --fab-stack-gap: var(--fab-space-2);
+}
+
 .fabricate .fab-stack[data-gap='3'] {
   --fab-stack-gap: var(--fab-space-3);
 }
 
 .fabricate .fab-cluster[data-gap='1'] {
   --fab-cluster-gap: var(--fab-space-1);
+}
+
+.fabricate .fab-cluster[data-gap='2'] {
+  --fab-cluster-gap: var(--fab-space-2);
 }
 
 .fabricate .fab-cluster[data-gap='3'] {
