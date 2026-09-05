@@ -2102,7 +2102,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The ten frames a change to the shared positioning seam must publish (issue 1500).
+// The eleven frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame).
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2118,6 +2119,7 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
 // half the seam.
 const ANCHORED_POPOVER_FRAMES = [
   'manager-environment-edit-automatic-force-add',
+  'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
