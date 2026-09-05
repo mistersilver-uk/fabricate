@@ -155,6 +155,12 @@ const FIXTURE_ALLOWLIST = Object.freeze([
       'string), held out of the conversion. The dock-pinning suite renders it as the bulk dock`s ' +
       'delete probe so the dock`s one-line, full-width danger face is measured against a real ' +
       'label (issue 1371, M24).',
+    // The provenance, READ rather than believed (issue 1371 r17-b, quality N7): the `why` above
+    // claims the product writes exactly this string, and the loop below checks it does.
+    stillRenderedBy: Object.freeze({
+      file: 'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      literal: 'class="manager-button is-danger"',
+    }),
   }),
   Object.freeze({
     file: 'tests/components/theme-rendered-validation.test.js',
