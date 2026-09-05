@@ -26,12 +26,24 @@ import { zipDirectory } from '../scripts/lib/zip.js';
 import {
   ARCHIVE_CHUNK_GATE_LABEL,
   ARCHIVE_GATE_SKIPPED_MESSAGE,
+  archiveNameMismatchMessage,
   assertArchiveChunkCompleteness,
   extractModuleReferences,
   findMissingChunkReferences,
+  isReleaseZipName,
   normalizeArchiveMemberName,
   releaseZipName,
 } from '../scripts/lib/releaseZipChunks.js';
+
+// AT MODULE SCOPE, so no execution order can get past it. Every negative row below asserts the
+// gate's own label as an `includes` FRAGMENT, and `includes('')` is true of any string at all — so
+// an accidentally empty label would make each of those rows pass over any message, or none. The
+// same guard the console literals carry in `tests/release-build.test.js`, for the same reason.
+assert.equal(typeof ARCHIVE_CHUNK_GATE_LABEL, 'string', 'the gate label must be a string');
+assert.ok(
+  ARCHIVE_CHUNK_GATE_LABEL.length > 0,
+  'the gate label must be non-empty, or every includes() of it below is vacuously true'
+);
 
 /**
  * Run `act` and hand back the error it threw. `assert.throws` returns nothing, and every negative
@@ -172,6 +184,28 @@ const ARCHIVE_ROWS = [
     },
     manifest: { esmodules: ['main.js'] },
     expect: [ARCHIVE_CHUNK_GATE_LABEL, 'chunks/second-BBBB.js', 'chunks/first-AAAA.js'],
+  },
+  {
+    // r3 review finding 7. The read predicate used to be `.js`-only, so a `main.mjs` entry was
+    // never read and this archive — which is COMPLETE — was refused as "read but references
+    // nothing", a message naming the wrong cause entirely.
+    name: 'an entry named .mjs is read rather than reported as referencing nothing',
+    tree: {
+      'module.json': '{}',
+      'main.mjs': 'import "./chunks/first-AAAA.js";\n',
+      'chunks/first-AAAA.js': 'export const a = 1;\n',
+    },
+    manifest: { esmodules: ['main.mjs'] },
+    expect: null,
+  },
+  {
+    name: 'a .mjs entry short a chunk names the missing member, not the unread refusal',
+    tree: {
+      'module.json': '{}',
+      'main.mjs': 'import "./chunks/gone-AAAA.js";\n',
+    },
+    manifest: { esmodules: ['main.mjs'] },
+    expect: [ARCHIVE_CHUNK_GATE_LABEL, 'chunks/gone-AAAA.js', 'main.mjs'],
   },
   {
     name: 'every listed entry is checked, not only the first',
@@ -385,7 +419,7 @@ test('findMissingChunkReferences follows references transitively and attributes 
   ]);
 });
 
-test('findMissingChunkReferences survives a reference cycle', () => {
+test('findMissingChunkReferences survives a reference cycle and still reaches both members', () => {
   const texts = {
     'main.js': 'import "./chunks/a-1.js";',
     'chunks/a-1.js': 'import "./b-2.js";',
@@ -397,6 +431,39 @@ test('findMissingChunkReferences survives a reference cycle', () => {
     readMember: (name) => texts[name],
   });
   assert.deepEqual(result.missing, []);
+  // Not just "it returned": both cycle members must have been REACHED, or a walk that bailed out
+  // of the cycle early would look identical here.
+  assert.deepEqual(result.referenced.toSorted(), ['chunks/a-1.js', 'chunks/b-2.js']);
+
+  // r3 review finding 4. Terminating here rests on the walk's `visited` check, and removing it
+  // makes the loop spin SYNCHRONOUSLY and forever — which `node --test`'s timeout cannot
+  // interrupt, because that is a timer and the event loop never turns. CI would hang to the job
+  // timeout while the queue grew without limit. The walk therefore also refuses once it has
+  // dequeued more members than the archive holds, so a broken guard fails fast and named. That
+  // bound is unreachable through this API while the guard works (only present members are ever
+  // enqueued, at most once each), so it is proved by mutation control rather than asserted here.
+});
+
+test('the name-mismatch refusal names both archive names and does not read as a skip', () => {
+  // r3 review finding 5's message, checked here as a unit; `tests/release-build.test.js` proves
+  // `release.js` actually exits non-zero with it.
+  const message = archiveNameMismatchMessage('fabricate-v0.1.0.zip', ['fabricate-v1.9.5.zip']);
+  assert.ok(message.includes(ARCHIVE_CHUNK_GATE_LABEL), 'must carry the gate label');
+  assert.ok(message.includes('fabricate-v0.1.0.zip'), 'must name the archive it looked for');
+  assert.ok(message.includes('fabricate-v1.9.5.zip'), 'must name the archive it found');
+  assert.ok(
+    !/\bskipp/i.test(message),
+    `a present-but-differently-named archive is a refusal, not a skip: ${message}`
+  );
+});
+
+test('isReleaseZipName recognises a published archive and nothing else', () => {
+  assert.ok(isReleaseZipName(releaseZipName('1.9.5')));
+  assert.ok(isReleaseZipName(releaseZipName('9.9.9-wiretest')));
+  // The names that share dist/ with it, none of which are an archive under another version.
+  for (const name of ['module.json', 'main.js', 'fabricate.zip', 'fabricate-v1.9.5.zip.map']) {
+    assert.ok(!isReleaseZipName(name), `${name} must not read as a published archive`);
+  }
 });
 
 test('findMissingChunkReferences reports an absent entry rather than reading it', () => {

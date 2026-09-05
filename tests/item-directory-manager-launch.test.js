@@ -18,6 +18,13 @@
  *     and report success for a call site that lost its dispatch entirely.
  *  2. Nothing re-slices to the first `'},'`. That delimiter moves the moment Prettier breaks a
  *     chain across lines, which is exactly what happens when a `.catch` or a wrapper is added.
+ *
+ * AND EVERY ASSERTION IS `assert.ok(regex.test(...))`, NEVER `assert.match`. Measured: on failure
+ * `node:assert` serialises the actual value to build its diff, and the actual value here is
+ * `src/main.js` — 300,000 characters. That dump does not merely make the failure unreadable; it
+ * overflows the test runner's IPC channel, and the sibling file in the same `node --test`
+ * invocation died with `Unable to deserialize cloned data`, losing ITS results too. Same hazard,
+ * and same remedy, as the repo's rule against asserting a mounted DOM node against `null`.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -36,19 +43,16 @@ test('the deferred manager is opened through the memoized loader', () => {
   const source = mainSource();
   // Issue 150: the GM-only subtree is loaded once, lazily. Issue 1565 moved the memoization into
   // `src/utils/memoizedModuleLoad.js`, so the opener is the one place that chains the loader.
-  assert.match(
-    source,
-    /const showCraftingSystemManagerApp = \(\) =>\s*loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/,
+  assert.ok(
+    /const showCraftingSystemManagerApp = \(\) =>\s*loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/.test(source),
     'main.js should open the manager through the memoized loader'
   );
-  assert.match(
-    source,
-    /const loadCraftingSystemManagerAppClass = createMemoizedLoad\(/,
+  assert.ok(
+    /const loadCraftingSystemManagerAppClass = createMemoizedLoad\(/.test(source),
     'and the loader should be the shared memoization seam, not a hand-rolled module-level flag'
   );
-  assert.doesNotMatch(
-    source,
-    /getCraftingSystemManagerAppClass\(\)\.show\(\)/,
+  assert.ok(
+    !/getCraftingSystemManagerAppClass\(\)\.show\(\)/.test(source),
     'nothing should reach the app class without going through the deferred load'
   );
 });
@@ -61,19 +65,16 @@ test('the Items Directory manager button reports a failed load and swallows it',
 
   // SWALLOWING, and brace-bounded to this button's own handler: nothing awaits a click handler,
   // so a rethrow would land as the unhandled rejection that made this failure invisible.
-  assert.match(
-    buttonSource,
-    /^[^}]*void openDeferredApp\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/,
+  assert.ok(
+    /^[^}]*void openDeferredApp\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(buttonSource),
     'the header button should dispatch through the swallowing wrapper'
   );
-  assert.doesNotMatch(
-    buttonSource,
-    /^[^}]*openDeferredAppRethrowing\(/,
+  assert.ok(
+    !/^[^}]*openDeferredAppRethrowing\(/.test(buttonSource),
     'and not through the rethrowing one, which would leave an unhandled rejection'
   );
-  assert.doesNotMatch(
-    buttonSource,
-    /^[^}]*loadCraftingSystemManagerAppClass\(\)/,
+  assert.ok(
+    !/^[^}]*loadCraftingSystemManagerAppClass\(\)/.test(buttonSource),
     'nor call the loader directly, which reports nothing to the user'
   );
 });
@@ -86,19 +87,16 @@ test('openRecipeManager reports a failed load and rethrows it', () => {
 
   // RETHROWING: a public API member must keep returning a promise that rejects, so a macro
   // author's `await` still sees the failure after the user has been told.
-  assert.match(
-    apiSource,
-    /^[^}]*return openDeferredAppRethrowing\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/,
+  assert.ok(
+    /^[^}]*return openDeferredAppRethrowing\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(apiSource),
     'openRecipeManager should dispatch through the rethrowing wrapper'
   );
-  assert.doesNotMatch(
-    apiSource,
-    /^[^}]*openDeferredApp\(/,
+  assert.ok(
+    !/^[^}]*openDeferredApp\(/.test(apiSource),
     'and not through the swallowing one, which would resolve undefined over a failure'
   );
-  assert.doesNotMatch(
-    apiSource,
-    /^[^}]*loadCraftingSystemManagerAppClass\(\)/,
+  assert.ok(
+    !/^[^}]*loadCraftingSystemManagerAppClass\(\)/.test(apiSource),
     'nor call the loader directly, which reports nothing to the user'
   );
 });
@@ -112,15 +110,41 @@ test('the api export stays raw and un-notified', () => {
   // DELIBERATE (issue 1565): an API consumer owns its own error handling, and the Foundry smoke
   // is one of these consumers — a failure there must surface as a named failing step rather than
   // as a notification-mirrored console error.
-  assert.match(
-    apiSource,
-    /^\s*loadCraftingSystemManagerAppClass,$/m,
+  assert.ok(
+    /^\s*loadCraftingSystemManagerAppClass,$/m.test(apiSource),
     'the api member should be the bare loader'
   );
-  assert.doesNotMatch(
-    apiSource,
-    /loadCraftingSystemManagerAppClass:/,
+  assert.ok(
+    !/loadCraftingSystemManagerAppClass:/.test(apiSource),
     'not a wrapped or notifying variant'
+  );
+});
+
+test('both module console lines are written at a level the published build keeps', () => {
+  const source = mainSource();
+
+  // A MINIFIER-INDEPENDENT COMPANION to the bundle assertions in `tests/release-build.test.js`,
+  // which remain the authority because they read the shipped artefact — but they need a full vite
+  // build, so this one is what fails in the fast suite.
+  //
+  // The level matters differently at the two sites, and conflating them is how the first version
+  // of the bundle assertion came to be vacuous. `vite.config.js` declares `console.log`,
+  // `console.info` and `console.debug` pure, and `manualPureFunctions` lets Rolldown drop such a
+  // call only when its RETURN VALUE IS UNUSED:
+  //
+  //  - the load-failure write is the body of a concise arrow, so its value is used and the call
+  //    survives DCE at any level. Its level is a deliberate contract (a failed open is an error),
+  //    not a survival requirement.
+  //  - the stale-entry write is an expression STATEMENT whose value is discarded, so a regression
+  //    to `log`/`info`/`debug` really does delete the call, and its message with it, from every
+  //    published build. Measured.
+  assert.ok(
+    /log: \(error\) => console\.error\(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error\)/.test(source),
+    'the load-failure console line should be written at console.error'
+  );
+  assert.ok(
+    /\n {2}console\.warn\(STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,/.test(source),
+    'the stale-entry console line should be written at console.warn, or the build strips it'
   );
 });
 
@@ -132,9 +156,8 @@ test('the stale-entry check is dispatched from the ready body, behind a typeof g
   // also runs in the lab and in every suite that builds the lab world.
   const readyStart = source.indexOf("Hooks.once('ready', async () => {");
   assert.notEqual(readyStart, -1, 'main.js should register a ready hook');
-  assert.match(
-    source.slice(readyStart),
-    /^[^}]*\n {2}reportStaleEntryScript\(\);/,
+  assert.ok(
+    /^[^}]*\n {2}reportStaleEntryScript\(\);/.test(source.slice(readyStart)),
     'the stale-entry check should be dispatched from the ready body'
   );
 

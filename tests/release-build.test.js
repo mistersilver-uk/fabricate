@@ -11,13 +11,17 @@ import { zipDirectory } from '../scripts/lib/zip.js';
 import {
   ARCHIVE_CHUNK_GATE_LABEL,
   ARCHIVE_GATE_SKIPPED_MESSAGE,
+  archiveNameMismatchMessage,
   releaseZipName
 } from '../scripts/lib/releaseZipChunks.js';
-// Imported, never retyped. The point of asserting this literal against the BUILT bundle is that it
-// is referenced by nothing except its own console.error, so a copy of the string in this file
-// would still match a bundle the console call had been stripped from — and re-typing it would
-// silently stop matching the day the copy in src/ is reworded.
-import { DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE } from '../src/utils/deferredEntryNotice.js';
+// Imported, never retyped, for two reasons. A retyped copy would silently stop matching the day
+// the sentence in src/ is reworded; and each of these literals is referenced by nothing except its
+// own console write, so a copy living in this file would still match a bundle that write had been
+// stripped out of — which is exactly the regression the stale-entry assertion below has to catch.
+import {
+  DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
+  STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE
+} from '../src/utils/deferredEntryNotice.js';
 
 const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions, applyReleaseUrls } = await import('../scripts/release.js');
 
@@ -303,27 +307,83 @@ test('release.js --dist-version wires the release URLs into the built dist/modul
   );
 });
 
-// Issue 1565. A BUNDLE-level assertion, not a spy-level one, and that distinction is the whole
-// point: `vite.config.js` marks console.log/info/debug pure, so Rolldown deletes those calls from
-// every published build. A unit test's `log` spy passes at any level, so the only thing that can
-// hold the line on the LEVEL of the module's own console write is the built artefact.
-test('the built bundle carries the version this build shipped, and the load-failure console line', () => {
-  buildWithoutZip();
-  const bundle = readFileSync(join(REPO_ROOT, 'dist', 'main.js'), 'utf8');
+/** Regex-escape a literal so it can be matched inside a minified bundle. */
+function escapeForRegExp(text) {
+  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
+/**
+ * Pin BOTH that a module console literal reached the bundle AND the level it is written at.
+ *
+ * THE LEVEL NEEDS ITS OWN ASSERTION, and the first version of this file wrongly believed presence
+ * implied it: `vite.config.js` declares `console.log`/`info`/`debug` pure, but
+ * `manualPureFunctions` lets Rolldown drop a call only when its RETURN VALUE IS UNUSED. The
+ * deferred-load line is written from a concise arrow (`log: (error) => console.error(MSG, error)`)
+ * whose value IS the call's, so that one survives at any level and `includes` alone cannot see a
+ * regression — measured, by rebuilding at `console.info` with the old assertion still green. The
+ * stale-entry line is a bare statement and genuinely does strip. Asserting the CALL covers both.
+ *
+ * @param {string} bundle The built `dist/main.js`.
+ * @param {string} literal The exported console literal, imported from src/ rather than retyped.
+ * @param {'error'|'warn'} level The level this line must be written at.
+ * @param {string} what Names the line, for the failure message.
+ * @returns {void}
+ */
+function assertBundleConsoleLine(bundle, literal, level, what) {
   // Asserted BEFORE the includes(): an accidentally empty literal makes `includes('')` true for
   // any input at all, which is a green test proving nothing.
-  assert.equal(typeof DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, 'string');
-  assert.ok(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE.length > 0, 'the console literal must be non-empty');
+  assert.equal(typeof literal, 'string', `${what}: the console literal must be a string`);
+  assert.ok(literal.length > 0, `${what}: the console literal must be non-empty`);
+  assert.ok(
+    bundle.includes(literal),
+    `${what}: the literal must reach dist/main.js — its absence means the write was tree-shaken` +
+      ' out of the published build entirely'
+  );
+
+  // Minifiers may either bind the literal to a name or inline it at the call site. Both shapes
+  // pin the level; accepting both keeps this from failing on a formatting choice while still
+  // failing on every level change. (Rolldown currently binds it.)
+  const quoted = `["'\`]${escapeForRegExp(literal)}["'\`]`;
+  if (new RegExp(`console\\.${level}\\(\\s*${quoted}`).test(bundle)) return;
+  const bound = bundle.match(new RegExp(`([A-Za-z_$][\\w$]*)\\s*=\\s*${quoted}`));
+  assert.ok(
+    bound,
+    `${what}: the literal is neither bound to an identifier nor inlined at a console call, so` +
+      ' this assertion cannot locate the write — update it against the current minifier output'
+  );
+  // `assert.ok(regex.test(...))`, NEVER `assert.match(bundle, ...)`. Measured while proving this
+  // assertion flips: on failure `node:assert` serialises the actual value into its diff, and the
+  // actual value is a megabyte of minified bundle. That overflows the test runner's IPC channel,
+  // so the whole FILE reports `Unable to deserialize cloned data` and no test is ever named — a
+  // real regression here would have been undiagnosable.
+  assert.ok(
+    new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
+    `${what}: must be written at console.${level} in the built bundle`
+  );
+}
+
+// Issue 1565. BUNDLE-level assertions, not spy-level ones, and that distinction is the whole
+// point: a unit test's `log` spy passes at any level, so the only thing that can hold the line on
+// the LEVEL of the module's own console writes is the built artefact.
+test('the built bundle carries the version this build shipped, and both console lines at their levels', () => {
+  buildWithoutZip();
+  const bundle = readFileSync(join(REPO_ROOT, 'dist', 'main.js'), 'utf8');
 
   assert.ok(
     bundle.includes(WIRE_VERSION),
     'release.js must set FABRICATE_BUILD_VERSION so vite bakes the SHIPPED version into the bundle'
   );
-  assert.ok(
-    bundle.includes(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE),
-    'the deferred-load console line must survive the build — a level regression to console.log,' +
-      ' .info or .debug would strip this call and its argument out of dist/main.js'
+  assertBundleConsoleLine(
+    bundle,
+    DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
+    'error',
+    'the deferred-load console line'
+  );
+  assertBundleConsoleLine(
+    bundle,
+    STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
+    'warn',
+    'the stale-entry console line'
   );
 });
 
@@ -383,6 +443,47 @@ test('release.js --validate-only fails on an existing archive short a referenced
     // Leave dist/ exactly as the build left it: the staged archive is this test's only addition.
     await rm(stagedZip, { force: true });
     await rm(staging, { recursive: true, force: true });
+  }
+});
+
+// Issue 1565, r3 review finding 5. THE SKIP LINE IS ONLY HONEST WHEN dist/ HOLDS NO ARCHIVE.
+// The archive name carries a version and `--dist-version` never touches the tracked module.json,
+// so a bare `npm run release:validate` after such a build derives `fabricate-v0.1.0.zip`, misses
+// the archive that was actually produced, and used to print "this build produced no archive" —
+// exiting 0 and silently skipping the one check the maintainer ran the command for.
+test('release.js --validate-only refuses rather than reporting a skip when dist/ holds an archive under another name', async () => {
+  buildWithoutZip();
+  const distDir = join(REPO_ROOT, 'dist');
+  const otherVersion = '9.9.9-othername';
+  const otherZip = join(distDir, releaseZipName(otherVersion));
+  try {
+    // Deliberately NOT a readable archive: the refusal must come from the name mismatch, before
+    // anything opens it. A zip reader's own complaint would be a different (and later) failure.
+    await writeFile(otherZip, 'not a real archive');
+
+    let error;
+    try {
+      execFileSync(
+        process.execPath,
+        ['scripts/release.js', '--validate-only', '--dist-version', WIRE_VERSION],
+        { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }
+      );
+    } catch (thrown) {
+      error = thrown;
+    }
+    assert.ok(error, 'a derived-name miss over a populated dist/ must fail the command');
+    assert.equal(error.status, 1);
+    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    assert.ok(
+      output.includes(archiveNameMismatchMessage(releaseZipName(WIRE_VERSION), [releaseZipName(otherVersion)])),
+      `must be the gate's own name-mismatch refusal, naming both names; got:\n${output}`
+    );
+    assert.ok(
+      !output.includes(ARCHIVE_GATE_SKIPPED_MESSAGE),
+      'and must not also claim this build produced no archive'
+    );
+  } finally {
+    await rm(otherZip, { force: true });
   }
 });
 
