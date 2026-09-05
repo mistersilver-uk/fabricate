@@ -412,6 +412,51 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       );
       harness.remount();
     });
+
+    it('opens with no cursor after a close, even with the same options and an empty query', async () => {
+      chosen.length = 0;
+      await mountPicker({});
+      const panel = await openPanel();
+      const holder = panel.querySelector('.manager-travel-popover-search input');
+
+      pressKey('ArrowDown');
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'the cursor is on Wood');
+
+      pressKey('Escape');
+      await settle();
+      assert.ok(!harness.target.querySelector('.fabricate-picker-popover'), 'the panel is shut');
+
+      // A CURSOR CANNOT OUTLIVE ITS PANEL EITHER, and the generation stamp alone cannot see this
+      // one: with the same `options` and the query reset to empty, the string this reopen builds
+      // is BYTE-IDENTICAL to the one the abandoned index was stamped under, so a cursor kept
+      // across the close reads as live again. Three presses reach it — arrow, Escape, reopen —
+      // and the panel would come back with a row marked, the holder naming it, the list scrolled
+      // to it and Enter choosing it without the GM ever arrowing into this pass.
+      const reopened = await openPanel();
+      const reopenedHolder = reopened.querySelector('.manager-travel-popover-search input');
+
+      assert.deepEqual(
+        optionRows(reopened).map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
+        ['Metal', 'Wood', 'Cloth'],
+        'the same three options and no query, which is what makes the generation repeat'
+      );
+      assert.deepEqual(
+        markedRows(reopened).map((row) => row.id),
+        [],
+        'opening starts a fresh pass over the options, so nothing in the new list is active'
+      );
+      assert.equal(
+        activeDescendant(reopenedHolder),
+        null,
+        'and the holder names no row, because there is no cursor for it to announce'
+      );
+
+      const ignored = pressKey('Enter');
+      assert.deepEqual(chosen, [], 'Enter stays a no-op until the GM arrows into THIS pass');
+      assert.ok(!ignored.defaultPrevented, 'so the key is left to the field it was pressed in');
+      harness.remount();
+    });
   });
 
   describe('the search-suppressed shape, where the TRIGGER is the holder', () => {

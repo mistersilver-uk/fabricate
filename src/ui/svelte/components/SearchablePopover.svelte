@@ -730,8 +730,15 @@
   // does that when a page-size change keeps the card mounted but invalidates its page-local UI.
   // Keep the query owned by the primitive in step with that externally controlled state, or the
   // next open resurrects a filter the caller cannot see or reset while the picker is closed.
+  //
+  // A CURSOR CANNOT OUTLIVE ITS PANEL EITHER. The generation string repeats across a
+  // close/reopen with the same options and an empty query, so a stamp alone would restore the
+  // index the GM abandoned. Cleared while closed, which is the one window in which a write
+  // cannot render late: the panel is unmounted for the whole flush.
   $effect(() => {
-    if (!open && search) search = '';
+    if (open) return;
+    if (search) search = '';
+    cursor = { generation: '', index: -1 };
   });
 
   // ESCAPE, in every mode including `inlineSearchTrigger`, is handled by
