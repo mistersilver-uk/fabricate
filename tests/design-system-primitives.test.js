@@ -187,6 +187,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
   // override itself and everything about where it sorts.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // Issue 1504: the app's own select. Its option list exists only while the panel is open, and
+  // both representative frames draw every select they contain CLOSED — so its override names the
+  // two frames that open one, at both values of `showTick`, in both applications. It is NOT in
+  // `PRIMITIVES_WITH_NO_FRAME`: that list is removal-only, and this primitive shipped with the two
+  // frames rather than acquiring them later.
+  'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
