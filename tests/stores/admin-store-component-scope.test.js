@@ -1394,3 +1394,188 @@ test('1371 r19: and a refused flag write refuses the whole component save', asyn
   assert.equal(saved, false, 'a refusal is reported, never swallowed as a success');
   assert.deepEqual(calls, [], 'and no value write was made');
 });
+
+// ---------------------------------------------------------------------------
+// One accessor for "what does this system resolve", and the rest of round 6
+// (issue 1371 r20-store3, reviewer round 6 findings 4, 5 and 6; quality R5)
+// ---------------------------------------------------------------------------
+
+test('1371 r20: the essence card and the delete dialog COUNT what the system resolves', async () => {
+  // Finding 4. `_itemUsesEssence` walked `item.essences` — the PERSISTED row — so an essence a
+  // component carries only through the world map reported `In use: 0` on the Essences tab, and the
+  // delete confirmation the GM decides on omitted it from the cascade it was asking consent for.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+
+  const fire = get(store.viewState).essenceCards.find((card) => card.id === 'fire');
+  assert.equal(fire.componentUsageCount, 1, 'the card counts the component that INHERITS `fire`');
+  assert.deepEqual(
+    fire.componentUsageItems.map((item) => item.id),
+    ['ingot'],
+    'and names it, so the bulk panel’s impact statement can union it'
+  );
+
+  harness.services.confirmDialog = async (options) => {
+    harness.confirmations.push(options);
+    return false;
+  };
+  await store.deleteEssence('fire');
+  assert.match(
+    harness.confirmations.at(-1).content,
+    /1 component/,
+    'and the delete dialog states the carrier it would strip the essence from'
+  );
+});
+
+test('1371 r20: the world Essence Catalogue’s own `used by` figure resolves too', async () => {
+  // The same read, in the leg that walks EVERY system rather than the selected one. It needs a
+  // world essence corpus as well, because the figure is published per catalogue row.
+  const harness = makeInheritingPair();
+  const essenceScope = makeWorldScopeStoreFake([{ id: 'fire', name: 'Fire' }]);
+  harness.services.getEssenceScopeStore = () => essenceScope.store;
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+
+  const row = get(store.viewState).worldScope.essence.entries.find((entry) => entry.id === 'fire');
+  assert.equal(row.componentCount, 1, '`used by` counts the component that INHERITS the essence');
+});
+
+test('1371 r20: a refused flag write costs a pair its ESSENCE axis and nothing else', async () => {
+  // Finding 6. The pair used to be dropped from the whole edit, so a cohort staging `category`
+  // alongside `essences` lost its category change to a setting refusal that had nothing to say
+  // about categories — and the reported `updated` said nothing about it either.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+  scope.store.save = async () => {
+    throw new Error('The requested Setting update was refused');
+  };
+
+  const result = await store.applyComponentBulkEdit(['ingot'], {
+    category: 'ore',
+    essences: { ash: 4 },
+  });
+
+  assert.equal(result.refused, 1, 'the caller is told how many pairs lost the essence axis');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    calls[0].edit,
+    { category: 'ore' },
+    'the category still lands; only the axis that was refused is withheld'
+  );
+  assert.deepEqual(
+    resolvedIngotEssences(harness, scope),
+    { fire: 3 },
+    'and the pair still inherits, so the union still answers the world map'
+  );
+});
+
+test('1371 r20: a bulk value write that THROWS puts every switch it flipped back', async () => {
+  // Finding 5. The flip is a durable, replicated world-setting write that lands BEFORE the values,
+  // so a failed write used to leave the pair overriding with its dormant map — which no later
+  // world edit reaches — while the GM was told the write failed.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getCraftingSystemManager().applyBulkEditToComponents = async () => {
+    throw new Error('the components could not be written');
+  };
+
+  const result = await store.applyComponentBulkEdit(['ingot'], { essences: { ash: 4 } });
+
+  assert.equal(result, null);
+  assert.equal(
+    scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    true,
+    'the switch is back ON, so the pair still follows the world map it never left'
+  );
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { fire: 3 });
+});
+
+test('1371 r20: a single value write that THROWS puts its switch back too', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  await seedInheritingPair(store, scope);
+  harness.services.getCraftingSystemManager().updateItem = async () => {
+    throw new Error('the component could not be written');
+  };
+
+  const saved = await store.updateComponent('ingot', { essences: { fire: 3, ash: 1 } });
+
+  assert.equal(saved, false);
+  assert.equal(scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences, true);
+});
+
+test('1371 r20: the rules-bulk verb applies the SAME override rule as the Studio’s own', async () => {
+  // Quality R5. `bulkEditRules` has no production caller — M31 superseded M25's route — so its
+  // override arm is defence for a route no screen currently drives. It is driven directly here
+  // rather than left as the one of the four sites a reader cannot tell is live.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+
+  const result = await store.worldScope.component.bulkEditRules('sys1', ['ingot'], {
+    essences: { ash: 4 },
+  });
+
+  assert.equal(result.updated, 1);
+  assert.deepEqual(
+    calls.map((call) => call.switchesOnArrival),
+    [[false]],
+    'flag before values here as well, or this verb would write into a shadow'
+  );
+  assert.deepEqual(resolvedIngotEssences(harness, scope), { ash: 4 });
+});
+
+test('1371 r20: and it moves NO switch for a cohort that stages no essence axis', async () => {
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installBulkComponentWrite(harness, scope);
+  await seedInheritingPair(store, scope);
+
+  await store.worldScope.component.bulkEditRules('sys1', ['ingot'], { category: 'ore' });
+
+  assert.deepEqual(calls.map((call) => call.edit), [{ category: 'ore' }]);
+  assert.equal(
+    scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'a category-only edit is not an essence override'
+  );
+});
+
+test('1371 r20: an UNAUTHORED world essence section shadows nothing, so no switch moves', async () => {
+  // Finding 7, at the store. `applyInheritedSections` skips an `undefined` world value, so this
+  // pair already resolves its own row — and `ComponentEditView` withholds the inherit offer in
+  // exactly this state, so a flip here was one the GM could neither see nor reverse.
+  const harness = makeInheritingPair();
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installReadUnion(harness, scope);
+  const calls = installSingleComponentWrite(harness);
+  scope.payload.defaults.ingot = { id: 'ingot', category: 'ore' };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+
+  const saved = await store.updateComponent('ingot', { essences: { iron: 5 } });
+
+  assert.equal(saved, true);
+  assert.deepEqual(calls, [{ systemId: 'sys1', itemId: 'ingot', updates: { essences: { iron: 5 } } }]);
+  assert.equal(
+    scope.payload.membership[membershipKey('ingot', 'sys1')].inherit.essences,
+    undefined,
+    'nothing shadowed the write, so the pair keeps the world default it has not yet received'
+  );
+});

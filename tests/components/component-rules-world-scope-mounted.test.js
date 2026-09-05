@@ -300,6 +300,37 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       assert.deepEqual(calls[1].args[1].essences, { flame: 2, earth: 1 }, 'the world map plus the GM’s step');
     });
 
+    it('carries an essence THIS SYSTEM DOES NOT DEFINE through the save rather than dropping it', async () => {
+      // Issue 1371 r20-store3, reviewer round 6 finding 2. `essenceOptions` is built by mapping
+      // over the SYSTEM's roster, and `data-models`, `### Component scope` states that a world map
+      // is NOT narrowed to the ids a given system holds — so a resolved map carrying `moss` had no
+      // row here and was silently dropped from `updates.essences` on the next save. It is carried
+      // rather than offered: this system has no name, icon or control for it.
+      const { target, calls } = await openEssences('ingot', 'sys-forge', options(2), {
+        component: {
+          ...componentRecord('ingot', 'Iron Ingot', 'Refined'),
+          // The item card's own shape: the RESOLVED map, projected as rows.
+          essences: [
+            { id: 'flame', name: 'Flame', quantity: 2 },
+            { id: 'moss', name: 'moss', quantity: 1 },
+          ],
+        },
+      });
+      assert.ok(
+        !target.querySelector('[data-component-edit-essence="moss"]'),
+        'the foreign essence is NOT drawn — there is no definition behind it'
+      );
+      await flip(target);
+      await step(target, 'earth', 'increment');
+      save(target);
+      await drain();
+      assert.deepEqual(
+        calls.at(-1).args[1].essences,
+        { moss: 1, flame: 2, earth: 1 },
+        'the GM’s step lands AND the essence this system cannot show survives the write'
+      );
+    });
+
     it('from an OVERRIDING system, flipping back to inherit stages `true`, shows the WORLD map again, and Save writes it first', async () => {
       // The alchemy record overrides with an EMPTY in-system map, so its options read zero for
       // everything; flipping back to inherit shows the world's `flame: 2` while the draft rests.

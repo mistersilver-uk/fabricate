@@ -129,6 +129,7 @@ import {
 // DISPLAYS from `resolvedToolsFor` — what a craft will actually do — and SAVES only the sections
 // the membership record marks overriding, which is what stops a display read from converting an
 // inheriting section into an override on the next save.
+import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
 import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
 import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
 import {
@@ -5063,9 +5064,16 @@ export function createAdminStore(services) {
       // and collapsing them would be a correctness regression rather than a cleanup.
       const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
 
+      // THE USAGE COUNTS READ WHAT THE SYSTEM RESOLVES (issue 1371 r20-store3, reviewer round 6
+      // finding 4). `managedItems` is the PERSISTED in-system array, and for every pair whose
+      // `essences` section inherits that is the dormant map nothing reads — so an essence a
+      // component carries only through the world map reported `In use: 0` on the Essences tab and
+      // was omitted from the delete dialog's impact. The rows are resolved through the SAME
+      // accessor the rules list and the override rule use; only the essence map is overlaid, so
+      // every other field on the card is the persisted one.
       essenceCards = _buildEssenceCards(
         essenceDefinitions,
-        managedItems,
+        componentsWithResolvedEssences(systemManager, selectedSystem.id, managedItems),
         managedItemOptions,
         systemRecipes
       );
@@ -5281,10 +5289,17 @@ export function createAdminStore(services) {
    * @returns {object[]}
    */
   function _allComponents() {
+    const systemManager = services.getCraftingSystemManager?.();
     const all = [];
     for (const system of _allSystems()) {
       const components = Array.isArray(system?.components) ? system.components : [];
-      for (const component of components) all.push(component);
+      // RESOLVED PER SYSTEM (issue 1371 r20-store3, reviewer round 6 finding 4). The world
+      // Essence Catalogue's own `used by` figure is a count of components that CARRY the essence,
+      // and after an `essences` world-map edit the persisted row no longer says so. Resolution is
+      // per (component, system) pair, so it has to happen inside this loop rather than over the
+      // flattened result.
+      for (const component of componentsWithResolvedEssences(systemManager, system?.id, components))
+        all.push(component);
     }
     return all;
   }
@@ -6007,22 +6022,23 @@ export function createAdminStore(services) {
   //
   // Issue 1371 r19-store2, the driver's ruling on the reviewer's round-5 finding 3. The RULE lives
   // in `systems/componentEssenceOverride.js`, not here, because this store is not its only caller:
-  // the standalone `SvelteComponentEditorApp` opened from an item sheet writes a component's
-  // essences too, and reaches `CraftingSystemManager.updateItem` directly when it has no manager
-  // window to borrow this store from. Two copies of "does this write override" is the drift the
-  // shared unit exists to prevent. See that module for the rule, the per-pair refusal and the
-  // restatement exemption.
+  // the standalone `SvelteComponentEditorApp` writes a component's essences too, and reaches
+  // `CraftingSystemManager.updateItem` directly when it has no manager window to borrow this store
+  // from. Two copies of "does this write override" is the drift the shared unit exists to prevent.
+  // See that module for the rule, the per-pair refusal, the shadowing gate and the baseline the
+  // restatement exemption is answered against.
   //
-  // WIRED FROM WHAT THIS STORE ALREADY HOLDS. The membership read is the published corpus, as
+  // WIRED FROM WHAT THIS STORE ALREADY HOLDS. The corpus read is the published one, as
   // `_worldComponentEntities` reads the roster; the resolved map is the read union the row
   // projection draws from; and the flag write is the UNWRAPPED family verb, because every caller
   // here already refreshes once for the whole write and the wrapped one would re-project per
-  // component.
+  // component. The verb takes the switch's TARGET rather than always writing `false`, because the
+  // rule rolls a flip back when the value write it preceded then fails.
   const _componentEssenceOverride = componentEssenceOverrideOn({
     getComponentScopeStore: () => services.getComponentScopeStore?.() ?? null,
     getCraftingSystemManager: () => services.getCraftingSystemManager?.() ?? null,
-    setEssencesOverridden: (componentId, systemId) =>
-      worldScopeFamilies.component.setSectionInherited(componentId, systemId, 'essences', false),
+    setEssenceInheritance: (componentId, systemId, inherit) =>
+      worldScopeFamilies.component.setSectionInherited(componentId, systemId, 'essences', inherit),
   });
 
   /**
@@ -6133,7 +6149,18 @@ export function createAdminStore(services) {
    * so the world panel and the world entry write `updateWorldDefaultSection(id, 'essences', map)`
    * and every system whose switch is on follows it. A write made HERE lands on a system's own row,
    * which is what that system resolves only while it OVERRIDES the section — on an inheriting
-   * system the world map shadows it until the rules editor flips the switch.
+   * system a staged `essences` axis IS an override, and every shadowed pair in the cohort has its
+ * switch flipped before the values land (`systems/componentEssenceOverride.js`). This sentence used
+ * to end "the world map shadows it until the rules editor flips the switch"; twenty-six lines
+ * below, this verb flips it itself.
+ *
+ * ── AND ITS OVERRIDE ARM IS DEFENCE FOR A ROUTE NO SCREEN DRIVES (quality round 6, R5) ─────
+ * `bulkEditRules` has no production caller: M31 superseded M25's route, so the world catalogue's
+ * essence group writes the world SECTION instead. The arm is KEPT — this verb writes the same rows
+ * through the same primitive as the Studio's own bulk edit, so it must not be able to take a
+ * different view of what an essence write means the day something calls it again — and it is
+ * driven directly by a store case rather than left as the one of the four sites a reader cannot
+ * tell is live.
    *
    * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
    * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
@@ -6159,21 +6186,71 @@ export function createAdminStore(services) {
     // THE SAME OVERRIDE RULE AS THE STUDIO'S OWN BULK EDIT (issue 1371 r19-store2). This verb
     // writes the same rows through the same primitive with the system named by the caller, so it
     // cannot take a different view of what an essence write on an inheriting pair means.
-    const writable = await _componentEssenceOverride.cohortFor(system, ids, edit);
-    if (writable.length === 0) return false;
+    const { writable, refused, flipped } = await _componentEssenceOverride.cohortFor(
+      system,
+      ids,
+      edit
+    );
     try {
-      const result = await systemManager.applyBulkEditToComponents(system, writable, edit);
-      return {
-        updated: Number(result?.updated) || 0,
-        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
-      };
+      const result = await _writeComponentCohorts(systemManager, system, {
+        writable,
+        refused,
+        edit,
+      });
+      if (!result) return false;
+      return { ...result, refused: refused.length };
     } catch (error) {
+      // THE FLIP IS ROLLED BACK (issue 1371 r20-store3, reviewer round 6 finding 5). It is a
+      // durable, replicated world-setting write that landed AHEAD of the values, so leaving it
+      // standing over a failed write would opt those pairs out of every later world edit while the
+      // GM is being told the write failed. `joinComponentToSystem` sets the precedent.
+      await _componentEssenceOverride.rollback(system, flipped);
       console.error('Fabricate | Failed to apply component rules bulk edit:', error);
       services.notify?.error?.(
         _componentBulkEditFailureMessage(error, systemManager.getSystem?.(system)?.name || system)
       );
       return false;
     }
+  }
+
+  /**
+   * Write ONE staged edit to a cohort the override rule has split in two (issue 1371 r20-store3,
+   * reviewer round 6 finding 6).
+   *
+   * A pair whose `essences` flag write was REFUSED used to be dropped from the whole edit, so a
+   * cohort staging `category` alongside `essences` lost its category change to a setting refusal
+   * that had nothing to say about categories, and the reported `updated` said nothing about it.
+   * The drop is now restricted to the axis that was actually refused: the writable pairs take the
+   * whole edit and the refused ones take the same edit MINUS `essences`. The caller reports
+   * `refused` alongside `updated`, so the count is available to a surface that wants to state it.
+   *
+   * TWO PERSISTS ONLY WHEN THERE IS SOMETHING TO PERSIST TWICE. A pass with no ids, and a pass
+   * whose axes are empty once `essences` is removed, is dropped — so the ordinary path (nothing
+   * refused) costs exactly one persist, as it did.
+   *
+   * @param {object} systemManager
+   * @param {string} systemId
+   * @param {{writable: string[], refused: string[], edit: object}} cohorts
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} `null` when there was
+   *   nothing to write at all.
+   */
+  async function _writeComponentCohorts(systemManager, systemId, { writable, refused, edit }) {
+    const withoutEssences = { ...edit };
+    delete withoutEssences.essences;
+    const passes = [
+      { ids: writable, axes: edit },
+      { ids: refused, axes: withoutEssences },
+    ].filter((pass) => pass.ids.length > 0 && Object.keys(pass.axes).length > 0);
+    if (passes.length === 0) return null;
+
+    let updated = 0;
+    const componentIds = [];
+    for (const pass of passes) {
+      const result = await systemManager.applyBulkEditToComponents(systemId, pass.ids, pass.axes);
+      updated += Number(result?.updated) || 0;
+      if (Array.isArray(result?.componentIds)) componentIds.push(...result.componentIds);
+    }
+    return { updated, componentIds };
   }
 
   /**
@@ -8668,7 +8745,15 @@ export function createAdminStore(services) {
     const essence = existing.find((def) => def.id === essenceId);
     if (!essence) return false;
 
-    const managedItems = _getManagedItems(system);
+    // THE REFUSAL IS COMPUTED OFF WHAT THE SYSTEM RESOLVES (issue 1371 r20-store3, reviewer
+    // round 6 finding 4). This is the statement the GM decides on, and `deleteEssence` strips the
+    // essence from every carrying component — so a component that carries it only through the
+    // world map must be named here or the dialog understates the cascade it is asking consent for.
+    const managedItems = componentsWithResolvedEssences(
+      systemManager,
+      sysId,
+      _getManagedItems(system)
+    );
     const recipes = services.getRecipeManager?.()?.getRecipes?.({ craftingSystemId: sysId }) || [];
     const impact = describeEssenceDeleteImpact([
       {
@@ -11302,7 +11387,20 @@ export function createAdminStore(services) {
     }
   }
 
-  async function updateComponent(itemId, updates = {}) {
+  /**
+   * Write one component's authored fields in the selected system.
+   *
+   * `baseline` is the essence map the CALLER's editor was seeded from (issue 1371 r20-store3).
+   * The override rule uses it to tell a restatement of that seed from a real authored override
+   * without assuming which of the two maps the editor drew; a caller that omits it is taken to
+   * have been seeded from the read union, which is what the in-page rules editor is.
+   *
+   * @param {string} itemId
+   * @param {object} [updates]
+   * @param {{baseline?: unknown}} [options]
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function updateComponent(itemId, updates = {}, { baseline } = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!itemId || !sysId) return false;
@@ -11311,8 +11409,13 @@ export function createAdminStore(services) {
 
     // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2). See
     // `componentEssenceOverride`'s `updatesFor`: the flag moves first, an untouched restatement of
-    // the resolved map writes nothing, and a refused flag write refuses the save.
-    const staged = await _componentEssenceOverride.updatesFor(sysId, String(itemId), updates);
+    // the editor's own baseline writes nothing, and a refused flag write refuses the save.
+    const { staged, flipped } = await _componentEssenceOverride.updatesFor(
+      sysId,
+      String(itemId),
+      updates,
+      { baseline }
+    );
     if (staged === null) return false;
     if (Object.keys(staged).length === 0) return true;
 
@@ -11321,6 +11424,10 @@ export function createAdminStore(services) {
       await refresh();
       return true;
     } catch (error) {
+      // The switch this call flipped goes back (round 6, finding 5): the values did not land, so
+      // leaving the pair overriding with its dormant map would silently take it out of every later
+      // world edit's reach.
+      await _componentEssenceOverride.rollback(sysId, flipped);
       console.error('Fabricate | Failed to update component:', error);
       services.notify?.error?.(error?.message || 'Failed to update component');
       return false;
@@ -11351,10 +11458,15 @@ export function createAdminStore(services) {
    * `null` means nothing was written, for any reason — a bad or empty argument, no
    * selected system, or a throw that has already been reported to the GM.
    *
+   * `refused` is how many pairs had their `essences` axis withheld because the world-setting write
+   * that would have flipped their switch was refused (issue 1371 r20-store3, round 6 finding 6).
+   * Those pairs still take every OTHER staged axis and are still counted in `updated` when they
+   * change, so the two numbers answer different questions and neither is derived from the other.
+   *
    * @param {Iterable<string>} componentIds
    * @param {object} [edit]
-   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the write result, or
-   *   `null` when no write happened.
+   * @returns {Promise<{updated: number, componentIds: string[], refused: number}|null>} the write
+   *   result, or `null` when no write happened.
    */
   async function applyComponentBulkEdit(componentIds, edit = {}) {
     const systemManager = services.getCraftingSystemManager();
@@ -11364,20 +11476,27 @@ export function createAdminStore(services) {
     if (!edit || typeof edit !== 'object') return null;
     if (Object.keys(edit).length === 0) return null;
 
-    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2): every inheriting pair
-    // in the cohort has its switch flipped FIRST, and a pair whose flag write is refused is
-    // dropped from the value write rather than counted as updated.
-    const writable = await _componentEssenceOverride.cohortFor(sysId, ids, edit);
-    if (writable.length === 0) return null;
+    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2): every SHADOWED pair in
+    // the cohort has its switch flipped FIRST, and a pair whose flag write is refused loses its
+    // ESSENCE axis and keeps every other one (round 6, finding 6) rather than dropping out of the
+    // edit entirely.
+    const { writable, refused, flipped } = await _componentEssenceOverride.cohortFor(
+      sysId,
+      ids,
+      edit
+    );
 
     try {
-      const result = await systemManager.applyBulkEditToComponents(sysId, writable, edit);
+      const result = await _writeComponentCohorts(systemManager, sysId, {
+        writable,
+        refused,
+        edit,
+      });
+      if (!result) return null;
       await refresh();
-      return {
-        updated: Number(result?.updated) || 0,
-        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
-      };
+      return { ...result, refused: refused.length };
     } catch (error) {
+      await _componentEssenceOverride.rollback(sysId, flipped);
       console.error('Fabricate | Failed to apply component bulk edit:', error);
       services.notify?.error?.(error?.message || 'Failed to apply component bulk edit');
       return null;

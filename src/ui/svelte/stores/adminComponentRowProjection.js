@@ -38,6 +38,7 @@
  * Deliberately a LEAF under `stores/`: no `.svelte` imports from `src/ui/svelte/stores/`,
  * so this module cannot reach a mounted-component test's dependency closure.
  */
+import { resolvedComponentEssencesById } from '../../../systems/resolvedComponentEssences.js';
 import {
   plainTextDescription as _plainTextDescription,
   descriptionTextCandidate as _descriptionTextCandidate,
@@ -270,8 +271,9 @@ function _createItemCard(item, systemId, options) {
     cache,
   } = options;
   // WHAT THE SYSTEM RESOLVES, not what its own row stores (issue 1371 r19-store2). See
-  // `_resolvedEssencesBySystemComponent`. The persisted row is the fallback, for a card built
-  // from a manager with no read union and for a row the union does not answer for.
+  // `resolvedComponentEssencesById` (`systems/resolvedComponentEssences.js`). The persisted row is
+  // the fallback, for a card built from a manager with no read union and for a row the union does
+  // not answer for.
   const essenceMap = resolvedEssencesById?.get(item.id) ?? item.essences;
   const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
   const storedDescription = _plainTextDescription(item.description);
@@ -385,7 +387,7 @@ function _createItemCard(item, systemId, options) {
 // USER-edited field goes stale — a user edit mutates the stored item → signature miss.
 /**
  * Each component's RESOLVED essence map for one system, keyed by component id (issue 1371
- * r19-store2, reviewer round 5).
+ * r19-store2, reviewer round 5; repointed at the shared accessor at r20-store3, round 6).
  *
  * ── WHY THE ROW CANNOT READ `getItems` FOR THIS ────────────────────────────────────────────
  * `essences` became a component world-default SECTION at r18: a world record carries the map and
@@ -398,30 +400,13 @@ function _createItemCard(item, systemId, options) {
  * editor and every engine reader answered the world map — and after the `1.32.0` election that is
  * every component in a one-system world.
  *
- * OPTIONAL BY CONSTRUCTION. `getComponentsForSystem` is absent from the direct-projection
- * fixtures, and a manager without it (or one that throws) answers `null`, which leaves every card
- * reading its persisted row exactly as before.
- *
- * @param {object} systemManager
- * @param {string} systemId
- * @returns {Map<string, object>|null} component id → the resolved map, or `null` when there is no
- *   read union to ask.
+ * THE READ ITSELF IS NOT THIS MODULE'S. `systems/resolvedComponentEssences.js` owns it, because
+ * round 6 found the same "which of the two maps is this reader looking at" defect again in the
+ * essence usage counts and the delete-impact dialog; one accessor consumed by every reader is what
+ * stops a third copy answering differently. It stays optional by construction there — a manager
+ * with no read union, or one that throws, answers `null` and every card reads its persisted row
+ * exactly as before.
  */
-function _resolvedEssencesBySystemComponent(systemManager, systemId) {
-  let resolved;
-  try {
-    resolved = systemManager?.getComponentsForSystem?.(systemId);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(resolved)) return null;
-  const byId = new Map();
-  for (const component of resolved) {
-    const id = typeof component?.id === 'string' ? component.id : String(component?.id ?? '');
-    if (id) byId.set(id, component.essences);
-  }
-  return byId;
-}
 
 export async function buildItemCards(
   systemManager,
@@ -438,7 +423,7 @@ export async function buildItemCards(
     showSalvage,
     essenceDefinitionById,
     resolvedEssencesById: showEssences
-      ? _resolvedEssencesBySystemComponent(systemManager, selectedSystem.id)
+      ? resolvedComponentEssencesById(systemManager, selectedSystem.id)
       : null,
     enrichToHtml,
     cache,

@@ -1,5 +1,7 @@
 import { get } from 'svelte/store';
 
+import { resolvedComponentEssencesFor } from '../systems/resolvedComponentEssences.js';
+
 import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import ComponentEditorRoot from './svelte/apps/ComponentEditorRoot.svelte';
 import { buildComponentEditorState } from './svelte/util/componentEditor.js';
@@ -55,8 +57,32 @@ export class SvelteComponentEditorApp extends SvelteApplicationMixin(
     return game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(this._systemId) ?? null;
   }
 
+  /**
+   * The component this editor edits, with its essence map SEEDED FROM WHAT THE SYSTEM RESOLVES
+   * (issue 1371 r20-store3, reviewer round 6 finding 1).
+   *
+   * `system.components` is the PERSISTED in-system row, which for a pair whose `essences` section
+   * inherits is the dormant map nothing reads. Seeding the steppers from it drew numbers no
+   * surface agrees with, and — because the editor sends its essence axis on every save — a save
+   * that touched only a tag then differed from the world map, read as a real authored override,
+   * flipped the switch and pinned the dormant numbers. The read union is the same accessor the
+   * rules list, the essence usage counts and the override rule itself use.
+   *
+   * The overlay is per FIELD, not per record: absence means "no world half for this row", so the
+   * persisted row stands exactly as it did.
+   *
+   * @param {object|null} [system]
+   * @returns {object|null}
+   */
   _getItem(system = this._getSystem()) {
-    return (system?.components || []).find(component => component.id === this._itemId) || null;
+    const item = (system?.components || []).find(component => component.id === this._itemId) || null;
+    if (!item) return null;
+    const resolved = resolvedComponentEssencesFor(
+      game?.fabricate?.getCraftingSystemManager?.() ?? null,
+      this._systemId,
+      this._itemId
+    );
+    return resolved === undefined ? item : { ...item, essences: resolved };
   }
 
   /**
@@ -86,7 +112,8 @@ export class SvelteComponentEditorApp extends SvelteApplicationMixin(
         ? get(selected) === this._systemId
         : false;
     if (onThisSystem && typeof store?.updateComponent === 'function') {
-      return (_systemId, componentId, updates) => store.updateComponent(componentId, updates);
+      return (_systemId, componentId, updates, options) =>
+        store.updateComponent(componentId, updates, options);
     }
     return overrideAwareComponentWrite({
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
@@ -108,9 +135,19 @@ export class SvelteComponentEditorApp extends SvelteApplicationMixin(
 
       // A REFUSAL is reported and the window stays open, exactly as a throw is: the GM's edit has
       // not landed either way, and closing over it would hide that.
+      //
+      // The seed's two facts travel with the save (issue 1371 r20-store3): `carriedEssences` is
+      // what this system's roster does not define and the write must not drop, and
+      // `baselineEssences` is the map an UNTOUCHED save of these rows produces, which is what the
+      // override rule compares the staged map against. Both are re-derived from the record as it
+      // is NOW rather than from the props this window rendered with, so a concurrent world edit
+      // widens neither.
+      const seed = buildComponentEditorState(system, item);
       const saved = await saveComponentEditorDraft(draft, {
         systemId: this._systemId,
         componentId: this._itemId,
+        carriedEssences: seed.carriedEssences,
+        baseline: seed.baselineEssences,
         writeComponent: this._componentWrite(),
       });
       if (!saved) {

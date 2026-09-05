@@ -260,6 +260,40 @@ test('a record whose ids carry whitespace still finds its donor and its own row 
   assert.deepEqual(padded.essences, { fire: 5 });
 });
 
+test('and the DONOR half of the same claim: padding the OLDEST record still elects from the oldest system (issue 1371 r20-store3)', () => {
+  // Quality round 6, R4. There are TWO downstream lookups keyed on the trimmed system id —
+  // `decideEntity`'s and `electFromDonor`'s — and the case above pads the YOUNGEST record, so the
+  // donor is found either way and only one of the two was measured. Reverting `electFromDonor` to
+  // `bySystem.get(record.systemId)` left 1,074 tests green while electing the world map from the
+  // YOUNGEST system and inverting every record's mark.
+  //
+  // BOTH `sys-old` AND `sys-mid` are padded, and that is what makes the case discriminating rather
+  // than thorough: `sys-mid` holds the same normalized map as `sys-old`, so padding the oldest
+  // alone leaves the mid system electing the identical answer and the mutation survives.
+  const data = migratedWorld();
+  const keys = ['sys-old', 'sys-mid'].map((systemId) => membershipKey('ingot', systemId));
+  for (const [index, systemId] of ['sys-old', 'sys-mid'].entries()) {
+    data.componentScope.membership[keys[index]] = {
+      entityId: ' ingot ',
+      systemId: ` ${systemId} `,
+      inherit: { category: false },
+    };
+  }
+  migrateComponentEssenceSections(data);
+  assert.deepEqual(
+    data.componentScope.defaults.ingot.essences,
+    { fire: 2, moss: 1 },
+    'the OLDEST system’s map, found through the trimmed id — `sys-new` holds `{fire: 5}`'
+  );
+  assert.equal(
+    data.componentScope.membership[keys[0]].inherit.essences,
+    true,
+    'so the oldest system inherits the map it donated'
+  );
+  assert.equal(record(data, 'ingot', 'sys-new').inherit.essences, false, 'and the younger overrides');
+  assert.deepEqual(record(data, 'ingot', 'sys-new').essences, { fire: 5 });
+});
+
 test('RESOLUTION IS UNCHANGED: after a real load, every system reads its own map through the union', async () => {
   const data = migratedWorld();
   migrateComponentEssenceSections(data);

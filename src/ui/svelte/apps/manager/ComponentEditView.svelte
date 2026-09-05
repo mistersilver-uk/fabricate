@@ -39,7 +39,10 @@
     getEffectiveComponentCategories,
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
-  import { clampComponentEssenceQuantity } from '../../util/componentEditor.js';
+  import {
+    carriedComponentEssences,
+    clampComponentEssenceQuantity,
+  } from '../../util/componentEditor.js';
   // The add-new offer projection (issue 1036). The DRAFT stays unfiltered — it is the sole
   // source `buildComponentEditorUpdates` rebuilds `updates.essences` from — and only what
   // this grid RENDERS is narrowed, so a disabled essence disappears from the offer while
@@ -935,7 +938,13 @@
       updates.tags = tagDraft.filter((opt) => opt.checked).map((opt) => opt.tag);
     }
     if (showEssences) {
-      const essences = {};
+      // THE ESSENCES THIS SYSTEM'S ROSTER DOES NOT DEFINE, CARRIED FORWARD (issue 1371
+      // r20-store3, reviewer round 6 finding 2). `essenceOptions` is built by mapping over the
+      // SYSTEM's `essenceDefinitions`, and a world map is not narrowed to the ids a given system
+      // holds — so an id outside the roster had no row here and was silently DROPPED from the
+      // write, on a save the GM made to change a category. It is carried rather than rendered
+      // because the system has no name, icon or colour for it and no control that could edit it.
+      const essences = carriedComponentEssences(component?.essences, essenceOptions);
       for (const option of essenceDraft) {
         const quantity = clampComponentEssenceQuantity(option.quantity);
         if (quantity > 0 && option.id) essences[option.id] = quantity;
