@@ -1763,6 +1763,18 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag="moss"][aria-pressed="true"]',
       },
+      // THE APPLIED-BUT-UNAUTHORED CHIP (issue 1371 r18-entry, maintainer ruling M33, closing
+      // D-CJ). `sm-coal`'s migrated default applies `fuel` and `bulk`, which the lab's vocabulary
+      // (`ingot` / `moss` / `ore`) never authored; under M18 they were invisible on this run and
+      // only the note counted them. M33 draws each as a LIT, STRUCK, clearable chip after the
+      // vocabulary's, with an accessible name that says it is not in the vocabulary, its clear
+      // staged until `Save entry` (M34). This claim reds if the run stops drawing them, if they
+      // lose the struck face's hook, or if the lab's `sm-coal` stops applying `fuel`.
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target:
+          '[data-scoped-entry-tag="fuel"][aria-pressed="true"][data-scoped-entry-tag-unauthored]',
+      },
     ],
     // THE TAG CHIP OWNS ITS OWN CENTRE (issue 1371, revision 8 — UX F13). The world tag run is a
     // wrapping row of 999-radius chips inside a two-column grid column, and a chip is a real

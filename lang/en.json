@@ -6461,6 +6461,7 @@
               "TagsLabel": "Tags",
               "TagApply": "Apply the world tag {tag}",
               "TagClear": "Remove the world tag {tag}",
+            "TagClearUnauthored": "Remove the world tag {tag} (not in the world vocabulary)",
               "TagsEmpty": "No world tags are authored yet. Add them in the world vocabulary.",
               "SystemsTitle": "Systems using this component",
               "SystemsSubtitle": "A system uses it when it has rules for it \u2014 that is where category, tags, essences and salvage live.",

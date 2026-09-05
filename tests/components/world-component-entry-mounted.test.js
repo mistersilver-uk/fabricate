@@ -869,6 +869,104 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
+  // ── AN APPLIED-BUT-UNAUTHORED WORLD TAG IS DRAWN, LIT AND CLEARABLE (issue 1371 r18-entry,
+  // maintainer ruling M33, closing D-CJ) ──────────────────────────────────────────────────────────
+  // A migrated record can apply a tag the world vocabulary never authored (`coal`'s `fuel` and
+  // `bulk`). Under M18 the run offered the vocabulary alone, so those tags were invisible on the
+  // one screen that could clear them and only the note counted them. M33: they are drawn on the
+  // run AFTER the vocabulary's chips as lit, STRUCK, clearable chips whose accessible name says
+  // they are not in the vocabulary; clearing one is staged under M34; once cleared it is never
+  // re-offered, because nothing the world has not authored can be added.
+  describe('an applied-but-unauthored world tag is drawn lit, struck and clearable (M33)', () => {
+    const MOSS = Object.freeze({ tags: ['moss'] });
+    const run = (target) =>
+      [...target.querySelectorAll('[data-scoped-entry-tag]')].map((chip) => ({
+        tag: chip.getAttribute('data-scoped-entry-tag'),
+        unauthored: chip.hasAttribute('data-scoped-entry-tag-unauthored'),
+        pressed: chip.getAttribute('aria-pressed'),
+        struck: chip.classList.contains('is-struck'),
+        lit: chip.classList.contains('is-lit'),
+        label: chip.getAttribute('aria-label'),
+      }));
+
+    it('draws it AFTER the vocabulary’s chips, lit and struck, pressed, with the qualified accessible name', async () => {
+      const { target } = await open('coal', undefined, MOSS);
+      assert.deepEqual(
+        run(target).map(({ tag, unauthored, pressed, struck, lit }) => [tag, unauthored, pressed, struck, lit]),
+        [
+          ['moss', false, 'false', false, false],
+          ['fuel', true, 'true', true, true],
+          ['bulk', true, 'true', true, true],
+        ],
+        'vocabulary first (unlit, not struck — the NEGATIVE control), then the record’s unauthored pair, lit and struck'
+      );
+      const fuel = run(target).find((chip) => chip.tag === 'fuel');
+      assert.equal(fuel.label, 'Remove the world tag fuel (not in the world vocabulary)');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tag="fuel"]').tagName,
+        'BUTTON',
+        'clearable means a real button'
+      );
+    });
+
+    it('a vocabulary tag the record applies is lit but NOT struck — struck means "not in the vocabulary", nothing else', async () => {
+      const { target } = await open('coal', {
+        defaults: [{ id: 'coal', category: 'Raw', tags: ['moss', 'fuel'] }],
+      }, MOSS);
+      assert.deepEqual(
+        run(target).map(({ tag, pressed, struck, unauthored }) => [tag, pressed, struck, unauthored]),
+        [
+          ['moss', 'true', false, false],
+          ['fuel', 'true', true, true],
+        ]
+      );
+      assert.match(
+        run(target).find((chip) => chip.tag === 'moss').label,
+        /^Remove the world tag moss$/,
+        'the authored chip keeps its plain name'
+      );
+    });
+
+    it('clearing it is STAGED, it is never re-offered, the note still counts, and Save writes the list without it', async () => {
+      const { target, calls, reports } = await open('coal', undefined, MOSS);
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tag-note]').textContent.trim(),
+        '2 world tags set on this record · muted in 1 system',
+        'the note counts the unauthored pair before anything is touched'
+      );
+      target.querySelector('[data-scoped-entry-tag="fuel"]').click();
+      await drain();
+      assert.deepEqual(calls, [], 'the clear is a draft (M34)');
+      assert.deepEqual(
+        run(target).map((chip) => chip.tag),
+        ['moss', 'bulk'],
+        'the cleared tag is GONE from the run — nothing the world has not authored is offered back'
+      );
+      assert.equal(reports.dirty.at(-1), true, '`Save entry` lights');
+      assert.equal(
+        target.querySelector('[data-scoped-entry-tag-note]').textContent.trim(),
+        '1 world tag set on this record · muted in 1 system',
+        'the note follows the staged list'
+      );
+      await reports.handles.filter(Boolean).at(-1).save();
+      await drain();
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'setWorldTags'),
+        [{ verb: 'setWorldTags', args: ['coal', ['bulk']] }]
+      );
+    });
+
+    it('and a discard brings it back, because the clear had not landed', async () => {
+      const { target, reports } = await open('coal', undefined, MOSS);
+      target.querySelector('[data-scoped-entry-tag="bulk"]').click();
+      await drain();
+      assert.deepEqual(run(target).map((chip) => chip.tag), ['moss', 'fuel']);
+      reports.handles.filter(Boolean).at(-1).discard();
+      await drain();
+      assert.deepEqual(run(target).map((chip) => chip.tag), ['moss', 'fuel', 'bulk']);
+    });
+  });
+
   describe('the world tags are a TOGGLE RUN over the vocabulary, not an add field', () => {
     // `proto:899-901` draws the world tag list as click-to-toggle chips over the world
     // vocabulary, with no add field and no remove glyph on this card: authoring the vocabulary
@@ -1027,10 +1125,18 @@ describe('world Component entry editor (issue 1371)', () => {
       // record, as the category trigger does, and is the one place that data stays visible.
       // With one tag authored the sentence goes.
       const { target: none } = await open('coal');
-      assert.equal(
-        none.querySelectorAll('[data-scoped-entry-tag]').length,
-        0,
-        'the applied-but-unauthored pair is not offered as chips'
+      // M33 (issue 1371 r18-entry): the applied-but-unauthored pair IS drawn — lit, struck and
+      // clearable — but it is not OFFERED: no vocabulary chip exists, so the sentence still stands.
+      assert.deepEqual(
+        [...none.querySelectorAll('[data-scoped-entry-tag]')].map((chip) => [
+          chip.getAttribute('data-scoped-entry-tag'),
+          chip.hasAttribute('data-scoped-entry-tag-unauthored'),
+        ]),
+        [
+          ['fuel', true],
+          ['bulk', true],
+        ],
+        'the record`s own applied tags are drawn as unauthored chips, and nothing is offered'
       );
       assert.ok(
         Boolean(none.querySelector('[data-scoped-entry-tags-empty]')),

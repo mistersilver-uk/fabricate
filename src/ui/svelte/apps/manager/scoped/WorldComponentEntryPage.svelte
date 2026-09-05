@@ -443,6 +443,11 @@
   // yet, drew the `No world tags are authored yet` sentence about a list that was not empty — a
   // string denying a reach that exists. The names come off the leg the category picker reads.
   const tagVocabulary = $derived(worldVocabularyComponentTags(scope));
+  // THE APPLIED-BUT-UNAUTHORED TAGS (issue 1371 r18-entry, maintainer ruling M33, closing D-CJ):
+  // the STAGED list minus the vocabulary. A migrated record can apply a tag the world never
+  // authored; the run draws each one after the vocabulary's chips as a lit, STRUCK, clearable chip,
+  // and once cleared it is gone — nothing the world has not authored can be added back.
+  const unauthoredTags = $derived(worldTags.filter((tag) => !tagVocabulary.includes(tag)));
 
   const categoryNote = $derived(entry ? componentWorldCategoryNote(entry, phrase) : '');
   // The tag note counts the STAGED list (M34) over the record's own mutes, so it follows the run.
@@ -1052,6 +1057,39 @@
                           worldTags.includes(tag)
                             ? 'Remove the world tag {tag}'
                             : 'Apply the world tag {tag}',
+                          { tag }
+                        )}
+                        onclick={() => toggleWorldTag(tag)}>{tag}</Chip
+                      >
+                    {/each}
+                    <!--
+                      THE APPLIED-BUT-UNAUTHORED TAGS (M33), after the vocabulary's chips. Lit,
+                      because the record applies them (`tone="tag" emphasis="lit"`, pressed);
+                      STRUCK, because the shared chip's struck face is the reference's own
+                      reading for "a value that is switched off in the vocabulary" and is the one
+                      face this run does not already use for another meaning; and the accessible
+                      name says why. Clearing one stages its removal (M34); it is drawn from the
+                      staged list, so a cleared tag leaves the run and is never re-offered.
+                    -->
+                    {#each unauthoredTags as tag (tag)}
+                      <Chip
+                        tag="button"
+                        type="button"
+                        density="tag-run"
+                        tone="tag"
+                        emphasis="lit"
+                        struck
+                        data-scoped-entry-tag={tag}
+                        data-scoped-entry-tag-unauthored=""
+                        aria-pressed="true"
+                        title={phrase(
+                          'FABRICATE.Admin.Manager.Scoped.Component.Entry.TagClearUnauthored',
+                          'Remove the world tag {tag} (not in the world vocabulary)',
+                          { tag }
+                        )}
+                        aria-label={phrase(
+                          'FABRICATE.Admin.Manager.Scoped.Component.Entry.TagClearUnauthored',
+                          'Remove the world tag {tag} (not in the world vocabulary)',
                           { tag }
                         )}
                         onclick={() => toggleWorldTag(tag)}>{tag}</Chip
