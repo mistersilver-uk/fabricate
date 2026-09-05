@@ -21,6 +21,7 @@ import {
 } from '../../src/utils/componentScopeValidation.js';
 import {
   componentAttributionNote,
+  componentBulkEssenceBatches,
   componentCategoryInheritOffered,
   componentCategoryNote,
   componentDeleteNote,
@@ -522,5 +523,54 @@ describe('the inspector’s `Salvage in` heading names the system as its own nod
       name: 'Forge',
       trail: '',
     });
+  });
+});
+
+// ── issue 1371 r17-b ──────────────────────────────────────────────────────────────────────────
+describe('the world essence write goes only where a system HOLDS the essence (M25)', () => {
+  // A roster whose systems differ in exactly one respect: what each one's own `essenceDefinitions`
+  // row set holds. `forge` holds both essences, `alchemy` holds `flame` alone, and `glass` has
+  // rules for `coal` and holds NOTHING — the shape the reviewer traced: a write into it would be
+  // normalized away by the store (`_scopeBasis`) and reported as an update that landed nothing.
+  const ROSTER = [
+    {
+      id: 'sys-forge',
+      essenceDefinitions: [{ id: 'flame' }, { id: 'earth' }],
+      components: [{ id: 'coal', essences: { flame: 1 } }],
+    },
+    {
+      id: 'sys-alchemy',
+      essenceDefinitions: [{ id: 'flame' }],
+      components: [{ id: 'coal', essences: {} }],
+    },
+    { id: 'sys-glass', essenceDefinitions: [], components: [{ id: 'coal', essences: {} }] },
+    // A system carrying NO roster at all, which is what an unmigrated fixture hands over: it holds
+    // nothing, so nothing is written to it either.
+    { id: 'sys-bare', components: [{ id: 'coal', essences: {} }] },
+  ];
+
+  it('drops the keys a system does not hold, and yields NO batch for a system holding none of them', () => {
+    assert.deepEqual(componentBulkEssenceBatches(['coal'], { flame: 3, earth: 2 }, ROSTER), [
+      { systemId: 'sys-forge', componentIds: ['coal'], essences: { flame: 3, earth: 2 } },
+      { systemId: 'sys-alchemy', componentIds: ['coal'], essences: { flame: 3 } },
+    ]);
+  });
+
+  it('skips a system whose only staged key it does not hold, even when its rules carry that value', () => {
+    // `glass` carries a stale `earth` on its rules and holds no `earth`: a strip is not written
+    // there, because the store would refuse the key on the way in and the write would land nothing.
+    const stale = [
+      { id: 'sys-glass', essenceDefinitions: [], components: [{ id: 'coal', essences: { earth: 2 } }] },
+    ];
+    assert.deepEqual(componentBulkEssenceBatches(['coal'], { earth: 0 }, stale), []);
+  });
+
+  it('reads the legacy `essences` spelling of the roster as `_scopeBasis` does', () => {
+    const legacy = [
+      { id: 'sys-old', essences: [{ id: 'earth' }], components: [{ id: 'coal', essences: {} }] },
+    ];
+    assert.deepEqual(componentBulkEssenceBatches(['coal'], { flame: 3, earth: 2 }, legacy), [
+      { systemId: 'sys-old', componentIds: ['coal'], essences: { earth: 2 } },
+    ]);
   });
 });

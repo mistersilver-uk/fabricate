@@ -2174,17 +2174,33 @@ describe('world Component Catalogue (issue 1371)', () => {
       // THE ROSTER WITH ITS COMPONENTS, which is what the root hands the page: `coal` has rules in
       // both systems and carries `flame` in the forge, `ingot` has rules in the forge alone, and
       // `sys-jewel` holds neither — so a write to it would be a write to a system with no rules.
+      // EACH SYSTEM'S OWN `essenceDefinitions` ROSTER IS WHAT IT HOLDS (issue 1371 r17-b): `forge`
+      // holds both, `alchemy` holds `flame` alone, and `sys-glass` has rules for `coal` and holds
+      // NOTHING — the system the write must skip, because the store normalizes a foreign key away
+      // and the docs already promise "a system that does not hold an essence skips it".
       const ESSENCE_SYSTEMS = Object.freeze([
         {
           id: 'sys-forge',
           name: 'Forge',
+          essenceDefinitions: [{ id: 'flame' }, { id: 'earth' }],
           components: [
             { id: 'coal', essences: { flame: 2 } },
             { id: 'ingot', essences: {} },
           ],
         },
-        { id: 'sys-alchemy', name: 'Alchemy', components: [{ id: 'coal', essences: {} }] },
-        { id: 'sys-jewel', name: 'Jewelcraft', components: [] },
+        {
+          id: 'sys-alchemy',
+          name: 'Alchemy',
+          essenceDefinitions: [{ id: 'flame' }],
+          components: [{ id: 'coal', essences: {} }],
+        },
+        { id: 'sys-jewel', name: 'Jewelcraft', essenceDefinitions: [], components: [] },
+        {
+          id: 'sys-glass',
+          name: 'Glassworks',
+          essenceDefinitions: [],
+          components: [{ id: 'coal', essences: {} }],
+        },
       ]);
 
       async function essenceCatalogue(worldEssences = WORLD_ESSENCES) {
@@ -2317,7 +2333,8 @@ describe('world Component Catalogue (issue 1371)', () => {
             ['sys-forge', ['coal', 'ingot'], { essences: { flame: 3 } }],
             ['sys-alchemy', ['coal'], { essences: { flame: 3 } }],
           ],
-          'one write per system per resulting map, and none to `sys-jewel`, which holds neither'
+          'one write per system per resulting map, none to `sys-jewel`, which holds neither, ' +
+            'and none to `sys-glass`, which has rules for `coal` and holds no essence'
         );
         assert.equal(
           calls.filter((call) => call.verb !== 'bulkEditRules').length,
@@ -2328,6 +2345,39 @@ describe('world Component Catalogue (issue 1371)', () => {
           target.querySelectorAll('[data-scoped-list-row].is-bulk-selected').length,
           0,
           'and the selection is cleared on the way out'
+        );
+      });
+
+      it('writes an essence only into a system that HOLDS it, dropping the key elsewhere (issue 1371 r17-b)', async () => {
+        // `earth` is held by the forge alone. Staged beside `flame`, the alchemy batch carries
+        // `flame` and NOT `earth`; `sys-glass`, holding neither, gets no batch at all.
+        const { target, calls } = await essenceCatalogue();
+        await inc(target, 'flame');
+        await inc(target, 'earth');
+        await inc(target, 'earth');
+        assert.equal(
+          target.querySelector('[data-world-component-bulk-apply]').textContent.trim(),
+          'Set essence values on 2 components'
+        );
+        await press(target, '[data-world-component-bulk-apply]');
+        const writes = calls.filter((call) => call.verb === 'bulkEditRules');
+        assert.deepEqual(
+          writes.map((call) => [
+            call.args[0],
+            [...call.args[1]].sort((left, right) => left.localeCompare(right)),
+            call.args[2],
+          ]),
+          [
+            // `coal` already carries `flame: 2` in the forge, so its map ends `{flame: 1, earth: 2}`
+            // exactly as `ingot`'s does — one write.
+            ['sys-forge', ['coal', 'ingot'], { essences: { flame: 1, earth: 2 } }],
+            ['sys-alchemy', ['coal'], { essences: { flame: 1 } }],
+          ],
+          'the alchemy write drops `earth`, which that system does not hold; `sys-glass` is not written'
+        );
+        assert.ok(
+          !writes.some((call) => call.args[0] === 'sys-glass'),
+          'NON-VACUITY, stated on its own: the system with rules and no roster is skipped'
         );
       });
 

@@ -1444,6 +1444,44 @@ function essenceMapKey(essences) {
 }
 
 /**
+ * The essences one system HOLDS: the ids on its own `essenceDefinitions` roster, which is the
+ * in-system row a joined world essence carries (issue 1371 r17-b, reviewer 5 / Foundry 2).
+ *
+ * Read exactly as `CraftingSystemManager._scopeBasis` reads it — `essenceDefinitions`, with the
+ * legacy `essences` spelling behind it — because that is the basis the store normalizes a bulk
+ * write's map against: a key the system does not hold is dropped there, so a batch carrying it
+ * would report an update and land nothing. A system carrying no roster at all holds nothing.
+ *
+ * @param {object} system a raw crafting system.
+ * @returns {Set<string>}
+ */
+function heldEssenceIdsOf(system) {
+  const roster = Array.isArray(system?.essenceDefinitions)
+    ? system.essenceDefinitions
+    : Array.isArray(system?.essences)
+      ? system.essences
+      : [];
+  return new Set(
+    roster.map((definition) => String(definition?.id ?? '')).filter((id) => id !== '')
+  );
+}
+
+/**
+ * The staged map narrowed to the essences one system holds.
+ *
+ * @param {Record<string, number>} staged
+ * @param {Set<string>} held
+ * @returns {Record<string, number>}
+ */
+function stagedEssencesHeldBy(staged, held) {
+  const out = {};
+  for (const [id, quantity] of Object.entries(staged ?? {})) {
+    if (held.has(id)) out[id] = quantity;
+  }
+  return out;
+}
+
+/**
  * The writes an essence instruction makes: one per crafting system per RESULTING map.
  *
  * `CraftingSystemManager.applyBulkEditToComponents` REPLACES a component's whole `essences` map,
@@ -1451,6 +1489,12 @@ function essenceMapKey(essences) {
  * system are written together. A system with no rules for a component is not written for it, and
  * a component whose map would not change is skipped — an Apply that touches nothing on a record is
  * a write that reports itself and changes nothing.
+ *
+ * A SYSTEM THAT DOES NOT HOLD AN ESSENCE SKIPS IT (issue 1371 r17-b): the staged map is narrowed
+ * to each system's own roster ({@link heldEssenceIdsOf}) before it is merged, so a system holding
+ * none of the staged essences yields NO batch, and one holding some of them is written only those
+ * keys. This is the mechanism the panel's note and `docs/components/index.md` describe, and it
+ * matches what the store would otherwise do silently on the way in.
  *
  * Batches are in roster order, then in selection order within a batch.
  *
@@ -1465,13 +1509,15 @@ export function componentBulkEssenceBatches(entityIds, staged, systems) {
   for (const system of Array.isArray(systems) ? systems : []) {
     const systemId = String(system?.id ?? '');
     if (!systemId) continue;
+    const stagedHere = stagedEssencesHeldBy(staged, heldEssenceIdsOf(system));
+    if (Object.keys(stagedHere).length === 0) continue;
     const groups = new Map();
     for (const rawId of Array.isArray(entityIds) ? entityIds : []) {
       const componentId = String(rawId ?? '');
       const rules = componentRulesIn(system, componentId);
       if (!rules) continue;
       const carried = carriedEssencesOf(rules);
-      const merged = mergeStagedEssences(carried, staged);
+      const merged = mergeStagedEssences(carried, stagedHere);
       const key = essenceMapKey(merged);
       if (key === essenceMapKey(carried)) continue;
       if (!groups.has(key)) groups.set(key, { systemId, componentIds: [], essences: merged });
