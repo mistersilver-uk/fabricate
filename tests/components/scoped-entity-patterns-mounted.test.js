@@ -252,12 +252,12 @@ describe('InheritRow (mounted)', () => {
   after(() => inheritHarness.teardown());
   afterEach(() => inheritHarness.remount());
 
-  it('draws exactly ONE row for a component, and no group chrome around it', async () => {
+  it('draws exactly TWO rows for a component, and no group chrome around them', async () => {
     const root = await inheritHarness.mount({ entityType: 'component' });
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')];
     assert.deepEqual(
       rows.map((row) => row.getAttribute('data-scoped-inherit-row')),
-      ['category']
+      ['category', 'essences'] // issue 1371 r18 (M31): category and the world essence section
     );
     // No header, no divider, no empty state: chrome costs more space than the one control
     // it would frame and says nothing the row does not.

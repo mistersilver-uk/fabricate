@@ -339,7 +339,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
   afterEach(() => catalogueHarness.remount());
 
   const EXPECTED = {
-    component: ['category'],
+    component: ['category', 'essences'], // issue 1371 r18 (M31): the world record's second section
     essence: ['effectSource', 'macro'],
     // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
     // sections, so the catalogue inspector states a card for each of them too.
@@ -687,7 +687,7 @@ describe('the rules list draws one inherit row per inheritable section, with its
   afterEach(() => rulesHarness.remount());
 
   const EXPECTED = {
-    component: ['category'],
+    component: ['category', 'essences'], // issue 1371 r18 (M31): the world record's second section
     essence: ['effectSource', 'macro'],
     // FOUR since `1.31.0` (issue 1373). The row set is derived from the descriptor rather than
     // listed, so this moves with `TOOL_SECTIONS` and nothing else had to change.

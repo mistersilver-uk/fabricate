@@ -7794,8 +7794,9 @@ describe('createAdminStore', () => {
       assert.equal(card.sourceMissing, false);
       assert.deepEqual(card.tags, ['fire']);
       assert.deepEqual(card.essences, [
-        { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
-        { id: 'ess-shadow', name: 'Shadow', icon: 'fas fa-mortar-pestle', quantity: 1 },
+        // issue 1371 r18 (M29): the row card carries the essence's colour token beside its icon.
+        { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '', quantity: 2 },
+        { id: 'ess-shadow', name: 'Shadow', icon: 'fas fa-mortar-pestle', colorToken: '', quantity: 1 },
       ]);
       assert.deepEqual(card.salvageSummary, {
         quantityRequired: 3,
