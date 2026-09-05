@@ -54,7 +54,7 @@
   {options}
   {disabled}
   pickerClass="manager-travel-parties-override"
-  triggerClass="manager-button manager-travel-picker-trigger manager-travel-parties-override-trigger"
+  triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-travel-parties-override-trigger"
   triggerIcon="fas fa-location-crosshairs"
   triggerLabel={selectedName}
   valueClass="manager-travel-parties-override-value"

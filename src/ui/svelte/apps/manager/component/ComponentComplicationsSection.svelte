@@ -1075,7 +1075,7 @@
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
-                        triggerClass="manager-button"
+                        triggerClass="fabricate-button manager-button"
                         triggerIcon="fas fa-scroll"
                         triggerLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',

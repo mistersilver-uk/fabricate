@@ -3,7 +3,7 @@
  *
  * ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────
  * Converting a hand-written manager button adds a second class, `fab-manager-button`, and
- * `styles/fabricate.css` declares `.fabricate-manager .manager-button.fab-manager-button` at
+ * `styles/fabricate.css` declares `.fabricate-button.manager-button.fab-manager-button` at
  * (0,3,0). EVERY rule a converted button matches is therefore re-arbitrated, and a rule that
  * wins today only because it appears later in the sheet loses the moment the sweep is licensed
  * to move declarations around.
@@ -346,6 +346,24 @@ const SHEET = 'styles/fabricate.css';
 // template rather than being flattened into a literal or deleted.
 const POPULATION_C_FILE = 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 const globalRule = (selector) => `${SHEET}#${selector}`;
+
+/**
+ * The class the conversion REMOVES from a call site, and the tag-free probe for it.
+ *
+ * Written as a token test over class-attribute VALUES rather than as the
+ * `source.includes('class="manager-button')` prefix these clauses used before issue 1502, for two
+ * reasons that arrived together. The prefix is defeated by the re-root: a raw site returning today
+ * spells `class="fabricate-button manager-button …"`, which the prefix cannot see, so a booked-as-
+ * converted file could quietly regain a literal control with this gate green. And the prefix
+ * spelled the literal IN THIS FILE, where the area-scope gate's fixture census then had to read it
+ * as a fixture attribute no class could repair — the census counts elements, not intentions, and a
+ * message string is neither.
+ */
+const CONTRACT_CLASS = 'manager-button';
+const writesContractLiteral = (source) =>
+  [...source.matchAll(/class="([^"]*)"/g)].some((match) =>
+    match[1].split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
+  );
 const scopedRule = (component, selector) => `src/ui/svelte/apps/manager/${component}#${selector}`;
 
 /**
@@ -370,7 +388,7 @@ const REVIEWED = [
   // DISCHARGED (issue 1118, task 7). At (0,2,0) it lost min-height 38px and font-size 0.78rem
   // outright, against a source comment forbidding exactly that because Apply swaps slots with
   // the inspector's primary. It converted with its component and is now
-  // `:global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply)` —
+  // `:global(.fabricate-button.manager-button.fab-manager-button.fab-bulk-edit-apply)` —
   // (0,4,0), so it beats the primitive on specificity — and its key compound demands
   // `fab-manager-button`, which makes it a PRIMITIVE rule here rather than a candidate.
   //
@@ -405,7 +423,7 @@ const REVIEWED = [
 
   // ── INTENDED: the primitive is designed to supersede these ────────────────────────────
   {
-    id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled)'),
+    id: globalRule('.fabricate-button.manager-button.is-ghost:not(:disabled)'),
     disposition: 'INTENDED',
     convertedReach: [
       // TWO since issue 1373: `World Tool` joined `Back to Tool Rules` on the ghost role,
@@ -432,7 +450,7 @@ const REVIEWED = [
       'three components below are counted from the tree rather than asserted in prose.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.manager-button.is-ghost:not(:disabled):hover'),
     disposition: 'INTENDED',
     convertedReach: [
       {
@@ -523,15 +541,16 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
     disposition: 'EXCLUDE',
-    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:153'],
+    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:164'],
     why:
       MOVED_POPULATION +
       'The move is unusually clean here, because this entry always rested on the site that ' +
       'is left: the knowledge row`s `ArmedDangerButton`. ' +
       'Deliberately NOT re-chained, and the one place where this instrument is wrong about ' +
       'its own corpus. `collectSites` gives every non-population-B site the primitive class, ' +
-      'including `ArmedDangerButton`, which is held out of the conversion and renders ' +
-      '`class="manager-button is-danger"` from its own markup — so the tool believes a chained ' +
+      'including `ArmedDangerButton`, which is held out of the conversion and renders the ' +
+      'tokens `fabricate-button manager-button is-danger` from its own markup (the family root ' +
+      'leads it since issue 1502) — so the tool believes a chained ' +
       'selector would still reach it. It would not. Both knowledge rows render an ' +
       '`ArmedDangerButton` inside this container, and chaining would leave that Delete at the ' +
       'ambient ~1rem beside the 0.72rem Expend button next to it, which is the exact ' +
@@ -614,7 +633,21 @@ const REVIEWED = [
       'them; the 18 unconverted controls still take their size from it.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button'),
+    id: globalRule('.fabricate-button'),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — the review-r3 fix wrote it, and EXCLUDE here is a ' +
+      'STRUCTURAL instruction rather than a population one. This is the family`s bare-element ' +
+      'type baseline, `font: inherit`, and it is deliberately rooted at the family root ALONE ' +
+      'at (0,1,0) so that it is a FLOOR: high enough to beat the user agent`s button font in a ' +
+      'host that declares nothing, and too low to beat a caller`s per-site rule at (0,2,0). ' +
+      'Chaining `fab-manager-button` onto it would raise it above exactly those rules and turn ' +
+      'the floor back into an override — which is how it deleted `.manager-recipe-lock``s and ' +
+      '`.manager-recipe-edit``s 0.68rem and rendered both glyphs 28.7% larger. Never re-chain ' +
+      'this one; `re-rooted-controls-host-independence.test.js` pins its specificity.',
+  },
+  {
+    id: globalRule('.fabricate-button.manager-button'),
     disposition: 'EXCLUDE',
     why:
       MOVED_POPULATION +
@@ -623,7 +656,7 @@ const REVIEWED = [
       'leave those triggers with no control treatment at all.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button:disabled'),
+    id: globalRule('.fabricate-button.manager-button:disabled'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9, and its NO_CONFLICT filing is worth keeping ' +
@@ -637,7 +670,7 @@ const REVIEWED = [
       'is the same reason it is EXCLUDE now rather than merely safe.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.manager-button:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why:
       MOVED_POPULATION +
@@ -646,7 +679,7 @@ const REVIEWED = [
       'sweep must not disturb.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-danger:not(:disabled)'),
+    id: globalRule('.fabricate-button.manager-button.is-danger:not(:disabled)'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9. It reached 11 converting sites and shared no ' +
@@ -655,7 +688,7 @@ const REVIEWED = [
       'not come from a `role="danger"` prop.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-danger:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.manager-button.is-danger:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE REVIEWED LIST BEFORE: while `is-danger` sites were literal this rule beat ' +
@@ -663,7 +696,7 @@ const REVIEWED = [
       'population narrowed to `ArmedDangerButton`. The hover half of the entry above.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-subtle'),
+    id: globalRule('.fabricate-button.manager-button.is-subtle'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9, and it is the delta`s worked example for a ' +
@@ -692,7 +725,7 @@ const REVIEWED = [
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved ' +
       'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
@@ -733,7 +766,7 @@ const REVIEWED = [
   },
 
   {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed'),
+    id: globalRule('.fabricate-button.manager-button.is-dashed'),
     disposition: 'EXCLUDE',
     why:
       'The geometry half of the RECONCILED bare dashed treatment, and now population B only. ' +
@@ -742,7 +775,7 @@ const REVIEWED = [
       'triggers render the same control as the converted buttons beside them in the same row.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled)'),
+    id: globalRule('.fabricate-button.manager-button.is-dashed:not(:disabled)'),
     disposition: 'EXCLUDE',
     why:
       'The paint half of the same reconciliation, split out so the disabled rule can win. ' +
@@ -751,31 +784,31 @@ const REVIEWED = [
       'ten converted (task 8) the triggers are all that is left.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.manager-button.is-dashed:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.manager-checks-preview-actor-trigger'),
+    id: globalRule('.fabricate-button.manager-button.manager-checks-preview-actor-trigger'),
     disposition: 'EXCLUDE',
     why:
       'The Checks preview actor popover trigger. `SearchablePopover` renders it from a class ' +
       'string, so it never gains `fab-manager-button`.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.manager-salvage-component-trigger'),
+    id: globalRule('.fabricate-button.manager-button.manager-salvage-component-trigger'),
     disposition: 'EXCLUDE',
     why: 'Salvage component popover trigger, population B.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-component-trigger'),
+    id: globalRule('.fabricate-button.manager-button.manager-recipe-component-trigger'),
     disposition: 'EXCLUDE',
     why:
       "NOT IN THE SEEDED LIST as its own entry: the seed named only the group's first line, " +
       'and this is the second of its three selectors, reaching two more population-B triggers.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.manager-tool-replacement-component-trigger'),
+    id: globalRule('.fabricate-button.manager-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
     why: 'The third selector of that same group, likewise population B only.',
   },
@@ -787,7 +820,7 @@ const REVIEWED = [
     why: 'NOT IN THE SEEDED LIST. The tool replacement card`s own override of that trigger.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.manager-travel-parties-override-trigger'),
+    id: globalRule('.fabricate-button.manager-button.manager-travel-parties-override-trigger'),
     disposition: 'EXCLUDE',
     why: 'Travel parties override popover trigger, population B.',
   },
@@ -829,7 +862,7 @@ const REVIEWED = [
   // are unconverted ones. Their reasoning is preserved at their new entries rather than
   // summarised here.
   {
-    id: globalRule('.fabricate-manager .manager-button.is-warning-action:not(:disabled)'),
+    id: globalRule('.fabricate-button.manager-button.is-warning-action:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     // WAS DEAD, and is the sweep's one entry to move in that direction. Its old `why` said the
     // entry 'should go live rather than away', and this is that: the primitive's sixth role
@@ -858,7 +891,7 @@ const REVIEWED = [
       'quick-action Force add beside it renders, and the pair agree by construction.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-primary:not(:disabled)'),
+    id: globalRule('.fabricate-button.manager-button.is-primary:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     // The primary paint reaches no LITERAL site at all now — no population-B trigger is a
     // primary — so it is named the same way `.manager-setup-links .manager-button` below is,
@@ -1152,8 +1185,8 @@ function assertConvertedReach(entry) {
       `${entry.id} books ${file} as rendering ${buttons} primitives it reaches`
     );
     assert.ok(
-      !source.includes('class="manager-button'),
-      `${file} is booked as converted but still writes a literal class="manager-button"`
+      !writesContractLiteral(source),
+      `${file} is booked as converted but still writes a literal \`${CONTRACT_CLASS}\` class token`
     );
   }
 }
@@ -1202,8 +1235,11 @@ test('every reviewed DEAD rule is a real rule in the sheet with no call site at 
 test('a site the sweep does not convert is never modelled as carrying the primitive class', () => {
   // The instrument used to hand `fab-manager-button` to everything outside population B, which
   // included `ArmedDangerButton` — a component held out of the conversion on purpose, which
-  // writes `class="manager-button is-danger"` in its own markup and will never gain the
-  // primitive class. The error was invisible in the report: it changed no derived set and no
+  // writes the tokens `fabricate-button manager-button is-danger` in its own markup and will
+  // never gain the primitive class. It DOES carry the family root since issue 1502, and that is
+  // not the same permission: the root is what every re-rooted rule keys on, so a carrier writes
+  // it or renders unstyled, while `fab-manager-button` is the conversion's own marker and stays
+  // the primitive's alone. The error was invisible in the report: it changed no derived set and no
   // printed line, because losses are only counted on CONVERTING sites. What it changed was the
   // advice. `.manager-knowledge-row-actions .manager-button` derived as a plain RECHAIN, and
   // re-chaining it would have left that row's Delete button at the ambient ~1rem beside the
@@ -1360,8 +1396,8 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
       `${file} is booked as ${sites} converted sites but renders ManagerButton ${rendered} times`
     );
     assert.ok(
-      !source.includes('class="manager-button'),
-      `${file} is booked as converted but still writes a literal class="manager-button"`
+      !writesContractLiteral(source),
+      `${file} is booked as converted but still writes a literal \`${CONTRACT_CLASS}\` class token`
     );
     assert.ok(
       !cascade.convertingSites.some((site) => site.file === file),
@@ -1429,13 +1465,13 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   // A repaint is a winner change on an UNCONVERTED literal site, so with the sweep complete
   // there can be none. That makes this the regression detector for the whole change: a new raw
-  // `class="manager-button"` landing anywhere under `src/` puts a site back in the corpus and
-  // reappears here as a measured repaint.
+  // A bare `manager-button` class token landing anywhere under `src/` puts a site back in the
+  // corpus and reappears here as a measured repaint.
   assert.deepEqual(
     cascade.repaints.map((change) => change.property),
     [],
     'the conversion is complete, so no literal call site is left whose cascade winner could ' +
-      'change — a repaint here means a raw class="manager-button" has come back'
+      'change — a repaint here means a raw `manager-button` class token has come back'
   );
 });
 

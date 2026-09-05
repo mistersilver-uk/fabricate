@@ -108,10 +108,15 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     //
     // So this reads the rule by its SELECTOR, tolerant of the chain: the compound may carry
     // the primitive marker, and a prelude long enough to wrap may be spread over lines.
+    //
+    // The spelling moved a third time in issue 1502: the family is now rooted at the class
+    // `ManagerButton` itself emits, so the leading `.fabricate-manager` DESCENDANT became a
+    // `.fabricate-button` COMPOUND on the same element. Specificity is unchanged — one class
+    // swapped for one class — and the tolerance below still absorbs the primitive marker.
     for (const selector of [
-      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
-      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
-      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
+      '.fabricate-button.manager-button.manager-recipe-browser-inspector-duplicate',
+      '.fabricate-button.manager-button.manager-recipe-browser-inspector-edit',
+      '.fabricate-button.manager-button.manager-recipe-browser-inspector-delete'
     ]) {
       const pattern = selector
         .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)

@@ -1,4 +1,92 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  THE browse-screen pager (issues 675, 1372, 1502).
+
+  ── THE ROOT CLASS THIS COMPONENT EMITS ───────────────────────────────────────────
+  The root `<section>` carries `fabricate-pagination` ahead of `manager-pagination`, and
+  the sheet's own pager rules are rooted at THAT class rather than at `.fabricate-manager`
+  (issue 1502; `design-system/spec.md` — a shared primitive's class family is rooted at the
+  primitive, not at an app). It is written inline in the markup rather than composed in
+  `<script>` because this component composes nothing: there is no `const classes` array to
+  put it in, as there is on `ManagerButton` and `IconButton`.
+
+  The `<nav>` is NOT the root. The descendant rules read `.fabricate-pagination
+  .manager-pagination-…`, so they resolve through the `<section>`; a root written on the
+  `<nav>` would leave the summary and the per-page label unpainted.
+
+  ── WHAT THAT RE-ROOTING WIDENED, AND WHY THE SIX PLAYER CALLERS CHANGED WITH IT ──
+  This component is area-agnostic and six player-app components render it — the journal
+  history list, the inventory grid, the recipe browser, and the three gathering panels.
+  Rooting the family at the class this component emits means the sheet's pager rules, and
+  the five `.manager-icon-button` rules the two arrows match, now paint in `.fabricate-app`
+  where they only ever painted in `.fabricate-manager`. TWELVE rules newly match there:
+  seven Pagination rules (the bar, `-summary`, `-nav`, `-page`, `-size`, `-size select`, and
+  the 28px arrow box) and five IconButton rules (the shared base block plus the `font:
+  inherit` issue 1502 adds to it, `:disabled`, `:hover`, the 34px box, and the glyph rule).
+
+  It also declares its own focus PAIR for the BUTTONS it contains: a `:focus` strip and a
+  `:focus-visible` repaint at `fabricate.css:5616` and `:5634`. Buttons only, deliberately —
+  the sheet comment above those rules says why an `:is(button, select)` form would delete the
+  player app's inset select ring.
+
+  Issue 1502 preserves the frame; it does not adopt the primitive's paint. Issues 1503 and
+  1504 are where that adoption is decided, with their own visual review. (Written without a
+  leading hash: `tests/components/theme-colour-contract.test.js` reads a four-digit issue
+  number behind one as an `#RGBA` colour literal.)
+
+  Each caller's own `:global` block is injected UNLAYERED while `styles/fabricate.css` is
+  imported at `layer(modules)`, so every property a caller already declares still wins at
+  any specificity. Only the REMAINDER — the sheet's longhands minus the union of every
+  longhand that caller declares for that element in that state — is newly painted, and each
+  caller restates its remainder at the value it rendered before. That base is mostly
+  FOUNDRY CORE's, not nothing: core's `button` rule (`@layer elements.forms`) supplies
+  `min-height: var(--button-size)` (2em, so 28px at its own 14px) and `font-size:
+  var(--font-size-14)`, and its `select` rule supplies `height`/`line-height:
+  var(--input-height)` (2rem).
+
+  THE REMAINDER, MEASURED PER CALLER. Five callers (`inventory/InventoryGrid`,
+  `crafting/RecipeBrowser`, `gathering/GatheringEnvironmentList`, `…/GatheringTasksPanel`,
+  `…/GatheringEventsPanel`) declare the same block and share one remainder;
+  `journal/HistoryList` declares less and has three more entries.
+
+    element / state         | newly painted longhands        | restated | adopted (inert)
+    ------------------------|--------------------------------|----------|-----------------
+    .manager-pagination     | justify-content, background-*  | bg       | justify-content
+    -summary                | (empty)                        | —        | —
+    -nav                    | (empty)                        | —        | —
+    -page                   | min-width, text-align,         | min-w,   | text-align
+                            | font-weight                    | weight   |
+    -size                   | (empty)                        | —        | —
+    -size select            | min-width, font-* + line-height| min-w,   | font-family/-size/
+                            |                                | l-height | -style/-variant/
+                            |                                |          | -weight/-stretch
+    .manager-icon-button    | appearance, -webkit-appearance,| min-h,   | the rest
+                            | box-sizing, gap, min-width,    | font-size|
+                            | min-height, line-height,       |          |
+                            | font-*, padding                |          |
+    …:disabled              | (empty)                        | —        | —
+    …:hover                 | (empty)                        | —        | —
+    .manager-icon-button i  | position, margin               | —        | both (same value)
+
+  `journal/HistoryList` adds `padding-right/-bottom/-left` and `border-top-*` on the bar
+  (it declared only `padding-top` and no rule), and `height` on the select (it declared no
+  select rule at all) — all three restated. Its arrow also newly takes `flex: 0 0 28px`
+  from the 28px box rule, adopted: its nav is `flex: 0 0 auto` inside a `nowrap` row whose
+  summary absorbs every shrink, so the arrows are never compressed and a `flex-basis` of
+  28px is the width they already had.
+
+  WHY THE ADOPTIONS ARE INERT, once. `justify-content` cannot act because
+  `.manager-pagination-size` carries `margin-left: auto`, and an auto margin takes all the
+  free space before an alignment property sees it (all six render the size label; a future
+  caller passing `showPageSize={false}` would make this live). `text-align` cannot act on a
+  flex item whose box is its own max-content. `gap` cannot act on a button with one rendered
+  child. `min-width: 0` cannot act on an arrow that never shrinks — `min-height: 0` CAN, and
+  is the one that is restated, because it releases core's 2em floor and that floor is what
+  actually sizes the five 26px arrows to 28px today. `padding` and `line-height` cannot move
+  a glyph that `justify-content`/`align-items: center` keeps centred in a fixed box. `appearance` cannot act where the caller already declares border,
+  radius, background and colour. `box-sizing`, the select's font longhands and the glyph
+  rule are the same value the base already computed.
+-->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import IconButton from './IconButton.svelte';
@@ -91,7 +179,7 @@
 
 {#if showPagination}
   <section
-    class="manager-pagination"
+    class="fabricate-pagination manager-pagination"
     aria-label={text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>

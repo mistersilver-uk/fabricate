@@ -104,7 +104,7 @@ const FIXTURE = `
                    order. Note this fixture still measured 11.52px WITHOUT the marker, because
                    the components view has a toolbar rule of its own that supplies it — so it
                    would have gone on passing while measuring a rule it does not name. -->
-              <button class="manager-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+              <button class="fabricate-button manager-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
             </div>
           </div>
           <div class="manager-component-filter-row is-chips">
@@ -235,7 +235,7 @@ const FIXTURE = `
                  bottom-slot equality below against a shipped control that has not moved.
                  That rule now names .manager-button.fab-manager-button and compiles to
                  (0,4,0), so the box this fixture measures is the same box it always was. -->
-            <button type="button" class="manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
@@ -258,7 +258,7 @@ const FIXTURE = `
                (0,3,0) it only TIED the primitive's own control and held its 38px and 0.78rem
                by source order alone. Unmarked, this fixture matched no rule at all and fell to
                Foundry's 14px app base — which is how it failed, loudly, rather than drifting. -->
-          <button type="button" class="manager-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
+          <button type="button" class="fabricate-button manager-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 
@@ -302,7 +302,7 @@ const FIXTURE = `
                   <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
                   <span class="manager-salvage-component-field">
                     <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
-                      <button type="button" class="manager-button manager-salvage-component-trigger" data-m="stage-picker">
+                      <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
                         <span class="manager-travel-portrait"><img src="" alt=""></span>
                         <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
                         <i class="fas fa-chevron-down"></i>

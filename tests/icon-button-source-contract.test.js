@@ -44,10 +44,22 @@
  * rounds of census for exactly that reason), `<style>` blocks and comments are stripped before
  * matching — six player-app components carry legitimate `:global(.manager-icon-button)` rules,
  * because `components/Pagination.svelte` renders two icon buttons and is area-agnostic while the
- * class is painted only under `.fabricate-manager` — and the tag scan tracks `{}` DEPTH so a
- * COMPARISON inside an expression attribute cannot end a tag early, which is the case that hid
- * `VocabularyPanel.svelte`'s `ariaLabel` from an earlier scan. Each of those is argued where it
- * lives: `helpers/primitiveSourceContract.js` and `helpers/svelteTagScan.js`.
+ * sheet's rules for the class were, until issue 1502, rooted at `.fabricate-manager` and painted
+ * nothing outside it. Issue 1502 re-rooted them at `fabricate-icon-button`, which the primitive
+ * now emits itself, so the control is painted wherever it renders; those six `:global` rules are
+ * UNLAYERED and still win at any specificity, which is why they stay and why the six player
+ * frames do not move. The tag scan tracks `{}` DEPTH so a COMPARISON inside an expression
+ * attribute cannot end a tag early, which is the case that hid `VocabularyPanel.svelte`'s
+ * `ariaLabel` from an earlier scan. Each of those is argued where it lives:
+ * `helpers/primitiveSourceContract.js` and `helpers/svelteTagScan.js`.
+ *
+ * ── WHAT THE PRIMITIVE IS PINNED TO EMIT ──────────────────────────────────────────────────
+ * Two things, not one, and `primitiveEmits` takes a LIST for that reason (issue 1502): the root
+ * class `fabricate-icon-button`, which is what the sheet is rooted at, and
+ * `data-keyboard-focus="true"`, which is what stops Foundry's `KeyboardManager` firing its
+ * Space/arrow/Tab bindings while this control holds focus. Neither is gated anywhere else, and
+ * the attribute in particular is invisible in every frame and every geometry probe — deleting it
+ * changes nothing anyone can photograph and breaks every icon button a keyboard reaches.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -56,6 +68,15 @@ import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract
 
 /** The class only the primitive may write. */
 const CONTRACT_CLASS = 'manager-icon-button';
+
+/**
+ * The class `styles/fabricate.css` roots the control's rules at (issue 1502).
+ *
+ * Not policed as a class-only contract the way `CONTRACT_CLASS` is — the six deferred carriers in
+ * `CraftingSystemManagerRoot.svelte` write it deliberately, which is the whole point of the
+ * re-root — but pinned as an EMISSION below, because the sheet paints nothing without it.
+ */
+const ROOT_CLASS = 'fabricate-icon-button';
 
 const PRIMITIVE = 'src/ui/svelte/components/IconButton.svelte';
 
@@ -84,7 +105,12 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'condition modifier adds and the four character-modifier reference deletes — are held ' +
       'out of the sweep because the converging 12k-line root is the wrong place to land its ' +
       'tail. Pinned by count so a later root pass that converts some of the six fails here ' +
-      'instead of leaving a fraction of a deferral nobody is tracking.',
+      'instead of leaving a fraction of a deferral nobody is tracking. Issue 1502 left the ' +
+      'deferral intact and gave each of the six the ROOT class as a literal token instead — ' +
+      'one token per site, no composition and no new props — because the sheet is now rooted ' +
+      'at it and a carrier without it would have lost its entire paint. That is why the count ' +
+      'is still 6: `fabricate-icon-button` does not contain `manager-icon-button`, so adding ' +
+      'it moves nothing here.',
   }),
 ]);
 
@@ -116,10 +142,15 @@ const contract = definePrimitiveSourceContract({
   callSiteFloor: 28,
 
   primitiveEmits: {
-    source: `'${CONTRACT_CLASS}'`,
+    // Three tokens, each asserted separately. The contract class is what the restatement clause
+    // below polices; the ROOT class is what `styles/fabricate.css` paints from after issue 1502,
+    // and it is pinned in its QUOTED form so it is the array literal in `classes` that satisfies
+    // this — a prose mention in the `//` note beside it would not; the attribute is the keyboard
+    // contract, which nothing else in the suite would notice the loss of.
+    source: Object.freeze([`'${CONTRACT_CLASS}'`, `'${ROOT_CLASS}'`, 'data-keyboard-focus="true"']),
     otherwise:
-      'the primitive no longer emits the contract class, so the restatement clause is policing ' +
-      'a token that reaches nothing',
+      'the primitive no longer emits something it is the single source of, so a clause here is ' +
+      'policing a token that reaches nothing',
   },
 
   // Three probes. `type` and `aria-label` would still WORK from a call site — both ride the rest
@@ -147,6 +178,59 @@ const contract = definePrimitiveSourceContract({
     'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on ' +
     'an element, so the rest spread renders `="true"` where the hand-rolled button rendered ' +
     '`=""`. 17 attributes were written bare before this conversion; spell it `data-x=""`',
+});
+
+test('every deferred hand-rolled carrier writes the root class the sheet paints from', () => {
+  // The six deferred sites are not `<IconButton>`s, so they inherit nothing from the primitive.
+  // Since issue 1502 the sheet paints this control from `fabricate-icon-button`, so a carrier
+  // that writes only the contract class renders as an unstyled native button — while every
+  // `data-*` selector and every geometry probe that resolves it keeps passing. The count clause
+  // above cannot see that: it counts the OTHER class, which is exactly what such a site would
+  // still have.
+  //
+  // EVERY deferred carrier, iterated rather than the first one `find` returns. There is one
+  // today, and a second deferral added later would be skipped in silence: the clause would still
+  // pass, and the new carrier would render unpainted with nothing anywhere saying so.
+  const carriers = CLASS_EXCEPTIONS.filter((entry) => entry.file !== PRIMITIVE);
+  assert.ok(
+    carriers.length > 0,
+    'the deferred-carrier exemption is gone, so this clause holds over nothing'
+  );
+
+  for (const carrier of carriers) {
+    const source = contract.components[carrier.file] ?? '';
+    assert.ok(source.length > 0, `${carrier.file} is not in the corpus`);
+
+    // TOKEN-AWARE, and ORDER-aware, rather than a leading-substring search over the `class`
+    // attribute. Two reasons, and the second is why the prefix form was rejected outright.
+    //
+    // The order is part of the contract — the root leads, exactly as `IconButton.svelte`
+    // composes it — so a token-set check would let the two spellings drift apart between the
+    // primitive and its carriers, and a prefix check reads the order but cannot see a third
+    // token inserted between them.
+    //
+    // And a prefix needle is an UNTERMINATED class-attribute literal, which is the shape
+    // `searchable-popover-area-scope.test.js`'s fixture-attribute clause reads with
+    // `/class="([^"]*)"/g`: its `[^"]*` runs past the end of the line and swallows hundreds of
+    // characters, producing a phantom offender in this file that no class could repair. Written
+    // as a balanced regex the quote closes on its own line, so this clause costs that gate
+    // nothing.
+    const attributes = [...source.matchAll(/class="([^"]*)"/g)].map((match) =>
+      match[1].split(/\s+/).filter(Boolean)
+    );
+    const rooted = attributes.filter(
+      (tokens) => tokens[0] === ROOT_CLASS && tokens[1] === CONTRACT_CLASS
+    ).length;
+
+    assert.equal(
+      rooted,
+      carrier.count,
+      `${carrier.file} holds ${carrier.count} deferred hand-rolled icon buttons and leads ` +
+        `${rooted} class attributes with \`${ROOT_CLASS}\` then \`${CONTRACT_CLASS}\`, in ` +
+        'that order. Each one must, or it loses every rule in `styles/fabricate.css` that ' +
+        'paints it, silently — the control keeps its shape in the DOM and loses it on screen'
+    );
+  }
 });
 
 test('every icon button is given an accessible name', () => {

@@ -115,7 +115,11 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     const button = trigger(target);
     assert.ok(Boolean(button), 'the trigger announces `aria-haspopup="menu"`');
     assert.equal(button.getAttribute('aria-expanded'), 'false');
-    assert.equal(button.className, 'manager-icon-button', 'the trigger IS the shared IconButton');
+    assert.equal(
+      button.className,
+      'fabricate-icon-button manager-icon-button',
+      'the trigger IS the shared IconButton, root class first (issue 1502)'
+    );
     assert.equal(
       button.getAttribute('aria-label'),
       'More actions',

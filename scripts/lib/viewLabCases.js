@@ -453,14 +453,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // the player window holds none. The two entries are the treatments that frame cannot hold.
   //
   // `manager-gathering-task-editor-normal` is the COMPACT density — `is-compact`, the
-  // `min(220px, 30%)` 32px form at `fabricate.css:15183`, which three of the twenty converted
+  // `min(220px, 30%)` 32px form at `fabricate.css:15193`, which three of the twenty converted
   // sites take and all three live in that editor. Its drop-rules card renders one
   // unconditionally, and the sheet gives that card's controls a second override on top
-  // (`:15196`), so the frame draws the density and its per-card refinement together.
+  // (`:15206`), so the frame draws the density and its per-card refinement together.
   //
   // `manager-knowledge-owned-copies` is the one place the field is NOT the flexible member of
   // a row: `.manager-knowledge-roster .manager-search` overrides the shared `flex: 1 1 260px`
-  // to `flex: 0 0 auto` (`fabricate.css:13986`), authored alongside the Access roster's
+  // to `flex: 0 0 auto` (`fabricate.css:13996`), authored alongside the Access roster's
   // identical rule. `KnowledgeView.svelte:159` renders the roster unconditionally, so this
   // frame always contains it.
   //
@@ -482,7 +482,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // restyle of the shell published two frames that could not contain it.
   //
   // Two, because the shell has two painted treatments and one frame cannot hold both.
-  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:12937` and `:13663`, the
+  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:12937` and `:13673`, the
   // 8px radius on `--fab-overlay-light-04`: it is the one essence frame whose steps select a row,
   // and the inspector it opens is six of these stacked, which is the densest run of the base
   // treatment in the registry.
@@ -7266,17 +7266,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         selector: '[data-manager-header-action="lab-back"]',
         name: 'class',
-        value: 'manager-button is-ghost',
+        value: 'fabricate-button manager-button is-ghost',
       },
       {
         selector: '[data-manager-header-action="lab-delete"]',
         name: 'class',
-        value: 'manager-button is-danger',
+        value: 'fabricate-button manager-button is-danger',
       },
       {
         selector: '[data-manager-header-action="lab-save"]',
         name: 'class',
-        value: 'manager-button is-primary',
+        value: 'fabricate-button manager-button is-primary',
       },
       // The companion's screen is still mounted: the header changed, the mount did not.
       {

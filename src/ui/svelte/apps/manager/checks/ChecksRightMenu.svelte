@@ -578,7 +578,7 @@
           value={previewActorId}
           options={previewActorOptions}
           pickerClass="manager-checks-preview-actor"
-          triggerClass="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
+          triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
           triggerData={{ 'data-checks-preview-actor': '' }}
           triggerIcon={selectedPreviewActor ? '' : 'fas fa-user-slash'}
           triggerImg={selectedPreviewActor?.img || ''}

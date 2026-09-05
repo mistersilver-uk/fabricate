@@ -23,6 +23,11 @@
  * the machine, not a caller's choice, and routing it through the primitive would buy one shared
  * class string in exchange for a keydown/blur contract no other call site wants.
  *
+ * Each exception states the EVIDENCE it earns its exemption by — `'prose'` or `'markup'` — and
+ * the earning clause reads it that way. Issue 1502 is why: it re-rooted the family, so the
+ * carrier now writes `class="fabricate-button manager-button is-danger"`, which the raw
+ * `class="manager-button` prefix no longer matches while the primitive's prose still does.
+ *
  * ── WHY IT READS THE FILES ITSELF ───────────────────────────────────────────────────────
  * Never by shelling to `grep`. GNU grep classifies a file holding a raw NUL byte as BINARY and
  * omits it from a recursive search with no `-a` — silently, with no diagnostic. Three tracked
@@ -39,6 +44,11 @@
  * and passed only because the values happened to agree. So every bare `manager-button` in a
  * fixture is either fixed or ALLOWLISTED WITH ITS REASON, and the allowlist is asserted
  * exactly: an entry that stops matching reds just as loudly as an unlisted one appearing.
+ *
+ * That census lives in `tests/helpers/managerButtonFixtureAllowlist.js` since issue 1502, because
+ * the area-scope gate's fixture clauses need the same list to know which fixture elements must
+ * NOT gain the family root. Two hand-listed copies of one census is the drift this repository
+ * has already paid for once; it is stated there and imported here.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -46,97 +56,53 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { FIXTURE_ALLOWLIST } from './helpers/managerButtonFixtureAllowlist.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(repoRoot, 'src');
 const TESTS = join(repoRoot, 'tests');
 
 const CONTRACT_CLASS = 'manager-button';
 const PRIMITIVE_CLASS = 'fab-manager-button';
+const ROOT_CLASS = 'fabricate-button';
+const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
+const PRIMITIVE_FILE = 'src/ui/svelte/components/ManagerButton.svelte';
 
 /**
  * The two `.svelte` files under `src/` that may still write the literal, each for its own
  * reason. Repo-relative POSIX paths, so a Windows checkout compares the same strings.
+ *
+ * ── `evidence` IS NOT DECORATION (issue 1502) ───────────────────────────────────────────
+ * The exemption-earning clause below asserts that an exempted file STILL WRITES the thing it is
+ * exempted for, so a permission nobody is using is dropped rather than inherited. The two
+ * exemptions earn that in DIFFERENT WAYS, and one probe cannot read both:
+ *
+ * - `'prose'` — the file's only occurrences of the literal are inside its docblock, explaining
+ *   the convention it replaced. `classAttributesIn` returns ZERO class attributes for such a
+ *   file, so a token-aware probe would red with "no longer writes the literal, so drop the
+ *   exception" against a file that has not changed. Prose evidence is the raw substring.
+ * - `'markup'` — the file writes the literal on a real element, so the token form is both
+ *   available and strictly better. It is REQUIRED here rather than merely preferred: issue
+ *   1502 re-rooted the family, and `ArmedDangerButton` now spells its attribute
+ *   `class="fabricate-button manager-button is-danger"`, which a `class="manager-button`
+ *   PREFIX probe no longer matches. A prefix probe is exactly the shape this change defeats.
  */
 const LITERAL_EXCEPTIONS = Object.freeze({
-  'src/ui/svelte/components/ManagerButton.svelte':
-    'the primitive itself, which names the convention it replaced in its docblock prose and ' +
-    'emits its own classes through a `.join(" ")` rather than writing them in markup',
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte':
-    'a consumer of the same CSS contract, not of the primitive: its danger role is an ' +
-    'invariant of its arm/confirm machine rather than a caller choice',
+  [PRIMITIVE_FILE]: Object.freeze({
+    evidence: 'prose',
+    why:
+      'the primitive itself, which names the convention it replaced in its docblock prose and ' +
+      'emits its own classes through a `.join(" ")` rather than writing them in markup — so ' +
+      'its evidence is PROSE, and a token-aware probe would read it as having stopped',
+  }),
+  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte': Object.freeze({
+    evidence: 'markup',
+    why:
+      'a consumer of the same CSS contract, not of the primitive: its danger role is an ' +
+      'invariant of its arm/confirm machine rather than a caller choice — so its evidence is ' +
+      'MARKUP, read in token form because it now writes the family root ahead of the literal',
+  }),
 });
-
-/**
- * Every bare-`manager-button` fixture a test is allowed to keep, and why.
- *
- * Keyed on the file and the exact class attribute rather than on a line number, which rots on
- * the first edit above it, and counted, so that deleting one of two identical probes is not
- * silently absorbed. `why` is required: a fixture with no stated reason to be pre-conversion is
- * a stale fixture that has not been noticed yet.
- */
-const FIXTURE_ALLOWLIST = Object.freeze([
-  Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
-    classes: 'manager-button is-primary',
-    count: 1,
-    why:
-      'HALF OF A DELIBERATE PAIR, and the reason this allowlist exists rather than a blanket ' +
-      'exemption. `data-probe="roll-unconverted"` stands beside `data-probe="roll"`, which ' +
-      'carries the primitive class, so the Checks rail test can show that its rule reaches the ' +
-      'converted control and that the unconverted spelling measures something else. Convert ' +
-      'this one and the test proves nothing while still passing.',
-  }),
-  Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
-    classes: 'manager-button is-danger',
-    count: 2,
-    why:
-      'Two controls, one reason each. `data-probe="card-unconverted"` is the negative control ' +
-      'in the authority-equivalence test — the class string the Modifiers card shipped before ' +
-      'the conversion, kept so that "the primitive changes nothing" would fail rather than ' +
-      'pass. The other is the Delete in the knowledge-row geometry fixture, which is an ' +
-      '`ArmedDangerButton` and writes this string in the product too.',
-  }),
-  // (`manager-layout.test.js: manager-button is-subtle manager-recipe-tag-trigger` was booked
-  // here as population B. Issue 1373's maintainer round 5 made `+ Tag` a CHIP trigger — the
-  // design draws a dashed tag-tinted pill, not a button (`proto:2256`) — so it writes no
-  // `manager-button` class at all and the fixture that modelled it went with it. Recorded
-  // rather than quietly deleted, because this list exists to catch exactly the reverse: a
-  // fixture outliving the control it models.)
-  Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
-    classes: 'manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger',
-    count: 1,
-    why: 'Population B, as above: the Checks preview actor picker trigger.',
-  }),
-  Object.freeze({
-    file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'manager-button manager-recipe-component-trigger',
-    count: 1,
-    why: 'Population B: the recipe ingredient picker trigger.',
-  }),
-  Object.freeze({
-    file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'manager-button manager-recipe-component-trigger manager-recipe-stage-trigger',
-    count: 1,
-    why: 'Population B: the recipe stage picker trigger.',
-  }),
-  Object.freeze({
-    file: 'tests/components/component-studio-font-size.test.js',
-    classes: 'manager-button manager-salvage-component-trigger',
-    count: 1,
-    why: 'Population B: the salvage result component picker trigger.',
-  }),
-  Object.freeze({
-    file: 'tests/components/theme-rendered-validation.test.js',
-    classes: 'manager-button is-danger is-armed',
-    count: 1,
-    why:
-      'The armed half of `ArmedDangerButton`, which is held out of the conversion and writes ' +
-      'this exact string. It carries its own solid-contrast probe because it is the product`s ' +
-      'first solid danger surface.',
-  }),
-]);
 
 /** Every file beneath `directory`, as repo-relative POSIX paths. */
 function filesUnder(directory) {
@@ -213,10 +179,18 @@ test('no .svelte under src writes the manager-button class literal', () => {
       `files rendering <ManagerButton across ${svelte.length} components under src/`
   );
 
+  // TOKEN-AWARE, not a prefix probe (issue 1502). It reads the file's own `classAttributesIn`
+  // extractor and splits on whitespace, which strictly TIGHTENS the clause: the prefix form
+  // `includes('class="manager-button')` cannot see a site that spells the attribute
+  // `class="fabricate-button manager-button …"`, and re-rooting the family is precisely the
+  // change that makes that spelling the normal one for a hand-written carrier. The token form
+  // also stops matching the middle of a longer class name, which the prefix form never could.
   const offenders = svelte
     .filter((path) => !(path in LITERAL_EXCEPTIONS))
     .filter((path) =>
-      readFileSync(join(repoRoot, path), 'utf8').includes(`class="${CONTRACT_CLASS}`)
+      classAttributesIn(readFileSync(join(repoRoot, path), 'utf8')).some((attribute) =>
+        attribute.split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
+      )
     );
 
   assert.deepEqual(
@@ -231,12 +205,86 @@ test('no .svelte under src writes the manager-button class literal', () => {
   // The exceptions are asserted to still EARN their exemption. An exception for a file that no
   // longer contains the literal is a permission nobody is using, and the next file added to
   // this object gets to lean on the precedent of an unchecked list.
-  for (const [path, why] of Object.entries(LITERAL_EXCEPTIONS)) {
+  //
+  // Each is read by the evidence it actually offers — see `LITERAL_EXCEPTIONS` above. Reading
+  // both the same way is what would break: the token form reports the primitive as having
+  // stopped (its literal is prose, and prose holds no class attribute), and the prose form
+  // reports the carrier as having stopped the moment it writes the family root first.
+  for (const [path, exception] of Object.entries(LITERAL_EXCEPTIONS)) {
+    const source = readFileSync(join(repoRoot, path), 'utf8');
+    const earns =
+      exception.evidence === 'prose'
+        ? source.includes(`class="${CONTRACT_CLASS}`)
+        : classAttributesIn(source).some((attribute) =>
+            attribute.split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
+          );
     assert.ok(
-      readFileSync(join(repoRoot, path), 'utf8').includes(`class="${CONTRACT_CLASS}`),
-      `${path} is exempted (${why}) but no longer writes the literal, so drop the exception`
+      earns,
+      `${path} is exempted (${exception.why}) but no longer writes the literal as ` +
+        `${exception.evidence}, so drop the exception or restate its evidence`
     );
   }
+});
+
+test('the primitive emits the family root and the keyboard-focus attribute', () => {
+  // NOTHING ELSE PINS EITHER EMISSION (issue 1502). `IconButton` has
+  // `tests/helpers/primitiveSourceContract.js` for exactly this, but `ManagerButton` does not use
+  // that helper, so its two new emissions would otherwise be deletable with every suite green:
+  // the class family would silently lose its root and fall back to matching nothing, and
+  // `KeyboardManager#hasFocus` would silently answer `false` again.
+  const source = readFileSync(join(repoRoot, PRIMITIVE_FILE), 'utf8');
+
+  const composed = /const classes = \$derived\(\s*\[([\s\S]*?)\]/.exec(source);
+  assert.ok(
+    composed,
+    `${PRIMITIVE_FILE} no longer composes its classes in a \`const classes = $derived([…])\` ` +
+      'array literal. Retarget this reader rather than deleting the assertion — ' +
+      '`manager-layout.test.js` scrapes the same literal to build its browser probes, so an ' +
+      'unreadable array leaves that harness measuring an unstyled control by the primitive`s name.'
+  );
+
+  const literals = [...composed[1].matchAll(/'([a-z][\w-]*)'/g)].map((match) => match[1]);
+  assert.ok(
+    literals.includes(ROOT_CLASS),
+    `${PRIMITIVE_FILE} must emit \`${ROOT_CLASS}\` as an unconditional literal of \`classes\`: ` +
+      'the whole family is rooted at it in `styles/fabricate.css`, so without it every rule ' +
+      `misses and the button renders as a bare Foundry control. Found: ${literals.join(', ')}`
+  );
+  assert.equal(
+    literals[0],
+    ROOT_CLASS,
+    `\`${ROOT_CLASS}\` is the family ROOT and leads the array, ahead of \`${CONTRACT_CLASS}\` ` +
+      `and \`${PRIMITIVE_CLASS}\`, so the rendered attribute reads root-first like every ` +
+      'hand-written carrier of the same contract.'
+  );
+  for (const expected of [CONTRACT_CLASS, PRIMITIVE_CLASS]) {
+    assert.ok(
+      literals.includes(expected),
+      `${PRIMITIVE_FILE} stopped emitting \`${expected}\`, which every rule in the family ` +
+        'still names beside the root.'
+    );
+  }
+
+  assert.ok(
+    source.includes(KEYBOARD_FOCUS_ATTRIBUTE),
+    `${PRIMITIVE_FILE} must emit \`${KEYBOARD_FOCUS_ATTRIBUTE}\` on its root element. ` +
+      'Foundry`s `KeyboardManager#hasFocus` reads `dataset.keyboardFocus` on the FOCUSED ' +
+      'element only, with no inheritance, so dropping it silently restores Foundry`s ' +
+      'Space/arrow/Tab bindings while this control holds focus.'
+  );
+
+  // PLACEMENT, not merely presence. A rest spread that lands later wins, so the attribute has to
+  // sit on the same side of `{...rest}` as `class={classes}` — see the docblock sentence this
+  // asserts. Written after the spread, a caller`s `data-*` bag unsets it by accident.
+  const markup = source.slice(source.indexOf('</script>'));
+  const attributeAt = markup.indexOf(KEYBOARD_FOCUS_ATTRIBUTE);
+  const spreadAt = markup.indexOf('{...rest}');
+  assert.ok(
+    attributeAt !== -1 && spreadAt !== -1 && attributeAt < spreadAt,
+    `${PRIMITIVE_FILE} must write \`${KEYBOARD_FOCUS_ATTRIBUTE}\` BEFORE \`{...rest}\`, on the ` +
+      'same side of the spread as `class={classes}`, so a caller`s pass-through attribute bag ' +
+      'can override it deliberately and never by accident.'
+  );
 });
 
 test('no tracked file under src contains a raw NUL byte', () => {

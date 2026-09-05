@@ -90,8 +90,14 @@ function markupOf(source) {
  * @property {ReadonlyArray<{ file: string, count: number, why: string }>} exemptions Files that
  *   may still write the class, each with its reason and the exact number of times it writes it.
  * @property {number} callSiteFloor The non-vacuity floor, in call-site FILES.
- * @property {{ source: string, otherwise: string }} primitiveEmits A positive control: the
- *   substring the primitive must still contain, and what to say when it does not.
+ * @property {{ source: string | readonly string[], otherwise: string }} primitiveEmits A positive
+ *   control: the substring — or, since issue 1502, the LIST of substrings — the primitive must
+ *   still contain, and what to say when one of them is gone. A list rather than a single string
+ *   because a primitive can own more than one emission: `<IconButton>` owns both its root class
+ *   and the `data-keyboard-focus="true"` attribute that suppresses Foundry's key bindings while
+ *   it holds focus, and a control that pinned only the first would let the second be deleted
+ *   silently. Each entry is asserted SEPARATELY, so the failure names the token that went
+ *   missing rather than reporting that "the emissions" moved.
  * @property {ReadonlyArray<RestatementProbe>} restatements What a call site may not restate.
  * @property {string} classOnlyRemedy Prose for the class-only clause's failure.
  * @property {string} restatementRemedy Prose for the restatement clause's failure.
@@ -194,8 +200,16 @@ export function definePrimitiveSourceContract(spec) {
     // Positive control: the clause is only meaningful while the primitive still emits what the
     // call sites are being told not to. If that stops being true, every call site below can stay
     // clean while rendering nothing of the contract, and this clause would keep passing.
+    //
+    // Asserted one token at a time rather than over the joined list, so a caller pinning several
+    // emissions gets told WHICH one is gone. `[…].flat()` accepts the single-string form the two
+    // pre-1502 callers were written with, so widening this was backward-compatible.
     const primitiveSource = components[primitive] ?? '';
-    assert.ok(primitiveSource.includes(primitiveEmits.source), primitiveEmits.otherwise);
+    const emissions = [primitiveEmits.source].flat();
+    assert.ok(emissions.length > 0, `${primitive} pins no emission, so this control is vacuous`);
+    for (const emission of emissions) {
+      assert.ok(primitiveSource.includes(emission), `${primitiveEmits.otherwise}: \`${emission}\``);
+    }
 
     // Restating any of them would still WORK — the `class` prop appends rather than replaces, and
     // the rest spread lands last and therefore wins — which is exactly why each needs a gate

@@ -1799,17 +1799,17 @@
    These are declared BEFORE the tool studio's own block on purpose. At equal
    specificity the later rule wins, so the Tool Studio keeps being styled by its own
    selectors and converting it is provably a no-op, while every other converted site
-   picks these up. Against the base `.fabricate-manager .manager-button` (0,2,0) this
+   picks these up. Against the base `.fabricate-button.manager-button` (0,2,0) this
    (0,3,0) wins outright, which is what lifts the Modifiers card.
    `manager-layout.test.js` measures the result in a real browser rather than trusting
    that arithmetic. */
-.fabricate-manager .manager-button.fab-manager-button {
+.fabricate-button.manager-button.fab-manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-size: 0.72rem;
 }
 
-.fabricate-manager .manager-button.fab-manager-button.is-primary {
+.fabricate-button.manager-button.fab-manager-button.is-primary {
   padding: 0 var(--fab-space-4);
   font-weight: 700;
 }
@@ -1839,13 +1839,13 @@
    is a `<ManagerButton>`, so nothing unconverted lost paint with it. `manager-layout.test.js`
    now probes this invariant in every container the sheet styles, not just one, because a
    probe scoped to one container is what let this survive a whole review round. */
-.fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.is-ghost:not(:disabled) {
   border-color: var(--fab-border);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled):hover {
+.fabricate-button.manager-button.fab-manager-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
@@ -1862,7 +1862,7 @@
    of the ten literal dashed sites sit in wrapping flex rows where a pinned full width
    stacks a four-up row into four rows. The primitive takes a `fullWidth` prop instead and
    emits `is-full-width`, declared below. */
-.fabricate-manager .manager-button.fab-manager-button.is-dashed {
+.fabricate-button.manager-button.fab-manager-button.is-dashed {
   display: flex;
 
   /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a
@@ -1882,13 +1882,13 @@
 }
 
 /* Paint only, and qualified: see the invariant at `.manager-button:disabled` below. */
-.fabricate-manager .manager-button.fab-manager-button.is-dashed:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.is-dashed:not(:disabled) {
   border-color: var(--fab-border-strong);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-manager .manager-button.fab-manager-button.is-dashed:not(:disabled):hover {
+.fabricate-button.manager-button.fab-manager-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
@@ -1899,7 +1899,7 @@
    in a wrapping row of chips must not. It is a CAPABILITY of the primitive rather than a
    fourth hand-written class string — `.manager-recipe-add-full` was the recipe-namespaced
    spelling of exactly this statement, and it is retired with this edit. */
-.fabricate-manager .manager-button.fab-manager-button.is-full-width {
+.fabricate-button.manager-button.fab-manager-button.is-full-width {
   width: 100%;
 }
 
@@ -2428,7 +2428,7 @@
 
    The reset is the same one the trigger disclosure states: Foundry's core `button` rule
    imposes a fixed height, a border and a font, and no mounted test can see it. */
-.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link {
+.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -2469,17 +2469,15 @@
    and `background` are therefore not overridden here so much as invisible by construction —
    there is no border to colour and no box to fill — which is why this control is not a second
    exception beside `.manager-button.is-danger.is-armed`. */
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
   color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link > i {
+.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link > i {
   font-size: 9px;
 }
 
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
   color: var(--fab-text);
   background: none;
   text-decoration: underline;
@@ -2830,7 +2828,7 @@
    the list's `gap` for its spacing; moving it out of a flex container took that spacing with
    it, so the gap is restated here as a margin. The VALUE is the list's, copied rather than
    re-chosen: the populated card must be pixel-identical after the move. */
-.fabricate-manager .manager-button.manager-checks-outcome-add {
+.fabricate-button.manager-button.manager-checks-outcome-add {
   margin-top: 6px;
 }
 
@@ -3439,7 +3437,7 @@
    .manager-button` declares `font-weight: 700` at the same (0,2,0) as a bare class rule
    here would, thousands of lines LATER, so a two-class selector would lose the tie on
    source order and the trigger would go on reading bold beside a 500-weight select. */
-.fabricate-manager .manager-button.manager-checks-preview-actor-trigger {
+.fabricate-button.manager-button.manager-checks-preview-actor-trigger {
   width: 100%;
   font-size: 11.5px;
   font-weight: 500;
@@ -3454,7 +3452,7 @@
 
    (0,4,0), to beat `.manager-button.fab-manager-button`'s own (0,3,0) control height
    without depending on source order. */
-.fabricate-manager .manager-button.fab-manager-button.manager-checks-simulator-roll {
+.fabricate-button.manager-button.fab-manager-button.manager-checks-simulator-roll {
   justify-content: center;
   width: 100%;
   height: auto;
@@ -5578,14 +5576,14 @@
 
    NOTE what the chain changes, because it is more than it looks. At (0,2,0) this rule was
    already losing `min-height`, `padding` and `font-weight` to the base
-   `.fabricate-manager .manager-button` (0,2,0, declared later in this file), so the compact
+   `.fabricate-button.manager-button` (0,2,0, declared later in this file), so the compact
    30px/600/space-2 control it describes has never been what shipped: the six buttons render
    the standard 34px/700/space-3 one. Only `margin-left`, `font-size` and the two colours
    were reaching them. Chaining does not merely defend this rule against the primitive — it
    makes it TAKE EFFECT for the first time, which is a real six-site repaint and is budgeted
    as one. The alternative was to delete the three declarations that never applied, which
    would have preserved the pixels by preferring the accident to the intent. */
-.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters {
+.fabricate-button.manager-button.fab-manager-button.manager-clear-filters {
   margin-left: auto;
   padding: 0 var(--fab-space-2);
   min-height: 30px;
@@ -5593,12 +5591,12 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-clear-filters:not(:disabled) {
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-manager .manager-pagination {
+.fabricate-pagination.manager-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5611,17 +5609,44 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-pagination-summary {
+/* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's
+   `a.button:focus, button:focus` paints an orange outline and a 4px glow that only the two area
+   resets remove, and this family now renders in hosts that have neither. BUTTONS ONLY here for
+   the same reason the ring below is, and above the ring because the two tie at (0,2,1). */
+.fabricate-pagination button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE PAGER'S OWN KEYBOARD RING (issue 1502). Now that this family is rooted at the class
+   `Pagination.svelte` emits rather than at an application root, it renders in areas whose
+   own bare-element ring it can no longer assume — `design-system/spec.md` puts that chrome
+   on the primitive. The declarations are the two area rings' verbatim (`:1043-1044`,
+   `:1605-1606`), so nothing moves where an area ring already reached.
+
+   BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too, TIES
+   `.fabricate-app select:focus-visible` and wins on source order — which would delete that
+   rule's `outline: none` + inset `box-shadow` and reinstate the clipped-outline defect on
+   the per-page select that it exists to prevent. The `<select>` keeps the area ring in both
+   apps (issues 1504 and 1510). The arrows are `<IconButton>`s and take that primitive's
+   ring as well; this rule is not redundant, because it also covers a non-IconButton button
+   in the pager. */
+.fabricate-pagination button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-pagination .manager-pagination-summary {
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-pagination-nav {
+.fabricate-pagination .manager-pagination-nav {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-pagination-page {
+.fabricate-pagination .manager-pagination-page {
   min-width: 96px;
   text-align: center;
   color: var(--fab-text);
@@ -5631,14 +5656,14 @@
 /* `Per page` IS TWO WORDS AND ONE LABEL (issue 1373). In a wrapping pager row it broke
    across two lines beside a 28px select, which set the bar's own height off its siblings'
    and read as a stray word. The label is short and fixed in every locale this ships. */
-.fabricate-manager .manager-pagination-size {
+.fabricate-pagination .manager-pagination-size {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-pagination-size select {
+.fabricate-pagination .manager-pagination-size select {
   height: 28px;
   min-width: 64px;
   border: 1px solid var(--fab-border);
@@ -6099,7 +6124,7 @@
   cluster to ~420px, truncating every description to about 28 characters. The border and
   fill arrive on hover, where they are needed.
 */
-.fabricate-manager .manager-icon-button.is-ghost {
+.fabricate-icon-button.manager-icon-button.is-ghost {
   width: 28px;
   height: 28px;
   min-height: 28px;
@@ -6110,18 +6135,18 @@
   font-size: 0.68rem;
 }
 
-.fabricate-manager .manager-icon-button.is-ghost:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-ghost:focus-visible {
+.fabricate-icon-button.manager-icon-button.is-ghost:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button.is-ghost:focus-visible {
   color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
-.fabricate-manager .manager-icon-button.is-ghost.is-danger {
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger {
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-ghost.is-danger:focus-visible {
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:focus-visible {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
@@ -6653,15 +6678,24 @@
    and `font-weight` (700 against their 600) did not. The dead class went with the conversion,
    so the hook is the honest handle: an attribute selector counts as one class-level component,
    which puts this third selector at the same (0,4,0) as the other two. */
-.fabricate-manager .manager-button.fab-manager-button.manager-recipe-sort-direction,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-sort-direction,
-.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction] {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-sort-direction,
+.fabricate-button.manager-button.fab-manager-button.manager-component-sort-direction,
+.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction] {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
-  font-size: var(--fab-recipe-control-font);
+
+  /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-recipe-control-font)` deliberately
+     not. That property is declared once, on `.fabricate-manager` (styles/fabricate.css:1252),
+     which makes it AREA-SCOPED — but this rule carries no `.fabricate-manager` compound (the
+     re-root sweep, issue 1502, put its root class first instead), so a shared-primitive-rooted
+     rule may not read an area-scoped custom property. The shipped precedent for the same
+     trade is `src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte:497-505`, which
+     writes the literal for the identical reason. Rendering is unchanged: the property is
+     declared as this same value everywhere it resolves. */
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
@@ -6766,7 +6800,7 @@
 }
 
 /* These chain `.manager-button` into the selector (raising specificity to 0,3,0) so they
-   beat the base `.fabricate-manager .manager-button` rule declared LATER in this file
+   beat the base `.fabricate-button.manager-button` rule declared LATER in this file
    (0,2,0) — which otherwise wins on source order and repaints every one of them the dark
    overlay surface, collapsing Edit's accent fill and Delete's danger text into the same
    flat button (issue 643).
@@ -6786,9 +6820,9 @@
    `.manager-button:disabled` gives: chaining this treatment above the primitive also lifted
    it above that rule, so a switched-off control would have kept its switched-on colours.
    The geometry is state-independent and stays unqualified; the ink is not. */
-.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-copy,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-unlink {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-copy,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-unlink {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -6796,20 +6830,17 @@
   font-weight: 700;
 }
 
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
   border-color: var(--fab-border);
   background: var(--fab-bg-2);
 }
 
 /* Accent primary: the loudest control on the panel. Both rows stay role-LESS (issue 1118):
    the accent fill is this panel's own treatment, not the `primary` role's Save green. */
-.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-edit {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -6817,23 +6848,17 @@
   font-weight: 700;
 }
 
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
 }
 
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
@@ -6847,8 +6872,8 @@
    this conversion exists to end. What stays is the panel's own SURFACE, which is not a
    duplicate: `is-danger` declares no background at all, so dropping this one would take the
    button off the inspector's solid surface and onto the base 6% overlay. */
-.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-delete {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -6856,10 +6881,8 @@
   font-weight: 700;
 }
 
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
   background: var(--fab-bg-2);
 }
 
@@ -6867,10 +6890,8 @@
    `.manager-button.is-danger:not(:disabled):hover`, which states the same three values at
    (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the
    one state the pair still has to declare for itself. */
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
-.fabricate-manager
-  .manager-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
+.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -7124,7 +7145,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-icon-button.manager-recipe-step-nav {
+.fabricate-icon-button.manager-icon-button.manager-recipe-step-nav {
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
@@ -10599,10 +10620,10 @@
 
    Chained onto the primitive's own classes for the reason every re-chained bespoke rule in
    this sweep is: at (0,2,0) it would be arbitrated against
-   `.fabricate-manager .manager-button.fab-manager-button` by injection order rather than by
+   `.fabricate-button.manager-button.fab-manager-button` by injection order rather than by
    specificity. `align-self` is a property the primitive does not declare, so nothing is being
    won BACK here — the chain is what keeps that true if either side grows. */
-.fabricate-manager .manager-button.fab-manager-button.manager-recipe-tab-action {
+.fabricate-button.manager-button.fab-manager-button.manager-recipe-tab-action {
   align-self: flex-start;
 }
 
@@ -10735,13 +10756,13 @@
 
 /* Quiet ghost button (used by the header Back and the Validation "View" links).
    Qualified in issue 1118 — see the invariant at `.manager-button:disabled` below. */
-.fabricate-manager .manager-button.is-ghost:not(:disabled) {
+.fabricate-button.manager-button.is-ghost:not(:disabled) {
   border-color: transparent;
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-manager .manager-button.is-ghost:not(:disabled):hover {
+.fabricate-button.manager-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
@@ -10765,7 +10786,7 @@
    is a statement about the container, and it lives on `is-full-width` now. This is why the
    values are COPIED rather than shared through the primitive's selector — the primitive's
    is chained on a class these four controls cannot have. */
-.fabricate-manager .manager-button.is-dashed {
+.fabricate-button.manager-button.is-dashed {
   display: flex;
   height: 34px;
   min-height: 34px;
@@ -10777,13 +10798,13 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-button.is-dashed:not(:disabled) {
+.fabricate-button.manager-button.is-dashed:not(:disabled) {
   border-color: var(--fab-border-strong);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-manager .manager-button.is-dashed:not(:disabled):hover {
+.fabricate-button.manager-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
@@ -11232,9 +11253,9 @@
    instead — the bleed signature the font gates exist to catch, and a 0.88px drift
    between rows that are meant to be the same surface. Stating it here makes them equal
    by rule rather than by luck of the ancestry. */
-.fabricate-manager .manager-button.manager-salvage-component-trigger,
-.fabricate-manager .manager-button.manager-recipe-component-trigger,
-.fabricate-manager .manager-button.manager-tool-replacement-component-trigger {
+.fabricate-button.manager-button.manager-salvage-component-trigger,
+.fabricate-button.manager-button.manager-recipe-component-trigger,
+.fabricate-button.manager-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
   width: max-content;
   min-width: 0;
@@ -12538,7 +12559,7 @@
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-button.is-subtle {
+.fabricate-button.manager-button.is-subtle {
   background: var(--fab-overlay-light-04);
 }
 
@@ -12982,7 +13003,7 @@
   a `<button>` and this one is a link" — a fact now true of all twelve manager-button
   anchors, so it is stated once, for `a.manager-button`, beside the base control.
 */
-.fabricate-manager .manager-button.fab-manager-button.manager-downtime-unlock {
+.fabricate-button.manager-button.fab-manager-button.manager-downtime-unlock {
   min-height: 34px;
   padding: 0 14px;
   border-radius: 8px;
@@ -12994,7 +13015,7 @@
    is an anchor and cannot be disabled, so the qualifier changes nothing it renders — it is
    here so that "a re-chained treatment states its paint under `:not(:disabled)`" is true of
    every rule in this sheet rather than of most of them. */
-.fabricate-manager .manager-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+.fabricate-button.manager-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
@@ -13489,8 +13510,35 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-button,
-.fabricate-manager .manager-icon-button {
+/* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, and it is a FLOOR rather than an override (issue
+   1502). Rooted at the family root ALONE, at (0,1,0): enough to beat the UA button font in a
+   host that declares nothing, and deliberately NOT enough to beat a caller's own per-site rule
+   at (0,2,0). Written at the family's own (0,2,0) it would TIE every such rule and win on
+   source order against each one declared earlier in this sheet, which silently deleted
+   `.manager-recipe-lock`'s and `.manager-recipe-edit`'s 0.68rem. `line-height` is not left to
+   the shorthand: the base rule below declares `line-height: 1` at (0,2,0) and still wins.
+
+   The same floor keeps the `font` shorthand off `font-weight`: `.fabricate-button.manager-button`
+   below supplies the manager button's 700 at (0,2,0), and a (0,1,0) baseline cannot reset it.
+
+   Why the family needs a baseline at all: the manager's own bare-element one
+   (`button, input, select, textarea { font: inherit }`, scoped to the manager area near the top
+   of this file) has no `.fabricate-app` counterpart, so a re-rooted button outside the manager
+   would otherwise render Foundry's default button font
+   (`openspec/specs/design-system/spec.md`, "the rule governs SELECTOR ROOTING"). Inside the
+   manager it restates that baseline and is a no-op. */
+.fabricate-button,
+.fabricate-icon-button {
+  font: inherit;
+}
+
+/* THE FAMILY'S SHARED BASE BLOCK: the lowest-specificity (0,2,0) rule of BOTH button families,
+   and the control contract every carrier gets for free. It declares `line-height: 1` in its own
+   right rather than leaving it to the `font` shorthand above, and it is the more specific of the
+   two, so the shorthand's line-height never reaches a control in this family. `box-sizing` needs
+   nothing either: this block already declares it. */
+.fabricate-button.manager-button,
+.fabricate-icon-button.manager-icon-button {
   appearance: none;
   -webkit-appearance: none;
   box-sizing: border-box;
@@ -13528,12 +13576,23 @@
    actually true — a role's resting paint is its ENABLED paint — and makes the two states
    mutually exclusive, so nothing here is decided by order at all.
 
+   WHAT A HAND-WRITTEN CARRIER MUST NOW WRITE (issue 1502). The family is rooted at the class the
+   PRIMITIVE emits — `fabricate-button` from `ManagerButton.svelte`, `fabricate-icon-button` from
+   `IconButton.svelte` — rather than at `.fabricate-manager`, so "serves every hand-written
+   `.manager-button`" holds only for a carrier that writes the ROOT TOKEN too. A control that
+   spells `class="manager-button …"` without it matches nothing in this family and renders as a
+   bare Foundry `<button>`. Every carrier held out of the conversion therefore writes the root
+   first — `class="fabricate-button manager-button is-danger"` in `ArmedDangerButton.svelte`, and
+   `class="fabricate-icon-button manager-icon-button …"` at the six raw icon buttons in
+   `CraftingSystemManagerRoot.svelte`. This is one token per site, not a conversion: both
+   deferrals stand and both are still count-pinned by their source-contract guards.
+
    `.manager-button.is-danger.is-armed` is the one deliberate exception, and it is not a
    role: it is the armed half of the two-step row confirmation, which disables itself while
    the destructive write it just confirmed is in flight. It keeps its solid danger surface
    through that write. */
-.fabricate-manager .manager-button:disabled,
-.fabricate-manager .manager-icon-button:disabled {
+.fabricate-button.manager-button:disabled,
+.fabricate-icon-button.manager-icon-button:disabled {
   border-color: var(--fab-overlay-light-12);
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
@@ -13541,10 +13600,35 @@
   opacity: 0.62;
 }
 
-.fabricate-manager .manager-button {
+.fabricate-button.manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-weight: 700;
+}
+
+/* THE STRIP HALF OF THE FAMILY'S FOCUS CHROME, and it is not optional (issue 1502). Foundry core
+   paints EVERY focused button with `outline: 1px solid var(--button-focus-outline-color)` — a
+   burnt orange — plus a 4px glow of the same colour, in `a.button:focus, button:focus`. The two
+   AREA resets above (`.fabricate-app …:focus` and `.fabricate-manager …:focus`) strip that only
+   inside their own app root, so a control rooted at the class this primitive emits keeps core's
+   orange under the accent ring the moment it renders in a host carrying neither area class. A
+   primitive that declares its own ring therefore declares the PAIR, which is the same rule
+   CONTRIBUTING.md states for an area. Written ABOVE the repaint because the two halves tie at
+   (0,2,0) and a keyboard-focused control matches both, so source order is what decides. */
+.fabricate-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE FAMILY'S OWN FOCUS RING (issue 1502). The two AREA rings — `.fabricate-app …:focus-visible`
+   and `.fabricate-manager …:focus-visible` above — are bare-element selectors an area declares
+   for itself, and a primitive that leans on one renders no ring at all in an application that has
+   none, exactly as it would render Foundry's default font without the `font: inherit` above. The
+   declarations are COPIED from those two rules rather than re-chosen, so nothing moves where an
+   area ring already reached. */
+.fabricate-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 /* Twelve manager buttons are anchors, not buttons (issue 1118): docs links, the premium
@@ -13554,24 +13638,29 @@
 
    It lives in the GLOBAL sheet rather than in `ManagerButton.svelte` because that component
    deliberately has no scoped `<style>` at all: a second source of truth for one control is
-   the exact failure the primitive exists to end, and the parity harness reads this file. */
-.fabricate-manager a.manager-button {
+   the exact failure the primitive exists to end, and the parity harness reads this file.
+
+   The type selector rides inside `:is(a)` rather than leading the compound, so the
+   namespacing gate reads the family root (`.fabricate-button`) first — an identical
+   match set and specificity (0,2,1) either way, just written so the root class comes
+   first in the selector text. */
+.fabricate-button.manager-button:is(a) {
   text-decoration: none;
 }
 
-.fabricate-manager .manager-button.is-primary:not(:disabled) {
+.fabricate-button.manager-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success);
 }
 
-.fabricate-manager .manager-icon-button.is-primary:not(:disabled) {
+.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-button.is-danger:not(:disabled),
-.fabricate-manager .manager-icon-button.is-danger:not(:disabled) {
+.fabricate-button.manager-button.is-danger:not(:disabled),
+.fabricate-icon-button.manager-icon-button.is-danger:not(:disabled) {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
 }
@@ -13583,13 +13672,13 @@
    everywhere. The armed state is also carried by an icon swap in
    `ArmedDangerButton.svelte`, so it survives greyscale and never rests on the fill
    alone. */
-.fabricate-manager .manager-button.is-danger.is-armed {
+.fabricate-button.manager-button.is-danger.is-armed {
   border-color: var(--fab-danger);
   color: var(--fab-on-danger);
   background: var(--fab-danger);
 }
 
-.fabricate-manager .manager-button.is-danger.is-armed:not(:disabled):hover {
+.fabricate-button.manager-button.is-danger.is-armed:not(:disabled):hover {
   border-color: var(--fab-danger);
   color: var(--fab-on-danger);
   background: var(--fab-danger);
@@ -13626,58 +13715,88 @@
 
    The three declarations are paint only. That is what makes the role order-independent
    against `.manager-button.fab-manager-button`, which states geometry and no colour. */
-.fabricate-manager .manager-button.is-warning-action:not(:disabled) {
+.fabricate-button.manager-button.is-warning-action:not(:disabled) {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-button:not(:disabled):hover,
-.fabricate-manager .manager-icon-button:not(:disabled):hover {
+.fabricate-button.manager-button:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button:not(:disabled):hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-overlay-light-10);
 }
 
-.fabricate-manager .manager-button.is-primary:not(:disabled):hover {
+.fabricate-button.manager-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
 }
 
-.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover {
+.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-button.is-danger:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-danger:not(:disabled):hover {
+.fabricate-button.manager-button.is-danger:not(:disabled):hover,
+.fabricate-icon-button.manager-icon-button.is-danger:not(:disabled):hover {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-button.is-warning-action:not(:disabled):hover {
+.fabricate-button.manager-button.is-warning-action:not(:disabled):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-icon-button {
+.fabricate-icon-button.manager-icon-button {
   width: 34px;
   height: 34px;
   padding: 0;
   flex: 0 0 34px;
 }
 
-.fabricate-manager .manager-pagination .manager-icon-button {
+/* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
+   `button:focus` outline and 4px glow survive in any host carrying neither area class, so the
+   repaint below would sit on top of them rather than replace them. Above the repaint because the
+   two tie at (0,2,0). */
+.fabricate-icon-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The primitive's OWN focus ring (issue 1502). The two area rings — `.fabricate-app
+   button:focus-visible` and `.fabricate-manager button:focus-visible` — are (0,2,1) and stop
+   at their app root, so a control re-rooted at `fabricate-icon-button` would keep its paint
+   and lose its ring the moment it renders outside either area. The declarations are copied
+   verbatim from those two rules, so wherever an area ring also applies it BEATS this (0,2,0)
+   one and nothing moves; this rule paints only in a host that carries neither area class,
+   which is the case it was added for. The ghost/danger `:focus-visible` pairs above are (0,4,0)
+   colour-and-background only, so nothing here contends with them. */
+.fabricate-icon-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502).
+   Its ancestor is the primitive's OWN class, not a caller's container, so `design-system/spec.md`
+   does not exempt it as a caller override: `Pagination` is the thing that says its arrows are
+   28px rather than the 34px the icon button ships at, so the rule is re-rooted at
+   `.fabricate-pagination` with the family class it already carried. (0,3,0) before and after,
+   so it still beats the 34px rule above for `width`/`height`/`flex` and still leaves that
+   rule's `padding: 0` in force. It is exempt to BOTH area-scope entries in both states,
+   because neither primitive writes the other's class. */
+.fabricate-pagination.manager-pagination .manager-icon-button {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
 }
 
-.fabricate-manager .manager-icon-button i,
-.fabricate-manager .manager-button i {
+.fabricate-icon-button.manager-icon-button i,
+.fabricate-button.manager-button i {
   position: static;
   margin: 0;
 }
@@ -21350,7 +21469,7 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-button.manager-travel-parties-override-trigger {
+.fabricate-button.manager-button.manager-travel-parties-override-trigger {
   justify-content: space-between;
   gap: var(--fab-space-2);
   width: 100%;

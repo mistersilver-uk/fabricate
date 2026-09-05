@@ -1243,7 +1243,7 @@
           value={result.componentId}
           disabled={saving}
           pickerClass="manager-salvage-component-picker"
-          triggerClass="manager-button manager-salvage-component-trigger"
+          triggerClass="fabricate-button manager-button manager-salvage-component-trigger"
           triggerImg={selected?.img || ''}
           triggerIcon={selected?.img ? '' : 'fas fa-cube'}
           triggerLabel={selected?.name ||
