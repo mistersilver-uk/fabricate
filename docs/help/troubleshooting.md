@@ -530,6 +530,25 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ---
 
+## Fabricate Asks You to Reload Your Browser
+
+**Symptom:** A notification appears saying Fabricate is installed at a different version than the one your browser is running, or clicking **Manage Crafting Systems** shows a notification blaming an earlier version of the module and the window does not open.
+
+**Cause:**
+
+Your browser can keep an out-of-date copy of Fabricate cached from before the module was last updated on the server.
+When that happens your browser is still running yesterday's Fabricate, and the window you tried to open only exists in today's version.
+
+**Fix:**
+
+1. Reload your browser.
+2. If the notification comes back, reload again, this time bypassing the cache: **Ctrl+Shift+R** on Windows and Linux, or **Cmd+Shift+R** on macOS.
+3. Try **Manage Crafting Systems** again.
+
+**See also:** [Quickstart]({% link help/quickstart.md %}) covers the **Manage Crafting Systems** button.
+
+---
+
 ## Completed Simple Craft Still Shows as In-Progress
 
 **Symptom:** After a single-step (simple) craft completes successfully or fails, the Crafting App still shows the recipe as in-progress.
