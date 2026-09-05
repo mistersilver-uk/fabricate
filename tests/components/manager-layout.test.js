@@ -13418,3 +13418,55 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
     await context.close();
   }
 });
+
+test('the pager names its per-page control with the words a GM can see', () => {
+  // ── WCAG 2.5.3, LABEL IN NAME (issue 1504) ───────────────────────────────────────────────
+  // The `<select>` this replaced read `aria-label="Rows per page"` beside a visible `Per page`.
+  // The name CONTAINED the visible text, so 2.5.3 was arguably met — but a speech-input user
+  // says what they can see, and "Per page" is not how that name begins. Two fixes were
+  // available: retype the label, or point the trigger at the caption. Pointing at it is the one
+  // the two strings cannot drift apart under, because there is only one string.
+  //
+  // MEASURED after the change: host `<span class="manager-pagination-size">`, trigger
+  // `<button role="combobox" aria-haspopup="listbox" aria-labelledby="…-per-page">`, no
+  // `aria-label` at all, accessible name `Per page`, trigger text the page size itself.
+  //
+  // This is a SOURCE clause rather than a mounted one because it pins the WIRING — which id
+  // points at which element — and a mounted assertion on the resolved name passes just as well
+  // with an `aria-label` string beside the caption, which is the arrangement this removed.
+  const source = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/Pagination.svelte'),
+    'utf8'
+  );
+
+  // THE HOST CLASS IS BUILT RATHER THAN SPELLED, and that is not fussiness: the fixture-ancestry
+  // clause in `searchable-popover-area-scope.test.js` scans this file's TEXT for markup copying
+  // a shared primitive's classes, and a literal `<span class="manager-pagination-size">` in an
+  // assertion reads to it as a hand-built fixture with no `fabricate-pagination` above it.
+  const HOST_CLASS = 'manager-pagination-size';
+  assert.ok(
+    !source.includes(`<label class="${HOST_CLASS}"`),
+    'the host is no longer a `<label>`: a label names no `<button>` by containment and DOES ' +
+      'forward its clicks to one, which would open the panel and shut it again in one press'
+  );
+  assert.ok(
+    source.includes(`<span class="${HOST_CLASS}">`),
+    'and the class survives the host change, because every per-site trigger rule hangs off it'
+  );
+  assert.match(
+    source,
+    /<span id=\{captionId\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    'the visible caption carries the per-instance id'
+  );
+  assert.match(
+    source,
+    /ariaLabelledBy=\{captionId\}/,
+    'and the trigger points at THAT, so the accessible name IS the visible text rather than a ' +
+      'second string free to drift from it'
+  );
+  assert.ok(
+    !source.includes('PerPageLabel'),
+    'the `Rows per page` key retires with the control it named; a name that no longer matches ' +
+      'what is on screen is the defect this change removes, not a string to keep beside it'
+  );
+});
