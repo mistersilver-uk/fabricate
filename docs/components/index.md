@@ -27,7 +27,9 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-A search field and a source filter share one row of the toolbar, and a **Membership** filter, a sort control, and an ascending/descending toggle share the row beneath.
+A search field and a source filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
+The source filter offers **Any source**, **World items**, **Compendium**, and **Broken link**.
+**Sort by** offers **Name**, **System count**, and **Source type**.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
 The list itself opens with a drop zone for dragging in items, so it scrolls with the rows rather than sitting fixed above the toolbar.
@@ -39,8 +41,11 @@ Below the name, a second line shows the component's description, or says it has 
 Two right-aligned columns state how many recipes name it and how many of your crafting systems currently have rules for it, as a fraction such as **2/6 systems**.
 A pencil control at the row's trailing edge, titled **Open catalogue entry**, opens the component's full entry directly.
 
-Filter by whether a component has a linked source item, and sort by name or by source item.
-Sorting by source item groups linked components ahead of unlinked ones, or the reverse when you flip the ascending and descending toggle, with equally-grouped rows kept in name order either way.
+**World items** narrows the list to components linked to an item in this world's Items directory, and **Compendium** to components linked to a compendium entry.
+**Broken link** shows only the components carrying the **Broken link** pill.
+A compendium link is never reported broken here, because the catalogue checks addresses against the world's own Items directory alone.
+**System count** sorts by how many crafting systems have rules for the component.
+**Source type** groups compendium-linked components first, then world items, then components with no source item, or the reverse when you flip the toggle, with each group kept in name order either way.
 
 ### Inspecting a component
 
@@ -103,6 +108,9 @@ Once you have staged at least one, the tags you touched appear as their own run 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The panel states how many changes it is about to make before you apply them, and applies every staged change one at a time, so a large selection across several systems takes a moment.
+A change that is refused, such as adding a component to a system where another component already claims the same source item, is reported as it happens and does not stop the run.
+A change that fails outright is counted instead, and once the run has finished a notice says how many components could not be updated.
+The selection clears when the run finishes either way, and nothing is said when every change landed.
 
 A separate **Delete** control at the foot of the panel deletes every selected component that no crafting system currently has rules for, along with each one's world defaults.
 A selected component any crafting system still has rules for is left alone, and the confirmation names which systems are holding it back, the same refusal the single entry's own delete makes for one component at a time.
@@ -123,7 +131,10 @@ Two tabs sit below it, **Catalogue entry** and **Validation**.
 
 For a component linked to a Foundry item, the name and description are shown as read-only text under a **Linked Foundry item** pill, and a note explains that they refresh from the linked item and that every system shows the same three.
 You cannot type over them here.
+For a component linked to a compendium entry, the pill reads **Linked Compendium entry** instead, and the name and description shown are the ones taken when the item was linked, not read live from the compendium.
+Dropping the item onto the source area again takes a fresh snapshot.
 Only a component with no linked source item takes typed **Name** and **Description** fields instead, held until you press **Save entry**.
+Those two fields are the only ones held for **Save entry**, so on a linked component that button stays inactive and the **Unsaved changes** marker never lights.
 Everything else on this screen, including the linked item, the world category, world tags, membership, and delete, takes effect immediately.
 
 If you leave with an unsaved name or description, Fabricate asks whether to save, discard, or keep editing.
@@ -168,6 +179,7 @@ It appears on member rows only.
 - The exit icon beside it removes this component from that system once you confirm.
 Removing deletes that system's rules for it, rewrites every recipe in that system that names it, and disables a recipe left without a usable ingredient set or result because of it.
 The world record and every other system are untouched.
+If the removal does not complete, Fabricate tells you so, with the reason.
 - A system this component is not yet in carries a dashed **Add to system** button instead.
 Adding creates rules in that system that inherit the world category.
 
@@ -188,7 +200,11 @@ Because the world-scope upgrade gives every pre-existing component a full set of
 
 ### Validation
 
-The Validation tab lists what this world record states and what every crafting system inheriting it will resolve, grouped as **Source item**, **Identity**, **World classification**, and **System rules**.
+The **Validation** tab opens straight onto its verdict, with no heading of its own.
+A panel on the left reads **2 blocking issues**, or however many there are, with **Clear these before saving** beneath it, or **Passing with warnings** with how many warnings will not stop a save, or **All clear** when every check passes.
+Beside it, three rows count the **Passing**, **Warnings**, and **Blocking** checks.
+The tab's own label carries the blocking count, the warning count when nothing blocks, or a tick when every check passes.
+Below the verdict, the checks are grouped as **Source item**, **Identity**, **World classification**, and **System rules**, and each row is badged **Pass**, **Warning**, or **Blocking**.
 A missing source item or an empty name blocks saving.
 No world category and no world tags are reported as warnings, not blockers, because a legitimately blank entry is not broken.
 A system that inherits an unset world category simply supplies its own.
@@ -204,9 +220,17 @@ The rail updates live as you edit the entry.
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
 **Add from catalogue**, in the header, opens a picker listing every world catalogue component this system does not already hold.
-Search by name and tick as many as you want.
-Confirming gives each one fresh rules in this system, inheriting the world category, with the confirm button itself naming how many components and which system they are joining.
-New rules start empty otherwise, the same blank starting point as any other new addition to this system.
+Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
+Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.
+The confirm button names how many components and which system they are joining, such as **Add 2 to Mythwright Forge**.
+As the picker's own subtitle says, new rules start empty, and the world category is inherited until this system overrides it.
+Fabricate adds the ticked components one at a time.
+If one cannot be added, for example because another component in this system already claims the same source item, the rest are still added, and the picker stays open with the refused rows still ticked under a sentence counting how many could not be added.
+The picker closes on its own only when every ticked component was added, or when you press **Cancel**.
+It also closes if you move to another screen while it is open.
+Each time it opens it starts fresh, with no search text or ticks left over from an earlier visit, and it always offers against the crafting system currently selected in the rail.
+When there is nothing to list, the picker says why.
+It tells you when the world catalogue has no components at all, when this system already has rules for every component in the catalogue, and when no component matches your search.
 
 Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
@@ -352,7 +376,8 @@ This run is read-only, and Fabricate does not currently offer a way to mute one 
 The card carries no link of its own back to the world entry.
 Use the **Edit shared identity** link on the identity callout at the top of the page to reach it, where the world tags themselves are applied or cleared.
 
-Below that, this system's own tags are listed as a click-to-toggle pill run.
+Below that, this system's own tags are listed as a click-to-toggle pill run, under a caption naming the system.
+Each pill shows the tag name alone, and a lit pill is one that is applied here.
 A note beneath both groups states how many tags are in effect here and how many world tags are muted.
 
 ### Essence contribution
