@@ -49,6 +49,7 @@ import {
   mergeVerdict,
   scopedBlockerWalk,
   selectorAppearances,
+  specificityOf,
 } from '../scripts/lib/stylesheetSelectorCensus.js';
 
 const MODULE = path.join(
@@ -358,13 +359,46 @@ const OUT_OF_BAND_CSS = sheet(
   block('.fabricate .fab-truncate', 'overflow: hidden;')
 );
 
-/** The scoped walk over one corpus, from the donor at index 0 to the utility at index 2. */
-function scopedWalk(css, classes) {
+/**
+ * The same corpus with a MULTI-MEMBER intervening rule, one member in the band and one above it.
+ *
+ * `.fabricate-manager .donor` is (0,2,0) — inside the band and equal to its low endpoint — and its
+ * subject is a class the donor element carries. `.fabricate-manager .panel .card .other.is-open` is
+ * (0,5,0), ABOVE the band's high endpoint. A walk that bands the rule on its highest member reads
+ * the pair as (0,5,0), skips it, and clears an adoption a live rule overrides.
+ */
+const MULTI_MEMBER_CSS = sheet(
+  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
+  block(
+    '.fabricate-manager .donor, .fabricate-manager .panel .card .other.is-open',
+    'overflow: visible;'
+  ),
+  block('.fabricate .fab-truncate', 'overflow: hidden;')
+);
+
+/** The control: the same two-member shape with the IN-BAND member's subject changed to a stranger. */
+const MULTI_MEMBER_STRANGER_CSS = sheet(
+  block('.fabricate-manager .panel .card .donor', 'overflow: hidden;'),
+  block(
+    '.fabricate-manager .stranger, .fabricate-manager .panel .card .other.is-open',
+    'overflow: visible;'
+  ),
+  block('.fabricate .fab-truncate', 'overflow: hidden;')
+);
+
+/**
+ * The scoped walk over one corpus, from the donor at index 0 to the utility at index 2.
+ *
+ * `reversed` passes the SAME interval with its endpoints the other way round, which is how a caller
+ * naming the donor first and the utility second writes it when the utility precedes the donor in
+ * the sheet.
+ */
+function scopedWalk(css, classes, { reversed = false } = {}) {
   const rules = censusRules(css);
   return scopedBlockerWalk({
     rules,
-    from: 0,
-    to: 2,
+    from: reversed ? 2 : 0,
+    to: reversed ? 0 : 2,
     declarations: rules[0].declarations,
     band: [rules[0].specificity, rules[2].specificity],
     element: { classes },
@@ -413,5 +447,52 @@ test('the scoped walk clears a blocker outside the closed specificity band', () 
     !scopedWalk(OUT_OF_BAND_CSS, ['donor', 'panel', 'card']).blocked,
     'a universal subject is admitted whatever the element carries, so this row can only be ' +
       'cleared by the band — which is the clause that makes a ten-thousand-line walk tractable'
+  );
+});
+
+test('the scoped walk bands a multi-member rule per member, not on its highest member', () => {
+  const rules = censusRules(MULTI_MEMBER_CSS);
+  assert.deepEqual(
+    rules.map((rule) => formatSpecificity(rule.specificity)),
+    ['(0,4,0)', '(0,5,0)', '(0,2,0)'],
+    'the intervening rule as a whole must sit ABOVE the band, or a walk banding it on its ' +
+      'highest member would admit it anyway and this row would prove nothing'
+  );
+  assert.deepEqual(
+    rules[1].selectors.map((selector) => formatSpecificity(specificityOf(selector))),
+    ['(0,2,0)', '(0,5,0)'],
+    'while its FIRST member is inside the band, at the utility’s own specificity'
+  );
+
+  assert.ok(
+    scopedWalk(MULTI_MEMBER_CSS, ['donor', 'panel', 'card']).blocked,
+    'an in-band member whose subject the donor element carries overrides the moved declaration ' +
+      'wherever it lands, so the adoption is blocked — a walk that tests the band on the list’s ' +
+      'highest member and the subject per member asks its two questions of different selectors ' +
+      'and reports a clean adoption'
+  );
+  assert.ok(
+    !scopedWalk(MULTI_MEMBER_STRANGER_CSS, ['donor', 'panel', 'card']).blocked,
+    'the control for the row above: the same two-member shape with the in-band member’s subject ' +
+      'changed to a class the element does not carry, so the block above is earned by the ' +
+      'subject test rather than by any multi-member rule blocking'
+  );
+});
+
+test('the scoped walk reads the same interval with its endpoints in either order', () => {
+  const classes = ['donor', 'panel', 'card', 'intruder'];
+  const forward = scopedWalk(SCOPED_CSS, classes);
+  const reversed = scopedWalk(SCOPED_CSS, classes, { reversed: true });
+
+  assert.ok(
+    forward.blocked,
+    'the forward walk finds the intruder, so the comparison has a subject'
+  );
+  assert.deepEqual(
+    reversed.blockers.map((blocker) => `${blocker.property} @${blocker.line}`),
+    forward.blockers.map((blocker) => `${blocker.property} @${blocker.line}`),
+    'a walk that iterates from the first argument upwards examines NOTHING when the endpoints ' +
+      'arrive reversed and returns the unblocked shape — a clean bill of health indistinguishable ' +
+      'from a real one, which is what a caller gets whenever the utility precedes the donor'
   );
 });
