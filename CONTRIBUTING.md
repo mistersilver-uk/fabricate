@@ -355,7 +355,7 @@ No Jest, Vitest, or Playwright.
 
 Foundry core ships global styles for `button`, `input`, `select`, `textarea`, and `[tabindex]` controls.
 These frequently win over — or fight with — Fabricate's own styling.
-The override almost always belongs in **global per-area CSS in `styles/fabricate.css`**, not in a scoped Svelte component `<style>`.
+The override almost always belongs in **global CSS in `styles/fabricate.css`**, not in a scoped Svelte component `<style>`.
 
 **Why global, not scoped:**
 
@@ -423,7 +423,7 @@ Use the single class (`.fabricate …`) — matching how `.fabricate-interactabl
 
 - New top-level app surface? It inherits the `.fabricate` paired block automatically — add a per-area block only where a surface deliberately needs a different treatment, and say why.
 - Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so the module default still wins where it applies.
-A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host that has neither.
+A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host carrying no Fabricate root at all.
 - Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — the module block already handles it.
 Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the module default doesn't fight them.
 - Custom-content button clipping? Apply the layout fix in Instance 1.

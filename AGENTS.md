@@ -476,7 +476,7 @@ Do not add or reintroduce Handlebars templates.
 - Tests live under `tests/`.
 - Styles live in `styles/`, primarily `styles/fabricate.css`.
 - `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field; in dev also through the `src/main.js` import), so it shares the page with every other module and system sheet.
-Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate-admin`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
+Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
 A bare generic selector like `.badge` or `.btn-icon` will bleed into other sheets (it previously broke the D&D 5e Armor Class badge). `tests/styles-namespacing.test.js` enforces this under `npm test` and fails on any unscoped selector.
 Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, which compile to hashed, component-scoped classes and do not bleed.
 - No literal colours in product code. `tests/components/theme-colour-contract.test.js` (under `npm test`) forbids colour literals — `#hex`, `rgb()/rgba()`, `hsl()/hsla()`, bare `white`/`black` — anywhere under `src/ui/` or `styles/` outside the approved `:root`/theme blocks, **including JS fallback constants** (a `'#888888'` default in a `.js` util fails the gate).
@@ -605,7 +605,7 @@ A compendium-**directory** world folder (resolved `folder.documentType === 'Comp
   Gathering character modifiers use the *other* convention (`@actor.system.…`), which is what makes this easy to get wrong.
   A `system.`-prefixed prerequisite resolves to `undefined`, coerces to 0/false, and fails its gate permanently while logging only a `console.warn` — and the manager renders the raw path, so the mistake reaches published screenshots.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
-- Foundry core styles fight Fabricate styles for `button`/`input` controls; the override usually belongs in global per-area CSS in `styles/fabricate.css`, not in scoped Svelte `<style>`.
+- Foundry core styles fight Fabricate styles for `button`/`input` controls; the override usually belongs in global CSS in `styles/fabricate.css`, not in scoped Svelte `<style>`.
 Two recurring instances:
   - **Layout.** Foundry's global `button` styles center their content (`justify-content: center`) and pin a fixed height.
 A Svelte component rendering a `<button>` with custom content (icon+label triggers, portrait+name option rows) must set `justify-content: flex-start`, `height: auto`, and a `min-height` explicitly, or content centers and taller children (portraits) clip.
