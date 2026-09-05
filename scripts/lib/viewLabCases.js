@@ -7266,17 +7266,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         selector: '[data-manager-header-action="lab-back"]',
         name: 'class',
-        value: 'manager-button is-ghost',
+        value: 'fabricate-button manager-button is-ghost',
       },
       {
         selector: '[data-manager-header-action="lab-delete"]',
         name: 'class',
-        value: 'manager-button is-danger',
+        value: 'fabricate-button manager-button is-danger',
       },
       {
         selector: '[data-manager-header-action="lab-save"]',
         name: 'class',
-        value: 'manager-button is-primary',
+        value: 'fabricate-button manager-button is-primary',
       },
       // The companion's screen is still mounted: the header changed, the mount did not.
       {
