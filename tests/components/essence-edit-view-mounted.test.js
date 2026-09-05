@@ -97,7 +97,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
