@@ -1313,8 +1313,8 @@ const repetitionKey = (entry) =>
   rowKey(entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)', entry.selector);
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,859 `(at-context, selector)`
-  // keys under this very keying, of which 2,740 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,863 `(at-context, selector)`
+  // keys under this very keying, of which 2,744 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.
