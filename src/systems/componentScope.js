@@ -22,10 +22,25 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * issue 1371).** `unionScopedDefinitions` applies each INHERITING section from the world default
  * AFTER the in-system re-spread, on the shipped field name, so an inheriting system's `category`
  * really does resolve from the world layer and really does change when the world default moves.
- * The world Component catalogue and entry are the surfaces that author that default. That is the
- * ONE key on this path with a live world parent: identity is re-derived from the in-system record
- * unconditionally, and `tags` is not a section at all — see below — so both are authored at world
- * scope and read back only by the world screens themselves.
+ * The world Component catalogue and entry are the surfaces that author that default.
+ *
+ * **AND SO IS `essences` (issue 1371 r18-store, maintainer ruling M31).** The world record
+ * carries an `essences` SECTION beside `category`, on the category model exactly: a map
+ * `essenceId -> quantity` over the WORLD essence catalogue's ids, persisted on the world default,
+ * inherited by every system that has rules for the component unless that system overrides with
+ * its own map. It exists because the world catalogue's essence values were being written into
+ * per-system rules that no world screen reads, so the maintainer's edit "did not persist or show
+ * anywhere". The section is spelled over the shipped in-system `Component.essences` map, so its
+ * union writer is an assignment (`scopedDefinitionStore.js`), and its SHAPE rule — a map of
+ * positive quantities, an EMPTY map being an authored "no essences" rather than absence — is
+ * stated once at the normalizer (`normalizeComponentEssenceMap`, through `coerceComponentSection`)
+ * so both resolution branches carry it. The `1.32.0` migration elects each world map from the
+ * oldest system holding rules and marks each system inheriting only where its own map equals the
+ * elected one (`src/migration/migrateComponentEssenceSections.js`).
+ *
+ * Those two are the keys on this path with a live world parent: identity is re-derived from the
+ * in-system record unconditionally, and `tags` is not a section at all — see below — so both are
+ * authored at world scope and read back only by the world screens themselves.
  *
  * A COMPONENT MEMBERSHIP RECORD CARRIES NO `enabled` FLAG, and that absence is STRUCTURAL rather
  * than conventional. The maintainer ruling behind epic 1357 is that essence enabling toggles
@@ -64,9 +79,67 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * The component sections resolution reads through, and the only keys a component membership
  * record's `inherit` map may carry.
  *
+ * `essences` joined `category` at issue 1371 r18-store (M31). Adding a name here is what makes
+ * `normalizeInherit` read an ABSENT switch for it as INHERITING, which is why the section came
+ * with the `1.32.0` migration that marks every pre-existing record, and why a third section
+ * would need the same.
+ *
  * @type {readonly string[]}
  */
-export const COMPONENT_SECTIONS = Object.freeze(['category']);
+export const COMPONENT_SECTIONS = Object.freeze(['category', 'essences']);
+
+/**
+ * Normalize an essence map — `essenceId -> quantity` — to trimmed ids and POSITIVE, FINITE
+ * quantities, answering ABSENCE for anything that is not a plain object.
+ *
+ * THE SHAPE RULE OF THE `essences` SECTION, stated once and applied on both records through
+ * `coerceComponentSection`, exactly as `category`'s trim is. It mirrors what the in-system
+ * normalizer (`CraftingSystemManager#_normalizeEssenceQuantities`) keeps of a component's map,
+ * minus the per-system roster filter: a world map is over the WORLD essence catalogue's ids, and
+ * which of those a given system holds is that system's own concern at read time.
+ *
+ * AN EMPTY MAP IS A VALUE, NOT ABSENCE. `{}` is an authored "this component carries no essences",
+ * which an inheriting system must take rather than keep its own — the same reading the essence
+ * scope gives `effectSource: {}`. Only a non-object is absence, so a world default that never
+ * authored the section stays distinguishable from one that authored none.
+ *
+ * ALWAYS A NEW OBJECT for a plain-object input, so a normalized record never aliases the
+ * caller's map. A quantity of zero or less is dropped rather than stored: the bulk panels use `0`
+ * as "strip this essence", and the in-system normalizer drops it too.
+ *
+ * @param {unknown} raw
+ * @returns {Record<string, number>|undefined}
+ */
+export function normalizeComponentEssenceMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+  const normalized = {};
+  for (const [rawId, rawQuantity] of Object.entries(raw)) {
+    const id = String(rawId ?? '').trim();
+    if (!id) continue;
+    const quantity = Number(rawQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    normalized[id] = quantity;
+  }
+  return normalized;
+}
+
+/**
+ * Whether two essence maps carry the SAME quantities, compared by normalized content.
+ *
+ * Absence and a non-map read as EMPTY, so an unelected world map equals a system that authored
+ * no essences — which is the equality the `1.32.0` migration marks a system inheriting on.
+ *
+ * @param {unknown} left
+ * @param {unknown} right
+ * @returns {boolean}
+ */
+export function componentEssenceMapsEqual(left, right) {
+  const a = normalizeComponentEssenceMap(left) ?? {};
+  const b = normalizeComponentEssenceMap(right) ?? {};
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((id) => b[id] === a[id]);
+}
 
 /**
  * Normalize a list of trimmed, de-duplicated, order-preserving labels.
@@ -127,13 +200,18 @@ function isAuthoredCategory(category) {
  * branch, and the overriding branch hands back the stored value verbatim, so `'  ingot  '` would
  * otherwise resolve trimmed for one system and untrimmed - and unmatchable - for the next.
  *
+ * An essence map takes {@link normalizeComponentEssenceMap} for the same reason: an overriding
+ * system's stored `{ ' fire ': '2', water: 0 }` must resolve to the same `{fire: 2}` an
+ * inheriting one would read.
+ *
  * @param {string} section
  * @param {unknown} value
  * @returns {unknown}
  */
 function coerceComponentSection(section, value) {
-  if (section !== 'category') return value;
-  return isAuthoredCategory(value) ? value.trim() : undefined;
+  if (section === 'category') return isAuthoredCategory(value) ? value.trim() : undefined;
+  if (section === 'essences') return normalizeComponentEssenceMap(value);
+  return value;
 }
 
 /**
@@ -238,16 +316,17 @@ export function resolveComponentTags(worldTags, membership = null) {
 /**
  * Resolve one `(component, system)` pair.
  *
- * The answer carries `category` (when either scope authored one), the effective `tags`, `member`,
- * and the per-section `inherited` map. It carries NO `enabled` key - `'enabled' in result` is
- * `false`, not `enabled: false`.
+ * The answer carries `category` (when either scope authored one), `essences` (when either scope
+ * authored a map — on the PLAIN section pattern, with no helper of its own), the effective
+ * `tags`, `member`, and the per-section `inherited` map. It carries NO `enabled` key -
+ * `'enabled' in result` is `false`, not `enabled: false`.
  *
  * Sections are populated even for a non-member, so `member` is the gate a caller must check.
  *
  * @param {object|null} worldDefault
  * @param {object|null} membership
- * @returns {{category?: string, tags: string[], member: boolean,
- *   inherited: {[section: string]: boolean}}}
+ * @returns {{category?: string, essences?: Record<string, number>, tags: string[],
+ *   member: boolean, inherited: {[section: string]: boolean}}}
  */
 export function resolveComponent(worldDefault, membership) {
   const world = worldDefault && typeof worldDefault === 'object' ? worldDefault : {};
@@ -279,8 +358,10 @@ export function resolveComponent(worldDefault, membership) {
  * marks it inheriting resolves from the world default and the in-system value does NOT win. That
  * is the one place the suspension does not apply, and it is why the world catalogue's category
  * picker is a real write with real reach rather than an authored-and-unread one. An UNAUTHORED
- * world `category` still applies nothing, so an inheriting system keeps its own value.
- * So the surviving record supplies `essences`, `salvage`, `difficulty` and `complications` as it always did, AND every
+ * world `category` still applies nothing, so an inheriting system keeps its own value. The
+ * `essences` section takes the same path since M31: an inheriting system's `essences` IS the
+ * world map, whole, and an overriding system's is its own in-system row.
+ * So the surviving record supplies `salvage`, `difficulty` and `complications` as it always did, `essences` where it overrides, AND every
  * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
  * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
  * must not implement against world-wins precedence: doing so reverts the GM's own edits on

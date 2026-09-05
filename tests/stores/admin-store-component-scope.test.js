@@ -965,3 +965,74 @@ test('1371 r17: and a world that HAS the key reads the translation, system and r
       'localizer rather than only reaching the English floor'
   );
 });
+
+// ── THE WORLD `essences` SECTION REACHES THE STORE AND THE PROJECTION (r18-store, M31) ────────
+//
+// The maintainer's world essence edit "did not persist or show anywhere" because the world panel
+// wrote per-system rules that no world screen reads. The world record now carries an `essences`
+// SECTION, so the generic section verbs take the name, and the projection publishes what the
+// world entry and the catalogue read: the world map on `defaults`, and per system the switch and
+// the map that system resolves.
+
+test('1371 r18: `updateWorldDefaultSection("essences")` lands on the world record and is published', async () => {
+  const harness = makeEssenceStoreHarness({
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+
+  const written = await store.worldScope.component.updateWorldDefaultSection('ingot', 'essences', {
+    fire: 3,
+    water: 0,
+  });
+  assert.equal(written, true, 'the section name is KNOWN to the component scope now');
+  assert.deepEqual(
+    scope.payload.defaults.ingot.essences,
+    { fire: 3, water: 0 },
+    'stored opaquely, as every section value is; the normalizer coerces the shape on load'
+  );
+
+  const entry = get(store.viewState).worldScope.component.entries.find((row) => row.id === 'ingot');
+  assert.deepEqual(entry.defaults.essences, { fire: 3, water: 0 }, 'the world map is published');
+  const row = entry.systems.find((system) => system.systemId === 'sys1');
+  assert.equal(row.inherited.essences, true, 'an omitted switch inherits');
+  assert.deepEqual(row.resolvedEssences, { fire: 3 }, 'and the system resolves the world map');
+  assert.deepEqual(entry.inheritCounts, { category: 1, essences: 1 });
+});
+
+test('1371 r18: flipping the essences switch OFF makes the system resolve its OWN rules, and the projection follows', async () => {
+  const harness = makeEssenceStoreHarness({
+    components: [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 } }],
+  });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
+  scope.payload.membership[membershipKey('ingot', 'sys1')] = {
+    entityId: 'ingot',
+    systemId: 'sys1',
+    inherit: {},
+  };
+  await store.refresh();
+
+  assert.equal(
+    await store.worldScope.component.setSectionInherited('ingot', 'sys1', 'essences', false),
+    true
+  );
+  const stored = scope.payload.membership[membershipKey('ingot', 'sys1')];
+  assert.equal(stored.inherit.essences, false);
+  assert.deepEqual(stored.essences, { fire: 3 }, 'the switch going off SEEDS the record from the world map');
+
+  const entry = get(store.viewState).worldScope.component.entries.find((row) => row.id === 'ingot');
+  const row = entry.systems.find((system) => system.systemId === 'sys1');
+  assert.equal(row.inherited.essences, false);
+  assert.deepEqual(
+    row.resolvedEssences,
+    { iron: 2 },
+    'an overriding system answers its IN-SYSTEM rules, not the seeded membership copy'
+  );
+  assert.deepEqual(entry.inheritCounts, { category: 1, essences: 0 });
+});

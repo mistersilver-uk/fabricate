@@ -437,7 +437,8 @@ describe('the READ union and the BASIS union', () => {
     assert.equal(member.category, 'ore', 'the world DEFAULT, resolved through the inherit map');
     assert.equal(member.name, 'Legacy Member', 'while identity still comes from the in-system row');
     assert.equal(member.member, true);
-    assert.deepEqual(member.inherited, { category: true });
+    // BOTH component sections, since `essences` joined at issue 1371 r18-store (M31).
+    assert.deepEqual(member.inherited, { category: true, essences: true });
     assert.equal('enabled' in member, false, 'a component carries no enabled flag at all');
   });
 
@@ -461,7 +462,11 @@ describe('the READ union and the BASIS union', () => {
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).find((e) => e.id === 'shared');
     assert.equal(shared.category, 'ingot');
-    assert.deepEqual(shared.inherited, { category: true }, 'and the row says so about itself');
+    assert.deepEqual(
+      shared.inherited,
+      { category: true, essences: true },
+      'and the row says so about itself'
+    );
   });
 
   it('while an OVERRIDING section keeps the in-system value', () => {

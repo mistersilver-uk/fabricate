@@ -14,7 +14,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resolveComponentScope } from '../../src/systems/componentScope.js';
+import {
+  COMPONENT_SECTIONS,
+  componentEssenceMapsEqual,
+  normalizeComponentEssenceMap,
+  resolveComponentScope,
+} from '../../src/systems/componentScope.js';
 import {
   componentScopeValidation,
   componentScopeValidationPresentation,
@@ -691,5 +696,123 @@ describe('the catalogue’s essence filter is the rules list’s, over the world
   it('is WITHHELD over an empty world essence catalogue', () => {
     assert.deepEqual(componentEssenceFilter({ essences: [], systems: ROSTER }, phrase), []);
     assert.deepEqual(componentEssenceFilter({ systems: ROSTER }, phrase), []);
+// ── THE WORLD `essences` SECTION (issue 1371 r18-store, maintainer ruling M31) ────────────────
+//
+// The world component record carries an `essences` SECTION beside `category`, on the category
+// model exactly: a world map every system with rules for the component inherits unless it
+// overrides with its own. These pin the read union's answer, because that is the premise the
+// world entry's editor, the catalogue's rows and filter, and the rules editor's inherit choice
+// all rest on — and a mounted assertion could only observe it through a rendered consequence a
+// hand-built fixture can also produce.
+
+/** A one-component corpus with the essences switch and the world map as parameters. */
+function essenceCorpus({ inheriting, worldEssences }) {
+  return {
+    entities: [{ id: 'ingot', name: 'Iron Ingot' }],
+    defaults: worldEssences === undefined ? [] : [{ id: 'ingot', essences: worldEssences }],
+    membership: [
+      {
+        entityId: 'ingot',
+        systemId: 'sys-forge',
+        inherit: inheriting === undefined ? {} : { essences: inheriting },
+      },
+    ],
+  };
+}
+
+/** The system's own surviving in-system row, carrying its own essence map. */
+const IN_SYSTEM_ESSENCES = [{ id: 'ingot', name: 'Iron Ingot', essences: { iron: 2 }, tags: [] }];
+
+describe('the component read union answers an inheriting essence map from the world default (M31)', () => {
+  it('declares `essences` as a component section beside `category`', () => {
+    assert.deepEqual([...COMPONENT_SECTIONS], ['category', 'essences']);
+  });
+
+  it('resolves the WORLD map when the section is marked inheriting', () => {
+    const [row] = resolveComponentScope(
+      essenceCorpus({ inheriting: true, worldEssences: { fire: 3 } }),
+      'sys-forge',
+      IN_SYSTEM_ESSENCES
+    );
+    assert.deepEqual(row.essences, { fire: 3 }, 'the world map is the answer, whole');
+    assert.equal(row.inherited.essences, true);
+  });
+
+  it('and an OMITTED switch inherits, which is the state "add to system" creates', () => {
+    const [row] = resolveComponentScope(
+      essenceCorpus({ inheriting: undefined, worldEssences: { fire: 3 } }),
+      'sys-forge',
+      IN_SYSTEM_ESSENCES
+    );
+    assert.deepEqual(row.essences, { fire: 3 });
+  });
+
+  it('and the IN-SYSTEM map when the section is marked overriding', () => {
+    const [row] = resolveComponentScope(
+      essenceCorpus({ inheriting: false, worldEssences: { fire: 3 } }),
+      'sys-forge',
+      IN_SYSTEM_ESSENCES
+    );
+    assert.deepEqual(row.essences, { iron: 2 }, 'the system keeps its own values');
+    assert.equal(row.inherited.essences, false);
+  });
+
+  it('and the in-system map when the world default authored NOTHING', () => {
+    const [row] = resolveComponentScope(
+      essenceCorpus({ inheriting: true, worldEssences: undefined }),
+      'sys-forge',
+      IN_SYSTEM_ESSENCES
+    );
+    assert.deepEqual(row.essences, { iron: 2 }, 'absence at world scope is the world saying nothing');
+  });
+
+  it('an authored EMPTY world map clears an inheriting system, because `{}` is a value', () => {
+    const [row] = resolveComponentScope(
+      essenceCorpus({ inheriting: true, worldEssences: {} }),
+      'sys-forge',
+      IN_SYSTEM_ESSENCES
+    );
+    assert.deepEqual(row.essences, {}, '"no essences" is authored, not absent');
+  });
+
+  it('hands the row a COPY of the world map, never the corpus object itself', () => {
+    const corpus = essenceCorpus({ inheriting: true, worldEssences: { fire: 3 } });
+    const [row] = resolveComponentScope(corpus, 'sys-forge', IN_SYSTEM_ESSENCES);
+    row.essences.fire = 99;
+    assert.equal(corpus.defaults[0].essences.fire, 3, 'a consumer edit cannot reach the corpus');
+  });
+});
+
+describe('the essence section normalizes to a map of positive quantities over trimmed ids', () => {
+  it('keeps positive finite quantities, drops the rest, and trims the ids', () => {
+    assert.deepEqual(
+      normalizeComponentEssenceMap({ ' fire ': 2, water: 0, earth: -1, air: 'x', '': 4, moss: 1.5 }),
+      { fire: 2, moss: 1.5 }
+    );
+  });
+
+  it('answers an EMPTY map for an empty object, which is authored "no essences"', () => {
+    assert.deepEqual(normalizeComponentEssenceMap({}), {});
+  });
+
+  it('and ABSENCE for anything that is not a plain object', () => {
+    for (const junk of [undefined, null, 'fire', 3, ['fire'], true]) {
+      assert.equal(normalizeComponentEssenceMap(junk), undefined, `${String(junk)} is not a map`);
+    }
+  });
+
+  it('answers a NEW object, so a normalized record never aliases the caller\'s map', () => {
+    const raw = { fire: 2 };
+    const normalized = normalizeComponentEssenceMap(raw);
+    assert.notEqual(normalized, raw);
+    assert.deepEqual(normalized, raw);
+  });
+
+  it('compares two maps by their normalized content, absence reading as empty', () => {
+    assert.equal(componentEssenceMapsEqual({ fire: 2, moss: 1 }, { moss: 1, fire: 2 }), true);
+    assert.equal(componentEssenceMapsEqual({ fire: 2, water: 0 }, { fire: 2 }), true);
+    assert.equal(componentEssenceMapsEqual(undefined, {}), true);
+    assert.equal(componentEssenceMapsEqual({ fire: 2 }, { fire: 3 }), false);
+    assert.equal(componentEssenceMapsEqual({ fire: 2 }, {}), false);
   });
 });

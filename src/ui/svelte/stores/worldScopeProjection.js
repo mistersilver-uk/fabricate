@@ -26,7 +26,11 @@ import {
   SOURCE_LINK_FIELDS,
   WORLD_IDENTITY_FIELDS,
 } from '../../../migration/worldScopeEntityGrouping.js';
-import { COMPONENT_SCOPE, COMPONENT_SECTIONS } from '../../../systems/componentScope.js';
+import {
+  COMPONENT_SCOPE,
+  COMPONENT_SECTIONS,
+  normalizeComponentEssenceMap,
+} from '../../../systems/componentScope.js';
 import { ESSENCE_SCOPE, ESSENCE_SECTIONS } from '../../../systems/essenceScope.js';
 import {
   isSectionInherited,
@@ -437,6 +441,63 @@ function indexMemberships(memberships) {
 }
 
 /**
+ * Index every crafting system's IN-SYSTEM component rows, keyed `systemId` then component id.
+ *
+ * THE ONE UNION FACT THIS PROJECTION RE-DERIVES, and only for the component leg (issue 1371
+ * r18-store, M31). The projection publishes the CORPUS, but a world screen stating "which map does
+ * this system resolve" cannot answer it from the corpus alone: an OVERRIDING system's map is its
+ * in-system row — the membership record's stored block is the dormant copy and does not win while
+ * `## CraftingSystem` requirement 36 holds — so the roster's rows are the other half of the
+ * answer. One pass over the raw roster per publish, the same walk the vocabulary leg already
+ * takes over `systems[].components`.
+ *
+ * @param {unknown} systems The RAW crafting-system roster.
+ * @returns {Map<string, Map<string, object>>}
+ */
+function indexInSystemComponents(systems) {
+  const bySystem = new Map();
+  for (const system of Array.isArray(systems) ? systems : []) {
+    const systemId = typeof system?.id === 'string' ? system.id : String(system?.id ?? '');
+    if (!systemId) continue;
+    const rows = new Map();
+    for (const component of Array.isArray(system?.components) ? system.components : []) {
+      const id = typeof component?.id === 'string' ? component.id.trim() : '';
+      if (id && !rows.has(id)) rows.set(id, component);
+    }
+    bySystem.set(systemId, rows);
+  }
+  return bySystem;
+}
+
+/**
+ * Whether a descriptor's scope declares the component `essences` section — derived from the
+ * section list rather than tested against the entity type, so a second type declaring the
+ * section would answer the new shape without this file changing.
+ *
+ * @param {object} descriptor
+ * @returns {boolean}
+ */
+function resolvesEssences(descriptor) {
+  return descriptor?.sections?.includes?.('essences') === true;
+}
+
+/**
+ * The essence map ONE system resolves for an entity: the world map where the switch is on and
+ * the world authored one, the system's own in-system row otherwise — normalized as the row's
+ * own normalizer would, and always a NEW map, never the corpus's or the roster's.
+ *
+ * @param {{inherited: {[section: string]: boolean}}} resolved The resolver's answer.
+ * @param {object|null} worldDefault
+ * @param {object|null} inSystemRow
+ * @returns {Record<string, number>}
+ */
+function resolvedEssencesFor(resolved, worldDefault, inSystemRow) {
+  const world = normalizeComponentEssenceMap(worldDefault?.essences);
+  if (resolved.inherited?.essences !== false && world) return world;
+  return normalizeComponentEssenceMap(inSystemRow?.essences) ?? {};
+}
+
+/**
  * Index the world defaults by entity id.
  *
  * @param {unknown} defaults
@@ -469,14 +530,30 @@ function indexDefaults(defaults) {
  * switch goes off, and clicking it then appears to do nothing. `enabled` is therefore exactly
  * what it was before the master switch existed, so nothing reading it changed meaning.
  *
+ * ── `resolvedEssences` IS THE MAP THIS SYSTEM RESOLVES, AND IT IS A READ FACT ───────────────
+ * On the component leg alone (issue 1371 r18-store, M31): the world map where `inherited.essences`
+ * is on and the world authored one, this system's own in-system row otherwise. It is named for
+ * what it is so no world editor writes it back — the world entry authors `defaults.essences`, and
+ * the rules editor authors the in-system row; this row only says which of the two the system
+ * reads, which is what the entry's per-system rows and the rules editor's inherit choice state.
+ *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system
  * @param {object|null} membership
  * @param {object|null} worldDefault
  * @param {number} [recipeCount] Recipes in THIS system that reference the entity.
+ * @param {object|null} [inSystemRow] This system's own in-system row for the entity, when the
+ *   roster holds one; read for the component `essences` section alone.
  * @returns {object}
  */
-function buildSystemRow(descriptor, system, membership, worldDefault, recipeCount = 0) {
+function buildSystemRow(
+  descriptor,
+  system,
+  membership,
+  worldDefault,
+  recipeCount = 0,
+  inSystemRow = null
+) {
   const resolved = resolveScopedDefinition(worldDefault, membership, descriptor.scope);
   const row = {
     systemId: system.id,
@@ -508,6 +585,9 @@ function buildSystemRow(descriptor, system, membership, worldDefault, recipeCoun
   // that mutated the published value in place would edit the corpus behind the store's back.
   if (descriptor.taggable) {
     row.mutedTags = Array.isArray(membership?.mutedTags) ? [...membership.mutedTags] : [];
+  }
+  if (resolvesEssences(descriptor)) {
+    row.resolvedEssences = resolvedEssencesFor(resolved, worldDefault, inSystemRow);
   }
   return row;
 }
@@ -553,9 +633,19 @@ function entryHasSourceLink(entity) {
  * @param {Array<{id: string, name: string}>} systems
  * @param {Map<string, object>} membershipIndex
  * @param {Record<string, object>|null} [usage] World-wide reference counts per entity id.
+ * @param {Map<string, Map<string, object>>} [inSystemIndex] Each system's in-system rows, from
+ *   {@link indexInSystemComponents}; read for the component `essences` section alone.
  * @returns {object}
  */
-function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, usage = null) {
+function buildEntry(
+  descriptor,
+  entity,
+  worldDefault,
+  systems,
+  membershipIndex,
+  usage = null,
+  inSystemIndex = new Map()
+) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
   const rows = [];
@@ -575,7 +665,8 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
         system,
         membership,
         worldDefault,
-        entityUsage?.recipeCountBySystem?.[system.id]
+        entityUsage?.recipeCountBySystem?.[system.id],
+        inSystemIndex.get(system.id)?.get(entity.id) ?? null
       )
     );
   }
@@ -659,6 +750,8 @@ export function projectWorldScopeEntity({
   const defaultsIndex = indexDefaults(corpus.defaults);
   const membershipIndex = indexMemberships(corpus.membership);
   const projectedSystems = projectSystems(systems);
+  // Walked only for a scope that resolves `essences`; the other two legs never touch the rows.
+  const inSystemIndex = resolvesEssences(descriptor) ? indexInSystemComponents(systems) : new Map();
   const state = {
     entityType,
     sections: [...descriptor.sections],
@@ -681,7 +774,8 @@ export function projectWorldScopeEntity({
         defaultsIndex.get(entity.id) ?? null,
         projectedSystems,
         membershipIndex,
-        usage
+        usage,
+        inSystemIndex
       )
     ),
   };

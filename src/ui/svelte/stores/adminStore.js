@@ -6027,15 +6027,22 @@ export function createAdminStore(services) {
 
   /**
    * Write one bulk edit to a SET of components' RULES in ONE crafting system (issue 1371 r16-cat,
-   * maintainer ruling M25).
+   * maintainer ruling M25; its WORLD caller superseded by M31 at r18).
    *
-   * The world Component catalogue's bulk panel stages essence values for a selection whose members
-   * have rules in several systems, and a component's essence values ARE each system's own rules —
-   * so the world-scope write is per system, through the same set-apply primitive the system
-   * Component Studio's bulk edit uses ({@link applyComponentBulkEdit}), with the system named by
-   * the caller instead of read from the rail's selection. `edit` is forwarded VERBATIM: the
-   * primitive tests key PRESENCE, so `{essences: {}}` is the instruction "strip every essence" and
-   * must not be pruned as empty.
+   * THE PER-SYSTEM RULES WRITE, kept for the system-scope surfaces. It writes through the same
+   * set-apply primitive the system Component Studio's bulk edit uses
+   * ({@link applyComponentBulkEdit}), with the system named by the caller instead of read from the
+   * rail's selection. `edit` is forwarded VERBATIM: the primitive tests key PRESENCE, so
+   * `{essences: {}}` is the instruction "strip every essence" and must not be pruned as empty.
+   *
+   * ── THE WORLD CATALOGUE NO LONGER ROUTES ESSENCES THROUGH IT (M31) ─────────────────────────
+   * M25 had the world bulk panel write staged essence values into each selected component's rules
+   * in every system, which is why the maintainer's world edit "did not persist or show anywhere":
+   * no world screen reads per-system rules. The world record now carries an `essences` SECTION,
+   * so the world panel and the world entry write `updateWorldDefaultSection(id, 'essences', map)`
+   * and every system whose switch is on follows it. A write made HERE lands on a system's own row,
+   * which is what that system resolves only while it OVERRIDES the section — on an inheriting
+   * system the world map shadows it until the rules editor flips the switch.
    *
    * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
    * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
