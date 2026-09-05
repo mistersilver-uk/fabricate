@@ -71,7 +71,12 @@ import {
   rulesIn,
   splitSelectorList,
 } from '../helpers/styleBlockScan.js';
-import { parsedTemplates, walkElements } from '../helpers/svelteTemplateScan.js';
+import {
+  attributeText,
+  lineOf,
+  parsedTemplates,
+  walkElements,
+} from '../helpers/svelteTemplateScan.js';
 
 import {
   KNOWN_BARE_FOCUS_SELECTORS,
@@ -1109,6 +1114,119 @@ test('each module utility is declared exactly once, at the module root', () => {
         'the per-application copy issue 1501 collapsed, and it reaches the same elements at the ' +
         'same rank, so which one paints is decided by source order rather than by anything a ' +
         'reader of either rule can see.'
+    );
+  }
+});
+
+/** A `[data-gap]` rung as the sheet declares it or as an element writes it: `<utility>=<rung>`. */
+const gapRungKey = (utility, rung) => `${utility}=${rung}`;
+
+/** Every rung the module sheet declares, read off the selectors that pin one. */
+function declaredGapRungs() {
+  const declared = new Set();
+  for (const rule of sheetRules()) {
+    for (const member of rule.selectors) {
+      for (const [, utility, rung] of member.matchAll(/\.(fab-[\w-]+)\[data-gap='([^']+)'\]/gu)) {
+        declared.add(gapRungKey(utility, rung));
+      }
+    }
+  }
+  return declared;
+}
+
+/** A tag's `fab-*` classes and its `data-gap` literal, from the two attribute texts. */
+const gapRungsOf = (classText, gapText) =>
+  [...(classText ?? '').matchAll(/\b(fab-[\w-]+)\b/gu)].map(([, utility]) =>
+    gapRungKey(utility, gapText)
+  );
+
+/** An element written into a JavaScript template string, with its whole tag captured. */
+const JAVASCRIPT_GAP_ELEMENT = /<[a-z][^<>]*\bdata-gap="[^"]+"[^<>]*>/giu;
+
+/**
+ * Every `data-gap` the product writes, over BOTH channels a rung can be emitted through.
+ *
+ * The Svelte templates are the obvious one. `rollPrompt.js` builds its dialog body as an HTML
+ * string in a `.js` module, which `svelte/compiler` never reads — the same blind spot the native
+ * `<select>` clause above records — and it writes two rungs, so a template-only scan would report
+ * a smaller emitted set than the tree holds and clear a rung nothing declares.
+ */
+function emittedGapRungs() {
+  const found = [];
+  for (const { file, source, ast } of parsedTemplates()) {
+    walkElements(ast.fragment, (element) => {
+      const gap = attributeText(source, element, 'data-gap');
+      const written = gap?.match(/^data-gap="([^"]*)"$/u);
+      if (!written) return;
+      const classText = attributeText(source, element, 'class');
+      for (const key of gapRungsOf(classText, written[1])) {
+        found.push({ file, line: lineOf(source, element.start), key });
+      }
+    });
+  }
+  for (const [file, source] of Object.entries(collectWorkingTreeSources(['src'], ['.js']))) {
+    for (const [index, text] of stripComments(source).split('\n').entries()) {
+      for (const [tag] of text.matchAll(JAVASCRIPT_GAP_ELEMENT)) {
+        const written = tag.match(/\bdata-gap="([^"]+)"/u);
+        for (const key of gapRungsOf(tag.match(/\bclass="([^"]*)"/u)?.[1], written[1])) {
+          found.push({ file, line: index + 1, key });
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * The two utilities whose BASE rule sets a rung default, and the rung that default must equal.
+ *
+ * Named here rather than left implicit, because an implicit default is the drift this clause
+ * exists to stop: `data-gap="2"` renders correctly only while `--fab-stack-gap` happens to be
+ * `var(--fab-space-2)`, and re-rung the base and every site writing `2` moves while its markup
+ * still says `2`.
+ */
+const DEFAULT_GAP_RUNGS = Object.freeze([
+  { utility: 'fab-stack', property: '--fab-stack-gap', rung: '2' },
+  { utility: 'fab-cluster', property: '--fab-cluster-gap', rung: '2' },
+]);
+
+test('every emitted `data-gap` rung is declared, and each default is written as its own rule', () => {
+  // THE OTHER DIRECTION OF A HAND-MAINTAINED MIRROR. `styles-dead-classes` fires on a
+  // declared-and-unemitted CLASS; nothing fires on an EMITTED-and-undeclared rung, which renders
+  // at whatever the base rule happens to set and so looks correct in every frame. The utility
+  // comment reasons about the first direction only.
+  const declared = declaredGapRungs();
+  const emitted = emittedGapRungs();
+
+  assert.ok(
+    emitted.length >= 16,
+    `only ${emitted.length} \`data-gap\` emitters reached this scan, against the 16 the tree ` +
+      'holds. A walk that stopped seeing call sites reports a clean mirror, which is the one ' +
+      'direction an absence check cannot distinguish from success.'
+  );
+  assert.deepEqual(
+    [...new Set(emitted.filter((site) => !declared.has(site.key)).map((site) => site.key))].sort(
+      byCodePoint
+    ),
+    [],
+    `every rung written in markup must have a rule. Declared: ${[...declared].sort(byCodePoint).join(', ')}. ` +
+      'A rung nothing declares renders at the base rule’s default, so the attribute promises a ' +
+      'pin that is not there and the site moves silently when that default changes.'
+  );
+
+  for (const { utility, property, rung } of DEFAULT_GAP_RUNGS) {
+    const base = declarationsOfClass(utility).map(({ rule }) => declarationMap(rule)[property]);
+    const pinned = sheetRules()
+      .filter((rule) =>
+        rule.selectors.includes(`.${MODULE_ROOT.slice(1)} .${utility}[data-gap='${rung}']`)
+      )
+      .map((rule) => declarationMap(rule)[property]);
+    assert.deepEqual(
+      base,
+      pinned,
+      `\`.${utility}\`'s default rung must also be written as \`[data-gap='${rung}']\`. It is the ` +
+        'most-used rung at the call sites, and leaving it implicit is what lets the base rule be ' +
+        're-rung without meeting this gate.'
     );
   }
 });
