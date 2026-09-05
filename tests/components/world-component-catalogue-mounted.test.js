@@ -35,6 +35,12 @@ import {
   componentBulkMembershipModes,
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+// THE REAL VOCABULARY STORE AND THE LAB WORLD'S PERSISTED SHAPE (issue 1371 r16-cat, maintainer
+// ruling M20): the store the Tags & Categories screen writes through, fed exactly what the View
+// Lab world persists, so the offer is proven against the data shape a live world carries and not
+// against this suite's `{tags: […]}` wrapper.
+import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
 // The frame's own lifted view-state factory, so the page-size case below states the SHIPPED
 // shape and changes with it rather than hand-rolling a second one.
 import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
@@ -2005,6 +2011,54 @@ describe('world Component Catalogue (issue 1371)', () => {
         await selectTwo(target);
         assert.deepEqual(insetRows(target, 'category'), ['none', 'Reagents']);
         assert.deepEqual(insetRows(target, 'tags'), ['moss', 'ore']);
+      });
+
+      // ── M20 (issue 1371 r16-cat): "the world component catalogue says there are no world tags
+      // authored even when I have 3." The offer's whole chain is the REAL one here — the store the
+      // Tags & Categories screen writes through, loaded from the exact `{id, name}` rows the View
+      // Lab world persists; the real assembler; the page on the leg it publishes — so a tag the
+      // world has authored reaches the inset as a bare NAME and the `not authored yet` sentence is
+      // never drawn over an authored vocabulary. The store's rows are objects and the offer wants
+      // strings; the projection is the one place that maps between them, and this is its guard.
+      it('offers the three tags the lab world PERSISTS, through the real vocabulary store and the real projection, and never says none are authored (M20)', async () => {
+        const persisted = buildLabContent().worldVocabulary;
+        assert.deepEqual(
+          persisted.componentTags.map((row) => row.name),
+          ['ore', 'ingot', 'moss'],
+          'NON-VACUITY: the lab world persists three authored tags, as `{id, name}` rows'
+        );
+        const store = createWorldVocabularyStore({
+          getSetting: () => persisted,
+          setSetting: async () => {},
+        });
+        const seeded = (corpus) => ({ corpus: () => corpus, isSeeded: () => true });
+        const { worldScope } = buildWorldScopeState({
+          stores: { component: seeded(componentCorpus()), vocabulary: store },
+          systems: COMPONENT_SYSTEMS,
+        });
+        // THE RAIL'S BADGE AND THE OFFER READ ONE PROJECTION: the count the World rail shows for
+        // `Tags & Categories` includes these three, so a badge of 5 beside `no world tags` is the
+        // contradiction M20 names and this pins away.
+        assert.equal(worldScope.vocabulary.componentTags.length, 3, 'the vocabulary leg holds them');
+        assert.ok(
+          worldScope.vocabulary.total >= 3,
+          'and the rail`s total counts them'
+        );
+        const target = await harness.mount({
+          scope: worldScope.component,
+          systems: COMPONENT_SYSTEMS,
+          actions: recordingComponentActions().actions,
+        });
+        await selectTwo(target);
+        assert.ok(
+          !target.querySelector('[data-world-component-bulk-tags-empty]'),
+          'the `No world tags are authored yet` sentence is NOT drawn over three authored tags'
+        );
+        assert.deepEqual(
+          insetRows(target, 'tags'),
+          ['ingot', 'moss', 'ore'],
+          'the inset offers exactly the three the store publishes, by NAME, sorted'
+        );
       });
     });
 
