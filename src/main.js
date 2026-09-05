@@ -364,12 +364,14 @@ const reportManagerLoadFailure = createDeferredChunkFailureReporter({
  * having to click the one broken button first.
  *
  * EVERY READ OF `__FABRICATE_BUILD_VERSION__` IS INSIDE THE `typeof` GUARD BELOW, and there is
- * no module-scope read anywhere. The identifier is a build-time define, so it is genuinely
- * UNDECLARED wherever the define is absent - the View Lab is served with an explicit
- * `configFile` that declares no `define`, and `node --test` has no build at all - and a bare
- * read there is a `ReferenceError` during module evaluation that would take down the capture run
- * and every suite that builds the lab world. ESLint cannot catch that, precisely because the
- * identifier is declared to it as a readonly global.
+ * no module-scope read anywhere. `vite.config.js` declares the define under `build` ONLY, so the
+ * general rule is that NO SERVE-MODE CONFIG CARRIES IT and the identifier is genuinely UNDECLARED
+ * in every non-build run - the dev server, each mounted suite's harness and the screenshot lab
+ * alike - as it is under `node --test`, which has no build at all. A bare read in any of them is
+ * a `ReferenceError` during module evaluation; the View Lab is the illustration that cost the
+ * most, because a throw there takes down the capture run and every suite that builds the lab
+ * world. ESLint cannot catch it, precisely because the identifier is declared to it as a readonly
+ * global.
  *
  * The comparison itself, and the decision to stay silent unless BOTH sides are known and they
  * differ, is `buildStaleEntryNotice`'s - and is unit-tested there.
