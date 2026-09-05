@@ -200,7 +200,16 @@
                    rule resolves in favour of `triggerAriaLabel`, because it arrives through the
                    spread. `triggerClass` becomes a declared NO-OP with a `trigger` snippet: it
                    is a pass-through to this component's own button, which is then not rendered
-                   at all.
+                   at all, and `inlineSearchTrigger` still wins over BOTH while the panel is
+                   open, exactly as it wins over `triggerChip` — the two shapes contradict each
+                   other, and the inline field is the one the GM is typing into.
+
+                   The click REFUSAL is the caller's too, and it has two halves for the same
+                   reason the omission does. A snippet caller's own `disabled` attribute stops
+                   the browser dispatching the click at all; a caller that also wants this
+                   component's own guard to refuse — the `aria-disabled` shape, where the button
+                   stays focusable — passes `triggerAriaDisabled`, and one that passes `disabled`
+                   through as well gets the same answer from both.
     option       — OPTIONAL snippet that draws the row's CONTENT while this component keeps
                    owning the row ELEMENT — its `id`, its `tabindex`, its
                    `data-keyboard-focus`, its ARIA, its click and its keyboard-cursor marker
