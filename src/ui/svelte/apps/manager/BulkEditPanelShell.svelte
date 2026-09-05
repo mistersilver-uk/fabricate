@@ -36,6 +36,60 @@
    - children: the staged axes, rendered between the hero and Apply. They are FLEX ITEMS of
      this panel, so a caller emits its labels, controls and hints as siblings rather than
      wrapping them — the panel's uniform `gap` is the section rhythm.
+
+  ── FOUR PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47; r16-cat
+  ruling M24) ───
+
+  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with four
+  differences, and each is a PARAMETER here rather than a fork or an in-place restyle — the
+  standing rule for a shared primitive that must behave differently at a second site. All
+  four default to exactly what ships, so the Component, Recipe and Essence Studios render
+  byte-identically across this change.
+
+   - clearLabel: the header action's label, ALREADY LOCALIZED. `proto:626` reads `Clear`
+     where this panel reads `Clear selection`, and the shorter word is right there: the
+     action sits under a `BULK EDIT` eyebrow in a rail that is showing nothing but the
+     selection, so "selection" is the only thing it could be clearing. `''` — the default —
+     keeps the shipped phrase and its `BulkEdit.ClearSelection` key.
+
+     A CALLER'S STRING rather than a second key chosen here, following the `heading` and
+     `applyLabel` idiom directly above: a panel that wants the shorter word is a panel that
+     has decided its own rail says enough, which is a fact about that screen.
+   - hint: the hero's standing sentence, ALREADY LOCALIZED. `proto:628` writes a sentence
+     naming the staging that panel actually offers — `Pick the systems to add them to, stage
+     a category or tags, then commit below.` — where this shell's noun-free default says
+     `Stage changes below, then apply to all at once.` `''` keeps the default and its
+     `BulkEdit.SelectedHint` key.
+
+     Named `hint` because that is what this component already calls the element
+     (`.fab-bulk-edit-hero-hint`) and the key (`SelectedHint`), and what
+     `BulkSelectionToolbar` calls its own muted standing sentence. One meaning, one name.
+   - dockFoot: a snippet rendered INSIDE the dock, under Apply. `proto:791-796` puts the
+     destructive `🗑 Delete N components` and its consequence note in the same bordered,
+     pinned foot as the primary action, on the dock's own 8px column rhythm — not above it
+     and not in the scrolling body.
+
+     A SNIPPET AND NOT A PROP PAIR, because what goes there is a caller's CONTROL: the
+     catalogue stages an `ArmedDangerButton` with a note under it, and a label-plus-callback
+     prop would force this shell to grow an arm/confirm contract that belongs to that
+     component. `children` already takes the staged axes the same way, for the same reason.
+
+     IT DOES NOT MOVE THE DOCK. The dock's sticky construction and its three negative bleeds
+     are unchanged, and the comment on `.fab-bulk-edit-dock` below is still exact: what the
+     snippet adds is a second flex child inside the same box. A caller placing a TALL control
+     there makes the dock taller, which eats into the scrollport the panel above it scrolls
+     in — that is the same trade `bulk-edit-dock-pinning.test.js` already bounds for a
+     sibling delete card, and the two are alternatives rather than a stack.
+   - dockBleed: WHICH SPACING TOKEN THE DOCK BLEEDS BY (issue 1371 r16-cat, maintainer ruling
+     M24). The dock's three negative bleeds and its two compensating insets are written as the
+     SAME token as its container's padding so the two cannot drift — and that token is
+     `--fab-space-3`, the shared `.manager-inspector` rail's. `EntityListInspectorFrame`'s
+     inspector column pads `--fab-space-4`, so inside it the shipped dock stopped 4px short of
+     each edge and of the bottom, and the panel's scroller clipped it there: "a padding/
+     whitespace around the bulk edit panel that prevents the button panel from being
+     full-width". `'space-4'` restates all five declarations at that token; `''` — the
+     default — is the shipped rail's. Named for the token rather than for a consumer, because
+     what it states is a fact about the box the dock sits in, not about who put it there.
 -->
 <script>
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -47,6 +101,19 @@
     canApply = false,
     onClearSelection = () => {},
     onApply = () => {},
+    // An ALREADY-LOCALIZED override for the header action's label. `''` keeps the shipped
+    // `Clear selection`; see the props block above for why this is the caller's string.
+    clearLabel = '',
+    // An ALREADY-LOCALIZED override for the hero's standing sentence. `''` keeps the shipped
+    // noun-free copy.
+    hint = '',
+    // A snippet rendered inside the dock, UNDER Apply — the reference's destructive action and
+    // its consequence note (`proto:791-796`). Absent by default.
+    dockFoot = undefined,
+    // The spacing token the dock bleeds by: `''` (the shipped `--fab-space-3`, the shared
+    // rail's inset) or `'space-4'` (the scoped list frame's inspector column). See the props
+    // block above.
+    dockBleed = '',
     panelAttr = 'data-component-bulk-panel',
     clearAttr = 'data-component-bulk-clear',
     countAttr = 'data-component-bulk-count',
@@ -81,7 +148,10 @@
       onclick={() => onClearSelection()}
     >
       <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span>
+      <span
+        >{clearLabel ||
+          text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span
+      >
     </button>
   </header>
 
@@ -92,17 +162,22 @@
     <div class="fab-bulk-edit-hero-copy">
       <strong class="fab-bulk-edit-hero-title" {...countHook}>{heading}</strong>
       <span class="fab-bulk-edit-hero-hint"
-        >{text(
-          'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
-          'Stage changes below, then apply to all at once.'
-        )}</span
+        >{hint ||
+          text(
+            'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
+            'Stage changes below, then apply to all at once.'
+          )}</span
       >
     </div>
   </div>
 
   {@render children?.()}
 
-  <div class="fab-bulk-edit-dock">
+  <div
+    class="fab-bulk-edit-dock"
+    class:has-foot={Boolean(dockFoot)}
+    class:is-bleed-space-4={dockBleed === 'space-4'}
+  >
     <ManagerButton
       class="fab-bulk-edit-apply"
       {...applyHook}
@@ -112,6 +187,7 @@
       <i class="fas fa-check-double" aria-hidden="true"></i>
       <span>{applyLabel}</span>
     </ManagerButton>
+    {@render dockFoot?.()}
   </div>
 </section>
 
@@ -338,11 +414,59 @@
     bottom: calc(-1 * var(--fab-space-3));
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
+    /* THE DOCK'S OWN TOP INSET (issue 1371 r16-cat, maintainer ruling M24): `proto:791` and
+       `proto:1270` pad the foot `13px 17px`, and the primary action sat 4px under the hairline
+       here — Apply's own `margin-top`, which the dock inherited from the rail's bottom slot. The
+       reference's 13 is `--fab-space-3` on the scale, stated on the dock so every consumer's foot
+       breathes the same, and Apply's margin goes with it. Whole-manager: the three studios' docks
+       gain the same 8px above Apply. */
+    padding-top: var(--fab-space-3);
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
+  }
+
+  /* THE DOCK'S COLUMN RHYTHM, STATED ONLY WHEN IT HAS A SECOND CHILD (issue 1371, gap-list
+     row 47). `proto:791` draws the foot as a `flex-direction:column` with `gap:8px` between the
+     primary action and the destructive one below it.
+
+     GATED ON THE SNIPPET rather than declared unconditionally, because with one child the two
+     display modes are not obviously identical and this rule may not repaint the three studios
+     that ship today: `.fab-bulk-edit-apply` carries `margin-top: var(--fab-space-1)`, whose
+     behaviour is a block-flow question in one mode and not a question at all in the other. With
+     no `dockFoot` the class is not emitted and the dock is byte-identical to what ships.
+
+     `--fab-space-2` IS the reference's 8px, so the rhythm is a token statement rather than an
+     approximation, and the dock's own three negative bleeds above are untouched. */
+  .fab-bulk-edit-dock.has-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  /* THE FOOT'S CHILDREN MAY SHRINK TO THE RAIL (issue 1371 r16-cat, M24). A flex item's automatic
+     minimum is its min-content width, and a foot whose delete label is one `nowrap` line has a
+     min-content width of that whole line — so without this the column WIDENED past the rail to fit
+     it instead of letting the label ellipsise (measured: a 299px dock holding a 492px button). The
+     rule is on the dock's contract rather than on a consumer's wrapper because the snippet's root is
+     the consumer's markup, and every consumer needs the same answer. `:global`, since that root
+     carries the consumer's scope hash and never this one's. */
+  .fab-bulk-edit-dock.has-foot > :global(*) {
+    min-width: 0;
+  }
+
+  /* THE WIDER BLEED, FOR A CONTAINER THAT PADS `--fab-space-4` (issue 1371 r16-cat, M24). All
+     five container-bound declarations of the base rule, restated at the wider token and nothing
+     else: the sticky construction, the hairline, the fill and the shadow are the base rule's.
+     Gated on `dockBleed` so the three studios in the shared rail are byte-identical. */
+  .fab-bulk-edit-dock.is-bleed-space-4 {
+    bottom: calc(-1 * var(--fab-space-4));
+    margin-inline: calc(-1 * var(--fab-space-4));
+    margin-bottom: calc(-1 * var(--fab-space-4));
+    padding-inline: var(--fab-space-4);
+    padding-bottom: var(--fab-space-4);
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
@@ -387,7 +511,8 @@
     width: 100%;
     height: auto;
     min-height: 38px;
-    margin-top: var(--fab-space-1);
+    /* The 4px it carried moved onto the dock as its `padding-top` (M24). */
+    margin-top: 0;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;

@@ -541,6 +541,46 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     harness.remount();
   });
 
+  it('AC5: and the mode pill is the reference MICRO pill, not the default chip', async () => {
+    // `proto:5721` builds it from the prototype's own `pill()` helper (`proto:3893`):
+    // `padding: 2px 8px`, a stadium corner, `600 9.5px`. That is `Chip`'s `density="list"` to
+    // within a pixel, and it is the same scale the identity callout's `World catalogue` badge
+    // takes — the reference draws ONE micro pill and uses it in both places, so a second answer
+    // here would be a scale this screen invented.
+    const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
+    const pill = target.querySelector('[data-salvage-mode]');
+    assert.ok(
+      pill.classList.contains('is-list'),
+      `the mode pill takes the micro scale; it carried "${pill.className}"`
+    );
+    assert.ok(
+      !pill.classList.contains('is-tag-run'),
+      'and not the tag run, which is the scale of a chip a GM CLICKS — this one is read-only'
+    );
+    harness.remount();
+  });
+
+  it('AC5: and it is the SECONDARY tone — a quiet fact, not a state to act on', async () => {
+    // `proto:5721` builds the pill from the prototype's own `pill()` helper (`proto:3893`) with
+    // three arguments: the subtle surface, the plain `--fab-border` hairline and the SECONDARY
+    // ink. `tone="neutral"` — what this pill shipped with for a round — is genuinely a different
+    // statement: it inks `--fab-text-muted`, declares no fill at all, and reads as "a fact that
+    // is merely present". The mode is a step louder than that. It names the rule that decides
+    // this whole panel's shape, on a surface of its own, and it is a step quieter than any
+    // semantic family, because it is not a state the GM has to act on.
+    const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
+    const pill = target.querySelector('[data-salvage-mode]');
+    assert.ok(
+      pill.classList.contains('is-secondary'),
+      `the mode pill takes the secondary tone; it carried "${pill.className}"`
+    );
+    assert.ok(
+      !pill.classList.contains('is-neutral'),
+      'and not neutral, which paints no fill and would leave the pill on the card behind it'
+    );
+    harness.remount();
+  });
+
   it('AC5: each mode names itself', async () => {
     for (const [mode, label] of [
       ['simple', /Simple/],

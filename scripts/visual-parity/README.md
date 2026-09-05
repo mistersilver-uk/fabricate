@@ -18,12 +18,14 @@ That gap is how a whole studio shipped with the wrong card treatment, the wrong 
 ```sh
 node scripts/visual-parity/extract.mjs --spec <spec.mjs> --out <fixture.json>
 node scripts/visual-parity/compare.mjs --spec <spec.mjs> --fixture <fixture.json> [--screen <name>]
+node scripts/visual-parity/compare.mjs --spec <spec.mjs> --assert-locators
 node scripts/visual-parity/inventory.mjs --spec <spec.mjs> [--screen <name>] [--dump]
 ```
 
 `extract` drives the prototype in real Chromium and records `getComputedStyle` per named region.
 `compare` boots the **real app**, drives it to each screen and reports every computed-style difference, exiting non-zero on any.
 `inventory` is the **structural** pass: it walks the prototype's own element tree and fails on every landmark the subject has no counterpart for, against that same real app.
+`compare --assert-locators` is the **standing guard over the locator map** — see below.
 
 Run **both** halves.
 They answer different questions, and neither can answer the other's.
@@ -116,6 +118,32 @@ That is a constraint, not drift, and it is recorded the way every other constrai
 The locator is still required, and the absence is still **asserted**: the moment the app starts rendering that element the run fails, telling you to delete the note.
 An excuse that outlives the constraint is the same defect as an exemption that outlives the difference.
 
+### The locator map is a MIRROR, so it has its own guard
+
+The subject half of a spec is a hand-maintained mirror of the product's selectors, and **a hand-maintained mirror does not fail — it drifts.**
+This one drifted the worst way available to it: eighteen regions named `data-*` hooks that no source file has ever emitted, at any revision.
+They were invented in a pre-build spec and the screens then shipped under different names.
+Each printed one `nothing matched` line — honest, and indistinguishable from the hundred drift lines around it — so a third of one screen's regions measured **nothing at all** while the report read like a screen under measurement.
+
+```sh
+node scripts/visual-parity/compare.mjs --spec <spec.mjs> --assert-locators
+```
+
+It drives the same live subject through the same navigation and asks one question per subject locator: **did it resolve on its screen, or is it marked `unreachable` with a stated reason?**
+Nothing else is reported — no computed values, no alignments — so it can be run as a gate on a spec whose screens are still drifting.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- It is a **full-screen-set** run by definition and refuses `--screen`: "resolves at least once" is a claim about the whole map, and a scoped run would report every region of another screen unresolved for a reason that is the run's rather than the map's.
+- It needs **no fixture**. The roster is the spec's own `regions`, so a locator added since the last `extract` — which is exactly when one is most likely to be wrong — is audited on the first run rather than the second.
+- The **denominator is printed** beside the count. `0 unresolved` out of `0` is what a guard pointed at nothing says, and it is otherwise indistinguishable from a clean run.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+```text
+locator guard: 184 resolved, 6 unreachable (with a stated reason), 15 unresolved, of 205 subject locators
+```
+
 ### Recording a structural exemption
 
 Same discipline as a computed-style exemption, in `inventoryExemptions` on the spec, keyed by the landmark key the report prints in parentheses:
@@ -140,8 +168,9 @@ A spec is an ES module exporting:
 | `regions` | `{ name, screen, measuredOn?, groups, locator, effectiveBackground? }` per region. |
 | `alignments` | `{ name, screen, measuredOn?, edges, regions }` per edge-alignment group. |
 | `subject` | The real app: `viewport`, `root`, `open(browser)`, `navigate(page, screen)`, `locators` (region → `{ locator, effectiveBackground?, unreachable? }`), `requiredAncestors`, `chromeSweep`. |
-| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn? }`) and optional `limits`. |
+| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn?, prototypePane?, subjectPane? }`) and optional `limits`; a root is one locator or a declared SET. |
 | `inventoryExemptions` | Accepted structural divergences, key → reason. |
+| `tolerances` | Optional; property → `{ px, reason }`, the ONE place exact equality is relaxed. |
 
 A region declares property **groups** rather than properties, so adding a region cannot quietly record a narrower set than its siblings.
 The groups are in `lib/schema.js`; a spec may extend or replace them.
@@ -174,6 +203,80 @@ Nothing crosses that boundary as text now: `page.evaluate` is handed real functi
 5. Re-extract, then compare, then inventory.
 
 Step 1 alone makes both gates **fail** until steps 3 and 4 are done, which is the point.
+
+### A root is one locator, or a declared SET of them
+
+The two documents do not always have one element covering the same ground.
+
+A prototype screen root is routinely a `display: contents` wrapper over the whole screen — its
+header band AND its body grid — while the product draws the header band, the content column and the
+inspector rail as three siblings of a body grid that ALSO holds the navigation rail the prototype's
+root excludes.
+Neither the content column nor the body grid is the counterpart: one omits two thirds of the
+prototype's ground and the other adds a rail it never drew.
+
+So a root may be a set:
+
+```js
+subject: {
+  parts: ['header.manager-header', 'main.manager-main', 'aside.manager-inspector'],
+},
+subjectPane: 'main.manager-main',
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- Each part is a locator like any other and is checked like one.
+- **A part that resolves to nothing FAILS**, and the message names the part. A quietly shorter walk
+  does not report itself: it reports every landmark under the missing part as one the subject draws
+  nowhere, which is the exact false report the set exists to end.
+- **A part INSIDE another part FAILS.** Nesting enumerates the overlap twice and closes the same
+  card twice, so it surfaces as an EXTRA CARD the subject appears to draw twice — a finding about
+  the spec wearing the shape of a finding about the product.
+- **A set MUST declare its pane.** With no single root there is no box to take the card ratio from,
+  so the classifier would use whichever part is listed first, and a header band and a content column
+  are different widths. That is the silent re-calibration the declared pane already exists to end,
+  and the order of a list is not a decision anybody made.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The measured cost of not having this: on one screen, 24 of 38 MISSING lines said "the subject draws
+it nowhere" about landmarks — `add from catalogue`, `selected component`, `tags in effect`, `edit
+system rules` — that were plainly on screen in the composite beside the log.
+A false line is worse than a missing one, because a reader cannot tell it from a real one.
+
+### A tolerance, declared per property, reported not suppressed
+
+**A tolerance band on colours or lengths is the beginning of a gate that cannot fail**, and that
+rule stands.
+There is exactly one exception and it is a UNIT CONVERSION rather than a band on a decision: a
+prototype writes absolute pixels and a product may write `rem` against a 16px root, so `0.72rem`
+computes to `11.52px` against a reference `11.5px` and `0.53rem` to `8.496px` against `8.5px`.
+Twenty-eight such lines in one round were sub-hundredth differences no reader can see, that no edit
+can close without abandoning `rem`, and that every reviewer in turn re-derived as noise.
+
+```js
+export const tolerances = {
+  fontSize: { px: 0.15, reason: 'UNIT CONVERSION, not drift. …' },
+};
+```
+
+Four rules keep it from becoming the band the paragraph above refuses:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **There is no default.** A spec that declares none gets the exact-equality gate it had.
+- **It is capped** at `MAX_TOLERANCE_PX` (0.5px, refused at the boundary), an order below the
+  smallest step any published scale takes, so it cannot absorb a decision.
+- **It is validated like an exemption**: the property must be one some group measures, and the
+  reason must be at least 40 characters.
+- **It is REPORTED.** Absorbed lines print in their own `ROUNDING (N)` block with each measured
+  delta, so "these are unit conversion" stays a claim a reader can check rather than a silence.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Both values must be plain `px` lengths; a keyword, a colour or a multi-part value is never
+rounding, whatever the property, because there is no delta to be under a tolerance.
 
 ### Recording an exemption
 
@@ -212,6 +315,14 @@ The extractor measures those regions' edges **in the prototype** and records whi
 A group can therefore never demand an alignment the design does not draw, and it stops demanding one the moment the design stops.
 Both members must be measured on the same screen — two boxes that were never on screen together share no edge — and the tolerance is half a pixel, which is the resolution of the question rather than a tolerance band on a value.
 
+The alignable edges are `left`, `right` and `top`.
+`top` is there because two cards drawn side by side in one grid row share one, and a row gap or a stray margin on one of the pair staggers the row while both cards measure exactly right.
+`bottom` is deliberately absent: two cards in a row legitimately end at different heights because their CONTENT differs, so a shared bottom edge is a fact about the world's data rather than about the design.
+
+A group cannot express a relationship between two DIFFERENT edges — a column's right edge against a rail's left edge, say.
+That is a distance rather than a shared edge, it is width-derived in a `1fr / rail` grid, and a width-derived value belongs in an exemption rather than in a number.
+State the same claim on the one edge the two boxes do share: a rail and the content column beside it start level.
+
 The report names both ends and the gap:
 
 ```text
@@ -228,6 +339,7 @@ Each of these has already cost a round.
 - **Starting below the shell.** A harness that renders the panel under test, rather than the real ancestor chain, cannot see an inset that lives above it. The first version of this harness passed while 36px of stacked dead space was on screen, because the shell's padding and the grid's gap were not in the tree at all. Declare `subject.requiredAncestors`; the comparator fails when one is missing.
 - **Comparing two transparent backgrounds.** Both sides often inherit their surface and report `rgba(0, 0, 0, 0)`, so the assertion passes on *any* background whatsoever. Set `effectiveBackground: true` and the harness walks to the nearest ancestor that actually paints.
 - **A named-region list can only catch what someone named.** `subject.chromeSweep` is the complement: it reports every border, outline and scrollbar on the chrome selectors you list that paints a forbidden colour. It is what caught host chrome leaking a crimson scrollbar through a pane as two full-height rules.
+- **A `display: contents` root has no box, and the card classifier needs one.** `isCard` asks whether an element spans most of its pane, and a prototype's screen root is routinely `display: contents` — no box, `clientWidth` 0, `getBoundingClientRect()` 0x0. The first version fell through to `|| 1`, so the ratio test was `>= 0.6px` on the prototype and `>= 707px` on the subject: **two classifiers wearing one name**, comparing their own disagreement. Every bordered, rounded list ROW on the mockup became a card the subject was "missing", and no card in a two-column grid was a card on either side. The classifier now walks to the first ancestor with a box, and a root with none anywhere above it is reported rather than defaulted. Walking up is not always enough: it reaches the app SHELL, which includes a side rail the subject's own root sits inside, so a spec whose root is rootless declares `prototypePane` / `subjectPane` — the box the ratio is taken from, as data, beside the root. A declared pane that resolves to nothing FAILS rather than falling back to the walk, because a silent re-calibration is the defect this whole entry is about.
 - **A landmark nobody can SEE is not a landmark.** A mockup routinely carries a hidden branch of an alternative state, and a walk that reads a `display: none` subtree will demand the subject build a control the prototype does not draw. The classifier skips `display: none` and `visibility: hidden`, and deliberately does NOT skip the clip-path visually-hidden idiom, whose content is announced.
 - **A heading is a heading.** A presentational test — weight and size — is all a styled-components prototype can offer, and it is exactly the assumption such a prototype invites. It is wrong about the subject: a card headed by an UPPERCASE MICRO-LABEL, which is this manager's own inspector convention, sits far below any size floor, so the card read as titleless, folded into its parent, and was reported MISSING while on screen. A real `h1`–`h6` counts as a title whatever it measures.
 - **Measuring both sides cannot see one side's absence.** A region that is missing is either not in the map (nothing is asserted) or one line about a selector, and a region nobody named is invisible either way. `inventory.mjs` is the complement, and the section above states the rule it exists for.
@@ -259,6 +371,15 @@ Worked controls, all currently passing:
 | Exempt a landmark the prototype does not draw | `names a landmark this prototype does not draw` |
 | Give a locator step an op the vocabulary has no entry for | `a locator is data, never an expression` |
 | Render an `unreachable` region after all | `is marked unreachable, but the app renders it now` |
+| Point a subject locator at a hook nothing emits | `--assert-locators`: `matched nothing on screen "<name>"` |
+| Declare a `prototypePane` that resolves to nothing | `inventory pane … resolved to nothing` |
+| Enumerate a root with no box on it or any ancestor | `generates no box, and neither does any ancestor` |
+| Declare a root SET with no pane | `a root SET must declare its pane` |
+| Name a part no element answers | `resolved to nothing (one part of the declared root set)` |
+| Declare a part inside another part | `declares a part INSIDE another part` |
+| Declare a tolerance at or over the cap | `is at or over the 0.5px cap` |
+| Declare a tolerance on a property no group measures | `no property group measures it` |
+| Move a difference from 0.1px to 0.2px | it leaves `ROUNDING` and reports as `DRIFT` |
 | Restore a card-contract class the studio strips padding with | `alignment "<name>".left: … insets "<region>" 12.0px from "<region>"` |
 
 Two of these matter most, because each is a failure this harness was extended for.

@@ -639,6 +639,16 @@ test('the world defaults change NOTHING at migration time, RESOLVED VALUE by res
     macro: (record) => record.propertyMacroUuid ?? null,
     breakage: (record) => record.breakage,
     onBreak: (record) => record.onBreak,
+    // `essences` (issue 1371 r18-store, M31): the system's own map, absence reading as EMPTY on
+    // both sides, because an inheriting record with no world map elected resolves to absence and
+    // that IS its own empty map.
+    essences: (record) => {
+      const own = {};
+      for (const [id, quantity] of Object.entries(record.essences ?? {})) {
+        if (Number(quantity) > 0) own[id] = Number(quantity);
+      }
+      return own;
+    },
   };
 
   let checked = 0;
@@ -660,7 +670,7 @@ test('the world defaults change NOTHING at migration time, RESOLVED VALUE by res
       for (const section of WORLD_DEFAULT_SECTIONS[entityType]) {
         if (section === 'repairRequirements') continue;
         assert.deepEqual(
-          resolved[section] ?? null,
+          section === 'essences' ? (resolved[section] ?? {}) : (resolved[section] ?? null),
           OWN_VALUE[section](record) ?? null,
           `${entityType}.${section} for ${membership.entityId}/${membership.systemId} must ` +
             'resolve to the SYSTEM OWN value, never the donor value'

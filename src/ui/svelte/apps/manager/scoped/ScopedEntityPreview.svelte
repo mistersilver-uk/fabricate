@@ -83,6 +83,38 @@
     rules = [],
     ruleHookAttribute = '',
     ruleTile = false,
+    // THE HEAD BLOCK A CALLER DRAWS ITSELF (issue 1371, maintainer parity round 4).
+    //
+    // `identity` is a fixed anatomy — art, name, context, chips — and the reference's world
+    // Component rail is a different one: a 118px column holding a micro-label, an inventory TILE
+    // with a quantity badge and a status badge, and the name under it, beside a second column
+    // holding the resolved category, the effective tag chips and an art note. No arrangement of
+    // `identity` produces that, and `children` cannot either, because `children` renders at the
+    // very END of the rail, after the fact groups.
+    //
+    // A SNIPPET rather than another prop bag, because the block is markup the caller owns; the
+    // shell owns only where it sits. A caller passes `tile` or `identity`, never both.
+    tile = undefined,
+    // TWO INDEPENDENTLY KICKERED FACT GROUPS, in place of one flat `rules` list.
+    //
+    // The reference draws `USED BY` and `PRODUCED BY` as two kickered lists in one rail, each
+    // with its own empty sentence. `rulesKicker` + `rules` can express exactly one, so the second
+    // group had nowhere to go and the whole `Produced by` half of the model was invisible.
+    //
+    // `[{ kicker, rows, emptyNote, hookAttribute }]`. Empty by default, so every shipped caller
+    // keeps the single-list path above it untouched. A group with no rows draws its own
+    // `emptyNote` rather than vanishing: an absent group and an empty one say different things,
+    // and the reference writes a sentence for the empty one.
+    //
+    // `hookAttribute` NAMES THE GROUP, not its rows (issue 1371, maintainer parity round 5). It
+    // used to land on the `<ul>`, with the kicker a SIBLING before it, so no selector reached a
+    // group's label at all and a parity lane had to report both rail kickers as unmeasurable.
+    // See the wrapper in the markup below for why it generates no box.
+    factGroups = [],
+    // A leading line under the head block, above the first fact group: the reference's
+    // `Across every system that has rules for it.` Empty renders nothing.
+    scopeNote = '',
+    scopeNoteHook = '',
     explainer = null,
     children,
   } = $props();
@@ -92,6 +124,17 @@
     identity?.hookAttribute ? { [identity.hookAttribute]: true } : {}
   );
   const liveAttributes = $derived(liveNoteHook ? { [liveNoteHook]: true } : {});
+  const scopeNoteAttributes = $derived(scopeNoteHook ? { [scopeNoteHook]: true } : {});
+
+  /**
+   * One fact group's own hook, so a mounted assertion can name the group it means.
+   *
+   * @param {object} group
+   * @returns {object}
+   */
+  function groupAttributes(group) {
+    return group?.hookAttribute ? { [group.hookAttribute]: true } : {};
+  }
 
   function ruleAttributes(rule) {
     return ruleHookAttribute ? { [ruleHookAttribute]: rule.id } : {};
@@ -100,6 +143,10 @@
 
 <aside class={classPrefix} {...asideAttributes} aria-label={ariaLabel}>
   <p class="manager-kicker">{kicker}</p>
+  {@render tile?.()}
+  {#if scopeNote}
+    <p class={`${classPrefix}-scope-note`} {...scopeNoteAttributes}>{scopeNote}</p>
+  {/if}
   {#if identity}
     <div class={`${classPrefix}-identity`} {...identityAttributes}>
       <img src={identity.image} alt="" />
@@ -155,6 +202,57 @@
       {/each}
     </ul>
   {/if}
+  <!--
+    THE KICKERED FACT GROUPS. Each draws its own kicker, its own rows and — when it has none —
+    its own sentence, because "no recipe requires it yet" and "this rail has no `Used by` group"
+    are different claims and only the first is ever true here.
+
+    THE GROUP'S OWN HOOK IS ON THIS WRAPPER, so `[hook]` means the group and `[hook] .manager-kicker`
+    reaches its label. On the `<ul>` it named the ROWS: the kicker was a sibling before it, nothing
+    could select it, and an empty group's hook and a populated one's landed on different elements.
+
+    `display: contents` IS WHY THE WRAPPER COSTS NOTHING. The rail is a column flexbox with its own
+    gap, so a wrapper that generated a box would make each group ONE flex item and collapse the
+    space between a kicker and its own rows to zero. With `display: contents` the wrapper generates
+    no box at all and both children stay direct participants in the rail's layout, so every
+    rendered pixel is what it was.
+
+    IT IS AN INLINE STYLE BECAUSE THIS COMPONENT HAS NO SCOPED BLOCK AND MUST NOT GROW ONE. The
+    class stem is a PROP — see the note at the top of this file — so a scoped selector over
+    `${classPrefix}-…` cannot be proven used and Svelte emits the unused-selector warning
+    `lint:svelte:warnings` fails on; and adding ANY `<style>` here would restamp every element in
+    this shell with a new scope class, which is a rendering change to six editors to buy one
+    declaration. The host sheet is closed to this lane by `### GM World Scoped Entity Routes`
+    requirement 7, and a `${classPrefix}-` class here would need a rule under BOTH stems.
+
+    ONE CONSEQUENCE FOR CALLERS: the rows are now a GRANDCHILD of the hook, so a selector written
+    `[hook] > li` no longer resolves and has to be `[hook] li`.
+  -->
+  {#each factGroups as group, index (group.kicker || index)}
+    <div style="display: contents" {...groupAttributes(group)}>
+      <p class="manager-kicker">{group.kicker}</p>
+      {#if (group.rows ?? []).length > 0}
+        <ul class={`${classPrefix}-rules`}>
+          {#each group.rows as row (row.id)}
+            <li {...ruleHookAttribute ? { [ruleHookAttribute]: row.id } : {}}>
+              <IconFactRow
+                icon={row.icon}
+                title={row.title}
+                subtitle={row.subtitle}
+                titleAttr={row.titleAttr || ''}
+                badge={row.badge || ''}
+                badgeTone={row.badgeTone || 'neutral'}
+                tile={ruleTile}
+                density="rule"
+              />
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class={`${classPrefix}-fact-empty`}>{group.emptyNote}</p>
+      {/if}
+    </div>
+  {/each}
   {#if explainer}
     <ExplainerCard
       icon={explainer.icon}

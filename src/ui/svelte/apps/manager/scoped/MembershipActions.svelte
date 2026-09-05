@@ -10,8 +10,12 @@
   it), so a switch here would write a value that vanishes on the next `load()` while reading
   back as an authored choice. A caller that passed `enabled` anyway is simply ignored.
 
-  ADDING inherits every section, and the copy says so. REMOVING deletes only this record and
-  its overrides; the world entity and every other system are untouched. Removal is ARMED
+  ADDING inherits every section, and the copy says so. WHAT REMOVING DOES DEPENDS ON THE ENTITY
+  TYPE, and so does the sentence the armed control announces: an essence or tool removal drops
+  this record and its overrides and touches nothing else, while a COMPONENT removal runs the
+  in-system delete cascade and disables the recipes it leaves unbuildable. That answer is read
+  from the descriptor beside `enableable` rather than taken from a caller — see its derivation.
+  Removal is ARMED
   rather than confirmed by a dialog, through the shipped `ArmedDangerButton`, whose token is
   keyed on the DOCUMENT ID pair rather than a row index — a re-projected list must not be
   able to arm one row and delete another.
@@ -117,12 +121,32 @@
       { entity: entityName || entityId, system: systemName || systemId }
     )
   );
+  // WHETHER REMOVAL CASCADES IS A PROPERTY OF THE ENTITY TYPE, so the sentence is READ FROM THE
+  // DESCRIPTOR and never from a caller's flag — the same rule this cluster already applies to
+  // `enableable`, and for the same reason: a caller's opinion cannot make a store do something.
+  //
+  // Only the COMPONENT path cascades. `partComponentFromSystem` runs the in-system delete through
+  // `deleteComponents`, which repairs every reference, disables the recipes left without a usable
+  // ingredient set or result, cleans up salvage and reconciles alchemy. `partEssenceFromSystem`
+  // filters `essenceDefinitions` and writes — no reference repair, no recipe disable — and the
+  // tool path is the generic verb, which does neither either.
+  //
+  // Revision 9 disclosed the cascade on the SHARED key, which this one cluster renders for all
+  // three types, so every essence and tool row began announcing a repair its own store never
+  // performs. That is the same class of defect as asserting the unconsumed half of the tag merge.
+  const removalCascades = $derived(entityType === 'component');
   const removeConsequence = $derived(
-    formatted(
-      'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConsequence',
-      'Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched.',
-      { entity: entityName || entityId, system: systemName || systemId }
-    )
+    removalCascades
+      ? formatted(
+          'FABRICATE.Admin.Manager.Scoped.Component.RemoveConsequence',
+          'Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.',
+          { entity: entityName || entityId, system: systemName || systemId }
+        )
+      : formatted(
+          'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConsequence',
+          'Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched.',
+          { entity: entityName || entityId, system: systemName || systemId }
+        )
   );
 </script>
 

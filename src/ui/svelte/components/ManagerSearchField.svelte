@@ -86,6 +86,25 @@
      (`fabricate.css:15183`). Three converted sites take it, all in the gathering task
      editor. A boolean rather than a `density` string because the sheet declares
      exactly two states and the base one is the absence of the class.
+   - size: the control-height RUNG, as a string naming the rung — `''` (the shipped 34px
+     field) or `'38'` (issue 1371, maintainer ruling M12b). It is a STRING NAMING A NUMBER
+     rather than a boolean, because the ladder
+     (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44) has six rungs and a
+     boolean can only ever express the second of them — the next reference that draws a 30px
+     field would add `tall`, then `short`, and the prop would be a bag of adjectives standing
+     in for a published scale. `compact` above is the one that stayed a boolean, and it stayed
+     one because it is not a rung at all: it is a WIDTH (`min(220px, 30%)`) with a height
+     attached, which is a density and not a size.
+
+     An unrecognised value resolves to `''` — the shipped field — exactly as `Chip`'s
+     unrecognised tone does, so a typo renders the default rather than emitting an unstyled
+     `is-size-*`. The set is closed at `38` because 38 is the only rung any reference asks this
+     field for; adding the next one is one entry in `SIZE_CLASSES` and one rule in the sheet.
+
+     The class it emits is `is-size-38`, in `styles/fabricate.css`'s appended `r8-prim` block
+     (this component has no scoped `<style>` — see below). The token names the axis as well as
+     the rung: a bare `is-38` in a class list beside `is-compact` states a number and not what
+     the number is of.
    - class: an EXTRA class, appended after the primitive's own and after `is-compact`,
      which is the order all 22 hand-rolled sites already wrote
      (`manager-search is-compact manager-task-component-tag-search`,
@@ -124,6 +143,9 @@
     ariaLabel = undefined,
     // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:15183`).
     compact = false,
+    // The control-height RUNG, named after the rung rather than after an adjective. `''` is the
+    // shipped 34px field; see the props block above for why this is a string and `compact` is not.
+    size = '',
     // An EXTRA class, appended after the primitive's own and after `is-compact` — never a
     // replacement. Named rather than a rest key for the reason `InspectorCard.svelte` records.
     class: extraClass = '',
@@ -133,8 +155,33 @@
     ...rest
   } = $props();
 
+  /**
+   * The rungs this field can be asked for, and the class each one emits.
+   *
+   * A NAMED MAPPING RATHER THAN AN `is-size-${size}` TEMPLATE, for `ManagerButton`'s
+   * `ROLE_CLASSES` reason and for one more of its own. The shared one: the rung set is closed, so
+   * an unrecognised value must render the shipped 34px field rather than emit an unstyled
+   * `is-size-<whatever the caller composed>`. The one that is this file's:
+   * `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`/`has-` class through a
+   * positional wildcard — one `is-${state}` site would otherwise license every `.is-*` rule in a
+   * 26k-line sheet — so a class this component only ever BUILDS is not a class the dead-rule gate
+   * can see a customer for. Written as a literal it is live by that gate's first rule.
+   *
+   * The keys are strings because a rung is a NAME here and not an arithmetic quantity: nothing
+   * adds or compares it, and a numeric prop invites `size={38}` and `size={37}` alike with only
+   * the sheet to say which of the two exists.
+   */
+  const SIZE_CLASSES = { 38: 'is-size-38' };
+
+  // `Object.hasOwn`, not a plain index, for `ManagerButton`'s reason: a plain read finds
+  // `toString` on `Object.prototype` and the closed-set contract would hold only for values that
+  // are not names on it.
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
+  );
+
   const classes = $derived(
-    ['manager-search', compact ? 'is-compact' : '', extraClass].filter(Boolean).join(' ')
+    ['manager-search', compact ? 'is-compact' : '', sizeClass, extraClass].filter(Boolean).join(' ')
   );
 
   /**

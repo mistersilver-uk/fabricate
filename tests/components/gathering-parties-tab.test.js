@@ -33,6 +33,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',

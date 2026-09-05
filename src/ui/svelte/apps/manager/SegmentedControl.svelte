@@ -22,7 +22,9 @@
      radio ITSELF, not merely onto a class: `select()` only guards `next !== value`,
      so a dimmed-but-live segment would still fire onChange. `count` renders a trailing
      tally so a segment can say how many rows choosing it would show — omitted by every
-     existing consumer, and a non-finite value renders nothing rather than `NaN`.
+     existing consumer, and a non-finite value renders nothing rather than `NaN`. `badge`
+     (issue 1371) is that SAME tally in the mono face, for a filter the reference draws that
+     way; a caller passes `count` or `badge`, never both.
    - value: the currently selected option `value`.
    - onChange(value): called with the chosen option's `value` on selection.
    - groupName: the shared radio `name` (must be unique per rendered control).
@@ -35,6 +37,13 @@
      share it equally (each `flex: 1 1 0`), rather than the default inline track
      hugging its content. The recipe rail's Step-mode control opts in; the other
      uses (whenSpent, learning scope) keep the default inline sizing.
+   - shape?: '' (the shipped track) or 'pill' — the CONSTRUCTION, orthogonal to `density`
+     (which is the scale) and to `tone` (which is the paint). The reference draws its
+     filter controls as a RUN OF SEPARATE PILLS rather than as tiles inside a frame
+     (`proto:5457`, the world Component entry's `All / With rules / Without`): no track fill,
+     no track edge, no track padding, radius 999 on each segment, and every segment at 600
+     because a pill run has no resting/chosen WEIGHT contrast — each pill carries its own
+     edge instead. Opt-in, so every existing consumer keeps the framed track.
    - iconOnly?: when true each segment renders its `icon` glyph alone in a compact
      square tile and the label is CLIPPED rather than dropped (issue 1036). See the
      `is-icon-only` CSS below for why the markup is unchanged and the accessible
@@ -92,7 +101,32 @@
     // `density`: the design draws this control at one size only, and a caller free to combine
     // the two would be choosing between two sets of the same four properties at equal
     // specificity, decided by source order.
+    //
+    // 'accent' (issue 1371, maintainer parity round 4) is the COHORT filter's family: the
+    // reference's system rules list draws its `In this system` / `All world components` switch
+    // with the chosen segment FILLED `--fab-accent` on `--fab-on-accent` and the idle one
+    // unfilled, unbordered and in `--fab-text-muted` (`proto:1558`). Unlike `tag` it carries no
+    // scale of its own — it is colour only — so it composes with `density="compact"`, which is
+    // the rung the reference's `padding: 5px 11px` / radius-6 / 10.5px-600 segment lands on.
+    // That is deliberate and is why it is spelled as a `tone` rather than a fourth `density`:
+    // the geometry is already a shipped rung and only the paint is new.
+    //
+    // 'accent-soft' (issue 1371) is the OTHER accent control the reference draws, and it is a
+    // second value rather than a repaint of `accent` because both ship. `accent` is the cohort
+    // SWITCH at `proto:1558`: the chosen segment solid `--fab-accent` on `--fab-on-accent`, the
+    // idle one unfilled, unbordered and muted — two alternative views of one thing, where only
+    // the chosen one has a face. `accent-soft` is the FILTER at `proto:5457`, where every
+    // segment has a face: the idle one a real tile on `--fab-bg-1` behind a `--fab-border`
+    // hairline, the chosen one `--fab-accent-soft` inside `--fab-accent-border` in `--fab-accent`
+    // ink. All three of those accent tokens are byte-equal to the reference's own values here, so
+    // this is a token statement rather than an approximation.
+    //
+    // Like `accent` it carries NO scale, so it composes with `density="compact"` — the rung the
+    // reference's 10.5px segment already lands on — and with `shape="pill"`, which is the corner
+    // and the frameless track. Note for anyone matching on strings: `is-accent` is a PREFIX of
+    // `is-accent-soft`, and only a whole-token match tells the two apart.
     tone = '',
+    shape = '',
   } = $props();
 
   function text(key, fallback) {
@@ -116,7 +150,7 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -144,6 +178,23 @@
       <span class="manager-segment-label">{text(option.labelKey, option.fallback)}</span>
       {#if Number.isFinite(option.count)}
         <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
+      {/if}
+      <!--
+        `badge` IS `count`'S MONO PRESENTATION, not a second tally (issue 1371, round 4).
+
+        The reference draws a filter segment as `label` + a numeral in the MONO face, and the
+        shipped `count` slot draws the same number in the track's sans. Rather than a second
+        element with a second meaning — which is the duplication a shared primitive exists to
+        stop — `badge` reuses the slot and changes only the face. A caller passes one or the
+        other; passing both is a caller error and renders two numerals, which is visible.
+
+        The mono face ships 400 and 500 only (`design-system/spec.md:230-231`), so the
+        reference's `font:700 …var(--mono)` numeral lands on 500.
+      -->
+      {#if option.badge !== undefined && option.badge !== null && option.badge !== ''}
+        <span class="manager-segment-count is-badge" data-segment-badge={option.badge}
+          >{option.badge}</span
+        >
       {/if}
     </label>
   {/each}
@@ -343,6 +394,123 @@
     border: 0;
   }
 
+  /* PILL SHAPE (issue 1371): a RUN OF SEPARATE PILLS, not tiles in a frame. `proto:5457` draws
+     the entry's system filter with no track box at all — the pills sit directly in the toolbar
+     row — so the track gives up its fill, its edge and its padding, and what is left of it is the
+     flex row and the gap between the pills.
+
+     THE GAP IS `--fab-space-2`. The reference's toolbar sets 9px between every one of its
+     children, which is off the published 4px spacing scale that
+     `tests/components/spacing-scale-ratchet.test.js` enforces as a ratchet; 8px is the nearest
+     step, and it is the same step the row's other gaps snap to.
+
+     WRITTEN AFTER `is-compact` AND `is-field` ON PURPOSE. `.manager-segmented.is-pill
+     .manager-segment` ties `.manager-segmented.is-compact .manager-segment` on specificity —
+     both are two classes plus one — so ORDER is what decides the corner, and a pill run written
+     above them would silently keep the density's 6px radius. The same is true of the weight
+     rule below against each density's `:not(.is-active)` block.
+
+     `border-color: transparent` rather than `border: 0`, so the track keeps the 1px it
+     contributes to the row's height and nothing above it reflows when a caller opts in. */
+  .manager-segmented.is-pill {
+    gap: var(--fab-space-2);
+    padding: 0;
+    border-color: transparent;
+    border-radius: 0;
+    background: none;
+  }
+
+  .manager-segmented.is-pill .manager-segment {
+    border-radius: 999px;
+  }
+
+  /* Every segment at 600. A framed track says which segment is chosen partly by WEIGHT — the
+     densities above drop their idle segments to 500 — but a pill run says it with the pill's own
+     face, and the reference draws all three at 600. `:not(.is-active)` reaches the segments those
+     density rules reach, and only them: the chosen segment is already 600 from
+     `.manager-segment.is-active`. */
+  .manager-segmented.is-pill .manager-segment:not(.is-active) {
+    font-weight: 600;
+  }
+
+  /* ACCENT TONE (issue 1371): colour only. It states the chosen segment's fill and ink and the
+     idle segment's ink, and nothing about size — see the `tone` note. Written after the
+     `is-compact` block it composes with, so the fill wins over that block's active paint at
+     equal specificity, and after nothing else, because nothing else declares these two. */
+  .manager-segmented.is-accent .manager-segment.is-active {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+  }
+
+  .manager-segmented.is-accent .manager-segment:not(.is-active) {
+    border-color: transparent;
+    background: none;
+    color: var(--fab-text-muted);
+  }
+
+  /* The numeral rides the segment's own ink in both states, so the chosen segment's count is
+     legible on the accent fill rather than staying in the muted grey the base rule gives it.
+     BOTH selectors carry `.is-active` / `:not(.is-active)` to reach (0,4,0): the shipped
+     `.manager-segment.is-active .manager-segment-count` below is (0,3,0) and is written LATER
+     in this block, so a (0,3,0) rule here would lose the chosen segment's numeral to it. */
+  .manager-segmented.is-accent .manager-segment.is-active .manager-segment-count {
+    color: inherit;
+  }
+
+  .manager-segmented.is-accent .manager-segment:not(.is-active) .manager-segment-count {
+    color: inherit;
+  }
+
+  /* SOFT ACCENT TONE (issue 1371): the filter's paint, where BOTH states have a face. Colour
+     only — see the `tone` note — so it states no size and composes with `density="compact"` and
+     `shape="pill"`. `proto:5457` verbatim, and every value is the token that already holds it:
+     the reference's accent at sixteen percent IS `--fab-accent-soft`, its accent at forty-eight
+     IS `--fab-accent-border`, and its solid accent IS `--fab-accent` — measured byte for byte in
+     this theme, not approximated — which is why nothing here has to be written as a literal, and
+     why this note names the tokens rather than quoting the reference's raw values:
+     `theme-colour-contract.test.js` scans prose under `src/ui/**` as well as declarations. That
+     these three tokens are the ones this tone states is pinned by
+     `segmented-control-mounted.test.js`; that each equals the reference was measured once, from
+     the design's own markup, and is recorded in the issue rather than re-derived here.
+
+     `--fab-bg-1` for the idle fill is the ONE licensed departure, and it is this epic's standing
+     one: the reference draws the darker ramp step and the shipped ramp is a step brighter
+     throughout (the issue-676 ruling), so the token that HOLDS this role here is `--fab-bg-1`,
+     and reaching down to `--fab-bg-0` to match the reference's own value would put this control
+     on a different ramp from the card it sits in.
+
+     Written after the `is-compact` and `is-field` blocks it composes with, so its fills win over
+     their active paint at equal specificity, and after `is-accent` so the two accent controls read
+     in the order they were built. */
+  .manager-segmented.is-accent-soft .manager-segment.is-active {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+  }
+
+  .manager-segmented.is-accent-soft .manager-segment:not(.is-active) {
+    border-color: var(--fab-border);
+    background: var(--fab-bg-1);
+    color: var(--fab-text-muted);
+  }
+
+  /* THE CHOSEN SEGMENT'S TALLY, and ONLY the chosen one's. `proto:5457` inks the numeral
+     `var(--accent)` when its segment is chosen and `var(--subtle)` when it is not, so the chosen
+     one has to leave the shipped `.manager-segment.is-active .manager-segment-count`'s
+     `--fab-text-secondary` — grey on an accent face — and follow the segment instead.
+
+     THE IDLE ONE IS DELIBERATELY NOT RESTATED, which is a measurement rather than an omission.
+     `.manager-segment-count.is-badge` already declares `--fab-text-subtle`, which IS the
+     reference's `var(--subtle)`, and a `:not(.is-active)` rule here would out-specify it and pull
+     the idle numeral up to the segment's `--fab-text-muted` — a step brighter than the reference
+     draws it. A plain `count` consumer's idle numeral is `--fab-text-muted` from the base rule
+     either way, so the rule would be a no-op there and a regression on the slot the reference
+     actually uses. */
+  .manager-segmented.is-accent-soft .manager-segment.is-active .manager-segment-count {
+    color: inherit;
+  }
+
   .manager-segment {
     display: inline-flex;
     align-items: center;
@@ -367,6 +535,19 @@
     font-weight: 600;
     font-size: 0.66rem;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* The MONO presentation. Weight 500 is the ceiling the mono face ships
+     (`design-system/spec.md:230-231`), so the reference's 700 lands here. */
+  .manager-segment-count.is-badge {
+    font-family: var(--fab-font-mono);
+    font-weight: 500;
+    font-size: 0.6rem;
+    color: var(--fab-text-subtle);
+  }
+
+  .manager-segment-input:checked ~ .manager-segment-count.is-badge {
+    color: inherit;
   }
 
   .manager-segment.is-active .manager-segment-count {

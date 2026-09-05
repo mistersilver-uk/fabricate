@@ -569,7 +569,8 @@ describe('the NON-SECTION behaviour keys are re-derived from the in-system recor
     const [row] = manager.resolveScopedComponents(system);
 
     assert.equal(row.member, true);
-    assert.deepEqual(row.inherited, { category: false });
+    // Both component sections since issue 1371 r18-store (M31); the omitted `essences` switch inherits.
+    assert.deepEqual(row.inherited, { category: false, essences: true });
   });
 });
 

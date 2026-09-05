@@ -336,6 +336,129 @@ export function countComponentsChangingEssences(selectedCards, stagedEssences) {
 }
 
 /**
+ * The axes a draft stages, in the order the reference's foot names them (issue 1371 r16-list,
+ * `proto:5523`-`5528`): `category`, `tags`, `essences`, `difficulty`.
+ *
+ * Reads the SAME predicates `bulkDraftHasChanges` reads — a removal-only tag draft and a staged
+ * all-zero essence map are both axes — so the foot's `Apply tags to 3 components` and the Apply
+ * gate cannot disagree about whether anything is staged.
+ *
+ * @param {ComponentBulkDraft} draft
+ * @returns {Array<'category'|'tags'|'essences'|'difficulty'>}
+ */
+export function stagedBulkAxes(draft) {
+  const next = readDraft(draft);
+  const axes = [];
+  if (next.category.trim()) axes.push('category');
+  if (next.tagAdd.length > 0 || next.tagRemove.length > 0) axes.push('tags');
+  if (next.essencesStaged) axes.push('essences');
+  if (next.difficultyStaged) axes.push('difficulty');
+  return axes;
+}
+
+/**
+ * How many of the selected components' effective category is `category` — the `n/N` an inset
+ * row states beside the value it would write (`proto:5571`, `carried`).
+ *
+ * @param {Array<{category?: string}>} selectedCards
+ * @param {string} category
+ * @returns {number}
+ */
+export function countSelectedWithCategory(selectedCards, category) {
+  const wanted = String(category ?? '');
+  return (Array.isArray(selectedCards) ? selectedCards : []).filter(
+    (card) => String(card?.category ?? '') === wanted
+  ).length;
+}
+
+/**
+ * How many of the selected components already carry `tag`, compared case-insensitively because
+ * the `itemTags` vocabulary and the write primitive both store tags lowercase.
+ *
+ * @param {Array<{tags?: string[]}>} selectedCards
+ * @param {string} tag
+ * @returns {number}
+ */
+export function countSelectedWithTag(selectedCards, tag) {
+  const wanted = String(tag ?? '').toLowerCase();
+  return (Array.isArray(selectedCards) ? selectedCards : []).filter((card) =>
+    (Array.isArray(card?.tags) ? card.tags : []).some(
+      (entry) => String(entry ?? '').toLowerCase() === wanted
+    )
+  ).length;
+}
+
+/**
+ * How many of the selected components carry a POSITIVE quantity of `essenceId`.
+ *
+ * Reads the PROJECTED `essences` ARRAY (`[{id, quantity}]`), like `countComponentsChangingEssences`,
+ * and a projected zero is not a carrier: `_normalizeEssenceQuantities` drops non-positive values,
+ * so a zero in the projection is a value the write would never have kept.
+ *
+ * @param {Array<{essences?: {id: string, quantity: number}[]}>} selectedCards
+ * @param {string} essenceId
+ * @returns {number}
+ */
+export function countSelectedWithEssence(selectedCards, essenceId) {
+  const wanted = String(essenceId ?? '').trim();
+  return (Array.isArray(selectedCards) ? selectedCards : []).filter((card) =>
+    (Array.isArray(card?.essences) ? card.essences : []).some(
+      (entry) => String(entry?.id ?? '').trim() === wanted && clampQuantity(entry?.quantity) > 0
+    )
+  ).length;
+}
+
+/** The reference's inset window: five rows, so the groups below never move on a keystroke. */
+const INSET_PAGE_SIZE = 5;
+
+/**
+ * One staging inset's visible page: the rows whose `name` survives the search, windowed.
+ *
+ * SHARED BY EVERY INSET the system bulk panel draws (`proto:1120`-`1240` draws the same object
+ * for categories, tags and essences), so the search predicate, the window size and the range
+ * arithmetic cannot drift between them. It deliberately imports nothing: the world panel keeps
+ * its twin beside its only caller for the manifest reason it records, and this module is already
+ * in every mounted closure that renders the rules list, so a new import here would be a new
+ * required entry in each of them — and a missing entry hangs a suite rather than failing it.
+ *
+ * `pageCount` is never 0: an empty match is one empty page, so a pager reads `1/1` over
+ * `Showing 0-0 of 0` rather than dividing by nothing.
+ *
+ * @param {Array<{id: string, name: string}>} items
+ * @param {{query?: string, pageIndex?: number, pageSize?: number}} view
+ * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
+ *   rangeStart: number, rangeEnd: number}}
+ */
+export function pageBulkInsetRows(
+  items,
+  { query = '', pageIndex = 0, pageSize = INSET_PAGE_SIZE } = {}
+) {
+  const needle = String(query ?? '')
+    .trim()
+    .toLowerCase();
+  const matched = (Array.isArray(items) ? items : []).filter(
+    (item) =>
+      !needle ||
+      String(item?.name ?? '')
+        .toLowerCase()
+        .includes(needle)
+  );
+  const size = Math.max(1, Math.trunc(Number(pageSize)) || INSET_PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(matched.length / size));
+  const index = Math.min(Math.max(0, Math.trunc(Number(pageIndex)) || 0), pageCount - 1);
+  const start = index * size;
+  const rows = matched.slice(start, start + size);
+  return {
+    rows,
+    pageIndex: index,
+    pageCount,
+    total: matched.length,
+    rangeStart: rows.length > 0 ? start + 1 : 0,
+    rangeEnd: rows.length > 0 ? start + rows.length : 0,
+  };
+}
+
+/**
  * The selection helpers this module used to define, re-exported under the names every call
  * site already imports.
  *

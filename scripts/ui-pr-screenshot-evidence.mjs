@@ -119,14 +119,20 @@ const TOOL_STUDIO_MATCHES = [
 // studios render" — a mirror with nothing checking the copies agreed, and a literal Sonar's
 // Automatic Analysis counts twice besides. There is now one.
 //
-// The five files it names are `evidence: 'targeted'` rows in
+// The four files it names are `evidence: 'targeted'` rows in
 // `scripts/lib/designSystemPrimitives.js`, which is the same judgement stated from the design
 // system's side: these are shared primitives whose consumers are few enough to attribute a frame
 // to. `tests/design-system-primitives.test.js` binds the two, so promoting one of them to a broad
 // signal there — which would route it to the representative pair and away from the bulk frames
 // this list sends it to — fails rather than silently splitting the two registries' answers.
+//
+// `BulkEditSelect` LEFT this pattern for issue 1371 r16-list (maintainer ruling M23): the system
+// Component Rules bulk panel stopped rendering a select when its category axis became the
+// reference's inline inset, so the Recipe Studio is its one caller and it is routed to the recipe
+// frames alone, below. It is a `notAPrimitive` row now, with that caller named.
 const BULK_STUDIO_SURFACE_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard)\.svelte$/;
+const RECIPE_BULK_SELECT_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkEditSelect\.svelte$/;
 
 // The Component Studio BROWSER's own files (issue 676): the view and every component in
 // `components/`, which is the browser's directory (`component/` is the EDITOR's, mirroring
@@ -135,6 +141,9 @@ const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
   BULK_STUDIO_SURFACE_PATTERN,
+  // The Component Studio's three staging insets (issue 1371 r16-list, M23) render through this
+  // one component, which sits directly under `apps/manager/` and would otherwise map to no view.
+  /^src\/ui\/svelte\/apps\/manager\/BulkStagingInset\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -175,6 +184,9 @@ const RECIPES_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
   BULK_STUDIO_SURFACE_PATTERN,
+  // The Recipe Studio's leave-unchanged select, which is ITS alone since issue 1371 r16-list — see
+  // `BULK_STUDIO_SURFACE_PATTERN`.
+  RECIPE_BULK_SELECT_PATTERN,
 ];
 
 // A single-frame recipes-browser view: one same-named smoke label over the shared browser match

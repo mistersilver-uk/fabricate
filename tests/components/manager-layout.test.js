@@ -4500,15 +4500,17 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // re-bordered. `:not([type='radio'])` excludes the custom resolution radios for the
   // same reason — the text-field treatment tied their own rule on specificity and, later
   // in the file, squared the dot and stretched it to fill the flex line.
-  // `.manager-component-inline-control` joins it because it renders OUTSIDE a
-  // `.manager-field` and would otherwise inherit Foundry's native control.
   // `:not([type='range'])` (issue 883) excludes the chance slider, whose 6px track and
   // coloured fill are painted BEHIND a transparent input that this rule was stretching to
   // 36px and filling opaquely.
+  // The list used to end in `.manager-component-inline-control`, a class no source file
+  // emits since the issue-1371 rebuild gave the Category select a card of its own. It was
+  // removed from all three of the sheet's lists at revision 8, and this anchor with it: a
+  // retired selector kept inside a live selector list is dead CSS the block-granular
+  // dead-class gate cannot see, and a test anchor naming it kept it alive by hand.
   const fieldInputBlock = blockFor(
     ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
-      '.fabricate-manager .manager-field select,\n' +
-      '.fabricate-manager .manager-component-inline-control'
+      '.fabricate-manager .manager-field select'
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
@@ -6639,133 +6641,196 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
 // guard ties the template to the markup rather than to a literal value: adding a section
 // without widening the template reintroduces exactly that defect, and before this test no
 // coverage existed for this route at all.
-test('the Books & Scrolls route names one grid track per section and grows the table', () => {
-  const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
-  // Matched as a pattern, not as `<main class="manager-main`: Prettier (issue 923) prints an
-  // element with several attributes one per line, so the class no longer sits on the open tag's
-  // own line. That miss failed LOUDLY but unhelpfully rather than silently: `indexOf` returned
-  // -1, `slice(-1)` kept only the file's last character, and the child count came out 0 against
-  // an expected 3. Anchoring on the tag name alone removes the dependence on attribute layout.
+/**
+ * ONE GUARD FOR THE THREE ROUTES THAT DECLARE THEIR OWN `grid-template-rows` (issue 1371,
+ * round 3), because it is one defect family and it has now shipped three times.
+ *
+ * ## The defect
+ *
+ * `.manager-main` is a grid whose row track list is named in the sheet, per route. A child added
+ * to the markup without a track added to the sheet shifts every later child one track down: the
+ * last named track is `minmax(0, 1fr)` and its MIN IS 0, so whichever child lands there collapses
+ * to nothing and paints over its neighbours. On `components` that put the toolbar — its filter
+ * row, its inherit summary and its count — on top of rows 1 to 3 of the list. The sheet's own
+ * comments record the same off-by-one for the same route from issue 676; it happened again
+ * because nothing measured it.
+ *
+ * ## Why one function rather than three tests
+ *
+ * The three guards were near-identical bodies differing in a file name, a selector, a count and
+ * two message strings. SonarCloud's copy-paste detector matches by token SHAPE rather than by
+ * literal, so that is duplicated new lines against the quality gate — and worse, the three copies
+ * had already DRIFTED: `books-scrolls` used a hand-listed tag alternation while the other two used
+ * the general matcher, so the same markup was counted two ways in one file. One function makes the
+ * matcher one thing by construction.
+ *
+ * ## The child matcher
+ *
+ * ANY two-space-indented opening tag, element or COMPONENT, rather than a hand-listed alternation.
+ * A list does not fail on an unknown tag: it silently stops counting one, and the track assertion
+ * then compares a short count against a short template and passes. Issue 1429 turned a grid child
+ * into `<VocabularyTabs>`, a name no list was holding, and `<Pagination>` and
+ * `<SharedDefinitionCallout>` are capitalised too.
+ *
+ * That opener is DESCRIBED rather than quoted, deliberately. This file's own `withoutComments`
+ * strips comments with a non-greedy regex over the RAW text, so a comment that spells the opener
+ * pairs with the next closer anywhere below it and deletes everything between — it once silently
+ * blanked two fixtures 200k characters later. The lookahead is not decoration either: without it
+ * the pattern ends in a `*` quantifier followed by the regex's closing slash, and that sequence IS
+ * a block-comment terminator to every raw-text stripper here.
+ *
+ * ## And the count must be UNCONDITIONAL
+ *
+ * A `{#if}` at grid level makes the child count a function of state, and no static track list can
+ * be right for two different counts — the collapsing track simply moves depending on what is
+ * rendered. So a top-level block opener is a FAILURE rather than something to count: the repair is
+ * always the same, wrap the conditional content in an unconditional element. That is exactly what
+ * `.manager-component-head` does on `components`, and without this assertion a probe child added
+ * as `{#if …}<section/>{/if}` was counted as zero and the whole guard passed green.
+ *
+ * @param {object} args
+ * @param {string} args.viewFile the `.svelte` under `apps/manager/`.
+ * @param {string} args.route the `data-manager-view` token, which is also the sheet selector key.
+ * @param {number} args.expectedChildren how many unconditional top-level children the view renders.
+ * @param {number} [args.growingTrackIndex] which track must be `minmax(0, 1fr)`; last by default.
+ * @param {number} [args.impliedTrailingTracks] children the sheet deliberately leaves to IMPLICIT
+ *   auto rows, with the reason at the call site. Not a licence: it is a recorded shortfall.
+ * @param {string} args.growingLabel what the growing child is, for the failure message.
+ * @param {string} args.autoLabel what the content-sized children are, for the failure message.
+ * @param {(main: string, children: string[]) => void} [args.also] route-specific extra assertions.
+ */
+function assertOneTrackPerGridChild({
+  viewFile,
+  route,
+  expectedChildren,
+  growingTrackIndex,
+  impliedTrailingTracks = 0,
+  growingLabel,
+  autoLabel,
+  also = () => {},
+}) {
+  const source = readFileSync(resolve(managerComponentDir, viewFile), 'utf8');
+  // Anchored on the TAG NAME rather than on `<main class="manager-main`, because two of these
+  // views write their attributes one per line and the class is not on the opening tag's own line.
   const mainIndex = source.search(/<main\b/);
-  assert.notEqual(mainIndex, -1, 'the route should render a <main> element');
-  // The grid tracks read below are declared against `.manager-main`, so the route carrying that
-  // class is half of this contract. Asserted separately rather than folded back into the slice
-  // anchor, so dropping the class fails here instead of quietly rebasing the child walk.
+  assert.notEqual(mainIndex, -1, `${viewFile} should render a <main> element`);
   assert.ok(
     /<main\b[^<]*class="manager-main[\s"]/.test(source),
-    'the books-scrolls route should render its content region as .manager-main'
+    `${viewFile} should render its content region as .manager-main`
   );
   const main = source.slice(mainIndex);
-  // A grid CHILD is whatever element the child renders, so `<ManagerToolbar>` counts as one
-  // (issue 1039): this route's filter bar is that primitive now and renders the same
-  // `<section>` it always did. Without the name here the walk books two children against
-  // three tracks and reports the route as having LOST a section.
-  //
-  // NAMED rather than a general `[A-Z]\w*` component pattern, and that is a scope line
-  // rather than timidity. A general pattern also picks up `<Pagination>`, which this route
-  // renders unconditionally as a fourth top-level child and which the element-only walk has
-  // never counted — so generalising would silently turn a 3-versus-3 pin into a 4-versus-3
-  // failure and demand a real change to `grid-template-rows` on a route this change does not
-  // touch. That omission is pre-existing and is reported rather than repaired here.
-  // Both routes below use the same matcher so they cannot drift apart.
-  const children = main.match(/^ {2}<(?:section|div|header|footer|nav|ManagerToolbar)\b/gm) || [];
-  assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
-  assert.equal(
-    main.includes('manager-section-header'),
-    false,
-    'the view must not render a second page header (issue 676/785)'
+
+  const conditionals = main.match(/^ {2}\{#\w+/gm) || [];
+  assert.deepEqual(
+    conditionals,
+    [],
+    `${viewFile} renders a CONDITIONAL direct child of .manager-main (${conditionals.join(', ')}). ` +
+      'The child count then depends on state, so the collapsing `minmax(0, 1fr)` track lands on a ' +
+      'different child in each state and no single track list is right for both. Wrap the ' +
+      'conditional content in an unconditional element, as `.manager-component-head` does.'
   );
 
-  const block = blockFor('.fabricate-manager[data-manager-view="books-scrolls"] .manager-main');
-  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
-  assert.ok(template, 'the books-scrolls route must declare its own grid-template-rows');
-
-  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
-  // tokenize functional notation as one unit rather than splitting on whitespace.
-  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
-  assert.equal(
-    tracks.length,
-    children.length,
-    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
-  );
-  assert.equal(
-    tracks.at(-1),
-    'minmax(0, 1fr)',
-    'the scrolling table is the last child, so it must be the growing track'
-  );
-  assert.ok(
-    tracks.slice(0, -1).every((track) => track === 'auto'),
-    `only the table may grow; header/drop-zone/toolbar must be auto, got "${template}"`
-  );
-});
-
-// The same defect family on the Tags & Categories route (issue 878). It carried its own
-// duplicate page header until now, which happened to give it exactly three children for
-// the shared three-track `auto auto 1fr`. Deleting the header takes it to TWO, and the
-// shared template's `1fr` would then land on an EMPTY third row — the vocabulary
-// workspace would size to its content and the panel's remaining height would sit dead
-// below it, the mirror image of the books-scrolls toolbar float. The guard ties the
-// template to the markup rather than to a literal count, and pins the absence of a second
-// page header so it cannot come back unnoticed.
-test('the Tags & Categories route names one grid track per section and grows the workspace', () => {
-  const source = readFileSync(resolve(managerComponentDir, 'TagsCategoriesView.svelte'), 'utf8');
-  // This view's opening `<main>` tag is attribute-per-line, so it cannot be located by the
-  // one-line `<main class="manager-main` literal the books-scrolls guard above uses.
-  const mainStart = source.indexOf('<main');
-  assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
-  const main = source.slice(mainStart);
-  // ANY two-space-indented opening tag, element or COMPONENT, rather than a hand-listed
-  // alternation. The list previously named `section|div|header|footer|nav|ManagerToolbar`, and
-  // issue 1429 turned the first grid child into `<VocabularyTabs>` — a name no list could have
-  // been holding. A hand-listed alternation does not fail on an unknown tag, it silently stops
-  // counting one, and the track assertion below then compares 1 track against 1 child and
-  // passes. An HTML comment opener is excluded by the leading-letter class, and attribute lines
-  // do not open with `<`, so this counts exactly the children of `.manager-main`.
-  //
-  // That opener is DESCRIBED rather than quoted, deliberately. This file's own `withoutComments`
-  // at the top strips `<!-- … -->` with a non-greedy regex over the RAW text, so a comment that
-  // spells the opener in prose pairs with the next closer anywhere below it and deletes
-  // everything between — here it silently blanked two switch-track fixtures 200k characters
-  // later and reddened `status-toggle-source-contract.test.js`'s non-vacuity floor instead of
-  // anything near the edit.
-  // The lookahead is not decoration. Without it the pattern ends in a `*` quantifier followed
-  // by the regex's own closing slash, and that two-character sequence IS a block-comment
-  // terminator to every raw-text comment stripper in this repository — including the one this
-  // file declares at the top. A stray terminator makes some other opener close early, which
-  // silently changes what a scanner sees hundreds of lines away.
   const children = main.match(/^ {2}<[A-Za-z][\w-]*(?=[\s>])/gm) || [];
   assert.equal(
     children.length,
-    2,
-    `expected two unconditional top-level grid children, got ${children.length}: ${children.join(', ')}`
+    expectedChildren,
+    `expected ${expectedChildren} unconditional top-level grid children in ${viewFile}, got ` +
+      `${children.length}: ${children.join(', ')}`
   );
   assert.equal(
     main.includes('manager-section-header'),
     false,
-    'the view must not render a second page header (issue 676/785/878)'
+    `${viewFile} must not render a second page header (issue 676/785/878)`
   );
 
-  const block = blockFor('.fabricate-manager[data-manager-view="tags"] .manager-main');
+  const block = blockFor(`.fabricate-manager[data-manager-view="${route}"] .manager-main`);
   const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
-  assert.ok(template, 'the tags route must declare its own grid-template-rows');
+  assert.ok(template, `the ${route} route must declare its own grid-template-rows`);
 
-  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
-  // tokenize functional notation as one unit rather than splitting on whitespace.
+  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so tokenize
+  // functional notation as one unit rather than splitting on whitespace.
   const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
   assert.equal(
     tracks.length,
-    children.length,
-    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+    children.length - impliedTrailingTracks,
+    `expected ${children.length - impliedTrailingTracks} tracks for ${children.length} children ` +
+      `in ${route}, got "${template}"`
   );
+
+  const growing = growingTrackIndex ?? tracks.length - 1;
   assert.equal(
-    tracks.at(-1),
+    tracks[growing],
     'minmax(0, 1fr)',
-    'the scrolling vocabulary workspace is the last child, so it must be the growing track'
+    `${growingLabel} takes the slack, got "${template}"`
   );
   assert.ok(
-    tracks.slice(0, -1).every((track) => track === 'auto'),
-    `only the workspace may grow; the tab strip must be auto, got "${template}"`
+    tracks.every((track, index) => index === growing || track === 'auto'),
+    `only ${growingLabel} may grow; ${autoLabel} must be auto, got "${template}"`
   );
+
+  also(main, children);
+}
+
+test('the Books & Scrolls route names one grid track per section and grows the table', () => {
+  // THE PAGER IS A FOURTH CHILD AND THE SHEET NAMES THREE TRACKS, which the old hand-listed
+  // matcher hid by not counting `<Pagination>` at all. It is recorded rather than repaired: an
+  // unnamed trailing child falls into an IMPLICIT row, which grid sizes `auto` — the same value
+  // the sheet would name — so the route renders correctly today and naming the track is a change
+  // to a route this issue does not touch. What matters is that the shortfall is now written down
+  // and a FIFTH child would fail here instead of passing.
+  assertOneTrackPerGridChild({
+    viewFile: 'BooksScrollsView.svelte',
+    route: 'books-scrolls',
+    expectedChildren: 4,
+    impliedTrailingTracks: 1,
+    growingLabel: 'the scrolling table',
+    autoLabel: 'header/drop-zone/toolbar',
+  });
+});
+
+// The same defect family on the Tags & Categories route (issue 878). It carried its own duplicate
+// page header until then, which happened to give it exactly three children for the shared
+// three-track `auto auto 1fr`. Deleting the header took it to TWO, and the shared template's `1fr`
+// would have landed on an EMPTY third row — the vocabulary workspace sizing to its content with
+// the panel's remaining height sitting dead below it, the mirror image of the books-scrolls
+// toolbar float.
+test('the Tags & Categories route names one grid track per section and grows the workspace', () => {
+  assertOneTrackPerGridChild({
+    viewFile: 'TagsCategoriesView.svelte',
+    route: 'tags',
+    expectedChildren: 2,
+    growingLabel: 'the scrolling vocabulary workspace',
+    autoLabel: 'the tab strip',
+  });
+});
+
+// The SAME defect family, a third time, on the Component Rules route (issue 1371). Issue 1371
+// added a fifth top-level child to a four-track template: the attribution banner went in FIRST,
+// every child shifted one track down, and the toolbar landed in the zero-min growing track.
+test('the Component Rules route names one grid track per child and grows the list', () => {
+  assertOneTrackPerGridChild({
+    viewFile: 'ComponentsBrowserView.svelte',
+    route: 'components',
+    expectedChildren: 4,
+    // THE LIST IS THE THIRD OF FOUR, not the last: the pager is a real child below it, and this
+    // is the one route whose sheet names a track for it. So the growing track is asserted by
+    // POSITION rather than by "last".
+    growingTrackIndex: 2,
+    growingLabel: 'the scrolling list',
+    autoLabel: 'head/toolbar/pager',
+    also: (main) => {
+      // THE COUNT IS UNCONDITIONAL, which is the whole repair. The banner renders inside a
+      // `.manager-component-head` wrapper precisely so a null `bannerEntry` — a system whose
+      // components the world corpus has no record of — leaves the same four children. A banner
+      // hoisted back out to be a direct child would make this five, and a template widened to
+      // five tracks would misplace the list in the state the banner is absent.
+      assert.ok(
+        main.includes('class="manager-component-head"'),
+        'the banner and the drop zone share one head wrapper, so the child count does not ' +
+          'depend on whether a component is selected'
+      );
+    },
+  });
 });
 
 // Rendered-geometry guard for the reserved General row (issue 878). Its explanatory
@@ -9411,6 +9476,23 @@ test('all three browser sort-direction toggles render as one control', async () 
     // the essence toggle measured before this rule, so if it matched the three below, the
     // rule would be reaching nothing and every equality here would hold trivially.
     const bare = `<button type="button" class="${base}" data-probe="bare"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    // AND A SECOND CONTROL, added when the primitive's own control rule took the 34-38px band's
+    // 9px corner (issue 1371, maintainer ruling M12a). Before that, `borderRadius` was the
+    // discriminator this test used to prove the toolbar rule had reached its fixture at all: 9px
+    // against the bare primitive's 6px. The primitive is 9px now, so that half of the control has
+    // been superseded rather than lost — `fontWeight` still discriminates (600 against 700), and
+    // this probe carries `manager-button` WITHOUT `fab-manager-button`, which is what an
+    // unconverted hand-written button is and is still on the base rule's 6px. So the corner is
+    // measured in a real browser on both sides of the conversion boundary instead.
+    //
+    // IT MODELS A STRING THE PRODUCT STILL RENDERS, which is what earns it its row in
+    // `manager-button-source-contract.test.js`'s fixture allowlist rather than a conversion:
+    // `ComponentComplicationsSection.svelte` passes a bare `triggerClass="manager-button"` to
+    // `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
+    // That allowlist row names the file and the literal and READS them, so this fixture cannot
+    // outlive the call site it models. Converting this probe would make it measure 9px, the
+    // equality below would hold trivially, and M12a's blast-radius claim would be gone.
+    const unconverted = `<button type="button" class="manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
       <!doctype html>
@@ -9425,7 +9507,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="manager-toolbar">${toggles}${bare}</div>
+            <div class="manager-toolbar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -9446,20 +9528,37 @@ test('all three browser sort-direction toggles render as one control', async () 
         };
       };
       return Object.fromEntries(
-        ['recipe', 'component', 'essence', 'bare'].map((probe) => [probe, read(probe)])
+        ['recipe', 'component', 'essence', 'bare', 'unconverted'].map((probe) => [
+          probe,
+          read(probe)
+        ])
       );
     });
 
-    for (const probe of ['recipe', 'component', 'essence', 'bare']) {
+    for (const probe of ['recipe', 'component', 'essence', 'bare', 'unconverted']) {
       assert.ok(measured[probe], `the ${probe} probe rendered`);
     }
 
-    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares, and
-    // the base control declares 6px and 700, so agreeing on these two is what "the rule
-    // matched" means here.
+    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares; the
+    // bare PRIMITIVE declares 700 and, since issue 1371's M12a ruling, the same 9px — so weight
+    // is the discriminator and the corner is now the thing the third probe measures.
     assert.equal(measured.recipe.borderRadius, '9px', 'the toolbar rule reached the fixture');
-    assert.equal(measured.bare.borderRadius, '6px', 'and the bare primitive is still at 6px');
-    assert.equal(measured.bare.fontWeight, '700', 'and at the base weight');
+    assert.equal(measured.bare.fontWeight, '700', 'and the bare primitive is at the base weight');
+    assert.notEqual(
+      measured.bare.fontWeight,
+      measured.recipe.fontWeight,
+      'so the bare probe still discriminates — an equality that held for every property would mean the rule was reaching nothing'
+    );
+
+    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner and the
+    // unconverted hand-written button is still on the base rule's 6px, so the ruling moved the
+    // primitive and not the whole `.manager-button` family.
+    assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
+    assert.equal(
+      measured.unconverted.borderRadius,
+      '6px',
+      'and an unconverted hand-written one still paints the base control, so the edit is scoped to the primitive'
+    );
 
     for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
       assert.equal(

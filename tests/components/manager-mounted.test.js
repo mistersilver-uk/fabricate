@@ -149,6 +149,8 @@ function compileManagerRoot() {
   // (issue 676). They live under `components/` — NOT `component/`, which the screenshot
   // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
+  // issue 1371 r18-colour: the row and the inspector both render the tinted essence chip (M29).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceChip.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
   // The shared essence quantity card (issue 772), extracted out of the editor and rendered
   // by the browser's bulk-edit panel too. `ComponentEditView` above imports it statically,
@@ -158,6 +160,9 @@ function compileManagerRoot() {
   // The bulk edit panel that REPLACES the single-component inspector in the rail
   // (issue 772). The root imports it statically, so omitting it HANGS every mounted manager
   // test as `# cancelled` for the same reason as the card above.
+  // The system bulk panel's three staging insets render through this one component (issue 1371
+  // r16-list, M23); omitting it HANGS the suite as `# cancelled` rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BulkStagingInset.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
   // The four shared bulk-edit primitives (issue 1010). They sit directly under
   // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because every module
@@ -314,6 +319,27 @@ function compileManagerRoot() {
   // page imports it statically, so it is in this root's graph whether or not anything ticks a
   // row — and an omission HANGS this file rather than failing one test in it.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte');
+  // The world COMPONENT catalogue's bulk panel (issue 1371), on the same rule as its tool twin
+  // above: the page imports it statically, so it is in this root's graph whether or not
+  // anything ticks a row, and an omission HANGS this file rather than failing one test in it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte');
+  // ── issue 1371 r16-cat ──────────────────────────────────────────────────────────────────
+  // ── issue 1371 r8-list ──────────────────────────────────────────────────────────────────
+  // The system Component Rules list's `Add from catalogue` PICKER (M9). The ROOT imports it
+  // statically and mounts it unconditionally beside the two import dialogs, so it is in this
+  // root's graph whether or not the header action is ever clicked — and an omission does not
+  // fail one test here, it HANGS the whole file and is reported as `# cancelled` with no
+  // message. Its own leaves (`ManagerModal`, `ManagerSearchField`, `SelectionCheckbox`,
+  // `ManagerButton`) are all already registered above for other callers.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentAddFromCatalogueDialog.svelte');
+  // THE WORLD COMPONENT ENTRY'S THREE OWN CHILDREN (issue 1371, parity round 4): the source
+  // identity card, the systems card and the player-preview rail. The entry page imports all
+  // three STATICALLY, so they are in this root's graph regardless of which tab is open — and an
+  // omission does not fail one test here, it HANGS the whole file and is reported as
+  // `# cancelled` with no message.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.
@@ -973,6 +999,17 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
     'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
+    // Issue 1371 (epic 1357, PR 6a-ii): the two world COMPONENT screens are real bodies now, so
+    // the component presentation leaf and the pure validation model are in this root's static
+    // graph. THIS LIST HAS NO VALIDATOR - `assertCompiledSvelteClosure` walks `.svelte` only -
+    // so an omission here dies later on `ERR_MODULE_NOT_FOUND` with the module named only in a
+    // stack, and every blocked test is reported as `# cancelled` rather than failing.
+    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+    'src/utils/componentScopeValidation.js',
+    // The system rules EDITOR's own Validation tab model (issue 1371, parity round 4). It is a
+    // separate module from the world entry's above because it validates a different subject —
+    // one system's rules rather than the world record — and both are in this root's static graph.
+    'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
     'src/utils/scopedEntityListModel.js',
     // Issue 1392 (epic 1357, PR 7a): the world Tags & Categories screen is a real body now, so
     // its pure leaf is in this root's static graph — and so is the World Vocabulary's own core,
@@ -8858,8 +8895,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
-    assert.ok(target.textContent.includes('Compendium'));
-    assert.ok(target.textContent.includes('Unknown'));
+    // THE SOURCE-ORIGIN PILL IS GONE FROM THE ROW (issue 1371, parity round 4; gap-list row 114).
+    // The reference's system row carries ONE state pill — `Salvage` — because the source belongs
+    // to the world catalogue and the category is the group band's job.
+    assert.ok(
+      !target.querySelector('[data-component-id="c1"] [data-status-pill="accent"]'),
+      'no `Compendium` / `Items Directory` pill on a system rules row'
+    );
+    assert.ok(
+      target.textContent.includes('Recipes'),
+      'and the trailing cluster states the stat the reference draws in its place'
+    );
     const compactEssenceChip = target.querySelector(
       '[data-component-id="c1"] .manager-essence-compact-chip'
     );
@@ -8916,12 +8962,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Iron Ore'), 'the category filter narrows the list');
 
-    // `general` is suppressed as a BADGE (no redundant "General" chip on every row) but
-    // stays a selectable FILTER option, pinned last as the catch-all — the Recipe
-    // Studio's badge-vs-filter asymmetry.
+    // NO CATEGORY BADGE ON THE ROW since issue 1371's parity round 4 (gap-list row 114). The
+    // reference's system row carries one state pill — `Salvage` — because CATEGORY is the group
+    // band's whole subject, and a chip repeating it on every row inside that band is the noise
+    // the band exists to remove. It stays a selectable FILTER option, which is the half of the
+    // Recipe Studio's badge-vs-filter asymmetry that survives.
     assert.ok(
-      target.querySelector('[data-component-id="c1"] [data-component-category="Reagent"]'),
-      'a custom category renders as a row badge'
+      !target.querySelector('[data-component-id="c1"] [data-component-category]'),
+      'the row states no category: the band it sits under already does'
+    );
+    assert.equal(
+      target.querySelector('[data-component-group="Reagent"] .fab-group-name').textContent.trim(),
+      'Reagent',
+      'and THAT is where the category is stated'
     );
     categoryFilter.value = 'general';
     categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
@@ -8932,34 +8985,27 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.textContent.includes('Glass Vial'),
       'the uncategorized component falls into general'
     );
-    assert.equal(
-      target.querySelector('[data-component-id="c2"] [data-component-category]'),
-      null,
-      'the general bucket renders no redundant badge'
+    // ── THE ACTIVE-FILTER CHIP ROW IS GONE (gap-list row 103) ────────────────────────────
+    // The reference's toolbar is TWO rows — [search, category, essence] then [Select all, Group
+    // by category, Sort by, count] — and this one was four. The chip run was the third of them,
+    // and each of the three filters already shows its own state in the control that set it.
+    assert.ok(
+      !target.querySelector('[data-component-filter-chip]'),
+      'no third toolbar row restating what the three controls above already show'
     );
 
-    // Filters clear through the dismissible CHIP run (issue 676), adopted from the Recipe
-    // Studio: the lone "Clear filters" button said that filters were on but never which
-    // ones. `data-clear-filters="components"` survives only on the filtered-to-nothing
-    // panel, which is not this state.
-    const categoryChip = target.querySelector('[data-component-filter-chip="category"]');
-    assert.ok(categoryChip, 'an active category filter announces itself as a chip');
-    assert.ok(
-      categoryChip.textContent.includes('General'),
-      'the chip names the LOCALIZED category, not the raw `general` token'
-    );
-    categoryChip.querySelector('button').click();
+    // The filter is cleared through the control that set it, and the list widens again.
+    categoryFilter.value = 'all';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
+    // The count is the sentence the reference writes for the in-system cohort (`proto:1069`),
+    // computed over the rows the body is drawing.
     assert.equal(
-      target.querySelector('[data-component-filter-chip="category"]'),
-      null,
-      'clearing the chip clears the filter it names'
+      target.querySelector('[data-component-count]').textContent.trim(),
+      '2 of 2 catalogue entries'
     );
-    // The count reports the page WINDOW, not "2 of 2" — `paginateComponents` has computed
-    // the range since it was written and the view never read it.
-    assert.equal(target.querySelector('[data-component-count]').textContent.trim(), '1–2 of 2');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -8971,26 +9017,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'raw source UUID should not render as inspector text'
     );
 
-    const copySourceAction = target.querySelector('[data-component-action="copy-source"]');
-    assert.ok(copySourceAction, 'component inspector should expose a copy source action');
-    assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
-    copySourceAction.click();
+    // Copy, Unlink and Delete are HOSTED here (issue 676) — they were rehomed off the row,
+    // whose three ghost icons had turned it into a toolbar. Since issue 1371's parity round 4
+    // they sit behind the inspector's kebab rather than in a four-button stack (gap-list row
+    // 123), so the inspector is still the reason the row can carry one action.
+    target.querySelector('[data-component-inspector-menu]').click();
     flushSync();
-    // Copy and Delete are HOSTED here (issue 676) — they were rehomed off the row, whose
-    // three ghost icons had turned it into a toolbar. The inspector is the reason the row
-    // can carry one action, so these must exist rather than be absent.
-    assert.ok(
-      target.querySelector('[data-component-action="edit"]'),
-      'component inspector offers Edit'
+    const menuLabels = [...target.querySelectorAll('[role="menuitem"]')].map((item) =>
+      item.textContent.trim()
     );
-    assert.ok(
-      target.querySelector('[data-component-action="delete"]'),
-      'component inspector hosts the Delete rehomed off the row'
-    );
-    assert.ok(
-      target.querySelector('[data-component-action="unlink"]'),
-      'component inspector offers Unlink for a linked component'
-    );
+    assert.deepEqual(menuLabels, [
+      'Copy source UUID',
+      'Unlink component',
+      'Delete component',
+    ]);
+    [...target.querySelectorAll('[role="menuitem"]')][0].click();
+    flushSync();
     assert.equal(
       target.querySelector('[data-component-source-missing]'),
       null,
@@ -8999,13 +9041,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     const componentInspector = target.querySelector('[data-component-inspector]');
     assert.ok(componentInspector, 'the components route renders the browser inspector');
     assert.ok(
-      componentInspector.querySelector('.manager-component-browser-inspector-hero .fab-medallion'),
-      'the inspector hero renders the shared Medallion, not a bespoke preview img'
+      componentInspector.querySelector('.manager-component-inspector-identity .fab-medallion'),
+      'the inspector identity renders the shared Medallion, not a bespoke preview img'
     );
+    // THE TWO STAT TILES ARE GONE (gap-list row 118): the subline states both numbers, and a
+    // tile per number over a panel about to list them is the same fact three times.
+    assert.equal(componentInspector.querySelectorAll('[data-component-fact]').length, 0);
     assert.equal(
-      componentInspector.querySelectorAll('[data-component-fact]').length,
-      2,
-      'the inspector reports the two stat tiles (tags / essences)'
+      componentInspector.querySelector('[data-component-inspector-subline]').textContent.trim(),
+      '2 tags · 1 essence',
+      'the subline states both numbers, which is what the two tiles were for'
     );
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
@@ -9050,7 +9095,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
-    target.querySelector('[data-component-action="delete"]').click();
+    target.querySelector('[data-component-inspector-menu]').click();
+    flushSync();
+    [...target.querySelectorAll('[role="menuitem"]')]
+      .find((item) => item.textContent.trim() === 'Delete component')
+      .click();
     flushSync();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
@@ -9096,7 +9145,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'the words belong in the tooltip only: repeating them on every row crowded the description'
     );
-    assert.ok(target.textContent.includes('Missing'));
+    // THE DANGLING LINK IS STATED IN THE INSPECTOR, NOT ON THE ROW (issue 1371, parity round 4).
+    // The row's source-origin pill went with the rest of the source register (gap-list row 114);
+    // the remediation paragraph stays, because a component claiming a document that no longer
+    // exists is the one thing on this screen a GM has to act on.
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector] [data-component-source-missing]')),
+      'a missing source still reaches the GM, one pane over'
+    );
 
     // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
     // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
@@ -9226,63 +9282,81 @@ describe('CraftingSystemManager mounted behavior', () => {
   // column has FOUR controls, and Unlink is the one that makes the sibling check worth
   // running. Unlink breaks the item linkage and keeps the component — it destroys nothing —
   // so it is precisely the neighbour a `danger` role picked by feel would land on.
-  it('paints the component inspector Delete as danger, and not Unlink beside it', async () => {
+  // REWRITTEN FOR ISSUE 1371's PARITY ROUND 4 (gap-list row 123). The four-button stack this
+  // case was written against — Edit, Copy source UUID, Unlink, Delete, all full-width and all
+  // inline in the scroll area — is what the reference replaces with ONE pinned primary and an
+  // overflow. Four commands at equal weight where the design pins one is a hierarchy change, not
+  // a variant, so the case moves with it: what survives is the claim it was really making, that
+  // Delete is marked destructive and its three neighbours are not.
+  it('pins ONE primary and puts the other three behind the kebab, Delete alone marked destructive', async () => {
     await openComponentsBrowser();
 
     const inspector = target.querySelector('[data-component-inspector]');
     assert.ok(Boolean(inspector), 'the components route opens on the single-component inspector');
 
-    const remove = inspector.querySelector('[data-component-action="delete"]');
-    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    const foot = inspector.querySelector('[data-component-inspector-foot]');
+    assert.ok(Boolean(foot), 'the inspector pins a foot rather than scrolling its actions');
+    const actions = foot.querySelectorAll('button');
+    assert.equal(actions.length, 1, 'and the foot carries exactly ONE action');
+    assert.equal(actions[0].textContent.trim(), 'Edit system rules');
     assert.ok(
-      remove.classList.contains('fab-manager-button'),
-      'Delete renders through the ManagerButton primitive, not a hand-written class'
-    );
-    assert.ok(
-      remove.classList.contains('is-danger'),
-      'Delete carries the danger role — the verb removes the component from the system'
-    );
-    assert.ok(
-      remove.classList.contains('manager-component-browser-inspector-delete'),
-      'and keeps the bespoke class the panel geometry is keyed on'
+      Boolean(foot.querySelector('[data-component-edit-system-rules]')),
+      'which is the act this whole screen exists to reach'
     );
 
-    for (const action of ['edit', 'copy-source', 'unlink']) {
-      const sibling = inspector.querySelector(`[data-component-action="${action}"]`);
-      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+    // The other three are BEHIND the kebab and therefore absent until it is opened — which is
+    // itself the assertion the old stack could not make.
+    assert.ok(
+      !target.querySelector('[role="menuitem"]'),
+      'pre-condition: the overflow is closed, so none of its commands is on screen'
+    );
+    inspector.querySelector('[data-component-inspector-menu]').click();
+    flushSync();
+
+    const items = [...target.querySelectorAll('[role="menuitem"]')];
+    assert.deepEqual(
+      items.map((item) => item.textContent.trim()),
+      ['Copy source UUID', 'Unlink component', 'Delete component'],
+      'nothing is lost: the three commands the foot no longer carries are all here'
+    );
+    assert.ok(
+      items[2].classList.contains('is-danger'),
+      'Delete carries the danger marking — the verb removes the component from the system'
+    );
+    for (const item of items.slice(0, 2)) {
       assert.ok(
-        sibling.classList.contains('fab-manager-button'),
-        `${action} renders through the primitive too`
-      );
-      assert.ok(
-        !sibling.classList.contains('is-danger'),
-        `${action} destroys no record, so the danger role must not have landed on it`
+        !item.classList.contains('is-danger'),
+        `${item.textContent.trim()} destroys no record, so the marking must not have landed on it`
       );
     }
   });
 
+  // The remove leg sits in the shell's dock since issue 1371 r16-list (M23): the reference's
+  // `Remove N components from {system}…`, not a delete card below the shell.
   function componentDeleteButton() {
-    return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
+    return target.querySelector('[data-component-bulk-remove] .manager-button.is-danger');
   }
 
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
     await openComponentsBrowser();
 
-    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance.
+    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance. The
+    // single-component delete is behind the inspector's kebab since issue 1371's parity round 4
+    // (gap-list row 123), so the pre-condition is asserted on the trigger that reaches it.
     assert.ok(
-      Boolean(target.querySelector('[data-component-action="delete"]')),
-      'the single-component inspector offers Delete'
+      Boolean(target.querySelector('[data-component-inspector-menu]')),
+      'the single-component inspector offers its overflow, and Delete is in it'
     );
 
     tickComponentRow('c1');
 
     assert.ok(
-      !target.querySelector('[data-component-action="delete"]'),
-      'the inspector — and its Delete — is replaced'
+      !target.querySelector('[data-component-inspector-menu]'),
+      'the inspector — and the overflow carrying its Delete — is replaced'
     );
     assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
     assert.match(
-      target.querySelector('[data-component-bulk-impact-row="recipes"]').textContent,
+      target.querySelector('[data-component-bulk-remove-note]').textContent,
       /2 recipes will be rewritten/,
       'the impact the store computed reaches the panel'
     );
@@ -9413,7 +9487,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
     assert.ok(
-      Boolean(target.querySelector('[data-component-bulk-delete-card]')),
+      Boolean(target.querySelector('[data-component-bulk-remove]')),
       'and the selection survives, so the GM can see what did not happen and retry'
     );
     assert.equal(
@@ -9458,9 +9532,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     target.querySelector('[data-bulk-tag="herb"]').click();
     flushSync();
-    const categorySelect = target.querySelector('[data-component-bulk-category]');
-    categorySelect.value = 'Reagent';
-    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    // The category is an inline inset ROW since issue 1371 r16-list (M23), not a select.
+    target.querySelector('[data-component-bulk-category-option="Reagent"]').click();
     flushSync();
 
     target.querySelector('[data-component-bulk-apply]').click();
@@ -10298,10 +10371,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       editHeading.querySelector('.fab-medallion'),
       'the heading leads with the shared Medallion, as the recipe editor does'
     );
+    // `{system} rules · {effective category} · {mode}` since issue 1371's parity round 4
+    // (`proto:5719`, gap-list row 125). The subline used to end in a SOURCE segment naming where
+    // the linked Item lives, which under epic 1357 is world data stated on the world entry — so
+    // the one line this screen has for context spent half of it on a fact that is not this
+    // screen's. The reference spends it on the three facts that decide what the editor below can
+    // author: whose rules these are, what they classify the component as, and how salvage
+    // resolves here.
     assert.equal(
       editHeading.querySelector('[data-component-edit-subline]').textContent.trim(),
-      'Reagent · Linked Compendium',
-      'the subline reads "<category> · Linked <source>"'
+      'Alchemy rules · Reagent · Simple',
+      'the subline reads "{system} rules · {category} · {mode}"'
     );
     // The breadcrumb names the component too — not the generic string the recipe
     // breadcrumb's own comment rejects.
@@ -10329,58 +10409,50 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the component editor renders no right-rail inspector card'
     );
 
-    // AC3: open-sheet stays ON THE SOURCE NAME — the common action keeps its
-    // affordance rather than being buried in the kebab.
-    target.querySelector('[data-component-edit-action="open-source"]').click();
-    flushSync();
-    assert.deepEqual(
-      opened,
-      ['Compendium.fabricate.items.iron-ore'],
-      'Open Source Item should call onOpenSource with the stored UUID'
-    );
-
-    // AC3: unlink lives in the OVERFLOW (rare + destructive — what a kebab is for), so
-    // it must be opened first. The menu is portaled to the `.fabricate-manager` host to
-    // escape the scrolling column's `overflow: hidden`, so query from the root, not the
-    // strip. Rows are addressed by their label: `ActionMenu` is a shared component and
-    // gives items no per-caller data hook unless the caller asks for one.
-    //
-    // `role="menuitem"`, not `.manager-travel-option` (issue 1477). These are COMMANDS, and the
-    // picker they used to be announced them as selectable options in a listbox.
-    const overflowItem = (label) =>
-      Array.from(root.querySelectorAll('[role="menuitem"]')).find((button) =>
-        button.textContent.includes(label)
-      );
-
-    target.querySelector('.manager-component-overflow-trigger').click();
-    await tick();
-    flushSync();
-    assert.ok(overflowItem('Copy source UUID'), 'the overflow carries Copy source UUID');
+    // ── THE SOURCE REGISTER IS GONE FROM THIS SCREEN (issue 1371, parity round 4) ──────────
+    // Open-sheet on the name, the overflow's Copy source UUID and Unlink Source Item, and the
+    // drop-to-replace target were all asserted here. `rebuild-spec.md` D3 removes every one of
+    // them: under epic 1357 the record naming the source Item is world catalogue data, so it is
+    // authored on the world Component entry and this screen carries the ONE exit that goes
+    // there. The removal is asserted rather than deleted, and the three unused recorders below
+    // are the proof that no path still reaches them.
     assert.ok(
-      !root.querySelector('.manager-component-identity-strip [role="listbox"]'),
-      'and it is no longer a listbox anywhere in the strip'
+      !target.querySelector('[data-component-edit-action="open-source"]'),
+      'the name no longer opens the linked Item sheet from a system rules screen'
     );
-    overflowItem('Unlink Source Item').click();
-    flushSync();
+    assert.ok(
+      !target.querySelector('.manager-component-overflow-trigger'),
+      'and there is no source overflow to bury Unlink and Copy source UUID in'
+    );
+    assert.ok(
+      !target.querySelector('[data-component-edit-action="replace-source"]'),
+      'and no drop target: a rules editor must not restamp the durable roles map'
+    );
     assert.deepEqual(
-      unlinked,
-      ['c1'],
-      'Unlink Source Item should call onUnlinkSource with the component id'
+      [opened, unlinked, replaced],
+      [[], [], []],
+      'nothing reached the three source services, which is what "removed" has to mean'
     );
 
-    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(dropEvent, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.replacement' }) },
-    });
-    target.querySelector('[data-component-edit-action="replace-source"]').dispatchEvent(dropEvent);
-    flushSync();
-    assert.deepEqual(
-      replaced,
-      [{ itemId: 'c1', data: { type: 'Item', uuid: 'Item.replacement' } }],
-      'drop should route through onReplaceSource for the active component'
+    // What stands in their place is ONE callout. THIS fixture's world corpus holds no record of
+    // `c1`, which is the branch that withholds the pill, the attribution note and the exit — so
+    // the card states whose the identity is instead of claiming a catalogue entry that is not
+    // there. Both branches are driven; the other is
+    // `tests/components/component-identity-strip-mounted.test.js`.
+    const callout = target.querySelector('[data-component-edit-section="identity"]');
+    assert.ok(Boolean(callout), 'the editor opens on the identity callout');
+    assert.equal(
+      callout.querySelector('[data-component-edit-field="name"]').textContent.trim(),
+      'Iron Ore'
+    );
+    assert.ok(!callout.querySelector('[data-component-world-pill]'));
+    assert.match(
+      callout.querySelector('[data-component-identity-unlinked-hint]').textContent,
+      /no world catalogue entry/
     );
 
-    // Tags and essences are stacked cards in the editor (no tabs), so they render immediately.
+    // Tags and essences are cards on the `Component rules` tab, which is the tab a fresh editor
+    // opens on, so they render immediately.
     assert.ok(
       target.querySelector('[data-component-edit-section="tags"]'),
       'Tags section should render'
@@ -25802,9 +25874,15 @@ describe('CraftingSystemManager mounted behavior', () => {
         toolbarClear: 'data-component-clear-selection',
         panelClear: 'data-component-bulk-clear',
         panel: 'data-component-bulk-panel',
-        deleteCard: 'data-component-bulk-delete-card',
+        // The remove leg's hook and a category ROW (issue 1371 r16-list, M23): the component
+        // studio's category is an inline inset, so its stage is a click rather than a select.
+        deleteCard: 'data-component-bulk-remove',
         apply: 'data-component-bulk-apply',
-        stage: () => stageFirstCategory('data-component-bulk-category'),
+        stage: () => {
+          const row = target.querySelector('[data-component-bulk-category-option]');
+          assert.ok(Boolean(row), 'the category inset offers no row, so nothing can be staged through it');
+          row.click();
+        },
         applyResultOption: 'applyComponentBulkEditResult',
         applied: 'Applied bulk changes to 2 components.',
         appliedNone: 'No components needed changing.',
@@ -26748,12 +26826,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       return { fill };
     }
 
-    const inspectorDescription = () =>
-      target
-        .querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
-        .textContent.trim();
-    const inspectorPillTone = () =>
-      target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
+    // THE INSPECTOR'S HYDRATED SURFACE IS ITS REMEDIATION PARAGRAPH (issue 1371, parity round 4).
+    // It used to be the description paragraph and the source-origin pill, and `rebuild-spec.md`
+    // C7 removes both: the reference's inspector states shared identity, tags, category and
+    // salvage, and the source register belongs to the world catalogue. What a dangling link
+    // still has to reach is the sentence telling the GM to act, and THAT is what hydration must
+    // deliver — a fill the GM never sees is the whole defect this suite exists for.
+    const inspectorRemediation = () =>
+      target.querySelector('[data-component-inspector] [data-component-source-missing]');
     const rowDescription = () =>
       target
         .querySelector('[data-component-id="linked-1"] .manager-system-description')
@@ -26762,40 +26842,29 @@ describe('CraftingSystemManager mounted behavior', () => {
     it('replaces the inspector prose and flips the source pill from Linked to Missing', async () => {
       const { fill } = await openComponentStudioWithLinkedCard();
 
-      // CONTROL, same fixture: the pre-hydration reading. This is the regression issue 676
-      // filed and issue 800 preserved, and an accent pill telling the GM a dangling link is
-      // healthy — so these three strings are what a broken republish leaves on screen.
-      assert.equal(
-        inspectorDescription(),
-        'No description has been added.',
-        'pre-condition: the un-hydrated card has no prose to show'
-      );
-      assert.equal(inspectorPillTone(), 'accent', 'pre-condition: it reads as a healthy link');
+      // CONTROL, same fixture: the pre-hydration reading. The un-hydrated card still reads as a
+      // healthy link, so the panel offers nothing to act on — which is what a broken republish
+      // would leave on screen forever.
       assert.ok(
-        !target.querySelector('[data-component-source-missing]'),
-        'pre-condition: and offers no remediation paragraph'
+        Boolean(target.querySelector('[data-component-inspector]')),
+        'pre-condition: the inspector is open on the linked card'
       );
+      assert.ok(!inspectorRemediation(), 'pre-condition: and offers no remediation paragraph');
 
       fill();
       await tick();
       await tick();
       flushSync();
 
-      assert.equal(
-        inspectorDescription(),
-        RESOLVED.description,
-        'the resolved prose REACHES the inspector — a fill the GM never sees is the whole ' +
+      assert.ok(
+        Boolean(inspectorRemediation()),
+        'the resolved verdict REACHES the inspector — a fill the GM never sees is the whole ' +
           'defect, and every spy in this repo stays green through it'
       );
-      assert.equal(
-        inspectorPillTone(),
-        'warning',
-        'and the pill flips to the amber Missing tone, so a deleted source document is not ' +
-          'reported as a healthy link'
-      );
-      assert.ok(
-        Boolean(target.querySelector('[data-component-source-missing]')),
-        'and the remediation paragraph renders'
+      assert.match(
+        inspectorRemediation().textContent,
+        /no longer resolves/,
+        'and it is the sentence that tells the GM what to do about it'
       );
     });
 
@@ -26980,7 +27049,11 @@ describe('CraftingSystemManager mounted behavior', () => {
         'component-catalogue',
         'world-components',
         'Component catalogue',
-        '[data-scoped-placeholder="world-components"]',
+        // Issue 1371: the real catalogue. `data-scoped-list` is the shell's own hook and the
+        // route token pins it to THIS screen rather than to any scoped list, exactly as the tool
+        // row below does - and swapping the placeholder selector for it is what makes this row
+        // fail again if the body ever reverts to delegating.
+        '[data-scoped-list="world-components"]',
       ],
       // Issue 1392: the real world vocabulary screen. Its body hook is one of the three panel
       // wrappers rather than the page hook, for this row's stated reason — a route wired into
@@ -27192,6 +27265,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       systemToolBreakage,
       worldEssences,
       worldTools,
+      // The world COMPONENT corpus (issue 1371). It defaulted to three generated entities and
+      // had no override, so a suite that needed a KNOWN component corpus - an empty one, or one
+      // holding a record with a specific alias - could not ask for it.
+      worldComponents,
       craftingCheck,
       resolutionMode,
       // The COMPONENT's services bag, which is a different one from the admin store's: the
@@ -27200,7 +27277,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       componentServices = {},
     } = {}) {
       scopeStores = {
-        component: scopeStore(worldEntities(3, 'comp')),
+        component: scopeStore(worldComponents ?? worldEntities(3, 'comp')),
         essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
         tool: scopeStore(
           worldTools ?? worldEntities(1, 'tool'),
@@ -28123,6 +28200,538 @@ describe('CraftingSystemManager mounted behavior', () => {
       });
     });
 
+    // ── THE WORLD COMPONENT CATALOGUE'S CREATION ZONE (issue 1371) ────────────────────────
+    //
+    // NESTED HERE for the reason the tool block above is: `mountWithRealStore` is the only
+    // harness in the repository that drives the manager shell over a real world-scope corpus,
+    // and the drop handler lives in the shell — a page cannot reach the services bag that
+    // resolves a payload, and `worldScopeActions` reads no Foundry global by design.
+    //
+    // TWO PROPERTIES, AND THE SECOND IS NEW BEHAVIOUR ON ONE ZONE. The drop RESOLVES before it
+    // mints, because `createEntity` dedupes on the entity id and the id is fresh every time — so
+    // an unresolved drop turns one Item into two world components with identical identity, and
+    // nothing on any screen says which one a recipe means. And an EMBEDDED Item is refused,
+    // which no shipped drop path does today: its uuid dies with its parent actor, while a
+    // compendium Item resolves through every client.
+    describe('the world Component catalogue mints ONE record per source Item', () => {
+      const RESIN = Object.freeze({
+        uuid: 'Item.resin',
+        name: 'Wildwood Resin',
+        img: 'icons/commodities/tree/sap-drop-amber.webp',
+        description: 'Tapped from an ironwood.',
+      });
+      const SALT = Object.freeze({
+        uuid: 'Item.salt',
+        name: 'Unbound Salt',
+        img: 'icons/commodities/materials/salt-pile-white.webp',
+        description: '',
+      });
+      // THE TWO COMPENDIUM SHAPES, and the resolver has to answer BOTH.
+      //
+      // `PACKED` is what a 14.365 GM drags: a full `Compendium.<scope>.<pack>.Item.<id>` uuid.
+      // Note it HAS an `.Item.` segment in the middle — that is the primary document's own pair,
+      // and reading it as an embedded pair is precisely the mistake a fixed-offset segmenter
+      // makes.
+      //
+      // `PACKED_LEGACY` is the pre-v10 `{pack, id}` pair, which `resolveDropUuid` still resolves
+      // to `Compendium.<pack>.<id>`. Round 1 covered only this one, so the shape a GM can actually
+      // produce was uncovered.
+      const PACKED = Object.freeze({
+        uuid: 'Compendium.p.q.Item.b',
+        name: 'Packed Ore',
+        img: 'icons/commodities/stone/ore-chunk-brown.webp',
+        description: '',
+      });
+      const PACKED_LEGACY = Object.freeze({ ...PACKED, uuid: 'Compendium.p.b', name: 'Older Ore' });
+      const COMPONENT_SOURCES = Object.freeze({
+        [RESIN.uuid]: RESIN,
+        [SALT.uuid]: SALT,
+        [PACKED.uuid]: PACKED,
+        [PACKED_LEGACY.uuid]: PACKED_LEGACY,
+      });
+
+      async function settleDrop() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      async function goToComponentCatalogue() {
+        worldNavItem('component-catalogue').click();
+        await settleDrop();
+        assert.ok(
+          Boolean(target.querySelector('[data-item-drop-zone="component-create"]')),
+          'the catalogue rendered no creation drop zone, so nothing below drops anywhere'
+        );
+      }
+
+      /**
+       * Open the world Component Catalogue over a real corpus, with the resolver seam wired.
+       *
+       * @param {Array<object>} worldComponents the corpus to start from.
+       * @returns {Promise<object>} the mounted admin store.
+       */
+      async function openComponentCatalogue(worldComponents) {
+        const store = await mountWithRealStore({
+          worldComponents,
+          componentServices: { resolveToolSource: async (uuid) => COMPONENT_SOURCES[uuid] ?? null },
+        });
+        await goToComponentCatalogue();
+        return store;
+      }
+
+      const worldComponentIds = () =>
+        scopeStores.component.corpus().entities.map((entity) => String(entity?.id ?? ''));
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+      /**
+       * Drop one payload on the creation zone, capturing what the GM is told while it happens.
+       *
+       * `foundry.utils.parseUuid` IS SEEDED, and that is load-bearing rather than scaffolding:
+       * the embedded-uuid gate FAILS CLOSED, so without a parser every drop is refused and every
+       * assertion below would pass for a fixture reason rather than a behavioural one. The stub
+       * answers the shape the real parser does — `embedded` is the segment pairs after the
+       * primary document — so `Actor.a.Item.b` reports one embedded pair and `Compendium.p.b`
+       * reports none.
+       *
+       * @param {object} payload the raw drag payload.
+       * @returns {Promise<{info: string[], warn: string[]}>} the toasts the drop raised.
+       */
+      async function dropPayload(payload, { withParser = true } = {}) {
+        const info = [];
+        const warn = [];
+        const previousUi = globalThis.ui;
+        const previousFoundry = globalThis.foundry;
+        globalThis.ui = {
+          notifications: {
+            info: (message) => info.push(message),
+            warn: (message) => warn.push(message),
+          },
+        };
+        globalThis.foundry = {
+          ...(previousFoundry ?? {}),
+          utils: {
+            ...(previousFoundry?.utils ?? {}),
+            // A DOUBLE THAT MATCHES CORE'S EDGE SEMANTICS, NOT JUST ITS HAPPY PATH.
+            //
+            // Two corrections, and each of them was producing a false pass:
+            //
+            //  1. IT RETURNS `null` RATHER THAN THROWING. Real `parseUuid` never throws for a
+            //     malformed uuid — it answers `null`. A stub that threw made the gate's `catch`
+            //     look like the branch under test, when in a live client that catch is
+            //     unreachable and the null branch is the only thing standing between this zone
+            //     and an unparseable payload. A double STRICTER than core is exactly how a
+            //     fail-open gate ships behind a green fail-closed assertion.
+            //  2. THE COMPENDIUM PREFIX IS SPLICED, NOT COUNTED. This assumed a fixed offset of
+            //     three for a compendium uuid, which is right only for the legacy
+            //     `Compendium.<pack>.<id>` shape. A 14.365 compendium drag carries
+            //     `Compendium.<scope>.<pack>.Item.<id>` — five segments — and the fixed offset
+            //     read its `Item.<id>` primary pair as an EMBEDDED pair, reporting the one
+            //     compendium shape a GM can actually produce as an embedded Item. Core splices
+            //     the pack triple first and then the primary pair; so does this.
+            parseUuid: (uuid) => {
+              if (typeof uuid !== 'string') return null;
+              const parts = uuid.split('.');
+              //  3. A SINGLE SEGMENT IS NOT MALFORMED TO CORE. Real `parseUuid('nonsense')`
+              //     answers a well-formed result with `embedded: []` — an unresolvable primary
+              //     id is not a parse failure — so a stub that nulled it was STRICTER than core
+              //     in the direction that manufactures a refusal production does not make. That
+              //     is the same false-pass shape as (1) with the sign flipped: a stub tighter
+              //     than core proves a gate that is not there.
+              if (parts.length < 2) return { embedded: [] };
+              // The pack triple — `Compendium`, scope, pack — comes off first when present.
+              if (parts[0] === 'Compendium') parts.splice(0, 3);
+              // Then the PRIMARY document's own `<Type>.<id>` pair.
+              parts.splice(0, 2);
+              // Whatever remains is embedded, in `<Type>, <id>` order. An odd remainder is
+              // malformed, and core answers `null` for it rather than half-reading it.
+              if (parts.length % 2 !== 0) return null;
+              return { embedded: parts };
+            },
+          },
+        };
+        // THE ONE CALLER THAT ASKS FOR NO PARSER AT ALL gets `foundry.utils` WITHOUT the key,
+        // rather than a `parseUuid` set to something falsy: the gate tests `typeof … !== 'function'`
+        // and an absent key is the shape a client actually presents — an older core, a partial
+        // shim, or the gate running before `foundry` is populated.
+        if (!withParser) delete globalThis.foundry.utils.parseUuid;
+        try {
+          dispatchDrop(target.querySelector('[data-item-drop-zone="component-create"]'), payload);
+          await settleDrop();
+          return { info, warn };
+        } finally {
+          if (previousUi === undefined) delete globalThis.ui;
+          else globalThis.ui = previousUi;
+          if (previousFoundry === undefined) delete globalThis.foundry;
+          else globalThis.foundry = previousFoundry;
+        }
+      }
+
+      it('mints ONE record when the same Item is dropped twice, and navigates to the first', async () => {
+        await openComponentCatalogue([]);
+
+        const first = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.deepEqual(first.info, [], 'the first drop is a plain creation and says nothing');
+        assert.equal(worldComponentIds().length, 1);
+        assert.equal(managerView(), 'world-component-entry', 'and lands the GM on it');
+        const created = worldComponentIds()[0];
+
+        await goToComponentCatalogue();
+        const second = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+
+        assert.equal(worldComponentIds().length, 1, 'the second drop mints NOTHING');
+        assert.equal(second.info.length, 1, 'and says so rather than appearing to do nothing');
+        assert.deepEqual(worldComponentIds(), [created], 'the record is the one that existed');
+        assert.equal(managerView(), 'world-component-entry');
+      });
+
+      it('resolves through the whole source-reference union, not one field', async () => {
+        // A RE-POINTED LINK keeps its previous uuid as an ALIAS. Comparing `registeredItemUuid`
+        // directly mints a duplicate for exactly the records a GM has already tidied, and the
+        // origin case above stays green while it does.
+        await openComponentCatalogue([
+          {
+            id: 'existing',
+            name: 'Older Resin',
+            originItemUuid: 'Item.something-else',
+            registeredItemUuid: 'Item.something-else',
+            aliasItemUuids: [RESIN.uuid],
+          },
+        ]);
+
+        const dropped = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+
+        assert.deepEqual(worldComponentIds(), ['existing'], 'the ALIAS match mints nothing');
+        assert.equal(dropped.info.length, 1);
+      });
+
+      it('REFUSES an embedded Item in all three of its shapes', async () => {
+        // `Actor.a.Item.b`, an unlinked token's `Scene.s.Token.t.Actor.a.Item.b`, and a
+        // compendium actor's `Compendium.p.Actor.a.Item.b`. A `startsWith('Actor.')` predicate
+        // catches only the first — and the token shape is the one a GM reaches by dragging off a
+        // token sheet.
+        await openComponentCatalogue([]);
+
+        for (const uuid of [
+          'Actor.a.Item.b',
+          'Scene.s.Token.t.Actor.a.Item.b',
+          'Compendium.p.Actor.a.Item.b',
+        ]) {
+          const refused = await dropPayload({ type: 'Item', uuid });
+          assert.deepEqual(worldComponentIds(), [], `${uuid} minted nothing`);
+          assert.equal(refused.warn.length, 1, `${uuid} told the GM why`);
+        }
+      });
+
+      it('and still MINTS from a compendium drag, in BOTH shapes core has emitted', async () => {
+        // THE POSITIVE CONTROL for the refusal, and it needs both shapes because they fail
+        // differently.
+        //
+        // The FULL uuid is what a 14.365 GM actually drags: `Compendium#_getEntryDragData` returns
+        // `{type, uuid}` and `CompendiumCollection#getUuid` composes
+        // `Compendium.<scope>.<pack>.Item.<id>`. It has an `.Item.` segment in the middle, so a
+        // segmenter that counts a fixed offset instead of splicing the pack triple reads its
+        // primary pair as an embedded one and REFUSES the commonest compendium drop there is.
+        //
+        // The `{pack, id}` pair is the pre-v10 legacy shape `resolveDropUuid` still tolerates. It
+        // carries no `uuid` at all, so a handler reading `data.uuid` refuses it while a
+        // uuid-string fixture stays green. Round 1 covered only this one.
+        await openComponentCatalogue([]);
+
+        const modern = await dropPayload({ type: 'Item', uuid: 'Compendium.p.q.Item.b' });
+        assert.equal(worldComponentIds().length, 1, 'a compendium Item is a world component');
+        assert.deepEqual(modern.warn, [], 'and nothing refused it');
+        assert.equal(managerView(), 'world-component-entry');
+
+        await goToComponentCatalogue();
+        const legacy = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
+        assert.equal(worldComponentIds().length, 2, 'and so is one dragged the legacy way');
+        assert.deepEqual(legacy.warn, []);
+      });
+
+      it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
+        // THE BRANCH THIS MEASURES IS THE NULL RETURN, not a throw. Real `parseUuid` answers
+        // `null` for a malformed uuid and never throws, so the gate's `catch` is unreachable in a
+        // live client — and a gate that only caught throws would ACCEPT this while the assertion
+        // stayed green against a stricter double.
+        //
+        // `Actor.a.Item` IS SUCH A UUID and it is the only one asserted here. It has three
+        // segments: core splices the primary `<Type>.<id>` pair off the front and is left with a
+        // single trailing segment, an ODD remainder that cannot be read as `<Type>, <id>` pairs,
+        // so core answers `null` rather than half-reading it.
+        //
+        // `nonsense` USED TO BE IN THIS LOOP AND DOES NOT BELONG. Core does not null a
+        // single-segment uuid: it answers a well-formed result with `embedded: []`, because an
+        // unresolvable primary id is not a parse failure. The old stub nulled it, which made this
+        // loop assert a refusal production never makes — the mirror of the too-loose double the
+        // note above warns about, and just as capable of shipping a green test about nothing. Its
+        // real outcome is asserted below instead.
+        await openComponentCatalogue([]);
+
+        const refused = await dropPayload({ type: 'Item', uuid: 'Actor.a.Item' });
+        assert.deepEqual(worldComponentIds(), [], 'it minted nothing');
+        assert.equal(refused.warn.length, 1, 'and told the GM why');
+      });
+
+      it('and a uuid that parses but resolves to nothing is DROPPED SILENTLY, which is a gap', async () => {
+        // RECORDED RATHER THAN REPAIRED, and asserted so it is recorded in a form that cannot rot.
+        //
+        // A single-segment uuid parses (see above), passes the embedded gate correctly — nothing
+        // about it says "this belongs to an actor" — and then fails to resolve to an Item. The
+        // handler's `if (!source) return false` says nothing at all, so the GM drops something on
+        // the zone and gets no record and no message.
+        //
+        // It is NOT this lane's to fix: `resolveToolSource` is the shared resolution service the
+        // essence and tool creation paths use too, and adding a toast on its empty return changes
+        // three lanes' behaviour from one issue's diff. What this test buys is that the silence is
+        // a KNOWN state with a name: the day someone adds the message, this test fails and points
+        // at the decision rather than at a mystery.
+        await openComponentCatalogue([]);
+
+        const unresolved = await dropPayload({ type: 'Item', uuid: 'nonsense' });
+        assert.deepEqual(worldComponentIds(), [], 'nothing is minted from an unresolvable uuid');
+        assert.deepEqual(
+          unresolved.warn,
+          [],
+          'and — today — nothing is said either; see the note above before "fixing" this line'
+        );
+
+        // THE POSITIVE CONTROL ON THE FIXTURE, so the silence above is the RESOLUTION failing and
+        // not the drop zone being unreachable in this arrangement.
+        const resolved = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(worldComponentIds().length, 1);
+        assert.deepEqual(resolved.warn, []);
+      });
+
+      it('and refuses EVERY drop when there is no parser to ask, rather than accepting them', async () => {
+        // THE FAIL-CLOSED DIRECTION, WHICH NOTHING ASSERTED. Round 1 wrote a gate that answered
+        // `false` — "not embedded, go ahead" — whenever `foundry.utils.parseUuid` was missing, and
+        // every test above seeds the parser, so the branch that decides what happens WITHOUT one
+        // was never executed. A gate that fails open on an absent parser is not a gate: the exact
+        // client state that removes the check is the one where the check matters, because nothing
+        // else in this path distinguishes a world Item from an actor's embedded copy.
+        //
+        // The consequence of failing closed is deliberate and is asserted here too: a legitimate
+        // world Item is refused as well. That is the correct trade for a creation path — the GM is
+        // told why and can retry, where the alternative silently mints a world component pointing
+        // at an Item inside somebody's inventory.
+        await openComponentCatalogue([]);
+
+        const refused = await dropPayload({ type: 'Item', uuid: RESIN.uuid }, { withParser: false });
+        assert.deepEqual(
+          worldComponentIds(),
+          [],
+          'with no parser, even a plain world Item mints nothing'
+        );
+        assert.equal(refused.warn.length, 1, 'and the GM is told, rather than left with silence');
+
+        // THE POSITIVE CONTROL ON THE FIXTURE. The very same payload with the parser present is
+        // accepted, so the refusal above is the ABSENT PARSER and not a broken drop fixture.
+        const accepted = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(worldComponentIds().length, 1);
+        assert.deepEqual(accepted.warn, []);
+      });
+    });
+
+    // ── THE WORLD COMPONENT ENTRY SAYS THERE ARE UNSAVED CHANGES (issue 1371, round 5) ──
+    //
+    // NESTED HERE for the reason the essence block below records: `mountWithRealStore` is the
+    // only harness in the repository that drives the manager shell over a real world-scope
+    // corpus, and this marker is rendered by the SHELL.
+    //
+    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS. The marker sits in `.manager-header`, a
+    // sibling of `.manager-main`, so `WorldComponentEntryPage`'s own mounted suite cannot see
+    // it — every assertion there is green whether the shell renders the marker, renders it
+    // permanently, or renders nothing at all. Lane A proved the behaviour against the running
+    // app and could not place a guard from its page mount; this is that guard.
+    //
+    // THE PAIR IS ASSERTED TOGETHER, not the marker alone. The marker and the Save's disabled
+    // state read one `worldComponentEntryDirty`, and the failure worth catching is the two
+    // DISAGREEING — a screen offering a Save it will not perform, or refusing one over an edit
+    // it is showing as pending.
+    describe('world component entry unsaved marker (issue 1371)', () => {
+      // A SOURCE-LESS record, and that is load-bearing rather than incidental: the entry renders
+      // the name as a read-only `<span>` when a Foundry item backs it, because the identity then
+      // follows the item. The editable `<input>` this block types into exists only for a record
+      // with no source, which is the state a GM authors a name in.
+      const UNBOUND_SALT = Object.freeze({
+        id: 'lab-unbound-salt',
+        name: 'Unbound Salt',
+        description: 'Catalogued from a merchant\u2019s ledger, with no game-world Item behind it.',
+      });
+
+      async function settleEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const unsavedMarker = () =>
+        target.querySelector('[data-world-component-entry-unsaved]')?.textContent?.trim();
+      const saveDisabled = () =>
+        target.querySelector('[data-world-component-save]')?.disabled === true;
+
+      /**
+       * Open the entry the way a GM does: the world rail, then the row's own open action.
+       *
+       * @returns {Promise<object>} the real admin store, for a caller that has to settle it.
+       */
+      async function openSaltEntry() {
+        const store = await mountWithRealStore({ worldComponents: [{ ...UNBOUND_SALT }] });
+        worldNavItem('component-catalogue').click();
+        await settleEntryRoute();
+        const open = target.querySelector(
+          `[data-scoped-list-row="${UNBOUND_SALT.id}"] [data-scoped-list-action="open-entry"]`
+        );
+        assert.ok(
+          Boolean(open),
+          'the component catalogue rendered no open-entry action, so nothing below reaches the ' +
+            'entry this block is about'
+        );
+        open.click();
+        await settleEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-component-entry',
+          'the row action did not commit the entry route'
+        );
+        return store;
+      }
+
+      /**
+       * Type into the buffered name field. An `input` event is the only thing that moves the
+       * draft: it is seeded from the persisted record, so a click cannot dirty it.
+       *
+       * @param {string} value the name to type.
+       */
+      async function typeName(value) {
+        const field = target.querySelector('[data-scoped-entry-name]');
+        assert.ok(Boolean(field), 'the entry rendered no editable name field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleEntryRoute();
+      }
+
+      it('rests with NO marker and a disabled Save', async () => {
+        await openSaltEntry();
+        assert.ok(
+          !target.querySelector('[data-world-component-entry-unsaved]'),
+          'a freshly-opened entry has nothing pending, so announcing unsaved changes would be a ' +
+            'permanent decoration rather than a state'
+        );
+        assert.ok(saveDisabled(), 'and the Save is off, because there is nothing to write');
+      });
+
+      it('announces the pending edit and arms the Save after ONE keystroke', async () => {
+        await openSaltEntry();
+        await typeName('Bound Salt');
+        assert.equal(
+          target.querySelector('[data-scoped-entry-name]').value,
+          'Bound Salt',
+          'the keystroke never reached the draft, so both assertions below are vacuous'
+        );
+        assert.equal(
+          unsavedMarker(),
+          'Unsaved changes',
+          'the GM holds an edit the record does not carry, and the header must say so before ' +
+            'they navigate away from it'
+        );
+        assert.ok(
+          !saveDisabled(),
+          'and the Save is armed: the marker and the Save read one dirty flag, and a screen ' +
+            'showing a pending edit while refusing to write it is the failure here'
+        );
+      });
+
+      // ── AND SOMETHING PRESSES IT (issue 1371 r19-entry2) ────────────────────────────────
+      //
+      // Everything above proves the Save EXISTS and ENABLES. Nothing pressed it, and under M34
+      // that button is the only way four staged sections reach the disk: before this case,
+      // replacing the shell's `onSave={saveWorldComponentEntry}` with `() => {}` left every one
+      // of this file's tests green. The page's own suite drives the HANDLE, which is the seam
+      // rather than the control, so the wire from the header's button through the shell to that
+      // handle was covered by nothing at all.
+      //
+      // READ BACK OFF THE CORPUS, not off a spy: this block mounts the REAL admin store over the
+      // real scope store, so "the write landed" is a fact about what a reload would find rather
+      // than about which function was called.
+
+      /**
+       * Give the world a vocabulary, so the category picker and the tag run have something to
+       * offer. The default leg is `null` — a world with none authored — and the entry withholds
+       * both controls over it, so a case that stages them has to author them first.
+       *
+       * @param {object} store the real admin store.
+       * @returns {Promise<void>}
+       */
+      async function authorVocabulary(store) {
+        scopeStores.vocabulary = {
+          corpus: () => ({
+            componentCategories: [{ id: 'Raw' }],
+            componentTags: [{ id: 'ore' }],
+            recipeCategories: [],
+          }),
+        };
+        await store.refresh();
+        await settleEntryRoute();
+      }
+
+      /** The world record as a reload would read it: the entity, and its world defaults. */
+      const persistedSalt = () => {
+        const corpus = scopeStores.component.get();
+        return {
+          name: corpus.entities.find((entry) => entry.id === UNBOUND_SALT.id)?.name,
+          category: corpus.defaults[UNBOUND_SALT.id]?.category,
+          tags: corpus.defaults[UNBOUND_SALT.id]?.tags,
+        };
+      };
+
+      it('CLICKING the Save lands the staged name, category and tag on the world corpus, and the marker goes', async () => {
+        const store = await openSaltEntry();
+        await authorVocabulary(store);
+        await typeName('Bound Salt');
+        target.querySelector('[data-scoped-entry-category-input]').click();
+        await settleEntryRoute();
+        const raw = [...target.querySelectorAll('[data-popover-option]')].find(
+          (option) => option.textContent.trim() === 'Raw'
+        );
+        assert.ok(Boolean(raw), 'the category picker offered nothing, so the stage below is vacuous');
+        raw.click();
+        await settleEntryRoute();
+        const ore = target.querySelector('[data-scoped-entry-tag="ore"]');
+        assert.ok(Boolean(ore), 'the tag run offered nothing, so the stage below is vacuous');
+        ore.click();
+        await settleEntryRoute();
+
+        assert.deepEqual(
+          persistedSalt(),
+          { name: 'Unbound Salt', category: undefined, tags: undefined },
+          'THREE EDITS, ZERO WRITES so far (M34) — which is what makes the click below the thing being measured'
+        );
+        assert.equal(unsavedMarker(), 'Unsaved changes');
+
+        const save = target.querySelector('[data-world-component-save]');
+        assert.ok(Boolean(save) && !save.disabled, 'the Save is there and armed');
+        save.click();
+        await settleEntryRoute();
+
+        assert.deepEqual(
+          persistedSalt(),
+          { name: 'Bound Salt', category: 'Raw', tags: ['ore'] },
+          'the click carried all three staged sections through the shell to the world corpus'
+        );
+        assert.ok(
+          !target.querySelector('[data-world-component-entry-unsaved]'),
+          'and the marker goes, because there is nothing pending any more'
+        );
+        assert.ok(saveDisabled(), 'and the Save disarms');
+      });
+    });
+
     // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
     //
     // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
@@ -28388,6 +28997,137 @@ describe('CraftingSystemManager mounted behavior', () => {
           chosen,
           'the tile at the top of the screen kept the glyph on disk while the picker trigger ' +
             'and the player preview both moved to the buffered one'
+        );
+      });
+    });
+
+    // ── issue 1371 r17 ──────────────────────────────────────────────────────────────────
+    describe('world component entry → system rules deep link, through the root (issue 1371 r17)', () => {
+      // REVIEWER 6 (r13). `openSystemComponentRules(entityId, systemId)` seeds the id through
+      // `resetComponentSelectionFor` inside `selectSystem`'s guarded callback, and its proof was
+      // a source regex plus a VIEW-level case that mounted the rules list with the id already
+      // set. Nothing exercised the wiring — `selectSystem` resolving, the switch effect stamping
+      // its sentinel, the view receiving the seeded id — and wiring is covered only when it is
+      // exercised. This walks it through the root: the world rail, the catalogue row's open
+      // action, the entry's member-row `View system rules`, and the rules list's
+      // `aria-current` row.
+      //
+      // ITS OWN MOUNT, on `mountWithRealStore`'s shape, because that helper seeds neither a
+      // membership record nor an in-system row: the member-row link is drawn only for a
+      // membership record, and `aria-current` lives on a MEMBER row of the rules list, which
+      // needs the system's own `components` entry. This suite is append-only for the lane, so
+      // the two knobs are not added to the shared helper.
+      //
+      // TWO MEMBERS, AND THE ORDER IS THE NON-VACUITY. M14 (r13-list) selects the FIRST drawn
+      // row whenever nothing this system holds is selected, and `Ash` sorts before `Coal` — so a
+      // deep link that dropped its entity id would land the GM on Ash with a row marked, and an
+      // assertion that "some row is current" would pass. The assertion is which row.
+      const worldRecord = (id, name) =>
+        Object.freeze({
+          id,
+          name,
+          originItemUuid: `Item.${id}`,
+          registeredItemUuid: `Item.${id}`,
+          aliasItemUuids: [],
+        });
+      const inSystemRow = (id, name) => ({
+        id,
+        name,
+        img: null,
+        description: '',
+        originItemUuid: `Item.${id}`,
+        registeredItemUuid: `Item.${id}`,
+        aliasItemUuids: [],
+      });
+      const ASH = worldRecord('ash', 'Ash');
+      const COAL = worldRecord('coal', 'Coal');
+
+      async function settleRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+      async function mountWithTwoMembers() {
+        scopeStores = {
+          component: scopeStore([{ ...ASH }, { ...COAL }], {
+            membership: [
+              { entityId: 'ash', systemId: 'sys1', inherit: { category: true } },
+              { entityId: 'coal', systemId: 'sys1', inherit: { category: true } },
+            ],
+          }),
+          essence: scopeStore(worldEntities(2, 'ess')),
+          tool: scopeStore(worldEntities(1, 'tool')),
+          vocabulary: null,
+        };
+        const forge = makeSystem({
+          id: 'sys1',
+          name: 'Forge',
+          components: [inSystemRow('ash', 'Ash'), inSystemRow('coal', 'Coal')],
+        });
+        const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
+        const systems = [forge, alchemy];
+        const services = createServices(forge, [], [], {
+          getCraftingSystemManager: () => ({
+            getSystems: () => systems,
+            getSystem: (id) => systems.find((system) => system.id === id) || null,
+            // THE RULES LIST'S ROWS COME FROM HERE, not from `system.components` directly:
+            // `buildItemCards` asks `getItems(systemId, search)`, and the shared helper's `[]`
+            // is why it never had a rules row to mark. The shipped manager answers the
+            // system's own array; so does this.
+            getItems: (id) => systems.find((system) => system.id === id)?.components ?? [],
+          }),
+          getComponentScopeStore: () => scopeStores.component,
+          getEssenceScopeStore: () => scopeStores.essence,
+          getToolScopeStore: () => scopeStores.tool,
+          getVocabularyScopeStore: () => scopeStores.vocabulary,
+        });
+        const store = createAdminStore(services);
+        await store.refresh();
+        target = document.createElement('div');
+        document.body.appendChild(target);
+        mounted = mount(Component, { target, props: { store, services: {} } });
+        flushSync();
+        await tick();
+        flushSync();
+        return store;
+      }
+
+      it('marks the linked component current on the rules list, not the first-sorted row', async () => {
+        await mountWithTwoMembers();
+        worldNavItem('component-catalogue').click();
+        await settleRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="coal"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(Boolean(open), 'the catalogue drew Coal with its open-entry action');
+        open.click();
+        await settleRoute();
+        assert.equal(managerView(), 'world-component-entry', 'the GM is on the world entry');
+
+        const link = target.querySelector(
+          '[data-scoped-entry-systems="coal"] [data-scoped-entry-system-rules="sys1"]'
+        );
+        assert.ok(Boolean(link), 'the member row draws `View system rules` for Forge');
+        link.click();
+        await settleRoute();
+
+        assert.equal(managerView(), 'components', 'the link lands on the rules list');
+        const rows = [...target.querySelectorAll('.manager-component-row')].map((row) =>
+          row.getAttribute('data-component-id')
+        );
+        assert.deepEqual(rows, ['ash', 'coal'], 'both members are drawn, Ash first');
+        const current = [...target.querySelectorAll('.manager-component-row[aria-current="true"]')];
+        assert.equal(current.length, 1, 'exactly one row is current');
+        assert.equal(
+          current[0].getAttribute('data-component-id'),
+          'coal',
+          'and it is the component whose entry the GM came from — not Ash, which M14 would ' +
+            'have marked had the deep link dropped its id'
         );
       });
     });

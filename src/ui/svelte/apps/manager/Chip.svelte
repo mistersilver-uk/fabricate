@@ -27,10 +27,42 @@
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
      `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
-     `tag`, or '' for the default neutral fill. Tone is colour only and never changes the
-     size; a tone that resized would reintroduce the drift this component removes.
+     `secondary`, `tag`, or '' for the default neutral fill. Tone is colour only and never
+     changes the size; a tone that resized would reintroduce the drift this component removes.
+   - emphasis: '' (the shipped chip), 'outlined' or 'lit'. It is a SECOND AXIS and not an
+     eleventh tone: `tone` says which family the chip belongs to, `emphasis` says HOW that
+     family arrives. Anything else resolves to '', exactly as an unrecognised `tone` does, so a
+     chip that does not ask for one is byte-identical to what shipped. Both rules are the last
+     in the style block and carry the full notes.
+     · 'outlined' — the chip as a FLAT PLATE rather than a tinted wash, for a badge that has to
+       stand ON a panel of its own colour family (`proto:1313`).
+     · 'lit' — the family's colour on the INK too, over a 16% wash of it and nothing else
+       (issue 1371). The reference's lit world-tag chip is purple ink on a purple tint behind a
+       purple edge (`proto:5401`, `proto:5665`); `tone="tag"` alone states the edge correctly,
+       inks `--fab-text` and mixes its wash into the opaque `--fab-bg-3`. It applies to the two
+       chips that declare a colour of their own — `tone="tag"` and any `swatch` — because those
+       are the ones with a colour to be lit in; on any other chip the rule does not match and
+       nothing moves.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
+   - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
+     the scope being read (issue 1371, maintainer parity round 4) — a dashed hairline, the
+     `--fab-surface-soft` fill and a struck-through label (`proto:5692-5697`). It composes with
+     `tone`, adding those three declarations and nothing else, so the two call sites pair it
+     with `tone="muted"` and a muted chip that does NOT set it is byte-identical to what
+     shipped. It is a BOOLEAN rather than a repaint of `tone="muted"` because that tone already
+     has five callers with a different meaning — "unavailable", as in the complications
+     section's `Salvage · n/a` — and striking those through would say they had been switched
+     off by a GM. `rebuild-spec.md` D4.2 names this the `muted` variant; the prop is spelled
+     `struck` only because the tone of that name is taken.
+     ONE SHIPPING CALLER, and the docblock names it because the prop's meaning is only as
+     stable as the set of screens that wear it: `ComponentEditView`'s world-tag group, as
+     `struck={worldMutedTags.includes(tag)}` — a world tag MUTED in the system being read. The
+     world Component entry's own world-tag run was a second caller for one revision, on the
+     opposite meaning ("applied, but not in the world vocabulary"), on the same records, one
+     screen apart; it was withdrawn rather than left to make the mark say two things (issue 1371
+     r19-entry2). A caller that wants a mark for something OTHER than "switched off here" needs
+     its own named prop and its own specimen, not this one.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
    - swatch: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …) rendering a leading
      COLOUR DOT (issue 1036). The colour pill is a variant of the one chip rather than a
@@ -39,6 +71,18 @@
      on a non-tag chip paints literally nothing — a declaration that renders as a no-op is a
      failed visual change, not a subtle one — and eight pastel fills down a dense library
      list is not what a colour pill should look like. `swatch` composes with every tone.
+   - tint: a BARE `--fab-tag-*` palette key that inks the WHOLE chip — glyph and label — in
+     that colour over the quiet surface behind the plain hairline (issue 1371 r18-colour,
+     maintainer ruling M29). It is the reference's face for a row's essence dot
+     (`proto:5502`: `background: var(--surface-soft); border: 1px solid var(--border);
+     color: e.color`), and it is what lets an essence be drawn in the colour the Essence
+     Catalogue gave it wherever it is drawn. It is validated exactly as `swatch` is and rides
+     the same `--fab-chip-color` vehicle, so the two compose on one declaration; it is NOT the
+     swatch, because a swatch says "this chip is ABOUT a colour" with a dot and a tint says
+     "this chip IS that colour" with its ink. It states colour only and is written after every
+     tone, so a tint on a toned chip wins the family; `emphasis="outlined"` still plates it and
+     `emphasis="lit"` still washes it, because a tint declares the colour those two act on.
+     A chip that does not ask for one is byte-identical to what shipped.
    - class: additional classes for a caller that also needs layout context from the
      global sheet (`manager-editor-tab-badge` positions a badge inside a tab button, for
      instance). Those rules sit at a higher specificity than this scoped block by
@@ -52,9 +96,40 @@
      "Rolls dice" chip), taken from the prototype (issue 1096) — 'list', a browser ROW's
      own in-line pill, which the reference draws smaller and quieter than either
      (`proto:4872`: a ~15px stadium at 9px/600 in the secondary ink on the soft surface) —
-     or 'action', the page
+     'action', the page
      header's action cluster, where a chip stands in the same row as the Back / Delete /
-     Save buttons and has to be one of them. `styles/fabricate.css`
+     Save buttons and has to be one of them — 'tag-run', the scale of a chip that is a
+     CONTROL a GM clicks rather than a badge they read (issue 1371) — or 'inspector', the
+     browser inspector's `Tags in effect` run, which is the DEFAULT chip's height at the
+     reference's own weight and inset rather than a fourth micro scale (its rule below carries
+     the measurement). The reference draws
+     every tag chip that way, on the world Component entry (`proto:5401`) and in the rules
+     editor's world-tag and own-tag runs (`proto:5692`, `proto:5707`): `padding: 5px 12px`,
+     `border-radius: 999px`, `font: 600 11px`, a pill roughly 25px tall against the default
+     chip's 20. Two parity lanes measured that one mismatch as ~34 of the rules editor's 117
+     drift lines and 10 of the entry's — the largest single cause on either screen. This
+     block closes 5 of that 10 outright (corner, size, weight and both horizontal insets);
+     the two vertical insets stay open by 1px under the spacing-scale deviation below, and
+     the remaining 3 are the caller's `tone`, not this scale's.
+
+     `tag-run` IS THE SCALE, NOT THE PAINT. The lit face the reference draws is its own purple at
+     sixteen percent behind an edge of the same purple at fifty and a LABEL in that purple at full
+     strength; that face is `tone="tag" emphasis="lit"`, and the second half of it is corrected
+     here (issue 1371, parity round 5). This note used to say `tone="tag"` alone stated the whole
+     of it. It does not, and the harness measured the difference rather than inferring it: that
+     tone mixes its sixteen percent into the OPAQUE `--fab-bg-3` rather than into what is behind
+     the chip, so the fill measures a grey-blue, and it inks the label `--fab-text` rather than
+     the purple. The edge was right all along. `emphasis="lit"` states the other two. The unlit
+     and switched-off faces stay `tone`/`struck`; keeping paint and scale on separate axes is what
+     lets one run draw lit, unlit and struck chips at one size, which is what that run is.
+
+     THE REFERENCE'S MICRO PILL IS ALREADY HERE, and is deliberately not a second value. Both
+     lanes also asked for a `micro` scale for the `World catalogue` badge (`proto:1313`) and the
+     salvage mode pill (`proto:5721`) at `padding: 2px 8px; border-radius: 999px; font: 600 9px`
+     — which is `density="list"` above, to within one pixel of vertical padding. Adding a value
+     a pixel from a shipped one is how a primitive drifts into two scales, which is the failure
+     this component was extracted to end; `list` is the answer for both, and this note is here so
+     the next lane does not re-derive the question. `styles/fabricate.css`
      cannot state it: that sheet imports at `layer(modules)` while this component's
      `css: 'injected'` block lands UNLAYERED (svelte.config.js), and an unlayered
      declaration beats a layered one no matter how specific the layered selector is
@@ -77,9 +152,12 @@
   let {
     tag = 'span',
     tone = '',
+    emphasis = '',
     mono = false,
+    struck = false,
     icon = '',
     swatch = '',
+    tint = '',
     class: extraClass = '',
     truncate = false,
     density = 'default',
@@ -92,14 +170,30 @@
   // a bare palette key can have; anything else is dropped and the dot is not rendered at
   // all, rather than emitting whatever the caller composed. Both spellings are tolerated
   // because `ManagerColorPicker` already accepts both.
-  const safeSwatch = $derived(
-    /^[a-z0-9-]+$/.test(String(swatch || '').replace(/^--fab-tag-/, ''))
-      ? String(swatch).replace(/^--fab-tag-/, '')
-      : ''
-  );
+  const safeSwatch = $derived(safePaletteKey(swatch));
+  // The tint takes the same shape and the same discipline (issue 1371 r18-colour): a bare key
+  // or nothing, never a value a caller composed.
+  const safeTint = $derived(safePaletteKey(tint));
+  // ONE declaration of the vehicle whichever of the two props set it. A swatch and a tint on
+  // one chip name one colour, so the tint's key is taken when both are given — a chip that is
+  // inked in a colour is that colour before it is about one.
+  const chipColor = $derived(safeTint || safeSwatch);
   const swatchStyle = $derived(
-    safeSwatch ? `--fab-chip-color:var(--fab-tag-${safeSwatch})` : undefined
+    chipColor ? `--fab-chip-color:var(--fab-tag-${chipColor})` : undefined
   );
+
+  /**
+   * A bare `--fab-tag-*` palette key, or '' for anything that is not one. The key is interpolated
+   * into a `style` attribute, so it is constrained to the shape a key can have; both spellings
+   * are tolerated because `ManagerColorPicker` already accepts both.
+   *
+   * @param {unknown} value
+   * @returns {string}
+   */
+  function safePaletteKey(value) {
+    const key = String(value || '').replace(/^--fab-tag-/, '');
+    return /^[a-z0-9-]+$/.test(key) ? key : '';
+  }
 
   // Colour families this component paints. Anything else a caller passes is dropped
   // rather than emitted as an unstyled `is-*` class, so a typo shows up as the default
@@ -134,18 +228,45 @@
     // membership into the success family, `neutral` would erase the tag language, and a
     // `class=` override would re-derive the tone back in the global sheet.
     'tag',
+    // SECONDARY (issue 1371): the quiet FACT pill. The reference's salvage mode pill
+    // (`proto:5721`) is drawn by its own shared pill helper as the subtle surface behind a
+    // plain hairline with the SECONDARY ink, and no tone here inks that. `neutral` is the
+    // nearest and is genuinely a different statement: it inks `--fab-text-muted`, declares no
+    // fill at all, and has two dozen callers meaning "a fact that is merely present". The mode
+    // pill is a step louder than that — it names the rule the GM is reading, on a surface of
+    // its own — and a step quieter than every semantic family.
+    'secondary',
   ]);
+
+  /**
+   * The emphasis vocabulary, closed for the same reason `TONES` is: an unrecognised value
+   * renders the SHIPPED chip rather than emitting an `is-*` class the style block does not
+   * paint, so a typo shows up as the default rather than as a declaration that silently does
+   * nothing. It is a `Set` rather than a ternary because the style block's mirror is guarded by
+   * a test that reads this literal, exactly as the tone matrix reads `TONES`.
+   *
+   * @type {ReadonlySet<string>}
+   */
+  const EMPHASES = new Set(['outlined', 'lit']);
 
   const classes = $derived(
     [
       'manager-chip',
       TONES.has(tone) ? `is-${tone}` : '',
+      EMPHASES.has(emphasis) ? `is-${emphasis}` : '',
       safeSwatch ? 'has-swatch' : '',
+      safeTint ? 'has-tint' : '',
       mono ? 'is-mono' : '',
+      struck ? 'is-struck' : '',
       truncate ? 'is-truncated' : '',
       density === 'row' ? 'is-row' : '',
       density === 'list' ? 'is-list' : '',
       density === 'action' ? 'is-action' : '',
+      // `is-tag-run`, NOT `is-tag`: the tone of that name is already taken, and a class list is
+      // matched by whole token, so the scale and the purple tone compose on one chip without
+      // either reaching the other's rules.
+      density === 'tag-run' ? 'is-tag-run' : '',
+      density === 'inspector' ? 'is-inspector' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -156,7 +277,13 @@
 <!-- Written without internal whitespace on purpose: a newline between the glyph and the
      content becomes a text node, and callers assert on the chip's exact `textContent`
      (a count badge reading ' 1' instead of '1' is a real defect, not a test artefact). -->
-<svelte:element this={tag} bind:this={element} class={classes} style={swatchStyle} {...rest}
+<svelte:element
+  this={tag}
+  bind:this={element}
+  class={classes}
+  style={swatchStyle}
+  data-chip-tint={safeTint || undefined}
+  {...rest}
   >{#if safeSwatch}<span
       class="manager-chip-swatch"
       data-chip-swatch={safeSwatch}
@@ -349,6 +476,23 @@
     color: var(--fab-text-muted);
   }
 
+  /* SECONDARY (issue 1371): the quiet FACT pill, one step louder than `neutral` above and one
+     step quieter than every semantic family. `proto:5721` draws the rules editor's salvage
+     mode pill through the prototype's shared pill helper with exactly these three: the subtle
+     surface, a plain `--fab-border` hairline and the SECONDARY ink. `--fab-text-secondary` IS
+     that reference's own secondary ink token, the same equivalence `StatusPill`'s outlined
+     emphasis rests on, so this states a token rather than approximating a colour.
+
+     THREE DECLARATIONS AND NO GEOMETRY, like every tone here. The mode pill's SCALE is
+     `density="list"` — see the micro-pill note in the props block above, which settles both of
+     the reference's micro pills onto that one value rather than adding a scale a pixel from a
+     shipped one. */
+  .manager-chip.is-secondary {
+    border-color: var(--fab-border);
+    color: var(--fab-text-secondary);
+    background: var(--fab-surface-soft);
+  }
+
   /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
      is the ink, for the reason that token was added at all — the raw accent over
      `--fab-accent-soft` measures under AA in `ironblood-forge`, and every other semantic
@@ -368,6 +512,24 @@
     border-color: var(--fab-border);
     color: var(--fab-text-disabled);
     background: none;
+  }
+
+  /* THE MUTED VARIANT (issue 1371): a value switched off in the scope being read. Written
+     AFTER every tone rule so it wins the three properties it states over whichever tone the
+     caller paired it with, and states only those three — the tone still owns the ink, so a
+     muted-toned struck chip keeps `--fab-text-disabled` and an info-toned one would keep the
+     info ink. `border-style` rather than the `border` shorthand, so the tone's own
+     `border-color` survives. */
+  .manager-chip.is-struck {
+    border-style: dashed;
+    background: var(--fab-surface-soft);
+    text-decoration: line-through;
+  }
+
+  /* The strike must not cross the leading glyph: `text-decoration` inherits into the `<i>`,
+     and an eye-slash with a line through it reads as a broken icon rather than a muted tag. */
+  .manager-chip.is-struck > i {
+    text-decoration: none;
   }
 
   /* ROW density (issue 1096): the Checks Studio modifier row's in-line annotation chip
@@ -463,6 +625,74 @@
     white-space: nowrap;
   }
 
+  /* TAG-RUN scale (issue 1371): the chip that is a CONTROL. `proto:5401` states it as
+     `padding: 5px 12px; border-radius: 999px; font: 600 11px`, and every one of those but the
+     vertical padding is written here verbatim.
+
+     THE 5px SNAPS TO `--fab-space-chip` (6px). 5 is off the published 4px spacing scale, which
+     `openspec/specs/ui-integration/spec.md` makes normative and
+     `tests/components/spacing-scale-ratchet.test.js` enforces as a ratchet — a gate, not a
+     preference — so the choice is between the scale's 4px step and its 6px dense optical step.
+     6px is the nearer of the two once the reference's line box is accounted for: it authors no
+     `line-height`, so its 11px text lays out at ~13.2px and the pill measures ~25.4px tall,
+     against 25px here and 21px at 4px. The horizontal 12px is `--fab-space-3` exactly.
+
+     NO `min-height`, unlike `is-list` above, and that is a measurement rather than an omission:
+     6 + 6 + 11 + 2 is 25px, already clear of the base rule's 20px floor, so restating the floor
+     would change nothing and would read as though it did.
+
+     SIZE ONLY. The lit purple face is `tone="tag"` and the switched-off face is `struck`; this
+     block and those two share not one property, so all three compose without an ordering
+     argument. A scale that also painted would flatten a run whose whole job is to show three
+     different states at one size. */
+  .manager-chip.is-tag-run {
+    padding: var(--fab-space-chip) var(--fab-space-3);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* INSPECTOR density (issue 1371): the component browser inspector's `Tags in effect` run.
+     `proto:5663` and `proto:5665` draw both halves of that run — the tags a component inherits
+     from the world classification, and the ones a system sets itself — at one geometry:
+     `padding: 3px 9px; border-radius: 999px; font: 600 10px`.
+
+     IT IS NOT A FOURTH MICRO SCALE, and that is a measurement rather than a preference. The
+     reference's pill is the SAME HEIGHT as the shipped default — its unauthored line box puts a
+     10px face at roughly 12px, so 3 + 12 + 3 plus the hairline is about 20px, which is exactly
+     the base rule's floor — so what a parity lane actually measured as open is TWO properties,
+     not a size: the base scale's `font-weight: 700` against the reference's 600, and its
+     `--fab-space-chip` horizontal inset against a wider one. `is-list` (15px) and `is-tag-run`
+     (25px) are both a different pill; this is the default pill, spoken more quietly.
+
+     THE OTHER TWO DECLARATIONS ARE NOT RESTATEMENTS of the base rule, which is why they are
+     written rather than omitted the way `is-tag-run` omits its floor. The base rule's 10px
+     corner and this 999px are IDENTICAL on one line — 999px clamps to half the shorter side —
+     and diverge the moment a long tag name wraps, where the reference draws a stadium. And
+     `0.62rem` tracks the host document's root font size while the reference's 10px does not,
+     so the two agree in the manager and can disagree wherever else this primitive is reused.
+
+     THE DEFAULT SCALE DOES NOT MOVE, which is the whole reason this is a density and not an
+     edit to the base rule. That rule is what 60-odd call sites render, and one run's parity
+     finding is not a mandate to restyle all of them.
+
+     BOTH INSETS SNAP TO THE PUBLISHED SCALE. 3px and 9px are off the 4px scale
+     `openspec/specs/ui-integration/spec.md` makes normative and
+     `tests/components/spacing-scale-ratchet.test.js` enforces as a ratchet — a gate, not a
+     preference — so the vertical takes `--fab-space-1` (4px, one more) and the horizontal
+     `--fab-space-2` (8px, one less). Neither snap can move the rendered height: 4 + 10 + 4 is
+     18px, still under the base rule's 20px floor, so the pill measures 20px either way.
+
+     GEOMETRY AND TYPE ONLY, no colour, for the reason `is-list` and `is-tag-run` state above
+     and which this run makes vivid: its two halves are deliberately DIFFERENTLY toned, and a
+     density that painted a fill would flatten the distinction the run exists to draw. */
+  .manager-chip.is-inspector {
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
      `--fab-chip-color` the root sets inline. Named `manager-chip-swatch` rather than
      anything matching `manager-chip` on its own, because `manager-layout.test.js`'s
@@ -488,5 +718,114 @@
     border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
     color: var(--fab-text);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-bg-3));
+  }
+
+  /* THE TINT (issue 1371 r18-colour, maintainer ruling M29): the chip inked in ITS OWN colour.
+
+     `proto:5502` draws a row's essence dot as `background: var(--surface-soft); border: 1px solid
+     var(--border); color: e.color` — the essence's colour on the glyph AND the numeral, over the
+     quiet surface, behind the plain hairline. Three declarations, and every one of them is a
+     colour: the tint is an axis like `tone`, and a tint that resized would reintroduce the drift
+     this component was extracted to end.
+
+     IT READS `--fab-chip-color`, the vehicle the tag tone and the swatch dot already share, which
+     the root sets INLINE from the validated key. That is why this rule can be one selector rather
+     than eight: the palette arrives as a token name and the theme resolves it, so a theme swap
+     re-inks every tinted chip without this block naming a single palette entry.
+
+     WRITTEN AFTER EVERY TONE, and that is the whole of its cascade argument. Each tone is (0,2,0)
+     and so is this; a caller that pairs a tone with a tint asks for the tint, so the tint has to
+     be the later rule. `is-outlined` and the lit pair stand after it in turn, because both act ON
+     a chip's declared colour — the plate keeps this ink and edge and takes back the fill, and the
+     lit face keeps this ink and washes the fill — so a tint written after either would undo the
+     emphasis the caller also asked for.
+
+     The label keeps the palette colour as its INK, and that is a measured decision rather than a
+     stylistic one: `tests/components/essence-chip-rendered.test.js` renders this face in Chromium
+     under every theme block the sheet declares, for every tint the picker offers, and holds the
+     composited label above 4.5:1. */
+  .manager-chip.has-tint {
+    border-color: var(--fab-border);
+    color: var(--fab-chip-color);
+    background: var(--fab-surface-soft);
+  }
+
+  /* THE OUTLINED EMPHASIS (issue 1371): the chip as a FLAT PLATE.
+
+     `proto:1313` draws the world Component entry's `World catalogue` badge INSIDE an
+     `info-soft` callout, and does not tint it: the badge is a flat `--bg1` surface behind an
+     info hairline with info ink, so it reads as a different surface sitting ON the panel.
+     `tone="info"` alone cannot say that. It would put an `info-soft` fill on an `info-soft`
+     callout — measured equal, not estimated equal, by a parity run that reported no background
+     drift between the two — and the badge would dissolve into the panel it is meant to stand
+     on. That is the defect, and no combination of the ten tones closes it, because every one of
+     them paints a wash.
+
+     SO EMPHASIS IS A SECOND AXIS, not an eleventh tone. `tone` says which FAMILY the chip
+     belongs to; `emphasis` says whether that family arrives as a wash or as a plate. ONE
+     declaration expresses the whole of it, because the tone rules above already state the edge
+     and the ink it needs: `tone="info" emphasis="outlined"` is `--fab-info-border` and
+     `--fab-info-text` on `--fab-bg-1`, and a toneless outlined chip keeps the base rule's
+     `--fab-border` and `--fab-text`. Eleven tones times one rule, rather than eleven more rules
+     — and a tone added later is outlined for free.
+
+     IT IS THE MIRROR OF `StatusPill`'s EMPHASIS OF THE SAME NAME, and the axis it supersedes is
+     the OPPOSITE one. Stating that plainly because the shared prop name invites the assumption
+     that the two are the same declarations: that pill's outlined emphasis neutralises the EDGE
+     and the INK and keeps the tone's fill, because its reference draws one neutral attribution
+     badge whatever state it annotates (`proto:834`); this one neutralises the FILL and keeps
+     the tone's edge and ink, because its reference draws a coloured badge that must not melt
+     into a coloured panel. What the two genuinely share is the meaning of the word — a
+     hairline-edged plate rather than a tinted wash — which is why this is that prop's second
+     value and not a differently named prop.
+
+     WRITTEN LAST IN THE BLOCK, and that ordering is load-bearing rather than tidy. Every tone
+     rule is (0,2,0), as this is, so order decides the fill; `is-tag` immediately above is the
+     final tone rule and the only one whose fill is a `color-mix` rather than a token, so an
+     emphasis written anywhere earlier would be beaten by that tone alone and the purple tag
+     chip would be the one shape the plate did not reach. `is-struck` also states a fill and
+     also sits earlier, so a struck outlined chip keeps its dashed edge and its line-through and
+     takes the plate — the composition this axis promises, though no caller pairs the two
+     today. */
+  .manager-chip.is-outlined {
+    background: var(--fab-bg-1);
+  }
+
+  /* THE LIT EMPHASIS (issue 1371, parity round 5, UX finding F10): the chip's own colour on the
+     INK as well as on the edge, over a wash of that colour and nothing else.
+
+     WHAT IT CLOSES. The reference's lit world-tag chip is one colour said three ways — the
+     `--fab-purple` token at sixteen percent on the fill, at fifty on the edge, and at full
+     strength ON THE LABEL (`proto:5401`, `proto:5665`). The shipped `tone="tag"` states the edge
+     at fifty and is exactly right; it states the FILL as that purple at sixteen mixed into the
+     OPAQUE `--fab-bg-3`, and the ink as `--fab-text` — so a parity run measured the entry's tag
+     chip as a grey-blue fill under a cream label against a purple tint under a purple one. Two of
+     those three lines are this rule; the third was never wrong.
+
+     WHY IT IS NOT AN IN-PLACE REPAINT OF `is-tag`. That tone has shipped callers on other
+     screens, and a shared primitive that takes a second site's treatment takes a PROP rather than
+     an edit — the standing rule this whole round is applying. `emphasis` is the axis that already
+     says how a family arrives, so this is its second value rather than a thirteenth tone.
+
+     IT READS `--fab-chip-color`, AND IT IS SELECTED ON THE CLASSES THAT DECLARE ONE — the tag
+     tone, the `swatch` dot and, since issue 1371 r18-colour, the `tint`. That property is the
+     vehicle the three share, and it is the whole of this emphasis's generality: a chip has to
+     have a colour of its own before it can be lit in it. Writing the precondition into the
+     SELECTOR rather than into a `var()` fallback is the
+     honest form — `background: color-mix(…, var(--fab-chip-color, <something>) 16%, transparent)`
+     is a mix whatever the fallback is, so a toneless lit chip would lose its fill to a 16% wash
+     of it rather than keep it. Unmatched is the only genuine no-op, which is `Medallion`'s
+     `has-tint` reasoning applied one component over.
+
+     WRITTEN LAST, AFTER `is-outlined`, and that is load-bearing exactly as its neighbour's own
+     note says: every tone rule is (0,2,0) and decides its fill by order, so a rule that repaints
+     `is-tag`'s fill must stand after it. At (0,3,0) these two selectors also beat `is-outlined`
+     outright, which is correct — a plate and a wash are the two answers to one question, so the
+     two emphases are alternatives rather than a composition, and no caller pairs them. */
+  .manager-chip.is-tag.is-lit,
+  .manager-chip.has-swatch.is-lit,
+  .manager-chip.has-tint.is-lit {
+    color: var(--fab-chip-color);
+    background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
   }
 </style>

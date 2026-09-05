@@ -796,14 +796,40 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
 // one leaves the empty aside wrapped to an implicit grid row, where the track count is still
 // two and the frame still photographs a dead strip.
 const FULL_WIDTH_LAYOUT_CASE_IDS = ['world-scoped-narrow'];
-const LAYOUT_CASE_IDS = [...RESPONSIVE_LAYOUT_CASE_IDS, ...FULL_WIDTH_LAYOUT_CASE_IDS];
+
+// And the two consumers of the SHARED EDITOR FRAME, which assert the stacked shape on a grid of
+// their OWN rather than on `.manager-body` (issue 1371 r19-entry2). They are a third group because
+// the frame's stack is its own container query at 1000px, not the shell's at 960: the frame is one
+// column below its threshold whatever the body around it did, so a `maxContentBoxInlineSize` bound
+// borrowed from the responsive group would be asserting a different screen's breakpoint. The claim
+// they need is the one they carry — exactly ONE resolved column track on the frame's own grid —
+// because the DOM is identical on both sides of a container query and no selector can tell the
+// stacked frame from the wide one.
+const FRAME_STACK_LAYOUT_CASE_IDS = [
+  'world-component-entry-stacked',
+  'manager-component-edit-stacked',
+];
+const LAYOUT_CASE_IDS = [
+  ...RESPONSIVE_LAYOUT_CASE_IDS,
+  ...FULL_WIDTH_LAYOUT_CASE_IDS,
+  ...FRAME_STACK_LAYOUT_CASE_IDS,
+];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 test('exactly the declared 1024px cases carry complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
-    assert.deepEqual(viewCase.position, { width: 1024, height: 860 });
+    // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
+    // shared literal would be asserting one screen's threshold about another's. The shell's stack
+    // is reached at 1024; the shared editor frame's own container query is at 1000 and the lab's
+    // manager container resolves two pixels inside its window, so 1024 leaves that frame WIDE.
+    assert.deepEqual(
+      viewCase.position,
+      FRAME_STACK_LAYOUT_CASE_IDS.includes(viewCase.id)
+        ? { width: 980, height: 860 }
+        : { width: 1024, height: 860 }
+    );
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
   }
@@ -812,6 +838,17 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   )) {
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, 960);
     assert.equal(viewCase.expectLayout.expectedTracks ?? 1, 1, 'a stacked case is one track');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    FRAME_STACK_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
+    // No width bound and no absent aside: the subject is the frame's own grid, and what makes the
+    // case worth capturing is that BOTH halves survive the stack — which the capture driver reads
+    // as one column track plus the pointer hit on the first tab the case also declares.
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.expectedTracks, 1);
+    assert.equal(viewCase.expectLayout.absentSelector, undefined);
+    assert.equal(typeof viewCase.expectCenterHit, 'string');
   }
   for (const viewCase of declared.filter((entry) =>
     FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)
@@ -4727,8 +4764,16 @@ test('every world tool id the capture cases click exists in the lab world, proje
   // PAIRED WITH THE CASE THAT CLICKS IT, not flattened to a set of ids (issue 1373, round 2).
   // The membership clause below has exactly one honest exception and it is a PER-CASE fact, so
   // a bare set of ids could not express it without exempting the id everywhere.
+  //
+  // AND THE SCAN IS SCOPED TO THE TOOL ROUTES (issue 1371). It used to walk EVERY case in the
+  // registry and resolve every clicked row id against the TOOL corpus, which was correct only
+  // while the tool screens were the only ones whose cases clicked a scoped-list row. The
+  // component catalogue's cases click component ids, and this test would have reported them as
+  // world tools the lab does not hold — a true statement about the wrong corpus. The component
+  // twin is the test below.
   const clicked = [];
   for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-tool')) continue;
     for (const step of viewCase.steps || []) {
       for (const [, id] of String(step.selector || '').matchAll(
         /\[data-scoped-list-(?:row|inspect)="([^"]+)"\]/g
@@ -4778,5 +4823,169 @@ test('every world tool id the capture cases click exists in the lab world, proje
   assert.ok(
     scope.entries.some((entry) => !entry.hasSourceLink),
     'and an UNLINKED one, which is the state a source-item badge alone cannot show'
+  );
+});
+
+// ── The world-COMPONENT capture cases and the lab fixture that feeds them (issue 1371) ──────
+//
+// The twin of the guard above, and it resolves against a DIFFERENT corpus for a reason that is
+// structural rather than incidental: the lab's world component roster is not a seeded literal.
+// The `1.30.0` migration LIFTS every crafting system's own `components[]` into world records at
+// boot, and the fixture seeds only the four states that migration cannot produce — an inheriting
+// category, a world tag list with a mute, a component no system has, and one with no source Item.
+//
+// So the id set a case may click is the UNION of the two halves, and asserting against either
+// alone would be wrong in opposite directions: the seed alone rejects every migrated row, and the
+// systems alone reject the two world-only records the entry cases are built on.
+test('every world component id the capture cases click exists in the lab world', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  const migrated = new Set(
+    (content.systems ?? []).flatMap((system) =>
+      (system.components ?? []).map((component) => String(component?.id ?? ''))
+    )
+  );
+  const seeded = new Set(
+    (content.componentScope?.entities ?? []).map((entity) => String(entity?.id ?? ''))
+  );
+  const available = new Set([...migrated, ...seeded]);
+
+  // NON-VACUITY ON BOTH HALVES, because either one empty would make the union assertion below
+  // pass on the strength of the other.
+  assert.ok(migrated.size > 0, 'the lab systems carry components for the migration to lift');
+  assert.ok(seeded.size > 0, 'and the fixture seeds the world-only records the entry cases need');
+
+  const clicked = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-component')) continue;
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(
+        /\[data-scoped-list-(?:row|inspect|select)="([^"]+)"\]/g
+      )) {
+        clicked.push({ caseId: viewCase.id, id });
+      }
+    }
+  }
+  assert.ok(clicked.length > 0, 'the scan found no clicked component row ids; it is broken');
+
+  for (const { caseId, id } of clicked) {
+    assert.ok(
+      available.has(id),
+      `${caseId} clicks the world component row "${id}", which the lab world does not hold`
+    );
+  }
+});
+
+// ── EXISTENCE IS NOT REACHABILITY (issue 1371, round 2) ─────────────────────────────────────
+//
+// The guard above proves a clicked id is IN THE CORPUS. That is a different question from
+// whether its row hook is in the DOM, and the difference cost this lane a whole capture run: the
+// shared frame pages at ten rows and sorts `name-asc`, the lab world holds 68 world components,
+// and three of the four ids the component cases click sort onto pages 2, 4 and 7. Every one of
+// their row hooks was absent, the driver threw by name on a selector that matched nothing, and
+// because an abort takes the WHOLE run down, no case in the registry published a frame.
+//
+// So a case that clicks a scoped-list row must either land inside the first page under the
+// frame's own sort, or NARROW the list first. `fill` is the narrowing the frame offers a GM, and
+// it is the one this registry can check for without re-implementing the list model.
+test('a capture case that clicks a scoped-list row can actually reach it', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  // THE FRAME'S OWN CONSTANTS, read from its source rather than restated. A hard-coded 10 here
+  // would go on passing the day the window changes, which is the drift this file exists to stop.
+  const frame = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'),
+    'utf8'
+  );
+  const pageSize = Number(frame.match(/const DEFAULT_PAGE_SIZE = (\d+);/)?.[1]);
+  assert.ok(pageSize > 0, 'the frame declares a default page size; the read is broken');
+
+  // The world component corpus as the catalogue orders it: every in-system component the
+  // migration lifts, plus the fixture's world-only records, by NAME ascending.
+  //
+  // IT MODELS `name-asc`, WHICH IS THE FRAME'S RESTING SORT AND NOT A UNIVERSAL ONE. Every world
+  // component case today lands on the list at rest and none declares a sort step, so the model is
+  // exact — but a case that clicked the sort-direction toggle, chose a different sort key, or set
+  // a page size would reorder or re-slice the very page this scan reasons about, and the guard
+  // would answer about a list the capture never renders. It fails in the SAFE direction for a
+  // reversed sort (a row believed to be on page one is not, and the assertion demands a narrowing
+  // step that is harmless to add) and in the UNSAFE direction for a widened page size (a row
+  // believed to be past the fold is reachable, and the guard asks for a step the case does not
+  // need). The day a component case declares a sort, this model has to read it off the case's own
+  // steps rather than assuming the resting one.
+  const byName = [
+    ...new Map(
+      [
+        ...(content.systems ?? []).flatMap((system) =>
+          (system.components ?? []).map((component) => [
+            String(component?.id ?? ''),
+            String(component?.name ?? ''),
+          ])
+        ),
+        ...(content.componentScope?.entities ?? []).map((entity) => [
+          String(entity?.id ?? ''),
+          String(entity?.name ?? ''),
+        ]),
+      ].filter(([id]) => id)
+    ),
+  ].sort((left, right) => left[1].localeCompare(right[1]));
+
+  assert.ok(
+    byName.length > pageSize,
+    `the corpus must be longer than one page or this guard proves nothing; got ${byName.length}`
+  );
+
+  let checked = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-component')) continue;
+    const steps = viewCase.steps || [];
+    for (const [index, step] of steps.entries()) {
+      const row = String(step.selector || '').match(
+        /\[data-scoped-list-(?:row|inspect|select)="([^"]+)"\]/
+      );
+      if (!row) continue;
+      checked += 1;
+      const position = byName.findIndex(([id]) => id === row[1]);
+      if (position >= 0 && position < pageSize) continue;
+      // Not on page one, so SOME earlier step must have narrowed the list.
+      const narrowed = steps
+        .slice(0, index)
+        .some((earlier) => 'fill' in earlier && String(earlier.selector).includes('list-search'));
+      assert.ok(
+        narrowed,
+        `${viewCase.id} clicks "${row[1]}", which sorts at position ${position} of ` +
+          `${byName.length} — past the ${pageSize}-row first page — and no earlier step fills the ` +
+          'list search. The capture driver throws by name on a selector that matches nothing and ' +
+          'aborts the WHOLE run, so this publishes nothing and takes every other case with it.'
+      );
+    }
+  }
+  assert.ok(checked > 0, 'the scan found no clicked rows to check; it is broken');
+
+  // THE SEEDED WORLD STATES ARE LIVE, each named by the frame it exists for. An entry that
+  // stopped describing anything would be a fixture the cases silently no longer photograph.
+  assert.ok(
+    content.componentScope.defaults['sm-iron-ingot']?.category,
+    'the inheriting frames need an AUTHORED world category; a refused election photographs the ' +
+      '"no world category is set" branch and looks like a correct inheriting frame'
+  );
+  assert.equal(
+    content.componentScope.membership['sm-iron-ingot|lab-smithing']?.inherit?.category,
+    true,
+    'and the membership record that inherits it'
+  );
+  assert.ok(
+    (content.componentScope.defaults['sm-coal']?.tags ?? []).length > 0,
+    'the world tag list, its note and the mute grid all need world tags the migration never writes'
+  );
+  assert.ok(
+    (content.componentScope.membership['sm-coal|lab-smithing']?.mutedTags ?? []).length > 0,
+    'and one member system muting one of them'
+  );
+  assert.ok(
+    content.componentScope.entities.some((entity) => !entity.originItemUuid),
+    'the entry validation frame needs a record with NO source item, which is its one blocking row'
   );
 });

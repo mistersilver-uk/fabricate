@@ -158,6 +158,56 @@ describe('MembershipActions (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-scoped-membership-enabled]').length, 0);
   });
 
+  /**
+   * THE REMOVE SENTENCE IS THE ENTITY TYPE'S, NOT THE CALLER'S (issue 1371 r10, r9-cat finding 5b).
+   *
+   * Removing a COMPONENT from a system is not a membership edit: `partComponentFromSystem` runs
+   * the in-system delete through `deleteComponents`, which repairs every reference and DISABLES
+   * the recipes left without a usable ingredient set or result. `partEssenceFromSystem` filters
+   * `essenceDefinitions` and writes — no reference repair, no recipe disable — and the tool path
+   * is the generic verb, which does neither either.
+   *
+   * Revision 9 disclosed the cascade on the SHARED key, which this cluster renders for all three
+   * types, so an essence row began announcing a repair its own store does not perform. That is
+   * the same class of defect as the tag-merge overclaim the PR's own spec bans, and the fix is
+   * the one this file already exists to prove: read the answer from the DESCRIPTOR, so the
+   * component path structurally cannot borrow the essence sentence and the essence path
+   * structurally cannot borrow the component's.
+   *
+   * MOUNTED FROM ONE FACTORY WITH THE ENTITY TYPE AS THE ONLY DIFFERENCE, for the reason this
+   * file's header states: a `doesNotMatch` on its own passes on a cluster that rendered nothing,
+   * so the positive half is asserted from the same props.
+   */
+  it('announces the RECIPE CASCADE for a component, and not for an essence or a tool', async () => {
+    const noteFor = (root) => {
+      const remove = root.querySelector('[data-arm-token]');
+      assert.ok(Boolean(remove), 'the member cluster rendered its armed Remove');
+      return remove.getAttribute('aria-label');
+    };
+
+    const component = noteFor(await membershipHarness.mount(membershipProps('component')));
+    assert.match(component, /Remove Ash Salt from Mythwright Forge/, 'it names the pair');
+    assert.match(component, /rewrites every recipe in that system that names it/);
+    assert.match(component, /disables any recipe left without a usable ingredient set or result/);
+    assert.match(component, /The world record is untouched, and no other system changes\./);
+
+    for (const entityType of ['essence', 'tool']) {
+      const other = noteFor(await membershipHarness.mount(membershipProps(entityType)));
+      // The POSITIVE half first, so the refusal below is measured over a sentence that rendered.
+      assert.match(other, /Remove Ash Salt from Mythwright Forge/, `${entityType} names the pair`);
+      assert.match(
+        other,
+        /Its overrides go with it; the world record and every other system are untouched\./,
+        `${entityType} states what its own store does`
+      );
+      assert.equal(
+        /recipe/.test(other),
+        false,
+        `nothing on an ${entityType} row may promise a recipe repair its store never performs`
+      );
+    }
+  });
+
   it('arms removal on the entity/system pair rather than a row index', async () => {
     const token = 'scoped-membership-remove:ash-salt|sys-forge';
     const armed = [];
@@ -202,12 +252,12 @@ describe('InheritRow (mounted)', () => {
   after(() => inheritHarness.teardown());
   afterEach(() => inheritHarness.remount());
 
-  it('draws exactly ONE row for a component, and no group chrome around it', async () => {
+  it('draws exactly TWO rows for a component, and no group chrome around them', async () => {
     const root = await inheritHarness.mount({ entityType: 'component' });
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')];
     assert.deepEqual(
       rows.map((row) => row.getAttribute('data-scoped-inherit-row')),
-      ['category']
+      ['category', 'essences'] // issue 1371 r18 (M31): category and the world essence section
     );
     // No header, no divider, no empty state: chrome costs more space than the one control
     // it would frame and says nothing the row does not.

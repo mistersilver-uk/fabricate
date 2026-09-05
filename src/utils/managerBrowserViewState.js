@@ -226,6 +226,12 @@ export function createManagerBrowserViewStates() {
     componentCategoryVocabulary: createVocabularyBrowserState(),
     componentTagVocabulary: createVocabularyBrowserState(),
     worldEssenceCatalogue: createScopedListBrowserState(),
+    // The world COMPONENT catalogue's list state (issue 1371), on the same factory as its essence
+    // twin above: one composition, one shape, configured per scope. It is MINTED HERE rather than
+    // seeded at the root because the root's binding contract is a biconditional — every slot the
+    // registry mints must be bound, and nothing else may be — so a root-side slot is a binding
+    // the registry cannot account for.
+    worldComponentCatalogue: createScopedListBrowserState(),
     knowledgeRoster: createKnowledgeRosterBrowserState(),
     recipeAccess: createRecipeAccessBrowserState(),
   };

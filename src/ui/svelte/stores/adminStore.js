@@ -45,6 +45,9 @@ import {
   normalizeCharacterPrerequisite,
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
+// THE ONE HOME OF "IS THIS SYSTEM-SCOPE ESSENCE WRITE AN OVERRIDE" (issue 1371 r19-store2).
+// Shared with the standalone component editor app, which writes the same rows without this store.
+import { componentEssenceOverrideOn } from '../../../systems/componentEssenceOverride.js';
 import {
   buildExportPayload,
   validateImportData,
@@ -126,6 +129,7 @@ import {
 // DISPLAYS from `resolvedToolsFor` — what a craft will actually do — and SAVES only the sections
 // the membership record marks overriding, which is what stops a display read from converting an
 // inheriting section into an override on the next save.
+import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
 import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
 import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
 import {
@@ -1657,6 +1661,62 @@ function _essenceRecipeUsage(essenceId, recipes) {
     .map((recipe) => String(recipe?.id ?? ''))
     .filter(Boolean);
   return { count: ids.length, ids };
+}
+
+/**
+ * The WORLD identity's colour per essence id, for the selected system's rows to draw (issue
+ * 1371 r18-colour, maintainer ruling M29).
+ *
+ * WHY THE PROJECTION HAS TO SAY THIS AT ALL. The world essence entry writes `colorToken` onto
+ * the world entity alone; every in-system row carries the explicit `colorToken: null` the
+ * normalizer emits for an unauthored colour; and the read union answers identity from the
+ * in-system row FIRST (`## CraftingSystem` requirement 36, `scopedDefinitionStore.js`). So the
+ * colour a GM sets in the Essence Catalogue was, by construction, the one colour no system
+ * screen could ever draw — the maintainer's live world showed it on the world bulk panel, which
+ * reads the world entity, and nowhere else. `_seedInSystemEssence` copies the world colour onto
+ * a row at join time and nothing refreshes it, so a row joined before the recolour is stale in
+ * exactly the same way.
+ *
+ * THIS IS A READ OVERLAY ON THE MANAGER'S PROJECTION, NOT A CHANGE TO THE UNION. The union's
+ * in-system-first rule protects a GM's own edits from being reverted by a stale world copy, and
+ * for name, icon and description that is the right call. Colour is the one identity field the
+ * ruling names as the world's: a world-authored colour wins here, an UNAUTHORED one (`null`,
+ * `''`, or no world store at all) leaves the row's own colour standing, so a system whose
+ * essence was coloured in its own editor keeps that colour until the catalogue says otherwise.
+ *
+ * @param {{worldScope?: {essence?: {entries?: Array<object>}}}|null} worldScopeState The state
+ *   `buildWorldScopeState()` published this refresh — `{ worldScope: { component, essence, tool } }`.
+ * @returns {Map<string, string>} essence id → the world's authored colour key; absent when none.
+ */
+/**
+ * The essence ids the WORLD catalogue holds, off the state this refresh published (issue 1371
+ * r19-store2).
+ *
+ * The bulk panel's `Colour` axis is withheld for an essence the world corpus holds, because the
+ * M29 read overlay hides anything it writes there — the same condition `EssenceEditView` calls
+ * `scopedKnown`. The panel is a leaf with no corpus of its own, so the fact is stamped on each
+ * row here, beside the colour the same corpus supplies.
+ *
+ * @param {{worldScope?: {essence?: {entries?: Array<object>}}}|null} worldScopeState
+ * @returns {Set<string>} the world essence ids; empty when there is no world corpus.
+ */
+function _worldEssenceIds(worldScopeState) {
+  const ids = new Set();
+  for (const entry of worldScopeState?.worldScope?.essence?.entries ?? []) {
+    const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function _worldEssenceColourById(worldScopeState) {
+  const byId = new Map();
+  for (const entry of worldScopeState?.worldScope?.essence?.entries ?? []) {
+    const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+    const colour = entry?.entity?.colorToken;
+    if (id && typeof colour === 'string' && colour.trim()) byId.set(id, colour.trim());
+  }
+  return byId;
 }
 
 function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions, recipes = []) {
@@ -4956,6 +5016,8 @@ export function createAdminStore(services) {
       const managedItemOptions = _buildManagedItemOptions(managedItems);
       const componentTagOptions = _buildComponentTagOptions(managedItems);
       const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
+      const worldEssenceColourById = _worldEssenceColourById(worldScopeState);
+      const worldEssenceIds = _worldEssenceIds(worldScopeState);
 
       const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
         ? selectedSystem.essenceDefinitions
@@ -4979,6 +5041,14 @@ export function createAdminStore(services) {
           // convention once, at the boundary.
           enabled: def.enabled !== false,
           propertyMacroUuid: def.propertyMacroUuid || null,
+          // THE DRAWN COLOUR FOLLOWS THE WORLD IDENTITY (issue 1371 r18-colour, maintainer
+          // ruling M29). See `_worldEssenceColourById`: a colour the Essence Catalogue
+          // authored wins over the row's own, an unauthored one leaves the row's standing.
+          colorToken: worldEssenceColourById.get(def.id) ?? def.colorToken ?? null,
+          // WHETHER THE WORLD CATALOGUE HOLDS IT (issue 1371 r19-store2). See `_worldEssenceIds`:
+          // this is what the essence bulk panel withholds its colour axis on, and it is stated
+          // here rather than derived at the panel because the panel has no corpus to ask.
+          worldDefined: worldEssenceIds.has(def.id),
           sourceComponentId,
           associatedSystemItemId: sourceComponentId || null,
           associatedItem,
@@ -4994,9 +5064,16 @@ export function createAdminStore(services) {
       // and collapsing them would be a correctness regression rather than a cleanup.
       const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
 
+      // THE USAGE COUNTS READ WHAT THE SYSTEM RESOLVES (issue 1371 r20-store3, reviewer round 6
+      // finding 4). `managedItems` is the PERSISTED in-system array, and for every pair whose
+      // `essences` section inherits that is the dormant map nothing reads — so an essence a
+      // component carries only through the world map reported `In use: 0` on the Essences tab and
+      // was omitted from the delete dialog's impact. The rows are resolved through the SAME
+      // accessor the rules list and the override rule use; only the essence map is overlaid, so
+      // every other field on the card is the persisted one.
       essenceCards = _buildEssenceCards(
         essenceDefinitions,
-        managedItems,
+        componentsWithResolvedEssences(systemManager, selectedSystem.id, managedItems),
         managedItemOptions,
         systemRecipes
       );
@@ -5212,10 +5289,17 @@ export function createAdminStore(services) {
    * @returns {object[]}
    */
   function _allComponents() {
+    const systemManager = services.getCraftingSystemManager?.();
     const all = [];
     for (const system of _allSystems()) {
       const components = Array.isArray(system?.components) ? system.components : [];
-      for (const component of components) all.push(component);
+      // RESOLVED PER SYSTEM (issue 1371 r20-store3, reviewer round 6 finding 4). The world
+      // Essence Catalogue's own `used by` figure is a count of components that CARRY the essence,
+      // and after an `essences` world-map edit the persisted row no longer says so. Resolution is
+      // per (component, system) pair, so it has to happen inside this loop rather than over the
+      // flattened result.
+      for (const component of componentsWithResolvedEssences(systemManager, system?.id, components))
+        all.push(component);
     }
     return all;
   }
@@ -5251,11 +5335,18 @@ export function createAdminStore(services) {
    * inventing the NUMBER would put a fabricated figure in front of a GM deciding whether a change
    * is safe. Fabricate can answer it for real, so it does.
    *
+   * ── THE WORLD-WIDE RECIPE READ IS THE CALLER'S, NOT THIS LEG'S ──────────────────────────────
+   * `getRecipes({})` copies the WHOLE library, and since issue 1392 `buildWorldScopeState` takes
+   * one for its own `recipes` argument — so this leg calling `_allRecipes()` itself made the
+   * unfiltered read happen TWICE per publish for one snapshot. The default keeps every other
+   * caller (and every test) working while the publish path threads its single read through,
+   * exactly as `recipeCache` threads the per-system cohort through the two legs that walk it.
+   *
+   * @param {object[]} [recipes] every recipe in the world; read here when the caller has none.
    * @returns {Record<string, {componentCount: number, recipeCount: number}>} keyed by essence id.
    */
-  function _worldEssenceUsage() {
+  function _worldEssenceUsage(recipes = _allRecipes()) {
     const components = _allComponents();
-    const recipes = _allRecipes();
     const usage = {};
     for (const system of _allSystems()) {
       const definitions = Array.isArray(system?.essenceDefinitions)
@@ -5347,7 +5438,41 @@ export function createAdminStore(services) {
    *   requiredBy: Array<{id: string, name: string, kind: string, systemId: string,
    *   systemName: string}>}>}
    */
-  function _worldToolUsage() {
+  /**
+   * One crafting system's recipe cohort, read AT MOST ONCE PER REFRESH.
+   *
+   * ── WHY A CACHE RATHER THAN TWO READS (issue 1371) ────────────────────────────────────────
+   * Both world-scope usage legs walk every system's recipes: the tool leg counts tool references
+   * and the component leg counts ingredient and result references. Reading the cohort in each of
+   * them doubles the per-refresh recipe fetch and scales it by the crafting-system count — which
+   * `adminStore.test.js` bounds as a fixed budget precisely so a second consumer cannot spend it
+   * silently. One read, two consumers.
+   *
+   * The cache is per CALL of `buildWorldScopeState`, never a module-level memo: a stale recipe
+   * list would outlive the write that changed it, and the whole point of re-projecting is that it
+   * re-reads.
+   *
+   * GUARDED, on the same rule the two legs already followed: a recipe manager that throws must
+   * degrade to "no recipes here" rather than take the whole publish down.
+   *
+   * @param {object|null} recipeManager
+   * @param {Map<string, object[]>} cache
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  function _recipeCohort(recipeManager, cache, systemId) {
+    if (cache.has(systemId)) return cache.get(systemId);
+    let recipes = [];
+    try {
+      recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+    } catch {
+      recipes = [];
+    }
+    cache.set(systemId, recipes);
+    return recipes;
+  }
+
+  function _worldToolUsage(recipeCache = new Map()) {
     const usage = {};
     const recipeManager = services.getRecipeManager?.();
     const entryFor = (toolId) =>
@@ -5365,12 +5490,7 @@ export function createAdminStore(services) {
       const systemId = String(system?.id ?? '');
       if (!systemId) continue;
       const systemName = String(system?.name ?? systemId);
-      let recipes = [];
-      try {
-        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
-      } catch {
-        recipes = [];
-      }
+      const recipes = _recipeCohort(recipeManager, recipeCache, systemId);
       for (const recipe of recipes) {
         for (const toolId of _recipeToolIds(recipe)) {
           record(toolId, systemId);
@@ -5401,7 +5521,175 @@ export function createAdminStore(services) {
     return usage;
   }
 
+  /**
+   * Every component id one recipe names, split by WHAT the reference does.
+   *
+   * TWO AXES, NOT ONE. A recipe CONSUMES a component as an ingredient and PRODUCES one as a
+   * result, and the world Component entry states the two as separate lists: "Used by" is what a
+   * GM checks before removing a component, and "Produced by" is what they check before deleting
+   * the thing that makes it. A single reference list would answer neither question.
+   *
+   * FOUR PLACES PER AXIS, on the reasoning `_recipeToolIds` gives for tools: a recipe carries
+   * top-level ingredient sets and result groups, and a MULTI-STEP recipe repeats both per step. A
+   * scan of the top level alone reports nothing for every stepped recipe.
+   *
+   * `componentId` and its `systemItemId` alias are both read, because `Result` accepts either and
+   * an ingredient option carries the pair on itself OR under `match`.
+   *
+   * @param {object} recipe
+   * @returns {{required: Set<string>, produced: Set<string>}}
+   */
+  function _recipeComponentIds(recipe) {
+    const required = new Set();
+    const produced = new Set();
+    const add = (into, raw) => {
+      const trimmed = String(raw ?? '').trim();
+      if (trimmed) into.add(trimmed);
+    };
+    const addOption = (into, option) => {
+      add(into, option?.componentId ?? option?.systemItemId);
+      add(into, option?.match?.componentId ?? option?.match?.systemItemId);
+    };
+    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    for (const holder of [recipe, ...steps]) {
+      for (const set of Array.isArray(holder?.ingredientSets) ? holder.ingredientSets : []) {
+        for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
+          for (const option of Array.isArray(group?.options) ? group.options : []) {
+            addOption(required, option);
+          }
+        }
+        for (const option of Array.isArray(set?.ingredients) ? set.ingredients : []) {
+          addOption(required, option);
+        }
+      }
+      for (const group of Array.isArray(holder?.resultGroups) ? holder.resultGroups : []) {
+        for (const result of Array.isArray(group?.results) ? group.results : []) {
+          addOption(produced, result);
+        }
+      }
+      for (const result of Array.isArray(holder?.results) ? holder.results : []) {
+        addOption(produced, result);
+      }
+    }
+    return { required, produced };
+  }
+
+  /**
+   * How much of the world references each world COMPONENT (issue 1371).
+   *
+   * The third leg of the seam the essence and tool legs already fill: `usage` is a
+   * `buildWorldScopeState` argument the projection consumes and attaches per entity, and nothing
+   * outside this file can supply it. Without it every world component row answered `0 recipes`
+   * and its entry listed nothing, whatever the world actually held.
+   *
+   * ── `recipeCount` COUNTS RECIPES, NOT REFERENCES, AND ONLY RECIPES ────────────────────────
+   * The row's stat is labelled `Recipes`, so a recipe naming one component as both an ingredient
+   * and a result counts ONCE, and a GATHERING reference does not move it at all — it reaches
+   * `requiredBy` instead, exactly as the tool leg's gathering references do. A stat and its label
+   * that disagree is a wrong number rather than a missing one.
+   *
+   * ── WHY A GATHERING TASK'S CONSUMPTION IS RESOLVED THROUGH THE TOOL LIBRARY ───────────────
+   * A gathering task names TOOLS by id, and a library Tool names the component it is sourced
+   * from. So the component a task requires is one join away, and reading `task.toolIds` as
+   * component ids would key every reference by a Tool id no component carries.
+   *
+   * ── AND WHY ITS PRODUCTION IS READ OFF `dropRows`, NOT `resultGroups` ─────────────────────
+   * A STORED gathering task carries `dropRows` — `_normalizeGatheringTask` is an allowlist rebuild
+   * that emits it from `task.dropRows ?? task.itemDrops` and emits no `resultGroups` at all.
+   * `resultGroups` is minted at COMPOSITION time, with `results: []`, and stays empty until issue
+   * 683. A `resultGroups` read therefore compiles, runs, iterates nothing, and reports no gathering
+   * production on any world — which is what this leg did until round 2, invisibly, because the
+   * projection does not yet render `producedBy`.
+   *
+   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
+   *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
+   */
+  function _worldComponentUsage(recipeCache = new Map()) {
+    const usage = {};
+    const recipeManager = services.getRecipeManager?.();
+    const entryFor = (componentId) =>
+      (usage[componentId] ??= {
+        recipeCount: 0,
+        recipeCountBySystem: {},
+        requiredBy: [],
+        producedBy: [],
+      });
+    const record = (componentId, systemId) => {
+      const entry = entryFor(componentId);
+      entry.recipeCount += 1;
+      entry.recipeCountBySystem[systemId] = (entry.recipeCountBySystem[systemId] || 0) + 1;
+    };
+    const reference = (componentId, list, reference_) => {
+      entryFor(componentId)[list].push(reference_);
+    };
+    const gatheringSystems = _currentGatheringConfig()?.systems ?? {};
+    for (const system of _allSystems()) {
+      const systemId = String(system?.id ?? '');
+      if (!systemId) continue;
+      const systemName = String(system?.name ?? systemId);
+      const recipes = _recipeCohort(recipeManager, recipeCache, systemId);
+      for (const recipe of recipes) {
+        const { required, produced } = _recipeComponentIds(recipe);
+        const named = {
+          id: String(recipe?.id ?? ''),
+          name: String(recipe?.name ?? recipe?.id ?? ''),
+          kind: 'recipe',
+          systemId,
+          systemName,
+        };
+        for (const componentId of new Set([...required, ...produced])) {
+          record(componentId, systemId);
+        }
+        for (const componentId of required) reference(componentId, 'requiredBy', named);
+        for (const componentId of produced) reference(componentId, 'producedBy', named);
+      }
+      const componentIdByToolId = new Map();
+      for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
+        const componentId = String(tool?.componentId ?? '').trim();
+        const toolId = String(tool?.id ?? '').trim();
+        if (componentId && toolId) componentIdByToolId.set(toolId, componentId);
+      }
+      const tasks = gatheringSystems?.[systemId]?.tasks;
+      for (const task of Array.isArray(tasks) ? tasks : []) {
+        const named = {
+          id: String(task?.id ?? ''),
+          name: String(task?.name ?? task?.id ?? ''),
+          kind: 'gathering',
+          systemId,
+          systemName,
+        };
+        for (const raw of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+          const componentId = componentIdByToolId.get(String(raw ?? '').trim());
+          if (componentId) reference(componentId, 'requiredBy', named);
+        }
+        // `itemDrops` is the legacy alias the normalizer itself accepts, so a corpus written
+        // before the rename still answers here rather than reporting nothing.
+        const dropRows = task?.dropRows ?? task?.itemDrops;
+        for (const row of Array.isArray(dropRows) ? dropRows : []) {
+          // `componentId ?? systemItemId` is the pair `normalizeItemDrop` coalesces, so a row
+          // authored under either name reaches the same component.
+          const componentId = String(row?.componentId ?? row?.systemItemId ?? '').trim();
+          if (componentId) reference(componentId, 'producedBy', named);
+        }
+      }
+    }
+    return usage;
+  }
+
   function buildWorldScopeState() {
+    // ONE RECIPE COHORT READ PER SYSTEM, SHARED BY BOTH LEGS THAT WALK IT. See `_recipeCohort`:
+    // the per-refresh recipe fetch is a bounded budget, and a second consumer reading it again
+    // scales that budget by the crafting-system count.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-call cache, never state
+    const recipeCache = new Map();
+    // AND ONE WORLD-WIDE READ, SHARED THE SAME WAY (issue 1371, round 8). `_allRecipes()` is
+    // `getRecipes({})` — a copy of the whole library, and the one read on this path that is NOT
+    // cohort-indexed. It was being taken twice per publish once issue 1392 added the `recipes`
+    // argument beside the essence leg that already took its own; both want the same snapshot, so
+    // they take the same one. The per-system cohorts stay separate reads on purpose: they are
+    // answered from `RecipeManager`'s own cohort index, and `adminStore.test.js` bounds them as a
+    // fixed per-refresh budget.
+    const worldRecipes = _allRecipes();
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
@@ -5409,11 +5697,16 @@ export function createAdminStore(services) {
       // `### GM World Scoped Entity Routes` requirement 7 enumerates a projection's
       // REGISTRATION but not its INPUTS, and nothing in `{stores, systems, usage}` can answer a
       // world-wide recipe question — so the World Vocabulary's recipe-category reference count
-      // was underivable from inside the file that owns it. `_allRecipes()` already exists and
-      // is already invoked on every publish, so this adds no new corpus read. The counting
-      // itself lives in `worldScopeProjection.js`, an open file.
-      recipes: _allRecipes(),
-      usage: { essence: _worldEssenceUsage(), tool: _worldToolUsage() },
+      // was underivable from inside the file that owns it. `_allRecipes()` already exists and is
+      // already invoked on every publish, so this adds no new corpus read — a claim that is true
+      // because the essence leg is handed THIS array rather than taking a second one. The
+      // counting itself lives in `worldScopeProjection.js`, an open file.
+      recipes: worldRecipes,
+      usage: {
+        component: _worldComponentUsage(recipeCache),
+        essence: _worldEssenceUsage(worldRecipes),
+        tool: _worldToolUsage(recipeCache),
+      },
     });
   }
 
@@ -5711,6 +6004,635 @@ export function createAdminStore(services) {
   }
 
   /**
+   * The world component roster, keyed by id, straight off the published corpus.
+   *
+   * @returns {Map<string, object>}
+   */
+  function _worldComponentEntities() {
+    const entities = services.getComponentScopeStore?.()?.corpus?.()?.entities;
+    const byId = new Map();
+    for (const entity of Array.isArray(entities) ? entities : []) {
+      const id = typeof entity?.id === 'string' ? entity.id.trim() : '';
+      if (id) byId.set(id, entity);
+    }
+    return byId;
+  }
+
+  // ── A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE ────────────────────────────────────────────
+  //
+  // Issue 1371 r19-store2, the driver's ruling on the reviewer's round-5 finding 3. The RULE lives
+  // in `systems/componentEssenceOverride.js`, not here, because this store is not its only caller:
+  // the standalone `SvelteComponentEditorApp` writes a component's essences too, and reaches
+  // `CraftingSystemManager.updateItem` directly when it has no manager window to borrow this store
+  // from. Two copies of "does this write override" is the drift the shared unit exists to prevent.
+  // See that module for the rule, the per-pair refusal, the shadowing gate and the baseline the
+  // restatement exemption is answered against.
+  //
+  // WIRED FROM WHAT THIS STORE ALREADY HOLDS. The corpus read is the published one, as
+  // `_worldComponentEntities` reads the roster; the resolved map is the read union the row
+  // projection draws from; and both writes are the UNWRAPPED family verbs, because every caller
+  // here already refreshes once for the whole write and the wrapped ones would re-project per
+  // component. The flag verb takes the switch's TARGET rather than always writing `false`, because
+  // the rule rolls a flip back when the value write it preceded then fails.
+  //
+  // AND THE ROLLBACK NEEDS BOTH VERBS (issue 1371 r21-store4, Foundry integrator round 7): moving
+  // the switch off SEEDS the record's own `essences` block, so putting the switch back is only
+  // half a restore. `updateMembershipSection(..., undefined)` is the other half — `attachAuthored
+  // Sections` copies a section across only when it is not `undefined`, so writing `undefined`
+  // removes the key rather than storing an empty override.
+  const _componentEssenceOverride = componentEssenceOverrideOn({
+    getComponentScopeStore: () => services.getComponentScopeStore?.() ?? null,
+    getCraftingSystemManager: () => services.getCraftingSystemManager?.() ?? null,
+    setEssenceInheritance: (componentId, systemId, inherit) =>
+      worldScopeFamilies.component.setSectionInherited(componentId, systemId, 'essences', inherit),
+    clearEssenceOverride: (componentId, systemId) =>
+      worldScopeFamilies.component.updateMembershipSection(
+        componentId,
+        systemId,
+        'essences',
+        undefined
+      ),
+  });
+
+  /**
+   * The in-system component record adoption creates: the world entity's IDENTITY and its THREE
+   * SOURCE-LINK FIELDS, and nothing else.
+   *
+   * ── THE SOURCE-LINK FIELDS ARE NOT OPTIONAL, AND THAT IS THE WHOLE POINT ───────────────────
+   * Component-to-Item matching is durable-flag identity FIRST — the per-system `roles` map, then
+   * the legacy `componentId` scalar — and the raw source-reference union THIRD. That union is
+   * exactly `registeredItemUuid` union `originItemUuid` union `aliasItemUuids`. A seed that stamps
+   * no role flag and carries no source refs therefore matches at NO tier: every row on every list
+   * would render, and the component would resolve against nothing in any player's inventory.
+   *
+   * The two uuids are read with the SAME fallback the tool seed uses, so a world component
+   * carrying only one of the pair is tolerated rather than half-seeded.
+   *
+   * ── IT SEEDS NO `category` AND STAMPS NO ROLE FLAG ─────────────────────────────────────────
+   * `category` is the one section, so an unset value INHERITS from the world default — which is
+   * exactly the state the membership record beside it declares. And the role flag is a write on
+   * the Item, which adoption must neither resolve nor fail on when the Item is gone; that is the
+   * reason the tool adoption path gives for the same omission.
+   *
+   * @param {object} entity The world component roster record.
+   * @returns {object}
+   */
+  function _worldComponentAdoptionSeed(entity) {
+    const originItemUuid = entity?.originItemUuid ?? entity?.registeredItemUuid ?? null;
+    return {
+      id: String(entity?.id ?? ''),
+      name: entity?.name ?? null,
+      img: entity?.img ?? null,
+      description: entity?.description ?? '',
+      originItemUuid,
+      registeredItemUuid: entity?.registeredItemUuid ?? originItemUuid,
+      aliasItemUuids: Array.isArray(entity?.aliasItemUuids) ? [...entity.aliasItemUuids] : [],
+    };
+  }
+
+  /**
+   * Join a WORLD component to one crafting system — the membership record AND the in-system one.
+   *
+   * ── THE SAME RULE THE ESSENCE JOIN STATES, FOR THE SAME REASON ─────────────────────────────
+   * `worldScopeActions.addToSystem` writes exactly one thing: a membership row in the world-scope
+   * payload. The read union iterates the IN-SYSTEM array and only enriches rows it already finds
+   * there, so a world entity with a membership record and no in-system row contributes no row at
+   * all. Membership alone is a button that silently does nothing, on every component, forever.
+   *
+   * ── AN EXISTING ROW IS NEVER REWRITTEN ────────────────────────────────────────────────────
+   * A system that already holds a row for the id is left alone: the GM is re-adding a membership
+   * record for a component this system already has, and overwriting its authored essences,
+   * salvage or difficulty would be a destructive reading of "Add".
+   *
+   * ── AND A REFUSED SEED ROLLS THE MEMBERSHIP RECORD BACK (issue 1371, round 8) ──────────────
+   * `updateSystem` really does refuse: `_assertUniqueComponentSourcesForSystem` throws when two
+   * in-system components claim one source uuid, which is exactly the duplicate-source state the
+   * world entry's own `Review & merge` band exists to surface. Left to throw, that would leave
+   * BOTH the ghost state this verb was composed to prevent — a membership record with no
+   * in-system row, which the read union cannot draw — and an unhandled rejection escaping the
+   * catalogue's bulk loop, where it skips every remaining component and never clears the
+   * selection. So the second half is wrapped exactly as {@link adoptWorldTool} wraps its own:
+   * the membership record written by THIS call is removed again, the GM is told, and the verb
+   * answers `false`.
+   *
+   * ONLY THE RECORD THIS CALL WROTE IS REMOVED. `addToSystem` answers `false` for a component
+   * that was already a member, and rolling back on that answer would delete a membership record
+   * the GM authored earlier because an unrelated duplicate refused the seed.
+   *
+   * AND IT ISSUES NO `refresh()` ON THE WAY OUT, where `adoptWorldTool` must. That verb composes
+   * over the WRAPPED family, so its own `addToSystem` already re-published the membership record
+   * it then removes; this one composes UNDER the wrap and calls `worldScopeFamilies` directly, so
+   * nothing has been published to correct and the `false` return correctly spends no re-projection.
+   *
+   * @param {string} entityId the world component id.
+   * @param {string} systemId the crafting system to join it to.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function joinComponentToSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const joined = await worldScopeFamilies.component.addToSystem(target, system);
+    try {
+      const seeded = await _seedInSystemComponent(target, system);
+      // NO `refresh()` HERE. `_republishingFamily` wraps this verb with every other one, so a
+      // second call would re-project twice per click and would leave the wrapper looking optional.
+      return joined || seeded;
+    } catch (error) {
+      if (joined === true) await worldScopeFamilies.component.removeFromSystem(target, system);
+      services.notify?.error?.(_componentJoinFailureMessage(error));
+      return false;
+    }
+  }
+
+  /**
+   * Write one bulk edit to a SET of components' RULES in ONE crafting system (issue 1371 r16-cat,
+   * maintainer ruling M25; its WORLD caller superseded by M31 at r18).
+   *
+   * THE PER-SYSTEM RULES WRITE, kept for the system-scope surfaces. It writes through the same
+   * set-apply primitive the system Component Studio's bulk edit uses
+   * ({@link applyComponentBulkEdit}), with the system named by the caller instead of read from the
+   * rail's selection. `edit` is forwarded VERBATIM: the primitive tests key PRESENCE, so
+   * `{essences: {}}` is the instruction "strip every essence" and must not be pruned as empty.
+   *
+   * ── THE WORLD CATALOGUE NO LONGER ROUTES ESSENCES THROUGH IT (M31) ─────────────────────────
+   * M25 had the world bulk panel write staged essence values into each selected component's rules
+   * in every system, which is why the maintainer's world edit "did not persist or show anywhere":
+   * no world screen reads per-system rules. The world record now carries an `essences` SECTION,
+   * so the world panel and the world entry write `updateWorldDefaultSection(id, 'essences', map)`
+   * and every system whose switch is on follows it. A write made HERE lands on a system's own row,
+   * which is what that system resolves only while it OVERRIDES the section — on an inheriting
+   * system a staged `essences` axis IS an override, and every shadowed pair in the cohort has its
+   * switch flipped before the values land (`systems/componentEssenceOverride.js`). This sentence
+   * used to end "the world map shadows it until the rules editor flips the switch"; a few lines
+   * below, this verb flips it itself.
+   *
+   * ── AND ITS OVERRIDE ARM IS DEFENCE FOR A ROUTE NO SCREEN DRIVES (quality round 6, R5) ─────
+   * `bulkEditRules` has no production caller: M31 superseded M25's route, so the world catalogue's
+   * essence group writes the world SECTION instead. The arm is KEPT — this verb writes the same
+   * rows through the same primitive as the Studio's own bulk edit, so it must not be able to take
+   * a different view of what an essence write means the day something calls it again — and it is
+   * driven directly by a store case rather than left as the one of the four sites a reader cannot
+   * tell is live.
+   *
+   * `false` means nothing was written, for any reason — a bad or empty argument, or a throw that
+   * has already been reported to the GM — and `_republishingFamily` spends no `refresh()` on it.
+   *
+   * THE FAILURE SENTENCE IS LOCALIZED AND NAMES THE SYSTEM (issue 1371 r17). Foundry's
+   * `SocketInterface` toasts a refused world-setting write's `error.message` verbatim before it
+   * rejects, so a catch that re-posted that same message put one sentence on screen twice. This
+   * one goes through the membership twins' key-echo guard with its own key and says WHICH
+   * system did not take the rules — the write is per system, and a GM staging essences across
+   * several needs that half — with the reason after it, as the join and removal sentences do.
+   *
+   * @param {string} systemId the crafting system whose rules are written.
+   * @param {Iterable<string>} componentIds the components, all of which have rules there.
+   * @param {object} edit the staged axes, in `applyBulkEditToComponents`' contract.
+   * @returns {Promise<{updated: number, componentIds: string[]}|false>}
+   */
+  async function bulkEditComponentRules(systemId, componentIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager?.();
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    const ids = Array.from(componentIds || [], String).filter(Boolean);
+    if (!systemManager || !system || ids.length === 0) return false;
+    if (!edit || typeof edit !== 'object' || Object.keys(edit).length === 0) return false;
+    // THE SAME OVERRIDE RULE AS THE STUDIO'S OWN BULK EDIT (issue 1371 r19-store2). This verb
+    // writes the same rows through the same primitive with the system named by the caller, so it
+    // cannot take a different view of what an essence write on an inheriting pair means.
+    const { writable, refused, flipped } = await _componentEssenceOverride.cohortFor(
+      system,
+      ids,
+      edit
+    );
+    try {
+      const result = await _writeComponentCohorts(systemManager, system, {
+        writable,
+        refused,
+        edit,
+      });
+      if (!result) return false;
+      return { ...result, refused: refused.length };
+    } catch (error) {
+      // THE FLIP IS ROLLED BACK (issue 1371 r20-store3, reviewer round 6 finding 5). It is a
+      // durable, replicated world-setting write that landed AHEAD of the values, so leaving it
+      // standing over a failed write would opt those pairs out of every later world edit while the
+      // GM is being told the write failed. `joinComponentToSystem` sets the precedent.
+      await _componentEssenceOverride.rollback(system, flipped);
+      console.error('Fabricate | Failed to apply component rules bulk edit:', error);
+      services.notify?.error?.(
+        _componentBulkEditFailureMessage(error, systemManager.getSystem?.(system)?.name || system)
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Write ONE staged edit to a cohort the override rule has split in two (issue 1371 r20-store3,
+   * reviewer round 6 finding 6).
+   *
+   * A pair whose `essences` flag write was REFUSED used to be dropped from the whole edit, so a
+   * cohort staging `category` alongside `essences` lost its category change to a setting refusal
+   * that had nothing to say about categories, and the reported `updated` said nothing about it.
+   * The drop is now restricted to the axis that was actually refused: the writable pairs take the
+   * whole edit and the refused ones take the same edit MINUS `essences`. The caller reports
+   * `refused` alongside `updated`, so the count is available to a surface that wants to state it.
+   *
+   * TWO PERSISTS ONLY WHEN THERE IS SOMETHING TO PERSIST TWICE. A pass with no ids, and a pass
+   * whose axes are empty once `essences` is removed, is dropped — so the ordinary path (nothing
+   * refused) costs exactly one persist, as it did.
+   *
+   * ── THE REFUSED PASS RUNS FIRST, AND THE ORDER IS THE INVARIANT (issue 1371 r21-store4) ────
+   * The caller compensates a throw by rolling every FLIPPED switch back, and its comment states
+   * the precondition that makes that repair correct: the values did not land. `flipped` is a
+   * subset of `writable`, so running the writable pass first broke exactly that — pass one lands
+   * the flipped pairs' essence maps, pass two throws, and the catch puts those pairs back under
+   * the world map with their authored values already on disk and no surface reporting it. That is
+   * the inverse of the repair. Writing the REFUSED pairs first restores the invariant by
+   * construction: nothing a rollback would undo has been persisted until the last pass, so a
+   * throw anywhere always precedes the flipped pairs' values.
+   *
+   * @param {object} systemManager
+   * @param {string} systemId
+   * @param {{writable: string[], refused: string[], edit: object}} cohorts
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} `null` when there was
+   *   nothing to write at all.
+   */
+  async function _writeComponentCohorts(systemManager, systemId, { writable, refused, edit }) {
+    const withoutEssences = { ...edit };
+    delete withoutEssences.essences;
+    const passes = [
+      { ids: refused, axes: withoutEssences },
+      { ids: writable, axes: edit },
+    ].filter((pass) => pass.ids.length > 0 && Object.keys(pass.axes).length > 0);
+    if (passes.length === 0) return null;
+
+    let updated = 0;
+    const componentIds = [];
+    for (const pass of passes) {
+      const result = await systemManager.applyBulkEditToComponents(systemId, pass.ids, pass.axes);
+      updated += Number(result?.updated) || 0;
+      if (Array.isArray(result?.componentIds)) componentIds.push(...result.componentIds);
+    }
+    return { updated, componentIds };
+  }
+
+  /**
+   * Republish AFTER a component write that has already landed (issue 1371 r21-store4, the Foundry
+   * integrator's round-7 finding 3).
+   *
+   * THE COMPENSATED REGION IS THE WRITE, NOT THE REPUBLISH. A component write that flipped an
+   * `essences` switch first is compensated by rolling that switch back, and the repair is correct
+   * only while "the values did not land" is true. `refresh()` runs after they landed, so a throw
+   * there must NOT reach that catch: doing so re-shadows a map the GM authored and is durably on
+   * disk, and tells them the write failed. `bulkEditComponentRules` already had this shape, with
+   * its republish out in `_republishingFamily`; this is the same seam for the two verbs that
+   * refresh themselves.
+   *
+   * IT REPORTS NOTHING TO THE GM, deliberately. The write succeeded, so an error toast would be
+   * false; what failed is the projection rebuild, which the next publish repairs and which the GM
+   * can do nothing about. It is logged with the store's own `Fabricate |` idiom.
+   *
+   * @param {string} what the write that landed, for the log line.
+   * @returns {Promise<void>}
+   */
+  async function _republishAfterWrite(what) {
+    try {
+      await refresh();
+    } catch (error) {
+      console.error(`Fabricate | Failed to republish after ${what}:`, error);
+    }
+  }
+
+  /**
+   * THE ESSENCE DELETE'S COMPONENT CASCADE IS AN OVERRIDE TOO (issue 1371 r21-store4, the
+   * reviewer's round-7 finding 1).
+   *
+   * `CraftingSystemManager.deleteEssence(s)` strips the essence from the PERSISTED in-system rows,
+   * and the dialog above states that strip as the impact the GM consents to. For a pair that
+   * INHERITS its map from the world record, stripping the dormant row changes nothing the system
+   * resolves — so the consent statement was true of the write and false of the outcome. The manager
+   * decides the cascade's REACH and calls back here for the pairs it cannot flip itself, because
+   * the flag is a world-scope setting write and the manager holds no path to one.
+   *
+   * The compensation is the same one every other essence-override caller uses: the flips are
+   * captured, and a delete that throws puts them back before the failure is reported.
+   *
+   * @param {string} systemId
+   * @returns {{seam: {overrideInheritedEssences: (systemId: string, componentIds: string[]) =>
+   *   Promise<string[]>}, rollback: () => Promise<void>}}
+   */
+  function _essenceDeleteCascade(systemId) {
+    let flipped = [];
+    return {
+      seam: {
+        overrideInheritedEssences: async (system, componentIds) => {
+          // `{essences: {}}` names the axis so the cohort unit engages; the VALUES are the
+          // manager's, written onto the rows it is about to strip.
+          const cohort = await _componentEssenceOverride.cohortFor(system, componentIds, {
+            essences: {},
+          });
+          flipped = cohort.flipped;
+          return cohort.writable;
+        },
+      },
+      rollback: () => _componentEssenceOverride.rollback(systemId, flipped),
+    };
+  }
+
+  /**
+   * The message a FAILED per-system rules bulk edit puts in front of the GM (issue 1371 r17).
+   *
+   * "Did not complete" for the removal twin's reason: `applyBulkEditToComponents` mutates the
+   * live system before its one `save()`, so a refused persist leaves the manager's in-memory
+   * system and the saved setting disagreeing, and "was not written" would be false of it.
+   *
+   * @param {unknown} error the failure thrown by the set-apply primitive.
+   * @param {string} systemName the system the rules were being written to, by name.
+   * @returns {string}
+   */
+  function _componentBulkEditFailureMessage(error, systemName) {
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.BulkEditRulesFailed',
+      'Writing the staged rules to {system} did not complete.',
+      error,
+      { system: systemName }
+    );
+  }
+
+  /**
+   * The message a REFUSED component seed puts in front of the GM.
+   *
+   * ── IT CARRIES THE REASON, WHICH IS THE HALF THE GM CAN ACT ON ────────────────────────────
+   * The refusal that is actually reachable here names both components claiming one source uuid
+   * (`… is claimed by both Iron Scrap (scrap) and Iron Ingot (ingot)`), and that pair is what the
+   * GM has to go and merge. So the key takes an `{error}` parameter rather than the Tool twin's
+   * bare `Try again.` — same key shape, one more thing said.
+   *
+   * ── AND IT CANNOT PRINT THE KEY ───────────────────────────────────────────────────────────
+   * That guard is {@link _componentMembershipFailureMessage}, shared with the removal twin.
+   *
+   * @param {unknown} error the refusal thrown by the in-system write.
+   * @returns {string}
+   */
+  function _componentJoinFailureMessage(error) {
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.AddToSystemFailed',
+      'The component could not be added to this system.',
+      error
+    );
+  }
+
+  /**
+   * One membership-failure sentence, localized, with an English floor that CANNOT be a raw key.
+   *
+   * ── WHY THIS IS ONE FUNCTION AND NOT TWO (issue 1371, round 11) ───────────────────────────
+   * `localize` answers a MISSING key with the key itself, so `localize(k) || fallback` never
+   * reaches its fallback and would put `FABRICATE.…` on a GM's screen. This is the store's own
+   * shipped idiom for that (`_essenceDeleteDialogContent`, `_componentDeleteDialogContent`):
+   * take the answer only when it is not the key back. `lang-keys-no-orphans` and
+   * `ui-lang-keys-resolve` are what keep the key present; this is what keeps a GM from ever
+   * reading one.
+   *
+   * The join and the removal need that same guard around two different keys, and written out
+   * twice the pair differs only in two literals — a near-identical block of exactly the shape
+   * the duplication gate counts, and two places for the guard to be dropped from instead of one.
+   * So the KEY and the FLOOR are arguments and the guard is written once.
+   *
+   * THE DETAIL IS PASSED AS `{error}` EITHER WAY, so a translation can state the reason too
+   * rather than only the English floor being able to. Any OTHER parameter the sentence names
+   * (`{system}` for the per-system bulk write, issue 1371 r17) is handed to the localizer with
+   * it and substituted into the floor by the same token rule, so the floor and the translation
+   * cannot differ in which facts they can state.
+   *
+   * @param {string} key the lang key for this sentence.
+   * @param {string} fallback the English sentence, used with `{token}`s filled when the key echoes.
+   * @param {unknown} error the failure to state the reason from.
+   * @param {Record<string, string>} [data] the sentence's other parameters, by token name.
+   * @returns {string}
+   */
+  function _componentMembershipFailureMessage(key, fallback, error, data = {}) {
+    const detail = error?.message ? String(error.message) : '';
+    const localized = services.localize?.(key, { ...data, error: detail });
+    if (localized && localized !== key) return localized.trim();
+    let floor = fallback;
+    for (const [token, value] of Object.entries(data)) {
+      floor = floor.replaceAll(`{${token}}`, String(value ?? ''));
+    }
+    return `${floor} ${detail}`.trim();
+  }
+
+  /**
+   * Write the in-system `components` row a joined world component needs, when it is absent.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was written.
+   */
+  async function _seedInSystemComponent(entityId, systemId) {
+    const entity = _worldComponentEntities().get(entityId);
+    if (!entity) return false;
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.components) ? system.components : [];
+    if (existing.some((record) => String(record?.id ?? '').trim() === entityId)) return false;
+    await systemManager.updateSystem(systemId, {
+      components: [...existing, _worldComponentAdoptionSeed(entity)],
+    });
+    return true;
+  }
+
+  /**
+   * Remove a WORLD component from one crafting system — the membership record AND this system's
+   * in-system record.
+   *
+   * ── THE MIRROR, AND IT IS COMPOSED FOR A REASON OF ITS OWN ────────────────────────────────
+   * Deleting the membership record alone leaves the in-system record standing, and the read
+   * union's "no world half for this row" branch pushes such a record through UNCHANGED — so the
+   * component goes on resolving in a system the GM has just removed it from, with the world layer
+   * silently no longer consulted. Both halves go together or neither does.
+   *
+   * THE WORLD ENTITY AND EVERY OTHER SYSTEM ARE UNTOUCHED, which is the whole distinction from
+   * deleting the world component itself.
+   *
+   * ── THE IN-SYSTEM HALF IS A DELETE, SO IT TAKES THE DELETE PATH (issue 1371, round 8) ──────
+   * Removing the row from the `components` array with `updateSystem` is not the same operation
+   * as deleting the component, and the difference is every REFERENCE to it. `deleteComponents`
+   * routes through `_deleteComponentSet` — "remove the components, repair every reference to
+   * them, and persist once" — which rewrites every recipe in this system that names the id,
+   * disables the ones left without a usable shape, clears essence source links pointing at it,
+   * cleans up its salvage runs and reconciles alchemy signatures. A filtering `updateSystem`
+   * does none of that, so it left this system's recipes naming a component the system no longer
+   * has, with nothing on screen saying so.
+   *
+   * IT IS THE SAME OPERATION THE COMPONENT LIST'S OWN DELETE PERFORMS, and that is the point:
+   * "remove from this system" and "delete this system's component" leave the same system behind.
+   * The world entity is what survives one and not the other.
+   *
+   * ── THE ORDER IS THE COMPENSATION (issue 1371, round 11) ──────────────────────────────────
+   * The two halves used to run membership-first, awaited, with nothing around the second — so a
+   * throw out of the delete cascade escaped with the membership record already gone and the
+   * in-system row still standing. That is the ghost the first paragraph exists to prevent,
+   * reached by failure rather than by design.
+   *
+   * The answer is the ORDER, not a rollback, because the two partial states are not equally bad:
+   *
+   *   ROW GONE, MEMBERSHIP LEFT — inert, but NOT invisible (issue 1371 r17 corrects the earlier
+   *     wording). Inert to the READ UNION: it iterates the IN-SYSTEM array and only enriches rows
+   *     it finds there, so no recipe, no rules editor and no crafting surface can reach the
+   *     component through this system, which is what the GM asked for. The system rules list
+   *     draws it as an ordinary GHOST row, because the ghost cohort keys off in-system ids and
+   *     ignores membership. The WORLD screens, however, still COUNT the membership: the
+   *     projection sets `member` from the record alone, so the entry's systems card names this
+   *     system as holding the component, the catalogue's `{m}/{k} Systems` stat and its
+   *     `Has rules in {system}` filter include it, and the picker's `heldHere` reads
+   *     `member === true` and WITHHOLDS the record from this system's offer — the one place the
+   *     ghost row and the picker disagree about the same fact. It is recoverable two ways: the
+   *     ghost row's `Add to system` (`joinComponentToSystem` tolerates the `false` the
+   *     membership write answers and seeds the row), or re-issuing this removal (`holdsRecord`
+   *     is then false and only the membership half runs).
+   *   MEMBERSHIP GONE, ROW LEFT — the ghost. The row resolves on, with the world layer no longer
+   *     consulted, and no screen says so.
+   *
+   * So THE DELETE GOES FIRST and the membership record second. A throw from the first half has
+   * then written no membership at all, and a throw from the second can only leave the inert half.
+   * Neither window can reach the ghost, and neither needs a compensating write — which is the
+   * point of ordering rather than rolling back: a rollback is one more write that can fail, on a
+   * path only reached because a write already failed.
+   *
+   * AND THE ROLLBACK COULD NOT HAVE BEEN WRITTEN CORRECTLY HERE, which is worth recording
+   * because it is the obvious alternative and it was the one asked for. Two reasons, both
+   * measured rather than argued:
+   *
+   *   1. THERE IS NO VERB TO RESTORE THE RECORD WITH. `removeFromSystem` deletes the membership
+   *      record AND its per-section overrides, and the family publishes no "write this record
+   *      back": `addToSystem` mints a FRESH `{entityId, systemId, inherit: {}}`. Re-adding
+   *      through it would answer a failed removal by discarding every per-system override the GM
+   *      authored — a data loss the failure itself did not cause.
+   *   2. THE TWO FAILURE WINDOWS ARE NOT DISTINGUISHABLE FROM HERE. `_deleteComponentSet` mutates
+   *      `system.components` IN PLACE and persists ONCE at the end, and `getSystem` hands back
+   *      that same live object — so after a throw from the persist (nothing durable, the setting
+   *      still holds the row) and after a throw from `_reconcileAlchemySignaturesAfterDeletion`
+   *      (fully durable, the row really is gone) the row reads GONE either way. A "restore the
+   *      membership record only if the row still stands" rule therefore never fires in the window
+   *      it would have been written for. Both windows are pinned, with that reading printed, in
+   *      `tests/stores/admin-store-component-scope.test.js`.
+   *
+   * ── WHAT THE CATCH ANSWERS, AND WHY IT IS NOT ALWAYS `false` ──────────────────────────────
+   * The failure is REPORTED rather than propagated, on the same rule the join follows: the
+   * catalogue's bulk apply runs this verb over many component/system pairs, and an escaping
+   * rejection skips every remaining pair, never reaches `clearSelection()` and surfaces as an
+   * unhandled rejection.
+   *
+   * The value it answers is "did anything change", NOT "did it succeed", because that is what
+   * `_republishingFamily` gates the re-projection on. The delete's in-memory mutation lands
+   * before every throw that can follow it, so on failure the answer is read off the state every
+   * reader can now see: if the row is gone the screen is stale and MUST be re-projected even
+   * though the operation failed, and if it still stands nothing moved and a publish would be
+   * spent on nothing.
+   *
+   * A MANAGER THAT CANNOT DELETE STILL REFUSES THE WHOLE ACTION rather than half of it, on
+   * {@link adoptWorldTool}'s precedent, and the guard is load-bearing under this order too:
+   * without it `_dropInSystemComponent` would answer `false` for a missing seam and the
+   * membership half would then run ALONE, which is the ghost by the shortest route of all.
+   *
+   * @param {string} entityId the world component id.
+   * @param {string} systemId the crafting system to remove it from.
+   * @returns {Promise<boolean>} whether anything changed.
+   */
+  async function partComponentFromSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const systemManager = services.getCraftingSystemManager?.();
+    const holdsRecord = _systemHoldsComponentRow(systemManager, system, target);
+    if (holdsRecord && typeof systemManager?.deleteComponents !== 'function') return false;
+    try {
+      const dropped = holdsRecord ? await _dropInSystemComponent(target, system) : false;
+      const parted = await worldScopeFamilies.component.removeFromSystem(target, system);
+      return parted || dropped;
+    } catch (error) {
+      services.notify?.error?.(_componentPartFailureMessage(error));
+      return holdsRecord && !_systemHoldsComponentRow(systemManager, system, target);
+    }
+  }
+
+  /**
+   * The message a FAILED component removal puts in front of the GM.
+   *
+   * ── IT SAYS "DID NOT COMPLETE" RATHER THAN "FAILED", which is a precision and not a hedge ──
+   * The join either lands or is undone, so its message can say the component was not added. This
+   * one cannot: a throw from the second half leaves the in-system row really gone, and a throw
+   * from the first leaves the manager's in-memory system and the saved setting disagreeing about
+   * it. The sentence has to be true of every one of those, and "did not complete" is — where "was
+   * not removed" would be a fresh false statement in two of the three. The lang key carries the
+   * same wording for the same reason, and a translation that narrowed it to "was not removed"
+   * would be re-introducing the false statement in another language.
+   *
+   * ── AND IT CANNOT PRINT THE KEY, through the shared guard ─────────────────────────────────
+   * {@link _componentMembershipFailureMessage}, exactly as the join twin does.
+   *
+   * @param {unknown} error the failure thrown by either half of the removal.
+   * @returns {string}
+   */
+  function _componentPartFailureMessage(error) {
+    return _componentMembershipFailureMessage(
+      'FABRICATE.Admin.Manager.Component.RemoveFromSystemFailed',
+      'Removing the component from this system did not complete.',
+      error
+    );
+  }
+
+  /**
+   * One system's in-system `components` array, or `[]` when there is no such system.
+   *
+   * @param {object|null|undefined} systemManager
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  function _inSystemComponents(systemManager, systemId) {
+    const system = systemManager?.getSystem?.(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
+  }
+
+  /**
+   * Whether one system's in-system `components` array currently holds a row for this id.
+   *
+   * Read TWICE by {@link partComponentFromSystem} — once to decide whether the delete half runs
+   * at all, and once after a failure to decide whether the screen has to move — so it is one
+   * predicate rather than the same `.some` written out in two places that could drift apart.
+   *
+   * @param {object|null|undefined} systemManager
+   * @param {string} systemId
+   * @param {string} entityId
+   * @returns {boolean}
+   */
+  function _systemHoldsComponentRow(systemManager, systemId, entityId) {
+    return _inSystemComponents(systemManager, systemId).some(
+      (record) => String(record?.id ?? '').trim() === entityId
+    );
+  }
+
+  /**
+   * Delete the in-system `components` row for one component, through the sanctioned cascade.
+   *
+   * `deleteComponents` is the SET form, called with the one id, so the reference repair, the
+   * recipe disable count, the salvage clean-up and the alchemy reconciliation all run exactly as
+   * they do for the component list's own delete — and its `deleted` count is the honest answer to
+   * "was a row removed", including `0` for an id this system does not hold.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was removed.
+   */
+  async function _dropInSystemComponent(entityId, systemId) {
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.deleteComponents !== 'function') return false;
+    const outcome = await systemManager.deleteComponents(systemId, [entityId]);
+    return Number(outcome?.deleted ?? 0) > 0;
+  }
+
+  /**
    * Re-publish after a world-scope write that reported it wrote something.
    *
    * ── THE WRITE LANDED AND THE SCREEN DID NOT MOVE ────────────────────────────────────────────
@@ -5749,13 +6671,32 @@ export function createAdminStore(services) {
     return wrapped;
   }
 
-  // The published write path. Only the ESSENCE family is composed: `addToSystem` and
-  // `removeFromSystem` each have a second half in a store this gateway owns, and the generic
-  // family cannot reach `CraftingSystemManager` at all. Every other family and every other essence
-  // verb is the generic one — wrapped, so the screen re-flows on every write that lands.
+  // The published write path. TWO families are composed here — the ESSENCE one and, since issue
+  // 1371, the COMPONENT one: for each of them `addToSystem` and `removeFromSystem` have a second
+  // half in a store this gateway owns, and the generic family cannot reach
+  // `CraftingSystemManager` at all. Every other verb of theirs, and the whole vocabulary family,
+  // is the generic one — wrapped, so the screen re-flows on every write that lands.
+  //
+  // EACH COMPOSED VERB REPLACES THE GENERIC ONE UNDER ITS EXISTING KEY, never beside it. Every
+  // membership control in the product — a ghost row's Add, the system rules roster, the world
+  // entry's per-system rows, the catalogue's bulk membership group — reaches the family through
+  // that one key, so a parallel verb would leave all of them writing a record nothing can read.
+  //
+  // The TOOL family is composed one step later, over the WRAPPED families; see that site for why
+  // the two compositions are not interchangeable.
   const worldScope = Object.fromEntries(
     Object.entries({
       ...worldScopeFamilies,
+      component: {
+        ...worldScopeFamilies.component,
+        addToSystem: joinComponentToSystem,
+        removeFromSystem: partComponentFromSystem,
+        // THE PER-SYSTEM RULES WRITE (issue 1371 r16-cat, maintainer ruling M25). Composed HERE,
+        // beside the join/part verbs, because it is the same kind of verb they are: a world-scope
+        // instruction whose second half lives in `CraftingSystemManager`, which the generic family
+        // cannot reach. Wrapped like the rest, so one `refresh()` follows each landed batch.
+        bulkEditRules: bulkEditComponentRules,
+      },
       essence: {
         ...worldScopeFamilies.essence,
         addToSystem: joinEssenceToSystem,
@@ -5904,9 +6845,53 @@ export function createAdminStore(services) {
   // is the whole defect. The world-scope leg is unchanged and still owns the membership rule;
   // only the crafting-system leg is new.
   //
-  // TOOL ONLY. Components and essences reach `worldScopeActions` untouched: neither has a
-  // crafting-system-manager write to compose, and inventing one here would be a write path no
-  // screen asked for.
+  // TOOL ONLY AT THIS SITE, and that is a statement about WHERE rather than about which families
+  // are composed at all. The component and essence families are composed one step EARLIER, inside
+  // the `_republishingFamily` argument above, so their composed verbs call the UNWRAPPED family
+  // and do not republish themselves. `adoptWorldTool` does the opposite on both counts: it calls
+  // the WRAPPED `worldScope.tool.addToSystem` and issues its own `refresh()`, which is only
+  // correct because it composes AFTER the wrap. Moving either composition to the other site would
+  // make it self-recurse or double-publish.
+  //
+  // The tool family composes `addToSystem` ALONE. `removeFromSystem` is still the generic verb,
+  // so removing a Tool from a system deletes the membership record and leaves the in-system
+  // record for the read union to push through unchanged — the mirror defect the component family
+  // composes `partComponentFromSystem` to avoid. Named here as a follow-up on the tool path
+  // rather than fixed from a component lane.
+  //
+  // THE SAME FOLLOW-UP CARRIES THE UNCOMPENSATED TWO-KEY SPLIT ON BOTH FAMILIES (issue 1371,
+  // rounds 8 and 11, recorded rather than built). Every composed membership verb here writes TWO
+  // world settings — `componentScope` (or its tool twin) and `craftingSystems` — one after the
+  // other, with no pre-state snapshot and no cross-setting transaction. What each verb can do,
+  // and now does, is make its OWN failure windows harmless:
+  //
+  //   `adoptWorldTool` and `joinComponentToSystem` undo their own first write when the second is
+  //     refused, because for an ADD the dangerous partial state is the one their first write
+  //     creates.
+  //   `partComponentFromSystem` ORDERS the two halves so that neither partial state is the
+  //     dangerous one, because for a REMOVE there is nothing to undo: the delete cascade has
+  //     already rewritten this system's recipes by the time the second half can fail, and no
+  //     membership write can give those back.
+  //
+  // ROUND 11 CORRECTED THIS NOTE'S REASON, which is worth saying because it was over-broad and a
+  // later lane would have inherited it. It read that restoring a membership record after a
+  // partial delete "would manufacture the very ghost state the rollback exists to prevent", as
+  // if that held generally. It does not: `_deleteComponentSet` persists ONCE at its end, so a
+  // throw before that persist leaves the row durably in place and restoring membership would
+  // have restored the CORRECT state, not a ghost. Only a throw after it — from
+  // `_reconcileAlchemySignaturesAfterDeletion`, which `deleteComponents` runs once
+  // `_deleteComponentSet` has returned — leaves the row really gone. The reason the remove path
+  // does not restore is narrower and stated where it belongs, on
+  // {@link partComponentFromSystem}: the two windows are indistinguishable from here (the
+  // cascade mutates the live system object before it persists, so the row reads gone in both),
+  // and the family publishes no verb that could write the removed record back with its
+  // overrides intact.
+  //
+  // WHAT IS STILL OPEN is the tool family's `removeFromSystem`, which is the generic verb and so
+  // has neither the delete cascade nor the ordering, and the genuinely undetectable case on every
+  // verb here: a compensation that itself fails. Closing those properly means one transactional
+  // seam over both settings, which belongs to the tool follow-up above and not to a component
+  // lane.
   const worldScopeApi = {
     ...worldScope,
     tool: { ...worldScope.tool, addToSystem: adoptWorldTool },
@@ -7846,7 +8831,15 @@ export function createAdminStore(services) {
     const essence = existing.find((def) => def.id === essenceId);
     if (!essence) return false;
 
-    const managedItems = _getManagedItems(system);
+    // THE REFUSAL IS COMPUTED OFF WHAT THE SYSTEM RESOLVES (issue 1371 r20-store3, reviewer
+    // round 6 finding 4). This is the statement the GM decides on, and `deleteEssence` strips the
+    // essence from every carrying component — so a component that carries it only through the
+    // world map must be named here or the dialog understates the cascade it is asking consent for.
+    const managedItems = componentsWithResolvedEssences(
+      systemManager,
+      sysId,
+      _getManagedItems(system)
+    );
     const recipes = services.getRecipeManager?.()?.getRecipes?.({ craftingSystemId: sysId }) || [];
     const impact = describeEssenceDeleteImpact([
       {
@@ -7870,8 +8863,14 @@ export function createAdminStore(services) {
     });
     if (!confirmed) return false;
 
-    await systemManager.deleteEssence(sysId, essenceId);
-    await refresh();
+    const cascade = _essenceDeleteCascade(sysId);
+    try {
+      await systemManager.deleteEssence(sysId, essenceId, cascade.seam);
+    } catch (error) {
+      await cascade.rollback();
+      throw error;
+    }
+    await _republishAfterWrite('an essence delete');
     return true;
   }
 
@@ -7903,22 +8902,26 @@ export function createAdminStore(services) {
     const resolved = existing.filter((def) => requested.has(String(def?.id ?? '')));
     if (resolved.length === 0) return empty;
 
+    const cascade = _essenceDeleteCascade(sysId);
+    let result;
     try {
-      const result = await systemManager.deleteEssences(
+      result = await systemManager.deleteEssences(
         sysId,
-        resolved.map((def) => String(def.id))
+        resolved.map((def) => String(def.id)),
+        cascade.seam
       );
-      await refresh();
-      return {
-        deleted: Number(result?.deleted) || 0,
-        recipesUpdated: Number(result?.recipesUpdated) || 0,
-        recipesDisabled: Number(result?.recipesDisabled) || 0,
-      };
     } catch (error) {
+      await cascade.rollback();
       console.error('Fabricate | Failed to delete essences:', error);
       services.notify?.error?.(error?.message || 'Failed to delete essences');
       return empty;
     }
+    await _republishAfterWrite('an essence bulk delete');
+    return {
+      deleted: Number(result?.deleted) || 0,
+      recipesUpdated: Number(result?.recipesUpdated) || 0,
+      recipesDisabled: Number(result?.recipesDisabled) || 0,
+    };
   }
 
   /**
@@ -10480,22 +11483,58 @@ export function createAdminStore(services) {
     }
   }
 
-  async function updateComponent(itemId, updates = {}) {
+  /**
+   * Write one component's authored fields in the selected system.
+   *
+   * `baseline` is the essence map the CALLER's editor was seeded from (issue 1371 r20-store3).
+   * The override rule uses it to tell a restatement of that seed from a real authored override
+   * without assuming which of the two maps the editor drew; a caller that omits it is taken to
+   * have been seeded from the read union, which both shipped editors now state explicitly, so
+   * the fallback stands for callers outside the manager rather than for either of them.
+   *
+   * @param {string} itemId
+   * @param {object} [updates]
+   * @param {{baseline?: unknown}} [options]
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function updateComponent(itemId, updates = {}, { baseline } = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!itemId || !sysId) return false;
     if (!updates || typeof updates !== 'object') return false;
     if (Object.keys(updates).length === 0) return true;
 
+    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2). See
+    // `componentEssenceOverride`'s `updatesFor`: the flag moves first, an untouched restatement of
+    // the editor's own baseline writes nothing, and a refused flag write refuses the save.
+    const { staged, flipped } = await _componentEssenceOverride.updatesFor(
+      sysId,
+      String(itemId),
+      updates,
+      { baseline }
+    );
+    if (staged === null) return false;
+    if (Object.keys(staged).length === 0) return true;
+
     try {
-      await systemManager.updateItem(sysId, itemId, updates);
-      await refresh();
-      return true;
+      await systemManager.updateItem(sysId, itemId, staged);
     } catch (error) {
+      // The switch this call flipped goes back (round 6, finding 5): the values did not land, so
+      // leaving the pair overriding with its dormant map would silently take it out of every later
+      // world edit's reach.
+      await _componentEssenceOverride.rollback(sysId, flipped);
       console.error('Fabricate | Failed to update component:', error);
       services.notify?.error?.(error?.message || 'Failed to update component');
       return false;
     }
+    // AND THE REPUBLISH IS OUTSIDE IT (issue 1371 r21-store4, Foundry integrator round 7). The
+    // catch above compensates on the stated precondition "the values did not land", and `refresh()`
+    // is precisely where that precondition is FALSE: it is a large projection walk over Foundry
+    // documents, not a settings write, so a throw there used to roll the switch back over an
+    // override that is durably on disk — re-shadowing the map the GM just authored and reporting
+    // the update as failed. The write landed; that is what this answers.
+    await _republishAfterWrite('a component update');
+    return true;
   }
 
   /**
@@ -10522,10 +11561,15 @@ export function createAdminStore(services) {
    * `null` means nothing was written, for any reason — a bad or empty argument, no
    * selected system, or a throw that has already been reported to the GM.
    *
+   * `refused` is how many pairs had their `essences` axis withheld because the world-setting write
+   * that would have flipped their switch was refused (issue 1371 r20-store3, round 6 finding 6).
+   * Those pairs still take every OTHER staged axis and are still counted in `updated` when they
+   * change, so the two numbers answer different questions and neither is derived from the other.
+   *
    * @param {Iterable<string>} componentIds
    * @param {object} [edit]
-   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the write result, or
-   *   `null` when no write happened.
+   * @returns {Promise<{updated: number, componentIds: string[], refused: number}|null>} the write
+   *   result, or `null` when no write happened.
    */
   async function applyComponentBulkEdit(componentIds, edit = {}) {
     const systemManager = services.getCraftingSystemManager();
@@ -10535,18 +11579,29 @@ export function createAdminStore(services) {
     if (!edit || typeof edit !== 'object') return null;
     if (Object.keys(edit).length === 0) return null;
 
+    // A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (issue 1371 r19-store2): every SHADOWED pair in
+    // the cohort has its switch flipped FIRST, and a pair whose flag write is refused loses its
+    // ESSENCE axis and keeps every other one (round 6, finding 6) rather than dropping out of the
+    // edit entirely.
+    const { writable, refused, flipped } = await _componentEssenceOverride.cohortFor(
+      sysId,
+      ids,
+      edit
+    );
+
+    let result;
     try {
-      const result = await systemManager.applyBulkEditToComponents(sysId, ids, edit);
-      await refresh();
-      return {
-        updated: Number(result?.updated) || 0,
-        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
-      };
+      result = await _writeComponentCohorts(systemManager, sysId, { writable, refused, edit });
     } catch (error) {
+      await _componentEssenceOverride.rollback(sysId, flipped);
       console.error('Fabricate | Failed to apply component bulk edit:', error);
       services.notify?.error?.(error?.message || 'Failed to apply component bulk edit');
       return null;
     }
+    if (!result) return null;
+    // The republish is outside the compensated region, for `updateComponent`'s reason.
+    await _republishAfterWrite('a component bulk edit');
+    return { ...result, refused: refused.length };
   }
 
   /**

@@ -30,6 +30,7 @@ import {
   policyDefersSelection,
   resolveMaxModifierPicks,
 } from '../src/systems/checkModifierResolver.js';
+import { resolveComponentScope } from '../src/systems/componentScope.js';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 
@@ -398,4 +399,152 @@ test('no tolerated pattern matches a warning the capture gate exists to catch', 
         `warning would publish a frame instead of failing it:\n  ${control}`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// The two world-scope states the essence work is judged on, MEASURED after the
+// migration rather than read off the fixture seeds (issue 1371 r20-store3)
+// ---------------------------------------------------------------------------
+//
+// This block exists because a review round concluded the opposite from the seeds alone. The lab
+// fixture writes `essenceScope: { entities: [], defaults: {} }` and authors no component world
+// `essences` map, which reads as "neither state is reachable in the lab world" — and the file
+// header above says at length why that reading is unsound: NO lab fixture seeds `migrationVersion`,
+// so every registered migration runs on every lab build, and `1.30.0` LIFTS every system essence
+// into `essenceScope.entities` while `1.32.0` ELECTS a component world essence map for almost every
+// entity. What the frames show is the migrated world, and only a measurement of it can say so.
+
+/**
+ * The lab's THREE world-scope payloads through the same startup pass, seeded exactly as
+ * `labWorld.js` seeds them.
+ *
+ * `migrateLabWorld` above deliberately seeds only the five keys its own subjects live in; the scope
+ * keys are seeded here rather than added there so no assertion in this file changes meaning.
+ *
+ * @returns {Promise<{componentScope: object, essenceScope: object, craftingSystems: object[]}>}
+ */
+async function migrateLabWorldScopes() {
+  const content = buildLabContent();
+  const store = new Map(
+    Object.entries(
+      structuredClone({
+        recipes: content.recipes,
+        craftingSystems: content.systems,
+        gatheringConfig: content.gatheringConfig,
+        gatheringEnvironments: content.environments,
+        gatheringParties: [],
+        componentScope: content.componentScope,
+        // The literal `labWorld.js` puts: membership only, no entities and no defaults.
+        essenceScope: {
+          entities: [],
+          defaults: {},
+          membership: {
+            [`aether|${LAB_SYSTEM_IDS.SMITHING}`]: {
+              entityId: 'aether',
+              systemId: LAB_SYSTEM_IDS.SMITHING,
+              inherit: { effectSource: true, macro: false },
+              enabled: false,
+            },
+          },
+        },
+        toolScope: content.toolScope,
+        worldVocabulary: content.worldVocabulary,
+      })
+    )
+  );
+  const runner = new MigrationRunner({
+    getSetting: (key) => store.get(key),
+    setSetting: (key, value) => store.set(key, value),
+    moduleVersion: '0.0.0',
+  });
+  const summary = await runner.run();
+  assert.equal(summary.aborted, false, 'the lab world must not abort the migration pass');
+  return {
+    componentScope: store.get('componentScope'),
+    essenceScope: store.get('essenceScope'),
+    craftingSystems: store.get('craftingSystems'),
+  };
+}
+
+test('every lab essence is WORLD-KNOWN after the pass, so the bulk Colour axis is withheld', async () => {
+  // The panel withholds its `Colour` axis when ANY selected essence is `worldDefined`, which the
+  // store stamps from `worldScope.essence.entries` — the published corpus, not the fixture seed.
+  // `manager-essences-bulk-edit` ticks `mote` and `aether`, so the withheld axis and its Callout
+  // are already in a published frame and no further seed is needed to photograph them.
+  const { essenceScope } = await migrateLabWorldScopes();
+  const worldKnown = new Set(essenceScope.entities.map((entity) => entity.id));
+
+  assert.ok(worldKnown.size > 0, 'the `1.30.0` lift populated the world essence catalogue');
+  for (const essenceId of ['mote', 'aether']) {
+    assert.ok(
+      worldKnown.has(essenceId),
+      `\`${essenceId}\` is ticked by manager-essences-bulk-edit, so it must be world-known there`
+    );
+  }
+});
+
+test('the lab resolves an essence map for `sm-iron-ingot` that its OWN row does not carry', async () => {
+  // The r19 overlay — the rules list and its inspector drawing what the system RESOLVES rather than
+  // the persisted row — is invisible in a freshly migrated world, because `1.32.0` elects each
+  // world map FROM a system's own row and marks that system inheriting only when the two are equal.
+  // `labContent` seeds the divergence on the component `manager-component-edit-inheriting` opens.
+  const { componentScope, craftingSystems } = await migrateLabWorldScopes();
+  const smithing = labSystem(craftingSystems, LAB_SYSTEM_IDS.SMITHING);
+  const persisted = smithing.components.find((row) => row.id === 'sm-iron-ingot');
+  const [resolved] = resolveComponentScope(
+    {
+      entities: componentScope.entities,
+      defaults: Object.values(componentScope.defaults),
+      membership: Object.values(componentScope.membership),
+    },
+    smithing.id,
+    [persisted]
+  );
+
+  assert.deepEqual(persisted.essences, { earth: 2, fire: 1 }, 'the row the authoring accessor gives');
+  assert.deepEqual(
+    resolved.essences,
+    { earth: 2, fire: 1, air: 1 },
+    'and what the system actually resolves — a frame of the two agreeing proves nothing'
+  );
+  assert.equal(
+    componentScope.membership[`sm-iron-ingot|${LAB_SYSTEM_IDS.SMITHING}`].inherit.essences,
+    true,
+    'the pre-decided switch survives the pass, which is what keeps the two unequal'
+  );
+});
+
+test('and the divergence reaches NO essence demand this system makes', async () => {
+  // `air` is the divergence precisely because no smithing recipe demands it: raising a pool a
+  // recipe gates on would flip a player capture frame between "can craft" and "cannot".
+  const { craftingSystems } = await migrateLabWorldScopes();
+  const content = buildLabContent();
+  const demanded = new Set();
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      for (const entry of node) walk(entry);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'essence' && node.essenceId) demanded.add(node.essenceId);
+    if (node.essences && typeof node.essences === 'object' && !Array.isArray(node.essences)) {
+      for (const id of Object.keys(node.essences)) demanded.add(id);
+    }
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(
+    content.recipes.filter((recipe) => recipe.craftingSystemId === LAB_SYSTEM_IDS.SMITHING)
+  );
+
+  assert.ok(demanded.size > 0, 'the walk found no essence demand at all, so this is vacuous');
+  assert.ok(
+    !demanded.has('air'),
+    `smithing demands ${[...demanded].sort().join(', ')} — adding \`air\` moves no craftability`
+  );
+  assert.ok(
+    labSystem(craftingSystems, LAB_SYSTEM_IDS.SMITHING).essenceDefinitions.some(
+      (definition) => definition.id === 'air'
+    ),
+    'and the system does define it, so the tile has a name and an icon to draw'
+  );
 });

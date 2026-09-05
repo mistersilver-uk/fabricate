@@ -257,8 +257,17 @@ export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
  */
 export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 
-/** @see KNOWN_OFF_LADDER_RADII */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 318;
+/**
+ * @see KNOWN_OFF_LADDER_RADII
+ *
+ * RE-MEASURED at 318 → 314 in 140 → 139 rows by issue 1371, all four paid down rather than moved:
+ * `styles/fabricate.css` lost one 8px (73 → 72), one 10px (14 → 13) and one 12px (6 → 5) as the
+ * component screens' rebuild deleted the rules that held them, and
+ * `EssenceQuantityCard.svelte`'s single 10px went with its own rebuild, which is why that row is
+ * deleted rather than lowered. Banking a shrink is not bookkeeping: an unbanked one leaves the
+ * slot open for the next author to fill for free.
+ */
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 314;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -376,11 +385,19 @@ export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
  * as unrecognised as a bare `div`. This is the largest single row set in this file and it is
  * meant to collapse: once the shared primitives emit the attribute (issues 1502 and 1508) most of
  * it goes at once.
+ *
+ * RE-MEASURED at 280 → 278 in 97 → 95 file rows by issue 1371, which paid two rows down by
+ * rebuilding the files that held them: `ComponentsBrowserView.svelte` and
+ * `ComponentIdentityStrip.svelte` each carried one undeclared formless button and now carry none.
+ * The banking is the point rather than the bookkeeping — an unbanked shrink leaves the slot open
+ * for the next author to fill for free. That lane's three NEW inline-link buttons are absent from
+ * this table because they declare `data-keyboard-focus="true"`, which is what the gate asks for;
+ * they were never banked as debt.
  */
 export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 
 /** @see KNOWN_FORMLESS_BUTTONS */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 280;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 278;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
@@ -395,8 +412,45 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 280;
  * arriving or departing unrecorded is a failure. That is what settles the domain question issue
  * 1481 raises: nested manager directories ARE in domain, and the answer is now a table rather
  * than a reading.
+ *
+ * ONE ROW SWAPPED BY ISSUE 1371, and the total is unchanged at 49 because the two movements are
+ * opposite. `ScopedPlaceholderPage.svelte` LEFT, measured 2 importers → 0: that lane gave the
+ * world Component catalogue and entry real bodies, and they were its only two callers, so it
+ * dropped below the bar rather than gaining a manifest row. `ScopedEntityPreview.svelte` ARRIVED,
+ * measured 1 importer → 3: `ComponentEditView.svelte` and `WorldComponentEntryPreviewRail.svelte`
+ * joined `ToolBehaviorPreview.svelte`, which put it over the bar.
+ *
+ * IT IS REGISTERED RATHER THAN ADJUDICATED, which is what this table is for and is also the
+ * smaller claim. Deciding whether a preview belongs in the shared vocabulary needs a `library`
+ * specimen and an `evidence` derivation, or a `notAPrimitive` row with the measurement behind it;
+ * recording it here says only that it crossed the bar and that the decision is outstanding.
  */
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
 /** @see KNOWN_UNREGISTERED_SHARED_COMPONENTS */
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;
+// 49 -> 48 (issue 1371 r16-list): `EssenceQuantityCard` dropped to ONE importer when maintainer
+// ruling M23 rebuilt the system Component Rules bulk panel's essence axis as the reference's inset
+// rows — the card renders in the component editor's grid alone now, so it no longer clears the bar.
+// 48 -> 49 (issue 1371 r16-cat): `BulkStagingInset` gained its SECOND importer when maintainer rulings
+// M24/M25 converged the world Component catalogue's bulk panel onto the inset the system panel had
+// extracted — the same object over different data, which is the maximum reuse the maintainer asked
+// for. It crosses the bar beside `BulkSelectionToolbar` and `BulkEditPanelShell`'s family; whether it
+// is a manifest row with a `library.html` specimen is the outstanding decision this register records.
+// 49 -> 48 (issue 1371 r17-b): that decision was taken — `BulkStagingInset` LEFT by gaining its manifest
+// row (`shipped`, `targeted`) and its `library.html` specimen beside `<BulkEditPanel>`'s.
+// 48 -> 49 (issue 1371 r18-list): `scoped/WorldComponentEntryPreviewRail` gained its SECOND importer
+// when maintainer ruling M27 made the system Component Rules editor render the world entry's `How
+// players see it` rail at the system scope in place of a rail of its own — the same object over
+// different data, which is what the ruling asked for. Measured 1 importer → 2:
+// `ComponentEditView.svelte` joined `WorldComponentEntryPage.svelte`. Whether a component-specific
+// preview rail is a manifest row with a `library.html` specimen, or a `notAPrimitive` row beside the
+// deferred `EssenceBehaviorPreview`, is the outstanding decision this register records.
+// 49 -> 50 (issue 1371 r18-entry): `components/EssenceQuantityCard` is BACK over the bar. Maintainer
+// ruling M31 gave the world record an `essences` section and the world Component entry an `Essence
+// contribution` card on the shape the rules editor's card takes — the same quantity card over the
+// world essence catalogue instead of a system's roster. Measured 1 importer → 2:
+// `scoped/WorldComponentEntryPage.svelte` joined `ComponentEditView.svelte`. It left this register at
+// r16-list by dropping BELOW the bar, never by adjudication, so the decision it records is the same
+// one as then: a manifest row with a `library.html` specimen, or a `notAPrimitive` row with this
+// measurement behind it.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 50;

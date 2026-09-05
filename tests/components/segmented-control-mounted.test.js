@@ -339,6 +339,218 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  // ── THE PILL SHAPE AND THE SOFT-ACCENT TONE (issue 1371) ───────────────────────────────
+  //
+  // The reference draws its entry filter (`proto:5457`, `All / With rules / Without`) as a RUN
+  // OF SEPARATE PILLS rather than as tiles inside a frame: no track fill, no track edge, radius
+  // 999 per segment, every segment at 600, the idle one a real tile on `--fab-bg-1` behind a
+  // `--fab-border` hairline and the chosen one soft accent. Two props, on the two axes this
+  // component already separates — `shape` for the construction, `tone` for the paint — because
+  // the shipped `tone="accent"` is the OTHER accent control (`proto:1558`, the cohort switch,
+  // solid fill on a bare idle segment) and both have to keep rendering.
+  //
+  // A parity lane proved this is unreachable from `styles/fabricate.css` at any specificity:
+  // Foundry imports the module sheet at `layer(modules)` and this component's block is injected
+  // unlayered, so the primitive's own declaration wins however the sheet's selector is written.
+  it('adds is-pill to the track only when shape is set, and rounds only the segments', async () => {
+    const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    assert.equal(
+      plain.querySelector('.manager-segmented').classList.contains('is-pill'),
+      false,
+      'the default track carries no shape class'
+    );
+    harness.remount();
+
+    const pill = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      shape: 'pill'
+    });
+    assert.ok(pill.querySelector('.manager-segmented.is-pill'), 'shape="pill" marks the TRACK');
+    // The shape is a track statement for the same reason the tone is: painting it onto the
+    // chosen segment would collide with the per-option variant ramp, which is the axis neither
+    // of these props is.
+    assert.equal(
+      [...pill.querySelectorAll('.manager-segment')].filter((segment) =>
+        segment.classList.contains('is-pill')
+      ).length,
+      0,
+      'no segment carries the shape class'
+    );
+    harness.remount();
+
+    const unknown = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      shape: 'wat'
+    });
+    assert.equal(
+      unknown.querySelector('.manager-segmented').className.includes('is-wat'),
+      false,
+      'an unknown shape degrades to the shipped track rather than emitting a dead selector'
+    );
+  });
+
+  it('adds is-accent-soft WITHOUT disturbing the shipped solid is-accent tone', async () => {
+    const soft = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      tone: 'accent-soft'
+    });
+    const softTrack = soft.querySelector('.manager-segmented');
+    assert.ok(softTrack.classList.contains('is-accent-soft'), 'tone="accent-soft" marks the TRACK');
+    // `is-accent` is a PREFIX of `is-accent-soft`, and a class list is matched by whole token, so
+    // the shipped cohort switch's rules must not reach this track. Asserted rather than assumed:
+    // a `className.includes(...)` check anywhere would read the two as the same tone.
+    assert.equal(
+      softTrack.classList.contains('is-accent'),
+      false,
+      'the soft tone is NOT the solid accent tone, however the class strings read'
+    );
+    harness.remount();
+
+    const solid = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      tone: 'accent'
+    });
+    const solidTrack = solid.querySelector('.manager-segmented');
+    assert.ok(solidTrack.classList.contains('is-accent'), 'the shipped solid accent still paints');
+    assert.equal(
+      solidTrack.classList.contains('is-accent-soft'),
+      false,
+      'and it did not acquire the new one'
+    );
+  });
+
+  it('composes the pill run with the compact density and the badge slot', async () => {
+    // The consuming lane passes all three: `density="compact"` is the rung the reference's
+    // `padding: 5px 11px` / 10.5px segment already lands on, `shape="pill"` is the corner and
+    // the frameless track, `tone="accent-soft"` is the paint, and the tally rides the mono
+    // `badge` slot the reference draws it in.
+    const root = await harness.mount({
+      options: [
+        { value: 'all', fallback: 'All', badge: 6 },
+        { value: 'in', fallback: 'With rules', badge: 2 }
+      ],
+      value: 'all',
+      groupName: 'g',
+      density: 'compact',
+      shape: 'pill',
+      tone: 'accent-soft'
+    });
+    const track = root.querySelector('.manager-segmented');
+    for (const expected of ['is-compact', 'is-pill', 'is-accent-soft']) {
+      assert.ok(track.classList.contains(expected), `the track carries ${expected}`);
+    }
+    assert.equal(
+      root.querySelectorAll('.manager-segment-count.is-badge').length,
+      2,
+      'both segments draw their mono tally'
+    );
+  });
+
+  it('paints every declared shape and tone in the scoped style block', () => {
+    // The mirror guard, in both directions. A value accepted by the class builder but never
+    // given a rule renders as the shipped track while the class assertions above still pass:
+    // the class is there, the treatment is not, and nothing says so. Derived from the
+    // component's own class expression rather than restated, so a fourth value added to one
+    // and not the other fails here instead of shipping unpinned.
+    const trackClasses = segmentedSource.slice(
+      segmentedSource.indexOf('class={`manager-segmented'),
+      segmentedSource.indexOf('role="radiogroup"')
+    );
+    const declared = [...trackClasses.matchAll(/' (is-[a-z-]+)'/g)].map(([, name]) => name);
+    assert.ok(declared.length >= 8, `the track builder still names its variants (${declared})`);
+    const styleBlock = segmentedSource.slice(segmentedSource.indexOf('<style>'));
+    // Whole-token match, not `includes`. `is-accent` is a PREFIX of `is-accent-soft`, so a
+    // substring lookup would report the solid cohort tone as painted by the soft one's rules
+    // and this guard would answer yes to a question nothing had asked.
+    assert.deepEqual(
+      declared.filter(
+        (name) => !new RegExp(`\\.manager-segmented\\.${name}(?![\\w-])`).test(styleBlock)
+      ),
+      [],
+      'every track variant the builder can emit declares a rule of its own'
+    );
+  });
+
+  it('states the pill run and the soft accent in tokens, at the reference values', () => {
+    // `proto:5457` exactly: radius 999 per segment, `font: 600`, the idle segment on
+    // `background: var(--bg1); border: 1px solid var(--border); color: var(--muted)` and the
+    // chosen one on `var(--accent-soft)` / `var(--accent-border)` / `var(--accent)`. The three
+    // accent tokens are BYTE-EQUAL to the reference's here — `--fab-accent-soft` is
+    // `rgb(232 198 167 / 16%)` and the reference draws `rgba(232,198,167,.16)` — so this is a
+    // token statement rather than an approximation, and no colour literal enters `src/ui/**`.
+    //
+    // Each assertion is anchored to ITS OWN rule head with a `[^}]*` body, so a declaration
+    // that drifted into a neighbouring rule cannot satisfy the one that lost it.
+    const styleBlock = segmentedSource.slice(segmentedSource.indexOf('<style>'));
+    const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rule = (head, declaration) =>
+      new RegExp(`${escape(head)}\\s*\\{[^}]*${escape(declaration)}`);
+
+    assert.match(
+      styleBlock,
+      rule('.manager-segmented.is-pill', 'padding: 0'),
+      'the pill run has no track frame to pad'
+    );
+    assert.match(
+      styleBlock,
+      rule('.manager-segmented.is-pill .manager-segment', 'border-radius: 999px'),
+      'every segment is a stadium'
+    );
+    assert.match(
+      styleBlock,
+      rule('.manager-segmented.is-pill .manager-segment:not(.is-active)', 'font-weight: 600'),
+      'and the idle segment carries the reference weight rather than the track densities\u2019 500'
+    );
+
+    assert.match(
+      styleBlock,
+      rule(
+        '.manager-segmented.is-accent-soft .manager-segment.is-active',
+        'background: var(--fab-accent-soft)'
+      )
+    );
+    assert.match(
+      styleBlock,
+      rule(
+        '.manager-segmented.is-accent-soft .manager-segment.is-active',
+        'border-color: var(--fab-accent-border)'
+      )
+    );
+    assert.match(
+      styleBlock,
+      rule('.manager-segmented.is-accent-soft .manager-segment.is-active', 'color: var(--fab-accent)')
+    );
+    assert.match(
+      styleBlock,
+      rule(
+        '.manager-segmented.is-accent-soft .manager-segment:not(.is-active)',
+        'background: var(--fab-bg-1)'
+      )
+    );
+    assert.match(
+      styleBlock,
+      rule(
+        '.manager-segmented.is-accent-soft .manager-segment:not(.is-active)',
+        'border-color: var(--fab-border)'
+      )
+    );
+    assert.match(
+      styleBlock,
+      rule(
+        '.manager-segmented.is-accent-soft .manager-segment:not(.is-active)',
+        'color: var(--fab-text-muted)'
+      )
+    );
+  });
+
   it('stamps dataAttr and optionDataAttr hooks', async () => {
     const root = await harness.mount({
       options: OPTIONS,

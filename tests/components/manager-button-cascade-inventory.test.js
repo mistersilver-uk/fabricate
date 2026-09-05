@@ -184,9 +184,18 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
         sites: 6,
       }),
+      // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.manager-button`s is
+      // gone: the reference draws ONE primary plus a kebab, so the inspector now renders a
+      // single `InspectorActionButton` — a primitive whose own header records that it is
+      // deliberately NOT `.manager-button` — with the other three commands as `ActionMenu`
+      // DATA rather than as controls. Licensed by the same rule as every other movement in
+      // this ledger: the four SITES left the product, rather than leaving this instrument's
+      // view. The entry is kept at 0 rather than dropped, so the two ledger checks below —
+      // that the file writes no literal `class="manager-button"` and that the instrument
+      // derives no site in it — keep guarding it against a regression.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
-        sites: 4,
+        sites: 0,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte', sites: 1 }),
@@ -344,6 +353,17 @@ const SHEET = 'styles/fabricate.css';
 // The sweep's one population-C site: the only `class={…}` template that ever carried the
 // contract. Named here because the vacuity floor asserts it survived the conversion as a
 // template rather than being flattened into a literal or deleted.
+/**
+ * The one population-B site issue 1371 r10 converted onto `SearchablePopover`'s `triggerButton`
+ * form, and the site issue 1371 r13 then DELETED under maintainer ruling M13. Named here so the
+ * count assertion below can re-derive from the tree that the population shrank for the right
+ * reason — by a conversion and then a removal, never by a slide back to a hand-written token.
+ */
+const POPULATION_B_RETIRED_SITE_FILE =
+  'src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte';
+/** The primitive whose trigger form that site was the first consumer of. It outlives the site. */
+const SEARCHABLE_POPOVER_FILE = 'src/ui/svelte/components/SearchablePopover.svelte';
+
 const POPULATION_C_FILE = 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 const globalRule = (selector) => `${SHEET}#${selector}`;
 const scopedRule = (component, selector) => `src/ui/svelte/apps/manager/${component}#${selector}`;
@@ -462,7 +482,13 @@ const REVIEWED = [
         // below already records — reached by the rule, not attributable to this file by a static
         // count. The number is the container's own population read from the tree, so it moves
         // whenever a header branch gains or loses a control it renders itself.
-        buttons: 28,
+        //
+        // 28 -> 29 with issue 1371's C1 `+ Add from catalogue` (`proto:1046`), the `components`
+        // branch's first header action of its own: the system Components header carried nothing
+        // on the right, so the only route to adopt a world component into the system was the
+        // list's `All world components` cohort. It is a `role="primary"` `<ManagerButton>` this
+        // file renders itself, so it moves the `is-primary` count one line below by one too.
+        buttons: 29,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -504,7 +530,11 @@ const REVIEWED = [
         // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
         // — the reference's Essence Rules header carries nothing on the right, and an essence's
         // identity is a world record no system-scope screen authors.
-        buttons: 14,
+        //
+        // 14 -> 15 with issue 1371's C1 `+ Add from catalogue`, which is the header's loudest
+        // action on the Components route and is therefore booked in both this entry and the
+        // unqualified one above it.
+        buttons: 15,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -703,6 +733,42 @@ const REVIEWED = [
   },
 
   {
+    id: globalRule(
+      '.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. The world Component entry`s system rows draw removal as a 26px square EXIT ICON in the row`s own clothing (`proto:944`) rather than as a labelled danger button, and the control is the shared `ArmedDangerButton`: it renders `manager-button is-danger` from its own template and never gains `fab-manager-button`, so this rule cannot be re-chained onto the primitive. What it states is a SIZE and a surface taken from the layout context — the arm/disarm two-step, the Escape and blur disarm and the single-armed-token invariant are all still the primitive`s. The twin of the `SystemRulesRoster` entry above.',
+  },
+
+  {
+    id: globalRule(
+      '.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger:not(:disabled)'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'The PAINT half of the entry above. Geometry is unqualified and colour is not, which is the split `.manager-button:disabled` requires: switching the exit icon off must take its colours from the primitive and keep the 26px square it had when enabled.',
+  },
+
+  {
+    id: globalRule(
+      '.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. Deletion moved out of the header band and into a `Delete from the world` danger CARD at the foot of the Catalogue entry tab (`proto:928-936`), whose action is an `ArmedDangerButton` and so can never gain `fab-manager-button`. What it states is the card`s own treatment: the 34px rung (32 is retired), radius 9, and a transparent fill on the card`s danger hairline rather than the sheet`s filled danger face, which on a `--fab-danger-soft` card would be a danger block inside a danger block.',
+  },
+
+  {
+    id: globalRule(
+      '.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger:not(:disabled)'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'The PAINT half of the entry above, split from its geometry for the same reason.',
+  },
+
+  {
     id: scopedRule(
       'tools/ToolReplacementTarget.svelte',
       '.manager-tool-replacement .manager-tool-replacement-tile:where() ' +
@@ -791,6 +857,24 @@ const REVIEWED = [
     disposition: 'EXCLUDE',
     why: 'Travel parties override popover trigger, population B.',
   },
+  // REMOVED at issue 1371 r10, and the removal is recorded rather than performed silently.
+  //
+  // The two entries were `.manager-button.manager-world-component-register-action` and its
+  // `:not(:disabled):hover`, dispositioned EXCLUDE one revision earlier because the world
+  // Component catalogue`s `+ Register item` was a `SearchablePopover` `triggerClass` site —
+  // population B, never gaining `fab-manager-button`, so the rule`s 38px height and 9px corner
+  // could not be re-chained without repainting a control the sweep was not converting. r10 gave
+  // the popover a `triggerButton` form and that site used it, so the two rules kept only the
+  // site`s paint and took no disposition here at all: the instrument derived no call site for
+  // them, and EXCLUDE — whose whole content is `reaches a site, and no CONVERTING one` — could
+  // no longer be asserted of them.
+  //
+  // AND AT ISSUE 1371 r13 THE RULES ARE GONE FROM THE SHEET. Maintainer ruling M13 removed the
+  // control itself ("Remove the `+ Register Item` button next to the drop zone … and make the
+  // drop zone full-width"), and a paint rule for a control no screen renders is a dead rule, so
+  // both were deleted rather than left to the dead-class gate. There is nothing for this
+  // register to describe; the entry stays as a record so the next reader does not go looking
+  // for two rules that were never silently dropped.
   {
     id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
@@ -1336,11 +1420,18 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // re-read every booked file from the tree, so neither a deleted nor a booked-but-unconverted
   // component can stay silently mismatched, and the paragraph above is the reason a number
   // that moved needs a stated cause rather than a quiet edit.
+  //
+  // AND 128 -> 124 AT ISSUE 1371's C7.6, which is the fourth licensed movement and the largest:
+  // `ComponentBrowserInspector`'s four-button stacked action column collapsed to one
+  // `InspectorActionButton` plus an `ActionMenu`, so four SITES left the product on the same
+  // screen, in a file the ledger already holds. The component COUNT does not move with them —
+  // the file stays booked at 0 rather than being dropped, so it keeps answering the two ledger
+  // checks below — which is why 41 is unchanged while 128 is not.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    128,
-    'the conversion is 128 sites, whether or not a given one has been converted yet'
+    124,
+    'the conversion is 124 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
@@ -1396,10 +1487,85 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // Licensed by the same rule as the entries above: each of the six SITES left the product,
   // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
   // field in the same place on the same screen; none was silently unconverted.
+  // AND ISSUE 1371 MOVED IT TWICE, NET −1, TO 13 — and the first half of that is this note
+  // keeping the promise the version below it made.
+  //
+  // What stood here said TWO ARRIVED, taking the count to 14: the world Component catalogue's
+  // bulk panel staged its crafting systems and its world category as two `SearchablePopover`
+  // triggers, argued from "the recipe bulk panel's precedent". The paragraph under it then
+  // voided its own argument — a shipped sibling is not a reference — recorded that the
+  // reference draws both groups as an inline search with rows and a pager beneath it
+  // (`proto:590-697`), and committed this pin in as many words: when maintainer ruling M10 made
+  // those pickers inline, "both sites leave the product exactly as issue 1373's six did and
+  // THIS NUMBER GOES BACK TO 12 in the same change, with the sentence above rewritten to say
+  // the sites left rather than that they are licensed."
+  //
+  // M10 landed and they left. `ComponentCatalogueBulkPanel.svelte` writes no `triggerClass` at
+  // all now: all three staging groups are one inline inset rendered three times, with their own
+  // search field, row window and pager. That is −2, exactly as promised, and 12 is where the
+  // count would rest if nothing else had moved.
+  //
+  // ONE ARRIVED IN THE SAME RULING AND HAS SINCE LEFT, WHICH IS WHY THE NUMBER IS 12. M10 also
+  // built `+ Register item` beside the world-scope drop zone (`proto:570`), as a picker rather
+  // than a bare button because the prototype's own handler for it is `d.onStub` — there is no
+  // reference behaviour to copy and a control that opens nothing is the dead affordance that
+  // screen already refuses. `SearchablePopover` is the shipped chooser, so
+  // `WorldComponentCataloguePage.svelte` arrived as a 13th population-B site, and the note here
+  // said it stayed unconverted on the standing argument every entry above uses: converting a
+  // `triggerClass` site changes `SearchablePopover`'s own trigger contract rather than that call
+  // site's.
+  //
+  // ISSUE 1371 r10 CHANGED THAT CONTRACT, which is the one thing that legitimately empties this
+  // population, and the standing argument is what says so: the objection was never that the site
+  // should keep imitating the primitive, it was that the repair belongs in the popover. The
+  // reference draws this control at 38px, 38 is a published rung, and the rung's selector
+  // (`.manager-button.fab-manager-button.is-size-38`) demands a class only `ManagerButton`
+  // writes — so a `triggerClass` string could not reach it however it was spelt. The popover now
+  // takes `triggerButton={{ role, size, fullWidth }}` and renders the real primitive, and the
+  // catalogue became its first consumer: −1, to 12.
+  //
+  // AND AT ISSUE 1371 r13 THE SITE ITSELF LEFT THE PRODUCT (maintainer ruling M13): the
+  // catalogue's `+ Register item` was removed outright and its drop zone took the whole row.
+  // That moves NOTHING here — a converted site was already outside population B — and the
+  // primitive's `triggerButton` form stays, because a form is the primitive's and not its first
+  // consumer's; `searchable-popover-trigger-form-mounted.test.js` is its cover. What the proof
+  // below used to re-derive — "the site still renders the picker through the primitive form" —
+  // is no longer a fact about the tree, so it is REPLACED rather than left to match a control
+  // that does not exist: the count is 12 AND the page renders no popover at all AND the
+  // primitive still declares the form. A count of 12 satisfied by the page slipping back to a
+  // hand-written `manager-button` token would fail the second clause.
+  //
+  // THE OTHER TWELVE ARE NOT CONVERTED HERE, deliberately. Each of them carries a per-site sheet
+  // rule restating a height or a corner, so converting one re-arbitrates that site's own cascade
+  // and needs its own measurement; twelve at once would be twelve repaints inside a change about
+  // a trigger contract. They are a named follow-up rather than a silent remainder, and this
+  // number is what will move when it lands.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
     12,
-    'plus the 12 SearchablePopover triggerClass sites named as debt'
+    'plus the 12 SearchablePopover triggerClass sites still named as debt'
+  );
+  // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING, not by slipping back. The
+  // count above is satisfied just as well by a site that re-wrote the population-B token, which
+  // is the failure mode every ledger assertion in this file is written against. So the retired
+  // site is re-derived from the tree: the page renders no `SearchablePopover` at all (M13), it
+  // writes no population-B token, and the primitive still carries the trigger form the site
+  // was the first consumer of.
+  const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');
+  assert.ok(
+    !/<SearchablePopover\b/.test(retiredSite),
+    `${POPULATION_B_RETIRED_SITE_FILE} renders no popover at all since M13 — a trigger here ` +
+      'would be a 13th population-B site or a converted one, and either is a change to this count'
+  );
+  assert.ok(
+    !retiredSite.includes('triggerClass="manager-button'),
+    `${POPULATION_B_RETIRED_SITE_FILE} must not write the population-B token again`
+  );
+  assert.match(
+    readFileSync(resolve(repoRoot, SEARCHABLE_POPOVER_FILE), 'utf8'),
+    /\n\s*triggerButton = null,/,
+    `${SEARCHABLE_POPOVER_FILE} should still declare the \`triggerButton\` form: it is the ` +
+      'primitive`s, and it outlives the consumer M13 removed'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

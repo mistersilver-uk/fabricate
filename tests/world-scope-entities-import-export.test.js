@@ -305,9 +305,13 @@ test('7: a hand-edited membership record survives the upcast BYTE-IDENTICAL, fro
   );
   assert.deepEqual(
     byEntity.get('c1'),
-    handEdited,
-    'the record already present is preserved verbatim — `inherit.category` stays TRUE, which is ' +
-      'the opposite of what `buildMembershipRecord` writes'
+    // The `1.30.0` leg preserves the record verbatim; the `1.32.0` leg that follows it (issue
+    // 1371 r18-store, M31) adds EXACTLY ONE key, the `essences` switch, decided by equality with
+    // the bundled system's own row — `c1` carries no essences and no world map is elected, so it
+    // inherits. Everything the hand edit authored is untouched.
+    { ...handEdited, inherit: { ...handEdited.inherit, essences: true } },
+    'the record already present is preserved — `inherit.category` stays TRUE, which is ' +
+      'the opposite of what `buildMembershipRecord` writes — and gains only the essences switch'
   );
   assert.ok(byEntity.has('c2'), 'while the missing pair is derived');
 });

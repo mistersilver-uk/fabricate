@@ -321,6 +321,45 @@ export function observableKeys(screen, inventory, subject = null) {
 }
 
 /**
+ * An inventory root is one locator, or a declared SET of them under `parts`.
+ *
+ * The set exists because the two documents do not always have one element covering the same
+ * ground: this prototype's screen root is a `display: contents` wrapper around the header band
+ * AND the body grid, while the product draws the header band, the content column and the
+ * inspector as siblings of a body grid that also holds the navigation rail the prototype's root
+ * excludes. Enumerating one of the three reported the other two's landmarks as absent.
+ *
+ * A set is DATA, exactly as a locator is, and each part is checked as one — an empty set, or a
+ * part that is not a usable locator, fails here rather than at walk time.
+ *
+ * @param {string|object[]|{parts: unknown[]}} root Declared root.
+ * @param {string} label Human label for the problem message.
+ * @returns {string[]} Problems, empty when the root is usable.
+ */
+export function inventoryRootProblems(root, label, pane) {
+  if (!root || !Object.hasOwn(root, 'parts')) return locatorProblems(root, label);
+  if (!Array.isArray(root.parts) || root.parts.length === 0) {
+    return [`${label}: a root set declares a non-empty \`parts\` list`];
+  }
+  const problems = root.parts.flatMap((part, index) =>
+    locatorProblems(part, `${label} part ${index}`)
+  );
+  // A SET HAS NO "the root", SO ITS PANE CANNOT BE DERIVED. The classifier takes the card
+  // ratio from the first ancestor of the root that has a box, which for a set would silently
+  // mean the first PART's — and this product's header band is 1398px wide against the content
+  // column's 878px, so declaring the parts in one order rather than another would move the card
+  // floor from 527px to 839px without saying a word. That is the same silent re-calibration the
+  // declared pane exists to end, so a set must state its pane rather than inherit one.
+  if (!pane) {
+    problems.push(
+      `${label}: a root SET must declare its pane — with no single root there is no box to ` +
+        `derive the card ratio from, and the first part's width would set it by accident`
+    );
+  }
+  return problems;
+}
+
+/**
  * The COVERAGE rule, restated for the inventory: every declared screen owns a root on both
  * sides. Without it a structural pass that reached two screens out of six would read as
  * coverage in exactly the way the region map already can.
@@ -334,10 +373,38 @@ export function inventoryCoverageProblems(spec) {
   if (!roots) return ['spec.inventory.roots is missing: the structural pass has nothing to walk'];
   for (const screen of spec?.screens ?? []) {
     const entry = roots[screen];
+    // A ROOT'S `unreachable` NOTE ANSWERS TO THE SAME RULE EVERY OTHER REASON HERE DOES: at
+    // least 40 characters, so it is a decision somebody wrote down rather than a placeholder.
+    if (
+      entry?.unreachable !== undefined &&
+      (typeof entry.unreachable !== 'string' ||
+        entry.unreachable.trim().length < MINIMUM_REASON_LENGTH)
+    ) {
+      problems.push(
+        `inventory root "${screen}": an unreachable note needs a stated reason of at least ` +
+          `${MINIMUM_REASON_LENGTH} characters, not a placeholder`
+      );
+    }
     if (entry?.prototype && entry.subject) {
       problems.push(
-        ...locatorProblems(entry.prototype, `inventory root "${screen}" (prototype)`),
-        ...locatorProblems(entry.subject, `inventory root "${screen}" (subject)`)
+        ...inventoryRootProblems(
+          entry.prototype,
+          `inventory root "${screen}" (prototype)`,
+          entry.prototypePane
+        ),
+        ...inventoryRootProblems(
+          entry.subject,
+          `inventory root "${screen}" (subject)`,
+          entry.subjectPane
+        ),
+        // A declared PANE is the box the card ratio is taken from, for a root that generates
+        // none of its own. It is a locator like any other, so it is checked like one.
+        ...(entry.prototypePane
+          ? locatorProblems(entry.prototypePane, `inventory pane "${screen}" (prototype)`)
+          : []),
+        ...(entry.subjectPane
+          ? locatorProblems(entry.subjectPane, `inventory pane "${screen}" (subject)`)
+          : [])
       );
       continue;
     }

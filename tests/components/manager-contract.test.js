@@ -1345,7 +1345,15 @@ describe('CraftingSystemManager source contract', () => {
       'Drop items to add components'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.Origin, 'Origin');
-    assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, 'Compendium');
+    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it — are
+    // RETIRED (issue 1371, maintainer parity round 5). They labelled the browser row's origin
+    // column, which the C5 rebuild replaced with the reference's one-line row: the origin is now
+    // carried by the source filter and the linked/unlinked face, neither of which names a
+    // provenance in words. Nothing under `src/` reads any of the four, so `lang-keys-no-orphans`
+    // reds on the key the moment it is put back — asserting its ABSENCE is what keeps this
+    // inventory and that ratchet describing the same en.json. `SourceOriginLinked` survives only
+    // as an explicit `KNOWN_ORPHANS` debt entry, which is the baseline, not a live reference.
+    assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Title, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Library, 'Tags & Categories');
     assert.equal(
@@ -4263,7 +4271,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   );
 
   /**
-   * The five class names `ScopedEntityPreview` renders for a given stem, derived from the
+   * The SEVEN class names `ScopedEntityPreview` renders for a given stem, derived from the
    * component's own markup rather than restated here: a list restated in this file would be a
    * third copy of the mirror it exists to guard.
    *
@@ -4312,10 +4320,14 @@ describe('world scoped-entity source contract (issue 1362)', () => {
 
     for (const stem of [defaultStem, toolStem]) {
       const classes = renderedPreviewClasses(stem);
+      // SEVEN since issue 1371's parity round: the shell gained a `-scope-note` line under the
+      // head block and a `-fact-empty` sentence for a fact group with no rows. The number is
+      // pinned rather than derived so a region ADDED without a rule is a failure here rather
+      // than a silently unstyled block on six editors.
       assert.equal(
         classes.length,
-        5,
-        `the shell renders five classes per stem; the derivation found ${classes.length}`
+        7,
+        `the shell renders seven classes per stem; the derivation found ${classes.length}`
       );
       for (const className of classes) {
         assert.ok(
@@ -4372,8 +4384,23 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const declared = (source, attribute, constant) =>
       source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
       source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
+    // THE SEVEN PAGES, AND THE THREE `WorldComponentEntry*` CHILDREN THAT ARE NOT PAGES (issue
+    // 1371, parity round 4). The world Component entry was rebuilt to the reference as four
+    // files; each child renders a CARD or the rail, declares no route identity and carries no
+    // route hook. They are excluded BY NAME rather than by "has no PAGE_ID", because the
+    // non-vacuity assertion below exists precisely to catch a page that stopped declaring one.
+    const SCOPED_ENTRY_CHILDREN = new Set([
+      'WorldComponentEntryPreviewRail.svelte',
+      'WorldComponentEntrySourceCard.svelte',
+      'WorldComponentEntrySystemsCard.svelte',
+    ]);
     const pages = readdirSync(scopedDir)
-      .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
+      .filter(
+        (entry) =>
+          entry.startsWith('World') &&
+          entry.endsWith('.svelte') &&
+          !SCOPED_ENTRY_CHILDREN.has(entry)
+      )
       .map((entry) => {
         const source = readFileSync(resolve(scopedDir, entry), 'utf8');
         return {
