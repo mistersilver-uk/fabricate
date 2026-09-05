@@ -40,6 +40,18 @@ The centre column spells that out for the selected recipe on its own, whether or
 The shopping list is scratch planning.
 It clears when you close the Crafting window.
 
+## Currency costs
+
+A currency cost follows the same rule as any other material: an affordable one never appears on the list.
+Only a cost you cannot pay, or one Fabricate cannot check, shows up here.
+
+- A cost you cannot currently afford shows a **Can't afford** chip and counts toward the missing components total, the same as a missing item.
+- A cost the world's currency setup cannot price shows a **Setup needed** chip in a warning colour, and does not count toward that total.
+  It is not something you can go and acquire.
+  See [Checking your currency setup]({% link world/rules/currency.md %}#checking-your-currency-setup) to fix it.
+- A cost queued for more than one craft shows a **×N** chip in place of an affordability chip.
+  Fabricate only ever checks whether you can afford a single craft, so it cannot tell you whether you can afford N of them, and shows the multiplier instead of guessing.
+
 ## See Also
 
 - [Recipes]({% link crafting/recipes/index.md %}) covers current recipe authoring and API crafting.

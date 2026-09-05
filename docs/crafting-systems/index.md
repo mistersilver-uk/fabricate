@@ -246,11 +246,13 @@ A crafter who does not have the items can pay the cost from their own coins inst
 Fabricate tries each ingredient's item options first, and falls back to a currency cost only when no item option is satisfied.
 Before the craft begins, Fabricate checks whether the crafting actor can afford every currency cost the craft will use, then spends those costs after the item ingredients are consumed.
 If the actor cannot pay, the craft is stopped before anything is consumed and Fabricate reports that there is not enough currency.
+A craft can also stop because the world's currency setup cannot price the cost at all, which is a different problem from the actor being short.
+See [Checking your currency setup]({% link world/rules/currency.md %}#checking-your-currency-setup) for what that looks like and how a GM fixes it.
 
 Currency requirements are off by default.
 You turn them on or off with the **Currency** toggle in the **Optional features** section of the system settings editor, next to the time toggle.
 This toggle only decides whether the system participates.
-The coin ladder, the spend strategy, the provider, and the currency macros are all configured once for the whole world, not per system.
+The currency units, the spend strategy, the provider, and the currency macros are all configured once for the whole world, not per system.
 See [World Currency]({% link world/rules/currency.md %}) for how a GM authors them.
 
 {: .note }
