@@ -334,6 +334,37 @@
     if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
   });
 
+  // ── THE FIRST SHOWN ROW IS SELECTED WHEN NOTHING IS (issue 1371 r13-list, M14) ──────────
+  // NOT lifted: this is the "nothing is selected, pick the first row" guard, and it names one
+  // mount's worth of auto-selection rather than anything the GM chose — the latch
+  // `ToolsBrowserView` keeps for the same rule.
+  let autoSelectedComponentId = $state('');
+
+  $effect(() => {
+    // A SELECTION THIS SYSTEM HOLDS A ROW FOR IS NEVER MOVED: not by a sort, a filter, a page
+    // turn or the cohort segment. A GM who re-sorts is looking for a component, not replacing
+    // the one they are inspecting; and a deep link or a remembered selection arrives here as an
+    // id this cohort holds, which is exactly this branch. The root clears the id on a system
+    // switch and a deleted row leaves a dangling one — both read as "nothing is selected".
+    if ((itemCards || []).some((item) => item.id === selectedComponentId)) {
+      autoSelectedComponentId = '';
+      return;
+    }
+    // THE FIRST ROW THE GM IS LOOKING AT, read off `pageIds` — the member rows the body draws,
+    // in the order it draws them: the category-major sort, then the page window. The root's
+    // inspector fallback answers `itemCards[0]`, the manager's STORED order, which is how the
+    // panel opened on `Iron Ore` while the list's first row was `Chainmail Shirt` and no row was
+    // marked (the `manager-components-normal` frame at `60e035d2`).
+    //
+    // A GHOST IS NEVER SELECTED. `pageIds` holds member rows only, so a page drawing ghosts alone
+    // selects nothing: a ghost's identity opens the world entry (see `ghostRowProps`) and the
+    // inspector answers from the in-system record, which a ghost by definition has none of.
+    const firstId = pageIds[0] || '';
+    if (!firstId || autoSelectedComponentId === firstId) return;
+    autoSelectedComponentId = firstId;
+    onSelectComponent(firstId);
+  });
+
   // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
   // state propagates back to the manager root.
   function toggleComponentBulkSelected(id) {

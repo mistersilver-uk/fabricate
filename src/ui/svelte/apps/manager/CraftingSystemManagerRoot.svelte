@@ -2431,6 +2431,12 @@
   const showComponentTags = $derived(
     itemCards.some((item) => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0))
   );
+  // THE `itemCards[0]` FALLBACK IS THE FIRST RENDER'S ANSWER, NOT THE SELECTION'S (issue 1371
+  // r13-list, M14). The rules list selects its first DRAWN row — the category-major, name-sorted,
+  // paged order — whenever `selectedComponentId` names nothing this system holds, and it does so
+  // through `selectComponent` below, so from the next flush the two agree. The fallback survives
+  // for the render before that flush and for a page drawing only world ghosts, where the list
+  // selects nothing; it is what the hydration effect below asks for on first open.
   const selectedComponent = $derived(
     itemCards.find((item) => item.id === selectedComponentId) || itemCards[0] || null
   );
@@ -2502,10 +2508,11 @@
   // `ComponentsBrowserView` only ever asks for the page it renders. Both cards above are
   // resolved from the WHOLE cohort rather than from that page, so unless this asks, nothing
   // does. Three independent routes reach an un-asked-for card:
-  //   - first open, where `selectedComponentId` is still empty so the inspector falls back
-  //     to `itemCards[0]` — the manager's STORED order, while the browser renders the
-  //     name-sorted page 1, so on any library past one page the default selection is
-  //     off-page from the moment the studio opens;
+  //   - first open, where `selectedComponentId` is still empty for the first render so the
+  //     inspector falls back to `itemCards[0]` — the manager's STORED order, while the browser
+  //     renders the name-sorted page 1, so on any library past one page that card is off-page
+  //     (the rules list then selects its first drawn row, M14, but the fallback card has
+  //     already been asked);
   //   - a selection made on one page and still held after paging elsewhere, because every
   //     refresh rebuilds every card un-hydrated and only the rendered page is re-asked;
   //   - the component editor, which UNMOUNTS the browser entirely — and Replace source /
@@ -3690,17 +3697,21 @@
    * Open one crafting system's COMPONENT RULES list, from a world catalogue row (issue 1371).
    *
    * The twin of `openSystemEssenceRules` and `openSystemToolRules`, and it takes the same
-   * two-argument shape the shell's `onOpenSystemRules` seam declares: the entity id is accepted
-   * and deliberately unused, because the rules list opens on the system's whole component library
-   * rather than on one component.
+   * two-argument shape the shell's `onOpenSystemRules` seam declares. Unlike its twins it USES
+   * the entity id (r13-list, maintainer ruling M14): the rules list now selects its first drawn
+   * row whenever nothing this system holds is selected, so a link that left the id unused would
+   * land the GM on a DIFFERENT component from the one whose entry they came from. The seed goes
+   * through `resetComponentSelectionFor`, inside the guarded callback, so a refused selection
+   * seeds nothing and the system-switch effect cannot wipe it.
    *
-   * @param {string} _entityId the component the row belongs to; see above.
+   * @param {string} entityId the component the row belongs to, selected into the list.
    * @param {string} systemId the crafting system whose rules to open.
    * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
    */
-  function openSystemComponentRules(_entityId, systemId) {
+  function openSystemComponentRules(entityId, systemId) {
     if (!systemId) return false;
     return afterTruthyResult(selectSystem(systemId, 'components'), () => {
+      resetComponentSelectionFor(systemId, String(entityId ?? ''));
       activeView = 'components';
     });
   }
@@ -4855,13 +4866,30 @@
     return systemRow?.inherited ?? {};
   });
 
-  $effect(() => {
-    if (selectedSystemId === lastComponentSystemId) return;
-    selectedComponentId = '';
+  /**
+   * Seed the component selection for a system, and stamp the system sentinel with it.
+   *
+   * ONE HELPER FOR TWO CALLERS (issue 1371 r13-list, M14). The system-switch effect below calls it
+   * with no component, which is the reset it always performed; `openSystemComponentRules` calls
+   * it with the deep-linked id. The sentinel is stamped HERE rather than left to the effect,
+   * because the effect compares `selectedSystemId` against it and would otherwise wipe the
+   * deep-linked seed the moment the selected system catches up with the switch.
+   *
+   * @param {string} systemId the system the selection belongs to.
+   * @param {string} [componentId] the component to select, or `''` for none — the rules list then
+   *   selects its first drawn row.
+   */
+  function resetComponentSelectionFor(systemId, componentId = '') {
+    selectedComponentId = componentId;
     componentEditDirty = false;
     componentEditSaving = false;
     componentEditDraft = null;
-    lastComponentSystemId = selectedSystemId;
+    lastComponentSystemId = systemId;
+  }
+
+  $effect(() => {
+    if (selectedSystemId === lastComponentSystemId) return;
+    resetComponentSelectionFor(selectedSystemId);
   });
 
   $effect(() => {
@@ -13159,7 +13187,7 @@
         {...componentScopeProps}
         {itemCards}
         itemSearchTerm={$viewState.itemSearchTerm || ''}
-        selectedComponentId={selectedComponent?.id || ''}
+        {selectedComponentId}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
         difficultyAxisProgressive={componentDifficultyAxisProgressive}

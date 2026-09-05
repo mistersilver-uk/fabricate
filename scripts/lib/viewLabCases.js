@@ -5135,6 +5135,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
+    // issue 1371 r13-list — THE LIST OPENS ON ITS FIRST DRAWN ROW (maintainer ruling M14). This
+    // frame used to photograph the inspector describing the manager's STORED-first card while no
+    // row in the list was marked; it now photographs the first row marked and the inspector it
+    // opened. Both are stated so a regression to the unmarked state fails the capture rather
+    // than publishing a frame that quietly shows it.
+    expectContained: [
+      {
+        container: '.manager-table-scroll',
+        target: '.manager-component-row[aria-current="true"]',
+      },
+      {
+        container: 'aside.manager-inspector',
+        target: '[data-component-inspector-kicker]',
+      },
+    ],
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,

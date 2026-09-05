@@ -740,6 +740,10 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   it("a MEMBER's identity still selects it in this system", async () => {
     // The positive control for the test above. Without it, deleting the member branch's
     // `onSelect: onSelectComponent` — or wiring every row to the navigation — passes.
+    //
+    // MOUNTED WITH THE ROW ALREADY SELECTED (issue 1371 r13-list, M14): the list now selects its
+    // first drawn row on open when nothing is, and that push would land in `selected` before the
+    // click below did. Naming the row as selected keeps the recorder's one entry the CLICK's.
     const opened = [];
     const selected = [];
     const root = await browser.mount({
@@ -747,6 +751,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       scope: ghostScope(),
       systemId: 'sys-1',
       selectedSystemId: 'sys-1',
+      selectedComponentId: 'own',
       onOpenWorldEntry: (...args) => opened.push(args),
       onSelectComponent: (...args) => selected.push(args),
     });
@@ -1488,5 +1493,161 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
     flushSync();
     assert.match(glyph(), /\bfa-arrow-up-a-z\b/, 'descending is `fa-arrow-up-a-z`');
     assert.doesNotMatch(glyph(), /short-wide|wide-short/);
+  });
+});
+
+describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13-list, M14)', () => {
+  /**
+   * Maintainer ruling M14: the library opens with its first component selected. The View Lab's
+   * `manager-components-normal` frame at `60e035d2` shows what the ruling closes — the inspector
+   * describing `Iron Ore`, the manager's STORED-first card, while the list's first row is
+   * `Chainmail Shirt` and no row is marked at all.
+   *
+   * THREE ROWS WITH THREE DIFFERENT "FIRST" ANSWERS, so the pick's basis is decidable from the
+   * id it pushes: `zinc` is authored first (the stored order the root's fallback read), `alloy`
+   * is first by name over the whole library (a flat name sort), and `coal` is first in the order
+   * the body DRAWS — category-major (`Raw` before `Refined`, `general` last), name within.
+   */
+  function threeFirsts() {
+    return [
+      makeComponent({ id: 'zinc', name: 'Zinc Ore', category: 'Raw' }),
+      makeComponent({ id: 'alloy', name: 'Alloy', category: 'Refined' }),
+      makeComponent({ id: 'coal', name: 'Coal', category: 'Raw' }),
+    ];
+  }
+
+  function rowIds(root) {
+    return [...root.querySelectorAll(':scope .manager-component-row')].map(
+      (row) => row.dataset.componentId
+    );
+  }
+
+  function markedRowIds(root) {
+    return [...root.querySelectorAll(':scope .manager-component-row[aria-current="true"]')].map(
+      (row) => row.dataset.componentId
+    );
+  }
+
+  /** A world corpus this system holds NO record for: every entry draws as a ghost. */
+  function worldOnlyScope() {
+    return projectComponentScope({
+      entityType: 'component',
+      corpus: {
+        entities: [{ id: 'w-aether', name: 'Aether Dust' }],
+        defaults: [],
+        membership: [],
+      },
+      systems: [{ id: 'sys-1', name: 'Forge' }],
+    });
+  }
+
+  function widen(root) {
+    root.querySelector('[data-component-membership-option="all"] input').click();
+    flushSync();
+  }
+
+  async function mountWithRecorder(props = {}) {
+    const selected = [];
+    const root = await browser.mount({
+      itemCards: threeFirsts(),
+      categoryVocabulary: ['Raw', 'Refined'],
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+      onSelectComponent: (id) => selected.push(id),
+      ...props,
+    });
+    return { root, selected };
+  }
+
+  it('selects the first row in the SHOWN order once, and marks it when the owner feeds it back', async () => {
+    const { root, selected } = await mountWithRecorder();
+
+    // NON-VACUITY FIRST: the drawn order really does put a row first that is neither the
+    // authored-first nor the name-first card.
+    assert.deepEqual(rowIds(root), ['coal', 'zinc', 'alloy'], 'category-major, name within');
+    assert.deepEqual(
+      selected,
+      ['coal'],
+      'the pick is the row drawn at the top — not `zinc` (stored order) and not `alloy` (flat name order)'
+    );
+    assert.deepEqual(markedRowIds(root), [], 'nothing is marked until the owner answers');
+
+    // The owner answers by feeding the id back, as the root does through `selectComponent`.
+    await browser.setProps({ selectedComponentId: 'coal' });
+    assert.deepEqual(selected, ['coal'], 'a selection this system holds is never pushed again');
+    assert.deepEqual(markedRowIds(root), ['coal'], 'and exactly that row is marked');
+  });
+
+  it('leaves a deep-linked or remembered selection alone, even when it is not the first row', async () => {
+    const { root, selected } = await mountWithRecorder({ selectedComponentId: 'zinc' });
+    assert.deepEqual(markedRowIds(root), ['zinc'], 'the row the owner named is the marked one');
+    assert.deepEqual(selected, [], 'and the auto-select does not override it');
+  });
+
+  it('does not re-select when the sort, a filter or the cohort segment changes', async () => {
+    const { root, selected } = await mountWithRecorder({
+      selectedComponentId: 'zinc',
+      scope: worldOnlyScope(),
+    });
+
+    root.querySelector('[data-component-sort-direction]').click();
+    flushSync();
+    assert.deepEqual(rowIds(root), ['zinc', 'coal', 'alloy'], 'the flip really re-ordered the rows');
+    assert.deepEqual(selected, [], 'a re-sort moves the list, not the selection');
+
+    // A filter that hides the selected row: it is still a component this system holds, so the
+    // panel keeps describing it rather than snapping to whatever is drawn first.
+    const filter = root.querySelector('[data-component-category-filter]');
+    const refined = [...filter.options].find((option) => /Refined/.test(option.textContent));
+    assert.ok(Boolean(refined), 'the filter offers the Refined category');
+    filter.value = refined.value;
+    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(rowIds(root), ['alloy'], 'the filter really hid the selected row');
+    assert.deepEqual(selected, [], 'and the selection is not moved onto the row that remains');
+
+    widen(root);
+    assert.ok(
+      root.querySelector('[data-component-member="false"]'),
+      'the widened cohort really drew a ghost'
+    );
+    assert.deepEqual(selected, [], 'widening the cohort moves nothing either');
+  });
+
+  it('re-selects when the selection names no row this system holds', async () => {
+    // The root clears its id to `` on a system switch; a deleted or unlinked selection leaves a
+    // dangling one. Both are the same state to this effect: nothing this cohort holds is selected.
+    const { selected } = await mountWithRecorder({ selectedComponentId: 'gone' });
+    assert.deepEqual(selected, ['coal'], 'the first drawn row is selected in the new cohort');
+  });
+
+  it('never selects a ghost: a page drawing only world rows selects nothing', async () => {
+    const { root, selected } = await mountWithRecorder({
+      itemCards: [],
+      scope: worldOnlyScope(),
+    });
+    widen(root);
+
+    assert.equal(
+      root.querySelectorAll('[data-component-member="false"]').length,
+      1,
+      'the page really is one ghost row'
+    );
+    assert.deepEqual(selected, [], 'a ghost is not pushed through the in-system selection');
+    assert.deepEqual(markedRowIds(root), [], 'and no row is marked');
+  });
+
+  it('picks the first MEMBER row on the page the GM is on, not on page one', async () => {
+    const shared = createComponentBrowserState();
+    shared.pageSize = 2;
+    shared.pageIndex = 1;
+    shared.systemId = 'sys-1';
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      makeComponent({ id: `r${index + 1}`, name: `Row ${index + 1}`, category: 'Raw' })
+    );
+    const { root, selected } = await mountWithRecorder({ itemCards: rows, browserState: shared });
+
+    assert.deepEqual(rowIds(root), ['r3', 'r4'], 'the remembered page is the one drawn');
+    assert.deepEqual(selected, ['r3'], 'and its first row is the pick, not page one’s');
   });
 });

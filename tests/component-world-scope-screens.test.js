@@ -444,16 +444,21 @@ describe('the deep link into a system’s Component Rules is a capability, not j
 
   it('it selects the system FIRST and commits the route only if that succeeded', () => {
     const handler =
-      /function openSystemComponentRules\(_entityId, systemId\) \{([\s\S]*?)\n  \}/.exec(body);
+      /function openSystemComponentRules\(entityId, systemId\) \{([\s\S]*?)\n  \}/.exec(body);
     assert.ok(handler, 'the gateway declares the handler');
     assert.match(
       handler[1],
       /if \(!systemId\) return false;/,
       'a missing system is refused rather than committing a route with nothing selected'
     );
+    // THE LINKED COMPONENT IS THE SELECTION THE LIST OPENS ON (issue 1371 r13-list, M14). The
+    // list now selects its first drawn row whenever nothing this system holds is selected, so a
+    // deep link that left the id unused would land the GM on a DIFFERENT component from the one
+    // whose entry they came from. The seed goes through the same helper the system-switch reset
+    // uses, INSIDE the guarded callback, so a refused selection seeds nothing.
     assert.match(
       handler[1],
-      /return afterTruthyResult\(selectSystem\(systemId, 'components'\), \(\) => \{\s*activeView = 'components';\s*\}\);/,
+      /return afterTruthyResult\(selectSystem\(systemId, 'components'\), \(\) => \{\s*resetComponentSelectionFor\(systemId, String\(entityId \?\? ''\)\);\s*activeView = 'components';\s*\}\);/,
       'the selection is committed through the shared guard and the route is set INSIDE it, so a ' +
         'refused selection (an unsaved-changes prompt the GM cancels) leaves the view where it was'
     );
@@ -473,6 +478,46 @@ describe('the deep link into a system’s Component Rules is a capability, not j
       2,
       'the world catalogue and the world entry both route into the COMPONENT handler; a mount ' +
         'left defaulted is silently inert and a mounted test would pass against the default'
+    );
+  });
+
+  // ── THE SELECTION SEAM THE AUTO-SELECT DEPENDS ON (issue 1371 r13-list, M14) ──────────────
+  // Two facts a mounted view cannot see, because the view is mounted standalone and the root is
+  // what feeds it. Both are silent when wrong: the list still renders, the inspector still shows
+  // the root's stored-order fallback, and the only symptom is M14 unfixed.
+  it('the browser is handed the RAW selection, so its auto-select can see an empty one', () => {
+    const mount = /<ComponentsBrowserView\s([\s\S]*?)\/>/.exec(body);
+    assert.ok(mount, 'the gateway mounts the rules list');
+    assert.match(
+      mount[1],
+      /\{selectedComponentId\}/,
+      'the mount passes the root state itself; the derived `selectedComponent?.id` carries the ' +
+        '`itemCards[0]` fallback, which reads to the view as "something is selected" on every open'
+    );
+    assert.doesNotMatch(
+      mount[1],
+      /selectedComponentId=\{selectedComponent\?\.id/,
+      'and not the fallback-bearing derivation it used to pass'
+    );
+  });
+
+  it('the system-switch reset and the deep link seed the selection through ONE helper', () => {
+    const helper =
+      /function resetComponentSelectionFor\(systemId, componentId = ''\) \{([\s\S]*?)\n {2}\}/.exec(
+        body
+      );
+    assert.ok(helper, 'the gateway declares the helper');
+    assert.match(helper[1], /selectedComponentId = componentId;/, 'it writes the selection');
+    assert.match(
+      helper[1],
+      /lastComponentSystemId = systemId;/,
+      'and stamps the system sentinel, so the switch effect does not wipe a deep-linked seed ' +
+        'the moment the selected system catches up'
+    );
+    assert.match(
+      body,
+      /if \(selectedSystemId === lastComponentSystemId\) return;\s*resetComponentSelectionFor\(selectedSystemId\);/,
+      'the switch effect is the helper with no component, so the two paths cannot drift'
     );
   });
 });
