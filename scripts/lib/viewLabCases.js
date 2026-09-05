@@ -1785,6 +1785,65 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
   }),
   managerCase({
+    // THE ENTRY'S `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31), reached
+    // by SCROLLING for the reason the tags case gives: the card follows `World classification`, so
+    // at 1280x900 the definition frame shows its head and the tops of its tiles and puts the
+    // steppers under the panel's fold, where every assertion passes on a frame that shows no
+    // control. `sm-coal` again, so all four entry cases follow ONE navigation: the lab's `1.32.0`
+    // pass elects its world map from the smithing row, which is what lights the `fire` tile here
+    // and draws `Fire 2` in the rail.
+    //
+    // THE PROTOTYPE DRAWS NO ESSENCE CARD ON ITS ENTRY SCREEN (`proto:805-1035`); the card is
+    // M31's extra, on the shape of the rules editor's card (`proto:1343-1356`), which is the
+    // reference it is measured against.
+    id: 'world-component-entry-essences',
+    label: 'Manager — World Component entry, essence contribution',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-essences="sm-coal"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-essences="sm-coal"]',
+    expectContained: [
+      // The grid of shared quantity cards, one per WORLD essence, with the elected `fire` value
+      // drawn as a CONTRIBUTING tile; the note that counts the section's inheritors; and the
+      // rail's essence run, which follows the same map and is the frame's other half.
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-scoped-entry-essence-grid]',
+      },
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-component-edit-essence="fire"][data-component-essence-active="true"]',
+      },
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-scoped-entry-essence-note]',
+      },
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-preview-essences] [data-essence-chip="fire"]',
+      },
+    ],
+    // THE STEPPER IS THE NEW CONTROL (issue 1371 r18-entry): a real pointer hit on its `+`, because
+    // a grid that overflowed its card or a head that overlapped it would leave a control present
+    // in the DOM, correct in every mounted assertion and unclickable on screen.
+    expectCenterHit:
+      '[data-scoped-entry-essences="sm-coal"] [data-component-edit-essence="fire"] [data-stepper-increment]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      // The shared quantity card is the frame's subject too: a change to it moves every tile here.
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceQuantityCard\.svelte$/,
+    ],
+  }),
+  managerCase({
     // THE MAINTAINER'S SECOND EXHIBIT (issue 1371, parity round 4): `Systems using this
     // component`, and the `Delete from the world` card under it. Neither was photographed by any
     // case — the systems card sat below the fold of both frames above, and deletion was a header
@@ -5261,7 +5320,26 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: 'main.manager-component-edit-main',
         target: '[data-component-edit-section="identity"]',
       },
+      // THE ESSENCE SECTION'S INHERIT CHOICE (issue 1371 r18-entry, maintainer ruling M31). The
+      // world record carries an `essences` section now, elected by the `1.32.0` pass from the
+      // oldest system's row, so `sm-iron-ingot` INHERITS it here as it inherits its category —
+      // and this is the only frame that shows the essence card locked over the world map under
+      // the shared inherit row's `Inherited` chip and the info-tone note. The claim reds if the
+      // row leaves the card, if the lab's ingot stops inheriting, or if the note loses its state.
+      {
+        container: '[data-component-edit-section="essences"]',
+        target: '[data-scoped-inherit-toggle="essences"]',
+      },
+      {
+        container: '[data-component-edit-section="essences"]',
+        target: '[data-component-edit-essence-note="inherited"]',
+      },
     ],
+    // THE SWITCH IS A NEW CONTROL ON THIS CARD (issue 1371 r18-entry), so it owns a real pointer
+    // hit: an inherit row overlapped by the card head or the grid would be present in the DOM,
+    // correct in every mounted assertion and unclickable on screen, and only `elementFromPoint`
+    // at its centre can tell those apart.
+    expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
