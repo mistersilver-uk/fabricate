@@ -368,3 +368,69 @@ export function recordingComponentActions() {
   }
   return { calls, actions };
 }
+
+/**
+ * THE SYSTEM COMPONENT RULES LIST'S OWN TREE, declared once for the two suites that mount it
+ * (issue 1371 r16-list).
+ *
+ * Same reason as {@link createWorldComponentCatalogueHarness}, one screen over: the mounted
+ * contract suite (`components-browser-view-mounted.test.js`) and the real-browser toolbar geometry
+ * suite (`components-browser-toolbar-rendered.test.js`) render the SAME `ComponentsBrowserView`,
+ * so a second copy of its manifest is duplicated lines against the new-code gate and a manifest
+ * the second suite can miss an edit to — reported as `# cancelled`, never as `# fail`. The
+ * compiled list is answered beside the harness because the rendered suite injects each compiled
+ * component's scoped CSS beside the global sheet, and a block missing there lays out unstyled.
+ *
+ * @param {{repoRoot: string, tmpPrefix: string}} args
+ * @returns {{harness: object, compiledModules: string[]}}
+ */
+export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
+  const componentPath = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
+  const compiledModules = [
+    ...SCOPED_SHARED_COMPILED_MODULES,
+    // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
+    // the two system-scope component screens.
+    'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
+    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+    'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+    // The cohort filter is the shared segmented track since issue 1371's parity round 4; the
+    // `<select>` it replaced needed no entry, and an omission here HANGS this suite.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The manager's ONE multi-select row (issue 772; extracted to a shared primitive under
+    // `apps/manager/` for issue 1010, so this path moved out of the browser's own directory).
+    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
+    componentPath,
+  ];
+  return {
+    harness: createMountedComponentHarness({
+      repoRoot,
+      tmpPrefix,
+      // COMPOSED FROM THE SHARED TIERS (issue 1371, round 3), not spelled out again. A missing
+      // entry HANGS the suite (`# cancelled`) rather than failing it, so an arrangement nobody can
+      // read back is the worst place for a manifest to drift.
+      rawModules: [
+        ...COMPONENT_SCOPE_LEAF_MODULES,
+        'src/ui/svelte/util/foundryBridge.js',
+        'src/ui/svelte/util/listReorderAnnouncement.js',
+        'src/ui/svelte/actions/dragDrop.js',
+        'src/utils/componentCategories.js',
+        'src/utils/componentBrowserModel.js',
+        // componentBrowserModel imports the shared category totals; omitting it HANGS the suite
+        // (`# cancelled`) rather than failing it.
+        'src/utils/browserGroupCounts.js',
+        // ... and, since issue 1036, the shared page-window model too. Same consequence.
+        'src/utils/browserPagination.js',
+        // The pure bulk selection + staging model (issue 772). The view imports it for the
+        // selection helpers and its toolbar reads the description it returns.
+        'src/utils/componentBulkEditModel.js',
+        // Its shared leaf (issue 1010): those selection helpers now live here and
+        // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
+        'src/utils/bulkSelectionModel.js',
+      ],
+      compiledModules,
+      componentPath,
+    }),
+    compiledModules,
+  };
+}

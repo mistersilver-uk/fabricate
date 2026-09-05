@@ -16,13 +16,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
-  COMPONENT_SCOPE_LEAF_MODULES,
-  SCOPED_SHARED_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   componentScopeFor,
   createComponentScopeHarness,
+  createComponentsBrowserViewHarness,
 } from '../helpers/componentScopeMountModules.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
@@ -31,51 +29,12 @@ import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/s
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-const browser = createMountedComponentHarness({
+// ONE MANIFEST FOR THE TWO SUITES THAT MOUNT THIS VIEW (issue 1371 r16-list): the module list
+// that used to sit here is `createComponentsBrowserViewHarness`'s now, so the rendered toolbar
+// geometry suite reads the same arrangement rather than a second copy of it.
+const { harness: browser } = createComponentsBrowserViewHarness({
   repoRoot,
   tmpPrefix: 'fabricate-components-browser-',
-  // COMPOSED FROM THE SHARED TIERS (issue 1371, round 3), not spelled out again. The ten
-  // component-scope leaves and the eleven design-system primitives below were literal lists here,
-  // in `componentEditViewModules.js` and in two world-scope suites — four copies of one
-  // arrangement, which is what SonarCloud's copy-paste detector reports and what a fifth suite
-  // would copy next. A missing entry HANGS the suite (`# cancelled`) rather than failing it, so an
-  // arrangement nobody can read back is the worst place for a manifest to drift.
-  rawModules: [
-    ...COMPONENT_SCOPE_LEAF_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
-    'src/ui/svelte/util/listReorderAnnouncement.js',
-    'src/ui/svelte/actions/dragDrop.js',
-    'src/utils/componentCategories.js',
-    'src/utils/componentBrowserModel.js',
-    // componentBrowserModel imports the shared category totals; omitting it HANGS this
-    // suite (`# cancelled`) rather than failing it.
-    'src/utils/browserGroupCounts.js',
-    // ... and, since issue 1036, the shared page-window model too. Same consequence.
-    'src/utils/browserPagination.js',
-    // The pure bulk selection + staging model (issue 772). The view imports it for the
-    // selection helpers and its toolbar reads the description it returns.
-    'src/utils/componentBulkEditModel.js',
-    // Its shared leaf (issue 1010): those selection helpers now live here and
-    // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
-    'src/utils/bulkSelectionModel.js',
-  ],
-  compiledModules: [
-    ...SCOPED_SHARED_COMPILED_MODULES,
-    // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
-    // the two system-scope component screens.
-    'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
-    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
-    'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-    // The cohort filter is the shared segmented track since issue 1371's parity round 4; the
-    // `<select>` it replaced needed no entry, and an omission here HANGS this suite.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    // The manager's ONE multi-select row (issue 772; extracted to a shared primitive under
-    // `apps/manager/` for issue 1010, so this path moved out of the browser's own directory).
-    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-    'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
-    'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
-  ],
-  componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
 });
 
 function makeComponent(overrides = {}) {

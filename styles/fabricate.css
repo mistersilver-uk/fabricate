@@ -24967,14 +24967,21 @@
      · every raw hex maps to the nearest `--fab-*` token.
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 
-/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge, and NO
-   bottom padding, because the second row already carries its own bottom margin and the list's
-   scroller starts immediately under it. Snapped to the spacing scale, which has no 14: 12 and 20
-   are the neighbouring steps and the zero is the reference's own. Measured before this rule: a
-   flat 12px on all four sides, so the band was inset 8px too little on each side and 12px too
-   much at the foot. */
+/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge. Snapped
+   to the spacing scale, which has no 14: 12 and 20 are the neighbouring steps. Measured before this
+   rule: a flat 12px on all four sides, so the band was inset 8px too little on each side.
+
+   THE FOOT IS `--fab-space-3`, NOT THE REFERENCE'S ZERO (issue 1371 r16-list, maintainer ruling
+   M22). The zero shipped on the claim that "the second row already carries its own bottom margin"
+   — no rule in this sheet or in the view's scoped block gives `.is-secondary` one, so the last
+   row (`Select all · GROUP BY CATEGORY · SORT BY · N of M catalogue entries`) sat flush against
+   the band's bottom border while the gap above it was the toolbar's normal row gap. The reference
+   draws that spacing as the row's `margin-bottom: 11px` (`proto:1058`), which snaps to 12 on the
+   4px scale; written here as the band's own padding rather than as a row margin because that is
+   what the world catalogue's `.manager-toolbar` does — one box owns all four edges — and the
+   rendered geometry test (`components-browser-toolbar-rendered.test.js`) measures the band. */
 .fabricate-manager .manager-component-toolbar {
-  padding: var(--fab-space-3) var(--fab-space-5) 0;
+  padding: var(--fab-space-3) var(--fab-space-5);
 }
 
 /* ── C3. THE TOOLBAR'S SECOND ROW ──────────────────────────────────────────────────────────
