@@ -294,11 +294,11 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
  * is a net −1 rather than a snap, and the snap is still owed against the `10px | 13` row.
  *
- * 317 → 316 with issue 1504, and this one IS a snap. `apps/manager/BulkEditSelect.svelte |
+ * 313 → 312 with issue 1504, and this one IS a snap. `apps/manager/BulkEditSelect.svelte |
  * border-radius | 8px | 1` is deleted: the component's whole scoped block went with its native
  * `<select>`, and the control it became takes the shared select's `form` rung, whose corner is the
  * ladder's 9. So the row leaves because a control moved onto a rung, which is the one way this
- * number is meant to fall. The key count falls 140 → 139 with it.
+ * number is meant to fall. The key count falls 139 → 138 with it.
  *
  * @see KNOWN_OFF_LADDER_RADII
  */

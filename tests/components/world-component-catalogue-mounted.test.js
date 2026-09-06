@@ -290,6 +290,38 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    // Issue 1504's converted membership filter and sort control both name their trigger by
+    // `aria-labelledby` rather than `aria-label` (a micro-labelled filter has no `ariaLabel`
+    // fallback at all, and the sort control passes only `ariaLabelledBy`). This RESOLVES each
+    // reference to the element it claims to name, rather than asserting the id string, so a
+    // caption id that stops matching its trigger's `aria-labelledby` fails here instead of
+    // leaving both controls with no accessible name at all.
+    it('names the membership filter and the sort control by reference to their visible label', async () => {
+      const target = await mountToolbar();
+      for (const [triggerHook, labelHook] of [
+        ['[data-scoped-list-filter="membership"]', '[data-scoped-list-filter-label="membership"]'],
+        ['[data-scoped-list-sort]', '.manager-scoped-list-sort-label'],
+      ]) {
+        const trigger = target.querySelector(triggerHook);
+        const labelledBy = trigger.getAttribute('aria-labelledby');
+        assert.ok(labelledBy, `${triggerHook} names its trigger by reference, not by a string`);
+        assert.ok(
+          trigger.getAttribute('aria-label') === null,
+          `${triggerHook} must carry no competing string name`
+        );
+        const label = target.querySelector(`[id="${labelledBy}"]`);
+        const expected = target.querySelector(labelHook);
+        assert.ok(
+          Boolean(label),
+          `${triggerHook}'s aria-labelledby must resolve to a real element`
+        );
+        assert.ok(
+          label === expected,
+          `${triggerHook}'s aria-labelledby must resolve to its own visible label, not a dangling id`
+        );
+      }
+    });
+
     it('withholds the system-relative pair when no system is in scope', async () => {
       // `Has rules in ` with nothing after it is worse than an absent option, and a predicate
       // keyed on an empty id would match nothing and read as a corpus of zero.
