@@ -23,7 +23,7 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
+  import Chip from '../../../../components/Chip.svelte';
   import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { salvage = null, result = null } = $props();
@@ -70,11 +70,9 @@
             <span class="salvage-outcome-name">{outcome.name}</span>
             {#if rolled}
               <span class="salvage-outcome-rolled" data-inventory-outcome-your-roll>
-                <StatusPill
-                  tone="accent"
-                  icon="fas fa-circle"
-                  label={localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
-                />
+                <Chip tone="accent" icon="fas fa-circle"
+                  >{localize('FABRICATE.App.Inventory.Salvage.YourRoll')}</Chip
+                >
               </span>
             {/if}
             {#if routedType === 'fixed'}

@@ -18,7 +18,7 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
+  import Chip from '../../../../components/Chip.svelte';
   import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { toolStates = [] } = $props();
@@ -42,17 +42,13 @@
         <CraftingThumb src={tool.img ?? ''} alt="" size={24} />
         <span class="salvage-tools-name">{tool.name}</span>
         {#if tool.available}
-          <StatusPill
-            tone="success"
-            icon="fas fa-screwdriver-wrench"
-            label={localize('FABRICATE.App.Inventory.Salvage.RequiredToolsAvailable')}
-          />
+          <Chip tone="positive" icon="fas fa-screwdriver-wrench"
+            >{localize('FABRICATE.App.Inventory.Salvage.RequiredToolsAvailable')}</Chip
+          >
         {:else}
-          <StatusPill
-            tone="danger"
-            icon="fas fa-triangle-exclamation"
-            label={localize('FABRICATE.App.Inventory.Salvage.RequiredToolsUnavailable')}
-          />
+          <Chip tone="danger" icon="fas fa-triangle-exclamation"
+            >{localize('FABRICATE.App.Inventory.Salvage.RequiredToolsUnavailable')}</Chip
+          >
         {/if}
       </li>
     {/each}

@@ -6,15 +6,14 @@
  * no error, no failing test. So the failure this file has to be able to see is not "the mapper
  * threw", it is "the mapper returned a name `Chip` will quietly ignore".
  *
- * That is why the expectation is DERIVED from `Chip.svelte`'s own `TONES` literal rather than
- * typed here: a hand-typed list of `Chip`'s tones is a second copy of the vocabulary, and a copy
+ * That is why the expectation is DERIVED from `Chip.svelte`'s own `TONES` literal — through the
+ * shared reader `tests/helpers/chipTone.js`, which the converted suites use to read a rendered
+ * chip's tone off the same vocabulary — rather than typed here: a hand-typed list of `Chip`'s tones is a second copy of the vocabulary, and a copy
  * cannot see the original change. `Chip` survives this change, so reading it from disk is a
  * landed assertion rather than a transient one — the retired pill is NOT read here for exactly
  * that reason, since this same phase deletes it.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
@@ -23,28 +22,7 @@ import {
   STATUS_CHIP_TONE_FALLBACK,
 } from '../src/ui/svelte/util/statusChipTone.js';
 
-const repoRoot = resolve(import.meta.dirname, '..');
-const chipSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'),
-  'utf8'
-);
-
-/**
- * The tones `Chip` paints, read from the component's own `TONES` literal with comments
- * stripped first — the file quotes tone names in its prose, so an unstripped read invents
- * members that were never in the set.
- *
- * @returns {Set<string>}
- */
-function chipTones() {
-  const source = chipSource.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
-  const start = source.indexOf('const TONES = new Set([');
-  assert.notEqual(start, -1, 'Chip still declares its tone vocabulary as `TONES`');
-  const body = source.slice(source.indexOf('[', start), source.indexOf(']);', start));
-  const names = [...body.matchAll(/'([\w-]+)'/g)].map(([, name]) => name);
-  assert.ok(names.length > 0, 'at least one tone is declared');
-  return new Set(names);
-}
+import { CHIP_TONES } from './helpers/chipTone.js';
 
 /**
  * The whole domain, pinned by NAME rather than by count. Both retired vocabularies are in it:
@@ -63,7 +41,7 @@ describe('statusChipTone', () => {
   });
 
   it('maps every accepted name onto a tone Chip actually paints', () => {
-    const painted = chipTones();
+    const painted = CHIP_TONES;
     const unpainted = Object.entries(STATUS_CHIP_TONES).filter(
       ([, chipTone]) => !painted.has(chipTone)
     );

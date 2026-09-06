@@ -22,6 +22,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -35,6 +36,8 @@ const harness = createMountedComponentHarness({
   // `{#if}` branches do, and an omission HANGS the suite (# cancelled) rather than
   // failing it. `createMountedComponentHarness` re-walks the closure and throws on a gap.
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryBridge.js',

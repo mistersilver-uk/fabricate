@@ -8,8 +8,10 @@ import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import {
   SYS_A,
   SYS_B,
@@ -27,6 +29,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-view-',
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
@@ -2623,13 +2627,16 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
 
   /**
    * Each run row paired with the TONE of its trailing status chip — `subtle` waiting,
-   * `accent` in progress, `success` done. The row keys alone say nothing about which row
+   * `accent` in progress, `positive` done. The row keys alone say nothing about which row
    * the panel claims is being worked on, which is the whole subject below.
+   *
+   * `positive` is `Chip`'s name for the family the retired pill spelled `success` (issue 1506);
+   * the tone is read off the chip's own class rather than off a hook restated per call site.
    */
   function runRowTones(target) {
     return [...target.querySelectorAll('[data-inventory-bulk-run-row]')].map((node) => [
       node.getAttribute('data-inventory-bulk-run-row'),
-      node.querySelector('[data-status-pill]')?.getAttribute('data-status-pill') ?? null,
+      chipToneOf(node.querySelector('.manager-chip')),
     ]);
   }
 
@@ -2680,7 +2687,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     await settle();
 
     assert.deepEqual(runRowTones(target), [
-      ['sys:a', 'success'],
+      ['sys:a', 'positive'],
       ['sys:b', 'accent'],
       ['sys:c', 'subtle'],
     ]);

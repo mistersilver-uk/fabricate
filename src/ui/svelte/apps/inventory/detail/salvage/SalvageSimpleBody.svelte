@@ -17,7 +17,7 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
+  import Chip from '../../../../components/Chip.svelte';
   import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { salvage = null } = $props();
@@ -51,11 +51,9 @@
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}
-            <StatusPill
-              tone="success"
-              icon="fas fa-circle-check"
-              label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-            />
+            <Chip tone="positive" icon="fas fa-circle-check"
+              >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+            >
           {/if}
         </li>
       {/each}

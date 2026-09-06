@@ -45,7 +45,8 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../../util/statusChipTone.js';
+  import Chip from '../../../../components/Chip.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
   import Callout from '../../../manager/Callout.svelte';
 
@@ -134,7 +135,7 @@
   {@const state = stateOf(stage)}
   {@const pill = STATES[state]}
   <span class="salvage-state-chip" data-progressive-stage-state={state}>
-    <StatusPill tone={pill.tone} icon={pill.icon} label={localize(pill.key)} />
+    <Chip tone={statusChipTone(pill.tone)} icon={pill.icon}>{localize(pill.key)}</Chip>
   </span>
 {/snippet}
 

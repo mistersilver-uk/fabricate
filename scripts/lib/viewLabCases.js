@@ -10662,8 +10662,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector:
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
-      ':has([data-inventory-bulk-yield] [data-status-pill="success"])' +
-      ':has([data-inventory-bulk-yield] [data-status-pill="accent"])',
+      ':has([data-inventory-bulk-yield] .manager-chip.is-positive)' +
+      ':has([data-inventory-bulk-yield] .manager-chip.is-accent)',
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -10746,7 +10746,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-queue-row="lab-smithing:sm-longsword"])' +
-      ':has([data-inventory-bulk-yield] [data-status-pill="success"])',
+      ':has([data-inventory-bulk-yield] .manager-chip.is-positive)',
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -11008,15 +11008,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     //   - the danger chip REPLACES the certainty chip instead of joining it, which a selector
     //     naming only the danger pill matches;
     //   - the danger chip renders elsewhere in the panel — the report's `failed` outcome pill is
-    //     the same tone — which a bare `[data-status-pill="danger"]` matches.
+    //     the same tone — which a bare `.manager-chip.is-danger` matches.
     // Requiring both pills on the same `[data-inventory-bulk-queue-row]` refuses all three. Only a
     // queued, guaranteed, broken row can satisfy it.
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ' [data-inventory-bulk-queue="preview"]' +
       ' [data-inventory-bulk-queue-row]' +
-      ':has([data-status-pill="success"])' +
-      ':has([data-status-pill="danger"])',
+      ':has(.manager-chip.is-positive)' +
+      ':has(.manager-chip.is-danger)',
   }),
   playerCase({
     ...BULK_DEFAULTS,
