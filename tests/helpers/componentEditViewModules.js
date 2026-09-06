@@ -99,7 +99,6 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/components/Chip.svelte',

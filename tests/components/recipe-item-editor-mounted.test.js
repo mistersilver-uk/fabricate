@@ -54,9 +54,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
-    // The salvage bodies render the house chip primitive. The preview never reaches them,
-    // but the compiled router imports them statically, so it is still in the graph.
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',

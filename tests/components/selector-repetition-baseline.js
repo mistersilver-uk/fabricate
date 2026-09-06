@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,102 `(at-context, selector)` keys, of which 2,983 appear exactly
+ * Unfiltered, the sheet holds 3,101 `(at-context, selector)` keys, of which 2,982 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,17 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,600 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,599 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting one
+ * rule block: the Tool player preview's `[data-tool-player-preview] .fab-status-pill.is-subtle`,
+ * which selected the status pill this change retires into the shared chip. It was a singleton
+ * key, so the rule count falls by one and the key and singleton counts fall with it, and the
+ * repeated table is untouched — the same shape as the deletion issue 1505 recorded above. The
+ * rule had never rendered, for the reason its own comment recorded: the sheet is imported at
+ * `layer(modules)` and the primitive's scoped block is unlayered, so it lost at every
+ * specificity.
  *
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's

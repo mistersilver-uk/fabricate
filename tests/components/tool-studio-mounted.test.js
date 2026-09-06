@@ -92,7 +92,6 @@ const harness = createMountedComponentHarness({
     // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',

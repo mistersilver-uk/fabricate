@@ -78,7 +78,6 @@ const harness = createMountedComponentHarness({
     // state's Clear filters both render it.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
     'src/ui/svelte/apps/manager/library/LibraryShelf.svelte',

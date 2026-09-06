@@ -45,7 +45,6 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/RowDisclosure.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/components/Chip.svelte',

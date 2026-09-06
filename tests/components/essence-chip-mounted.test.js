@@ -84,7 +84,6 @@ const row = createMountedComponentHarness({
     ESSENCE_CHIP_PATH,
     MEDALLION_PATH,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     ROW_PATH,
   ],

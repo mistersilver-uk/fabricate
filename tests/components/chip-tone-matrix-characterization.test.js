@@ -642,6 +642,85 @@ describe('1371 Chip — the lit emphasis', () => {
 
 
 /**
+ * THE BARE EMPHASIS, NOW THAT A CALLER DRAWS IT (issue 1506).
+ *
+ * The face landed unused beside the `subtle` tone, and the world Component catalogue's row badge
+ * is the caller that turns it on: `tone={linked ? 'subtle' : 'warning'} emphasis="bare"
+ * density="list"`. The mounted coverage that used to watch this face lived in
+ * `recipe-studio-primitives.test.js`, against the pill that owned it before this change — so it
+ * moves here with the face rather than dying with the file, and it asks the same three questions
+ * of the surviving primitive.
+ *
+ * The two that matter most are the negatives. `border: 0` is the WHOLE of this emphasis: it must
+ * not touch the tone's fill or ink, because the catalogue draws the same badge in `subtle` when a
+ * row is linked and in `warning` when it is not, and a face that stated a colour would flatten
+ * the amber the tone is there to say. And the glyph rule must exclude `.fa-circle`: the status
+ * dot rule is written earlier at the same (0,3,1), so an unqualified selector would tie it, win
+ * on source order and inflate every dot the day someone composed the two.
+ */
+describe('1506 Chip — the bare emphasis', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /** The bare rule's body, comments already absent because the head is inside the block. */
+  function bareRule() {
+    const open = ruleIndex('is-bare');
+    assert.notEqual(open, -1, 'the bare emphasis has a rule of its own');
+    return styleBlock.slice(open, styleBlock.indexOf('}', open));
+  }
+
+  it('emits is-bare only when asked, and composes with a NON-subtle tone', async () => {
+    const shipped = await harness.mount({ tone: 'warning' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-warning'],
+      'a chip that does not ask for the bare face is exactly what shipped'
+    );
+    harness.remount();
+
+    // The catalogue's UNLINKED row is `warning` with this face, so the composition is the shipped
+    // case rather than a hypothetical: a bare chip keeps every colour its tone states.
+    const bare = await harness.mount({ tone: 'warning', emphasis: 'bare', density: 'list' });
+    assert.deepEqual(
+      [...chipNode(bare).classList]
+        .filter((name) => name.startsWith('is-'))
+        .toSorted((a, b) => a.localeCompare(b)),
+      ['is-bare', 'is-list', 'is-warning'],
+      'the row badge draws as tone + emphasis + scale, three axes and three classes'
+    );
+  });
+
+  it('states the edge as the `border` SHORTHAND, and touches no colour', () => {
+    const rule = bareRule();
+    // `border: 0` rather than `border-width: 0`: the shorthand resets `border-color` to
+    // `currentColor`, which is the reference's computed edge, where the longhand would leave the
+    // base rule's `--fab-border` sitting on a zero-width edge at a different computed colour.
+    assert.match(rule, /(?:^|\n)\s*border:\s*0;/, 'the whole of this face is the edge going away');
+    assert.ok(
+      !/(?:^|;|\n)\s*(?:color|background)\s*:/.test(rule),
+      `the bare face states a colour of its own, so the tone stops deciding it: ${rule}`
+    );
+  });
+
+  it('drops its glyph to the reference 7px WITHOUT touching the status dot', () => {
+    const glyphRule = styleBlock.search(/\.manager-chip\.is-bare i:not\(\.fa-circle\)/);
+    assert.notEqual(glyphRule, -1, 'the bare face states its own glyph size');
+    assert.match(
+      styleBlock.slice(glyphRule, styleBlock.indexOf('}', glyphRule)),
+      /font-size:\s*7px/,
+      'at `density="list"` the glyph inherits 9px and the reference draws 7px'
+    );
+    // The tie this `:not()` exists to lose: the dot rule is (0,2,1) and written EARLIER, so an
+    // unqualified `.manager-chip.is-bare i` would tie it, win on order, and inflate the dot.
+    const dot = styleBlock.search(/\.manager-chip i\.fa-circle/);
+    assert.ok(dot !== -1 && dot < glyphRule, 'and the dot rule is still written first');
+  });
+});
+
+/**
  * THE CLOSED VOCABULARIES ARE PINNED BY EXACT COUNT (issue 1506).
  *
  * Two of this component's axes are closed vocabularies with no landed guard on their SIZE. The

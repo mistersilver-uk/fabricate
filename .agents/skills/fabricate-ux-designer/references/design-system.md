@@ -289,7 +289,7 @@ Use the expression `{' '}`, which survives the trim.
 | `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
 | `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
 | `Medallion` | `src/ui/svelte/components/Medallion.svelte` | Manager entity imagery with the canonical fallback icon, surface, radius, and sizing |
-| `StatusPill` | `src/ui/svelte/components/StatusPill.svelte` | Semantic icon-plus-label state chips; never hand-roll a local status ramp |
+| `Chip` | `src/ui/svelte/components/Chip.svelte` | EVERY chip and state badge — the pill, its thirteen tones, its six densities and its three emphases. Semantic icon-plus-label state badges are `tone` plus `density`; never hand-roll a local status ramp and never mint a second pill |
 | `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |
 | `ChanceSlider` | `src/ui/svelte/components/ChanceSlider.svelte` | Synchronized number/range input, normalized value, semantic thumb, value fill, or full-track semantic scale |
 | `CraftingThumb` | `src/ui/svelte/apps/crafting/CraftingThumb.svelte` | Player-facing item/recipe imagery and missing-art fallback |

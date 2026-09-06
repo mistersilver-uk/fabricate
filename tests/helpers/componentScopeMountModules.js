@@ -159,7 +159,6 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   // `Select`, `Field` and `SearchablePopover` are already in this list via the
   // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
 ]);
 

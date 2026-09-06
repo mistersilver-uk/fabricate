@@ -60,7 +60,6 @@ const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'ut
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   // The card's own CSS lives in the shared primitive now; without it this fixture measures
   // an unstyled stack and every gate below passes vacuously.

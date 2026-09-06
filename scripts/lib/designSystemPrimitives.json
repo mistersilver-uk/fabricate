@@ -344,13 +344,6 @@
       "why": "THE AT-A-GLANCE FIGURE (issue 1505). `library.html:881` heads its block and `library.html:894` states its API; the geometry is `library.html:237-239` — `--fab-bg-1`, 1px `--fab-border`, r9, `var(--fab-space-3)`, centred, with a serif 17px/700 value — and the LABEL is a `<Kicker>`, composed rather than restated, which is what the specimen draws. 2 importing files measured by `componentImporters.js`, which is the membership bar itself, and they span both windows: `apps/crafting/ShoppingList.svelte`'s three summary cards and `apps/manager/ItemPageInspector.svelte`'s three Books & Scrolls tiles. FOUR RECORDED DEVIATIONS from the specimen, each written into the library entry: an `icon` prop, because the Shopping list renders a leading glyph on the value line in all three cards; `tabular-nums`, which both callers declare so a 9 to 10 change cannot reflow the tile; the `tone` prop at all, since `.k-stat` declares no tone variant, so each of `default`, `info` and `danger` is derived from a shipped caller state; and the four hook props, which the specimen has no test harness to need. `size`, `unit`, `tone=\"warning\"` and `tone=\"accent\"` are WITHDRAWN rather than carried, because no caller reaches them and no test acts on one. Those hook props — `dataAttr`/`dataValue` on the box root, `valueDataAttr` on the value and `labelDataAttr` forwarded into the composed `Kicker` — are what let the item-page conversion preserve all six of its existing `data-*` hooks verbatim, so not one of the nine assertions pinned on them moved. Broad through the `components/` leg of `BROAD_SIGNAL_PATTERN`, with a `BROAD_SIGNAL_CASE_OVERRIDES` entry because neither representative frame draws a stat grid. `tests/stat-box-source-contract.test.js` holds the contract class `fab-stat-box`, records the hook props as attribute-only, and requires every literal hook value at a call site to start with `data-`, which is what keeps its \"emits no interactive element\" clause exhaustive."
     },
     {
-      "path": "src/ui/svelte/components/StatusPill.svelte",
-      "library": null,
-      "status": "target",
-      "evidence": "broad",
-      "why": "The row and inspector state pill, six tones (13 callers). The library's mark vocabulary (`library.html:835`, `:858`) specifies marks that carry KIND; this pill carries STATE, and `library.html:348` states that colouring a chip background by kind would double-code kind against state — so it is deliberately not one of those marks."
-    },
-    {
       "path": "src/ui/svelte/components/StatusToggle.svelte",
       "library": "<Toggle>",
       "status": "target",

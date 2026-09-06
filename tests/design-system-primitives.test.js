@@ -319,7 +319,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {

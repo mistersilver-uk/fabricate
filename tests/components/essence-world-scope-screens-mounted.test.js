@@ -87,7 +87,6 @@ const SHELL_MODULES = [
   // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
   // this shell rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives

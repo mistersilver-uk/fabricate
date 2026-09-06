@@ -79,7 +79,6 @@ const sharedComponentNames = [
   // MUST still be compiled into this tree: a `.svelte` the mounted root renders but
   // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
   'Medallion',
-  'StatusPill',
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',

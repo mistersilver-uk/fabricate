@@ -65,7 +65,6 @@ const RECIPE_PRIMITIVES = [
   // hoisting is required: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
   // reads the WHOLE file, so naming a primitive in only one of two harnesses reads as covered.
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',

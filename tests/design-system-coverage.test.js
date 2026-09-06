@@ -665,7 +665,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
 ];
 
 test('the shipped rows the library does not name are exactly the known set', () => {

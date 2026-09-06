@@ -37,7 +37,6 @@ const harness = createMountedComponentHarness({
     // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     // The REAL player tile the "How players see it" card mounts for both samples. A `.svelte` in
     // the closure but absent HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
