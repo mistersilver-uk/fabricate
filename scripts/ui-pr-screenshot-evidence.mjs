@@ -980,11 +980,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-essence-legacy',
     label: 'Player crafting — legacy set-level essence authored icon',
     smokeLabels: ['player-crafting-essence-legacy'],
-    // Issue 1506 DELETED the second matcher, `CraftingEssenceThumb.svelte`, rather than
-    // re-pointing it: that component was retired into the shared art tile, so the pattern
-    // could never match again while this test went on passing — a mirror whose guard cannot
-    // see its own staleness. Re-pointing it at the shared tile would hang four smoke-only
-    // labels on every future change to a primitive with forty-four importers, and those
+    // Issue 1506 DELETED the second matcher, which named the crafting essence thumbnail,
+    // rather than re-pointing it: that component was retired into the shared art tile, so the
+    // pattern could never match again while this test went on passing — a mirror whose guard
+    // cannot see its own staleness. Re-pointing it at the shared tile would hang four
+    // smoke-only labels on every future change to a primitive with 42 importers, and those
     // labels are producible only by the local ~26-minute Foundry run. The surviving
     // co-located matcher carries the recipe on its own: legacy set-level essences keep their
     // row presentation inside the IO table.
@@ -1183,7 +1183,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   {
     // Issue 777: the pre-roll required-tools disclosure — the `SalvageToolRequirements`
-    // section with one AVAILABLE (green) and one UNAVAILABLE (red) StatusPill row, the
+    // section with one AVAILABLE (green) and one UNAVAILABLE (red) chip row, the
     // state the existing player-salvage capture walk cannot reach. Its OWN view (one file
     // per view id) so `collect` publishes the dedicated frame; appending its label to the
     // existing `player-salvage` view would never publish it. Narrowly matched to the tool

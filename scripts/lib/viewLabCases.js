@@ -11400,7 +11400,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-essence-alternative'],
     // The counterpart's condition is an OPEN alternatives radiogroup — `.crafting-alt-option` rows
     // under `[data-recipe-section="alternatives"]` — one of whose options is an ESSENCE, so the
-    // option card draws a `CraftingEssenceThumb` rather than an item image.
+    // option card draws the shared art tile in its GLYPH face, `[data-medallion="glyph"]`, rather
+    // than an item image. It drew a crafting essence thumbnail until issue 1506 retired both
+    // crafting tiles into that one primitive; the state the case selects for is unchanged.
     //
     // It previously borrowed `player-crafting-essence-ingredient`'s recipe and published a
     // byte-identical frame under a second name. That recipe cannot reach this state: its essence
@@ -13532,7 +13534,8 @@ function widenedByCoverage(ids, unattributable) {
  * `flags.fabricate.gatheringRuns` — see `labFlags.js` `RUN_CONTAINER_PATHS`) and the
  * `gatheringBlindRuns` world setting that `labWorld.js` writes from `buildLabBlindRunSecret`. Both
  * are read only by the PLAYER window: the Journal (`apps/journal/**` is the run browser in its
- * entirety), the Crafting tab's `RunSummaryPanel` / `CraftingStatusBadge`, and the Gathering tab's
+ * entirety), the Crafting tab's `RunSummaryPanel` and the status badge its browse rows draw — a
+ * `Chip` since issue 1506 retired the crafting status component into it — and the Gathering tab's
  * in-flight task rows. The manager is the GM's system-configuration window — it renders systems,
  * recipes, components, tools and environments out of `game.settings`, and reads no actor run flag
  * anywhere in `src/ui/svelte/apps/manager/**`. So the predicate is `app === PLAYER`: a fact each

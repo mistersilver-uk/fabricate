@@ -293,7 +293,7 @@
     // its own — and a step quieter than every semantic family.
     'secondary',
     // SUBTLE (issue 1506): a quiet, non-actionable STATE, the third rank of the recessive ink
-    // ladder and the one tone `StatusPill` had that this component did not. It is a
+    // ladder and the one tone the retired status pill had that this one did not. It is a
     // REPRODUCTION rather than a new statement — `--fab-text-subtle` over
     // `--fab-surface-raised` behind no visible edge is byte-for-byte the pill's own default
     // face — so the sites that converge onto it keep their paint. It is genuinely distinct from
@@ -473,8 +473,8 @@
   }
 
   /* THE STATUS DOT (issue 1506): `fa-circle` is not a glyph, it is a MARK, and its whole meaning
-     is that it is small. Transcribed verbatim from `StatusPill.svelte`, which has drawn it at
-     0.36rem since it shipped; without this rule a dot inherits the base rule's 0.62rem and
+     is that it is small. Transcribed verbatim from the status pill this chip retired, which
+     drew it at 0.36rem from its first day; without this rule a dot inherits 0.62rem and
      inflates by 72% on a mark that is meant to read as a bullet.
 
      A RULE, NOT A PROP AND NOT A PER-SITE STYLE, in the shape `is-truncated > i` above already
@@ -580,8 +580,8 @@
      step quieter than every semantic family. `proto:5721` draws the rules editor's salvage
      mode pill through the prototype's shared pill helper with exactly these three: the subtle
      surface, a plain `--fab-border` hairline and the SECONDARY ink. `--fab-text-secondary` IS
-     that reference's own secondary ink token, the same equivalence `StatusPill`'s outlined
-     emphasis rests on, so this states a token rather than approximating a colour.
+     that reference's own secondary ink token, the same equivalence the retired pill's outlined
+     emphasis rested on, so this states a token rather than approximating a colour.
 
      THREE DECLARATIONS AND NO GEOMETRY, like every tone here. The mode pill's SCALE is
      `density="list"` — see the micro-pill note in the props block above, which settles both of
@@ -594,12 +594,12 @@
   }
 
   /* SUBTLE (issue 1506): a quiet, non-actionable state — the third rank of the recessive ink
-     ladder, one step below `neutral` and one above `muted`. It is transcribed from
-     `StatusPill.svelte`'s own default face, which declares `color` and `background` and takes a
+     ladder, one step below `neutral` and one above `muted`. It is transcribed from the retired
+     status pill's own default face, which declared `color` and `background` and took a
      transparent edge from that component's base rule.
 
      THREE DECLARATIONS, NOT TWO, and the third is the whole reason this tone can be a
-     reproduction rather than a move. That pill's base states `border: 1px solid transparent`;
+     reproduction rather than a move. That pill's base stated `border: 1px solid transparent`;
      THIS component's base states `1px solid var(--fab-border)` a few rules above, so restating
      only the pill's two would put a visible hairline on every subtle chip and the tone would
      read one rank louder than it is. `border-color` rather than the `border` shorthand, for the
@@ -966,13 +966,13 @@
      `--fab-border` and `--fab-text`. Eleven tones times one rule, rather than eleven more rules
      — and a tone added later is outlined for free.
 
-     IT IS THE MIRROR OF `StatusPill`'s EMPHASIS OF THE SAME NAME, and the axis it supersedes is
-     the OPPOSITE one. Stating that plainly because the shared prop name invites the assumption
-     that the two are the same declarations: that pill's outlined emphasis neutralises the EDGE
-     and the INK and keeps the tone's fill, because its reference draws one neutral attribution
-     badge whatever state it annotates (`proto:834`); this one neutralises the FILL and keeps
-     the tone's edge and ink, because its reference draws a coloured badge that must not melt
-     into a coloured panel. What the two genuinely share is the meaning of the word — a
+     IT IS THE MIRROR OF THE RETIRED PILL'S EMPHASIS OF THE SAME NAME, and the axis that one
+     superseded was the OPPOSITE one. Stated plainly because the shared prop name invited the
+     assumption that the two were the same declarations: its outlined emphasis neutralised the
+     EDGE and the INK and kept the tone's fill, because its reference draws one neutral
+     attribution badge whatever state it annotates (`proto:834`); this one neutralises the FILL
+     and keeps the tone's edge and ink, because its reference draws a coloured badge that must
+     not melt into a coloured panel. What the two genuinely share is the meaning of the word — a
      hairline-edged plate rather than a tinted wash — which is why this is that prop's second
      value and not a differently named prop.
 
@@ -1064,7 +1064,7 @@
      `.manager-chip i.fa-circle` at (0,2,1), and an unqualified `.manager-chip.is-bare i` is
      ALSO (0,2,1) — a tie, decided by order, and this rule is later, so a bare chip's dot would
      inflate from 5.76px to 7px. Excluding the dot by selector is the only form that cannot lose
-     that race, and it is the form `StatusPill.svelte` reached for the identical reason.
+     that race, and it is the form the retired status pill reached for the identical reason.
 
      WRITTEN AFTER EVERY TONE RULE, after `has-tint` and after `is-outlined` and the lit pair,
      for the equal-specificity ordering argument each of those already carries. */

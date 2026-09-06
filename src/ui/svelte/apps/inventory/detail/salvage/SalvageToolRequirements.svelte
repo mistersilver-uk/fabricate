@@ -5,10 +5,13 @@
   at attempt time, as a notification — so the player could spend the irreversible roll on
   an attempt the engine would reject for a missing tool.
 
-  Each row is a thumb + the tool's display name + a `Chip` availability treatment
-  (the shared chip, on its default scale — NOT the crafting `QuantityTag`):
-  success/`fa-screwdriver-wrench`/"Available" or danger/`fa-triangle-exclamation`/
-  "Unavailable". Two signals — icon + label — never colour alone.
+  Each row is a thumb + the tool's display name + a `Chip` availability treatment,
+  on the chip's DEFAULT density: `tone="positive"`/`fa-screwdriver-wrench`/"Available"
+  or `tone="danger"`/`fa-triangle-exclamation`/"Unavailable". Two signals — icon +
+  label — never colour alone. The scale is stated because the crafting have/need
+  readings beside it take `density="list"`, and this row is not one of those: the
+  quantity tag those readings used to be retired into the same chip at issue 1506,
+  so the two are now one component distinguished by a prop rather than by a file.
 
   Availability is decided builder-side (`InventoryListingBuilder._salvageToolStates`),
   scoped to the TARGET salvage actor's items only, so what this shows is exactly what the

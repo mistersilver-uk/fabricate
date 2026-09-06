@@ -27,12 +27,17 @@
                  `max-width: calc(100% - 32px)` to keep a wide essence row clear of
                  this slot rather than running under it.
 
-  The card owns its thumbnail markup rather than reusing CraftingThumb: that
-  component takes a px `size` and hard-sets width/height from it, so it cannot
-  render this responsive `width:100%; aspect-ratio:1/1` square. It DOES reuse
-  CraftingThumb's fallback constant, so a component with no authored art shows the
-  same blueprint every other tab shows rather than a broken-image glyph. The glyph
-  path is for ESSENCES only, which have an authored icon and no artwork.
+  The card owns its thumbnail markup rather than reusing the shared art tile, and
+  the reason is RE-MEASURED against the tile that survives rather than left pointing
+  at the crafting thumbnail this adjudication was written against: `Medallion` writes
+  `width:${size}px;height:${size}px` into a `style` attribute from a px `size` prop
+  (`components/Medallion.svelte`, the `boxStyle` derivation), so it still cannot render
+  this responsive `width:100%; aspect-ratio:1/1` square, and it declares no `class` and
+  no rest spread through which a caller could override the box. The decision therefore
+  STANDS at the point where the two tiles became one (issue 1506). What this card DOES
+  reuse is the shared fallback constant `DEFAULT_CRAFTING_IMAGE`, so a component with no
+  authored art shows the same blueprint every other tab shows rather than a broken-image
+  glyph. The glyph path is for ESSENCES only, which have an authored icon and no artwork.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';

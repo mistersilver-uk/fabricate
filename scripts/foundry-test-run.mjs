@@ -12283,7 +12283,7 @@ async function main() {
         // Issue 777: the pre-roll required-tools disclosure. Smoke Toolchest's salvage
         // names two library tools — the Mallet the crafter holds (available, green) and the
         // Anvil it does not (unavailable, red) — so this single frame proves the section is
-        // visible before any roll, the available/unavailable StatusPill treatment reads by
+        // visible before any roll, the available/unavailable chip treatment reads by
         // icon+label (not colour alone), the human tool name shows (not a raw componentId),
         // and the pre-roll action is disabled while a required tool is missing. Fails
         // loudly on the `[data-inventory-salvage-tools]` waitFor, for the same reason as the

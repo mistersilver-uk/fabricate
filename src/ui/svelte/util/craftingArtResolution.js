@@ -3,9 +3,9 @@
  *
  * ── WHY A MODULE AND NOT THIRTY-FIVE INLINE COPIES ──────────────────────────────────────
  *
- * The retired `CraftingThumb` centralised a four-step decision, and its own docblock said that
- * centralising it "so the same markup is not repeated per surface" was the component's whole
- * purpose. Retiring the tile into the shared `Medallion` moves the MARKUP into the primitive but
+ * The crafting thumbnail this change retired centralised a four-step decision, and its own
+ * docblock said that centralising it "so the same markup is not repeated per surface" was that
+ * component's whole purpose. Retiring the tile into the shared `Medallion` moves the MARKUP into the primitive but
  * leaves that decision homeless: `Medallion` is an import-free leaf by contract (design-system
  * §7), so it cannot read the two default-image constants itself, and its docblock records why —
  * importing them would propagate a required raw-module entry into every mount harness compiling

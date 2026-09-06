@@ -119,9 +119,10 @@
              emphasis states ONLY the fill, so the tone keeps the edge and the ink, and the three
              colours land as `--fab-info-border` / `--fab-info-text` on `--fab-bg-1`.
 
-             Note that this is the MIRROR of `StatusPill`'s emphasis of the same name, which
-             supersedes the edge and the ink and keeps the fill. Each matches its own reference;
-             `Chip.svelte`'s emphasis rule carries the note, and a test pins the inversion.
+             Note that this is the MIRROR of the emphasis of the same name on the status pill
+             issue 1506 retired, which superseded the edge and the ink and kept the fill. Each
+             matched its own reference; `Chip.svelte`'s emphasis rule carries that history, and
+             this file's mounted suite pins the two classes this site depends on.
 
              None of it can be stated from `styles/fabricate.css`. A
              `manager-component-world-pill` rule there, written against the primitive's own root

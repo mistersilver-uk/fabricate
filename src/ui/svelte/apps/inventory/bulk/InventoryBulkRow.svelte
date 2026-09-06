@@ -15,8 +15,8 @@
   point: this is the ONE place that markup exists instead of four near-copies.
 
   The shared `Medallion` at a FIXED 30px, through `resolveCraftingArt` (issue 1506;
-  it was `CraftingThumb` until that change retired the crafting tiles into the one
-  primitive). `InventoryItemCard`'s recorded reason for declining the retired thumb
+  it was the crafting thumbnail until that change retired both crafting tiles into
+  the one primitive). `InventoryItemCard`'s recorded reason for declining that tile
   (its hard-set width/height fights a responsive `aspect-ratio` square) does not
   apply to a row thumb that is a fixed size by design, and resolving through the
   shared helper means a result with no authored artwork gets the house fallback
