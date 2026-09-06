@@ -5,6 +5,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -46,20 +47,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // The manager's ONE labelled push-button (issue 1118). This tree renders it from
-    // EnvironmentsBrowserView and from the two gathering browsers it embeds; omitting it
-    // reds `mounted-harness-primitive-allowlist.test.js` and HANGS this suite.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), rendered from EnvironmentsBrowserView and from
+    // the two gathering browsers it embeds.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPicker.svelte',
@@ -71,7 +65,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     // The three card components the parties rebuild added (issue 1182), each imported

@@ -23,7 +23,10 @@
  * self-reporting.
  */
 
-import { createMountedComponentHarness } from './svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from './svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 /**
@@ -132,25 +135,24 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
  * @type {readonly string[]}
  */
 export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination` draws its
+  // page-size list through `Select` now, so every tree that renders a pager also renders `Field`,
+  // `SearchablePopover`, the `ManagerButton` it renders its trigger through, and the `Chip`/
+  // `EmptyState` pair the popover's list renders. An omission here does not fail a suite — the
+  // closure validator throws in `before()` and `node --test` reports every test in the file as
+  // `# cancelled`.
+  ...SELECT_COMPILED_MODULES,
   // issue 1371 r18-colour: the tinted essence chip (M29) is rendered by the system inspector,
   // the rules list row and the world catalogue's rows; an omission here HANGS every suite that
   // mounts one of those trees (`# cancelled`) rather than failing it.
   'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  // Issue 1504: `Pagination` draws its page-size list in the app now, so every tree that renders
-  // a pager also renders `Select`, the `SearchablePopover` it composes and the `Field` its
-  // labelled form wraps. An omission here does not fail a suite — the closure validator throws in
-  // `before()` and `node --test` reports every test in the file as `# cancelled`.
-  'src/ui/svelte/components/Select.svelte',
-  'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte',
+  // `Select`, `Field` and `SearchablePopover` are already in this list via the
+  // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',

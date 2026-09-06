@@ -11,7 +11,10 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
-import { SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -145,18 +148,10 @@ describe('GatheringView ↔ actor bar wiring', () => {
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
     }
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
-    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
-    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
-    // the app; an omission CANCELS this suite rather than failing it.
-    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');

@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
@@ -155,13 +156,10 @@ const harness = createMountedComponentHarness({
     // already listed above — so omitting any of these three HANGS this suite (# cancelled)
     // rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The searchable picker `ActorSelectTopBar` converted onto (issue 1475), and the empty
-    // panel it renders over a filtered-to-nothing list. `Chip` directly above is shared with
-    // the complication band and is already listed.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — covers `Chip` (also shared
+    // with the complication band above), the searchable picker `ActorSelectTopBar` converted
+    // onto (issue 1475) and the empty panel it renders over a filtered-to-nothing list.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
@@ -229,11 +227,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Stepper.svelte',

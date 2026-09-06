@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
@@ -51,29 +52,16 @@ const RECIPE_RAW_MODULES = [
 ];
 
 const RECIPE_PRIMITIVES = [
-  // The manager's ONE chip (issue 883). Both harnesses below render it now that the
-  // browser's filter and check pills are `Chip`s, so it is hoisted here rather than
-  // repeated: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
-  // reads the WHOLE file, so naming it in only one of two harnesses reads as covered.
-  'src/ui/svelte/apps/manager/Chip.svelte',
-  // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-  // the harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-  // composes. A module missing from a manifest does not fail this suite — it is reported as
-  // `# cancelled`, never `# fail`.
-  'src/ui/svelte/components/Select.svelte',
-  'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte',
+  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
+  // (`...RECIPE_PRIMITIVES, ...SELECT_COMPILED_MODULES`), not folded in here — it covers the
+  // manager's ONE chip (issue 883) and shared no-state primitive (issue 785) too. Both
+  // harnesses below render them now that the browser's filter and check pills are `Chip`s, so
+  // hoisting is required: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
+  // reads the WHOLE file, so naming a primitive in only one of two harnesses reads as covered.
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  // The manager's ONE labelled push-button (issue 1118). Hoisted here rather than named in
-  // one harness for the reason the chip above gives: the primitive allowlist guard reads the
-  // WHOLE file, so naming it in only one of two harnesses reads as covered while the other
-  // one HANGS.
-  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
@@ -86,6 +74,7 @@ const browser = createMountedComponentHarness({
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
     ...RECIPE_PRIMITIVES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The manager's ONE selection control and its ONE multi-select toolbar row (issue
     // 1010). The inspector harness below does not render either, so they are named here
@@ -103,6 +92,7 @@ const inspector = createMountedComponentHarness({
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
     ...RECIPE_PRIMITIVES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'

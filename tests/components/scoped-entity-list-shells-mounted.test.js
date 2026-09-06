@@ -33,6 +33,7 @@ import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js'
 import { chooseSelectOption, openSelectPanel } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
@@ -71,20 +72,13 @@ const SCOPED_RAW_MODULES = [
 
 const FRAME_MODULES = [
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-  // composes. A module missing from a manifest does not fail this suite — it is reported as
-  // `# cancelled`, never `# fail`.
-  'src/ui/svelte/components/Select.svelte',
-  'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte',
+  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
+  // (`...FRAME_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -100,6 +94,7 @@ const catalogueHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     ...FRAME_MODULES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
@@ -114,6 +109,7 @@ const rulesHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     ...FRAME_MODULES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte',
   ],

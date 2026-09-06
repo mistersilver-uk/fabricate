@@ -18,6 +18,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/utils/essenceBulkEditModel.js';
@@ -50,30 +51,22 @@ const harness = createMountedComponentHarness({
     'src/utils/bulkSelectionModel.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     // The shared bulk-delete card (issue 1132). The panel renders its delete block through it,
     // so it is a STATIC import of the component under test; omitting it HANGS this suite as
     // `# cancelled` rather than failing it.
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
-    // THE manager's labelled push-button (issue 1118). `BulkEditPanelShell` renders its
-    // Apply through the primitive, so it is a STATIC import of this tree; omitting it HANGS
-    // this suite as `# cancelled` rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), which `BulkEditPanelShell` renders its Apply
+    // through.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
   ],

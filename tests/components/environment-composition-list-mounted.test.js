@@ -11,7 +11,10 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
-import { SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -134,15 +137,8 @@ describe('CompositionList mounted layout', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-composition-list-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
     for (const component of [
-      // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-      // harness omits HANGS the suite (# cancelled) rather than failing it.
-      'src/ui/svelte/apps/manager/Chip.svelte',
-      // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-      // the harness omits HANGS the suite (# cancelled) rather than failing it.
-      'src/ui/svelte/apps/manager/EmptyState.svelte',
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
-      'src/ui/svelte/components/ManagerButton.svelte',
       'src/ui/svelte/components/IconButton.svelte',
       // THE shared overflow action menu (issue 1477), which the four row menus render and which
       // renders `IconButton` above as its trigger. Omitting a rendered `.svelte` HANGS the suite
@@ -153,16 +149,16 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/OverrideIndicator.svelte',
       'src/ui/svelte/components/Pagination.svelte',
-      // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-      // composes. A module missing from a manifest does not fail this suite — it is reported as
-      // `# cancelled`, never `# fail`.
-      'src/ui/svelte/components/Select.svelte',
-      'src/ui/svelte/components/Field.svelte',
-      'src/ui/svelte/components/SearchablePopover.svelte',
       // The shared numeric stepper (issue 1050): the blind-weight cell renders it.
       'src/ui/svelte/components/Stepper.svelte'
     ]) {
       writeCompiledSvelte(component);
+    }
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883) and the shared no-state primitive (issue 785) — spread from the
+    // harness's own roster rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
     }
     for (const modulePath of [
       // The ONE answer to "does this record compose into this environment?" (issue 1321),

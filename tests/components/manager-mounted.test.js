@@ -26,7 +26,11 @@ import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js
 // second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
 // getting it wrong reports as `# cancelled`, never `# fail` (issue 1185). It is also the exact
 // near-identical `tests/**` block SonarCloud's new-code duplication gate counts.
-import { SEARCHABLE_POPOVER_RAW_MODULES, rewriteClientImports } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  rewriteClientImports,
+} from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
@@ -324,11 +328,12 @@ function compileManagerRoot() {
     mkdirSync(dirname(rawDestination), { recursive: true });
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
   }
-  // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-  // composes. A module missing from a manifest does not fail this suite — it is reported as
-  // `# cancelled`, never `# fail`.
-  writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
-  writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
+  // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied —
+  // covers `Field`, `SearchablePopover`, the `ManagerButton` it renders its trigger through
+  // (issue 1371), and the `Chip`/`EmptyState` pair the popover's list renders.
+  for (const selectModule of SELECT_COMPILED_MODULES) {
+    writeCompiledSvelte(selectModule);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
@@ -396,7 +401,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
   // The World > Parties card tree (issue 1182). `PartyExpandedBody` imports all three of
   // these, and this suite hand-rolls its compile list with no dependency validator, so an
@@ -425,27 +429,26 @@ function compileManagerRoot() {
   // three are in the root's static graph, so the same rule applies: omitting it HANGS every
   // mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
-  // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
-  // so it is in the root's static graph too. `Callout` is the shared standing-statement
-  // strip both Knowledge tabs render (issue 785); same rule, same consequence.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
+  // The shared no-state primitive (already compiled above via `SELECT_COMPILED_MODULES`). The
+  // Knowledge roster and both tab bodies render it too. `Callout` is the shared
+  // standing-statement strip both Knowledge tabs render (issue 785); same rule, same
+  // consequence.
   writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
   // The shared side-panel explainer card and icon fact row (issue 881). The root renders
   // the explainer directly in the Tags & Categories inspector and reaches the fact row
   // through the Tool Studio's browser inspector, so both are in the root's static graph.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ExplainerCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/IconFactRow.svelte');
-  // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
-  // trees today, and through every other manager screen as the conversion proceeds.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  // The shared chip (issue 883, already compiled above via `SELECT_COMPILED_MODULES`). The
+  // root reaches it through the Tool Studio and Knowledge trees today, and through every
+  // other manager screen as the conversion proceeds.
   // THE manager's editor tab strip (issue 1362). The environment, system and recipe-item
   // strips are callers of it now, and all three are in this root's static graph, so omitting
   // it HANGS every mounted manager test as `# cancelled` rather than failing one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/EditorTabs.svelte');
-  // THE manager's labelled push-button (issue 1096). The root reaches it through the Tool
-  // Studio header and the System Overview Modifiers card, and through every other screen
-  // as the conversion proceeds.
-  writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+  // THE manager's labelled push-button (issue 1096, already compiled above via
+  // `SELECT_COMPILED_MODULES`). The root reaches it through the Tool Studio header and the
+  // System Overview Modifiers card, and through every other screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
   // THE manager's on/off switch (issue 1040). The root reaches it from 25 components — every
   // browser, every studio overview tab, the Checks rail, the scoped-entity rows and

@@ -6,6 +6,7 @@ import { tick } from 'svelte';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 
@@ -57,22 +58,11 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The shared side-panel explainer card and icon fact row (issue 881); the behavior
     // preview renders both.
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    // The shared chip (issue 883); the library rows, the browser inspector, the editor
-    // tab bar and the behavior preview all render it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
-    // Studio header both render through it; an omission HANGS this suite rather than
-    // failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -81,7 +71,6 @@ const harness = createMountedComponentHarness({
     // the conversion, so it is in this tree's static graph; the harness's closure validator
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     // The shipped segmented primitive (issue 975): `RecipeIngredientOption` below
     // renders it for the tag-match Any/All control, so it is in this tree's static
     // import graph and the closure validator throws without it.
@@ -116,10 +105,12 @@ const harness = createMountedComponentHarness({
     // pager - but the import is STATIC, so it is in this tree's graph either way and the
     // harness's closure validator throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the shared
+    // no-state primitive (issue 785), the shared chip (issue 883) — the library rows, the
+    // browser inspector, the editor tab bar and the behavior preview all render it — and the
+    // manager's ONE labelled push-button (issue 1096), which the Modifiers card and the Tool
+    // Studio header both render through.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
     // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in

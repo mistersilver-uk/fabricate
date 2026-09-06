@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
@@ -38,18 +39,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883) and ONE no-state primitive (issue 785).
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',

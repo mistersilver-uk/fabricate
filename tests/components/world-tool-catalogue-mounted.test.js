@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
@@ -66,7 +67,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
@@ -94,16 +94,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    // `SearchablePopover` renders its trigger through the shared `ManagerButton` primitive
-    // (issue 1371's `triggerButton` form), reached by the same route as the trio above.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    // `Chip`/`ManagerButton` also arrive via `TOOL_TREE_COMPILED_MODULES` above; a module named
+    // twice compiles the same file twice, harmlessly.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
   ],

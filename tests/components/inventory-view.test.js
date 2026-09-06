@@ -6,6 +6,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
@@ -40,17 +41,8 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
-    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
-    // the app; an omission CANCELS this suite rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // The house chip primitive the salvage bodies render.
     'src/ui/svelte/components/StatusPill.svelte',
@@ -69,12 +61,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The salvage tree, plus the shared stage list it reuses.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
-    // The shared complication summary row and the two leaves it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
-    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
-    // rather than failing it.
+    // The shared complication summary row and the leaf it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
+    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
+    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',

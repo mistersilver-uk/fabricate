@@ -5,6 +5,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -28,18 +29,8 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
-    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
-    // the app; an omission CANCELS this suite rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'

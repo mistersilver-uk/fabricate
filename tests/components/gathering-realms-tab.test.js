@@ -8,6 +8,7 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createSvelteCompiler,
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
@@ -63,22 +64,13 @@ describe('GatheringRealmsTab mounted behavior', () => {
     writeRawModule('src/utils/managerBrowserViewState.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
-    // The shared no-state primitive (issue 785) and the manager's ONE chip (issue 883).
-    // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
-    // rather than failing it.
-    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
-    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
-    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
-    // the app; an omission CANCELS this suite rather than failing it.
-    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the shared
+    // no-state primitive (issue 785) and the manager's ONE chip (issue 883) — spread rather
+    // than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');

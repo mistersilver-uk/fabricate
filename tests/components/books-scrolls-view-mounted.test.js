@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -24,22 +25,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js'
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
-    // composes. A module missing from a manifest does not fail this suite — it is reported as
-    // `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    // THE manager's labelled push-button (issue 1118). Both Clear filters controls render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
+    // push-button (issue 1118) both Clear filters controls render.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
