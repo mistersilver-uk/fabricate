@@ -153,8 +153,9 @@
   import Pagination from '../../../components/Pagination.svelte';
   import Select from '../../../components/Select.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
@@ -1345,14 +1346,12 @@
                               class="manager-scoped-list-source"
                               data-scoped-list-source="unlinked"
                             >
-                              <StatusPill
-                                tone="warning"
-                                icon="fas fa-link-slash"
-                                label={text(
+                              <Chip tone="warning" icon="fas fa-link-slash"
+                                >{text(
                                   'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
                                   'No source item'
-                                )}
-                              />
+                                )}</Chip
+                              >
                             </span>
                           {/if}
                           {@render rowMeta(entry, rowContext(entry))}
@@ -1376,16 +1375,16 @@
                         class="manager-scoped-list-source"
                         data-scoped-list-source={sourceLinkedRow(entry) ? 'linked' : 'unlinked'}
                       >
-                        <StatusPill
-                          tone={sourceLinkedRow(entry) ? 'subtle' : 'warning'}
+                        <Chip
+                          tone={statusChipTone(sourceLinkedRow(entry) ? 'subtle' : 'warning')}
                           icon={sourceLinkedRow(entry) ? 'fas fa-link' : 'fas fa-link-slash'}
-                          label={sourceLinkedRow(entry)
+                          >{sourceLinkedRow(entry)
                             ? text('FABRICATE.Admin.Manager.Scoped.List.SourceLinked', 'Linked')
                             : text(
                                 'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
                                 'No source item'
-                              )}
-                        />
+                              )}</Chip
+                        >
                       </span>
                     {/if}
                     {#if rowSecondLine === 'description' && rowMeta}

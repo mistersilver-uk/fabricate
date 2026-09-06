@@ -55,7 +55,6 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import EssenceQuantityCard from '../components/EssenceQuantityCard.svelte';
@@ -820,19 +819,30 @@
                       >
                       <span data-scoped-entry-linked-pill>
                         <!--
-                          `emphasis="outlined"` IS THE REFERENCE'S LOCK PILL (`proto:834`): 9px
-                          secondary ink on a hairline, on a 2px/8px band. The primitive's own
-                          scoped `<style>` is unlayered and this module's sheet is imported at
-                          `layer(modules)`, so no rule in `styles/fabricate.css` can reach it at
-                          any specificity — the variant is the only way to say this, and it is
-                          opt-in so every other `subtle` pill keeps its filled face.
+                          THE REFERENCE'S LOCK PILL (`proto:834`) IS A SHIPPED PAIR, NOT AN
+                          EMPHASIS (issue 1506). The reference draws 9px secondary ink on a
+                          `--fab-border` hairline over a 2px/8px band, and `tone="secondary"` plus
+                          `density="list"` render exactly that edge and that ink: `secondary`
+                          states the hairline and the `--fab-text-secondary` ink this reference
+                          asks for, and `list` states the 999px stadium at `600 9px`.
+
+                          IT PASSES NO `emphasis`, DELIBERATELY. The word means the opposite thing
+                          on this chip: the retired pill's `outlined` superseded the tone's edge
+                          and ink and kept its fill, while the chip's supersedes the FILL alone and
+                          renders a flat `--fab-bg-1` plate — a value that is RECOGNISED here, so
+                          carrying it forward would have drawn the wrong face silently rather than
+                          dropping to the default. Minting a fourth emphasis a pixel from a shipped
+                          scale is the drift the chip's own props block refuses by name.
+
+                          THREE MEASURED DEVIATIONS, all of the class that docblock already
+                          accepts twice: one pixel of vertical padding per side (`list`'s `1px 8px`
+                          against the reference's `2px 8px`), the fill at `--fab-surface-soft`
+                          rather than `--fab-surface-raised`, and a 9px inherited glyph against the
+                          reference's 8px. The badge measures 19.5px today and 13px after, of which
+                          4.5px is the leading the chip states as 1 rather than 1.5.
                         -->
-                        <StatusPill
-                          tone="subtle"
-                          emphasis="outlined"
-                          icon="fas fa-lock"
-                          label={sourceLabel}
-                        />
+                        <Chip tone="secondary" density="list" icon="fas fa-lock">{sourceLabel}</Chip
+                        >
                       </span>
                     {:else}
                       <input
@@ -847,14 +857,12 @@
                         oninput={(event) => patchIdentity('name', event.currentTarget.value)}
                       />
                       <span data-scoped-entry-linked-pill>
-                        <StatusPill
-                          tone="warning"
-                          icon="fas fa-link-slash"
-                          label={text(
+                        <Chip tone="warning" icon="fas fa-link-slash"
+                          >{text(
                             'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
                             'No source item'
-                          )}
-                        />
+                          )}</Chip
+                        >
                       </span>
                     {/if}
                   </div>

@@ -42,11 +42,11 @@
 -->
 <script>
   import { localize, notifyError } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import EssenceChip from '../components/EssenceChip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
@@ -777,8 +777,9 @@
   pill in particular said something different — the frame's badge answers "does this record name
   an Item at all", where the reference's pill names WHICH KIND of address it is.
 
-  It renders INSIDE the identity `<button>`, so nothing here may be interactive: `StatusPill` is
-  a `<span>`, which is why it is the primitive used rather than a chip button.
+  It renders INSIDE the identity `<button>`, so nothing here may be interactive: the chip's `tag`
+  defaults to `span` and neither badge passes one, which is what keeps them readable marks rather
+  than nested controls.
 -->
 {#snippet componentRowNameTrailing(entry)}
   {@const linked = entry?.hasSourceLink === true}
@@ -793,18 +794,26 @@
       insets. Every one of them is declared inside the primitive's own scoped block, and a
       component's scoped block is UNLAYERED while `styles/fabricate.css` imports at
       `layer(modules)` — so no page- or sheet-authored rule could have won against it however
-      specific. `emphasis="bare"` is that face, on the primitive that owns it.
+      specific. `emphasis="bare"` is that face, and since issue 1506 the chip is the primitive
+      that owns it.
 
       IT KEEPS THE TONE, which is why it is `bare` and not `outlined`: the fill and the ink are
       the tone's, and only the edge and the type move. So a linked badge stays `subtle` and an
       unlinked one stays `warning` and keeps its amber.
+
+      AND IT TAKES `density="list"` (issue 1506). The bare face states no height floor of its own
+      and the chip's base declares `min-height: 20px` where the retired pill declared none, so at
+      the default density this badge would floor at 20px inside an 11px gap. `list` declares
+      `min-height: 0` at the same `600 9px` the reference draws, which is also the weight the
+      chip's own base would have thickened to 700. Measured, the badge moves 15.5px to 11px, of
+      which 4.5px is the leading the chip states as 1 rather than 1.5.
     -->
-    <StatusPill
-      tone={linked ? 'subtle' : 'warning'}
+    <Chip
+      tone={statusChipTone(linked ? 'subtle' : 'warning')}
       emphasis="bare"
-      icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}
-      label={componentSourceType(entry, text)}
-    />
+      density="list"
+      icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}>{componentSourceType(entry, text)}</Chip
+    >
   </span>
   {#if broken}
     <!--
@@ -817,13 +826,17 @@
       They are two faces, not one: `proto:3893`'s `pill()` helper draws the exception flag at
       `2px 8px` with a REAL `1px solid` edge at 9.5px, and only `proto:601`'s source badge is
       edgeless. A flag that lost its edge would read as the badge beside it.
+
+      IT TAKES `density="list"` FOR THE PAIR (issue 1506). `proto:601` draws the two badges as one
+      line's pair and they render as `flex: 0 0 auto` siblings in this one snippet, so they move
+      together: at `list` the flag keeps the real edge the chip's base states and the `warning`
+      tone repaints, and measures 13px against the source badge's 11px — where the default density
+      would floor it at 20px, nine pixels above its sibling rather than two.
     -->
     <span class="manager-world-component-row-flag" data-world-component-row-flag={entry.id}>
-      <StatusPill
-        tone="warning"
-        icon="fas fa-link-slash"
-        label={text('FABRICATE.Admin.Manager.Scoped.Component.FlagBrokenLink', 'Broken link')}
-      />
+      <Chip tone="warning" density="list" icon="fas fa-link-slash"
+        >{text('FABRICATE.Admin.Manager.Scoped.Component.FlagBrokenLink', 'Broken link')}</Chip
+      >
     </span>
   {/if}
 {/snippet}

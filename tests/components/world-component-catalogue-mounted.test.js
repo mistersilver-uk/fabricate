@@ -2662,27 +2662,28 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
-    it('takes the BARE pill face on the source badge and leaves the flag its edge', async () => {
+    it('takes the BARE chip face on the source badge and leaves the flag its edge', async () => {
       // `proto:601` draws the source badge edgeless on `--surface-raised`; `proto:3893`'s `pill()`
       // helper draws the exception flag WITH a real 1px edge. They are two faces, and a flag that
       // lost its edge would read as the badge beside it — which is why this asserts both halves.
+      //
+      // Both badges are the shared chip since issue 1506, so the face is read off the class the
+      // chip emits for the emphasis rather than off the retired pill's own hook, and both take
+      // `density="list"`: the chip's base floors at 20px where the pill declared no height, which
+      // in an 11px row gap is the difference between the reference's pair and two buttons.
       const target = await mounted();
-      const badge = target.querySelector(
-        '[data-world-component-row-source-pill] [data-status-pill]'
-      );
-      assert.ok(Boolean(badge), 'the row leads its name line with the shared pill');
-      assert.equal(
-        badge.getAttribute('data-status-pill-emphasis'),
-        'bare',
-        'and the badge takes the edgeless face'
-      );
+      const badge = target.querySelector('[data-world-component-row-source-pill] .manager-chip');
+      assert.ok(Boolean(badge), 'the row leads its name line with the shared chip');
+      assert.ok(badge.classList.contains('is-bare'), 'and the badge takes the edgeless face');
+      assert.ok(badge.classList.contains('is-list'), 'at the dense scale the row has room for');
 
-      const flag = target.querySelector('[data-world-component-row-flag] [data-status-pill]');
+      const flag = target.querySelector('[data-world-component-row-flag] .manager-chip');
       assert.ok(Boolean(flag), 'NON-VACUITY: a broken-link row is in the corpus');
       assert.ok(
-        !flag.getAttribute('data-status-pill-emphasis'),
+        !flag.classList.contains('is-bare'),
         'and the exception flag keeps the shipped bordered face'
       );
+      assert.ok(flag.classList.contains('is-list'), 'at the same scale, so the pair stays a pair');
     });
 
     it('draws a world tag as the reference’s LIT micro pill, on both of Chip’s axes', async () => {
