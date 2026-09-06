@@ -69,6 +69,7 @@ import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { assertPublishSafety, fetchPublishState } from './lib/publishGuard.js';
+import { assertArchiveChunkCompleteness } from './lib/releaseZipChunks.js';
 import { zipDirectory } from './lib/zip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -577,6 +578,10 @@ async function defaultBuild({ version }) {
  * @typedef {object} ReleaseDeps
  * @property {Record<string, string|undefined>} [env] Environment map (`runCheckHeads` only —
  *   `main()` takes `env` as a top-level argument).
+ * @property {(opts: {zipPath: string, manifest: object}) => unknown} [assertArchiveChunks] The
+ *   archive-completeness gate (issue 1565). Injectable for the same reason `zip` is: the harnesses
+ *   inject a `zip` that writes the 9-byte string `zip-bytes`, and a zip reader throws on that, so
+ *   every test that is not ABOUT this gate stubs it out and one test per harness arms it for real.
  * @property {(opts: {version: string}) => Promise<{distDir: string, manifest: object}>} [build]
  * @property {(distDir: string, zipPath: string) => void} [zip]
  * @property {(opts: {bucket: string, region?: string}) => Promise<S3Port>} [createS3Client]
@@ -842,6 +847,11 @@ function assertBuiltManifest(built, { moduleId, version }) {
  * dist/ to a per-target staging path. Staged zips live outside dist/ so they are not nested into the
  * next target's archive.
  *
+ * EVERY STAGED ARCHIVE IS GATED HERE, before `publishTargets` exists to be called (issue 1565). It
+ * has to be gated on THIS path and not only in `scripts/release.js`: that script is invoked with
+ * `--no-zip`, so the archives this channel publishes are made here, by a different producer, and
+ * gating only the GitHub-release path would have left the channel publisher unproven.
+ *
  * @param {{plan: object, built: object, distDir: string, deps: ReleaseDeps, ci: boolean,
  *   log: (...args: unknown[]) => void}} opts The plan, the built manifest, and the collaborators.
  * @returns {Promise<Array<{target: PublishTarget, body: object, zipPath: string}>>} The staged
@@ -851,6 +861,7 @@ async function stageTargets({ plan, built, distDir, deps, ci, log }) {
   const { layout } = plan;
   const stagingDir = deps.stagingDir ?? STAGING_DIR;
   const zip = deps.zip ?? zipDirectory;
+  const assertChunks = deps.assertArchiveChunks ?? assertArchiveChunkCompleteness;
   const distManifestPath = join(distDir, 'module.json');
   await rm(stagingDir, { recursive: true, force: true });
 
@@ -863,6 +874,15 @@ async function stageTargets({ plan, built, distDir, deps, ci, log }) {
     await mkdir(outDir, { recursive: true });
     const zipPath = join(outDir, layout.zipName);
     zip(distDir, zipPath);
+    // `body` is the manifest just written into dist/, so it is the manifest that is now INSIDE
+    // this archive — which is what makes its `esmodules` the right place to learn the entry
+    // script's name. Routed through `fail` so a refusal reads as release-s3's own, with the gate's
+    // message (and the missing member's name) carried through intact.
+    try {
+      assertChunks({ zipPath, manifest: body });
+    } catch (error) {
+      fail(`staged archive for ${target.label} is incomplete: ${error.message}`);
+    }
     // Label only in CI (the key carries the secret segment); full key locally.
     log(
       ci
