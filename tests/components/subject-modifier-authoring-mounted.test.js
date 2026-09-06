@@ -26,7 +26,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
@@ -264,6 +268,8 @@ const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
@@ -293,20 +299,14 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
+    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). The stamina Add modifier and both
-    // Add drop rule controls render it; an omission HANGS the suite (# cancelled).
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
-    // The three availability add menus, and `ModifierPillSelect`'s, are this primitive
-    // (issue 1458). `Chip` and `EmptyState` are already above; an omission of this one
-    // cancels every test in the suite rather than failing one.
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],

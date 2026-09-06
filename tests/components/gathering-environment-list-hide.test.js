@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -15,6 +19,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-env-hide-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/sceneImages.js',
@@ -23,10 +29,18 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],
+  // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
+  // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
+  // portal host by walking up to the nearest Fabricate application root. `rootClass` IS that
+  // host: on the `fabricate-manager` default the panel would portal to a root no production
+  // mount of this component can reach, and every `target.querySelector` for a row would miss.
+  rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
 });
 

@@ -6,7 +6,11 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createSvelteCompiler,
+} from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -108,16 +112,19 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     ]) {
       writeRawModule(modulePath);
     }
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
-    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
     // The manager's ONE labelled push-button (issue 1118): the actor list's bulk Save renders
-    // it. This suite predates the shared harness and so has no dependency-closure check —
-    // omitting this line leaves the compiled view importing a module that is not there.
-    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+    // it. Already covered by the `SELECT_COMPILED_MODULES` loop above.
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(

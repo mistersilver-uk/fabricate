@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 247,
+  "pinnedTotal": 243,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -267,14 +267,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-salvage-dc-card",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar .manager-search input",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-scoped-list-toolbar select",
       "count": 2
     },
     {

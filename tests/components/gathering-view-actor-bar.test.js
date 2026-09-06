@@ -8,6 +8,13 @@ import { compile, compileModule } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
+// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
+// there cannot go missing here.
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -135,6 +142,16 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+      const rawDestination = join(tempRoot, rawModule);
+      mkdirSync(dirname(rawDestination), { recursive: true });
+      writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
+    }
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');

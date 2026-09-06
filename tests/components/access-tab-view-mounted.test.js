@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -12,22 +16,19 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-access-tab-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js'
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // THE manager's labelled push-button (issue 1118). Clear filters and Clear search both render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
+    // push-button (issue 1118) Clear filters and Clear search both render.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',

@@ -35,9 +35,14 @@ import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL = 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte';
@@ -167,6 +172,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-scoped-list-geometry-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/stores/worldScopeProjection.js',
@@ -194,17 +201,16 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     FRAME,
@@ -341,8 +347,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       `a ${ROW_COUNT}-entity corpus rendered no page-size control in the list column, so this ` +
         'fixture cannot be driven onto one page and the overflow below is unreachable'
     );
-    tallSizeSelect.value = String(TALL_PAGE_SIZE);
-    tallSizeSelect.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    // Issue 1504: the control is a shared `<Select>`, so this is two clicks on a portaled panel.
+    chooseSelectOption(target, '[data-pagination-size]', TALL_PAGE_SIZE);
     await harness.setProps({});
     assert.equal(
       target.querySelectorAll('[data-scoped-list-row]').length,
@@ -452,8 +458,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       `a ${PAGED_ROW_COUNT}-entity corpus rendered no page-size control in the list column, so ` +
         'this fixture never reached the multi-page state it exists to measure'
     );
-    sizeSelect.value = String(PAGED_PAGE_SIZE);
-    sizeSelect.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    // Issue 1504: the control is a shared `<Select>`, so this is two clicks on a portaled panel.
+    chooseSelectOption(pagedTarget, '[data-pagination-size]', PAGED_PAGE_SIZE);
     await harness.setProps({});
     shortPagedMarkup = pagedTarget.innerHTML;
 

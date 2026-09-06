@@ -1159,15 +1159,17 @@ describe('the catalogue shell FORWARDS what it declares', () => {
       /const onLeadRow = \(filter\?\.toolbarRow \?\? 'lead'\) === 'lead';/,
       'the helper decides on the descriptor’s ROW'
     );
-    // The sort select is written by the frame itself, outside the lane-filter snippet, and it
+    // The sort control is written by the frame itself, outside the lane-filter snippet, and it
     // must not acquire the token: `proto:583` draws it on the filter row. Sliced from the tag
     // that OPENS it — searching backwards from its own hook — so the assertion reads the element
-    // and not the whole file.
-    const hook = source.indexOf('data-scoped-list-sort\n');
-    assert.ok(hook > 0, 'NON-VACUITY: the sort select is still written by this frame');
-    const sortSelect = source.slice(source.lastIndexOf('<select', hook), hook);
+    // and not the whole file. Since issue 1504 that element is a shared `<Select>` carrying the
+    // hook through `triggerData`, not a native `<select>`.
+    const hook = source.indexOf("'data-scoped-list-sort'");
+    assert.ok(hook > 0, 'NON-VACUITY: the sort control is still written by this frame');
+    const sortSelect = source.slice(source.lastIndexOf('<Select', hook), hook);
     assert.match(sortSelect, /value=\{sortKey\}/, 'and the slice is that element');
     assert.ok(!/is-size-38/.test(sortSelect), 'and it carries no 38px token');
+    assert.ok(!/\bclass=/.test(sortSelect), 'and it takes no call-site class at all');
   });
 });
 

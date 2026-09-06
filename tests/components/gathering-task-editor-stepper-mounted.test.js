@@ -21,7 +21,11 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
@@ -32,6 +36,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-task-stepper-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
     // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
     'src/systems/characterLibraries.js',
@@ -63,22 +69,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
+    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    ...SELECT_COMPILED_MODULES,
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). The stamina Add modifier and both
-    // Add drop rule controls render it; an omission HANGS the suite (# cancelled).
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
-    // The three availability add menus, and `ModifierPillSelect`'s, are this primitive
-    // (issue 1458). `Chip` and `EmptyState` are already above; an omission of this one
-    // cancels every test in the suite rather than failing one.
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     EDITOR_PATH,

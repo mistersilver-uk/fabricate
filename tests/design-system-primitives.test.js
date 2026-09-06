@@ -187,6 +187,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
   // override itself and everything about where it sorts.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // Issue 1504: the app's own select. Its option list exists only while the panel is open, and
+  // both representative frames draw every select they contain CLOSED — so its override names the
+  // two frames that open one, at both values of `showTick`, in both applications. It is NOT in
+  // `PRIMITIVES_WITH_NO_FRAME`: that list is removal-only, and this primitive shipped with the two
+  // frames rather than acquiring them later.
+  'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -317,7 +323,12 @@ test('the inputs every property below quantifies over are alive', () => {
   // 49 as of issue 1371 r18-colour: `apps/manager/components/EssenceChip.svelte`, the tinted
   // essence chip maintainer ruling M29 asked for, registered at its second caller with its
   // `library.html` specimen beside the icon chip's.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 49, 'the shipped primitive set changed size');
+  // 50 as of issue 1504, which added `components/Select.svelte` — the app's one select, and the
+  // first member admitted by BUILDING a library entry rather than by promoting a component that
+  // had quietly crossed the membership bar. The non-member set is unmoved at 12:
+  // `BulkEditSelect.svelte` stays in it, on issue 1371 r16-list's one-caller ground, and is now a
+  // wrapper around the new member rather than around a native `<select>`.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 50, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
