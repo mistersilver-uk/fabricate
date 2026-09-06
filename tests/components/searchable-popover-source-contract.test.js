@@ -371,13 +371,13 @@ test('a popover that renders no search field announces a listbox', () => {
   // row-level `or…` menu passed `showSearch={false}` and no `triggerHasPopup`, so it took the
   // `dialog` default while rendering the primitive's bare-listbox shape, and under the focus
   // model its trigger announces `aria-haspopup="dialog"` beside `role="combobox"` and an
-  // `aria-controls` naming a `role="listbox"`. The other four search-suppressed sites all
-  // declare it, so the odd one out was invisible to every reader that looked at the four.
+  // `aria-controls` naming a `role="listbox"`. The other five search-suppressed sites all
+  // declare it, so the odd one out was invisible to every reader that looked at the five.
   const suppressed = popover.callSites.filter(
     (site) => site.attribute('showSearch') === 'showSearch={false}'
   );
   // A floor rather than a count, and above zero: at zero this clause quantifies over nothing and
-  // reports clean. Five sites suppress the field as issue 1503 lands.
+  // reports clean. Six sites suppress the field as issue 1503 lands.
   assert.ok(
     suppressed.length >= 5,
     `only ${suppressed.length} call sites suppress the search field, so this clause is vacuous`

@@ -5908,7 +5908,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
   // So the fixture now renders a COMPONENT row beside the two tag rows and the empty tag row is
   // asserted against ITS height, and the `+ Tag` pill is wrapped in the `div.fabricate-picker`
   // namespace root `SearchablePopover` actually renders it inside
-  // (`SearchablePopover.svelte:476`) rather than dropped bare into the arm - a flex item the
+  // (`SearchablePopover.svelte:986`) rather than dropped bare into the arm - a flex item the
   // shipped tree has and the old fixture did not.
   //
   // WHAT IS ASSERTED IS NOT "one line" AT BOTH WIDTHS. At the narrow width `Any of` + two chips

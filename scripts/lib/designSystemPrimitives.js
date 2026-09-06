@@ -192,7 +192,7 @@
  *
  * A name is recorded only when the library entry names the primitive AND the shipped file IS that
  * primitive today. A shipped file the library records as COLLAPSING INTO a primitive it is not yet
- * — the catalogue pickers at `library.html:764` are the live example — takes `null`, with the
+ * — the catalogue pickers at `library.html:784` are the live example — takes `null`, with the
  * target named in `why`. Guessing there would fill the "conformant" quadrant with work that has
  * not been done, which is the one thing a conformance manifest must never do.
  *

@@ -3775,7 +3775,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // world that has authored no component tags gives this picker nothing to list, and until
     // this case existed no frame in the registry drew ANY picker with an empty list — so the
     // dashed hero panel `EmptyState` used to put inside a 240px popover was unphotographed at
-    // all 22 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
+    // all 23 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
     // hero panel in a full pane and cannot show the note.
     //
     // NO `clearSystem`, AND THAT IS STILL THE FINDING. The tag list this picker offers is not
