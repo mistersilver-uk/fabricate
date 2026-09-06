@@ -80,7 +80,11 @@ function mount(props = {}) {
     .mount({
       options: CATALOGUE,
       selectedIds: null,
-      inheritedIds: [],
+      // The activity MARKS the whole catalogue by default, because the mark now bounds
+      // what the picker offers (issue 1608): an unmarked catalogue offers nothing, so a
+      // fixture that left this empty would be testing the suppressed path everywhere.
+      // The inheritance cases below override it with their own mark.
+      inheritedIds: CATALOGUE.map((entry) => entry.id),
       maxPicks: null,
       subject: 'component',
       testId: 'salvage-check-modifier',

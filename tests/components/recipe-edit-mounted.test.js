@@ -572,6 +572,9 @@ describe('RecipeEditView (mounted)', () => {
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
+        // The check MARKS both, which is what makes them offerable at all (issue 1608):
+        // `defaultModifierIds` bounds the pick, so an unmarked catalogue offers nothing.
+        craftingModifierDefaultIds: ['med', 'alch'],
         craftingModifierPolicy: 'bySubject',
       })
     );
@@ -591,9 +594,8 @@ describe('RecipeEditView (mounted)', () => {
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
     );
-    assert.equal(
-      picker.querySelector('[data-modifier-pill="alch"]'),
-      null,
+    assert.ok(
+      !picker.querySelector('[data-modifier-pill="alch"]'),
       'an unselected modifier is not a pill'
     );
     // Opening the menu and picking alch stages the combined set. The patch carries the
@@ -935,7 +937,15 @@ describe('RecipeEditView (mounted)', () => {
     ];
     const capOf = async (overrides) => {
       const target = await editHarness.mount(
-        ruleProps({ craftingModifierOptions: CAP_CATALOGUE, ...overrides })
+        ruleProps({
+          craftingModifierOptions: CAP_CATALOGUE,
+          // MARK all three. `ruleProps` marks only two, and the mark now bounds the offer
+          // (issue 1608), so leaving it would shrink the offer back to the two the picks
+          // fill — reinstating exactly the "everything is already selected" confound the
+          // three-entry catalogue above exists to remove.
+          craftingModifierDefaultIds: CAP_CATALOGUE.map((entry) => entry.id),
+          ...overrides,
+        })
       );
       const hint = target.querySelector('[data-recipe-crafting-modifier-cap]');
       const reading = hint?.getAttribute('data-recipe-crafting-modifier-cap') ?? null;

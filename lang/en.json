@@ -2624,6 +2624,8 @@
           "CraftingModifierInherited": "Inheriting the system default set:",
           "CraftingModifierInheritedEmpty": "The system default set is empty, so no check modifier applies to this recipe.",
           "CraftingModifierEmptySet": "No modifiers — nothing is added to this recipe’s check roll.",
+          "CraftingModifierSuppressed": "{count} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.",
+          "CraftingModifierSuppressedOne": "One chosen modifier is hidden because the check no longer marks it selectable. It is kept and returns if the check marks it again.",
           "CraftingModifierOpenChecks": "Checks tab",
           "CraftingModifierInertLabel": "Not used by this system’s check",
           "CraftingModifierInertNoCheck": "This system resolves without a crafting check, so check modifiers change nothing for this recipe.",

@@ -43,6 +43,8 @@ const CATALOGUE = [
   { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask' },
 ];
 
+const MARKED_IDS = CATALOGUE.map((entry) => entry.id);
+
 const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
@@ -75,7 +77,10 @@ function salvageProps(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     salvageModifierPolicy: 'bySubject',
     salvageModifierMaxPicks: null,
-    salvageModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    salvageModifierDefaultIds: MARKED_IDS,
     ...rest,
   };
 }
@@ -321,7 +326,10 @@ async function mountGathering(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',
     gatheringModifierMaxPicks: null,
-    gatheringModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    gatheringModifierDefaultIds: MARKED_IDS,
     onUpdateTask: (patch) => updates.push(patch),
     ...overrides,
   });
