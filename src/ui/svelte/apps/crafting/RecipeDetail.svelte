@@ -47,6 +47,13 @@
     // The step the engine would execute for this actor's active run, so a multi-step
     // body can make only that step's rail interactive.
     activeStepId = null,
+    // The step `craftability` above was projected from. It is the recipe's FIRST
+    // execution step, so it differs from `activeStepId` whenever a run is parked on a
+    // later step, and a multi-step body may substitute the recomputed craftability only
+    // into this step. Like the props above it MUST be declared and forwarded here — one
+    // that skips this dispatcher silently drops to null and every step block falls back
+    // to its baked projection.
+    displayedStepId = null,
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -99,6 +106,7 @@
           {steps}
           {rail}
           {activeStepId}
+          {displayedStepId}
         />
       </div>
       <div class="crafting-detail-footer">

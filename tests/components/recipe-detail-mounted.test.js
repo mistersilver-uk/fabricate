@@ -669,7 +669,9 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('feeds the active step rail the re-evaluated craftability, not the baked step projection', async () => {
+  // With no run in flight the active step IS the displayed step, so this case reads the
+  // recomputed value; the case below covers the two coming apart.
+  it('feeds the displayed step rail the re-evaluated craftability, not the baked step projection', async () => {
     const fixture = steppedEssenceRecipe();
     const recomputed = essenceCraftability();
     const target = await harness.mount({
@@ -678,6 +680,7 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: recomputed,
       steps: fixture.steps,
       activeStepId: fixture.activeStepId,
+      displayedStepId: fixture.displayedStepId,
       rail: {}
     });
     const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');

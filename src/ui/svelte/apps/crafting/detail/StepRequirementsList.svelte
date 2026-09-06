@@ -27,12 +27,18 @@
     // The requirement rail's interaction state (issue 917). ONLY the step the engine
     // would execute next receives it; every other step renders an inert preview,
     // because an allocation authored against a step the engine is not on would be
-    // dropped engine-side anyway and the rail must not imply otherwise.
+    // dropped engine-side anyway and the rail must not imply otherwise. Which step is
+    // INTERACTIVE and which step the recomputed craftability DESCRIBES are separate
+    // questions with separate answers, so they read separate ids below.
     rail = {},
     activeStepId = null,
-    // The store's re-evaluated craftability for the active step's set. The step
+    // The step the model's top-level projection was built from — always the FIRST
+    // execution step. It is NOT the active step while a run is parked on a later one,
+    // which is exactly the case `activeCraftability` below must not be applied to.
+    displayedStepId = null,
+    // The store's re-evaluated craftability for the DISPLAYED step's set. The step
     // projection's own baked craftability predates any in-session option override or
-    // essence allocation, so the interactive step reads this instead — otherwise the
+    // essence allocation, so the displayed step reads this instead — otherwise the
     // tiles would stop matching the plan the craft consumes.
     activeCraftability = null,
   } = $props();
@@ -44,8 +50,18 @@
     return Boolean(activeStepId) && step?.id === activeStepId;
   }
 
+  function isDisplayedStep(step) {
+    return Boolean(displayedStepId) && step?.id === displayedStepId;
+  }
+
+  // The recomputed value describes ONE step: the one it was projected from. The active
+  // and displayed steps coincide until a run is parked past the first step, and keying
+  // this on the ACTIVE step then painted that step with the first step's requirements,
+  // consumption plan and tools — so both blocks read identically and the player was
+  // told to gather materials for a step they had already finished. Every step other
+  // than the displayed one renders its own baked projection.
   function craftabilityFor(step) {
-    if (isActiveStep(step) && activeCraftability) return activeCraftability;
+    if (isDisplayedStep(step) && activeCraftability) return activeCraftability;
     return step?.ingredientSets?.[0]?.craftability ?? null;
   }
 

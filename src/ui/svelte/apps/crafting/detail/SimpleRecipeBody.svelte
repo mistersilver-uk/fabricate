@@ -29,6 +29,10 @@
     // The step the engine would execute for this actor's run, so a multi-step body
     // makes only THAT step's rail interactive.
     activeStepId = null,
+    // The step `craftability` above was projected from (the recipe's FIRST execution
+    // step), which is not the active step while a run is parked on a later one. The
+    // step list substitutes the recomputed value into THIS step, not the active one.
+    displayedStepId = null,
   } = $props();
 
   // An explicit multi-step recipe (more than one step) swaps the single IoTable for
@@ -41,7 +45,13 @@
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
       {#if isMultiStep}
-        <StepRequirementsList {steps} {rail} {activeStepId} activeCraftability={craftability} />
+        <StepRequirementsList
+          {steps}
+          {rail}
+          {activeStepId}
+          {displayedStepId}
+          activeCraftability={craftability}
+        />
         <!-- The single emphasized final product (terminal step). craftability={null}
              so IoTable emits only the Output group. -->
         <IoTable craftability={null} result={recipe?.result} idPrefix="fabricate-req-result" />
