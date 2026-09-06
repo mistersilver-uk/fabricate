@@ -32,8 +32,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     // The rail's "How players see it" preview builds a synthetic row (pure helper) and
-    // embeds the REAL player InventoryDetail, which pulls in CraftingThumb →
-    // craftingImageDefaults (issue 544).
+    // embeds the REAL player InventoryDetail, which pulls in the shared art tile and the
+    // resolution behind it (issue 544; retargeted by issue 1506).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',

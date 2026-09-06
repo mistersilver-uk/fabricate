@@ -917,7 +917,9 @@ const MEMBERSHIP_BAR = 2;
  * set is a closed, versioned vocabulary" requirement puts a candidate INTO the set at two or more
  * independent callers, and it does not say the candidate has to live in `components/` — but every
  * gate that read it did, so a component under `apps/` could acquire twenty callers without
- * anything asking whether it belonged in the vocabulary. `CraftingThumb` has twenty-one.
+ * anything asking whether it belonged in the vocabulary. The crafting art tile had twenty-one,
+ * and issue 1506 answered the question for it by retiring it into a registered primitive rather
+ * than by registering it where it stood.
  *
  * The register below is therefore the EXCLUSION MECHANISM rather than a list of offenders. A path
  * leaves it only by gaining a manifest row — in EITHER table, because recording a component as a

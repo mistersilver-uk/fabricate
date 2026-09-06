@@ -21,10 +21,10 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// The player Inventory tab tree. Its raw `.js` deps (foundryBridge +
-// craftingImageDefaults) are the same ones the Crafting tree already uses, so no
-// new raw module is needed — only the inventory `.svelte` components (plus the
-// shared Pagination + CraftingThumb they reuse) are compiled.
+// The player Inventory tab tree. Its raw `.js` deps (foundryBridge, craftingImageDefaults
+// and the art resolution beside it) are the same ones the Crafting tree already uses, so no
+// new raw module is needed — only the inventory `.svelte` components (plus the shared
+// Pagination and the shared art tile they reuse) are compiled.
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-view-',
