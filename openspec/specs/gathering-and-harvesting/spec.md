@@ -561,6 +561,11 @@ Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`
 5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
 6. GM-customized vocabularies are preserved.
 Defaults are seeded only when a custom list is absent or empty.
+6a. `vocabularies.{biomes,danger,weather,timeOfDay}` normalize to a de-duplicated list of ids.
+Entries persisted as condition-option or biome-option records are accepted and normalized to their id; the label, icon and color token on such an entry are display metadata derived from the id, are not authored at this level, and are re-derived on read.
+GM-authored option metadata lives in the per-system `conditions[kind].values` and `vocabularies.biomes.values` records.
+An entry whose normalized id is the lower-cased stringification of a plain object — `[object object]`, or `object-object` once condition-id normalization has stripped the brackets — is not a tag and is discarded.
+`weather` and `timeOfDay` ids are condition-option ids and are kebab-cased; `biomes` and `danger` ids are tags and are lower-cased only.
 7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day condition settings with `enabled`, `current`, and `values` fields. `current` stores a condition option id.
 8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes.
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
@@ -570,6 +575,9 @@ Defaults are seeded only when a custom list is absent or empty.
 13. Deleting the last value of an enabled per-system condition dimension must be rejected; GMs may disable that dimension instead.
 14. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
 15. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
+A validated change also sets `systems[systemId].conditions[kind].current` for every configured system whose own `values` contain that id, so the global setter drives the per-system current condition the runtime gates on.
+A system whose values do not contain the id keeps its current unchanged; per-system `values` are never modified; `enabled: false` does not exempt a dimension: it is updated on the same values-membership condition, because `enabled` governs runtime gating (requirement 19), not storage.
+A crafting system with no persisted `conditions` block continues to inherit the global current directly, so propagation is what keeps systems that do carry a block in step with it.
 16. Player-facing callers may read conditions but may not mutate them.
 17. Condition values are authored or selected by the GM unless an approved integration provider supplies them.
 18. Weather and time-of-day are runtime gates only; they never affect whether a Gathering Task or event matches an environment, and player environment browse filters must not expose weather/time as environment filters.
@@ -1476,7 +1484,7 @@ It is `null` for progressive/routed resolution modes and when there are no enabl
 It represents "chance at least one drop row rolls" — the chance the attempt finds something — and is NOT whole-attempt success: it ignores the d100 success threshold, condition/character modifiers, attempt/node/stamina/tool gates, and event policy.
 It is absent from the opaque `blindGather` entry, which must not leak any aggregate drop information.
 8. `biomeTags` carries resolved biome display metadata (id, label, icon, and color token/custom color) so player biome chips render consistently with GM authoring.
-The per-system biome vocabulary takes precedence over the global vocabulary, then defaults.
+The per-system biome vocabulary supplies authored display metadata and takes precedence; the global vocabulary contributes biome *membership* only (its entries are ids), so metadata for a biome not overridden per system is derived from the defaults.
 9. These listing fields are additive and redaction-safe: they must not leak hidden task identity, hidden result details, weights, provider diagnostics, or GM-only notes.
 Computing reveal/biome metadata is best-effort and must degrade to safe defaults (`0` / empty) rather than failing the listing.
 10. `eventChance` is the aggregate static "chance of encountering an event", a `0`–`1` fraction computed as `1 − ∏(1 − dropRate_i/100)` over the environment's enabled events (ignoring actor/condition/character modifiers and event selection-mode/limit).

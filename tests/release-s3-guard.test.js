@@ -7,6 +7,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
+const { zipDirectory } = await import('../scripts/lib/zip.js');
+const { ARCHIVE_CHUNK_GATE_LABEL, assertArchiveChunkCompleteness } = await import(
+  '../scripts/lib/releaseZipChunks.js'
+);
 // The comparator the guard's remedy is measured against — the same one that decides the refusal.
 const { foundryIsNewerVersion } = await import('../scripts/lib/semver.js');
 const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } =
@@ -396,13 +400,27 @@ test('fetchPublishState refuses a head manifest it cannot read', async () => {
  * A `main()` harness with every world-touching collaborator injected: no Vite build, no zip binary,
  * no AWS. `puts` is the assertion surface — the one-way door in Phase 2 rests on it staying empty
  * whenever the guard refuses.
- * @param {{heads?: Record<string, {status: number, body: string|null}>, exists?: (key: string) => boolean}} options
+ *
+ * The injected `zip` writes the 9-byte string `zip-bytes`, over which a zip reader throws, so the
+ * archive-completeness gate (issue 1565) is stubbed for every test that is not about it and
+ * `realArchiveGate` arms it with a real `zipDirectory` over a real `distDir` for the one that is.
+ * @param {{heads?: Record<string, {status: number, body: string|null}>,
+ *   exists?: (key: string) => boolean, distFiles?: Record<string, string>,
+ *   realArchiveGate?: boolean}} options
  * @returns {Promise<object>} The harness.
  */
-async function makeHarness({ heads = {}, exists = () => false } = {}) {
+async function makeHarness({
+  heads = {},
+  exists = () => false,
+  distFiles = {},
+  realArchiveGate = false,
+} = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
   const distDir = join(dir, 'dist');
   await mkdir(distDir, { recursive: true });
+  for (const [name, contents] of Object.entries(distFiles)) {
+    await writeFile(join(distDir, name), contents);
+  }
   const configPath = join(dir, 'release.s3.config.json');
   await writeFile(configPath, JSON.stringify(CONFIG));
 
@@ -433,8 +451,10 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
     },
     zip: (from, to) => {
       calls.zip += 1;
-      writeFileSync(to, 'zip-bytes');
+      if (realArchiveGate) zipDirectory(from, to);
+      else writeFileSync(to, 'zip-bytes');
     },
+    assertArchiveChunks: realArchiveGate ? assertArchiveChunkCompleteness : () => {},
     createS3Client: async () => ({
       headObject: async (key) => exists(key),
       getObject: async (key) => {
@@ -464,6 +484,40 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
 
   return { run, runWithBuild, puts, gets, calls, configPath };
 }
+
+// Issue 1565, in the file that owns the "ZERO PutObject" invariant. The archive gate is the newest
+// thing standing between a build and the bucket, so it belongs to that invariant too: an archive
+// short a chunk its own entry script references must be refused during STAGING, with the door to
+// Phase 2 never opened.
+//
+// It asserts the gate's own message and the missing member's name rather than a bare rejection —
+// `main()` has many refusals that also happen before any write, and a status-only assertion cannot
+// tell this one from those.
+test('main() performs ZERO PutObject calls when a staged archive is short a referenced chunk', async () => {
+  const missingChunk = 'chunks/absent-DEADBEEF.js';
+  const harness = await makeHarness({
+    realArchiveGate: true,
+    distFiles: { 'main.js': `import "./${missingChunk}";\n` },
+  });
+
+  await assert.rejects(
+    harness.runWithBuild({ esmodules: ['main.js'] }, '--version', '1.4.0', '--source-sha', 'sha1'),
+    (error) => {
+      assert.ok(
+        error.message.includes(ARCHIVE_CHUNK_GATE_LABEL),
+        `must be the archive gate's refusal; got: ${error.message}`
+      );
+      assert.ok(
+        error.message.includes(missingChunk),
+        `must name the missing member; got: ${error.message}`
+      );
+      return true;
+    }
+  );
+
+  assert.equal(harness.calls.zip, 1, 'staging must have produced an archive to gate');
+  assert.deepEqual(harness.puts, [], 'nothing may be written when the archive is incomplete');
+});
 
 const manifestAt = (version) => ({ status: 200, body: JSON.stringify({ version }) });
 

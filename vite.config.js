@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -17,6 +18,35 @@ function stripGlobalCss() {
       if (id === NOOP_ID) return '';
     },
   };
+}
+
+/**
+ * The version THIS BUILD WAS MADE FROM, baked into the bundle as `__FABRICATE_BUILD_VERSION__`
+ * (issue 1565).
+ *
+ * WHY A BUILD-TIME DEFINE AND NOT A RUNTIME READ. Foundry renders a module's `esmodules` entry as
+ * a plain `<script type="module" src="modules/fabricate/main.js">` with no cache-busting
+ * parameter, so the entry script's URL never changes between versions, while the version a client
+ * REPORTS comes from server-injected package data read from `module.json` on disk. That asymmetry
+ * is the whole defect: `game.modules` can say 1.9.4 while the JavaScript executing is 1.9.3. Only
+ * a value fixed at build time can tell the module which of the two it actually is.
+ *
+ * THE ENV VAR IS WHAT MAKES IT CORRECT ON A RELEASE. `scripts/release.js` sets
+ * `FABRICATE_BUILD_VERSION` from the very same `version` binding it writes into
+ * `dist/module.json`, so the baked and shipped versions cannot disagree. Without it a release
+ * would bake the TRACKED manifest version — semantic-release builds with `--dist-version <next>`
+ * and never writes the tracked `module.json`, which still reads 0.1.0 — and every user would then
+ * be warned about a staleness that was really this build lying about itself.
+ *
+ * @returns {string} The version to bake in.
+ */
+function resolveBuildVersion() {
+  const fromEnv = process.env.FABRICATE_BUILD_VERSION;
+  if (typeof fromEnv === 'string' && fromEnv !== '') return fromEnv;
+  // A bare `vite build` falls back to the tracked manifest. Serve mode never reaches here: it
+  // declares no define at all (see the build return, which explains why).
+  const manifest = JSON.parse(readFileSync(resolve(import.meta.dirname, 'module.json'), 'utf8'));
+  return typeof manifest.version === 'string' ? manifest.version : '';
 }
 
 export default defineConfig(({ command }) => {
@@ -43,6 +73,8 @@ export default defineConfig(({ command }) => {
   }
 
   if (command === 'serve') {
+    // NO `define` HERE. `__FABRICATE_BUILD_VERSION__` is a production-build value only; the build
+    // return below owns it and records why serve must never carry it.
     return {
       plugins,
       server: {
@@ -90,6 +122,23 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
+    // BUILD ONLY, AND NOT AN OVERSIGHT. `define` SUBSTITUTES AN EXPRESSION, so the value has to be
+    // JSON.stringify'd: a bare 1.9.5 would be spliced in as arithmetic and a bare 0.1.0 is a syntax
+    // error outright.
+    //
+    // WHY THE `serve` RETURN ABOVE DECLARES NONE. `tests/helpers/extension-composition-harness.js`
+    // starts Vite with `createServer({ root: repoRoot, ... })` and NO `configFile`, so default
+    // config discovery loads THIS file and every mounted Svelte suite inherits whatever `serve`
+    // defines. Those suites install the View Lab Foundry shim, which reports `0.0.0-viewlab` as the
+    // installed version of any module, and they dispatch `ready` — so a baked version present in
+    // serve mode differs from the installed one and `src/main.js`'s stale-entry check fires a
+    // user-facing "reload to complete the update" notice on every mounted run. Serve mode has
+    // nothing to detect in the first place: `npm run dev` reads its installed version from the same
+    // tracked `module.json` this file falls back to, so the check would compare a value with
+    // itself. Keeping the identifier undeclared outside a build lets the `typeof` guard in
+    // `src/main.js` short-circuit, uniformly, in the dev server, the mounted harness and the
+    // screenshot lab alike. Do not restore the symmetry.
+    define: { __FABRICATE_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()) },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
@@ -116,9 +165,18 @@ export default defineConfig(({ command }) => {
           // chunk paths predictable for the build-output gate.
           inlineDynamicImports: false,
           chunkFileNames: 'chunks/[name]-[hash].js',
-          // Drop developer-only console.log/debug/info calls from production
-          // output by marking them pure so dead-code elimination removes them.
-          // console.error and console.warn are retained for user-visible messages.
+          // Drop developer-only console.log/debug/info calls from production output by marking
+          // them pure so dead-code elimination removes them. console.error and console.warn are
+          // retained for user-visible messages.
+          // THE QUALIFICATION: this only strips a marked call whose RETURN VALUE IS UNUSED — a
+          // bare expression statement like the stale-entry-script write in src/main.js. A call
+          // whose value IS used survives at any level regardless of the marking, because removing
+          // it would remove the value; see src/utils/deferredEntryNotice.js's
+          // `(error) => console.error(MESSAGE, error)` reporter seam, whose value is the arrow's
+          // return. The optional-call form `console.info?.(...)` also survives even when its
+          // value is discarded, and the shipped bundle already carries an accidental survivor of
+          // exactly that shape (the `console.debug?.(...)` durable-flag summary lines in
+          // src/main.js and src/systems/CraftingSystemManager.js).
           // (Rolldown's equivalent of esbuild's `pure`; the Vite-default lib
           // minify of `{ compress: true, mangle: true, codegen: false }` is
           // preserved, with manualPureFunctions added.)
