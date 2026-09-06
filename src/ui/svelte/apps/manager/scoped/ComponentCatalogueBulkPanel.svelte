@@ -730,8 +730,14 @@
     INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). Re-read against the widened
     tone union, whose rule is that the tint is opt-in and reached only for a note about LIVE
     STATE: this is the standing explanation of what bulk cannot change, which that reading
-    would put at neutral. `proto:618` asks for the tint on this box, so it stands and the
-    tension is recorded rather than resolved here.
+    would put at neutral. `proto:618` asks for the tint here and `proto:1110` asks for it on the
+    per-system twin at `components/ComponentBulkEditPanel.svelte` — those two are the
+    PROTOTYPE-ANCHORED copies of this note. The other two panels that carry it,
+    `essences/EssenceBulkEditPanel.svelte` and `scoped/ToolCatalogueBulkPanel.svelte`, have no
+    such anchor and this change already quieted both. The recipe bulk panel carries no standing
+    note of this kind at all; its one `info` callout is the conditional check-tier message, which
+    stands as live state. So the open question is only whether a prototype anchor outranks the
+    tone rule, and that is issue 1580's; this pair moves together under it or not at all.
   -->
   <Callout
     tone="info"

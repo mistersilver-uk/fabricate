@@ -290,7 +290,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * so the two payments compound rather than describe the same corner.
  *
  * THE 10px ROW IS UNTOUCHED and stays owed. 10px is not on the ladder either — the shared panel's
- * own corner is one of the thirteen occurrences that row counts — so that change moved one
+ * own corner is one of the occurrences that row counts — so that change moved one
  * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
  * is a net −1 rather than a snap, and the snap is still owed against the `10px` row.
  *

@@ -2200,18 +2200,21 @@
              "Add group" — the GM read the policy governing the list only after they had
              finished writing it. -->
             {#if salvageShowChrome && salvageProgressive}
-              <!-- `proto:1374`: the shared info `Callout`, in the reference's own words. The
+              <!-- `proto:1374`: the shared `Callout`, in the reference's own words. The
                hand-rolled `manager-component-info-banner` said the same thing in a second
                vehicle.
 
-               INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). The tone union
-               widened to six, the default became neutral, and the tint became opt-in for a
-               note about LIVE STATE — under which reading a standing rule about how roll
-               budget works is a neutral note. The tint is this box's own prototype
-               instruction, so it stands and the tension is recorded rather than resolved
-               here. -->
+               NEUTRAL, not info (issue 1505), on the same reading its recipe twin carries:
+               the specimen reserves the info tint for a note about LIVE state, and roll
+               budget is an invariant — true of every progressive salvage list whatever the
+               toggle below it says. It also sits directly above an info-tinted ToggleCard,
+               so tinting it spent the colour twice and made the standing rule read as the
+               lesser of the two boxes. `recipe/RecipeResultsTab.svelte` reached that first;
+               this is the salvage side following, which reverses the direction of the
+               placement debt recorded at `recipe/RecipeResultsTab.svelte`, where salvage is
+               the side that led. -->
               <Callout
-                tone="info"
+                tone="neutral"
                 icon="fas fa-circle-info"
                 dataAttr="data-salvage-roll-budget"
                 text={text(
