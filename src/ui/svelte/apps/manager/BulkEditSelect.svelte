@@ -37,9 +37,9 @@
    - value / disabled / ariaLabel: the control's state and its accessible name.
    - options: `[{ value, label, hint?, badge?, disabled?, disabledReason?, group? }]`.
    - showTick: FORWARDED rather than fixed, because the judgement is the LIST's and this
-     component has three lists across two studios. The default is `Select`'s own `true`, so
-     this wrapper adds no opinion of its own and every call site states its judgement: the two
-     category axes drop the tick (the trigger already states the category), and the check-tier
+     component has two lists in the recipe studio. The default is `Select`'s own `true`, so
+     this wrapper adds no opinion of its own and every call site states its judgement: the
+     category axis drops the tick (the trigger already states the category), and the check-tier
      list keeps it (its list mixes two INSTRUCTIONS with named tiers, and the trigger's label
      alone cannot tell an instruction from a tier).
    - onChange(value): called with the newly selected value.

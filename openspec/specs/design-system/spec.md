@@ -917,7 +917,7 @@ Every select in the product MUST therefore render the app’s own option list, u
 Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
 
 THE IMPLEMENTATION IS `src/ui/svelte/components/Select.svelte`, composed over `SearchablePopover` with the query field suppressed, and a surface that needs a one-of-N choice MUST render through it rather than restate its markup.
-The three shared CONTROLS that hosted a native select — `Pagination` and `BulkEditSelect` from the primitive set, and `EntityListInspectorFrame`, which is a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
+The three shared CONTROLS that hosted a native select — `Pagination` from the primitive set, `BulkEditSelect`, an adjudicated non-member since issue 1371 left it one caller, and `EntityListInspectorFrame`, a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
 
 A converted control keeps the identity handles its drivers address it by, and there are TWO of them rather than one.
 The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.

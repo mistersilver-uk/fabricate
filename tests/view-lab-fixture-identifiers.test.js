@@ -188,10 +188,10 @@ function identifierPins(selector) {
 // the display label, which is localized and therefore not a selector".
 //
 // Issue 1504 widened it much further than that. `Select` stamps EVERY row, so the attribute now
-// carries page sizes, recipe and component categories, scoped-list sort keys and check-tier ids
+// carries page sizes, recipe categories, scoped-list sort keys and check-tier ids
 // beside the book ids — none of them a lab-world record, several not identifiers at all.
-// A source set defined from recipe book ids would by now falsely reject a dozen legitimate steps
-// across eleven cases, which is exactly what the absence is here to prevent (issue #1021).
+// A source set defined from recipe book ids would by now falsely reject eleven legitimate steps
+// across ten cases, which is exactly what the absence is here to prevent (issue #1021).
 //
 // Twenty of the twenty-five `expectSelector`-bearing cases key on an attribute IDENTITY_SOURCES does
 // not recognise — `data-bulk-book-state`, `data-essence-view`, `data-inventory-bulk-panel`,

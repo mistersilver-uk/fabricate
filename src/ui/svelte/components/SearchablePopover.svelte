@@ -692,12 +692,12 @@
   // `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
   // the HOLDER — and drive selection with `aria-activedescendant`. The holder is the query
   // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, five
-  // app surfaces plus `ModifierPillSelect`), and the option rows NEVER receive DOM focus. Roving
-  // focus onto them is what the prohibition forbids, because it re-arms Foundry's canvas
-  // bindings — and there is a second, independent reason: `styles/fabricate.css` rings any focused
-  // `[tabindex]` under `.fabricate` (`.fabricate [tabindex]:focus-visible`, a 2px accent outline
-  // at a POSITIVE offset), so a row that took focus would draw a competing ring around the
-  // keyboard cursor's own inset one.
+  // app surfaces plus `ModifierPillSelect` and `Select`), and the option rows NEVER receive DOM
+  // focus. Roving focus onto them is what the prohibition forbids, because it re-arms Foundry's
+  // canvas bindings — and there is a second, independent reason: `styles/fabricate.css` rings any
+  // focused `[tabindex]` under `.fabricate` (`.fabricate [tabindex]:focus-visible`, a 2px accent
+  // outline at a POSITIVE offset), so a row that took focus would draw a competing ring around
+  // the keyboard cursor's own inset one.
   //
   // `aria-controls` and `aria-activedescendant` are OMITTED while the list itself is absent: the
   // `role="listbox"` element renders only when `filteredOptions.length > 0`, and the empty branch

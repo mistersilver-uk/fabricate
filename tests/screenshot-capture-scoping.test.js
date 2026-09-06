@@ -1069,7 +1069,7 @@ test('no capture producer drives a converted select with Playwright’s <select>
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — four capture steps and
+  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — five capture steps and
   // several smoke assertions drive genuinely native selects that issues 1510 and 1511 own — or
   // this scan is reading a corpus with nothing in it to judge. And at least one converted hook
   // must still be named by a producer, or the ban holds over an empty intersection.
@@ -1102,7 +1102,7 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
 // spelling of every converted step is a line the ban above reads and passes over, and reverting
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
-// this PR's own screenshot evidence — not as a red unit test. Twelve steps converted here and
+// this PR's own screenshot evidence — not as a red unit test. Eleven steps converted here and
 // issues 1510/1511 will convert more, so the surface this covers is growing rather than closing.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   const registry = CAPTURE_PRODUCERS.find(
@@ -1122,9 +1122,10 @@ test('no View Lab step drives a converted select with the registry’s native `s
       offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
     }
   }
-  // NON-VACUITY, the same floor the ban above keeps: four `select:` steps survive on genuinely
-  // native selects (the recipe category filter, the world currency strategy twice, and the tool
-  // catalogue's sort), which issues 1510 and 1511 own. At zero the clause quantifies over nothing.
+  // NON-VACUITY, the same floor the ban above keeps: five `select:` steps survive on genuinely
+  // native selects (the recipe category filter, the world currency strategy twice, the system
+  // Component Rules list's essence filter and the tool catalogue's sort), which issues 1510 and
+  // 1511 own. At zero the clause quantifies over nothing.
   assert.ok(
     steps.length >= 4,
     `only ${steps.length} \`select:\` steps remain in the registry, against a floor of 4. If the ` +

@@ -243,7 +243,6 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ];
@@ -253,7 +252,6 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
       tmpPrefix,
       componentPath,
       rawExtras: [
-        ...SEARCHABLE_POPOVER_RAW_MODULES,
         // The drop zone's two leaves: the action it binds and the payload normalizer behind it.
         'src/ui/svelte/actions/dragDrop.js',
         'src/ui/svelte/util/dropUtils.js',

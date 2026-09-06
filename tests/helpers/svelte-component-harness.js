@@ -240,9 +240,9 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
 // missing from the allowlist does not fail, it HANGS (reported as `# cancelled`).
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`,
-  // spread from the roster above rather than copied so the two cannot drift.
+  // spread from the roster above rather than copied so the two cannot drift. It already
+  // carries `foundryBridge.js`, so this list does not restate it.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
-  'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters

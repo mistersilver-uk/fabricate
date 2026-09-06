@@ -922,8 +922,8 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
 
     assert.ok(
       panel.className.split(/\s+/).includes('fabricate-select-popover-ticked'),
-      'and the tick column is KEPT here, against the two category axes, because the trigger`s ' +
-        'label alone cannot tell an instruction from a tier'
+      'and the tick column is KEPT here, against the category axis beside it, because the ' +
+        'trigger`s label alone cannot tell an instruction from a tier'
     );
   });
 
