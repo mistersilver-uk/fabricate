@@ -45,7 +45,7 @@
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1504 MOVED FOUR OF THESE SIX FIGURES, through three edits that partly cancel. The
- * `.fabricate-select*` family arrived — 31 new rules writing 32 new keys, every one a
+ * `.fabricate-select*` family arrived — 32 new rules writing 33 new keys, every one a
  * singleton, so it moved the contextual figures and left the repeated ones alone. Then the two
  * scoped-catalogue toolbar select rules were NARROWED onto the one route that still renders a
  * native select there, which SPLIT the type rule's two-member list: its `input` leg merges into
