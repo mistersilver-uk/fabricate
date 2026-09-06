@@ -1399,6 +1399,88 @@ test('a withdrawn utility or skin class is not declared, and issue 1523 owns eac
   }
 });
 
+/** The border, radius and fill tuple the withdrawn `.fab-field-skin` would have carried. */
+const SKIN_CENSUS_TUPLE = Object.freeze({
+  border: '1px solid var(--fab-border)',
+  'border-radius': '9px',
+  background: 'var(--fab-bg-1)',
+});
+
+/** The comment every carrier of that tuple publishes, and the string this clause looks for. */
+const SKIN_CENSUS_MARKER = 'skin census (issue 1523)';
+
+/**
+ * The module sheet as it is WRITTEN, comments intact.
+ *
+ * `corpus().styles` cannot serve this clause: `styleTextFor` runs every corpus entry through
+ * `stripCssComments`, which is right for a declaration walk and fatal for a marker walk — the
+ * census comment this clause looks for is exactly what that strip removes. The strip preserves
+ * line numbering, so a rule's `line` is the same in both texts.
+ */
+let cachedSheetText = null;
+function sheetText() {
+  if (cachedSheetText === null) {
+    const text = collectWorkingTreeSources(['styles'], ['.css'])[MODULE_SHEET];
+    if (text === undefined) {
+      throw new Error(
+        `${MODULE_SHEET} is not in the working-tree style scan, so every carrier below would ` +
+          'report an absent marker as a present one and the clause would pass on an empty read.'
+      );
+    }
+    cachedSheetText = text;
+  }
+  return cachedSheetText;
+}
+
+/**
+ * The comment block written IMMEDIATELY above `line`, or `''` when the rule opens without one.
+ *
+ * Adjacency is the whole point rather than a convenience: a lookback window would let a marker
+ * written for one rule vouch for the next rule somebody adds beneath it, which is exactly the
+ * silent adoption the census exists to make visible. So a blank line between the comment and the
+ * selector reads as NO marker, and the fix is to move the comment onto the rule it describes.
+ */
+function commentAbove(line) {
+  const lines = sheetText().split('\n');
+  const end = line - 2;
+  if (end < 0 || !lines[end].trimEnd().endsWith('*/')) return '';
+  let start = end;
+  while (start >= 0 && !lines[start].includes('/*')) start -= 1;
+  return start < 0 ? '' : lines.slice(start, end + 1).join('\n');
+}
+
+test('every carrier of the withdrawn skin tuple carries its census marker', () => {
+  // THE WITHDRAWAL ABOVE STATES A POPULATION AND A SPLIT, and until this clause nothing derived
+  // either. The census went from ten carriers to fifteen across a single merge with every gate
+  // green, which is why both `why` texts had to be rewritten by hand afterwards. Marker adjacency
+  // is what makes the population re-derivable: a sixteenth carrier now lands with no marker and
+  // reds HERE, rather than in the grep of whichever reviewer next reads the withdrawal.
+  const carriers = sheetRules().filter((rule) => {
+    const declarations = declarationMap(rule);
+    return Object.entries(SKIN_CENSUS_TUPLE).every(
+      ([property, value]) => declarations[property] === value
+    );
+  });
+
+  assert.equal(
+    carriers.length,
+    15,
+    'the census is fifteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its four-pinned / six-non-adopter / five-unpinned split as prose, so a carrier arriving or ' +
+      'leaving means re-deriving that `why` text with it rather than moving this number alone.'
+  );
+  assert.deepEqual(
+    carriers
+      .filter((rule) => !commentAbove(rule.line).includes(SKIN_CENSUS_MARKER))
+      .map((rule) => `${MODULE_SHEET}:${rule.line}`),
+    [],
+    `a carrier of the withdrawn skin tuple must carry a \`${SKIN_CENSUS_MARKER}\` comment ` +
+      'immediately above its rule, saying whether it is pinned, an unpinned carrier or not an ' +
+      'adopter and naming what pins it. That comment is the record issue 1523 reads to decide the ' +
+      'class, and a carrier missing from it is a shared treatment the decision cannot see.'
+  );
+});
+
 /* ─────────────── gate 8: cross-list selector repetition in the module sheet ─────────────── */
 
 /** A repeated selector's ratchet key: `<at-context chain> | <normalised selector>`. */
