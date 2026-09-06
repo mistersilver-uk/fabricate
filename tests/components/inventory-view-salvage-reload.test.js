@@ -20,6 +20,7 @@ import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
@@ -57,11 +58,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
-    // The shared notice the inventory bulk report's banner composes (issue 1505).
-    'src/ui/svelte/components/Notice.svelte',
-    // The salvage banner became the shared standing-statement strip (issue 1505), which is
-    // that primitive's first player importer.
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryFilters.svelte',

@@ -261,6 +261,30 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopover.svelte'
 ]);
 
+// THE MARKS AND NOTICES the design-system pass of issue 1505 closed, as ONE closure. Every
+// suite whose tree reaches any of them names all four, because they compose each other and a
+// module a tree renders but a manifest omits does not fail that suite — it CANCELS it, and
+// `node --test` reports the blocked tests as `# cancelled`, never `# fail`.
+//
+// `Kicker` is the sharpest of the four: it is a LEAF TWO RUNGS DOWN on two separate routes —
+// nine crafting detail components render it directly, and `StatBox` COMPOSES it — so a tree
+// holding a Shopping list or a Books & Scrolls aside pulls a kicker in without naming one
+// anywhere. `Notice` is the shared standing statement the inventory bulk report's banner and
+// the alchemy workbench compose, and `Callout` is the manager strip the salvage banner became,
+// which made a MANAGER primitive reachable from the player app for the first time.
+//
+// Kept as one roster rather than as four hand-copied entries per suite for the reason
+// `SELECT_COMPILED_MODULES` above records: five suites carried byte-identical copies of these
+// paths and their comments, which is both the block SonarCloud's new-code duplication gate
+// counts and the shape that rots — the merged main's `ManagerButton` entry had to be re-added,
+// by hand, to nine already-shipped suites that each carried their own copy.
+export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/StatBox.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 // Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
 // test references one source of truth — a component referencing a `.svelte`/`.js`
@@ -421,15 +445,12 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
   // HANGS every mounted crafting suite rather than failing it.
   'src/ui/svelte/components/Stepper.svelte',
-  // THE UPPERCASE MICRO-LABEL every section header in `detail/` is now (issue 1505). Nine
-  // components in that directory render it, and all nine are listed below, so omitting it
-  // HANGS every mounted crafting suite (# cancelled) rather than failing one.
+  // The two marks this tree reaches (issue 1505): the eyebrow nine `detail/` components render,
+  // and the figure box the Shopping list's summary cards are, which composes that eyebrow.
+  // Written flat rather than as `...MARKS_AND_NOTICES_COMPILED_MODULES` for the reason
+  // `SELECT_COMPILED_MODULES` records above — a suite spreading THIS constant into its own
+  // literal cannot see through a second level of spread — and argued once at that roster.
   'src/ui/svelte/components/Kicker.svelte',
-  // THE AT-A-GLANCE FIGURE the Shopping list's three summary cards are (issue 1505). It
-  // COMPOSES the `Kicker` above, which makes that entry a leaf TWO rungs down on this route
-  // as well — a suite mounting `ShoppingList` pulls a kicker in without naming one anywhere,
-  // verbatim the `ActionMenu` shape that first reported as `# cancelled 7` with no failures
-  // on a suite whose tests never ran.
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',

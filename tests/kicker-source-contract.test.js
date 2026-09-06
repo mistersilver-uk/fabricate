@@ -21,61 +21,30 @@
  * `fab-kicker` is written by nothing else in the tree, which was measured before it was chosen.
  * The obvious alternative, `manager-kicker`, is NOT available: 33 `.svelte` files under `src/`
  * write it 80 times at the hand-rolled manager sites this change deliberately leaves alive, and
- * the class-only clause below scans the whole `src/` corpus by SUBSTRING — so reusing it would
- * have opened this file with a 33-entry deferral table, each entry needing an exact count and a
+ * the class-only clause scans the whole `src/` corpus by SUBSTRING — so reusing it would have
+ * opened this file with a 33-entry deferral table, each entry needing an exact count and a
  * reason, none of which anyone would ever read. A new token buys exactly one thing, and it is
- * the thing worth buying: the exemption table has ONE entry and no deferral row.
+ * the thing worth buying: the exemption below has ONE entry and no deferral row.
  *
- * The primitive is still in the corpus and still has to write the class. `primitiveSourceContract.js`
- * walks every `.svelte` under `src/` and strips only `<style>` blocks and comments, and its
- * restatement clause carries a positive control asserting the primitive still emits what the
- * call sites are told not to. Excluding the primitive from the corpus instead is not an option:
- * that disables the clause for every OTHER file.
- *
- * ── WHERE THE SHARED CLAUSES LIVE ─────────────────────────────────────────────────────────
- * `tests/helpers/primitiveSourceContract.js`, shared with `icon-button-source-contract.test.js`,
- * `inspector-card-source-contract.test.js` and `stat-box-source-contract.test.js`. That file
- * records why: SonarCloud measured 88 duplicated lines between the first two guards while each
- * carried its own copy, `sonar.cpd.exclusions` does not relieve `tests/**`, and two copies drift
- * into disagreeing about what a call site IS. This file supplies the facts those clauses are
- * stated over, and adds ONE clause of its own — the host union, below, which is the question
- * only this primitive raises.
+ * The four shared clauses, and the closed-token shape a new token puts this primitive in, come
+ * from `tests/helpers/primitiveSourceContract.js`, which argues both. Below are the facts they
+ * are stated over and the ONE clause only this primitive raises: what it may render.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
+import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. A NEW token: nothing else in the tree writes it. */
 const CONTRACT_CLASS = 'fab-kicker';
 
 const PRIMITIVE = 'src/ui/svelte/components/Kicker.svelte';
 
-/**
- * The `.svelte` files under `src/` that may still write the class, each with its reason and the
- * exact number of times it writes it.
- *
- * ONE entry, and that is what the new token bought. Counted rather than merely listed, and keyed
- * on the class rather than on a line number, which rots on the first edit above it.
- */
-const CLASS_EXCEPTIONS = Object.freeze([
-  Object.freeze({
-    file: PRIMITIVE,
-    count: 1,
-    why:
-      'the primitive itself, which writes the class once so that no call site has to remember ' +
-      'it. The count is 1 rather than the 2 the card and the icon button record because this ' +
-      "component's prop notes live in the leading HTML comment, which `withoutComments` does " +
-      'strip, and its accent modifier is a `class:` directive that names a different token',
-  }),
-]);
-
-const contract = definePrimitiveSourceContract({
+const contract = defineClosedTokenContract({
   label: 'kicker',
   tag: 'Kicker',
   contractClass: CONTRACT_CLASS,
   primitive: PRIMITIVE,
-  exemptions: CLASS_EXCEPTIONS,
 
   // 10 files render the primitive as this lands — eight in the player crafting detail tree, the
   // manager's recipe-item Overview tab, and `StatBox`, which composes it. The floor is EXACT
@@ -85,46 +54,30 @@ const contract = definePrimitiveSourceContract({
   // conversion that removes a site now has to say so here.
   callSiteFloor: 10,
 
-  primitiveEmits: {
-    // Pinned in its RENDERED form — `class="fab-kicker"` — rather than as a quoted JS literal,
-    // because this component writes the token straight onto the element rather than composing a
-    // class list. A prose mention in the docblock would not satisfy it: comments are stripped
-    // before the corpus is built.
-    source: `class="${CONTRACT_CLASS}"`,
-    otherwise:
-      'the primitive no longer emits the contract class, so the restatement clause is policing ' +
-      'a token that reaches nothing',
-  },
+  // Pinned in its RENDERED form — `class="fab-kicker"` — rather than as a quoted JS literal,
+  // because this component writes the token straight onto the element rather than composing a
+  // class list. A prose mention in the docblock would not satisfy it: comments are stripped
+  // before the corpus is built.
+  emits: `class="${CONTRACT_CLASS}"`,
 
-  // Three probes. The last is the class itself; the first two are the pass-throughs this
-  // primitive deliberately does NOT have, and they matter more here than at a component that
-  // does: `class` and `style` on a `<Kicker>` tag are props nothing reads, so Svelte drops them
-  // SILENTLY. The site renders, the rule it was reaching for never lands, and no gate but this
-  // one would notice. A caller that needs layout keeps its own wrapper element instead.
-  restatements: Object.freeze([
-    Object.freeze({ name: 'class', present: (tag) => /\bclass=/.test(tag) }),
-    Object.freeze({ name: 'style', present: (tag) => /\bstyle=/.test(tag) }),
-    Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
-  ]),
+  primitiveWrites: {
+    count: 1,
+    why:
+      'the primitive itself, which writes the class once so that no call site has to remember ' +
+      'it. The count is 1 rather than the 2 the card and the icon button record because this ' +
+      "component's prop notes live in the leading HTML comment, which `withoutComments` does " +
+      'strip, and its accent modifier is a `class:` directive that names a different token',
+  },
 
   classOnlyRemedy:
     'an uppercase micro-label is a `<Kicker>`, never a hand-written `class="fab-kicker"` and ' +
-    'never a fresh scoped rule restating 8.5px / 700 / 0.11em / uppercase / --fab-text-subtle. ' +
-    'A site that needs a flex row, an ellipsis or a min-width keeps its OWN wrapper element and ' +
-    'nests the kicker inside it, and a per-site test hook rides the named `dataAttr` / ' +
-    '`dataValue` props — see `Kicker.svelte`',
+    'never a fresh scoped rule restating 8.5px / 700 / 0.11em / uppercase / --fab-text-subtle',
 
-  restatementRemedy:
-    'this primitive exposes no `class`, no `style` and no rest spread, so an attribute the tag ' +
-    'does not name is a prop nothing reads and Svelte drops it without a word. Keep the ' +
-    'caller-owned wrapper element and put the layout on that; pass a hook through `dataAttr` ' +
-    'and `dataValue`',
+  keepInstead:
+    'A site that needs a flex row, an ellipsis or a min-width keeps its OWN wrapper element ' +
+    'and nests the kicker inside it, with the layout on the wrapper — see `Kicker.svelte`',
 
-  bareDataRemedy:
-    'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on an ' +
-    'element, so it renders `="true"` where the hand-rolled element rendered `=""`. Presence ' +
-    'selectors resolve either way, which is exactly why this would not be caught by the suites ' +
-    'that read them. Pass the hook as `dataAttr="data-x"` and leave `dataValue` at its default',
+  hookAdvice: 'Pass the hook as `dataAttr="data-x"` and leave `dataValue` at its default',
 });
 
 /**
@@ -145,14 +98,13 @@ const contract = definePrimitiveSourceContract({
  * the union advisory while every existing call site went on rendering exactly as before.
  */
 test('the kicker renders one of three measured, non-interactive hosts, and nothing else', () => {
-  contract.assertCallSitesAlive();
+  const source = contract.primitiveMarkup();
 
-  const source = contract.components[PRIMITIVE] ?? '';
-  assert.ok(source.length > 0, `${PRIMITIVE} is not in the corpus`);
-
-  const declared = /const HOSTS = new Set\(\[([^\]]*)\]\)/.exec(source);
-  assert.ok(declared, 'the primitive no longer declares its host union as a literal Set');
-  const hosts = [...declared[1].matchAll(/'([^']+)'/g)].map(([, host]) => host);
+  const hosts = contract.declaredList({
+    declaration: /const HOSTS = new Set\(\[([^\]]*)\]\)/,
+    member: /'([^']+)'/g,
+    absent: 'the primitive no longer declares its host union as a literal Set',
+  });
 
   assert.deepEqual(
     hosts,
@@ -170,15 +122,8 @@ test('the kicker renders one of three measured, non-interactive hosts, and nothi
       'or the union above is advisory and this clause is policing a list nothing reads'
   );
 
-  // Nothing interactive, by any of the three routes a presentational primitive could acquire
-  // one: an element, a handler, or a role.
-  const interactive = [/<button\b/, /<a\s/, /<input\b/, /<select\b/, /<textarea\b/, /\son[a-z]+=/];
-  const found = interactive.filter((pattern) => pattern.test(source)).map(String);
-  assert.deepEqual(
-    found,
-    [],
-    'a kicker is a LABEL. `design-system/spec.md` routes anything a GM can act on to a control ' +
-      'primitive, so an interactive element or a handler here is a routing error rather than a ' +
-      `feature: ${found.join(', ')}`
+  contract.assertNothingInteractive(
+    'a kicker is a LABEL, so an interactive element or a handler here is a routing error ' +
+      'rather than a feature'
   );
 });
