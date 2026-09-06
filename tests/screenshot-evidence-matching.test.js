@@ -96,11 +96,12 @@
  * WHY (g3), (g4) AND (g5) ASSERT ON THE CLOCK RATHER THAN ON A CODE
  * -----------------------------------------------------------------
  * Three separate bounds stop this gate — the grace give-up, the wall-clock ceiling and the once-only
- * deadline anchor — and each ALONE keeps the job inside the 75-minute `timeout-minutes` that
+ * deadline anchor — and each ALONE keeps the job inside the 110-minute `timeout-minutes` that
  * `tests/ci-workflow-semantics.test.js` ties `MAX_WAIT_MS` to. Dropping any one of them still ends
- * at `capture-did-not-conclude` or `capture-run-not-found`, just 15 to 77 minutes later, and past 75
- * GitHub kills the job with NO `::error::<code>` at all — an uncoded red, which is the failure this
- * issue exists to remove. A code assertion cannot see that; elapsed time on the injected clock can,
+ * at `capture-did-not-conclude` or `capture-run-not-found`, just 20 to 117 minutes later (the
+ * iteration cap is all that is left, and it runs 120), and past 110 GitHub kills the job with NO
+ * `::error::<code>` at all — an uncoded red, which is the failure this issue exists to remove.
+ * A code assertion cannot see that; elapsed time on the injected clock can,
  * so these three read `clock.now()`. Two of them also mutually mask (drop the ceiling and the anchor
  * guard together and the anchored deadline slides forever), which is why each has its own fixture
  * rather than one shared "it terminates" case.
@@ -481,8 +482,8 @@ describe('decideScreenshotGate', () => {
     // AT PRODUCTION BOUNDS, on a clock advancing one real poll interval per sleep, so the assertion
     // is wall-clock minutes rather than fixture units. `locateCaptureRun` carries no wall-clock
     // ceiling of its own — only this give-up and the iteration cap — so without it a pull request
-    // whose producer never dispatches polls for MAX_POLLS * POLL_INTERVAL_MS (80 minutes), and the
-    // 75-minute job ceiling kills the job before the script can name the problem.
+    // whose producer never dispatches polls for MAX_POLLS * POLL_INTERVAL_MS (120 minutes), and
+    // the 110-minute job ceiling kills the job before the script can name the problem.
     const gh = makeGhFake({ runs: [], body: '' });
     const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
 
@@ -501,9 +502,9 @@ describe('decideScreenshotGate', () => {
 
   it('(g4) stops at its own wall-clock ceiling on a capture that queues for most of it, at production bounds', async () => {
     // The ceiling is the ONLY bound that can end this: the run is queued for 50 minutes, so its
-    // anchored deadline (job start + capture timeout + slack) lands at 95 minutes, well past both the
-    // ceiling and the 75-minute job timeout. Queued time does not consume the capture's budget, but
-    // it does consume this gate's.
+    // anchored deadline (job start + capture timeout + slack) lands at 130 minutes, well past both
+    // the ceiling and the 110-minute job timeout. Queued time does not consume the capture's
+    // budget, but it does consume this gate's.
     const gh = neverConcludingRun((50 * MS_PER_MINUTE) / POLL_INTERVAL_MS);
     const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
 
@@ -525,7 +526,7 @@ describe('decideScreenshotGate', () => {
     // observation would move the deadline forward by one poll interval each time — a deadline that
     // can never be reached — leaving the wall-clock ceiling as the only bound, 10 minutes later here
     // and unbounded if the ceiling is dropped too. That mutual masking is why this case queues for
-    // only 10 minutes: the anchored deadline then lands at 55 minutes, strictly inside the ceiling,
+    // only 10 minutes: the anchored deadline then lands at 90 minutes, strictly inside the ceiling,
     // so the ceiling cannot stand in for the anchor.
     const queuedPolls = (10 * MS_PER_MINUTE) / POLL_INTERVAL_MS;
     const deadline = queuedPolls * POLL_INTERVAL_MS + CAPTURE_TIMEOUT_MS + SLACK_MS;
@@ -699,7 +700,18 @@ describe('decideScreenshotGate', () => {
     // Against a gate-start anchor this is a guaranteed fail, and against a `run_started_at` anchor
     // populated DURING the queued phase it is too — which is what makes it discriminate rather than
     // pass under either reading.
-    const queuedFor = 5;
+    //
+    // Both ends of the fixture are DERIVED from the production bounds rather than hand-picked. The
+    // hand-picked queue (5 polls, 50 minutes) stopped exceeding the capture timeout the moment that
+    // timeout was raised to 75 (issue 1594), and a queue that no longer outlasts the timeout tests
+    // nothing at all here; the ceiling assertion is the other end, because a queue long enough to
+    // trip `maxWaitMs` would be ended by the ceiling instead of by the anchor.
+    const step = 10 * 60_000;
+    const queuedFor = Math.floor(CAPTURE_TIMEOUT_MS / step) + 1;
+    assert.ok(
+      (queuedFor + 1) * step < MAX_WAIT_MS,
+      `this fixture concludes at ${(queuedFor + 1) * step}ms, which is not inside the gate ceiling (${MAX_WAIT_MS}ms), so the ceiling would end it rather than the anchor`
+    );
     const gh = makeGhFake({
       runs: (state) => {
         if (state.runListCalls < queuedFor) {
@@ -716,7 +728,7 @@ describe('decideScreenshotGate', () => {
       },
       body: bodyWithBlock(),
     });
-    const clock = makeGateClock({ start: 0, step: 10 * 60_000 });
+    const clock = makeGateClock({ start: 0, step });
 
     const decision = await decide({ gh, clock, bounds: PRODUCTION_BOUNDS });
 
@@ -1206,8 +1218,8 @@ describe('the check command adapter', () => {
   it('(p2) forwards --capture-timeout-minutes as the producer deadline, not merely validating it', async (t) => {
     // The flag was VALIDATED by a test and its value pinned by nothing: an adapter that parsed it
     // and then passed `undefined` left the whole suite green. The latent failure is exact — raise
-    // `capture`'s own `timeout-minutes` to 60, and `tests/ci-workflow-semantics.test.js` follows the
-    // YAML while the module keeps waiting 40, so every capture past 40 minutes reds
+    // `capture`'s own `timeout-minutes` to 90, and `tests/ci-workflow-semantics.test.js` follows the
+    // YAML while the module keeps waiting 75, so every capture past 75 minutes reds
     // `capture-did-not-conclude`: this issue's symptom under a new code, suite green.
     const paths = cliInputs(t);
     const gh = makeGhFake({

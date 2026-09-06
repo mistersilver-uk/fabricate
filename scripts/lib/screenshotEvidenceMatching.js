@@ -60,19 +60,28 @@ export const GRACE_MS = 3 * 60_000;
 export const SLACK_MS = 5 * 60_000;
 
 /** The whole gate's wall-clock ceiling, whatever the producer's own deadline works out to. */
-export const MAX_WAIT_MS = 65 * 60_000;
+export const MAX_WAIT_MS = 100 * 60_000;
 
 /** The gap between polls of the runs list. */
 export const POLL_INTERVAL_MS = 20_000;
 
-/** The clock-independent iteration cap. A clock bug must fail fast, never hang a required check. */
-export const MAX_POLLS = 240;
+/**
+ * The clock-independent iteration cap. A clock bug must fail fast, never hang a required check.
+ *
+ * It moves with {@link MAX_WAIT_MS} rather than standing still, because the inequality above makes
+ * `maxPolls * pollIntervalMs` the ceiling's own ceiling: at 240 polls the product is 80 minutes,
+ * so a 100-minute `maxWaitMs` would be unreachable and every long wait would end at the cap with a
+ * `capture-did-not-conclude` the clock never justified. 360 puts the product at 120 minutes —
+ * above `maxWaitMs` so the deadline is what ends a healthy wait, and above the gate job's own
+ * `timeout-minutes` so this cap is never mistaken for the thing keeping the job alive.
+ */
+export const MAX_POLLS = 360;
 
 /**
  * The producer's own job timeout, as a default. `--capture-timeout-minutes` pins this to
  * `capture`'s real `timeout-minutes` in `pr-screenshots.yml`, and Task 6 asserts the two agree.
  */
-export const CAPTURE_TIMEOUT_MS = 40 * 60_000;
+export const CAPTURE_TIMEOUT_MS = 75 * 60_000;
 
 /** The default workflow file the gate waits on. */
 export const DEFAULT_CAPTURE_WORKFLOW = 'pr-screenshots.yml';
