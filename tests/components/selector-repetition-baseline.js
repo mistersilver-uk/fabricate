@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,100 `(at-context, selector)` keys, of which 2,981 appear exactly
+ * Unfiltered, the sheet holds 3,101 `(at-context, selector)` keys, of which 2,982 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,15 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,599 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,600 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES A THIRD TIME, by adding one rule:
+ * `.fabricate-manager .manager-recipe-name-row .manager-chip` gives the row's status pills
+ * `flex: 0 0 auto`, so `truncate`'s `overflow: hidden` cannot zero their automatic minimum
+ * size and squeeze them for room the name should give up first. The selector is a new
+ * singleton in both keyings, so the rule, key and singleton counts each rise by one and the
+ * repeated table is untouched.
  *
  * ISSUE 1506 MOVED TWO OF THE THREE CONTEXTUAL FIGURES A SECOND TIME, AND NOT THE RULE COUNT, by
  * deleting one SELECTOR out of a five-selector group: `.fabricate-manager .manager-recipe-thumb`,
