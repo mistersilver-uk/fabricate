@@ -709,27 +709,28 @@ describe('the world identity drift report', () => {
     assert.equal(describeWorldIdentityDrift([]), '', 'and nothing to say when there is no drift');
   });
 
-  it('LOGS that list in src/main.js, before the toast and from Fabricate’s own call', () => {
-    // Core logs the notification's `textContent`, so a dump has to be Fabricate's own call or the
-    // withheld records never reach the console at all. `src/main.js` is not executable by a unit
-    // test, so this is a source-order assertion, the same idiom the audit's siting uses.
+  it('LOGS that list in src/main.js at `info`, and raises NO toast for it', () => {
+    // The drift report is CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise
+    // repeated the whole drifted list in the notification bar and read as an alarm for a state
+    // its own copy called harmless. `src/main.js` is not executable by a unit test, so these are
+    // source assertions, the same idiom the audit's siting uses.
     const dump = MAIN_SOURCE.indexOf('describeWorldIdentityDrift(worldIdentityDrift)');
-    const dispatch = MAIN_SOURCE.indexOf('ui.notifications?.info?.(driftNotice)');
     assert.notEqual(dump, -1, 'src/main.js must compose the uncapped list');
-    assert.ok(dump < dispatch, 'and log it BEFORE the toast that points at it');
-    const between = MAIN_SOURCE.slice(dump, dispatch);
-    // THE LEVEL IS PART OF THE PROMISE, so this pins it rather than accepting any console call.
-    // `console.debug` maps to DevTools' VERBOSE level, which Chromium's default filter excludes:
-    // a GM who presses F12 as the copy instructs would not see the dump at all, which is the
-    // same failure the cap's remainder clause exists to avoid, one level down. An earlier form
-    // of this assertion allowed `debug|info|log` and so could not defend the copy it guards.
-    assert.match(
-      between,
-      /console\.info\(/,
-      'the dump must be console.info: debug is hidden at Chromium’s default log level, so the ' +
-        'notice’s "the full list is in the console (F12)" clause would be false again'
+    const after = MAIN_SOURCE.slice(dump, dump + 600);
+    // THE LEVEL IS PART OF THE PROMISE: `console.debug` maps to DevTools' VERBOSE level, which
+    // Chromium's default filter excludes, so a GM who presses F12 would not see the dump at all.
+    assert.match(after, /console\.info\(/, 'the dump must be console.info');
+    assert.doesNotMatch(after, /console\.debug\(/, 'debug is specifically not acceptable');
+    assert.equal(
+      MAIN_SOURCE.includes('ui.notifications?.info?.(driftNotice)'),
+      false,
+      'the drift report must not reach the notification bar'
     );
-    assert.doesNotMatch(between, /console\.debug\(/, 'debug is specifically not acceptable');
+    assert.equal(
+      MAIN_SOURCE.includes('buildWorldIdentityDriftNotice('),
+      false,
+      'src/main.js composes no drift toast at all'
+    );
   });
 
   it('says nothing at all when there is no drift', () => {
