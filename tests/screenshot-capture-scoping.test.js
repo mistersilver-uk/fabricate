@@ -1052,7 +1052,6 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-scoped-list-filter',
   'data-recipe-bulk-category',
   'data-recipe-bulk-check-tier',
-  'data-component-bulk-category',
 ]);
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {

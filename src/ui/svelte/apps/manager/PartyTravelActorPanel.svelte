@@ -130,7 +130,7 @@
   // branch fired on `eligibleActors.length > 0`, a proxy for "the list holds something", and
   // every other picker in the app had no such branch at all and answered a search miss with
   // its own list-is-empty sentence. `SearchablePopover` owns the predicate now, so the
-  // distinction `openspec/specs/design-system/spec.md` requires holds at all 23 call sites
+  // distinction `openspec/specs/design-system/spec.md` requires holds at all 24 call sites
   // rather than at the two that had remembered to write it.
   const pickerEmptyHint = $derived(
     actorOptions.length === 0

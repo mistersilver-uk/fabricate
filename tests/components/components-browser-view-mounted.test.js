@@ -753,10 +753,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
 
     const memberRows = () => root.querySelectorAll('[data-component-member="true"]').length;
     const ghostRows = () => root.querySelectorAll('[data-component-member="false"]').length;
@@ -789,10 +786,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
     const count = () => root.querySelector('[data-component-count]').textContent.trim();
 
     assert.equal(count(), '10 shown · 8 of 13 in this system');

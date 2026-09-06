@@ -75,6 +75,10 @@ describe('GatheringRealmsTab mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
+    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
+    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
+    // the app; an omission CANCELS this suite rather than failing it.
+    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');

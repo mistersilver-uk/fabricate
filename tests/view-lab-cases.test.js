@@ -2114,7 +2114,7 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
   // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
   // above open a picker over a POPULATED list, so the branch that renders when the list is empty
-  // — reached by every one of the 23 call sites, and by four of them with no `emptyHint` to draw
+  // — reached by every one of the 24 call sites, and by four of them with no `emptyHint` to draw
   // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
   // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
   // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at

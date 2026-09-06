@@ -937,7 +937,7 @@ It was 100 across 39 before those three shared controls converted, and no file c
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carries a DOCBLOCK rather than the marker and is baselined with the rest.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
-It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panels' category axes.
+It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 #### Scenario: A select offers three plain options

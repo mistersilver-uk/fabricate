@@ -143,8 +143,8 @@
    * THE NON-EMPTY HOOK FOR AN EMPTY-STRING VALUE, declared once and nowhere else.
    *
    * `SearchablePopover` writes `data-popover-option={option.dataId || undefined}`, so a `dataId`
-   * of `''` omits the attribute entirely. The three bulk-edit selects this component converts all
-   * lead with an empty-string sentinel — the "Leave unchanged" row, which is both the panel's
+   * of `''` omits the attribute entirely. Both bulk-edit selects this component converts lead
+   * with an empty-string sentinel — the "Leave unchanged" row, which is both the panel's
    * default and the only way to UNSTAGE an axis — so `String(option.value)` would leave exactly
    * that row unaddressable by the capture registry's `data-popover-option` idiom, by any mounted
    * test and by the Foundry smoke, while every other row resolved.

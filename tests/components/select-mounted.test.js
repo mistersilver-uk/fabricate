@@ -47,6 +47,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -121,10 +122,11 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-select-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The primitive's own compiled roster rather than a copy of it: issue 1371 gave
+    // `SearchablePopover` a `triggerButton` form that renders `ManagerButton`, and a `.svelte`
+    // the tree renders but a manifest omits does not fail this suite — it CANCELS it.
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Select.svelte',
   ],
   componentPath: 'src/ui/svelte/components/Select.svelte',

@@ -22069,10 +22069,10 @@
      focus pair. The focus rule below is written at (0,3,0), which beats it outright.
 
    The rest are TIES this block wins on SOURCE ORDER, which is why it sits immediately after
-   the `.fabricate-picker*` family and before the roll prompt: `:21678` the panel's
-   `min-width: 240px` / `max-width: 340px` / `border-radius: 10px` at (0,2,0), `:21804` the
-   group heading's inset at (0,2,0), `:21829` the option row's `align-items: center` at (0,2,0)
-   and `:21847` its `:hover` fill at (0,3,0). That is exactly how the shipped
+   the `.fabricate-picker*` family and before the roll prompt: `:21757` the panel's
+   `min-width: 240px` / `max-width: 340px` / `border-radius: 10px` at (0,2,0), `:21883` the
+   group heading's inset at (0,2,0), `:21908` the option row's `align-items: center` at (0,2,0)
+   and `:21926` its `:hover` fill at (0,3,0). That is exactly how the shipped
    `.fabricate-picker-popover.manager-recipe-or-popover` variant above releases the same 240px
    floor, and every resulting number is MEASURED in a real browser by
    `tests/components/manager-layout.test.js` rather than inferred here.

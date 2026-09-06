@@ -341,7 +341,7 @@ const PRIMITIVES = Object.freeze([
       'manager-pagination-page',
       'manager-pagination-size',
     ]),
-    // Written inline on the root `<section>` (`Pagination.svelte:177`) — this component composes
+    // Written inline on the root `<section>` (`Pagination.svelte:215`) — this component composes
     // nothing, so `composesClasses` is neither needed nor set.
     // Measured today: 5 written (root class aside), 19 family selectors, 6 owned — 6
     // caller-container exempt plus 6 caller-container-by-ATTRIBUTE exempt (the
@@ -447,10 +447,14 @@ const PRIMITIVES = Object.freeze([
       'fabricate-select-popover',
       'fabricate-select-option',
     ]),
-    // Measured at this head: 19 written, 33 family selectors, 32 owned. The one exemption is
-    // `.fabricate-manager .fab-bulk-edit-select .fabricate-select-trigger`, the bulk panel's own
-    // full-width rule — a caller's override of the caller's own wrapper class, which is what the
-    // exemption is for. The floors sit a little under those counts, as the entries above do.
+    // Measured at this head: 19 written, 35 family selectors, 32 owned. The THREE exemptions are
+    // all the same shape — a caller's override of the caller's own wrapper class, reaching the
+    // trigger box the API deliberately does not address:
+    // `.fabricate-manager .fab-bulk-edit-select .fabricate-select-trigger`, the bulk panel's
+    // full width; and the two the scoped catalogue toolbar keeps from issue 1371, its opt-in
+    // `.is-size-38` lead rung and its `[data-manager-view='world-components']` secondary ink,
+    // both of which named a `<select>` element until this change converted those controls. The
+    // floors sit a little under those counts, as the entries above do.
     writtenFloor: 16,
     familyFloor: 30,
     ownedFloor: 29,

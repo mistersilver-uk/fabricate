@@ -551,7 +551,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       assert.deepEqual(
         optionRows(panel()).map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
         ['Anvil'],
-        'the default is today’s exact filter, so all 22 shipped importers are unchanged'
+        'the default is today’s exact filter, so all 23 shipped importers are unchanged'
       );
       harness.remount();
     });
@@ -659,7 +659,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
 
       assert.ok(
         !listOf(open).hasAttribute('style'),
-        'no callback means no `targets.list`, so the 22 shipped importers keep a list the action ' +
+        'no callback means no `targets.list`, so the 23 shipped importers keep a list the action ' +
           'never writes to at all'
       );
       harness.remount();

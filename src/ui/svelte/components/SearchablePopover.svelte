@@ -777,7 +777,7 @@
    *
    * Nothing becomes unreachable: every cursor movement is still one extra keypress away, which is
    * the behaviour of every editable combobox. And two populations do not change at all — a
-   * `<button>` holder has no `selectionStart`, so the six search-suppressed sites keep today's
+   * `<button>` holder has no `selectionStart`, so the seven search-suppressed sites keep today's
    * map exactly, and a freshly opened panel has an empty query, so both edges hold and the cursor
    * takes all four keys, which is when a GM actually arrows.
    *

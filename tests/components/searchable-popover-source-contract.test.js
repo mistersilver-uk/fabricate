@@ -134,7 +134,9 @@ const popover = definePrimitiveAdoptionContract({
   contractClass: 'manager-travel-picker',
   allowlist: RAW_ALLOWLIST,
   // 23 call sites in 22 components as issue 1503 lands (21 in 20 before it; the two pickers
-  // joined). 16 and 13 leave headroom for a conversion that merges two sites without letting a
+  // joined), and 24 in 23 as issue 1504 composes `components/Select.svelte` over it. Both
+  // figures are the `<SearchablePopover>` component NODES this factory parses, not `grep` hits.
+  // 16 and 13 leave headroom for a conversion that merges two sites without letting a
   // third of the corpus vanish unnoticed.
   callSiteFloor: 16,
   fileFloor: 13,
@@ -384,13 +386,14 @@ test('a popover that renders no search field announces a listbox', () => {
   // row-level `or…` menu passed `showSearch={false}` and no `triggerHasPopup`, so it took the
   // `dialog` default while rendering the primitive's bare-listbox shape, and under the focus
   // model its trigger announces `aria-haspopup="dialog"` beside `role="combobox"` and an
-  // `aria-controls` naming a `role="listbox"`. The other five search-suppressed sites all
-  // declare it, so the odd one out was invisible to every reader that looked at the five.
+  // `aria-controls` naming a `role="listbox"`. The other six search-suppressed sites all
+  // declare it, so the odd one out was invisible to every reader that looked at the rest.
   const suppressed = popover.callSites.filter(
     (site) => site.attribute('showSearch') === 'showSearch={false}'
   );
   // A floor rather than a count, and above zero: at zero this clause quantifies over nothing and
-  // reports clean. Six sites suppress the field as issue 1503 lands.
+  // reports clean. Six sites suppress the field as issue 1503 lands, seven once issue 1504's
+  // `Select` joins them.
   assert.ok(
     suppressed.length >= 5,
     `only ${suppressed.length} call sites suppress the search field, so this clause is vacuous`

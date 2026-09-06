@@ -236,19 +236,32 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   const fieldRule = '.fabricate-manager .manager-search.is-size-38 input';
   const selectRule =
-    '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-manager .manager-toolbar select.is-size-38, .fabricate-manager .manager-scoped-list-toolbar select.is-size-38';
+    '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-manager .manager-toolbar select.is-size-38';
+  // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own, because
+  // that toolbar's lane filters are shared `<Select>`s now: the class rides the SELECT ROOT and
+  // the rung has to reach the `<button>` trigger beneath it. It states `min-height` rather than
+  // `height`, because `.fabricate-select-trigger` sets `height: auto` to turn core's fixed
+  // `button { height: var(--button-size) }` into a floor — so a `height` here would put the
+  // fixed box straight back.
+  const triggerRule =
+    '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger';
 
   it('is on the published height ladder, which is why it needs no deviation', () => {
     assert.ok(LADDER_RUNGS.includes(38), '38 is a rung, so drawing it is compliance and not drift');
   });
 
   it('states 38px and the band’s 9px corner for the field and for a toolbar select', () => {
-    for (const [label, selector] of [
-      ['field', fieldRule],
-      ['select', selectRule]
+    for (const [label, selector, heightProperty] of [
+      ['field', fieldRule, 'height'],
+      ['select', selectRule, 'height'],
+      ['converted select trigger', triggerRule, 'min-height']
     ]) {
       const [body] = bodiesOf(selector);
-      assert.equal(pixels(valueOf(body, 'height')), 38, `the ${label} opts into the 38px rung`);
+      assert.equal(
+        pixels(valueOf(body, heightProperty)),
+        38,
+        `the ${label} opts into the 38px rung`
+      );
       assert.equal(
         pixels(valueOf(body, 'border-radius')),
         9,
@@ -261,11 +274,19 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     // Non-vacuity again, and a specificity claim: both shipped rules are (0,2,1) and both state
     // the height, so an opt-in written at the same weight would be decided by source order.
     assert.equal(pixels(valueOf(bodiesOf('.fabricate-manager .manager-search input')[0], 'height')), 34);
+    // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
+    // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
+    // route still rendering a native select there, and this row's controls are triggers now.
     assert.equal(
-      pixels(valueOf(bodiesOf('.fabricate-manager .manager-scoped-list-toolbar select')[0], 'height')),
+      pixels(
+        valueOf(
+          bodiesOf('.fabricate-select .fabricate-select-trigger-toolbar')[0],
+          'min-height'
+        )
+      ),
       34
     );
-    for (const selector of [fieldRule, ...selectRule.split(', ')]) {
+    for (const selector of [fieldRule, ...selectRule.split(', '), triggerRule]) {
       const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
       assert.ok(classes >= 3, `\`${selector}\` carries a third class, so it wins on specificity`);
     }

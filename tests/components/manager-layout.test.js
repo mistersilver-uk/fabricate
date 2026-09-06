@@ -5921,7 +5921,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
   // So the fixture now renders a COMPONENT row beside the two tag rows and the empty tag row is
   // asserted against ITS height, and the `+ Tag` pill is wrapped in the `div.fabricate-picker`
   // namespace root `SearchablePopover` actually renders it inside
-  // (`SearchablePopover.svelte:986`) rather than dropped bare into the arm - a flex item the
+  // (`SearchablePopover.svelte:1209`) rather than dropped bare into the arm - a flex item the
   // shipped tree has and the old fixture did not.
   //
   // WHAT IS ASSERTED IS NOT "one line" AT BOTH WIDTHS. At the narrow width `Any of` + two chips
@@ -13402,7 +13402,11 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
     .filter((prelude) => prelude.includes('.manager-scoped-list-toolbar'))
     .map((prelude) => prelude.replaceAll(/\s+/g, ' ').trim());
 
-  const withSelect = preludes.filter((prelude) => /\bselect\b/.test(prelude));
+  // A `select` TYPE selector, not the token inside `.fabricate-select-trigger`. `\bselect\b`
+  // matches that class too, because a hyphen is a word boundary — and since issue 1504 the
+  // catalogue toolbar carries call-site rules on the converted trigger, which are not the
+  // stranded native-select rules this clause is about.
+  const withSelect = preludes.filter((prelude) => /(?:^|[\s>+~,(])select(?![\w-])/.test(prelude));
   assert.ok(
     withSelect.length > 0,
     'a rule naming a scoped-list-toolbar select must still exist, or this clause holds over ' +

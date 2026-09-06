@@ -46,6 +46,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    // ... and the labelled push-button `SearchablePopover` renders in its `triggerButton` form
+    // (issue 1371). This tree reached no `ManagerButton` before the pager's list moved into
+    // the app; an omission CANCELS this suite rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     // The house chip primitive the salvage bodies render.

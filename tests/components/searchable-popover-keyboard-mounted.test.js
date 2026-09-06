@@ -1152,7 +1152,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const rows = optionRows(panel);
 
       // A `<button>` has no `selectionStart` at all, so the boundary predicate is false for it by
-      // construction and the six search-suppressed call sites keep exactly today's key map.
+      // construction and the seven search-suppressed call sites keep exactly today's key map.
       const pressed = pressKey('End');
       assert.ok(
         pressed.defaultPrevented,

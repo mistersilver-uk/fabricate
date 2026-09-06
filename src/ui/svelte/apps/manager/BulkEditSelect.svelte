@@ -70,11 +70,12 @@
   /**
    * The caller's rest attributes, routed to the TRIGGER rather than to the root.
    *
-   * Both call sites pass their stable hook as a bare rest attribute — `data-recipe-bulk-category=""`,
-   * `data-component-bulk-category=""` — and every driver of this control addresses that hook
-   * expecting the control itself. `Select`'s `...rest` lands on the picker root, which is a
-   * wrapper around the trigger, so a hook forwarded that way would still resolve and would
-   * silently point one element too high: a click would hit the box instead of the button.
+   * Both call sites pass their stable hook as a bare rest attribute —
+   * `data-recipe-bulk-category=""` and `data-recipe-bulk-check-tier=""` — and every driver of
+   * this control addresses that hook expecting the control itself. `Select`'s `...rest` lands on
+   * the picker root, which is a wrapper around the trigger, so a hook forwarded that way would
+   * still resolve and would silently point one element too high: a click would hit the box
+   * instead of the button.
    */
   const triggerData = $derived({ ...rest });
 </script>
