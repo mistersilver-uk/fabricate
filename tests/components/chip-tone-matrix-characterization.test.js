@@ -43,10 +43,25 @@ const harness = createMountedComponentHarness({
 });
 
 /**
- * The accepted tone vocabulary, DERIVED from the component's own `TONES` literal rather
- * than restated here (issue 1286).
+ * `chipSource`, or a slice of it, with its block and line comments removed.
  *
- * A hand-copied matrix is a mirror, and a mirror of a nine-entry list is exactly the kind
+ * Both scans below need this and neither may skip it: the literals and the class builder sit
+ * inside a heavily annotated file whose prose quotes tone names, density names and the very
+ * `density === '…'` shape one of those scans counts, so an unstripped read invents entries no
+ * `Set.has(…)` will ever match and counts branches that are not branches.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function withoutComments(text) {
+  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
+}
+
+/**
+ * The values one closed vocabulary `Set` declares, DERIVED from the component's own literal
+ * rather than restated here (issue 1286; generalized over both vocabularies at issue 1506).
+ *
+ * A hand-copied matrix is a mirror, and a mirror of a thirteen-entry list is exactly the kind
  * that rots quietly: a tone added to `Chip.svelte` and not to this file leaves the new tone
  * unpinned while every assertion here still passes, which reads as "the chip is
  * characterized" when the newest tone is the one nothing covers. `TONES` is a local `const`
@@ -54,23 +69,49 @@ const harness = createMountedComponentHarness({
  * `chipSource` for the `--fab-chip-color` scope assertion below, and this reads the same
  * text.
  *
+ * ONE SCAN FOR BOTH VOCABULARIES, not two. `EMPHASES` is declared in the same shape a few lines
+ * below `TONES`, and issue 1506 needed to read it for the exact-count contract at the foot of
+ * this file. A second copy of this body would be the mirror this function exists to close, said
+ * about itself: two scans that disagree about what a declaration IS do not fail — one of them
+ * reports clean over a literal the other polices.
+ *
  * Comments are stripped first. The literal is heavily annotated and those annotations quote
- * tone NAMES in prose, so a naive scan for quoted words inside the block would invent
+ * value NAMES in prose, so a naive scan for quoted words inside the block would invent
  * entries that no `TONES.has(...)` will ever match.
+ *
+ * @param {string} name The `const` the vocabulary is declared as, e.g. `TONES`.
+ * @returns {string[]}
  */
-function declaredTones() {
-  const start = chipSource.indexOf('const TONES = new Set([');
-  assert.notEqual(start, -1, 'Chip.svelte still declares its tone vocabulary as `TONES`');
+function declaredSetLiteral(name) {
+  const start = chipSource.indexOf(`const ${name} = new Set([`);
+  assert.notEqual(start, -1, `Chip.svelte still declares its \`${name}\` vocabulary as a Set literal`);
   const open = chipSource.indexOf('[', start);
   const close = chipSource.indexOf(']);', open);
-  assert.ok(close > open, 'the `TONES` literal is closed');
-  const body = chipSource
-    .slice(open + 1, close)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '');
-  const tones = [...body.matchAll(/'([\w-]+)'/g)].map(([, tone]) => tone);
-  assert.ok(tones.length > 0, 'at least one tone is declared');
-  return tones;
+  assert.ok(close > open, `the \`${name}\` literal is closed`);
+  const body = withoutComments(chipSource.slice(open + 1, close));
+  const values = [...body.matchAll(/'([\w-]+)'/g)].map(([, value]) => value);
+  assert.ok(values.length > 0, `at least one \`${name}\` value is declared`);
+  return values;
+}
+
+/**
+ * The accepted TONE vocabulary. See `declaredSetLiteral` above for why it is derived.
+ *
+ * @returns {string[]}
+ */
+function declaredTones() {
+  return declaredSetLiteral('TONES');
+}
+
+/**
+ * Every `density === '…'` branch the class builder routes through, in source order, comments
+ * stripped so a docblock that names a density in prose cannot answer for a branch.
+ *
+ * @returns {string[]}
+ */
+function densityBranches() {
+  const code = withoutComments(chipSource);
+  return [...code.matchAll(/density === '([a-z-]+)'/g)].map(([, value]) => value);
 }
 
 /** Tone → the single class it must add. The whole accepted vocabulary, in source order. */
@@ -596,5 +637,75 @@ describe('1371 Chip — the lit emphasis', () => {
     assert.ok(lit > 0, 'the lit emphasis has a rule');
     assert.ok(ruleIndex('is-tag') < lit, 'the tag tone is written first');
     assert.ok(ruleIndex('is-outlined') < lit, 'and so is the plate');
+  });
+});
+
+
+/**
+ * THE CLOSED VOCABULARIES ARE PINNED BY EXACT COUNT (issue 1506).
+ *
+ * Two of this component's axes are closed vocabularies with no landed guard on their SIZE. The
+ * matrices above quantify over whatever each axis declares, so they characterize a sixth density
+ * or a fourth emphasis as readily as they characterize the shipped ones: adding a value makes the
+ * suite pin one more thing and report green, which is exactly the opposite of what a vocabulary
+ * that is meant to be closed needs from a test.
+ *
+ * THE PIN IS AN EXACT COUNT AND NEVER A CEILING, and the difference is not pedantry. Written as
+ * `<= 5`, the density gate is defeated by the most natural refactor available — `DENSITIES.has(density) ? \`is-${density}\` : ''`, the exact shape `TONES` and `EMPHASES` already use — which
+ * drops the branch count to zero and lets a seventh density in for free while every assertion
+ * above still passes. An exact count reds on that refactor as loudly as on a new branch, which
+ * puts the question in front of a reviewer instead of leaving it to a green run.
+ *
+ * WHY THE EMPHASIS HALF IS HERE RATHER THAN WHERE IT USED TO BE. The one guard that watched this
+ * axis was the cross-primitive pair in `recipe-studio-primitives.test.js`, which reads
+ * `StatusPill.svelte` from disk — and that component is retiring into this one. This is the
+ * LANDED replacement: it reads only the surviving primitive, and it survives the deletion that
+ * takes the other one.
+ *
+ * Both clauses read the source rather than the mounted DOM on purpose. A value declared without a
+ * rule renders as the default chip, so the DOM cannot tell the two apart, and a value declared
+ * with a rule but never passed by a caller has no DOM at all.
+ */
+describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
+  it('routes exactly FIVE densities through a `density === …` branch, and `default` is their absence', () => {
+    const branches = densityBranches();
+
+    assert.equal(
+      branches.length,
+      5,
+      'the chip routes a different number of densities than the five it ships. This is an EXACT ' +
+        'count rather than a ceiling: a SIXTH branch reds here, and so does a `DENSITIES.has(…)` ' +
+        'set refactor that drops the count to zero. A conversion routes to an EXISTING rung; ' +
+        'minting one to make a conversion pixel-neutral re-creates, on the primitive, the ' +
+        `per-surface geometry this component was extracted to retire. Found: ${branches}`
+    );
+
+    // The names as well as the count, so the failure says WHICH rung moved rather than that the
+    // number did. `default` is deliberately absent: it is the absence of every branch above.
+    assert.deepEqual(
+      branches,
+      ['row', 'list', 'action', 'tag-run', 'inspector'],
+      'the five shipped densities are these five, in this order, and `default` is their absence'
+    );
+  });
+
+  it('declares exactly THREE emphases, and they are the three the specimen publishes', () => {
+    const emphases = declaredSetLiteral('EMPHASES');
+
+    assert.equal(
+      emphases.length,
+      3,
+      'the chip declares a different number of emphases than the three it ships. An EXACT count ' +
+        'rather than a ceiling, for the density clause\'s reason: a FOURTH value reds here, and ' +
+        'so does an `EMPHASES.has(…)` refactor that drops the count below three. A face a pixel ' +
+        `from a shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
+    );
+
+    assert.deepEqual(
+      emphases,
+      ['outlined', 'lit', 'bare'],
+      'the three shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
+        'the ink) and `bare` (no edge at all), in this order'
+    );
   });
 });
