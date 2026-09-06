@@ -15,11 +15,11 @@
  * renders is not the control the manager renders.
  *
  * ── WHY THE BARE HOST IS THE ONE THAT MATTERS ───────────────────────────────────────────────
- * `.fabricate-app` declares its own focus ring and its own select chrome, so comparing the two
- * APPS against each other can pass while both are being rescued by an area rule. The bare `<div>`
- * is rescued by nothing: it is the state a re-rooted control reaches when it is rendered somewhere
- * no `.fabricate-*` area class exists, which is precisely what "rooted at the primitive" claims to
- * make safe.
+ * `.fabricate` declares the module focus pair for every application, and `.fabricate-app` its own
+ * select chrome, so comparing the two APPS against each other can pass while both are being rescued
+ * by a rule neither of them owns. The bare `<div>` is rescued by nothing: it is the state a
+ * re-rooted control reaches when it is rendered somewhere no `.fabricate-*` area class exists,
+ * which is precisely what "rooted at the primitive" claims to make safe.
  *
  * ── WHAT THE HARNESS LOADS, AND WHAT IT DELIBERATELY DOES NOT ───────────────────────────────
  * `styles/fabricate.css` UNLAYERED, and nothing else. No Foundry core sheet, no scoped component
@@ -31,7 +31,7 @@
  * the primitive declared anything, and the `font-family` / `font-size` / `line-height` comparisons
  * would agree for a reason that has nothing to do with this change. The one declaration this file
  * exists to prove — `font: inherit` on the family's own baseline rule, replacing the manager's
- * `.fabricate-manager button, … { font: inherit }` at `fabricate.css:1310-1315` — would be
+ * `.fabricate-manager button, … { font: inherit }` at `fabricate.css:1442-1447` — would be
  * unobservable. Without core's sheet a bare `<button>` falls to the UA default button font, which
  * is NOT the inherited one, so deleting the primitive's declaration reds here. That is the whole
  * design of the fixture and it is why it diverges from `world-vocabulary-control-row-cascade.js`,
@@ -63,7 +63,7 @@
  *  2. THE RINGS. Each primitive now declares its own `:focus-visible` outline, and a ring is only
  *     observable on a focused element in a browser that has decided `:focus-visible` applies. The
  *     rule's declared text is the thing under contract here — that it exists, that its
- *     declarations are the two the area rings use, and that nothing this change added reaches a
+ *     declarations are the two the module ring uses, and that nothing this change added reaches a
  *     `<select>` and so displaces `.fabricate-app select:focus-visible`'s inset ring.
  *
  * ── THE MARKUP IS THE PRIMITIVE'S OWN CLASS LIST, READ OUT OF THE PRIMITIVE ─────────────────
@@ -255,11 +255,11 @@ const COMPARED = Object.freeze([
  * `box-sizing` is compared on the two BUTTON families and not on the pager, and the exclusion is
  * a measured fact rather than a convenience.
  *
- * The button families declare `box-sizing: border-box` on their own shared base rule
- * (`fabricate.css:13559-13560`), so the comparison is live for them and reds if that declaration goes.
- * `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather than a
- * value the family owns: in the manager it picks `border-box` up from
- * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`), a UNIVERSAL rule that is the
+ * The button families declare `box-sizing: border-box` on their own shared base rule at
+ * `fabricate.css:13667-13668`, so the comparison is live for them and reds if that declaration
+ * goes. `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather
+ * than a value the family owns: in the manager it picks `border-box` up from
+ * `.fabricate-manager * { box-sizing: border-box }` (`:1427-1428`), a UNIVERSAL rule that is the
  * manager area's own chrome and belongs to no primitive family, and everywhere else it takes
  * whatever the host declares.
  *
@@ -521,7 +521,7 @@ test('the values the comparison holds over are the ones the family declares, not
   // once and nothing below it, so a button that inherits carries the body's FAMILY; one that does
   // not carries the UA's default button font, which in Chromium is Arial. This is the single
   // computed observation that proves the family no longer depends on
-  // `.fabricate-manager button, … { font: inherit }` (`fabricate.css:1310-1315`) to get there.
+  // `.fabricate-manager button, … { font: inherit }` (`fabricate.css:1442-1447`) to get there.
   //
   // `font-size` is deliberately NOT read this way. `font: inherit` sets it to the inherited
   // value, but the family then declares its own type scale further down the sheet — measured
@@ -842,13 +842,13 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     //
     // THE CHROME A FAMILY DECLARES IS A PAIR, and only the pair is host-independent. Foundry core
     // paints every focused button with an orange outline and a 4px glow (`a.button:focus,
-    // button:focus` in core's `elements` layer), and the two AREA resets strip it only inside
-    // `.fabricate-app` and `.fabricate-manager`. A control rooted at a class the primitive emits
-    // renders in hosts carrying neither, where the repaint half alone would lay the accent ring
-    // OVER core's glow instead of replacing it. So each family declares the strip at `:focus` as
-    // well as the repaint at `:focus-visible` — the same pairing CONTRIBUTING.md states for an
-    // area — and the strip must be declared FIRST, because the two halves tie on specificity and
-    // a `:focus-visible` element matches both.
+    // button:focus` in core's `elements` layer), and the MODULE reset strips it only inside
+    // `.fabricate`, the root every Fabricate application emits (issue 1501). A control rooted at a
+    // class the primitive emits renders in hosts carrying no Fabricate root at all, where the
+    // repaint half alone would lay the accent ring OVER core's glow instead of replacing it. So
+    // each family declares the strip at `:focus` as well as the repaint at `:focus-visible` — the
+    // same pairing CONTRIBUTING.md states for the module — and the strip must be declared FIRST,
+    // because the two halves tie on specificity and a `:focus-visible` element matches both.
     for (const [strip, repaint] of [
       ['.fabricate-button:focus', '.fabricate-button:focus-visible'],
       ['.fabricate-icon-button:focus', '.fabricate-icon-button:focus-visible'],
@@ -859,12 +859,12 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       assert.match(
         ring[0].cssText,
         /outline:\s*2px solid var\(--fab-accent\)/,
-        `${repaint} must carry the same outline the two area rings declare`
+        `${repaint} must carry the same outline the module ring declares`
       );
       assert.match(
         ring[0].cssText,
         /outline-offset:\s*2px/,
-        `${repaint} must carry the area rings' outline offset`
+        `${repaint} must carry the module ring's outline offset`
       );
 
       const reset = rules.filter((rule) => rule.selectorText === strip);
@@ -872,13 +872,13 @@ test('each re-rooted family declares its own focus ring, and none of them reache
         reset.length,
         1,
         `${strip} must be declared exactly once: without the strip half, a control in a host ` +
-          "carrying neither area class keeps Foundry core's orange focus outline and 4px glow " +
+          "carrying no Fabricate root keeps Foundry core's orange focus outline and 4px glow " +
           'under the accent ring instead of having it replaced'
       );
       assert.match(
         reset[0].cssText,
         /outline:\s*none/,
-        `${strip} must strip core's focus outline, as the two area resets do`
+        `${strip} must strip core's focus outline, as the module reset does`
       );
       assert.match(
         reset[0].cssText,

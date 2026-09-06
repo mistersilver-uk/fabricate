@@ -158,10 +158,11 @@ The `line-height` is not left to the shorthand either. `font` is a shorthand, so
 `box-sizing` needed nothing, because that same block already declared it.
 
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
-The two area rings are bare-element selectors an area declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders outside either area — a control that is styled and unfocusable-looking, which is worse than one that is neither.
+The module ring is a bare-element selector a Fabricate root declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders in a host carrying no Fabricate root at all — a control that is styled and unfocusable-looking, which is worse than one that is neither.
 `ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
-The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the two applications' area resets pair them and as CONTRIBUTING.md's area rule states.
-Foundry core paints every focused button with an outline and a glow of its own, and the area resets remove that only inside their own root; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying neither area class, rather than replacing it.
+The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the module root pairs them and as CONTRIBUTING.md's rule states.
+Foundry core paints every focused button with an outline and a glow of its own, and the module reset removes that only inside a Fabricate window; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying no Fabricate root, rather than replacing it.
+The module pair is (0,2,1) and a family pair is (0,2,0), so wherever a Fabricate root is an ancestor the module pair wins; because the declarations are copied from it verbatim, nothing moves, and what the family pair paints is the host that has no Fabricate root.
 The strip half is declared ABOVE the repaint, because the two tie on specificity and a keyboard-focused control matches both.
 Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
@@ -184,6 +185,65 @@ A primitive declaring its own chrome must not, in doing so, displace an area's c
 - **WHEN** a caller outside that root proposes to adopt the primitive
 - **THEN** the family is re-rooted first, in its own change
 - **AND** the adoption is not landed on top of a family that only paints on one screen
+
+### Requirement: A cross-cutting utility or skin is declared once, at the module root
+
+A class that carries no meaning beyond a repeated declaration set — visually-hidden, truncation, a column stack, a wrapping cluster — is a UTILITY.
+A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
+
+The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
+They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
+BOTH HALVES are held to that rooting, not the reset alone: a per-area copy of the RING half reaches the same elements at the same rank as the module ring, so which one paints is decided by source order rather than by anything a reader of either block can see.
+
+A SKIN is a utility whose declaration set is a shared visual treatment the design system already names — a border, a radius and a fill at published rungs — rather than a layout mechanic.
+A skin is rooted at `.fabricate` exactly as any other utility, and it is a shared treatment rather than a rename only where TWO OR MORE blocks already carry its exact values on every property it declares.
+A skin with fewer than two such blocks MUST NOT be declared; the candidate blocks are recorded instead.
+
+A UTILITY and a SKIN are adopted differently, and the difference is normative.
+A utility's adoption DELETES the donor rule, so the donor's declaration set MUST equal the utility's, property for property and value for value.
+A skin's adoption removes only the properties the skin declares and the donor KEEPS the rest, so the donor MUST declare every property the skin declares at the skin's exact value and MAY declare more.
+
+Rooting a UTILITY at `.fabricate` is not the defect "A shared primitive's class family is rooted at the primitive, not at an app" forbids.
+That requirement governs a rule on a class a shared PRIMITIVE writes and forbids borrowing an ancestor for reach, whereas a utility is written by its CALLERS and `.fabricate` is the module's own root rather than an application's.
+
+A rule that restates a utility's or skin's declaration set on a semantic class either drops those declarations and lets the markup carry the utility, or is recorded with the reason it cannot — including "pinned by a test or script that reads the sheet's selectors", "its root is a class a portaled primitive emits, so the `.fabricate` ancestor is not guaranteed", and "a markup class would paint a wider set of elements than the donor selector matched".
+
+A collapse or an adoption is NOT position-neutral, unlike the one-class-for-one-class re-rooting that same requirement describes: it moves declarations through the cascade at equal, lower or higher specificity, where source order decides the winner.
+So it MUST be written at a position proved not to change paint — a blocker walk over every rule in the closed specificity band between the donor's rank and the utility's, judged against the donor element's real class list — and that walk MUST be published with the change, together with both specificities.
+An adoption whose specificity DIFFERS from its donor's in either direction is deferred unless the walk proves no competitor, and one that LOWERS specificity is deferred unless a captured frame shows the adopted element visible in its own pixels rather than merely present in its DOM, because a walk over the module sheet alone cannot see the layered core stylesheet the donor may be contending with.
+
+A utility or skin declared and not emitted is a dead rule, forbidden by the same gate that forbids any other.
+So a utility with no adopter is not declared, and one left with a single adopter is a rename rather than a shared treatment and is not declared either.
+
+The reverse direction is normative too, and it is the one no dead-rule gate can see: where a utility takes a VARIANT ATTRIBUTE, every value a call site writes MUST have a rule, and the utility's DEFAULT variant MUST be written as its own rule rather than left implicit.
+A value nothing declares renders at whatever the base rule happens to set, so the markup asserts a pin that is not there and every site naming it moves silently the day that base changes.
+
+`openspec/specs/design-system/library.html` carries no specimen for a utility or a skin and needs none.
+Membership of the primitive set is measured by independent Svelte importers through `scripts/lib/componentImporters.js`, which is a question a bare CSS class cannot be asked; the enumeration this document holds a utility to is `styles/fabricate.css` itself, through `tests/components/design-system-debt-ratchets.test.js`.
+
+#### Scenario: A second application needs a utility the first already has
+
+- **WHEN** a window outside the original app renders markup carrying a utility class
+- **THEN** the utility paints there without a second copy of the rule
+- **AND** no new application-rooted copy is added
+
+#### Scenario: A semantic rule restates a utility's declarations
+
+- **WHEN** a rule declares exactly a utility's set, property for property and value for value
+- **THEN** the rule is deleted and its markup carries the utility class
+- **AND** when the rule declares more than that set, or a test or script names its class, or its root is a class a portaled primitive emits, or the markup class would reach elements the rule's selector did not, it is recorded with that reason and kept
+
+#### Scenario: A shared treatment has only one block carrying its values
+
+- **WHEN** a proposed skin's exact border, radius and fill are already carried by exactly one block
+- **THEN** the skin is not declared, because one adopter is a rename rather than a shared treatment
+- **AND** the candidate blocks are recorded with their measured tuples for the change that can reach two
+
+#### Scenario: A collapse moves a declaration through the cascade
+
+- **WHEN** two copies of a utility are collapsed, or a semantic rule adopts one
+- **THEN** the surviving rule is written at a position proved by a blocker walk over every intervening rule in the closed specificity band
+- **AND** the walk, both specificities, any adoption deferred because its specificity differs from its donor's, and the captured frame witnessing any specificity-lowering adoption are published with the change
 
 ### Requirement: A component's own declaration outranks the module sheet, whatever the specificity
 
@@ -316,7 +376,7 @@ An interactive primitive MUST declare rest, hover, focus-visible and disabled, a
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
-Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for six application roots, and it is recognised by the SHAPE of those blocks — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
+Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for five roots — three interactables windows, the roll-prompt dialog, and `.fabricate` itself, the shared module root every Fabricate window emits, which carries the collapsed reset for the player app and the manager — and it is recognised by the SHAPE of those blocks — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 
 A loading control MUST set `aria-busy` and change its label or text.

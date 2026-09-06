@@ -257,9 +257,11 @@
        the row: a live region wrapped around the pills announces each added pill's whole
        subtree (its remove button's label included) and nothing at all on a removal.
        `polite` announces after the current utterance rather than interrupting it.
-       Visually hidden here rather than through the global `.sr-only` utility, which is
-       scoped to the two app theme roots — this is a shared primitive and must not depend
-       on which root it is dropped into. -->
+       Visually hidden here rather than through the global `.visually-hidden` utility.
+       That utility is now rooted at `.fabricate`, the module root every Fabricate
+       application emits (issue 1501), so the old reason — that it was scoped to the two app
+       theme roots — no longer holds. The reason that DOES hold is portability: this is a
+       shared primitive and a host may portal it out from under any root at all. -->
   <span class="manager-modifier-pill-status" aria-live="polite" data-modifier-pill-status
     >{selectionSummary}</span
   >

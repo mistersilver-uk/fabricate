@@ -714,7 +714,8 @@
 
                 {#if isOutcomeTier}
                   <div
-                    class="manager-checks-breakage-tiers"
+                    class="fab-cluster"
+                    data-gap="2"
                     role="group"
                     aria-label={text(
                       'FABRICATE.Admin.Manager.Checks.Breakage.Tiers',

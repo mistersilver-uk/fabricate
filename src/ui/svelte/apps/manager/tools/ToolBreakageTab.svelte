@@ -513,7 +513,12 @@
          `disabled` down three controls. The `Always fires` badge that used to caption its
          legend is GONE — the design uses that slot for the inheritance pill, which the card
          above now carries, and `Always fires` was never news. -->
-    <fieldset class="manager-tool-on-break" data-tool-on-break-controls disabled={immune}>
+    <fieldset
+      class="manager-tool-on-break fab-stack"
+      data-gap="3"
+      data-tool-on-break-controls
+      disabled={immune}
+    >
       {#if immune}<p class="manager-tool-info-strip">
           <i class="fas fa-shield" aria-hidden="true"></i>{text(
             'FABRICATE.Admin.Manager.Tools.Editor.ImmuneHint',

@@ -426,7 +426,7 @@
   {/if}
 
   {#if progressive}
-    <p class="sr-only" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
+    <p class="visually-hidden" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
   {/if}
 
   <div class="manager-recipe-ingredient-set-add">
