@@ -37,7 +37,7 @@
  * is a VANISHED row rather than a silent pass.
  *
  * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
- * MEASURED over this branch's own head, rebased onto issue 1502's final tree, by `the sheet's
+ * MEASURED over this branch's own head, rebased onto issue 1501's final tree, by `the sheet's
  * cross-list selector repetition does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
  * printed from. The sheet holds 2,570 rules at that head, 121 repeated keys and 247 appearances

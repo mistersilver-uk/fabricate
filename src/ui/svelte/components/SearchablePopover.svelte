@@ -243,8 +243,9 @@
                    `triggerClass` becomes a declared NO-OP with a `trigger` snippet: it
                    is a pass-through to this component's own button, which is then not rendered
                    at all, and `inlineSearchTrigger` still wins over BOTH while the panel is
-                   open, exactly as it wins over `triggerChip` — the two shapes contradict each
-                   other, and the inline field is the one the GM is typing into.
+                   open, exactly as it wins over `triggerChip` and `triggerButton` — the two
+                   shapes contradict each other, and the inline field is the one the GM is
+                   typing into.
 
                    The click REFUSAL is the caller's too, and it has two halves for the same
                    reason the omission does. A snippet caller's own `disabled` attribute stops
@@ -402,8 +403,8 @@
    *
    * Every other label here arrives pre-localized from the call site, because every other label
    * is a fact about that surface — what the picker is for, what it is empty OF. `No matches` is
-   * a fact about this control's own search box and is the same sentence at all 22 sites, so a
-   * new required prop would have been 22 identical edits to say one thing once.
+   * a fact about this control's own search box and is the same sentence at all 23 sites, so a
+   * new required prop would have been 23 identical edits to say one thing once.
    *
    * @param {string} key
    * @param {string} fallback
@@ -627,7 +628,7 @@
   //
   // `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
   // the HOLDER — and drive selection with `aria-activedescendant`. The holder is the query
-  // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, four
+  // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, five
   // app surfaces plus `ModifierPillSelect`), and the option rows NEVER receive DOM focus. Roving
   // focus onto them is what the prohibition forbids, because it re-arms Foundry's canvas
   // bindings — and there is a second, independent reason: `styles/fabricate.css` rings any focused
@@ -713,7 +714,7 @@
    *
    * Nothing becomes unreachable: every cursor movement is still one extra keypress away, which is
    * the behaviour of every editable combobox. And two populations do not change at all — a
-   * `<button>` holder has no `selectionStart`, so the five search-suppressed sites keep today's
+   * `<button>` holder has no `selectionStart`, so the six search-suppressed sites keep today's
    * map exactly, and a freshly opened panel has an empty query, so both edges hold and the cursor
    * takes all four keys, which is when a GM actually arrows.
    *
@@ -776,7 +777,7 @@
   // happens to have been scheduled first — true today, but an internal ordering of the
   // framework's batching that this primitive must not depend on. `tick()` states the
   // requirement instead of relying on it. The `querySelector` fallback covers a trigger
-  // shape that is not the bound element. Shared by all 19 consumers, so it is not branched
+  // shape that is not the bound element. Shared by all 22 consumers, so it is not branched
   // on the mode.
   function restoreTriggerFocus() {
     tick().then(() => {

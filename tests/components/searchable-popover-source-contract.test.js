@@ -125,7 +125,7 @@ const popover = definePrimitiveAdoptionContract({
   primitive: POPOVER_PATH,
   contractClass: 'manager-travel-picker',
   allowlist: RAW_ALLOWLIST,
-  // 24 call sites in 22 components as issue 1503 lands (22 in 20 before it; the two pickers
+  // 23 call sites in 22 components as issue 1503 lands (21 in 20 before it; the two pickers
   // joined). 16 and 13 leave headroom for a conversion that merges two sites without letting a
   // third of the corpus vanish unnoticed.
   callSiteFloor: 16,
