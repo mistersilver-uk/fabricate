@@ -158,9 +158,15 @@
          The strip's copy is NOT folded into the card's sub-line: the strip states an
          INVARIANT (the award mechanic is true of every progressive recipe regardless of
          this toggle) while the card states a CONDITIONAL. When the toggle is off the
-         budget explanation must still be true, so a merged sub-line would caveat itself. -->
+         budget explanation must still be true, so a merged sub-line would caveat itself.
+
+         NEUTRAL, not info (issue 1505), on the same reading: the specimen reserves the info
+         tint for a note about LIVE state, and the sentence above says in terms that this
+         strip states an invariant. It also sits directly above an info-tinted ToggleCard, so
+         tinting it spent the colour twice and made the standing rule read as the lesser of
+         the two boxes. -->
     <Callout
-      tone="info"
+      tone="neutral"
       icon="fas fa-dice-d20"
       text={text(
         'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',

@@ -93,7 +93,16 @@ describe('1505 Notice — the API the library states', () => {
       'polite',
       'a notice that appears without a focus change is still announced'
     );
-    assert.equal(noticeOf(polite).getAttribute('role'), null, 'without claiming the page');
+    // `status`, not nothing: both shipped callers INSERT the notice together with its text,
+    // and a bare `aria-live` on a node created in the same mutation as its content is not
+    // announced — only its later updates are. A live-region ROLE is recognised on insertion,
+    // and `status` is the polite one, so this keeps the announcement without claiming the
+    // page the way `alert` does.
+    assert.equal(
+      noticeOf(polite).getAttribute('role'),
+      'status',
+      'through a live-region role that survives being created with its own content'
+    );
     harness.remount();
   });
 
