@@ -17,6 +17,10 @@ const {
   runBackfill,
 } = await import('../scripts/release-s3.js');
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
+const { zipDirectory } = await import('../scripts/lib/zip.js');
+const { ARCHIVE_CHUNK_GATE_LABEL, assertArchiveChunkCompleteness } = await import(
+  '../scripts/lib/releaseZipChunks.js'
+);
 
 // ───────────────────────────────────────────────────────────────────────────
 // deriveS3Layout() tests
@@ -507,6 +511,13 @@ const TE_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json';
  * A `main()` harness with a tiny STATEFUL S3 double: manifest writes are reflected so the
  * post-publish read-back sees the version just published. `staleReadBack` forces the read-back to
  * come back at a different version, proving a partial publish fails the run.
+ *
+ * `realArchiveGate` swaps TWO collaborators together, because they only make sense together: the
+ * default `zip` writes the 9-byte string `zip-bytes`, which no zip reader can parse, so the
+ * archive-completeness gate (issue 1565) is stubbed out for every test that is not about it. The
+ * one test that IS about it needs a real `zipDirectory` over a real `distDir`, which is why
+ * `distFiles` exists — and an `esmodules` entry in the built manifest, without which the gate
+ * refuses for a DIFFERENT reason and the proof would be measuring the wrong refusal.
  */
 async function makeMain({
   config = MAIN_CONFIG,
@@ -515,10 +526,16 @@ async function makeMain({
   listing = {},
   resolveSha,
   staleReadBack = false,
+  distFiles = {},
+  builtManifestExtra = {},
+  realArchiveGate = false,
 } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'fab-s3-main-'));
   const distDir = join(dir, 'dist');
   await mkdir(distDir, { recursive: true });
+  for (const [name, contents] of Object.entries(distFiles)) {
+    await writeFile(join(distDir, name), contents);
+  }
   const configPath = join(dir, 'cfg.json');
   await writeFile(configPath, JSON.stringify(config));
 
@@ -554,9 +571,16 @@ async function makeMain({
     stagingDir: join(dir, 'staging'),
     build: async ({ version }) => ({
       distDir,
-      manifest: { id: 'fabricate', title: 'Fabricate', version, compatibility: { minimum: '13' } },
+      manifest: {
+        id: 'fabricate',
+        title: 'Fabricate',
+        version,
+        compatibility: { minimum: '13' },
+        ...builtManifestExtra,
+      },
     }),
-    zip: (from, to) => writeFileSync(to, 'zip-bytes'),
+    zip: realArchiveGate ? zipDirectory : (from, to) => writeFileSync(to, 'zip-bytes'),
+    assertArchiveChunks: realArchiveGate ? assertArchiveChunkCompleteness : () => {},
     createS3Client: async () => s3,
     resolveSha,
   };
@@ -566,13 +590,59 @@ async function makeMain({
       env: { S3_TESTER_PATH_SECRET: 'seg' },
       deps,
     });
-  return { run, puts, copies, store };
+  return { run, puts, copies, store, distDir };
 }
 
 const manifestPut = (puts, key) =>
   puts.find((p) => p.key === key && p.contentType === 'application/json');
 const zipPut = (puts, key) =>
   puts.find((p) => p.key === key && p.contentType === 'application/zip');
+
+// Issue 1565's composition proof for THIS publish path. release-s3 builds with `--no-zip` and
+// makes its own archives through scripts/lib/zip.js, so gating scripts/release.js alone would have
+// left every channel and cohort archive unproven.
+//
+// It asserts the GATE'S OWN MESSAGE and the missing member's NAME, not merely that the run
+// rejected: `main()` refuses for a dozen other reasons, several of them also before any write, so
+// a bare `assert.rejects` would pass just as happily with the gate deleted.
+test('main() refuses to publish a staged archive short a chunk its entry script references', async () => {
+  const missingChunk = 'chunks/absent-DEADBEEF.js';
+  const harness = await makeMain({
+    realArchiveGate: true,
+    // The entry script that ships inside every staged archive, referencing a chunk the build never
+    // emitted — which is exactly the packaging regression no gate could previously see.
+    distFiles: { 'main.js': `import "./${missingChunk}";\n` },
+    builtManifestExtra: { esmodules: ['main.js'] },
+  });
+
+  await assert.rejects(harness.run('--version', '1.4.0-beta.1', '--source-sha', 'deadbeef'), (error) => {
+    assert.ok(
+      error.message.includes(ARCHIVE_CHUNK_GATE_LABEL),
+      `must be the archive gate's refusal; got: ${error.message}`
+    );
+    assert.ok(error.message.includes(missingChunk), `must name the missing member; got: ${error.message}`);
+    return true;
+  });
+
+  // THE HEADLINE: the refusal happens during staging, so nothing reached the bucket.
+  assert.deepEqual(harness.puts, [], 'a short archive must be refused before any S3 write');
+});
+
+// The other direction: with a COMPLETE archive the same wiring publishes normally, so the test
+// above is measuring the gate and not merely the fact that a real zip is in the path.
+test('main() publishes normally when the staged archive carries every referenced chunk', async () => {
+  const harness = await makeMain({
+    realArchiveGate: true,
+    distFiles: { 'main.js': 'import "./chunks/present-CAFEBABE.js";\n' },
+    builtManifestExtra: { esmodules: ['main.js'] },
+  });
+  await mkdir(join(harness.distDir, 'chunks'), { recursive: true });
+  await writeFile(join(harness.distDir, 'chunks', 'present-CAFEBABE.js'), 'export const a = 1;\n');
+
+  await harness.run('--version', '1.4.0-beta.1', '--source-sha', 'deadbeef');
+
+  assert.ok(zipPut(harness.puts, `modules/fabricate/beta/versions/1.4.0-beta.1/fabricate-1.4.0-beta.1.zip`));
+});
 
 test('main() writes each manifest conditionally: IfMatch on an existing head, IfNoneMatch * on a new one', async () => {
   const harness = await makeMain({

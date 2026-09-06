@@ -173,6 +173,205 @@ test('global gathering conditions seed defaults and preserve customized vocabula
   await assert.rejects(() => service.setWeather('hail'), /Unknown gathering weather tag/);
 });
 
+test('record-shaped gathering vocabularies resolve to their ids and accept their tags', async () => {
+  const { service } = makeRichState({
+    config: {
+      vocabularies: {
+        weather: [{ id: 'clear' }, { id: 'rain' }, { value: 'eclipse' }, { label: 'Blood Moon' }],
+        timeOfDay: [{ id: 'dawn' }, { value: 'gloaming' }, { label: 'Witching Hour' }],
+        biomes: [{ id: 'forest' }, { label: 'Old Growth' }],
+        danger: ['safe', 'cursed']
+      }
+    }
+  });
+
+  const { vocabularies } = service.getConditions();
+  assert.deepEqual(vocabularies.weather, ['clear', 'rain', 'eclipse', 'blood-moon'],
+    'an option record resolves through id, then value, then label');
+  assert.deepEqual(vocabularies.timeOfDay, ['dawn', 'gloaming', 'witching-hour']);
+  assert.deepEqual(vocabularies.biomes, ['forest', 'old growth'],
+    'biome ids stay lower-cased tags, because the biome modifier lookup matches on normalizeTag');
+  assert.deepEqual(vocabularies.danger, ['safe', 'cursed']);
+
+  await service.setWeather('eclipse');
+  assert.equal(service.getConditions().weather, 'eclipse');
+  await service.setWeather('Blood Moon');
+  const after = service.getConditions();
+  assert.equal(after.weather, 'blood-moon', 'a multi-word condition tag persists kebab-cased');
+  assert.ok(after.vocabularies.weather.includes(after.weather),
+    'the persisted current condition is a member of the published vocabulary');
+  await service.setWeather('rain');
+  assert.equal(service.getConditions().weather, 'rain');
+  await service.setTimeOfDay('Witching Hour');
+  assert.equal(service.getConditions().timeOfDay, 'witching-hour');
+});
+
+test('a gathering vocabulary poisoned with object stringifications recovers the defaults', async () => {
+  const { service, writes } = makeRichState({
+    config: {
+      vocabularies: {
+        weather: ['[object object]'],
+        timeOfDay: ['object-object'],
+        biomes: [{ id: '[object object]' }]
+      }
+    }
+  });
+
+  const { vocabularies } = service.getConditions();
+  assert.deepEqual(vocabularies.weather, ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']);
+  assert.deepEqual(vocabularies.timeOfDay, ['dawn', 'day', 'dusk', 'night'],
+    'the kebab-cased sentinel the manager persists is dropped under the same normalizer');
+  assert.deepEqual(vocabularies.biomes,
+    ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland']);
+
+  await service.setWeather('rain');
+  assert.equal(service.getConditions().weather, 'rain');
+
+  await service.setConditions({});
+  assert.deepEqual(writes.at(-1).value.vocabularies.weather,
+    ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
+    'the tagless save that perpetuated the corruption now writes the healed list back');
+});
+
+test('bare-string gathering vocabularies kebab-case condition ids and seed defaults when empty', async () => {
+  const { service } = makeRichState({
+    config: {
+      vocabularies: { weather: ['clear', 'blood moon'], timeOfDay: [], biomes: ['old growth'] }
+    }
+  });
+
+  const { vocabularies } = service.getConditions();
+  assert.deepEqual(vocabularies.weather, ['clear', 'blood-moon']);
+  assert.deepEqual(vocabularies.timeOfDay, ['dawn', 'day', 'dusk', 'night'],
+    'an empty list still seeds the documented defaults');
+  assert.deepEqual(vocabularies.biomes, ['old growth']);
+
+  await service.setWeather('Blood Moon');
+  assert.equal(service.getConditions().weather, 'blood-moon');
+  await assert.rejects(() => service.setWeather('hail'), /Unknown gathering weather tag/);
+});
+
+test('per-system condition and biome options seed from a record-shaped global vocabulary', () => {
+  const { service } = makeRichState({
+    config: {
+      vocabularies: {
+        weather: [{ id: 'clear' }, { id: 'rain' }, { label: 'Blood Moon' }],
+        biomes: [{ id: 'forest' }, { label: 'Old Growth' }]
+      },
+      systems: { 'system-a': {} }
+    }
+  });
+
+  const systemConfig = service._config().systems['system-a'];
+  assert.deepEqual(systemConfig.conditions.weather.values.map(option => option.id),
+    ['clear', 'rain', 'blood-moon'],
+    'a system with no explicit values inherits every global tag, not one corrupted entry');
+  assert.deepEqual(systemConfig.vocabularies.biomes.values.map(option => option.id),
+    ['forest', 'old growth']);
+});
+
+test('a global condition change propagates to the per-system current condition', async () => {
+  const { service, writes } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: {
+            weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: false, current: 'day', values: ['day', 'night'] }
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(service.composeEnvironment(environment(), system).conditions.weather, 'clear');
+
+  await service.setWeather('rain');
+
+  const saved = writes.at(-1).value.systems['system-a'].conditions;
+  assert.equal(saved.weather.current, 'rain');
+  assert.deepEqual(saved.weather.values.map(option => option.id), ['clear', 'rain'],
+    'per-system values are never modified');
+  assert.equal(service.composeEnvironment(environment(), system).conditions.weather, 'rain',
+    'the runtime gates on the per-system current, so the global setter now takes effect');
+
+  await service.setTimeOfDay('night');
+  assert.equal(writes.at(-1).value.systems['system-a'].conditions.timeOfDay.current, 'night',
+    'enabled governs runtime gating, not whether the stored current is maintained');
+});
+
+test('one setConditions call carries both dimensions into a single write', async () => {
+  const { service, writes } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: {
+            weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: true, current: 'day', values: ['day', 'night'] }
+          }
+        }
+      }
+    }
+  });
+
+  const before = writes.length;
+  await service.setConditions({ weather: 'rain', timeOfDay: 'night' });
+
+  assert.equal(writes.length - before, 1, 'both dimensions are persisted by one save');
+  const saved = writes.at(-1).value.systems['system-a'].conditions;
+  assert.equal(saved.weather.current, 'rain');
+  assert.equal(saved.timeOfDay.current, 'night',
+    'the second dimension propagates onto the systems map the first produced, not the stale config');
+  assert.deepEqual(service.composeEnvironment(environment(), system).conditions,
+    { weather: 'rain', timeOfDay: 'night' },
+    'the runtime reads both propagated currents back');
+});
+
+test('condition propagation is bounded to systems whose values offer the tag', async () => {
+  const { service, writes } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: { weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] } }
+        },
+        'system-b': {
+          conditions: {
+            weather: { enabled: true, current: 'fog', values: ['clear', 'fog'] },
+            timeOfDay: { enabled: false, current: 'day', values: [] }
+          }
+        }
+      }
+    }
+  });
+
+  await service.setWeather('rain');
+
+  const systems = writes.at(-1).value.systems;
+  assert.equal(systems['system-a'].conditions.weather.current, 'rain');
+  assert.equal(systems['system-b'].conditions.weather.current, 'fog',
+    'a system whose values exclude the tag keeps its current rather than being forced to a value it lacks');
+  assert.deepEqual(systems['system-b'].conditions.weather.values.map(option => option.id), ['clear', 'fog']);
+  assert.equal(
+    service.composeEnvironment(environment({ craftingSystemId: 'system-b' }), { id: 'system-b' }).conditions.weather,
+    'fog', 'the unoffered tag does not reach that system runtime');
+
+  await service.setTimeOfDay('night');
+  assert.equal(writes.at(-1).value.systems['system-b'].conditions.timeOfDay.current, 'day',
+    'a disabled dimension with no values is left alone like any other non-offering dimension');
+
+  const currents = () => JSON.stringify({
+    conditions: writes.at(-1).value.conditions,
+    systems: writes.at(-1).value.systems
+  });
+  const beforeTagless = currents();
+  await service.setConditions({});
+  assert.equal(currents(), beforeTagless,
+    'a tagless setConditions changes no current, global or per-system');
+});
+
 test('rich gathering service normalizes default biome strings with readable labels and metadata', () => {
   const { service } = makeRichState({
     config: {
