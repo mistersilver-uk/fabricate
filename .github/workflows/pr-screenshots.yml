@@ -72,7 +72,18 @@ jobs:
     # it points the reader at the frames rather than at the clock. A capture is also
     # self-limiting in a way a hung test is not (it renders a finite, declared case list), so a
     # generous ceiling costs nothing on the happy path and buys room for the registry to grow.
-    timeout-minutes: 40
+    #
+    # Raised again from 40 (issue 1594) — the same failure, one registry-doubling later. 40 held
+    # while selection stayed narrow, and it does not hold for a design-system-wide change, whose
+    # changed files map to the WHOLE registry rather than to a handful of cases. The first head to
+    # hit it was issue 1506's pull request: 273 changed files selected 303 cases, 348 with the lab
+    # surface set, and the job was cancelled at 40m13s inside `Render the selected frames`.
+    # The measured rate on `ubuntu-latest` is 9 to 10 seconds per frame including setup — 196
+    # frames in 30m10s and 142 in 23m52s, both the same day — so the 335 publishable cases this
+    # registry holds today are a 53 to 56 minute capture. 75 leaves about 20 minutes, another
+    # 115-odd cases, before this number has to move again; re-derive it from the per-frame rate
+    # and the registry size, never from this ceiling.
+    timeout-minutes: 75
     # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
     # should state the write it needs where the write happens.
     permissions:

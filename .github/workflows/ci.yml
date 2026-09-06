@@ -193,13 +193,15 @@ jobs:
   check-screenshots:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # 75, raised from 5 (issue 1133). This job now AWAITS the `capture` job in
-    # `pr-screenshots.yml` for the same head SHA before deciding, and that job's own ceiling is 40
-    # minutes. The script's `maxWaitMs` (65 minutes) fires first by construction — the bounds
-    # inequality in `tests/ci-workflow-semantics.test.js` pins that ordering against this number —
-    # so a wait that runs long reports `capture-did-not-conclude` with a diagnosis rather than
-    # being killed here with none.
-    timeout-minutes: 75
+    # 110, raised from 75 (issue 1594; 75 was itself raised from 5 under issue 1133). This job
+    # AWAITS the `capture` job in `pr-screenshots.yml` for the same head SHA before deciding, and
+    # that job's own ceiling is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
+    # construction — the bounds inequality in `tests/ci-workflow-semantics.test.js` pins that
+    # ordering against this number — so a wait that runs long reports `capture-did-not-conclude`
+    # with a diagnosis rather than being killed here with none. Every one of those numbers moves
+    # WITH the producer's ceiling: raising that alone would leave this gate abandoning a capture
+    # that was still rendering, which is the same uncoded red under a different name.
+    timeout-minutes: 110
     # Declared at JOB level as well as workflow level (SonarCloud S8264). Job-level permissions
     # REPLACE the workflow-level block rather than merging with it, so all three are restated;
     # `actions: read` is the new one, needed to list the producer's workflow runs.
@@ -300,4 +302,4 @@ jobs:
             --await-capture \
             --capture-eligible "$CAPTURE_ELIGIBLE" \
             --capture-workflow pr-screenshots.yml \
-            --capture-timeout-minutes 40
+            --capture-timeout-minutes 75
