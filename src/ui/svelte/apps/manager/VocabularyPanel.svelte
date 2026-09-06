@@ -320,7 +320,7 @@
           {#if !isSilentlyDeletable(row)}
             <Chip tone="warning" icon="fas fa-link">{refText(row)}</Chip>
           {:else}
-            <Chip icon="fa-regular fa-circle" class="manager-vocabulary-chip-unused"
+            <Chip icon="fas fa-circle" class="manager-vocabulary-chip-unused"
               >{text('FABRICATE.Admin.Manager.TagsCategories.Unused', 'Unused')}</Chip
             >
           {/if}

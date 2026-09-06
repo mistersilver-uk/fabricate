@@ -769,8 +769,11 @@
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
                           {#each statusPills(recipe) as pill (pill.id)}
-                            <Chip tone={statusChipTone(pill.tone)} icon={pill.icon}
-                              >{pill.label}</Chip
+                            <Chip
+                              tone={statusChipTone(pill.tone)}
+                              icon={pill.icon}
+                              truncate
+                              title={pill.label}>{pill.label}</Chip
                             >
                           {/each}
                         </span>

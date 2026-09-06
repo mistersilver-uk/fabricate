@@ -442,14 +442,17 @@
             activation gate fires only on a transition into the enabled state.
           -->
           {#if selectedRecipe.enableBlocked}
+            {@const blockedLabel =
+              selectedRecipe.enabled === false
+                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
+                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
             <Chip
               tone={statusChipTone(selectedRecipe.enabled === false ? 'danger' : 'warning')}
               icon={selectedRecipe.enabled === false
                 ? 'fas fa-circle-exclamation'
                 : 'fas fa-pen-ruler'}
-              >{selectedRecipe.enabled === false
-                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
-                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}</Chip
+              truncate
+              title={blockedLabel}>{blockedLabel}</Chip
             >
           {/if}
         </div>
