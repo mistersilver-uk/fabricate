@@ -375,11 +375,11 @@ export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
  *
- * MEASURED at `6a2c3b46b`: 280 elements in 97 file rows. The corpus holds 290 formless buttons
- * across 103 files and ten of them already declare, so those ten are compliant and correctly
- * absent. `ActionMenu.svelte` is the case worth naming: it emits the attribute on the trigger it
- * opens with, and a baseline keyed on the POPULATION rather than on the debt would have listed it
- * as owing something it does not.
+ * MEASURED at `6a2c3b46b`: 280 elements in 97 file rows. RE-MEASURED on this tree at 277 in 94,
+ * after the two payments recorded below. The corpus holds 303 formless buttons across 108 files
+ * and 26 of them declare, so those 26 are compliant and correctly absent. `ActionMenu.svelte` is
+ * the case worth naming: it emits the attribute on the trigger it opens with, and a baseline keyed
+ * on the POPULATION rather than on the debt would have listed it as owing something it does not.
  *
  * `hasFocus` returns `!!focused.form` for a BUTTON, so a button with no ancestor form is exactly
  * as unrecognised as a bare `div`. This is the largest single row set in this file and it is
@@ -393,11 +393,20 @@ export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
  * for the next author to fill for free. That lane's three NEW inline-link buttons are absent from
  * this table because they declare `data-keyboard-focus="true"`, which is what the gate asks for;
  * they were never banked as debt.
+ *
+ * RE-MEASURED again at 278 → 277 in 95 → 94 file rows by issue 1502, which made `IconButton`
+ * emit the attribute and so retired the single row it owned. Its SIZE is the point — one row, not
+ * the hundreds the runtime change actually reaches. This scanner counts SOURCE elements: a
+ * `RegularElement` `<button>` outside a form, never a component call site. So `IconButton`'s own
+ * `<button>` left, while `ManagerButton`'s `<svelte:element>` root and the six hand-written
+ * `manager-icon-button` carriers in `CraftingSystemManagerRoot.svelte` are invisible to it and
+ * stay. Every rendered instance of both primitives outside a form now answers `hasFocus` true;
+ * this number does not say so, and must not be read as if it did.
  */
 export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 
 /** @see KNOWN_FORMLESS_BUTTONS */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 278;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 277;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

@@ -146,7 +146,7 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="manager-button manager-tool-replacement-component-trigger"
+        triggerClass="fabricate-button manager-button manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-cube"
         triggerImg={selected.img || ''}
         triggerLabel={selected.name}
@@ -221,7 +221,7 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="manager-button manager-tool-replacement-component-trigger"
+        triggerClass="fabricate-button manager-button manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Tools.Editor.ReplacementSearchLabel',

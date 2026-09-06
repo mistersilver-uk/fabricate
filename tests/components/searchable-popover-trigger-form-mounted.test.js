@@ -92,6 +92,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     assert.deepEqual(
       triggerClasses(),
       [
+        'fabricate-button',
         'manager-button',
         'fab-manager-button',
         'is-size-38',
@@ -107,6 +108,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   it('takes the role and the full-width flag from the same object', async () => {
     await mountPicker({ triggerButton: { role: 'danger', fullWidth: true } });
     assert.deepEqual(triggerClasses(), [
+      'fabricate-button',
       'manager-button',
       'fab-manager-button',
       'is-danger',
@@ -119,7 +121,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     // The primitive's own closed-set contract, read through this form: a typo must render the
     // default control, never an `is-*` the sheet does not paint.
     await mountPicker({ triggerButton: { role: 'lavender', size: '37' } });
-    assert.deepEqual(triggerClasses(), ['manager-button', 'fab-manager-button']);
+    assert.deepEqual(triggerClasses(), ['fabricate-button', 'manager-button', 'fab-manager-button']);
     harness.remount();
   });
 

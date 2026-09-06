@@ -7,8 +7,8 @@
  * 26 / 28 / 30 / 34 / 38 / 44, and "Radius tracks the size of the thing: 6 for chips at or below
  * 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px…". A `<ManagerButton>` is a
  * 34px control and painted a 6px corner — the chip rung — on every manager screen, because
- * `.fabricate-manager .manager-button.fab-manager-button` declared the height and no radius and
- * the base `.fabricate-manager .manager-button` rule's 6px reached it. Four parity regions on
+ * `.fabricate-button.manager-button.fab-manager-button` declared the height and no radius and
+ * the base `.fabricate-button.manager-button` rule's 6px reached it. Four parity regions on
  * three screens measured the same one-line drift.
  *
  * THE HAZARD THE FIX CREATES IS WHAT THE DERIVED GUARD BELOW IS FOR. Stating a corner on the
@@ -104,7 +104,7 @@ function bodiesOf(selector) {
 }
 
 describe('M12a — a manager button takes the corner its height is on', () => {
-  const PRIMITIVE = '.fabricate-manager .manager-button.fab-manager-button';
+  const PRIMITIVE = '.fabricate-button.manager-button.fab-manager-button';
 
   it('publishes both ladders, so the numbers below are read and not restated', () => {
     // Non-vacuity for the whole file: every assertion here is an arithmetic claim about two
@@ -137,7 +137,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
     // different size — had been repainted as a side effect.
     const base = rules().find(
       (rule) =>
-        rule.selector === '.fabricate-manager .manager-button, .fabricate-manager .manager-icon-button'
+        rule.selector === '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button'
     );
     assert.ok(base, 'the shared base control rule is still spelled as one selector list');
     assert.equal(pixels(valueOf(base.body, 'border-radius')), 6, 'the base control is still on 6px');
@@ -199,7 +199,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
       convertedButtonsBelowTheBand().map((entry) => [entry.selector, entry])
     );
     for (const selector of [
-      '.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters',
+      '.fabricate-button.manager-button.fab-manager-button.manager-clear-filters',
       '.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button'
     ]) {
       const entry = bySelector.get(selector);
@@ -317,7 +317,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
   const BUTTON = 'src/ui/svelte/components/ManagerButton.svelte';
-  const buttonRule = '.fabricate-manager .manager-button.fab-manager-button.is-size-38';
+  const buttonRule = '.fabricate-button.manager-button.fab-manager-button.is-size-38';
 
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
     const [body] = bodiesOf(buttonRule);
@@ -332,7 +332,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       null,
       'the rung restates a corner the primitive already declares for this whole band'
     );
-    const [primitive] = bodiesOf('.fabricate-manager .manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
     assert.equal(
       pixels(valueOf(primitive, 'border-radius')),
       9,
@@ -345,7 +345,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
-    const [primitive] = bodiesOf('.fabricate-manager .manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
     assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
     // A specificity claim, not a source-order one: the shipped rule is (0,3,0) and states the
     // height, so an opt-in written at the same weight would be decided by where it was written.

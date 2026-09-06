@@ -3,7 +3,7 @@
  *
  * ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────
  * Converting a hand-written manager button adds a SECOND class, `fab-manager-button`, and
- * `styles/fabricate.css` declares `.fabricate-manager .manager-button.fab-manager-button` at
+ * `styles/fabricate.css` declares `.fabricate-button.manager-button.fab-manager-button` at
  * specificity (0,3,0). Every rule a converted button already matched is therefore
  * re-arbitrated, and a rule that wins today only because it sits LATER in the sheet loses
  * silently the moment the sweep is licensed to move declarations around.
@@ -42,6 +42,17 @@ import { collectWorkingTreeSources } from './sourceScan.js';
 
 const GLOBAL_SHEET = 'styles/fabricate.css';
 const PRIMITIVE_CLASS = 'fab-manager-button';
+// The class the family is ROOTED at since issue 1502. `ManagerButton.svelte` emits it as the
+// leading literal of its `classes` array, so a site the sweep converts gains it exactly as it
+// gains `fab-manager-button`, and `collectSites` adds both synthetically for the same reason: a
+// converted site writes NEITHER in the markup this scanner reads.
+//
+// It is load-bearing here rather than cosmetic. Every re-rooted rule in the sheet now leads with
+// `.fabricate-button`, so a site model that omitted it would have those rules reaching NOTHING —
+// every winner this instrument derives would change, and the reviewed inventory's re-key would
+// stop being mechanical. A hand-written carrier picks the root up through `tokens` instead,
+// because it writes the token literally.
+const ROOT_CLASS = 'fabricate-button';
 const CONTRACT_CLASS = 'manager-button';
 const APP_ROOT_CLASS = 'fabricate-manager';
 // `ArmedDangerButton` renders the same CSS contract but is a primitive in its own right and is
@@ -973,7 +984,7 @@ function collectSites(trees) {
         line,
         tag: ownsContract ? element.tag : 'button',
         tokens,
-        classes: new Set([...tokens, ...(converting ? [PRIMITIVE_CLASS] : [])]),
+        classes: new Set([...tokens, ...(converting ? [ROOT_CLASS, PRIMITIVE_CLASS] : [])]),
         dynamic: ownsContract ? element.dynamic : triggerTokens.dynamic,
         directives: element.directives.map(({ name }) => name),
         population,

@@ -276,8 +276,15 @@ const PRIMITIVES = Object.freeze([
   // classes through a `class` prop. It renders three elements a caller may want to reach — the
   // trigger, the portaled panel and the value span — so it takes `triggerClass`,
   // `popoverClass`, `valueClass` and `pickerClass` instead, which is what `classProps` below is
-  // for. Without it the scan reads `class` on sixteen call sites, finds nothing, and every
-  // clause here goes vacuous over this primitive while reporting clean; with it, 69 tokens.
+  // for. Without it the scan reads `class` on twenty call sites, finds nothing, and every
+  // clause here goes vacuous over this primitive while reporting clean; with it, 73 tokens.
+  //
+  // MEASURED at 73 on this tree, and TEN of those are issue 1502's. That issue gave all twelve
+  // `triggerClass` sites the `fabricate-button` family root, and that adds TEN rather than
+  // twelve: `tokens` is a Set per FILE, eleven files carry the twelve sites, and the twelfth
+  // list (`RecipeResultItemRow.svelte`) is a template literal, which the `prop="…"` scanner
+  // cannot read. The figure is re-measured rather than adjusted, because it had already drifted
+  // once before this issue touched it — which is what a floor rather than an equality is for.
   //
   // It also CORRECTS what this file records about the silent mode, and the correction is the
   // reason the entry earns its place rather than restating the ones above. The silent,
@@ -298,7 +305,7 @@ const PRIMITIVES = Object.freeze([
   // The portaled panel is why the contract set is not just the picker root: `.manager-travel-
   // popover` and `.manager-travel-option` are appended to the `.fabricate-manager` host, so a
   // caller's `.its-cell .manager-travel-option` rule is dead on ARRIVAL as well as unscoped.
-  // The floor is 40 against a measured 69, which reds if two fifths of the call sites stop
+  // The floor is 40 against a measured 73, which reds if nearly half the call sites stop
   // resolving without failing on a single conversion that drops a bespoke token.
   Object.freeze({
     tag: 'SearchablePopover',

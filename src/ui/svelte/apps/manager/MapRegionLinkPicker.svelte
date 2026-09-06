@@ -45,7 +45,7 @@
   {options}
   {disabled}
   pickerClass="manager-map-link-picker"
-  triggerClass="manager-button manager-travel-picker-trigger manager-map-link-trigger"
+  triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-map-link-trigger"
   triggerIcon="fas fa-link"
   triggerLabel={selectedName}
   valueClass="manager-map-link-value"

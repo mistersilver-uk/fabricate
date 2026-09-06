@@ -407,6 +407,7 @@ Keep area blocks at **single area-class** specificity so per-component focus rin
 | Selector | Specificity | Role |
 | --- | --- | --- |
 | `.fabricate-app button:focus-visible` | 0,2,1 | area default — strips/repaints Foundry's ring |
+| `.fabricate-button:focus-visible` | 0,2,0 | shared-primitive family ring — global sheet, below the area default |
 | `.some-widget:focus-visible` (scoped Svelte, `+ .svelte-hash`) | 0,3,0 | per-component ring (custom offset, inset, color) |
 | `.fabricate.fabricate-app button:focus-visible` | 0,3,1 | ❌ clobbers the per-component ring |
 
@@ -416,6 +417,8 @@ Use the single class (`.fabricate-app …`) — matching how `.fabricate-admin`/
 **Checklist when adding/auditing a control or surface:**
 
 - New top-level app surface (new root application class)? It needs its own paired focus block — a partial `:focus:not(:focus-visible)` rule reads as "handled" but isn't.
+- Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so both area defaults still win where they apply.
+A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host that has neither.
 - Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — put it in the area block.
 Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the area default doesn't fight them.
 - Custom-content button clipping? Apply the layout fix in Instance 1.

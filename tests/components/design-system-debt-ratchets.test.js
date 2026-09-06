@@ -210,18 +210,76 @@ function focusResetRoot(selector) {
   return RESET_SHAPES.includes(shape) ? [...roots][0] : null;
 }
 
-/** Every selector matching bare `:focus`, split by whether its rule is an allow-listed reset. */
+/**
+ * The three primitive families that root their own focus chrome, and the one compound each may
+ * write for the STRIP half of it (issue 1502).
+ *
+ * `Pagination` is the odd one: its family root is on a `<section>` and the controls it strips for
+ * are the buttons inside it, so its compound carries an element where the other two do not.
+ */
+const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
+  '.fabricate-button:focus',
+  '.fabricate-icon-button:focus',
+  '.fabricate-pagination button:focus',
+]);
+
+/** The strip half's declaration set, exactly — property to normalised value, nothing else. */
+const FOCUS_STRIP_DECLARATIONS = Object.freeze({ outline: 'none', 'box-shadow': 'none' });
+
+/**
+ * The primitive family compound a rule strips core focus chrome for, or `null` when it is not one.
+ *
+ * A SECOND exemption beside the area resets above, and it exists for the same reason they do.
+ * Foundry core paints `a.button, button:focus` with an outline and a 4px glow. The six reset
+ * blocks remove that inside an application root; a family rooted at a class the primitive emits
+ * renders in hosts carrying no application root at all, where the repaint half alone would draw
+ * the accent ring ON TOP of core's treatment rather than in place of it. `design-system/spec.md`
+ * states the consequence as a rule: the chrome a primitive declares is the PAIR. The strip half
+ * is therefore required chrome, not debt, and booking it in the baseline would file a
+ * requirement as a defect.
+ *
+ * Narrow on all three axes, so it cannot become somewhere to hide a real bare `:focus`: ONE
+ * compound (a list is not this shape), that compound named exactly, and the declaration set
+ * exactly `outline: none; box-shadow: none`. A strip that PAINTS anything — a colour, a border,
+ * a ring of its own — is a bare `:focus` doing real work at mouse-click focus, which is the whole
+ * population this gate exists to hold down.
+ *
+ * @param {{selector: string, file: string, body: string}} rule A rule from the corpus.
+ * @returns {string|null} The compound recognised, or `null`.
+ */
+function primitiveFocusStrip(rule) {
+  const compounds = splitSelectorList(rule.selector);
+  if (compounds.length !== 1 || !PRIMITIVE_FOCUS_STRIPS.includes(compounds[0])) return null;
+  const declared = declarationsIn(rule.file, rule.body);
+  const expected = Object.entries(FOCUS_STRIP_DECLARATIONS);
+  if (declared.length !== expected.length) return null;
+  const byProperty = new Map(
+    declared.map((entry) => [entry.property.toLowerCase(), normaliseValue(entry.value)])
+  );
+  return expected.every(([property, value]) => byProperty.get(property) === value)
+    ? compounds[0]
+    : null;
+}
+
+/**
+ * Every selector matching bare `:focus`, split three ways: the allow-listed area resets, the
+ * primitive families' strip halves, and everything else — which is what the ratchet holds down.
+ */
 function bareFocusSelectors() {
   const gated = [];
   const exempt = [];
+  const strips = [];
   for (const rule of corpus().rules) {
     const reset = focusResetRoot(rule.selector);
+    const strip = reset === null ? primitiveFocusStrip(rule) : null;
     for (const compound of splitSelectorList(rule.selector)) {
       if (!BARE_FOCUS.test(compound)) continue;
-      (reset === null ? gated : exempt).push({ ...rule, compound, reset });
+      if (reset !== null) exempt.push({ ...rule, compound, reset });
+      else if (strip === null) gated.push({ ...rule, compound, reset });
+      else strips.push({ ...rule, compound, strip });
     }
   }
-  return { gated, exempt };
+  return { gated, exempt, strips };
 }
 
 test('the six Foundry-core focus resets are recognised, and a look-alike is not', () => {
@@ -282,6 +340,69 @@ test('the six Foundry-core focus resets are recognised, and a look-alike is not'
   );
 });
 
+test('a primitive family’s focus STRIP half is recognised, and a look-alike is not', () => {
+  // THE SECOND EXEMPTION, BOTH POLARITIES, in the shape the clause above uses. The positive half
+  // is the live corpus — three families, named, so a strip being renamed, split or deleted shows
+  // up here rather than as three rows quietly arriving in the baseline. The negative half is
+  // synthetic, because the tree holds no look-alike today, and a permission nobody has tested
+  // against a counterexample is a permission that will eventually exempt something real.
+  const { strips } = bareFocusSelectors();
+
+  assert.deepEqual(
+    [...new Set(strips.map((entry) => entry.strip))].sort(byCodePoint),
+    [
+      '.fabricate-button:focus',
+      '.fabricate-icon-button:focus',
+      '.fabricate-pagination button:focus',
+    ],
+    'the set of primitive families declaring their own focus strip has changed. Each of the ' +
+      'three is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
+      'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
+      'carrying neither application root — a deliberate edit here, never a silent one.'
+  );
+  assert.equal(strips.length, 3, 'one strip per family, and each family declares exactly one');
+
+  // `declarationsIn` stamps the file onto each declaration and `primitiveFocusStrip` never reads
+  // it back, so the synthetic rules below name the sheet only to look like what they stand for.
+  const strip = (selector, body) =>
+    primitiveFocusStrip({ selector, file: 'styles/fabricate.css', body });
+
+  assert.equal(
+    strip('.fabricate-button:focus', 'outline: none; box-shadow: none;'),
+    '.fabricate-button:focus',
+    'the shipped shape is real, so the negative cases below must fail for their own reasons ' +
+      'rather than because nothing is ever recognised'
+  );
+  assert.equal(
+    strip('.fabricate-button:focus', 'outline: none; box-shadow: none; background: red;'),
+    null,
+    'a third declaration is a strip doing real PAINTING at mouse-click focus, which is the ' +
+      'population this gate exists to hold down'
+  );
+  assert.equal(
+    strip('.fabricate-button:focus', 'outline: none;'),
+    null,
+    "half a strip does not remove core's 4px glow, which is a box-shadow rather than an outline"
+  );
+  assert.equal(
+    strip('.fabricate-button:focus', 'outline: 2px solid var(--fab-accent); box-shadow: none;'),
+    null,
+    'a strip that draws an outline is a bare `:focus` RING, which is exactly the debt'
+  );
+  assert.equal(
+    strip('.manager-nav-button:focus', 'outline: none; box-shadow: none;'),
+    null,
+    'the exemption is for a PRIMITIVE FAMILY ROOT, not for any class that writes the two ' +
+      'declarations — otherwise every row in the baseline could be paid off by deleting its ring'
+  );
+  assert.equal(
+    strip('.fabricate-button:focus, .manager-nav-button:focus', 'outline: none; box-shadow: none;'),
+    null,
+    'appending a compound to a recognised strip must break the shape, or the allow-list is a ' +
+      'place to hide anything — the same reason the reset blocks are matched whole'
+  );
+});
+
 test('no bare :focus selector survives outside a Foundry-core reset', () => {
   const { gated } = bareFocusSelectors();
   const observed = tallyByKey(gated, (entry) => rowKey(entry.file, entry.compound));
@@ -297,8 +418,14 @@ test('no bare :focus selector survives outside a Foundry-core reset', () => {
       'The design system states the focus ring as `:focus-visible` — see the "Every interactive ' +
       'primitive declares its full state set" requirement. Bare `:focus` draws the ring for a ' +
       'MOUSE click as well as for the keyboard, which is the state the rule exists to keep apart. ' +
-      "Write `:focus-visible`; the only exception is suppressing Foundry core's own ring, which " +
-      'is what the six allow-listed reset blocks do and which this gate recognises by shape.',
+      "Write `:focus-visible`. There are two exceptions, both suppressing Foundry core's own " +
+      'ring and both recognised by SHAPE rather than by line: the six allow-listed area reset ' +
+      "blocks, and a primitive family's focus STRIP half — a single-compound rule on the class " +
+      'the primitive emits, declaring exactly `outline: none; box-shadow: none`. That second one ' +
+      'is REQUIRED CHROME rather than debt: `design-system/spec.md` says the chrome a primitive ' +
+      'declares is the PAIR, because a family rooted at its own class renders in hosts carrying ' +
+      "no application root, where the repaint alone lands on top of core's treatment instead of " +
+      'replacing it. Do not book one of those in the baseline; widen the recognition instead.',
   });
 });
 

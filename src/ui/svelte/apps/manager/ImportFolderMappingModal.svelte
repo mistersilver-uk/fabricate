@@ -424,7 +424,7 @@
      was always here and is still load-bearing: the row is written by THIS component so it
      carries the scoping hash, while the buttons inside it are not — two are
      `<ManagerButton>`s now and the third never was. What changed is the arbitration. At
-     (0,3,0) this rule TIED `.fabricate-manager .manager-button.fab-manager-button` and kept
+     (0,3,0) this rule TIED `.fabricate-button.manager-button.fab-manager-button` and kept
      its 28px only because a component's injected sheet lands after the linked one; naming
      the primitive's own class takes it to (0,4,0), which wins on specificity instead.
 
