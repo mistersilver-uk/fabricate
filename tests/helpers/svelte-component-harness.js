@@ -276,7 +276,16 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
 // A raw module missing from a manifest is INVISIBLE to that guard, which quantifies over
 // compiled COMPONENTS — the only symptom is the harness throwing its named "add it to
 // rawModules" error in `before()`, which cancels the suite's subtests rather than failing one.
-export const STATUS_TONE_RAW_MODULES = Object.freeze(['src/ui/svelte/util/statusChipTone.js']);
+//
+// THE QUANTITY READINGS RIDE WITH IT (issue 1506). `QuantityTag` retired into the same chip, and
+// the readings it never owned — a count, a held-against-needed pair, a stack's `×N` — became a
+// second pure leaf beside the map. Every suite that mounts a converted crafting tree needs both,
+// and the same three-plus suites need both, so they are ONE closure rather than two rosters that
+// have to be remembered separately.
+export const STATUS_TONE_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/statusChipTone.js',
+  'src/ui/svelte/util/craftingQuantityReading.js'
+]);
 
 // THE MARKS AND NOTICES the design-system pass of issue 1505 closed, as ONE closure. Every
 // suite whose tree reaches any of them names all four, because they compose each other and a
@@ -476,7 +485,6 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-  'src/ui/svelte/apps/crafting/QuantityTag.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/CraftButton.svelte',

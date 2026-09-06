@@ -136,7 +136,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/crafting/CraftingView.svelte',
-    'src/ui/svelte/apps/crafting/QuantityTag.svelte',
     'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',

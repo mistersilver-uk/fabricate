@@ -3,8 +3,8 @@
  *
  * ── WHY A MODULE AND NOT A TEMPLATE LITERAL PER CALL SITE ───────────────────────────────
  *
- * `QuantityTag.svelte` was the shared have/need chip for the recipe detail's material economy
- * and the alternatives picker. It formatted NOTHING: every one of its six call sites composed
+ * The retired have/need tag was the shared chip for the recipe detail's material economy and the
+ * alternatives picker. It formatted NOTHING: every one of its six call sites composed
  * the value itself and handed the finished string over — `state.have ?? 0` twice, a
  * `${have}/${need}` ratio once, a `×${have}` stack count once. Retiring that component into the
  * shared `Chip` therefore had a choice to make about four readings that had never had a home,

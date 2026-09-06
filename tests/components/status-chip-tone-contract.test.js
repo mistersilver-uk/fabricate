@@ -70,13 +70,14 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
  * journal run sites join them: each reads a `RunModel.derivedStatus` through the run-status
  * vocabulary, whose `ready`, `succeeded` and `cancelled` entries emit `success` and `neutral`,
  * neither of which is a chip tone under that spelling. The two recipe browse-status sites join
- * them on the same fact, from the crafting vocabulary's `AVAILABLE` and `LOCKED`.
+ * them on the same fact, from the crafting vocabulary's `AVAILABLE` and `LOCKED`, and so do the
+ * six have/need readings, four of which pass `success` inline from a satisfied-or-not ternary.
  *
  * The floor is stated rather than derived because the clause it guards is a NEGATIVE: "no chip in
  * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
  * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-const MAPPED_TONE_SITES = 18;
+const MAPPED_TONE_SITES = 24;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -107,10 +108,10 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the seventeen files the conversion routed through it', () => {
+  it('is read by the nineteen files the conversion routed through it', () => {
     assert.equal(
       MAP_READERS.length,
-      17,
+      19,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
         'site that has gone back to binding a projected tone straight onto a chip, which ' +

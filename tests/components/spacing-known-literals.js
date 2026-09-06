@@ -218,7 +218,10 @@ export function isExemptSpacingPixels(pixels) {
 // 895 -> 892 (issue 1506): the crafting `CraftingStatusBadge` went the same way, taking
 // three — a 5px gap, the 2px inset of its icon-only variant and an 8px padding. Its two callers
 // render the shared chip, whose own square face states `padding: 0`.
-export const KNOWN_RAW_SPACING_TOTAL = 892;
+// 892 -> 890 (issue 1506): the crafting `QuantityTag` was the third and last of the retired
+// look-alikes, taking a 5px gap and an 8px padding. Seven occupancies in all, one per rule those
+// three files declared; the chip they converged onto declares its own once.
+export const KNOWN_RAW_SPACING_TOTAL = 890;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

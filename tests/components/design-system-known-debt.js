@@ -539,4 +539,6 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // already states.
 // 49 -> 48 (issue 1506): the crafting `CraftingStatusBadge` LEFT the same way, its two
 // callers rendering the shared chip. Re-measured: 74 clear the bar, 26 are registered, 48 are not.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+// 48 -> 47 (issue 1506): the crafting `QuantityTag` LEFT, the last of the three retired
+// look-alikes. Re-measured: 73 clear the two-caller bar, 26 are registered, 47 are not.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

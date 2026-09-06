@@ -109,8 +109,6 @@
   "src/ui/svelte/apps/crafting/CraftButton.svelte | padding | 8 | 1",
   "src/ui/svelte/apps/crafting/CraftingThumb.svelte | padding | 6 | 1",
   "src/ui/svelte/apps/crafting/CraftingView.svelte | gap | 12 | 1",
-  "src/ui/svelte/apps/crafting/QuantityTag.svelte | gap | 5 | 1",
-  "src/ui/svelte/apps/crafting/QuantityTag.svelte | padding | 8 | 1",
   "src/ui/svelte/apps/crafting/RecipeBrowser.svelte | gap | 4 | 2",
   "src/ui/svelte/apps/crafting/RecipeBrowser.svelte | gap | 6 | 2",
   "src/ui/svelte/apps/crafting/RecipeBrowser.svelte | gap | 8 | 5",
