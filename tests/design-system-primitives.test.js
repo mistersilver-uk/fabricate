@@ -180,7 +180,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
-  // Issue 1505: the uppercase micro-label, on fourteen converted eyebrow sites. Two frames, one
+  // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites. Two frames, one
   // per window, because the conversion is a different act in each — a section title joining the
   // ladder in the crafting detail, and three field labels changing size, weight and tracking in
   // the recipe-item editor.
