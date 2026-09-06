@@ -130,7 +130,7 @@ import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityR
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1175,10 +1175,9 @@ class Fabricate {
       // `Fabricate |`-prefixed `warning` only, and does not collect `info`.
       const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
       if (driftDetail) console.info(`Fabricate | world identity drift: ${driftDetail}`);
-      const driftNotice = buildWorldIdentityDriftNotice(worldIdentityDrift, (key, data) =>
-        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
-      );
-      if (driftNotice) ui.notifications?.info?.(driftNotice);
+      // CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise repeated the whole
+      // drifted list in the notification bar and read as an alarm for a state that is, by its own
+      // copy, harmless. The `info` line above is the whole report; nothing is shown in the UI.
     }
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,

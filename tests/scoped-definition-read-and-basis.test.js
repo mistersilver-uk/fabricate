@@ -838,16 +838,19 @@ describe('src/main.js construction order', () => {
     // INSIDE the detector — the least likely placement. A repair would land HERE, at the call
     // site, which no unit test can execute. So the absence is asserted by source text.
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    const dispatch = at('ui.notifications?.info?.(driftNotice)');
-    assert.ok(audit < dispatch, 'the notice is dispatched after the audit');
+    // The report is CONSOLE ONLY (maintainer, 2026-09-06): its dispatch is the `info` line, not
+    // a toast, and there must be no toast at all for it.
+    const dispatch = at('console.info(`Fabricate | world identity drift:');
+    assert.ok(audit < dispatch, 'the report is logged after the audit');
     const between = MAIN_SOURCE.slice(audit, dispatch);
     assert.equal(between.includes('setSetting'), false, 'the audit must not write a setting');
     assert.equal(between.includes('.save('), false, 'nor persist a store');
     assert.equal(
-      between.includes('ui.notifications?.warn'),
+      MAIN_SOURCE.includes('ui.notifications?.info?.(driftNotice)') ||
+        MAIN_SOURCE.includes('ui.notifications?.warn?.(driftNotice)'),
       false,
-      'and the notice is INFO: nothing is wrong, and a permanent warning would redden every ' +
-        'View Lab capture, which runs this path on every build'
+      'and nothing reaches the notification bar: a permanent toast reads as an alarm for a ' +
+        'state the report itself calls harmless, and a warning would redden every View Lab capture'
     );
   });
 });

@@ -60,7 +60,7 @@ const SEVERITY = Object.freeze({
   name: 'blocking',
   worldCategory: 'warning',
   worldTags: 'warning',
-  systemRules: 'blocking',
+  systemRules: 'warning',
   systemCategory: 'blocking',
 });
 
