@@ -197,6 +197,7 @@
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
     showSearch={false}
+    triggerHasPopup="listbox"
     popoverTitle={orMenuLabel}
     popoverClass="manager-recipe-or-popover"
     minWidth={150}

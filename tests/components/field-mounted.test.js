@@ -50,6 +50,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -59,6 +60,9 @@ const vocabularyHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   ],

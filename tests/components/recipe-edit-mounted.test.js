@@ -3563,15 +3563,21 @@ describe('RecipeEditView (mounted)', () => {
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
     const triggers = req.querySelectorAll('.manager-recipe-or-trigger');
     assert.equal(triggers.length, 1, 'exactly one "or..." trigger per requirement');
+    // `listbox`, NOT `dialog` (issue 1503). This menu passes `showSearch={false}`, so the panel
+    // the trigger opens is a bare list of choices with no query field in it — and under the
+    // listbox focus model the same trigger carries `role="combobox"` and an `aria-controls`
+    // naming a `role="listbox"`. It took the `dialog` default while the other four
+    // search-suppressed sites all declared `listbox`, so this assertion pinned the one site that
+    // announced a panel the GM never gets. What it is really asserting is unchanged: that this
+    // control is a `SearchablePopover` rather than a hand-rolled menu.
     assert.equal(
       triggers[0].getAttribute('aria-haspopup'),
-      'dialog',
+      'listbox',
       'it reuses SearchablePopover (aria-haspopup, Escape-dismiss, focus-on-open)'
     );
     for (const row of req.querySelectorAll('[data-recipe-option]')) {
-      assert.equal(
-        row.querySelector('[data-recipe-add]'),
-        null,
+      assert.ok(
+        !row.querySelector('[data-recipe-add]'),
         'option rows carry no add controls of their own'
       );
     }

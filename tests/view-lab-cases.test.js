@@ -2114,7 +2114,7 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
   // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
   // above open a picker over a POPULATED list, so the branch that renders when the list is empty
-  // — reached by every one of the 22 call sites, and by five of them with no `emptyHint` to draw
+  // — reached by every one of the 23 call sites, and by four of them with no `emptyHint` to draw
   // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
   // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
   // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
@@ -2123,11 +2123,20 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // list, which is the state the maintainer met. The lab world itself has authored one such tag
   // since issue 1392, and that case's `noAuthoredWorldComponents` is what puts the fixture back
   // in the day-one state rather than leaving the frame to whatever the fixture happens to carry.
+  //
+  // THE EIGHTH IS THE GRID LIST FORM (issue 1503), and it is a form rather than a configuration:
+  // `as="grid"` re-maps the key map's horizontal axis, paints from a `data-picker-columns` the
+  // primitive stamps on the list, and renders a caller-supplied `option` snippet inside the row
+  // element the primitive owns. Measured across `src/`, `EssenceSourceSelector` is its only
+  // caller, so `manager-essences-source-picker` is the only frame in the registry that can
+  // contain any of it — every other frame here is a flex column of the primitive's own rows, and
+  // without this entry a change to the grid rung published nine frames none of which was a grid.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
       'fabricate-app-shell',
       'manager-components-normal',
+      'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
@@ -2139,7 +2148,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The ten frames a change to the shared positioning seam must publish (issue 1500).
+// The eleven frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame).
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2155,6 +2165,7 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
 // half the seam.
 const ANCHORED_POPOVER_FRAMES = [
   'manager-environment-edit-automatic-force-add',
+  'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',

@@ -165,6 +165,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   // leg, so the override could no longer fire and `player-actor-picker` names it in
   // `sourceMatches` instead. The routing outcome is identical; only the table changed. Putting it
   // back here without moving the file back would be an entry `selectRenderFileCases` never reads.
+  //
+  // Issue 1503: the essence source picker, whose panel re-platformed onto `SearchablePopover` and
+  // was the one of the two panels that move made with no frame anywhere in the registry. Its
+  // override names the one published frame that opens it, and it leaves `PRIMITIVES_WITH_NO_FRAME`
+  // in the same change — which is the direction that list is meant to move.
+  'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
@@ -236,7 +242,7 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * whose path ends `.svelte` and which has no `BROAD_SIGNAL_CASE_OVERRIDES` entry. A change to one
  * of these publishes `manager-components-normal` and `fabricate-app-shell` and nothing else, and
  * whether either frame contains the changed component is unexamined — which is issue 1116's
- * complaint, unresolved for these 27 and resolved for `Stepper` and `ThresholdBandStrip`, whose
+ * complaint, unresolved for these 20 and resolved for `Stepper` and `ThresholdBandStrip`, whose
  * entries issue 1378 added, and for `EditorValidationSurface`, whose entry issue 1444 added when
  * it closed that primitive.
  *
@@ -258,7 +264,10 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * and it is the first to leave WITHOUT becoming or extracting a primitive: it stays a
  * `NOT_A_PRIMITIVE` row, and what earned it a frame is ADOPTING one. `SelectionCheckbox` left
  * it at issue 1373's round 5, when the Tool Studio's prerequisite list gained a frame and with
- * it the `sm` size's only rendering.
+ * it the `sm` size's only rendering. `EssenceSourceSelector` left it at issue 1503, when its panel
+ * re-platformed onto `SearchablePopover` and `manager-essences-source-picker` became the first
+ * frame in the registry to open it — the essence it selects, `mote`, is the lab corpus's only
+ * sourceless one, and so the only inspector that draws this control rather than the linked card.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -272,7 +281,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
-  'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/ImagePathPicker.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',

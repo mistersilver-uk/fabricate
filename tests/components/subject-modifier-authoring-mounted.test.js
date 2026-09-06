@@ -284,6 +284,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
   ],

@@ -73,6 +73,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
