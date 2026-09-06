@@ -323,7 +323,12 @@ test('the inputs every property below quantifies over are alive', () => {
   // 49 as of issue 1371 r18-colour: `apps/manager/components/EssenceChip.svelte`, the tinted
   // essence chip maintainer ruling M29 asked for, registered at its second caller with its
   // `library.html` specimen beside the icon chip's.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 49, 'the shipped primitive set changed size');
+  // 50 as of issue 1504, which added `components/Select.svelte` — the app's one select, and the
+  // first member admitted by BUILDING a library entry rather than by promoting a component that
+  // had quietly crossed the membership bar. The non-member set is unmoved at 12:
+  // `BulkEditSelect.svelte` stays in it, on issue 1371 r16-list's one-caller ground, and is now a
+  // wrapper around the new member rather than around a native `<select>`.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 50, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
