@@ -10,7 +10,7 @@
   crafting manager admin is GM-scoped.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 

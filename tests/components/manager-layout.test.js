@@ -46,7 +46,7 @@ const explainerCardPath = resolve(
 const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
 // reason, so its scale is read out of the component rather than the global sheet.
-const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
+const chipPath = resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte');
 const partyExpandedBodyPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
@@ -11551,7 +11551,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   // the same fixture renders a plain `Chip` beside the two, so "these two are not chips" is a
   // measured difference against the real primitive rather than an assertion about a token name.
   const chipScopedForTriggers = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte')
   );
   const chipProbe = withScopeHash(
     '<button type="button" class="manager-chip" data-plain-chip><i class="fa-solid fa-plus"></i><span>Chip</span></button>',

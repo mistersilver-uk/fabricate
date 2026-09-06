@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

@@ -445,7 +445,7 @@ test('a malformed runtime chrome update is refused with a message naming the fau
 // that the primitive drops would render as the default chip and look like a CSS bug.
 test('every status tone the seam offers is a tone the Chip primitive actually paints', () => {
   const chipSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'),
+    resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'),
     'utf8'
   );
   const declared = chipSource.slice(

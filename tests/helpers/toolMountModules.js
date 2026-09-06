@@ -78,7 +78,7 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
  * @type {ReadonlyArray<string>}
  */
 export const TOOL_TREE_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
 ]);

@@ -17,7 +17,7 @@
    - onSelectRecipe(id): row-select handler.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';

@@ -36,7 +36,7 @@ const harness = createMountedComponentHarness({
     // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
     // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     // The REAL player tile the "How players see it" card mounts for both samples. A `.svelte` in
     // the closure but absent HANGS the suite (# cancelled) rather than failing it.

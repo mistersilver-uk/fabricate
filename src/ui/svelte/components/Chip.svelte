@@ -1,8 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE chip: a short, fully-rounded badge carrying a count, a state, a
+  The app's ONE chip: a short, fully-rounded badge carrying a count, a state, a
   category or a tag. Every chip on every GM manager screen renders through this
-  component (issue 883).
+  component (issue 883) — and not the manager's alone: `components/SearchablePopover.svelte`
+  and `components/Select.svelte` render it too, so a player window that mounts either of
+  those controls draws this chip as well. That is why it ships under `components/` rather
+  than under `apps/manager/` (issue 1506). The `manager-chip` class hook does NOT move with
+  it, for the reason the class-hook paragraph below states.
 
   It exists because the chip had drifted into two scales. The base `.manager-chip` rule
   in `styles/fabricate.css` was 24px tall at `0.75rem`/700, and the Tool Studio and

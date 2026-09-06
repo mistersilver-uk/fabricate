@@ -71,7 +71,7 @@
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';

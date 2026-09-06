@@ -39,7 +39,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     LEARNED_SOURCE_AUTO_LEARN,

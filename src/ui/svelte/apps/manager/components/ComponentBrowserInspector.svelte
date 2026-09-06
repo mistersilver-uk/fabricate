@@ -31,7 +31,7 @@
   this screen's own row set cannot answer.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from './EssenceChip.svelte';
   import ActionMenu from '../../../components/ActionMenu.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';

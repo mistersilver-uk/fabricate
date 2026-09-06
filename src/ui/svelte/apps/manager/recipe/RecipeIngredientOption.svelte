@@ -95,7 +95,7 @@
 </script>
 
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   // The add-new offer projection (issue 1036). It feeds the SUGGESTION list; `selectedEssence`
   // below deliberately resolves against the UNFILTERED prop, so an authored requirement on a

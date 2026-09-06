@@ -27,7 +27,7 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';

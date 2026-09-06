@@ -35,7 +35,7 @@
   move. Everything below is `$derived` off the live props so a catalogue edit re-renders here.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';

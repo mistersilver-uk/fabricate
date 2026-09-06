@@ -26,7 +26,7 @@
   ring plus the inspector heading, matching `RecipesBrowserView`.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from './SegmentedControl.svelte';

@@ -357,7 +357,7 @@ describe('StatusPill (mounted)', () => {
 describe('emphasis is one axis across the two primitives that have it', () => {
   const SOURCES = {
     StatusPill: 'src/ui/svelte/components/StatusPill.svelte',
-    Chip: 'src/ui/svelte/apps/manager/Chip.svelte'
+    Chip: 'src/ui/svelte/components/Chip.svelte'
   };
 
   /**

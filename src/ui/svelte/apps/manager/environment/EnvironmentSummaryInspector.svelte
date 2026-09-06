@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';

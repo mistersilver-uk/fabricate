@@ -28,7 +28,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
     // omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
     // the shared picker now, so this tree reaches all three; an omission does not fail this

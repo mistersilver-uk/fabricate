@@ -21,7 +21,7 @@
 -->
 <script>
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

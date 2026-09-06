@@ -79,7 +79,7 @@ const harness = createMountedComponentHarness({
     // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
     // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.

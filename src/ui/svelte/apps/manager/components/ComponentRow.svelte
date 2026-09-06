@@ -44,7 +44,7 @@
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from './EssenceChip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';

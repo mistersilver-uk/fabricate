@@ -228,7 +228,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 // Suites that mount a larger tree keep their own list: they need these plus a screen's worth of
 // components, and spreading a constant into a longer literal buys nothing.
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'
@@ -255,7 +255,7 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
 export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'

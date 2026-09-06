@@ -58,7 +58,7 @@
   would leave the next tall identity button to rediscover the same crop.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';

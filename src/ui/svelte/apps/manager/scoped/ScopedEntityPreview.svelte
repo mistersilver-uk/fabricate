@@ -64,7 +64,7 @@
   rather than a new one. Absent by default, so every existing caller renders identically.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import IconFactRow from '../IconFactRow.svelte';
 

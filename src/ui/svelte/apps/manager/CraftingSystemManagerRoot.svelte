@@ -4,7 +4,7 @@
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
   import {

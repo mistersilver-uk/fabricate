@@ -67,7 +67,7 @@ const harness = createMountedComponentHarness({
   // through a `for (const X of …)` binding, which this file has none of. So the omission would
   // surface nowhere but here.
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',

@@ -31,15 +31,15 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const chipSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'),
   'utf8'
 );
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-chip-characterization-',
-  compiledModules: ['src/ui/svelte/apps/manager/Chip.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/Chip.svelte',
+  compiledModules: ['src/ui/svelte/components/Chip.svelte'],
+  componentPath: 'src/ui/svelte/components/Chip.svelte',
 });
 
 /**

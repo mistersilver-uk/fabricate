@@ -49,7 +49,7 @@
 <script>
   import { localize, notifyError, notifyWarn } from '../../../util/foundryBridge.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

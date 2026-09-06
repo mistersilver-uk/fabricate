@@ -99,7 +99,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';

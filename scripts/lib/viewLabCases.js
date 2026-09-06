@@ -8551,7 +8551,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$/,
+      /^src\/ui\/svelte\/components\/Chip\.svelte$/,
       /^src\/ui\/svelte\/components\/Medallion\.svelte$/,
       /^styles\/fabricate\.css$/,
     ],

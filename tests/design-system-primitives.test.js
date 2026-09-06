@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -243,7 +243,7 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`coverage-theme-light-player :: ^styles\/fabricate\.css$`,
   String.raw`manager-checks-crafting-dynamic-dc :: ^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$`,
   String.raw`manager-component-complications-empty :: ^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$`,
-  String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$`,
+  String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Chip\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Medallion\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^styles\/fabricate\.css$`,
   String.raw`manager-world-downtime-test-companion-installed :: ^styles\/fabricate\.css$`,
@@ -302,13 +302,13 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
   'src/ui/svelte/components/FillBar.svelte',
@@ -374,7 +374,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 266);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 261);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -537,7 +537,7 @@ test('(c) every manifest row names a file that exists', () => {
 const IMPORTERS = measureImporters(REPO_ROOT);
 
 /** A component this repository is known to import heavily. See the control clause below. */
-const POPULATED_CONTROL = 'src/ui/svelte/apps/manager/Chip.svelte';
+const POPULATED_CONTROL = 'src/ui/svelte/components/Chip.svelte';
 
 /** The number words a `why` may spell a caller count with, plus the digits. */
 const COUNT_WORDS = new Map([

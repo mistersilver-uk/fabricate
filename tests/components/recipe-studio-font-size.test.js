@@ -292,7 +292,7 @@ const FIXTURE = `
 // adding the hash without the real ordering proves the wrong winner. A role that gets
 // neither silently measures Foundry's 14px app base, which the anti-bleed loop then catches.
 const SCOPED_COMPONENTS = [
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',

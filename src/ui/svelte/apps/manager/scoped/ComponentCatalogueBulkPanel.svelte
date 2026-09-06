@@ -101,7 +101,7 @@
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { paginateRows } from '../../../../../utils/browserPagination.js';

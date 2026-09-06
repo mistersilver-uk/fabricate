@@ -58,7 +58,7 @@ const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-m
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 const SCOPED_COMPONENTS = [
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',

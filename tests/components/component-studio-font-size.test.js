@@ -375,7 +375,7 @@ const FIXTURE = `
 // its roles fall to 14px — which is why no `EXPECTED` value needed touching to make this
 // pass, and why a green run is evidence the extraction preserved the cascade.
 const SCOPED_COMPONENTS = [
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',

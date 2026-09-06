@@ -56,7 +56,7 @@
   the surface rather than to the check.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';

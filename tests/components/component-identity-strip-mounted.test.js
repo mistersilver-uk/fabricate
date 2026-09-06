@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness omits
     // HANGS the suite rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',

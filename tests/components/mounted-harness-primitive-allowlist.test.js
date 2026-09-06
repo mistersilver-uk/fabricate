@@ -64,7 +64,7 @@ const SHARED_PRIMITIVES = [
   // The manager's ONE chip (issue 883). This is the sharpest case yet: chips are on
   // essentially every manager screen, so as the conversion proceeds this component enters
   // the static graph of almost every mounted tree, and each omission costs a HUNG suite.
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   // The manager's ONE multi-select toolbar and ONE bulk-edit chrome (issue 1010), extracted
   // so the Component Studio and the Recipe Studio render the same controls. They live
   // directly under `apps/manager/` rather than `components/` because every module importing
