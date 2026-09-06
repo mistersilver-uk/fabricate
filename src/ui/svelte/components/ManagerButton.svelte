@@ -79,8 +79,10 @@
   because every rule in the family was rooted at that application class. It is now rooted at
   `fabricate-button`, which this component emits itself as the leading literal of `classes`
   below, so the family paints wherever the primitive renders. That makes it a CAPABILITY
-  rather than an app-agnostic control in practice: all 58 importers still sit under
-  `apps/manager/**`, so nothing outside the manager exercises it yet.
+  rather than an app-agnostic control in practice: 63 of its 64 importers still sit under
+  `apps/manager/**`, and the 64th is `SearchablePopover`, which renders this component only for
+  a caller passing `triggerButton` — no caller outside the manager does — so nothing outside the
+  manager exercises it yet.
   `manager-layout.test.js` pins the equivalence in
   a real browser — it renders a tool studio button and a Modifiers card button of the
   same role and compares the COMPUTED `font-size`, `font-weight`, `padding`, `height`
@@ -90,8 +92,8 @@
   declared outside the array and keep the array's own string literals to the three
   unconditional classes: an inline conditional there puts its tokens into every probe
   and the gate goes green while measuring markup this component never emits. It also
-  declares its own focus PAIR — a `:focus` strip at `fabricate.css:13618` and a
-  `:focus-visible` repaint at `fabricate.css:13629`.
+  declares its own focus PAIR — a `:focus` strip at `fabricate.css:13637` and a
+  `:focus-visible` repaint at `fabricate.css:13648`.
 
   ── RELATIONSHIP TO `ArmedDangerButton` ───────────────────────────────────────────
   INDEPENDENT, not composed. `ArmedDangerButton` also renders

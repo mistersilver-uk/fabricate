@@ -25,7 +25,7 @@
   inherit` issue 1502 adds to it, `:disabled`, `:hover`, the 34px box, and the glyph rule).
 
   It also declares its own focus PAIR for the BUTTONS it contains: a `:focus` strip and a
-  `:focus-visible` repaint at `fabricate.css:5616` and `:5634`. Buttons only, deliberately —
+  `:focus-visible` repaint at `fabricate.css:5637` and `:5655`. Buttons only, deliberately —
   the sheet comment above those rules says why an `:is(button, select)` form would delete the
   player app's inset select ring.
 

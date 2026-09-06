@@ -149,7 +149,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   // controls, which is where the ladder arithmetic already lives.
   it('emits NO size class by default, so every shipped button keeps its 34px control', async () => {
     await harness.mount({ role: 'primary' });
-    assert.equal(button().className, 'manager-button fab-manager-button is-primary');
+    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button is-primary');
   });
 
   it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
@@ -158,13 +158,13 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     // the primitive's own modifiers, then the rung, then whatever the caller appended.
     assert.equal(
       button().className,
-      'manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
+      'fabricate-button manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
     );
   });
 
   it('takes the rung as a number too, since a caller will write size={38}', async () => {
     await harness.mount({ size: 38 });
-    assert.equal(button().className, 'manager-button fab-manager-button is-size-38');
+    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button is-size-38');
   });
 
   it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
@@ -174,7 +174,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       await harness.mount({ size });
       assert.equal(
         button().className,
-        'manager-button fab-manager-button',
+        'fabricate-button manager-button fab-manager-button',
         `size="${String(size)}" is not a rung this button offers`
       );
       harness.remount();

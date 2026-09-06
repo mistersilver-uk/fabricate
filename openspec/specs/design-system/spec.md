@@ -138,7 +138,7 @@ The picker is therefore held to the geometry as well as the markup — its panel
 
 The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
 A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
-`ManagerButton` is the only pure capability of the three: all 58 of its importers are under `src/ui/svelte/apps/manager/`, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
+`ManagerButton` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
 `Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 

@@ -256,7 +256,7 @@ const COMPARED = Object.freeze([
  * a measured fact rather than a convenience.
  *
  * The button families declare `box-sizing: border-box` on their own shared base rule
- * (`fabricate.css:13540-13541`), so the comparison is live for them and reds if that declaration goes.
+ * (`fabricate.css:13559-13560`), so the comparison is live for them and reds if that declaration goes.
  * `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather than a
  * value the family owns: in the manager it picks `border-box` up from
  * `.fabricate-manager * { box-sizing: border-box }` (`:1295-1296`), a UNIVERSAL rule that is the
@@ -490,7 +490,11 @@ test('the values the comparison holds over are the ones the family declares, not
   // and the button's own block declare. Without these the equality above would still pass on a
   // tree where the whole family stopped matching in every host at once.
   assert.equal(bare('manager-button')['box-sizing'], 'border-box');
-  assert.equal(bare('manager-button')['border-radius'], '6px');
+  // 9px, not the shared base block's 6: the probe carries `fab-manager-button`, and issue 1371's
+  // maintainer ruling M12a gave the converted control the radius ladder's 34-38px rung on
+  // `.fabricate-button.manager-button.fab-manager-button`. `icon-button` below still reads the
+  // base block's 6, which is what keeps this pair a discriminator rather than one value twice.
+  assert.equal(bare('manager-button')['border-radius'], '9px');
   assert.equal(bare('manager-button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
   assert.equal(bare('icon-button')['border-radius'], '6px');

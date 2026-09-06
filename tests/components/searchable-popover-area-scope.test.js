@@ -234,11 +234,13 @@ const PRIMITIVES = Object.freeze([
     // than in markup — `classesWrittenBy` and the root-emission clause's `attributes` local both
     // read `composedClassRegion` for this entry as well as the (here, empty) markup region.
     composesClasses: true,
-    // Measured today: 2 written (the array holds no other unconditional family literal), 84
-    // family selectors, 29 owned — 17 caller-ancestor exempt, 38 belong to caller CLASS
-    // compounds (the twelve `SearchablePopover` `triggerClass` carriers and the
-    // `managerHeaderActionClass` builder's seven equalities, each naming a caller trigger class
-    // beside the family — issue 1502's Phase 1b) — 84 - 17 - 38 = 29.
+    // Measured today: 2 written (the array holds no other unconditional family literal), 109
+    // family selectors, 30 owned — 28 exempt (27 whose ancestor chain names a caller's own
+    // container, plus the one `[data-manager-view=…]` per-view override that is exempt by the
+    // application-root-attribute clause alone), 51 belong to caller CLASS compounds (the twelve
+    // `SearchablePopover` `triggerClass` carriers, the `managerHeaderActionClass` builder's
+    // equalities and the world component catalogue's per-control compounds, each naming a caller
+    // class beside the family) — 109 - 28 - 51 = 30.
     writtenFloor: 2,
     familyFloor: 75,
     ownedFloor: 26,
@@ -253,10 +255,10 @@ const PRIMITIVES = Object.freeze([
     family: 'manager-icon-button',
     anchors: Object.freeze(['manager-icon-button']),
     composesClasses: true,
-    // Measured today: 1 written, 21 family selectors, 15 owned — 4 caller-ancestor exempt, 1
-    // belongs to Pagination's own family (`:13792`, its ancestor is the primitive's OWN class,
-    // not a caller's), 1 belongs to a caller CLASS compound
-    // (`.manager-icon-button.manager-recipe-step-nav`) — 21 - 4 - 1 - 1 = 15.
+    // Measured today: 1 written, 22 family selectors, 15 owned — 5 caller-ancestor exempt, 1
+    // belongs to Pagination's own family (its ancestor is the primitive's OWN class, not a
+    // caller's), 1 belongs to a caller CLASS compound
+    // (`.manager-icon-button.manager-recipe-step-nav`) — 22 - 5 - 1 - 1 = 15.
     writtenFloor: 1,
     familyFloor: 18,
     ownedFloor: 13,
@@ -278,10 +280,10 @@ const PRIMITIVES = Object.freeze([
     ]),
     // Written inline on the root `<section>` (`Pagination.svelte:177`) — this component composes
     // nothing, so `composesClasses` is neither needed nor set.
-    // Measured today: 5 written (root class aside), 17 family selectors, 6 owned — 6
-    // caller-container exempt plus 4 caller-container-by-ATTRIBUTE exempt (the
+    // Measured today: 5 written (root class aside), 19 family selectors, 6 owned — 6
+    // caller-container exempt plus 6 caller-container-by-ATTRIBUTE exempt (the
     // `[data-manager-view=…]` per-view overrides — see the application-root-attribute clause
-    // below) plus 1 belonging to IconButton's own family (`:13792`) — 17 - 6 - 4 - 1 = 6.
+    // below) plus 1 belonging to IconButton's own family — 19 - 6 - 6 - 1 = 6.
     writtenFloor: 4,
     familyFloor: 15,
     ownedFloor: 5,
@@ -633,8 +635,8 @@ test('the application-root-attribute clause names a caller’s own container', (
       'plain .fabricate-manager compound from ownership'
   );
 
-  // NON-VACUITY: the clause actually reaches Pagination's four shipped per-view overrides in
-  // `styles/fabricate.css`, not just the synthetic control above.
+  // NON-VACUITY: the clause actually reaches Pagination's shipped per-view overrides in
+  // `styles/fabricate.css` — six of them today — not just the synthetic control above.
   const written = classesWrittenBy(pagination);
   const family = pickerSelectors(written);
   const callerContainerSelectors = family.filter((selector) =>
@@ -643,8 +645,9 @@ test('the application-root-attribute clause names a caller’s own container', (
   assert.ok(
     callerContainerSelectors.length >= 4,
     `only ${callerContainerSelectors.length} Pagination selectors were recognised by the ` +
-      'application-root-attribute clause, against a floor of 4 — the four `[data-manager-view=…] ' +
-      '.manager-pagination` overrides. A lower number means the clause has stopped recognising ' +
+      'application-root-attribute clause, against a floor of 4 — the `[data-manager-view=…] ' +
+      '.manager-pagination` overrides, of which the sheet holds six today. A lower number means ' +
+      'the clause has stopped recognising ' +
       'them and they would wrongly enter the owned set below.'
   );
 });
@@ -1040,12 +1043,14 @@ test('every fixture element in a picker’s family sits under one of its namespa
   // A PRE/POST element total for one file, so a lossy stripper reds instead of passing quietly
   // (`manager-layout.test.js` is the file issue 1470 already caught this on once). PRE is the
   // family-relevant population a RAW, unblanked scan finds; POST is the same population after
-  // blanking. POST is EXPECTED to be somewhat lower than PRE here — this file's docblocks
-  // illustrate the very markup they describe (`<style>`, a probe's own `<button class="…">`), and
-  // blanking correctly removes those phantom elements from the count. What must NOT happen is a
-  // MATERIAL drop beyond that: `stripComments` blanks a comment's characters to spaces rather
-  // than deleting them, which is what keeps a quote character OUTSIDE a comment exactly where it
-  // was; a stripper that instead deletes a comment's own stray apostrophe ("it's", "primitive's")
+  // blanking. The two need not agree in either direction, and today POST is the HIGHER of the
+  // pair (53 against 49): this file's docblocks illustrate the very markup they describe
+  // (`<style>`, a probe's own `<button class="…">`), which blanking correctly removes, while a
+  // comment's own stray apostrophe can break the RAW scan's quote pairing and hide real markup
+  // that blanking then restores. What must NOT happen is a MATERIAL drop: `stripComments` blanks
+  // a comment's characters to spaces rather than deleting them, which is what keeps a quote
+  // character OUTSIDE a comment exactly where it was; a stripper that instead deletes a comment's
+  // own stray apostrophe ("it's", "primitive's")
   // shifts the text after it and can corrupt this scanner's own `"[^"]*"|'[^']*'` quote pairing
   // well past the comment, dropping real markup along with the prose.
   const layoutFile = 'tests/components/manager-layout.test.js';
@@ -1101,8 +1106,12 @@ test('each primitive’s own scoped styles name no application root either', () 
 
   assert.ok(
     blocks >= 2,
-    `only ${blocks} of the nine component files carry a scoped <style> block. Two do today ` +
-      '(`SearchablePopover` and `ManagerColorPopover`); a lower number means the reader has ' +
-      'stopped finding them and this clause examined nothing.'
+    `only ${blocks} of the nine component files hold a \`<style>\` opener. Five do today: ` +
+      '`SearchablePopover` and `ManagerColorPopover` carry a real scoped block, while ' +
+      '`ActionMenu`, `ManagerButton` and `IconButton` name one in DOCBLOCK PROSE saying they ' +
+      'deliberately have none — the reader takes the LAST opener with no `afterScript` guard, ' +
+      'and neither sliced region carries a `.fabricate-` token, so the clause above stays empty ' +
+      'for them. A lower number means the reader has stopped finding them and this clause ' +
+      'examined nothing.'
   );
 });
