@@ -1513,7 +1513,6 @@ test('the controls nested inside a callout and a notice own their own pointer ta
   }
 });
 
-
 // Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
 // rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,
 // a glyph-led list at 0.6875rem/1.5); the Tags & Categories inspector rendered the same
