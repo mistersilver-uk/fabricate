@@ -2,7 +2,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,6 +13,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-books-scrolls-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
@@ -26,6 +31,12 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     // THE manager's labelled push-button (issue 1118). Both Clear filters controls render it.
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',

@@ -8,6 +8,10 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
+// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
+// there cannot go missing here.
+import { SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -149,6 +153,12 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/OverrideIndicator.svelte',
       'src/ui/svelte/components/Pagination.svelte',
+      // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+      // composes. A module missing from a manifest does not fail this suite — it is reported as
+      // `# cancelled`, never `# fail`.
+      'src/ui/svelte/components/Select.svelte',
+      'src/ui/svelte/components/Field.svelte',
+      'src/ui/svelte/components/SearchablePopover.svelte',
       // The shared numeric stepper (issue 1050): the blind-weight cell renders it.
       'src/ui/svelte/components/Stepper.svelte'
     ]) {
@@ -182,6 +192,12 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/util/actionMenuLayout.js',
       'src/gatheringImageDefaults.js'
     ]) {
+      copyModule(modulePath);
+    }
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`,
+    // spread from the harness's own roster rather than copied so it cannot drift from it. The
+    // four this tree already carries above are re-copied harmlessly.
+    for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) {
       copyModule(modulePath);
     }
     Component = (await import(pathToFileURL(join(

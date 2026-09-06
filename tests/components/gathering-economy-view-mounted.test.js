@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler } from '../helpers/svelte-component-harness.js';
+import { SEARCHABLE_POPOVER_RAW_MODULES, createSvelteCompiler } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -108,9 +108,18 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     ]) {
       writeRawModule(modulePath);
     }
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');

@@ -25,12 +25,17 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
@@ -76,6 +81,13 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // THE APP'S ONE SELECT (issue 1504), and the two components it composes. `Pagination` and the
+  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
+  // this shell rather than new controls on these screens — listed here for the same reason
+  // `IconButton` is listed before `Pagination`.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',

@@ -25,7 +25,10 @@ import { tick } from 'svelte';
 
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
   TOOL_TREE_RAW_MODULES,
@@ -40,6 +43,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-tool-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into, and the four leaves its breakage tab authors a
@@ -135,6 +140,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The design-system primitives this editor's tree renders: the icon action (issue 1422),

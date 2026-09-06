@@ -116,6 +116,10 @@ const harness = createMountedComponentHarness({
     // pager - but the import is STATIC, so it is in this tree's graph either way and the
     // harness's closure validator throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
     // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in

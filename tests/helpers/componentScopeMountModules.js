@@ -144,6 +144,13 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // Issue 1504: `Pagination` draws its page-size list in the app now, so every tree that renders
+  // a pager also renders `Select`, the `SearchablePopover` it composes and the `Field` its
+  // labelled form wraps. An omission here does not fail a suite — the closure validator throws in
+  // `before()` and `node --test` reports every test in the file as `# cancelled`.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -188,6 +195,10 @@ export function createComponentScopeHarness({
     rawModules: [
       ...WORLD_COMPONENT_SCOPE_RAW_MODULES,
       ...SCOPED_LIST_RAW_MODULES,
+      // Issue 1504: the shared compiled tier renders `Pagination`, which composes `Select` over
+      // `SearchablePopover`, so this closure is in every component-scope tree whether or not a
+      // test opens a panel.
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
       ...rawExtras,
     ],
     compiledModules: [...SCOPED_SHARED_COMPILED_MODULES, componentPath, ...compiledExtras],
@@ -430,6 +441,9 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
       // read back is the worst place for a manifest to drift.
       rawModules: [
         ...COMPONENT_SCOPE_LEAF_MODULES,
+        // Issue 1504: the pager's own list is a `Select` over `SearchablePopover` now, so this
+        // closure rides with `SCOPED_SHARED_COMPILED_MODULES`.
+        ...SEARCHABLE_POPOVER_RAW_MODULES,
         'src/ui/svelte/util/foundryBridge.js',
         'src/ui/svelte/util/listReorderAnnouncement.js',
         'src/ui/svelte/actions/dragDrop.js',

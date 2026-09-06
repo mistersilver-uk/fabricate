@@ -19,7 +19,11 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
@@ -35,6 +39,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-tool-catalogue-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`, whose
@@ -88,6 +94,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>` a converted control renders, and the components it
+    // composes. A module missing from a manifest does not fail this suite — it is reported as
+    // `# cancelled`, never `# fail`.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
   ],
@@ -666,9 +679,9 @@ describe('world Tools Catalogue (issue 1373)', () => {
      * @returns {Promise<void>}
      */
     async function sortBy(target, value) {
-      const select = target.querySelector('[data-scoped-list-sort]');
-      select.value = value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      // Issue 1504: the sort key is a shared `<Select>`, so this is two clicks on a portaled
+      // panel. The panel lands on `target`, which is the harness's own mount root.
+      chooseSelectOption(target, '[data-scoped-list-sort]', value);
       await harness.setProps({});
     }
 
