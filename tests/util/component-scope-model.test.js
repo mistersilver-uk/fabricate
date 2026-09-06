@@ -412,19 +412,21 @@ describe('the entry validation check set renders at its declared severity', () =
     );
   });
 
-  it('and the gate itself BLOCKS, which nothing asserted', () => {
-    // AC-17 names `No rules in {system}` as blocking. On the blank fixture it PASSES — the
-    // component is a member there — and the `member: false` case above checks presence only, so
-    // demoting the severity to a warning left the whole tree green.
+  it('and the gate itself WARNS rather than blocking (maintainer, 2026-09-06)', () => {
+    // A world component with no rules in the system in view is a normal state — the catalogue
+    // holds every component, and a system adopts the ones it wants — so the check is guidance,
+    // not a hazard: it must not block a save of the world record. It still renders, still
+    // counts, and still gates the checks that need a membership record.
     const { groups, counts } = componentScopeValidationPresentation(
       { ...blank, member: false },
       phrase
     );
     const row = groups.flatMap((group) => group.rows).find((entry) => entry.id === 'systemRules');
     assert.ok(Boolean(row), 'the gate renders a row');
-    assert.equal(row.status, 'block');
+    assert.equal(row.status, 'warn');
     assert.equal(row.title, 'No rules in Forge');
-    assert.ok(counts.blocking >= 2, 'it counts toward Blocking beside the missing source');
+    assert.ok(counts.warnings >= 1, 'it counts toward Warnings');
+    assert.ok(counts.blocking >= 1, 'and the missing source still blocks on its own');
   });
 
   it('omits the whole system pass when no crafting system is in view', () => {
