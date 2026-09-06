@@ -513,6 +513,29 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
+  // THE PERCENTAGE SLIDER (issue 1508), and the entry closes a gap that the SOURCE-MATCH route
+  // could not: this component is under `components/`, so the directory leg of
+  // `BROAD_SIGNAL_PATTERN` claims it and `selectRenderFileCases` never consults any case's
+  // `sourceMatches` for it at all. Until this entry existed, every change to the control
+  // published the representative pair and nothing else, and neither frame draws one:
+  // `manager-components-normal` is the components browser and `fabricate-app-shell` is the
+  // player window, which has no percentage slider anywhere.
+  //
+  // ONE frame, and it is chosen because it DRAWS the control rather than because it claims the
+  // file that renders one. `world-tool-entry` opens the world Tool catalogue's
+  // `sm-tool-hammer`, whose fixture declares `breakage: { mode: 'breakageChance' }`
+  // (`tests/view-lab/world/labContent.js`), and its third step clicks
+  // `[data-world-tool-entry-tab="breakage"]` — which is the arm
+  // `scoped/WorldToolEntryPage.svelte` renders the `<ChanceSlider>` in.
+  //
+  // `manager-tool-parity-03-breakage-1280x720` is NOT a second entry, and that is measured
+  // rather than assumed. Its walk clicks an UNQUALIFIED `[data-tool-edit-rules]`, so it opens
+  // the first row of the default system's tool list, which is sorted by name and begins with the
+  // anvil — whose fixture breakage mode is `limitedUses`. `tools/ToolBreakageTab.svelte`
+  // renders its slider inside `{:else if breakageChoice === 'breakageChance'}`, so that frame
+  // draws the uses stepper and no slider at all; its `sourceMatches` claim on that tab proves
+  // the FILE and not the frame.
+  'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
   // AN ACTOR'S PORTRAIT (issue 1506), and the first entry in this table gained by a primitive
   // ARRIVING rather than by an extraction leaving one state unphotographed. Neither
   // representative frame is a Knowledge screen: `manager-components-normal` is the component

@@ -171,6 +171,14 @@ const EXPECTED_OVERRIDE_KEYS = [
   // component ships with an override naming a frame that draws it. One frame, because one frame
   // draws both of its call sites.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1508: the percentage slider, and the second key gained by a family being RE-ROOTED
+  // rather than by a component arriving or acquiring a state. The re-root gave it a font floor,
+  // a focus pair and 23 moved selectors, and no published frame drew the control at all — so
+  // every one of those edits would have published two frames that structurally cannot contain
+  // one. Its entry names the frame that DRAWS a slider, measured through the fixture's breakage
+  // mode rather than through a `sourceMatches` claim, and it leaves `PRIMITIVES_WITH_NO_FRAME`
+  // in the same change.
+  'src/ui/svelte/components/ChanceSlider.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
@@ -318,6 +326,12 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * onto the glyph gave it a state neither representative frame draws. Its override names the one
  * published frame that draws a TINTED tile. `Avatar`, which arrived in the same change, never
  * entered this list either, and for the rule stated above rather than as an exception.
+ * `ChanceSlider` left it at issue 1508, and it is the first to leave by being RE-ROOTED: the
+ * change gave it a font floor, a focus pair and a family rooted at the class it emits, and no
+ * published frame drew the control at all, so every one of those edits would have published two
+ * frames that cannot contain one. Its override names `world-tool-entry`, chosen because that
+ * case's tool fixture declares the `breakageChance` mode its walk then opens — the frame DRAWS
+ * a slider, rather than claiming the file that renders one.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -326,7 +340,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
-  'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
