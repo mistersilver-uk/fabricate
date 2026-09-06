@@ -11,7 +11,11 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
 import {
@@ -31,6 +35,8 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/config/flags.js',
     'src/config/hooks.js',
     'src/config/stackQuantityPathPresets.js',
@@ -150,13 +156,10 @@ const harness = createMountedComponentHarness({
     // already listed above — so omitting any of these three HANGS this suite (# cancelled)
     // rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The searchable picker `ActorSelectTopBar` converted onto (issue 1475), and the empty
-    // panel it renders over a filtered-to-nothing list. `Chip` directly above is shared with
-    // the complication band and is already listed.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — covers `Chip` (also shared
+    // with the complication band above), the searchable picker `ActorSelectTopBar` converted
+    // onto (issue 1475) and the empty panel it renders over a filtered-to-nothing list.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',

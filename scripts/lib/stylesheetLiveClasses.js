@@ -20,10 +20,10 @@
  *
  * ── THE FOUR LIVENESS RULES ──────────────────────────────────────────────────────────────────
  * 1. LITERAL TOKENS. Every identifier-shaped run inside a string literal, a template literal's
- *    static text, a `class="…"` attribute, a `class:x` directive or a `:global(.x)` selector is a
- *    live class name. Comments are stripped FIRST, per region, so a class named only in prose is
- *    not live — `Stepper.svelte` names `manager-checks-outcome-row` in a `<style>` comment and must
- *    not thereby keep it alive.
+ *    static text, a `class="…"` attribute, a CLASS PROP (see below), a `class:x` directive or a
+ *    `:global(.x)` selector is a live class name. Comments are stripped FIRST, per region, so a
+ *    class named only in prose is not live — `Stepper.svelte` names `manager-checks-outcome-row`
+ *    in a `<style>` comment and must not thereby keep it alive.
  * 2. CONSTRUCTED CLASSES. A class attribute holding an interpolation is expanded: module-level
  *    `const` strings and frozen string maps that the interpolation reaches are substituted, so
  *    `${GM_CARD_BLOCK}__label` becomes a literal and `${block}__section` becomes both chat blocks.
@@ -43,6 +43,39 @@
  *    onto — which is what keeps `.manager-danger-tag-pill.is-hazardous` alive from
  *    `class={`manager-danger-tag-pill is-${tag}`}` without licensing anything else.
  *
+ * ── WHY A CLASS PROP IS READ EXACTLY LIKE A `class=` ATTRIBUTE ───────────────────────────────
+ * A shared primitive takes its classes as PROPS, so a caller's family classes are emitted THROUGH
+ * the primitive and the prop is the only place the caller writes them. `Select.svelte` never
+ * writes `class="…"` for its own family at all: it hands `pickerClass`, `triggerClass`,
+ * `valueClass` and `popoverClass` to `SearchablePopover`, and that component is what puts them on
+ * the element. Read as ordinary text those values are invisible — they are backtick templates, and
+ * the catch-all literal sweep matches quotes only — so 14 live `.fabricate-select*` rule blocks
+ * were reported dead.
+ *
+ * So an attribute whose name ENDS IN `Class` is a class attribute: its quoted or braced value goes
+ * through the same template path `class=` takes, static text becoming literals and interpolations
+ * becoming positional wildcards. Svelte's SHORTHAND form `{triggerClass}` names the BINDING rather
+ * than the value, so it is resolved out of the file's own definitions first — a `$derived(…)` or
+ * `$derived.by(…)` right-hand side included, since the resolver sweeps an expression's quoted and
+ * template runs rather than parsing it.
+ *
+ * The rule is keyed on the ATTRIBUTE NAME AND ON THE MARKUP REGION, and the pair is the whole of
+ * its safety. The one-line alternative — teaching the catch-all literal sweep to read backticks
+ * too — would make every identifier run in every template literal under `src/` live, an unaudited
+ * widening of a gate whose failure mode is a dead rule silently surviving. A
+ * `title={`Hello ${name}`}` therefore contributes nothing, and
+ * `tests/stylesheet-live-classes.test.js` holds that negative as a row beside the positive ones.
+ *
+ * THE REGION HALF IS NOT DECORATION, and it was added after the name half shipped alone. A name
+ * ending in `Class` is an ordinary JavaScript identifier as well as an attribute name, so on the
+ * whole comment-stripped text `const probeClass = 'zz-dead-probe';` — in a plain `.js` module,
+ * with no component and no call site anywhere — read exactly like a prop on an element and kept a
+ * dead rule alive. `class=` is bounded by the language rather than by this module (`class` is a
+ * reserved word, so it cannot be assigned), and this channel had no such bound. So a class prop is
+ * evidence only where a prop can be WRITTEN: in a `.svelte` file, outside its `<script>` and
+ * `<style>` regions. A `Class`-suffixed binding that no markup ever hands to a component is dead,
+ * and the negative corpus holds that as its own row.
+ *
  * ── THE ONE ASYMMETRY IN RULE 2 ──────────────────────────────────────────────────────────────
  * `class="${x}"` and `class={x}` do NOT resolve the same way. The quoted form is split into parts
  * and holes, so its hole runs through {@link constantDefinitions} and the constant behind `x` is
@@ -57,7 +90,9 @@
  * that way. If one ever does, the asymmetry under-approximates liveness and the gate reports a
  * live rule as dead — a false dead, which a deletion makes visible as a moved frame, rather than
  * a dead rule silently surviving. Resolve bare identifiers in the braced form then; do not assume
- * it already happens.
+ * it already happens. The same asymmetry and the same answer apply to a class prop, with one
+ * addition: `{fooClass}` is Svelte's shorthand for `fooClass={fooClass}` and IS resolved through
+ * the file's bindings, because a class prop is passed that way at every real call site.
  *
  * ── WHY RESOLUTION IS ADDITIVE, NEVER SUBSTITUTIVE ───────────────────────────────────────────
  * A resolved hole contributes its values AND still contributes its hole. That is not caution for
@@ -114,6 +149,31 @@ const IDENTIFIER_RUN = /[A-Za-z_][\w-]*/gu;
 
 /** A `class` attribute, in markup or inside an HTML template literal. */
 const CLASS_ATTRIBUTE = /(?<![\w-])class\s*=\s*/gu;
+
+/**
+ * A CLASS PROP: an attribute whose name ends in `Class`, which a shared primitive puts on an
+ * element for its caller. Same `(?<![\w-])` guard as {@link CLASS_ATTRIBUTE}, and `class` itself
+ * does not match it — the name must have at least one character before the capital `C`.
+ *
+ * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}: on the whole text this
+ * shape matches a plain JavaScript assignment as readily as an attribute.
+ */
+const CLASS_PROP_ATTRIBUTE = /(?<![\w-])([A-Za-z_$][\w$]*Class)\s*=\s*/gu;
+
+/**
+ * A braced expression that is EXACTLY a `Class`-suffixed identifier: Svelte's shorthand
+ * `{triggerClass}`, and the explicit `someProp={triggerClass}` it abbreviates.
+ *
+ * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}, for the same reason the
+ * attribute form is: on the whole text this shape also matches a destructuring pattern.
+ *
+ * The `(?<!\$)` guard excludes `${fooClass}` INSIDE a template literal, and that is a correctness
+ * point rather than caution. Such a hole is already resolved by {@link expandTemplate} AT ITS OWN
+ * POSITION, where the text around it decides whether the result is a prefix, an infix or a whole
+ * token; harvesting it a second time as a standalone value would throw that position away. And
+ * where the template is not a class value at all, the interpolation is not class evidence.
+ */
+const CLASS_PROP_SHORTHAND = /(?<!\$)\{\s*([A-Za-z_$][\w$]*Class)\s*\}/gu;
 
 /** A Svelte `class:name` directive; the directive's name IS the class. */
 const CLASS_DIRECTIVE = /(?<![\w-])class:([A-Za-z_][\w-]*)/gu;
@@ -232,6 +292,45 @@ function embeddedRegions(text) {
     }
   }
   return regions;
+}
+
+/**
+ * The spans of a file in which a component prop can be WRITTEN, as `[start, end)` pairs.
+ *
+ * A `.svelte` file's markup is everything outside its `<script>` and `<style>` regions, which
+ * {@link embeddedRegions} already locates for the comment strippers. Every other extension has no
+ * markup at all: a `.js` or `.mjs` module can hold an HTML template literal, and `class=` is read
+ * there, but it cannot hold a Svelte component tag and therefore cannot hold a class PROP.
+ *
+ * Offsets are into the same comment-stripped text every channel reads, so a caller compares a
+ * match index against them directly.
+ *
+ * @param {string} file Repo-relative path; only its extension is read.
+ * @param {string} text Comment-stripped source.
+ * @returns {Array<{start: number, end: number}>} Ascending, non-overlapping.
+ */
+function markupRegions(file, text) {
+  if (!file.endsWith('.svelte')) return [];
+  const embedded = [...embeddedRegions(text)].sort((left, right) => left.start - right.start);
+  const spans = [];
+  let cursor = 0;
+  for (const region of embedded) {
+    if (region.start > cursor) spans.push({ start: cursor, end: region.start });
+    cursor = Math.max(cursor, region.end);
+  }
+  if (cursor < text.length) spans.push({ start: cursor, end: text.length });
+  return spans;
+}
+
+/**
+ * Whether an offset falls inside one of the spans {@link markupRegions} returned.
+ *
+ * @param {Array<{start: number, end: number}>} spans
+ * @param {number} at
+ * @returns {boolean}
+ */
+function withinRegions(spans, at) {
+  return spans.some((span) => at >= span.start && at < span.end);
 }
 
 /**
@@ -376,29 +475,120 @@ function splitInterpolations(value) {
 }
 
 /**
- * Every `class=` value in one file, as a `{parts, holes}` template.
+ * One attribute's value, as `{parts, holes}` templates.
  *
  * A braced `class={expr}` form contributes the string and template literals INSIDE `expr`, which is
  * how a ternary of two string literals and a template literal both reach the same expansion path as
- * a quoted attribute.
+ * a quoted attribute. Any other opener — a bare identifier, a number, a backtick in a JavaScript
+ * assignment — contributes nothing, which is what keeps a `Class`-suffixed BINDING out of the
+ * evidence until a call site actually passes it.
  *
  * @param {string} text Comment-stripped source.
+ * @param {number} at Index of the first character after the attribute's `=`.
  * @returns {Array<{parts: string[], holes: string[]}>}
  */
-function classAttributeTemplates(text) {
+function attributeValueTemplates(text, at) {
+  const opener = text[at];
+  if (opener === '"' || opener === "'") {
+    return [splitInterpolations(text.slice(at + 1, quotedValueEnd(text, at + 1, opener)))];
+  }
+  if (opener === '{') {
+    const end = matchingDelimiter(text, at, '{', '}');
+    return quotedTemplatesIn(text.slice(at + 1, end - 1));
+  }
+  return [];
+}
+
+/**
+ * Every match of one module-level global pattern in `text`, from the start of the file.
+ *
+ * The `lastIndex` reset is the reason this exists rather than `String#matchAll`: these patterns are
+ * shared module constants, so a previous scan leaves the cursor mid-file and the next one silently
+ * loses everything above it. Stating the reset once keeps that trap in one place.
+ *
+ * @param {RegExp} pattern A global pattern.
+ * @param {string} text
+ * @yields {RegExpExecArray}
+ */
+function* matchesOf(pattern, text) {
+  pattern.lastIndex = 0;
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) yield match;
+}
+
+/**
+ * Every value of one attribute FAMILY in a file, tagged with where the evidence came from.
+ *
+ * @param {string} text Comment-stripped source.
+ * @param {RegExp} pattern A global pattern whose match ends at the attribute's `=`.
+ * @param {(match: RegExpExecArray) => string} label The origin prefix for {@link harvestFile}.
+ * @param {Array<{start: number, end: number}>} within Spans the match must fall inside. The
+ *   whole-file span is stated explicitly by the one channel that takes it, rather than left
+ *   implicit, so no channel is unbounded by omission.
+ * @returns {Array<{parts: string[], holes: string[], origin: string}>}
+ */
+function attributeTemplates(text, pattern, label, within) {
   const templates = [];
-  CLASS_ATTRIBUTE.lastIndex = 0;
-  for (let match = CLASS_ATTRIBUTE.exec(text); match; match = CLASS_ATTRIBUTE.exec(text)) {
-    const at = match.index + match[0].length;
-    const opener = text[at];
-    if (opener === '"' || opener === "'") {
-      templates.push(splitInterpolations(text.slice(at + 1, quotedValueEnd(text, at + 1, opener))));
-    } else if (opener === '{') {
-      const end = matchingDelimiter(text, at, '{', '}');
-      templates.push(...quotedTemplatesIn(text.slice(at + 1, end - 1)));
+  for (const match of matchesOf(pattern, text)) {
+    if (!withinRegions(within, match.index)) continue;
+    for (const template of attributeValueTemplates(text, match.index + match[0].length)) {
+      templates.push({ ...template, origin: label(match) });
     }
   }
   return templates;
+}
+
+/**
+ * Every SHORTHAND class prop in a file, resolved out of the file's own bindings.
+ *
+ * `{triggerClass}` is Svelte's shorthand for `triggerClass={triggerClass}`, so the attribute value
+ * is an identifier and nothing but an identifier. Its binding's right-hand sides are therefore what
+ * carries the classes, and they go through {@link quotedTemplatesIn} — the same reader the braced
+ * form uses — which is why a `$derived(…)` wrapper needs no case of its own: it is swept as text,
+ * not parsed. A name bound twice contributes both right-hand sides, per
+ * {@link constantDefinitions}.
+ *
+ * @param {string} text Comment-stripped source.
+ * @param {Map<string, string[]>} definitions
+ * @param {Array<{start: number, end: number}>} markup Spans the shorthand must fall inside.
+ * @returns {Array<{parts: string[], holes: string[], origin: string}>}
+ */
+function classPropShorthandTemplates(text, definitions, markup) {
+  const templates = [];
+  for (const match of matchesOf(CLASS_PROP_SHORTHAND, text)) {
+    if (!withinRegions(markup, match.index)) continue;
+    for (const rhs of definitions.get(match[1]) ?? []) {
+      for (const template of quotedTemplatesIn(rhs)) {
+        templates.push({ ...template, origin: `class prop {${match[1]}}=` });
+      }
+    }
+  }
+  return templates;
+}
+
+/**
+ * Every class-bearing value in one file, as a `{parts, holes, origin}` template.
+ *
+ * Three channels, one path: the `class=` attribute, the class PROP a shared primitive takes for its
+ * caller, and that prop's Svelte shorthand. See the module header for why the prop is read here
+ * rather than by widening the catch-all literal sweep to backticks.
+ *
+ * The two PROP channels are bounded to the file's markup and `class=` is not, which is the
+ * asymmetry the header's region paragraph explains: `class` cannot be assigned in JavaScript, and
+ * a `Class`-suffixed name can.
+ *
+ * @param {string} file Repo-relative path, for {@link markupRegions}.
+ * @param {string} text Comment-stripped source.
+ * @param {Map<string, string[]>} definitions
+ * @returns {Array<{parts: string[], holes: string[], origin: string}>}
+ */
+function classEvidenceTemplates(file, text, definitions) {
+  const markup = markupRegions(file, text);
+  const wholeFile = [{ start: 0, end: text.length }];
+  return [
+    ...attributeTemplates(text, CLASS_ATTRIBUTE, () => 'class=', wholeFile),
+    ...attributeTemplates(text, CLASS_PROP_ATTRIBUTE, (match) => `class prop ${match[1]}=`, markup),
+    ...classPropShorthandTemplates(text, definitions, markup),
+  ];
 }
 
 /**
@@ -626,7 +816,10 @@ function recordStateOpening(tokens, sink) {
 }
 
 /**
- * Record the class attributes whose interpolation contributes no positional evidence at all.
+ * Record the class values whose interpolation contributes no positional evidence at all.
+ *
+ * `origin` names the CHANNEL as well as the file — `class=`, `class prop pickerClass=`, or the
+ * shorthand `class prop {triggerClass}=` — so a token that lands here says where to go and look.
  *
  * Two shapes qualify, and both need a human: a token that is nothing but a hole, which as a wildcard
  * would match the whole sheet; and a hole behind a bare state prefix, which rule 4 forbids widening
@@ -676,7 +869,7 @@ function harvestFile(file, source, sink) {
   for (const match of text.matchAll(CLASS_DIRECTIVE)) sink.literals.add(match[1]);
   for (const match of text.matchAll(GLOBAL_SELECTOR)) sink.literals.add(match[1]);
 
-  for (const template of classAttributeTemplates(text)) {
+  for (const template of classEvidenceTemplates(file, text, definitions)) {
     for (const part of template.parts) {
       for (const run of part.matchAll(IDENTIFIER_RUN)) sink.literals.add(run[0]);
     }
@@ -685,7 +878,7 @@ function harvestFile(file, source, sink) {
       for (const token of tokens) recordEvidence(token, sink);
       recordStateOpening(tokens, sink);
     }
-    const origin = `${file}: class="${template.parts.join('<dynamic>')}"`;
+    const origin = `${file}: ${template.origin}"${template.parts.join('<dynamic>')}"`;
     reportUnresolvedTokens(template, definitions, origin, sink);
   }
 }

@@ -26,6 +26,9 @@ import { createComponentBrowserState } from '../../src/utils/componentBrowserMod
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
+// a portaled panel rather than a `change` on a native `<select>`.
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -135,10 +138,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
 
     browser.remount();
     const paged = await browser.mount({ itemCards: manyGeneral(26) });
-    const size = paged.querySelector('[data-pagination-size]');
-    size.value = '25';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(paged, '[data-pagination-size]', 25);
     paged.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -277,10 +277,7 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     });
 
     // Shrink the page to 10 so Metal (12) must span two pages.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
 
     // Page 1: the whole Herb bucket, then the first slice of Metal — NOT an interleaved
     // Herb/Metal/general alphabetical slice, which is what the pre-801 order produced.
@@ -481,10 +478,7 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
     );
 
     // POSITIVE CONTROL, same fixture, same spy: turning the page is what asks for the rest.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '25';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 25);
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -759,10 +753,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
 
     const memberRows = () => root.querySelectorAll('[data-component-member="true"]').length;
     const ghostRows = () => root.querySelectorAll('[data-component-member="false"]').length;
@@ -795,10 +786,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 10);
     const count = () => root.querySelector('[data-component-count]').textContent.trim();
 
     assert.equal(count(), '10 shown · 8 of 13 in this system');

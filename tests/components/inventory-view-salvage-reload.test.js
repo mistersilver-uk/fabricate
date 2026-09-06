@@ -19,7 +19,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -27,6 +31,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-salvage-reload-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
@@ -47,6 +53,8 @@ const harness = createMountedComponentHarness({
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
@@ -57,12 +65,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
-    // The shared complication summary row and the two leaves it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
-    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
-    // rather than failing it.
+    // The shared complication summary row and the leaf it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
+    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
+    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
@@ -88,6 +95,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
+  // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
+  // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
+  // portal host by walking up to the nearest Fabricate application root. `rootClass` IS that
+  // host: on the `fabricate-manager` default the panel would portal to a root no production
+  // mount of this component can reach, and every `target.querySelector` for a row would miss.
+  rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/inventory/InventoryView.svelte',
 });
 

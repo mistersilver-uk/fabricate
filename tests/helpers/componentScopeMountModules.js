@@ -23,7 +23,10 @@
  * self-reporting.
  */
 
-import { createMountedComponentHarness } from './svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from './svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 /**
@@ -132,18 +135,24 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
  * @type {readonly string[]}
  */
 export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination` draws its
+  // page-size list through `Select` now, so every tree that renders a pager also renders `Field`,
+  // `SearchablePopover`, the `ManagerButton` it renders its trigger through, and the `Chip`/
+  // `EmptyState` pair the popover's list renders. An omission here does not fail a suite — the
+  // closure validator throws in `before()` and `node --test` reports every test in the file as
+  // `# cancelled`.
+  ...SELECT_COMPILED_MODULES,
   // issue 1371 r18-colour: the tinted essence chip (M29) is rendered by the system inspector,
   // the rules list row and the world catalogue's rows; an omission here HANGS every suite that
   // mounts one of those trees (`# cancelled`) rather than failing it.
   'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // `Select`, `Field` and `SearchablePopover` are already in this list via the
+  // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -188,6 +197,10 @@ export function createComponentScopeHarness({
     rawModules: [
       ...WORLD_COMPONENT_SCOPE_RAW_MODULES,
       ...SCOPED_LIST_RAW_MODULES,
+      // Issue 1504: the shared compiled tier renders `Pagination`, which composes `Select` over
+      // `SearchablePopover`, so this closure is in every component-scope tree whether or not a
+      // test opens a panel.
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
       ...rawExtras,
     ],
     compiledModules: [...SCOPED_SHARED_COMPILED_MODULES, componentPath, ...compiledExtras],
@@ -232,7 +245,6 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ];
@@ -242,7 +254,6 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
       tmpPrefix,
       componentPath,
       rawExtras: [
-        ...SEARCHABLE_POPOVER_RAW_MODULES,
         // The drop zone's two leaves: the action it binds and the payload normalizer behind it.
         'src/ui/svelte/actions/dragDrop.js',
         'src/ui/svelte/util/dropUtils.js',
@@ -430,6 +441,9 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
       // read back is the worst place for a manifest to drift.
       rawModules: [
         ...COMPONENT_SCOPE_LEAF_MODULES,
+        // Issue 1504: the pager's own list is a `Select` over `SearchablePopover` now, so this
+        // closure rides with `SCOPED_SHARED_COMPILED_MODULES`.
+        ...SEARCHABLE_POPOVER_RAW_MODULES,
         'src/ui/svelte/util/foundryBridge.js',
         'src/ui/svelte/util/listReorderAnnouncement.js',
         'src/ui/svelte/actions/dragDrop.js',

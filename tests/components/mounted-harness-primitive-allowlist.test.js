@@ -81,6 +81,13 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // THE APP'S ONE SELECT (issue 1504). It is the widest-reaching arrival on this list since
+  // `EmptyState`: three shared components render it — `Pagination`, `BulkEditSelect` and
+  // `EntityListInspectorFrame` — so it is in the static closure of every suite that mounts a
+  // tree holding a pager, a bulk panel or a scoped catalogue, which is most of them. And it
+  // pulls `SearchablePopover` in behind it, which is exactly the silent fan-out this list
+  // exists to turn into a named failure.
+  'src/ui/svelte/components/Select.svelte',
   // THE right-inspector action button (issue 1036, maintainer round 2), extracted from the
   // Tool Studio's editor-header treatment and declared the point of arrival for every
   // studio's inspector actions. It is deliberately here BEFORE the sweep that converts the

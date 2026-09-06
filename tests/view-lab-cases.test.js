@@ -2114,7 +2114,7 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
   // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
   // above open a picker over a POPULATED list, so the branch that renders when the list is empty
-  // — reached by every one of the 23 call sites, and by four of them with no `emptyHint` to draw
+  // — reached by every one of the 24 call sites, and by four of them with no `emptyHint` to draw
   // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
   // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
   // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
@@ -2148,8 +2148,10 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The eleven frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame).
+// The thirteen frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, and the
+// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
+// PLAYER window, which is a second application root for the seam to clamp against).
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2169,11 +2171,13 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-availability-menu',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
+  'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-system-edit-lists',
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',
+  'player-inventory-page-size',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 

@@ -25,12 +25,18 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
@@ -60,15 +66,12 @@ const SCOPED_RAW_MODULES = [
 
 const SHELL_MODULES = [
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
   // FAIL the suite, it HANGS it and reports `# cancelled` — see
   // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
   // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
   // it arrives through `EntityListInspectorFrame` and through `Pagination`, both of which
   // converted to it, so it is a TRANSITIVE dependency of the shell rather than a new control
@@ -76,6 +79,10 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
+  // (`...SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: `Pagination` and the
+  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
+  // this shell rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -102,6 +109,7 @@ const pageHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     ...SHELL_MODULES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
@@ -142,6 +150,7 @@ const entryHarness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...SHELL_MODULES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
@@ -149,7 +158,6 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
@@ -161,7 +169,7 @@ const shellHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-control-',
   rawModules: SCOPED_RAW_MODULES,
-  compiledModules: SHELL_MODULES,
+  compiledModules: [...SHELL_MODULES, ...SELECT_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 });
 

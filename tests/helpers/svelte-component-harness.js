@@ -234,12 +234,42 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopover.svelte'
 ]);
 
+// THE APP'S ONE SELECT, plus `Field` (its labelled-form wrapper) and the popover closure above —
+// the whole compiled graph a `<Select>` composes (issue 1504). A converted control (a pager's
+// page-size field, a rules-sort dropdown, anything else migrated onto `<Select>`) reaches every
+// module here whether or not a test opens it, so a suite that mounts a tree with one of those
+// controls spreads this roster into its own `compiledModules` instead of copying the six paths
+// by hand. A hand-copied list is exactly what rotted silently before this constant existed: the
+// merged main's `ManagerButton` entry landed once and had to be re-added, by hand, to nine
+// already-shipped suites that each carried their own copy of this same block. As with the
+// popover roster above, a `.svelte` a suite's tree renders but its manifest omits does not fail
+// that suite — it CANCELS it, and `node --test` reports the blocked tests as `# cancelled`,
+// never `# fail`.
+//
+// Deliberately flat rather than `...SEARCHABLE_POPOVER_COMPILED_MODULES`: a suite that imports
+// only this constant and spreads it once cannot see through a SECOND level of spread — the
+// static guard in `mounted-harness-primitive-allowlist.test.js` reads an imported array's own
+// source text for quoted literals, and a nested `...NAME` inside that text is not a literal, so
+// a two-deep spread would silently under-report the popover's four modules as uncompiled. Four
+// repeated lines once, here, is cheaper than that miss in every consuming suite.
+export const SELECT_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte'
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 // Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
 // test references one source of truth — a component referencing a `.svelte`/`.js`
 // missing from the allowlist does not fail, it HANGS (reported as `# cancelled`).
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
-  'src/ui/svelte/util/foundryBridge.js',
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`,
+  // spread from the roster above rather than copied so the two cannot drift. It already
+  // carries `foundryBridge.js`, so this list does not restate it.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters
@@ -374,6 +404,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s
+  // page-size control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
+  // `SearchablePopover`, the `ManagerButton` `SearchablePopover` renders its trigger through
+  // (issue 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
+  // `IconButton` below arrives by. Omitting one HANGS every mounted crafting suite (# cancelled)
+  // rather than failing it.
+  ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422). It reaches this PLAYER-app list by two
   // independent routes, which is why it sits beside `Pagination` rather than under any one
   // screen: `Pagination` renders its two arrows, and `ProgressiveStageList` renders
@@ -422,13 +459,11 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // just the stage-list one.
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
   // The per-stage complication band (issue 1286). `ProgressiveStageList` — already listed
-  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` and
-  // imports `RowDisclosure`. All three are in the STATIC graph whether or not a fixture
-  // draws a band, so omitting any of them HANGS every mounted crafting suite (# cancelled)
-  // rather than failing one. `Chip` and `RowDisclosure` are import-free leaves, so these
-  // three entries close it.
+  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` (already
+  // in this list via the `SELECT_COMPILED_MODULES` spread above) and imports `RowDisclosure`, an
+  // import-free leaf. Omitting either HANGS every mounted crafting suite (# cancelled) rather
+  // than failing one.
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',

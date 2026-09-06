@@ -2,7 +2,11 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,6 +14,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-editor-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
@@ -37,13 +43,10 @@ const harness = createMountedComponentHarness({
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
-    // omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883) and the shared no-state primitive (issue 785).
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     // The salvage bodies render the house chip primitive. The preview never reaches them,
@@ -63,12 +66,11 @@ const harness = createMountedComponentHarness({
     // The preview NEVER renders the salvage tree (a book is never salvageable), but the
     // component branch statically imports it, so it must still be compiled here.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
-    // The shared complication summary row and the two leaves it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
-    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
-    // rather than failing it.
+    // The shared complication summary row and the leaf it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
+    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
+    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
@@ -86,14 +88,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
     // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
-    // `Chip`, `EmptyState` and the popover's raw dependencies are already listed above.
-    'src/ui/svelte/components/SearchablePopover.svelte',
+    // `Chip`, `EmptyState`, `SearchablePopover` and the popover's raw dependencies are already
+    // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
-    // either HANGS this suite (# cancelled) rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
+    // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',

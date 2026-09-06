@@ -42,6 +42,13 @@ import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProje
 // shape and changes with it rather than hand-rolling a second one.
 import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
+// Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s, so reading
+// what one offers means opening its portaled panel and choosing means two clicks.
+import {
+  chooseSelectOption,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -272,9 +279,8 @@ describe('world Component Catalogue (issue 1371)', () => {
         'Membership',
         'the label is VISIBLE, not an invisible accessible name'
       );
-      const select = target.querySelector('[data-scoped-list-filter="membership"]');
       assert.deepEqual(
-        [...select.options].map((option) => option.textContent.trim()),
+        selectOptionLabels(target, '[data-scoped-list-filter="membership"]'),
         ['Any system', 'Has rules in Forge', 'No rules in Forge', 'In no system at all'],
         'and the two system-relative options interpolate the selected system'
       );
@@ -284,34 +290,61 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    // Issue 1504's converted membership filter and sort control both name their trigger by
+    // `aria-labelledby` rather than `aria-label` (a micro-labelled filter has no `ariaLabel`
+    // fallback at all, and the sort control passes only `ariaLabelledBy`). This RESOLVES each
+    // reference to the element it claims to name, rather than asserting the id string, so a
+    // caption id that stops matching its trigger's `aria-labelledby` fails here instead of
+    // leaving both controls with no accessible name at all.
+    it('names the membership filter and the sort control by reference to their visible label', async () => {
+      const target = await mountToolbar();
+      for (const [triggerHook, labelHook] of [
+        ['[data-scoped-list-filter="membership"]', '[data-scoped-list-filter-label="membership"]'],
+        ['[data-scoped-list-sort]', '.manager-scoped-list-sort-label'],
+      ]) {
+        const trigger = target.querySelector(triggerHook);
+        const labelledBy = trigger.getAttribute('aria-labelledby');
+        assert.ok(labelledBy, `${triggerHook} names its trigger by reference, not by a string`);
+        assert.ok(
+          trigger.getAttribute('aria-label') === null,
+          `${triggerHook} must carry no competing string name`
+        );
+        const label = target.querySelector(`[id="${labelledBy}"]`);
+        const expected = target.querySelector(labelHook);
+        assert.ok(
+          Boolean(label),
+          `${triggerHook}'s aria-labelledby must resolve to a real element`
+        );
+        assert.ok(
+          label === expected,
+          `${triggerHook}'s aria-labelledby must resolve to its own visible label, not a dangling id`
+        );
+      }
+    });
+
     it('withholds the system-relative pair when no system is in scope', async () => {
       // `Has rules in ` with nothing after it is worse than an absent option, and a predicate
       // keyed on an empty id would match nothing and read as a corpus of zero.
       const target = await mountToolbar({ systemId: '' });
       assert.deepEqual(
-        [...target.querySelector('[data-scoped-list-filter="membership"]').options].map((option) =>
-          option.value
-        ),
+        selectOptionValues(target, '[data-scoped-list-filter="membership"]'),
         ['all', 'orphan']
       );
     });
 
     it('actually narrows the list, in both directions', async () => {
       const target = await mountToolbar();
-      const select = target.querySelector('[data-scoped-list-filter="membership"]');
       const rows = () =>
         [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
           row.getAttribute('data-scoped-list-row')
         );
       assert.equal(rows().length, 4, 'unfiltered first, so the narrowing below is a real change');
 
-      select.value = 'in';
-      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-scoped-list-filter="membership"]', 'in');
       await drain();
       assert.deepEqual(rows().sort(), ['coal', 'ingot', 'orphan'], 'the three Forge holds');
 
-      select.value = 'orphan';
-      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-scoped-list-filter="membership"]', 'orphan');
       await drain();
       assert.deepEqual(rows(), ['resin'], 'and the one no system holds at all');
     });
@@ -340,9 +373,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       // Gap-list row 11. A lane sort shipped as one descriptor and therefore as one whole order,
       // which inerted the toggle: `source-type-asc` did not exist and nothing said so.
       const target = await mountToolbar();
-      const sort = target.querySelector('[data-scoped-list-sort]');
-      sort.value = 'source-type';
-      sort.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-scoped-list-sort]', 'source-type');
       await drain();
       const direction = target.querySelector('[data-scoped-list-direction]');
       assert.equal(direction.disabled, false, 'the toggle is live');
@@ -402,18 +433,15 @@ describe('world Component Catalogue (issue 1371)', () => {
 
     /** Choose one source option and let the projection settle. */
     async function chooseSource(target, value) {
-      const select = target.querySelector('[data-scoped-list-filter="source-type"]');
-      select.value = value;
-      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-scoped-list-filter="source-type"]', value);
       await drain();
-      return select;
+      return target.querySelector('[data-scoped-list-filter="source-type"]');
     }
 
     it('offers the reference’s four options, in the reference’s own words', async () => {
       const target = await mountFiveSources();
-      const select = target.querySelector('[data-scoped-list-filter="source-type"]');
       assert.deepEqual(
-        [...select.options].map((option) => option.textContent.trim()),
+        selectOptionLabels(target, '[data-scoped-list-filter="source-type"]'),
         ['Any source', 'World items', 'Compendium', 'Broken link'],
         '`proto:579`, verbatim — the shipped pair asked about presence, which the row pill ' +
           'already states one row at a time'
@@ -474,18 +502,14 @@ describe('world Component Catalogue (issue 1371)', () => {
       // beside it used to ask.
       const target = await mountFiveSources();
       assert.deepEqual(
-        [...target.querySelector('[data-scoped-list-sort]').options].map((option) =>
-          option.textContent.trim()
-        ),
+        selectOptionLabels(target, '[data-scoped-list-sort]'),
         ['Name', 'System count', 'Source type']
       );
     });
 
     it('sorts by the KIND of source, compendium first, with the name tie-break', async () => {
       const target = await mountFiveSources();
-      const sort = target.querySelector('[data-scoped-list-sort]');
-      sort.value = 'source-type';
-      sort.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-scoped-list-sort]', 'source-type');
       await drain();
       assert.deepEqual(
         [...target.querySelectorAll('[data-scoped-list-row]')].map((row) =>
@@ -2572,9 +2596,14 @@ describe('world Component Catalogue (issue 1371)', () => {
         'and it carries the rung `ManagerSearchField` emits for size="38"'
       );
 
+      // ISSUE 1504 MOVED THE TOKEN OFF THE ELEMENT AND ONTO THE SELECT ROOT. These controls are
+      // shared `<Select>`s now: the hook rides the trigger through `triggerData` and the caller's
+      // `class` lands on the picker root the trigger sits in, which is where the sheet's rung
+      // rule reaches it from.
+      const rootOf = (control) => control.closest('.fabricate-select');
       const source = target.querySelector('[data-scoped-list-filter="source-type"]');
       assert.ok(
-        source.classList.contains('is-size-38'),
+        rootOf(source).classList.contains('is-size-38'),
         'the lead row’s select carries the same rung'
       );
 
@@ -2585,7 +2614,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         const control = target.querySelector(selector);
         assert.ok(Boolean(control), `NON-VACUITY: the ${what} control is rendered`);
         assert.ok(
-          !control.classList.contains('is-size-38'),
+          !rootOf(control).classList.contains('is-size-38'),
           `and the filter row’s ${what} control keeps the ladder’s 34, because 32 is retired`
         );
       }
@@ -3020,24 +3049,25 @@ describe('world Component Catalogue (issue 1371)', () => {
 
     /** Choose one option on a lane filter and let the projection settle. */
     async function choose(target, filterId, value) {
-      const select = target.querySelector(`[data-scoped-list-filter="${filterId}"]`);
-      select.value = value;
-      select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+      const hook = `[data-scoped-list-filter="${filterId}"]`;
+      chooseSelectOption(target, hook, value);
       await drain();
-      return select;
+      return target.querySelector(hook);
     }
 
     it('offers the rules list’s option set over the WORLD essence catalogue, in its order', async () => {
       const target = await mountEssences();
-      const select = target.querySelector('[data-scoped-list-filter="essence"]');
-      assert.ok(Boolean(select), 'the toolbar renders an essence select');
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-filter="essence"]')),
+        'the toolbar renders an essence select'
+      );
       assert.deepEqual(
-        [...select.options].map((option) => option.textContent.trim()),
+        selectOptionLabels(target, '[data-scoped-list-filter="essence"]'),
         ['All essences', 'Carries any essence', 'No essences', 'Flame', 'Earth', 'Tide'],
         '`proto:5533`: the neutral entry, the two predicates, then one entry per world essence'
       );
       assert.deepEqual(
-        [...select.options].map((option) => option.value).slice(3),
+        selectOptionValues(target, '[data-scoped-list-filter="essence"]').slice(3),
         ['flame', 'earth', 'tide'],
         'the per-essence values are the world catalogue’s IDS, not names'
       );
@@ -3048,9 +3078,11 @@ describe('world Component Catalogue (issue 1371)', () => {
       const lead = target.querySelector('[data-scoped-list-search-row]');
       const source = lead.querySelector('[data-scoped-list-filter="source-type"]');
       assert.ok(Boolean(source), 'NON-VACUITY: the source select is on the lead row');
-      const essence = source.nextElementSibling;
+      // The siblings on this row are the two `<Select>` ROOTS since issue 1504, not the trigger
+      // buttons inside them, and the rung class rides the root for the same reason.
+      const essence = source.closest('.fabricate-select').nextElementSibling;
       assert.equal(
-        essence?.getAttribute('data-scoped-list-filter'),
+        essence?.querySelector('[data-scoped-list-filter]')?.getAttribute('data-scoped-list-filter'),
         'essence',
         'the essence select is the source select’s next sibling — where the rules list puts its'
       );

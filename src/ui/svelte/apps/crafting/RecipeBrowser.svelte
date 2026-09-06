@@ -382,17 +382,26 @@
     white-space: nowrap;
   }
 
-  .crafting-browser-pagination :global(.manager-pagination-size select) {
-    /* 1502 base: the sheet newly paints `min-width: 64px`, and its `font: inherit`
-       shorthand newly resets `line-height`, which Foundry core sets to `--input-height`
-       on every select. */
-    min-width: auto;
-    line-height: var(--input-height, 2rem);
-    height: 26px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
+  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
+     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
+     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
+     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
+     sheet's family note records how this block still beats the family for it. */
+  .crafting-browser-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
-    color: var(--fab-text);
+    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
+       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
+       is the thing that would wrap it. */
+    min-width: 0;
+    /* AND IT NARROWS THE TRIGGER'S OWN INLINE PADDING, at this site only. The family's
+       `padding: 0 var(--fab-space-3)` plus its gap and chevron measure 12px wider than the
+       native control they replace (49 -> 61px), and the summary beside them is the row's only
+       shrinkable item — so the whole 12px came out of it and `Showing 1-12 o…` truncated to
+       `Showing 1-1…`, inside the range number, which reads as a different and wrong fact. The
+       narrowest player column is the reason this site alone takes it: the inventory pager's
+       summary survives the same growth intact. `--fab-space-2` is a published step, so the
+       spacing ladder does not move. */
+    padding-inline: var(--fab-space-2);
   }
 
   .crafting-browser-pagination :global(.manager-icon-button) {
@@ -409,7 +418,7 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;

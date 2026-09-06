@@ -25,7 +25,11 @@ import { tick } from 'svelte';
 
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
   TOOL_TREE_RAW_MODULES,
@@ -40,6 +44,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-tool-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into, and the four leaves its breakage tab authors a
@@ -128,23 +134,23 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
-    // The two pickers those three render: the component/essence/tag search popover (which the
-    // replacement card also uses) and the per-row match-type segmented control.
-    'src/ui/svelte/components/SearchablePopover.svelte',
+    // The per-row match-type segmented control those three render.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied —
+    // also covers the component/essence/tag search popover the replacement card above uses.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The design-system primitives this editor's tree renders: the icon action (issue 1422),
-    // the section enable switch (issue 1040), the card shell (issue 1427) and the labelled
-    // field column (issue 1428). A rendered `.svelte` the harness omits HANGS this suite and
-    // reports `# cancelled` with no message, which is why they are named rather than assumed.
+    // the section enable switch (issue 1040) and the card shell (issue 1427). A rendered
+    // `.svelte` the harness omits HANGS this suite and reports `# cancelled` with no message,
+    // which is why they are named rather than assumed. `Field` (issue 1428) is already above
+    // via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/components/Field.svelte',
   ],
 });
 
