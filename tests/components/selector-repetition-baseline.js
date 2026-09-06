@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 212 repeated selectors
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 213 repeated selectors
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,104 `(at-context, selector)` keys, of which 2,985 appear exactly
+ * Unfiltered, the sheet holds 3,105 `(at-context, selector)` keys, of which 2,986 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,602 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,603 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1504 MOVED FOUR OF THESE SIX FIGURES, through three edits that partly cancel. The
