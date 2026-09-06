@@ -7,8 +7,8 @@
  * 26 / 28 / 30 / 34 / 38 / 44, and "Radius tracks the size of the thing: 6 for chips at or below
  * 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px…". A `<ManagerButton>` is a
  * 34px control and painted a 6px corner — the chip rung — on every manager screen, because
- * `.fabricate-manager .manager-button.fab-manager-button` declared the height and no radius and
- * the base `.fabricate-manager .manager-button` rule's 6px reached it. Four parity regions on
+ * `.fabricate-button.manager-button.fab-manager-button` declared the height and no radius and
+ * the base `.fabricate-button.manager-button` rule's 6px reached it. Four parity regions on
  * three screens measured the same one-line drift.
  *
  * THE HAZARD THE FIX CREATES IS WHAT THE DERIVED GUARD BELOW IS FOR. Stating a corner on the

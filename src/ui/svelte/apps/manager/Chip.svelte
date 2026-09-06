@@ -601,7 +601,7 @@
      where every Core editor and every companion drill-down puts its own `Unsaved`. Measured
      in Chromium against the composed page, not reasoned: 20px against 34px.
      
-     34px IS THE BUTTON'S OWN FIGURE, from `.fabricate-manager .manager-button` in
+     34px IS THE BUTTON'S OWN FIGURE, from `.fabricate-button.manager-button` in
      `styles/fabricate.css`. It is restated here rather than read, because there is nothing to
      read it from: a `min-height` in a layered sheet cannot be inherited by an unlayered block,
      and the two are decided in different places by different layers. What keeps them equal is

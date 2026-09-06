@@ -590,12 +590,13 @@
      labelled-button authority rather than chosen: `.manager-button.fab-manager-button` in
      `styles/fabricate.css` declares `min-height: 34px`, `padding: 0 var(--fab-space-3)` and
      `font-size: 0.72rem`, which is the Tool Studio treatment `ManagerButton` reproduces. The
-     control cannot BE a `ManagerButton` — that primitive emits `manager-button
-     fab-manager-button`, whose auto width would fight `.manager-icon-button`'s square
-     `width: 34px; flex: 0 0 34px`, and the class this row is addressed by is the icon one.
+     control cannot BE a `ManagerButton` — that primitive emits `fabricate-button
+     manager-button fab-manager-button`, whose auto width would fight
+     `.manager-icon-button`'s square `width: 34px; flex: 0 0 34px`, and the class this row is
+     addressed by is the icon one.
 
      The selector is compounded through `.manager-essence-row` on purpose. The rule it has to
-     beat is `.fabricate-manager .manager-icon-button`, which is (0,2,0); a bare
+     beat is `.fabricate-icon-button.manager-icon-button`, which is (0,2,0); a bare
      `.manager-essence-edit` scopes to (0,2,0) as well and would be decided by injection order
      — the kind of tie that resolves differently in a bundle than in a mounted test. Chained,
      it is (0,3,0) and wins outright.
@@ -613,7 +614,7 @@
      edit control drawn by any other component. Specificity is unchanged by construction:
      Svelte compiles the scoped halves with `:where(.svelte-<hash>)`, which contributes
      nothing, so the pair is (0,3,0) and (0,3,1) before and after — still beating
-     `.fabricate-manager .manager-icon-button` at (0,2,0), exactly as reasoned above. */
+     `.fabricate-icon-button.manager-icon-button` at (0,2,0), exactly as reasoned above. */
   .manager-essence-row :global(.manager-essence-edit.is-labelled) {
     width: auto;
     height: auto;

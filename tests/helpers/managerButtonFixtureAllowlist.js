@@ -160,8 +160,9 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
       'the bulk dock`s delete probe so the dock`s one-line, full-width danger face is measured ' +
       'against a real label (issue 1371, M24). It stays ROOT-LESS deliberately: every value it ' +
       'measures — 34px, radius 9, 11px, weight 700, the clipped one-line label — is declared by ' +
-      '`.fab-bulk-edit-dock .manager-button.is-danger`, a rule whose ancestor chain names the ' +
-      'dock and which issue 1502 therefore left rooted at the application class.',
+      '`.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger`, a rule whose ' +
+      'ancestor chain names the dock and which issue 1502 therefore left rooted at the ' +
+      'application class.',
     // The provenance, READ rather than believed (issue 1371 r17-b, quality N7): the `why` above
     // claims the product writes this string, and the loop below checks it does.
     stillRenderedBy: Object.freeze({

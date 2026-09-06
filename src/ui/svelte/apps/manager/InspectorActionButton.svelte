@@ -38,7 +38,7 @@
   deferral is recorded rather than assumed.
 
   ── IT IS NOT `.manager-button` ───────────────────────────────────────────────────
-  Deliberately. `.fabricate-manager .manager-button.is-primary` is three classes; a scoped
+  Deliberately. `.fabricate-button.manager-button.is-primary` is three classes; a scoped
   Svelte rule compiles to two (`.fab-inspector-action.is-primary.svelte-<hash>` still selects
   on two of ITS OWN classes plus the hash, but the global rule would win the tone), so
   reusing that class and those modifier names would put the primitive's own tones behind the

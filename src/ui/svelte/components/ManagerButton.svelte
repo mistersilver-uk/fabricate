@@ -163,8 +163,8 @@
    - class: an EXTRA class, appended to the primitive's own — never a replacement. It
      has to be a named prop rather than a rest key, because the rest spread lands
      after `class={classes}` in the markup, so a `class` passed through it would
-     REPLACE `manager-button fab-manager-button is-<role>` outright rather than add
-     to it.
+     REPLACE `fabricate-button manager-button fab-manager-button is-<role>` outright
+     rather than add to it.
 
      Worth knowing before writing a rule against it (issue 1118): a scoped `<style>`
      block in the CALLING component that targets this class stops reaching the

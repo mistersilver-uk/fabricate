@@ -77,10 +77,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
     // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
-    // primitive emits `manager-button fab-manager-button` from its own `.join(' ')`, and each
-    // site passes only its BESPOKE class through the appending `class` prop. So the three are
-    // counted by the class each one still contributes — the class the rules below are keyed
-    // on — rather than by a string the component no longer writes.
+    // primitive emits `fabricate-button manager-button fab-manager-button` from its own
+    // `.join(' ')`, and each site passes only its BESPOKE class through the appending `class`
+    // prop. So the three are counted by the class each one still contributes — the class the
+    // rules below are keyed on — rather than by a string the component no longer writes.
     assert.equal((block.match(/<ManagerButton[\s/>]/g) || []).length, 3, 'three controls');
     for (const bespoke of [
       'manager-recipe-browser-inspector-duplicate',

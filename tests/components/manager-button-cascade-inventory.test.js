@@ -408,9 +408,13 @@ const REVIEWED = [
   // DISCHARGED (issue 1118, task 7). At (0,2,0) it lost min-height 38px and font-size 0.78rem
   // outright, against a source comment forbidding exactly that because Apply swaps slots with
   // the inspector's primary. It converted with its component and is now
-  // `:global(.fabricate-button.manager-button.fab-manager-button.fab-bulk-edit-apply)` —
+  // `:global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply)` —
   // (0,4,0), so it beats the primitive on specificity — and its key compound demands
   // `fab-manager-button`, which makes it a PRIMITIVE rule here rather than a candidate.
+  // Its ancestor is the APPLICATION root, not the family root issue 1502 gave the sheet's own
+  // family rules. That is deliberate: this is a caller override authored in the component's
+  // own `<style>` block, one of four halves that only move together, and naming the ancestor
+  // is what its source comment argues for. (0,4,0) either way, so nothing above changes.
   //
   // The `:global()` half is the part this instrument could NOT have told anyone, and it is
   // worth recording where the next batch will look: a SCOPED rule cannot reach a converted

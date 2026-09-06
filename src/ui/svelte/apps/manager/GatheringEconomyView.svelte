@@ -832,7 +832,7 @@
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
      Then chained, for the reason it always was: at (0,2,0) this rule did not beat
-     `.fabricate-manager .manager-button.fab-manager-button` (0,3,0) at all — it lost `padding`
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all — it lost `padding`
      and `font-size` outright, and `is-primary`'s own padding at (0,4,0) too. Naming the
      ancestor and the primitive's classes takes it to (0,5,0), which wins on specificity rather
      than on where the sheet happens to be injected — see the header of

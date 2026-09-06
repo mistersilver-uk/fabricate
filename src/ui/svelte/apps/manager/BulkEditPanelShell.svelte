@@ -494,7 +494,7 @@
      did: Apply lost `width: 100%` and stopped filling the rail.
 
      Then chained, because `:global()` alone would be (0,2,0) and lose outright to
-     `.fabricate-manager .manager-button.fab-manager-button` (0,3,0): this button would have
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0): this button would have
      given up `min-height` 38px for 34px and `font-size` 0.78rem for 0.72rem — the two values
      the dock comment above says must not change, because Apply swaps places with
      `.manager-component-browser-inspector-edit` in the rail's bottom slot and a resized or

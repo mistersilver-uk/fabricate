@@ -3,7 +3,7 @@
  *
  * ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────
  * Converting a hand-written manager button adds a SECOND class, `fab-manager-button`, and
- * `styles/fabricate.css` declares `.fabricate-manager .manager-button.fab-manager-button` at
+ * `styles/fabricate.css` declares `.fabricate-button.manager-button.fab-manager-button` at
  * specificity (0,3,0). Every rule a converted button already matched is therefore
  * re-arbitrated, and a rule that wins today only because it sits LATER in the sheet loses
  * silently the moment the sweep is licensed to move declarations around.
