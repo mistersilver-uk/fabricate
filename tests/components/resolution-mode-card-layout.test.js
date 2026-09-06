@@ -47,7 +47,7 @@ const FIXTURE = `
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="crafting-settings">
       <div style="grid-column: 1 / -1;">
-        <fieldset class="manager-field is-wide manager-resolution-mode-card is-config-cards">
+        <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card is-config-cards">
           <legend class="manager-resolution-mode-legend">Recipe resolution</legend>
           <div class="manager-resolution-mode-options">
             ${option(false, 'Simple', 'One ingredient set and one result group, with an optional pass/fail check.', 'fa-solid fa-wand-magic-sparkles')}

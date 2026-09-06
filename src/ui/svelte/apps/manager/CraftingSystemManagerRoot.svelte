@@ -13752,7 +13752,7 @@
                       <section class="manager-inspector-card manager-drop-editor-card">
                         <div class="manager-drop-editor-values">
                           <label
-                            class="manager-field manager-drop-rate-editor"
+                            class="fabricate-field manager-field manager-drop-rate-editor"
                             data-gathering-drop-inspector-rate
                           >
                             <span
@@ -13789,7 +13789,7 @@
                           </label>
 
                           <label
-                            class="manager-field manager-drop-count-editor"
+                            class="fabricate-field manager-field manager-drop-count-editor"
                             data-gathering-drop-inspector-count
                           >
                             <span
@@ -13844,7 +13844,9 @@
                             class="manager-condition-modifier-add-row"
                             data-gathering-drop-condition-modifier-picker={kind}
                           >
-                            <label class="manager-field manager-condition-modifier-picker">
+                            <label
+                              class="fabricate-field manager-field manager-condition-modifier-picker"
+                            >
                               <span class="visually-hidden"
                                 >{text(
                                   'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
@@ -14003,7 +14005,7 @@
                         <div class="manager-character-modifier-add-search-row">
                           <label
                             bind:this={characterModifierSearchAnchor}
-                            class="manager-search is-compact manager-character-modifier-add-search"
+                            class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
                             data-gathering-drop-character-modifier-search
                           >
                             <i class="fas fa-search" aria-hidden="true"></i>
@@ -14180,7 +14182,7 @@
                                   )}
                                 </p>
                                 <label
-                                  class="manager-field"
+                                  class="fabricate-field manager-field"
                                   for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
                                 >
                                   <span
@@ -14277,7 +14279,9 @@
                         class="manager-condition-modifier-add-row"
                         data-gathering-event-condition-modifier-picker={kind}
                       >
-                        <label class="manager-field manager-condition-modifier-picker">
+                        <label
+                          class="fabricate-field manager-field manager-condition-modifier-picker"
+                        >
                           <span class="visually-hidden"
                             >{text(
                               'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
@@ -14412,7 +14416,7 @@
                     <div class="manager-character-modifier-add-search-row">
                       <label
                         bind:this={characterModifierSearchAnchor}
-                        class="manager-search is-compact manager-character-modifier-add-search"
+                        class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
                         data-gathering-event-character-modifier-search
                       >
                         <i class="fas fa-search" aria-hidden="true"></i>
@@ -14574,7 +14578,7 @@
                               )}
                             </p>
                             <label
-                              class="manager-field"
+                              class="fabricate-field manager-field"
                               for={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
                             >
                               <span
@@ -16239,7 +16243,7 @@
               <div class="manager-condition-shortcut-list">
                 {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
                   <label
-                    class="manager-field manager-condition-shortcut"
+                    class="fabricate-field manager-field manager-condition-shortcut"
                     data-systems-gathering-condition={condition.kind}
                   >
                     <span class="manager-condition-shortcut-label">

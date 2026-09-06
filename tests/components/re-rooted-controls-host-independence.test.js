@@ -1,5 +1,20 @@
 /*
- * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issue 1502).
+ * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issues 1502 and 1508).
+ *
+ * ── WHAT ISSUE 1508 ADDED ───────────────────────────────────────────────────────────────────
+ * Two more families, and they differ from the first three in the one way that matters to this
+ * file: their root is NOT the control. `ManagerButton`, `IconButton` and `Pagination` are rooted
+ * on the thing being measured (or, for the pager, on a `<section>` whose buttons carry their own
+ * primitive's root); `Field` is a `<label>`/`<div>`/`<fieldset>` whose CONTROL is the caller's
+ * `<input>`, `<select>` or `<textarea>`, and `ManagerSearchField` is a `<label>` around its own
+ * `<input type="search">`. So each declares its floor at the family root PLUS the bare element it
+ * owns, (0,1,1), and the measured probe is the CONTROL rather than the root.
+ *
+ * That rank ties the manager's own bare-element baseline instead of losing to it, which makes
+ * POSITION load-bearing in a way it never was for the (0,1,0) button floor — and the negative
+ * controls below are what hold that down: inside `.fabricate-manager`, a textarea's `line-height`
+ * and a select's `line-height` under `@supports (appearance: base-select)` must still come from
+ * the area's own later rules, not from the floor.
  *
  * ── WHAT THIS FILE IS FOR ───────────────────────────────────────────────────────────────────
  * Issue 1502 moved `ManagerButton`, `IconButton` and `Pagination` off `.fabricate-manager` and
@@ -81,6 +96,8 @@ import { after, before, test } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { specificityOf } from '../../scripts/lib/stylesheetSelectorCensus.js';
+
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHEET_PATH = resolve(repoRoot, 'styles/fabricate.css');
 const sheet = readFileSync(SHEET_PATH, 'utf8');
@@ -120,6 +137,33 @@ const ICON_BUTTON_CLASSES = composedClasses(
  * `Pagination` writes its classes inline on its root `<section>` rather than composing them,
  * so its contract is read from the markup instead — by the same rule that nothing is restated.
  */
+/**
+ * `Field` composes exactly two unconditional literals — its root and its hook class — so the whole
+ * array is what a default `<Field>` emits.
+ */
+const FIELD_CLASSES = composedClasses(
+  read('src/ui/svelte/components/Field.svelte'),
+  'Field'
+).join(' ');
+
+/**
+ * `ManagerSearchField`'s array holds a THIRD literal, `is-compact`, behind `compact ? … : ''`, so
+ * the reader above — which matches every quoted literal in the array text — sees one token more
+ * than a default render emits. The fixture renders the DEFAULT control, so it writes the leading
+ * two, and the pinning test below asserts that exact pair rather than leaving the slice implicit.
+ *
+ * The slice is taken from the HEAD deliberately, and that is the same constraint the area-scope
+ * gate depends on: `composedClassRegion` truncates at the first `]` in the file after the array
+ * opener, so a family root that is not the array's FIRST literal is a root that gate reports as
+ * unemitted. Asserting `[0]` here says so out loud.
+ */
+const SEARCH_CLASSES = composedClasses(
+  read('src/ui/svelte/components/ManagerSearchField.svelte'),
+  'ManagerSearchField'
+)
+  .slice(0, 2)
+  .join(' ');
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -130,10 +174,27 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the three class strings under measurement are the ones the primitives emit', () => {
+test('the five class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
+  assert.equal(FIELD_CLASSES, 'fabricate-field manager-field');
+  assert.equal(SEARCH_CLASSES, 'fabricate-search manager-search');
+
+  // AND THE ROOT IS THE ARRAY'S FIRST LITERAL, for both. This is a CONSTRAINT rather than a
+  // style note: `searchable-popover-area-scope.test.js` reads the composed region by taking the
+  // first `]` after the opener, so a root moved off the head of the array is a root that gate
+  // reports as unemitted while every re-rooted rule in the sheet keeps matching.
+  for (const [file, label, root] of [
+    ['src/ui/svelte/components/Field.svelte', 'Field', 'fabricate-field'],
+    ['src/ui/svelte/components/ManagerSearchField.svelte', 'ManagerSearchField', 'fabricate-search'],
+  ]) {
+    assert.equal(
+      composedClasses(read(file), label)[0],
+      root,
+      `${label} must declare \`${root}\` as the FIRST literal of its class array`
+    );
+  }
 
   // AND THE FIXTURE BELOW WRITES EXACTLY THOSE STRINGS. The markup states its classes as
   // literals so the repository's own fixture census can read them (see `CONTROLS`), which only
@@ -198,6 +259,23 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<section class="fabricate-pagination manager-pagination" data-probe="${host}-pagination"><span class="manager-pagination-summary">Showing 1-4 of 8</span><nav class="manager-pagination-nav"><button type="button" class="fabricate-icon-button manager-icon-button" data-probe="${host}-pagination-arrow" aria-label="Previous"><i class="fas fa-chevron-left"></i></button><span class="manager-pagination-page">1 of 2</span></nav></section>`,
   }),
+  // THE PROBE IS THE CONTROL, NOT THE ROOT (issue 1508). `Field`'s root is a `<label>` and the
+  // thing the family's chrome reaches is the `<input type="text">` inside it, so that is what
+  // carries the `data-probe`. The root element still writes the family's class string, which is
+  // what the pinning test above reads and what the sheet's own rules are anchored on.
+  Object.freeze({
+    id: 'field',
+    classes: FIELD_CLASSES,
+    comparesBox: false,
+    markup: (host) =>
+      `<label class="fabricate-field manager-field" data-probe="${host}-field-root"><span>Name</span><input type="text" data-probe="${host}-field"></label>`,
+  }),
+  Object.freeze({
+    id: 'search',
+    classes: SEARCH_CLASSES,
+    markup: (host) =>
+      `<label class="fabricate-search manager-search" data-probe="${host}-search-root"><i class="fas fa-search"></i><input type="search" data-probe="${host}-search"></label>`,
+  }),
 ]);
 
 /**
@@ -218,6 +296,38 @@ const BASE_RULE_SELECTOR =
  * rule at (0,2,0) or above.
  */
 const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
+
+/**
+ * The issue-1508 families' font floor, as the browser serialises its prelude.
+ *
+ * ONE rule with one member per family, declared as a group immediately below the area's own
+ * bare-element baseline. Phase 3 of this change adds `.fabricate-slider input` to it.
+ */
+const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
+  '.fabricate-field :is(input, select, textarea)',
+  '.fabricate-search input',
+]);
+const FAMILY_FONT_FLOOR_SELECTOR = FAMILY_FONT_FLOOR_MEMBERS.join(', ');
+
+/**
+ * `Field`'s element-typed chrome rule, as the browser serialises its prelude.
+ *
+ * It restates the area baseline's OWN element predicate leg for leg — six `input` legs at (0,2,1)
+ * and `textarea` at (0,1,1) — rather than widening the (0,1,1) floor above, because `appearance`
+ * and `min-height` written over `:is(input, select, textarea)` reach radios, ranges, steppers and
+ * selects that the area deliberately excludes and that neither a higher-specificity `height` nor
+ * a higher-specificity `appearance` can undo.
+ */
+const FIELD_CHROME_MEMBERS = Object.freeze([
+  '.fabricate-field input[type="text"]',
+  '.fabricate-field input[type="url"]',
+  '.fabricate-field input[type="email"]',
+  '.fabricate-field input[type="tel"]',
+  '.fabricate-field input[type="password"]',
+  '.fabricate-field input:not([type])',
+  '.fabricate-field textarea',
+]);
+const FIELD_CHROME_SELECTOR = FIELD_CHROME_MEMBERS.join(', ');
 
 /**
  * A rule's specificity as (ids, classes, elements), counted off the browser-serialised prelude.
@@ -279,6 +389,69 @@ const COMPARED = Object.freeze([
  * guard that the condition making the keyword inert still holds.
  */
 const COMPARED_PAGINATION = Object.freeze(COMPARED.filter((property) => property !== 'box-sizing'));
+
+/**
+ * What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`.
+ *
+ * `appearance` and `-webkit-appearance` are here because they are two of the three declarations
+ * Field's element-typed chrome rule restates from the area baseline; `min-height` and `height`
+ * because they are the pair that decides the box; `border-*` and `background-color` because the
+ * family's own control chrome paints them. `line-height` is compared on the INPUT and
+ * deliberately not on a `<textarea>` or a `<select>` — see the negative controls below, where the
+ * area's own later same-rank rules are asserted to keep winning for exactly those two elements.
+ */
+const FIELD_COMPARED = Object.freeze([
+  'appearance',
+  '-webkit-appearance',
+  'min-height',
+  'height',
+  'border-radius',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'background-color',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+
+/**
+ * And on `ManagerSearchField`'s own `<input type="search">`.
+ *
+ * No `appearance` or `min-height`: the area's element-typed baseline matches no `type="search"`,
+ * so this family restates none of it. Its pill declares its own 34 height and 6 radius, and the
+ * 34px side padding is what leaves room for the leading glyph.
+ */
+const SEARCH_COMPARED = Object.freeze([
+  'height',
+  'border-radius',
+  'padding-left',
+  'padding-right',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'background-color',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+
+/**
+ * The compared set per control, for the entries that do not take the button families' default.
+ *
+ * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
+ * above these constants and a forward reference would be a temporal-dead-zone error at import.
+ */
+const COMPARED_BY_CONTROL = Object.freeze({
+  pagination: COMPARED_PAGINATION,
+  field: FIELD_COMPARED,
+  search: SEARCH_COMPARED,
+});
+
+/** Every property any control compares, which is what one page load has to collect. */
+const ALL_COMPARED = Object.freeze([
+  ...new Set([...COMPARED, ...FIELD_COMPARED, ...SEARCH_COMPARED]),
+]);
 
 /**
  * One page holding all three hosts, with the sheet supplied as a STRING so a negative control can
@@ -365,7 +538,7 @@ async function measure(css) {
       {
         hosts: HOSTS.map((host) => host.id),
         controls: CONTROLS.map((control) => control.id),
-        compared: COMPARED,
+        compared: ALL_COMPARED,
       }
     );
   } finally {
@@ -380,7 +553,8 @@ test('each re-rooted control computes the same geometry and type in all three ho
     for (const { id: host } of HOSTS) {
       assert.ok(measured[control]?.[host], `the ${host} host rendered no ${control} probe`);
     }
-    const compared = control === 'pagination' ? COMPARED_PAGINATION : COMPARED;
+    const entry = CONTROLS.find((one) => one.id === control);
+    const compared = COMPARED_BY_CONTROL[control] ?? COMPARED;
     for (const property of compared) {
       const values = HOSTS.map((host) => measured[control][host.id][property]);
       // PER-PROPERTY NON-VACUITY. An engine that returned `""` for a property would make the
@@ -402,6 +576,18 @@ test('each re-rooted control computes the same geometry and type in all three ho
     // AND THE LAID-OUT BOX AGREES, which is the promise the issue actually makes: no frame
     // moves, in either app. A computed-property comparison can agree while two hosts lay the
     // control out differently; this cannot.
+    //
+    // OPTED OUT FOR `field` ONLY, for the pager's own reason and no other. Field's control is an
+    // `<input type="text">`, which declares no `box-sizing` and which Chromium's UA sheet does not
+    // give one either: inside `.fabricate-manager` the area's universal `* { box-sizing:
+    // border-box }` supplies it, and elsewhere in THIS core-less harness it falls to
+    // `content-box` — so a 36px-high input with a 1px border lays out at 36 in the manager and 38
+    // outside it. That difference does not exist in Foundry, where core's `@layer reset` declares
+    // the universal rule for every host; it is a property of the fixture rather than of the
+    // sheet. `search` is NOT opted out and must not be: its control is an `<input type="search">`,
+    // which the UA sheet gives `border-box` in every host, so its box is comparable and is
+    // compared. The clause below asserts both halves, so neither can outlive its reason.
+    if (entry.comparesBox === false) continue;
     const boxes = HOSTS.map((host) => measured[control][host.id]['rendered-size']);
     assert.ok(
       boxes.every((box) => box !== '0x0'),
@@ -547,18 +733,25 @@ test('the values the comparison holds over are the ones the family declares, not
 function readRules(tab) {
   return tab.evaluate(() => {
     const out = [];
-    const walk = (rules) => {
+    // THE AT-CONTEXT IS CARRIED (issue 1508) because two rules in this sheet share the prelude
+    // `.fabricate-manager select` — the (0,1,1) select baseline at the top level, and the one
+    // inside `@supports (appearance: base-select)` that restates `line-height: 1`. The floor's
+    // position clause below is about the SECOND of those, and a filter on `selectorText` alone
+    // cannot tell them apart.
+    const walk = (rules, at) => {
       for (const rule of rules) {
-        if (rule.cssRules) walk(rule.cssRules);
+        const nested = rule.conditionText ? [...at, rule.conditionText] : at;
+        if (rule.cssRules) walk(rule.cssRules, nested);
         if (!rule.selectorText) continue;
         out.push({
           selectorText: rule.selectorText,
+          at: at.join(' >> '),
           cssText: rule.style.cssText,
           properties: [...rule.style],
         });
       }
     };
-    walk(globalThis.document.querySelector('#module-sheet').sheet.cssRules);
+    walk(globalThis.document.querySelector('#module-sheet').sheet.cssRules, []);
     return out;
   });
 }
@@ -849,10 +1042,23 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     // each family declares the strip at `:focus` as well as the repaint at `:focus-visible` — the
     // same pairing CONTRIBUTING.md states for the module — and the strip must be declared FIRST,
     // because the two halves tie on specificity and a `:focus-visible` element matches both.
+    //
+    // THE TWO ISSUE-1508 PAIRS ARE WRITTEN IN TWO DIFFERENT SHAPES ON PURPOSE, and both are
+    // asserted here by their exact serialised prelude so neither can be "unified" into the other.
+    // `Field`'s STRIP is ONE `:is(input, textarea):focus` member, because
+    // `design-system-debt-ratchets.test.js`'s strip register is an exact list of SINGLE compounds;
+    // its REPAINT is TWO comma-separated legs, because that file's `RING_ROOTS` recogniser reads
+    // `<root> <element>:focus-visible` per member and would not see an `:is()` at all. Each form
+    // is what keeps its half inside the population that governs it.
     for (const [strip, repaint] of [
       ['.fabricate-button:focus', '.fabricate-button:focus-visible'],
       ['.fabricate-icon-button:focus', '.fabricate-icon-button:focus-visible'],
       ['.fabricate-pagination button:focus', '.fabricate-pagination button:focus-visible'],
+      [
+        '.fabricate-field :is(input, textarea):focus',
+        '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
+      ],
+      ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
     ]) {
       const ring = rules.filter((rule) => rule.selectorText === repaint);
       assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
@@ -909,7 +1115,13 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       'the select ring stays an INSET box-shadow, which is the part that is never clipped'
     );
 
-    const roots = ['fabricate-button', 'fabricate-icon-button', 'fabricate-pagination'];
+    const roots = [
+      'fabricate-button',
+      'fabricate-icon-button',
+      'fabricate-pagination',
+      'fabricate-field',
+      'fabricate-search',
+    ];
     const selectReach = rules
       .filter((rule) => roots.some((root) => rule.selectorText.includes(`.${root}`)))
       .filter((rule) =>
@@ -923,6 +1135,346 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       'a rule rooted at one of the three new namespace classes reaches a focused `select`, which ' +
         'is what would displace the inset ring above'
     );
+  } finally {
+    await tab.close();
+  }
+});
+
+/*
+ * ── THE ISSUE-1508 FAMILIES: WHAT THEY DECLARE, AND WHAT THEY MUST NOT REACH ────────────────
+ *
+ * The two blocks below are the two halves of one claim. The first pins the values `Field`'s and
+ * `ManagerSearchField`'s own controls resolve to in a host that declares nothing, so the
+ * three-host equality above cannot pass on a tree where both families stopped matching in every
+ * host at once. The second is the NEGATIVE half, and it is the one this change actually turns on:
+ * the chrome these families declare must reach the control each of them OWNS and nothing else.
+ */
+
+/** The two new families' own controls, in a bare host, at the values their own rules declare. */
+test('the issue-1508 families declare their own control chrome rather than inheriting it', async () => {
+  const measured = await measure(sheet);
+  const field = measured.field.bare;
+  const search = measured.search.bare;
+
+  // NON-VACUITY FIRST: an engine returning `''` would satisfy every equality below.
+  for (const [label, style, properties] of [
+    ['field', field, FIELD_COMPARED],
+    ['search', search, SEARCH_COMPARED],
+  ]) {
+    for (const property of properties) {
+      assert.ok(
+        style[property] !== undefined,
+        `${label} computed nothing at all for \`${property}\`, so the pins below prove nothing`
+      );
+    }
+  }
+
+  // FIELD. `min-height: 34px` and `appearance: none` come from the family's element-typed chrome
+  // rule — the one that restates the area baseline's predicate leg for leg — and `height: 36px`,
+  // the 6px corner, the border and the fill from the family's own re-rooted control block. All
+  // six are values the manager used to supply and the family now declares for itself.
+  assert.equal(field['min-height'], '34px');
+  assert.equal(field.appearance, 'none');
+  assert.equal(field['-webkit-appearance'], 'none');
+  assert.equal(field.height, '36px');
+  assert.equal(field['border-radius'], '6px');
+  assert.equal(field['border-top-width'], '1px');
+  assert.equal(field['border-top-style'], 'solid');
+  assert.match(
+    field['font-family'],
+    /Signika/,
+    'a bare-host field input must inherit the ambient font family, or the family`s own `font: ' +
+      'inherit` floor is not reaching it'
+  );
+
+  // SEARCH. No `min-height` and no `appearance`: the area's element-typed baseline matches no
+  // `type="search"`, so this family restates none of it and the pill's own rule is the whole of
+  // its chrome — 34 high, a 6px corner, and 34px of side padding for the leading glyph.
+  assert.equal(search.height, '34px');
+  assert.equal(search['border-radius'], '6px');
+  assert.equal(search['padding-left'], '34px');
+  assert.equal(search['padding-right'], '34px');
+  assert.equal(search['border-top-width'], '1px');
+  assert.match(search['font-family'], /Signika/);
+});
+
+test('the issue-1508 controls depend on host chrome for box-sizing, and nothing lets that render', async () => {
+  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT, exactly as the pager's
+  // is. Neither `<input>` declares a `box-sizing`: in the manager the area's universal rule
+  // supplies `border-box`, and in this core-less harness they fall to `content-box` elsewhere. In
+  // Foundry that difference does not exist, because core's `@layer reset` declares the universal
+  // rule for every host. If either family ever declares its own keyword, this reds and the
+  // `comparesBox: false` opt-out above should go with it.
+  const measured = await measure(sheet);
+  assert.equal(
+    measured.field.bare['box-sizing'],
+    'content-box',
+    'the field control declares no `box-sizing` of its own and takes it from host chrome; a ' +
+      'change here means the family has started declaring one, and `comparesBox` should go with it'
+  );
+  assert.equal(
+    measured.field.manager['box-sizing'],
+    'border-box',
+    'the manager area`s universal rule must still be what supplies the field control its border-box'
+  );
+  for (const host of HOSTS) {
+    assert.equal(
+      measured.search[host.id]['box-sizing'],
+      'border-box',
+      'a `type="search"` input takes `border-box` from the UA sheet in EVERY host, which is why ' +
+        'this control compares its rendered box while the field does not'
+    );
+  }
+});
+
+/**
+ * The elements a widened floor would have reached, rendered inside a `.fabricate-field` in the
+ * manager host — which is the host where a move would be a regression rather than the point.
+ *
+ * Every one is a REAL shape from the tree, not an invented one: the resolution and tool-bonus
+ * radios live in a `<Field as="fieldset">` (`RadioCardGroup`), the range and the stepper in a
+ * `<Field as="label">`, and the `<select>` and `<textarea>` in ordinary fields everywhere.
+ *
+ * THE SLIDER WRAPPER CARRIES `fabricate-slider` ALREADY, and that is deliberate rather than
+ * premature: `.manager-drop-rate-control`'s own rules re-root onto that class in this change's
+ * third phase, and a fixture element carrying a family class with no root above it is exactly the
+ * offender `searchable-popover-area-scope.test.js`'s ancestry clause reports. Writing the wrapper
+ * now means this file does not become that phase's repair work.
+ */
+const NEGATIVE_CONTROLS =
+  '<fieldset class="fabricate-field manager-field" data-probe="neg-root">' +
+  '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
+  '<label><input type="checkbox" data-probe="neg-checkbox"></label>' +
+  '<span class="fabricate-slider manager-chance-slider"><span class="manager-drop-rate-control"><input type="range" data-probe="neg-range"></span></span>' +
+  '<span class="fab-stepper"><input type="number" class="fab-stepper-input" data-probe="neg-stepper"></span>' +
+  '<select data-probe="neg-select"><option>A</option></select>' +
+  '<textarea data-probe="neg-textarea"></textarea>' +
+  '</fieldset>';
+
+/**
+ * Those elements measured in the manager host under a given sheet text.
+ *
+ * @param {string} css The module sheet text to load.
+ * @returns {Promise<Record<string, Record<string, string>>>} probe → property → value.
+ */
+async function measureNegativeControls(css) {
+  const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  try {
+    await tab.setContent(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+        '<style>html, body { margin: 0; padding: 0; }' +
+        'body { font-family: "Signika", sans-serif; font-size: 16px; }</style>' +
+        `<style id="module-sheet">${css}</style></head><body>` +
+        `<div class="fabricate fabricate-manager"><div>${NEGATIVE_CONTROLS}</div></div>` +
+        '</body></html>'
+    );
+    return await tab.evaluate(() => {
+      const out = {};
+      for (const node of globalThis.document.querySelectorAll('[data-probe]')) {
+        const style = globalThis.getComputedStyle(node);
+        const box = node.getBoundingClientRect();
+        out[node.dataset.probe] = {
+          height: style.height,
+          'min-height': style['min-height'],
+          appearance: style.appearance,
+          'line-height': style['line-height'],
+          'font-size': style['font-size'],
+          box: `${Math.round(box.width)}x${Math.round(box.height)}`,
+        };
+      }
+      return out;
+    });
+  } finally {
+    await tab.close();
+  }
+}
+
+/**
+ * The two blocks issue 1508 ADDS that can move a resting measurement, spelled exactly as the sheet
+ * spells them, so a "base" sheet can be built by removing them.
+ *
+ * The two focus PAIRS are not on this list and do not need to be: they declare `:focus` and
+ * `:focus-visible` chrome only, which no resting measurement reads, and their own neutrality is
+ * asserted by the ring clause below and by the select-reach check inside it.
+ */
+const ADDED_BLOCKS = Object.freeze([
+  '.fabricate-field :is(input, select, textarea),\n.fabricate-search input {\n  font: inherit;\n}',
+  '.fabricate-field input[type="text"],\n.fabricate-field input[type="url"],\n' +
+    '.fabricate-field input[type="email"],\n.fabricate-field input[type="tel"],\n' +
+    '.fabricate-field input[type="password"],\n.fabricate-field input:not([type]),\n' +
+    '.fabricate-field textarea {\n  appearance: none;\n  -webkit-appearance: none;\n' +
+    '  min-height: 34px;\n}',
+]);
+
+test('the chrome these families declare reaches the control they own and nothing else', async () => {
+  // THE CONTROL IS A COMPARISON AGAINST BASE, not a list of remembered numbers, because that is
+  // the claim: the floor and the chrome rule move NOTHING inside the manager. The base sheet is
+  // this sheet with both added blocks removed, and the removal is proved to have applied before
+  // the run means anything.
+  let base = sheet;
+  for (const block of ADDED_BLOCKS) {
+    assert.equal(
+      base.split(block).length - 1,
+      1,
+      'an issue-1508 block is not spelled as this control expects, so removing it would perturb ' +
+        `nothing and the comparison below would pass vacuously. Re-derive it from the sheet:\n${block}`
+    );
+    base = base.replace(block, '');
+  }
+  assert.notEqual(base, sheet, 'the base sheet must actually differ from the shipped one');
+
+  const shipped = await measureNegativeControls(sheet);
+  const atBase = await measureNegativeControls(base);
+
+  const moved = [];
+  for (const probe of Object.keys(shipped)) {
+    for (const property of Object.keys(shipped[probe])) {
+      assert.ok(
+        shipped[probe][property] !== undefined && shipped[probe][property] !== '',
+        `${probe} computed no \`${property}\`, so comparing it against base proves nothing`
+      );
+      if (shipped[probe][property] !== atBase[probe][property]) {
+        moved.push(
+          `${probe}.${property}: base=${atBase[probe][property]} shipped=${shipped[probe][property]}`
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    moved,
+    [],
+    'the font floor or the element-typed chrome rule moved a measurement inside the manager. ' +
+      'Both are written to be no-ops there — the floor copies the area baseline`s own ' +
+      '`font: inherit` and the chrome rule copies the area baseline`s own three declarations over ' +
+      `the area baseline's own predicate — so any difference here is a real move:\n  ${moved.join('\n  ')}`
+  );
+
+  // AND THE ABSOLUTE VALUES, because "unchanged" is only reassuring once the reader can see WHAT
+  // was unchanged. Each is the height the element's own rule gives it, and none of them is 34.
+  assert.equal(shipped['neg-radio'].box, '16x16', 'the resolution radio keeps its 16px dot');
+  assert.equal(shipped['neg-range'].height, '28px', 'the drop-rate range keeps its 28px track');
+  assert.notEqual(shipped['neg-stepper'].height, '34px', 'a stepper input is never floored to 34');
+  assert.notEqual(shipped['neg-checkbox'].height, '34px', 'a checkbox is never floored to 34');
+  assert.equal(shipped['neg-textarea']['min-height'], '92px', 'the field textarea keeps its 92');
+
+  // THE TWO AREA RULES THE FLOOR TIES, measured rather than argued. Both restate a `font`
+  // longhand at the floor's own (0,1,1) and both are declared LATER in the sheet, so both must
+  // still win inside the manager — which is the whole reason the floor group sits immediately
+  // below the area baseline instead of in either family's own block.
+  assert.equal(
+    shipped['neg-textarea']['line-height'],
+    `${Number.parseFloat(shipped['neg-textarea']['font-size']) * 1.4}px`,
+    '`.fabricate-manager textarea { line-height: 1.4 }` must still beat the family font floor'
+  );
+  assert.equal(
+    shipped['neg-select']['line-height'],
+    shipped['neg-select']['font-size'],
+    "`@supports (appearance: base-select)`'s `.fabricate-manager select { line-height: 1 }` must " +
+      'still beat the family font floor'
+  );
+  assert.equal(
+    shipped['neg-select'].appearance,
+    'base-select',
+    'a select in a field keeps the area`s own `appearance`; the family declares none for it'
+  );
+});
+
+test('the font floor is declared between the area baseline and the two rules that restate a font longhand', async () => {
+  // N1's INTERVAL, STATED AS AN ASSERTION. The floor ties `.fabricate-manager button, … textarea`
+  // at (0,1,1) and beats it on source order with that rule's own declaration, which is a no-op.
+  // It ALSO ties every LATER same-rank rule in the area, and two of those restate a `font`
+  // longhand for controls the floor reaches. So the floor has exactly one safe position: after
+  // the baseline and before both of them. A later editor moving it into a family block reds here
+  // rather than silently re-typing every manager textarea and select.
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    const only = (predicate, label) => {
+      const found = rules.filter(predicate);
+      assert.equal(found.length, 1, `${label} must be declared exactly once; found ${found.length}`);
+      return rules.indexOf(found[0]);
+    };
+
+    const baselineIndex = only(
+      (rule) =>
+        rule.selectorText ===
+        '.fabricate-manager button, .fabricate-manager input, .fabricate-manager select, .fabricate-manager textarea',
+      'the area`s bare-element font baseline'
+    );
+    const floorIndex = only(
+      (rule) => rule.selectorText === FAMILY_FONT_FLOOR_SELECTOR,
+      'the issue-1508 family font floor'
+    );
+    const textareaIndex = only(
+      (rule) => rule.selectorText === '.fabricate-manager textarea' && rule.at === '',
+      'the area`s own textarea block'
+    );
+    const supportsSelectIndex = only(
+      (rule) =>
+        rule.selectorText === '.fabricate-manager select' && rule.at === '(appearance: base-select)',
+      'the `@supports (appearance: base-select)` select block'
+    );
+
+    assert.ok(
+      baselineIndex < floorIndex,
+      `the floor must be declared AFTER the area baseline it ties, so it wins on source order ` +
+        `with that baseline's own declaration; baseline=${baselineIndex} floor=${floorIndex}`
+    );
+    assert.ok(
+      floorIndex < textareaIndex && floorIndex < supportsSelectIndex,
+      'the floor must be declared BEFORE both rules that restate a `font` longhand at its own ' +
+        `rank; floor=${floorIndex}, textarea=${textareaIndex}, @supports select=${supportsSelectIndex}`
+    );
+
+    // AND ITS REACH IS READ AS THE DECLARATION, never as a resolved value: `font: inherit`
+    // computes to whatever the ancestor says, so a resolved reading cannot tell a floor that
+    // reached from an ancestor chain that happened to agree.
+    const floor = rules[floorIndex];
+    assert.match(
+      floor.cssText,
+      /font(?:-family)?:\s*inherit/,
+      `the family font floor must declare \`font: inherit\`; declared: ${floor.cssText}`
+    );
+    // AND NOTHING ELSE. Any declaration the tied baseline does not also carry is a real move
+    // inside the manager, which is why `appearance` and `min-height` are a separate rule. The
+    // property list is read as the `font` SHORTHAND'S OWN LONGHANDS — every `font-*` plus
+    // `line-height`, which is the one longhand the shorthand covers under another name — so a
+    // fourth declaration of any kind reds here by name.
+    const stray = floor.properties.filter(
+      (property) => !property.startsWith('font') && property !== 'line-height'
+    );
+    assert.deepEqual(
+      stray,
+      [],
+      'the family font floor must declare `font: inherit` and NOTHING else: it TIES the area ' +
+        'baseline rather than out-ranking it, so any declaration that baseline does not also ' +
+        `carry is a real move inside the manager. Declared: ${floor.properties.join(', ')}`
+    );
+
+    // THE RANK, per member, from the repository's own specificity implementation rather than this
+    // file's naive counter — which cannot read an `:is()` at all.
+    for (const member of FAMILY_FONT_FLOOR_MEMBERS) {
+      assert.deepEqual(
+        specificityOf(member),
+        [0, 1, 1],
+        `\`${member}\` must be (0,1,1): the family root plus the bare element it owns, which TIES ` +
+          'the area baseline rather than out-ranking it'
+      );
+    }
+    for (const member of FIELD_CHROME_MEMBERS) {
+      assert.deepEqual(
+        specificityOf(member),
+        // Six `input` legs carry an attribute — five `[type=…]` and one `:not([type])`, whose
+        // `:not()` argument counts in the class column just the same — so each is (0,2,1); the
+        // `textarea` leg names no attribute and is (0,1,1). Both are the rank of the donor leg
+        // they restate in `.fabricate-manager input[type="text"], … .fabricate-manager textarea`.
+        member.includes('[') ? [0, 2, 1] : [0, 1, 1],
+        `\`${member}\` must carry the same rank as its donor leg in the area baseline`
+      );
+    }
   } finally {
     await tab.close();
   }

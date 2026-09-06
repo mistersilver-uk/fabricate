@@ -1750,7 +1750,7 @@
             data-gathering-component-name-search=""
           />
           <label
-            class="manager-search is-compact manager-task-component-tag-search"
+            class="fabricate-search manager-search is-compact manager-task-component-tag-search"
             data-gathering-component-tag-search
           >
             <i class="fas fa-tags" aria-hidden="true"></i>

@@ -1439,6 +1439,37 @@
   font: inherit;
 }
 
+/* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issue 1508).
+
+   `Field` and `ManagerSearchField` are rooted at the class each of them emits, so both now render
+   in hosts carrying no `.fabricate-manager` — and the control each owns is a bare `<input>`,
+   `<select>` or `<textarea>` that would otherwise take Foundry's own font there. Where a family
+   root IS the control the floor is written at that root alone, (0,1,0), as the two button
+   families' is; where the root is NOT the control it is written at the family root plus the bare
+   element it owns, (0,1,1) — the SAME rank as the baseline above, which it therefore TIES and
+   beats on source order with that baseline's own declaration.
+
+   `font: inherit` AND NOTHING ELSE, because a tie is not a loss: any declaration this rule
+   carries that the baseline does not is a real move inside the manager. `appearance` and
+   `min-height` are the two the family would like and cannot have — neither can be undone by a
+   higher-specificity `height` or `appearance` rule, and the block below refuses both in prose.
+   Field's own element-typed chrome is a SECOND rule, in Field's own block, restating that
+   block's element predicate leg for leg.
+
+   POSITION IS LOAD-BEARING, and this group sits here rather than in either family's own block
+   for a measured reason. `font` is a SHORTHAND and resets `line-height` with the rest, and at
+   (0,1,1) this rule ties every LATER same-rank rule in the area as well. Two of those restate a
+   `font` longhand for controls these floors reach: `.fabricate-manager textarea
+   { line-height: 1.4 }` at `styles/fabricate.css:1537-1541`, in the free-text baseline block just
+   below, and `.fabricate-manager select { line-height: 1 }` at `:1663-1670`, inside `@supports
+   (appearance: base-select)`. Declared in a family block thousands of lines further down, this
+   group would win both and silently re-type every manager textarea and select. Immediately below
+   the baseline is the first position from which the interval walk comes back empty. */
+.fabricate-field :is(input, select, textarea),
+.fabricate-search input {
+  font: inherit;
+}
+
 /*
   PERMANENT baseline for free-text controls in the manager (issue 643).
 
@@ -1516,7 +1547,7 @@
   did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
   Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
   against these surfaces rather than as a missing border. Selects were themed
-  per-container instead — `.fabricate-manager .manager-field select` (further down this
+  per-container instead — `.fabricate-field.manager-field select` (further down this
   file) — so a select that leaves a `.manager-field` and carries only `.manager-input`
   reverted, exactly as the note on that rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
   found it: both sit in a revealed input strip rather than a field wrapper, and both painted
@@ -1545,7 +1576,7 @@
   Specificity is (0,1,1) — one step below the (0,2,1) of the group above, and below every
   per-control select rule in this file — so this only ever paints a select that nothing else
   claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
-  to `.fabricate-manager .manager-field select:disabled` (0,2,2).
+  to `.fabricate-field.manager-field select:disabled` (0,2,2).
 */
 
 /* skin census (issue 1523): not an adopter — an element-level baseline with no class; its
@@ -5528,7 +5559,7 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-search {
+.fabricate-search.manager-search {
   position: relative;
   flex: 1 1 260px;
   min-width: 180px;
@@ -5544,7 +5575,7 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-search input {
+.fabricate-search.manager-search input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -5553,6 +5584,27 @@
   border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
+}
+
+/* THE SEARCH FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-button:focus`: core's `input:focus` paints an orange outline and a 4px glow that
+   the module reset removes inside every Fabricate window, and this family now renders in hosts
+   that have no Fabricate root at all. The declarations are the module strip's verbatim, so
+   nothing moves where that reset already reaches. Written ABOVE the repaint because the two
+   halves tie at (0,2,1) and a keyboard-focused input matches both, so source order decides. */
+.fabricate-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE SEARCH FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the
+   module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so
+   this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host,
+   where a primitive leaning on the module ring would render none. ONE member, over the `<input>`
+   this family owns — the ring-root recogniser reads `<root> <element>:focus-visible`. */
+.fabricate-search input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-filter select {
@@ -5659,7 +5711,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-manager .manager-search > i {
+.fabricate-search.manager-search > i {
   position: absolute;
   top: 50%;
   left: 11px;
@@ -9944,7 +9996,7 @@
   min-height: 0;
 }
 
-.fabricate-manager .manager-field.span-2 {
+.fabricate-field.manager-field.span-2 {
   grid-column: 1 / -1;
 }
 
@@ -10028,7 +10080,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field {
+.fabricate-field.manager-field {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
@@ -10038,7 +10090,7 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-field.is-wide {
+.fabricate-field.manager-field.is-wide {
   grid-column: 1 / -1;
 }
 
@@ -10505,9 +10557,46 @@
    lists. A retired selector kept in a list nothing emits is dead CSS the block-granular
    dead-class gate cannot see, because the block's other selectors are live. */
 
+/* FIELD'S OWN ELEMENT-TYPED CHROME (issue 1508), and it is a SECOND rule rather than a widened
+   floor. The font floor near the top of this file declares `font: inherit` alone at (0,1,1);
+   these three declarations are NOT safe at that rank over `:is(input, select, textarea)`. Written
+   that way they take the resolution and tool-bonus radios inside a `<Field as="fieldset">` from
+   16px to 34, the gathering EVENT editor's Drop-rate range input from 28 to 34, that field's
+   number input likewise, and a `.fab-stepper-input` in any field from 22 to 34 — and, on a
+   `<select>`, `appearance: none` at (0,1,1) written later beats `@supports (appearance:
+   base-select)`'s `.fabricate-manager select` on source order and deletes the dropdown arrow this
+   file refuses to delete a few hundred lines above.
+
+   So it restates the area baseline's OWN element predicate LEG FOR LEG — six `input` legs at
+   (0,2,1) and `textarea` at (0,1,1), each leg the same rank as its donor leg in
+   `.fabricate-manager input[type="text"], … .fabricate-manager textarea` — and carries only that
+   block's `appearance`, `-webkit-appearance` and `min-height`. The exclusions cannot be spelled
+   with `:not()` on the floor instead: every `:not()` adds to the class column, so
+   `:is(input, textarea):not(.fab-stepper-input):not([type='radio']):not([type='range'])` is
+   (0,4,1) and would beat the per-site (0,2,0) rules the floor contract exists to stay under.
+
+   A `<select>` in a Field keeps the area's own `appearance` and therefore has Foundry's chrome in
+   a bare host — a stated residue on the same basis as its focus-ring residue (issue 1510).
+
+   Declared HERE, immediately above the family's own control chrome, because that is the first
+   position from which the interval walk comes back empty: the 36px `height` below and the 92px
+   textarea `min-height` further down both out-rank this rule at the elements they reach, and both
+   re-root with the family. */
+.fabricate-field input[type="text"],
+.fabricate-field input[type="url"],
+.fabricate-field input[type="email"],
+.fabricate-field input[type="tel"],
+.fabricate-field input[type="password"],
+.fabricate-field input:not([type]),
+.fabricate-field textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 34px;
+}
+
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
    (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
-   `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
+   `.fabricate-field.manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
    rows dodge this only by not living in a `.manager-field`. Excluding the stepper here
@@ -10536,9 +10625,9 @@
 
    Safe to exclude wholesale: `ChanceSlider.svelte` is the only source of a `type="range"`
    input in the codebase, and it always wants a transparent, unpadded control. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select,
-.fabricate-manager .manager-field textarea {
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field select,
+.fabricate-field.manager-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -10548,18 +10637,54 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood
-   36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select {
+   36px tall with 8px of side padding instead of the 28px/0 the control asks for.
+
+   retired height: sweep — 36 is a RETIRED rung (the ladder is 26, 28, 30, 34, 38, 44). It is
+   re-rooted here at its measured value, byte-identical, rather than moved: issue 1523 owns the
+   sweep that puts this field on a live rung, and re-cutting it inside a re-rooting change would
+   move the pixels that change exists to hold still. */
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-field select:disabled {
+.fabricate-field.manager-field select:disabled {
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
   opacity: 0.62;
+}
+
+/* THE FIELD FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-button:focus`: core paints every focused control with an orange outline and a 4px
+   glow, the module reset removes it inside every Fabricate window, and a family rooted at the
+   class it emits also renders in hosts that carry no Fabricate root at all. Declarations are the
+   module strip's verbatim. Written ABOVE the repaint because the two halves tie at (0,2,1).
+
+   ONE `:is()` member, deliberately, and the repaint below is TWO comma-separated legs: the two
+   halves are read by different recognisers — the strip register is an exact list of single
+   compounds, the ring-root register matches `<root> <element>:focus-visible` per member — so
+   neither form may be "unified" into the other. Both are asserted. */
+.fabricate-field :is(input, textarea):focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE FIELD FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the module
+   ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches;
+   what this is FOR is the bare host.
+
+   `input` AND `textarea` ONLY, and the exclusion of `select` is load-bearing.
+   `.fabricate-field :is(input, select, textarea):focus-visible` would be (0,2,1), TIE
+   `.fabricate-app select:focus-visible` near the top of this file and win on source order —
+   deleting the inset `box-shadow` ring that exists precisely because an outset outline on a
+   select is clipped by an overflow-clipped container. A select in a Field keeps the area ring
+   (issues 1504 and 1510). */
+.fabricate-field input:focus-visible,
+.fabricate-field textarea:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-recipe-steps-list {
@@ -12767,13 +12892,13 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-field textarea {
+.fabricate-field.manager-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
-.fabricate-manager .manager-field small,
+.fabricate-field.manager-field small,
 .fabricate-manager .manager-feature-tile small {
   color: var(--fab-text-muted);
   font-size: 0.76rem;
@@ -14984,7 +15109,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-search.is-compact {
+.fabricate-search.manager-search.is-compact {
   width: min(220px, 30%);
   min-height: 32px;
 }
@@ -16955,11 +17080,11 @@
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-search.is-compact {
+  .fabricate-search.manager-search.is-compact {
     width: 100%;
   }
 
-  .fabricate-manager .manager-search {
+  .fabricate-search.manager-search {
     flex-basis: 100%;
   }
 
@@ -19307,7 +19432,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field.is-disabled {
+.fabricate-field.manager-field.is-disabled {
   opacity: 0.6;
 }
 
@@ -22378,7 +22503,7 @@
    sheet, so the column, its gap and the caption's kicker treatment are inherited rather than
    restated. Only the two trailing lines are this component's, and they are the specimen's
    `k-hint` and `k-err` exactly. Both are declared DIRECTLY on the span, which is why they beat
-   the 0.82rem/700 `.fabricate-manager .manager-field` hands its children by inheritance
+   the 0.82rem/700 `.fabricate-field.manager-field` hands its children by inheritance
    whatever the two selectors' specificities are. */
 .fabricate-select-note {
   color: var(--fab-text-subtle);
@@ -23249,7 +23374,32 @@
   padding-right: var(--fab-space-3);
 }
 
-.fabricate-manager [data-manager-tools-search] .manager-search {
+/* THE ANCESTOR IS NAMED BY ITS CLASS, NOT BY ITS ATTRIBUTE (issue 1508).
+
+   These three rules — this one, the input's own type below it, and the icon's — used to read
+   `.fabricate-manager [data-manager-tools-search] .manager-search…`. The search family is now
+   rooted at the class `ManagerSearchField` emits, and the leading-position mechanism expresses
+   none of the three: the root sits on the family element, a DESCENDANT of the attributed one,
+   so a root at position one matches nothing, and dropping the application root leaves the first
+   compound with no namespace class at all.
+
+   So the caller's own container is named by a class the caller writes ON THAT SAME ELEMENT.
+   The match set is identical, and that is measured rather than argued:
+   `data-manager-tools-search` occurs on exactly two elements repo-wide —
+   `ToolsBrowserView.svelte:492` and `tool-rules-list-parity.test.js:187` — and BOTH carry
+   `manager-tools-library-card`; the class's only other two carriers
+   (`ToolsBrowserView.svelte:575`, `tool-rules-list-parity.test.js:200`, both
+   `data-manager-tools-browser`) contain no `.manager-search`, because that file's single
+   `<ManagerSearchField>` is at `:493` inside this search card. Rank is unchanged for each —
+   this rule (0,3,0), the input and the icon (0,3,1) — the position is unchanged, and the
+   declarations are byte-identical. `tool-rules-list-parity.test.js` measures the input's 11.5px
+   /500 type, 30px height and 8px radius on its own fixture, so the rewrite is CI-armed.
+
+   These stay APPLICATION-ROOTED on purpose: this is the Tools browser's own override of a
+   search field inside its library card — caller chrome under the exemption
+   `openspec/specs/design-system/spec.md` already grants — expressed in the form the area-scope
+   detector reads. `ToolsBrowserView.svelte`'s own scoped block keeps the attribute. */
+.fabricate-manager .manager-tools-library-card .manager-search {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -23269,7 +23419,7 @@
    The FILL is the design's translucent surface token rather than the opaque `--fab-bg-1` the
    shared rule paints; the `<select>` beside it keeps the opaque one, and its own block says
    why. 32 takes the nearest surviving ladder rung — see the segment block above. */
-.fabricate-manager [data-manager-tools-search] .manager-search input {
+.fabricate-manager .manager-tools-library-card .manager-search input {
   height: 30px;
   border-radius: 8px;
   background: var(--fab-surface-soft);
@@ -23278,7 +23428,7 @@
 }
 
 /* `proto:2511`: `font-size: 10px; color: var(--subtle)`. */
-.fabricate-manager [data-manager-tools-search] .manager-search > i {
+.fabricate-manager .manager-tools-library-card .manager-search > i {
   color: var(--fab-text-subtle);
   font-size: 10px;
 }
@@ -26598,7 +26748,7 @@
    turn core's fixed `button { height: var(--button-size) }` into a floor, and a `height` here
    would put the fixed box straight back. (0,4,0) beats the trigger's own toolbar rung at (0,2,0)
    on specificity, so the rule's position in this file is not load-bearing. */
-.fabricate-manager .manager-search.is-size-38 input {
+.fabricate-search.manager-search.is-size-38 input {
   height: 38px;
   border-radius: 9px;
 }

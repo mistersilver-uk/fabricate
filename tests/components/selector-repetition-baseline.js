@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,101 `(at-context, selector)` keys, of which 2,982 appear exactly
+ * Unfiltered, the sheet holds 3,115 `(at-context, selector)` keys, of which 2,996 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,20 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,600 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,606 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1508 RE-KEYED THREE ROWS AND MOVED THE THREE CONTEXTUAL FIGURES, and it did the two
+ * things separately. RE-KEYED: rooting `Field` at the class it emits rewrites the leading compound
+ * of its whole family, so the three rows whose members re-root together —
+ * `.fabricate-manager .manager-field input:not(…)`, `… select` and `… textarea` — become
+ * `.fabricate-field.manager-field …`. Each row keeps its count of 2, because both members of each
+ * pair re-rooted in the same commit, so `pinnedTotal` does not move and stays 243 across 119 rows.
+ * MOVED: the same change ADDS six rules carrying fourteen selectors — the two-member font floor,
+ * `Field`'s seven-leg element-typed chrome rule, and the strip and repaint halves of both new
+ * families' focus pairs — every one of them a new singleton in both keyings, so the key count and
+ * the singleton count each rise by fourteen and the rule count by six, while the repeated table is
+ * untouched.
  *
  * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES A THIRD TIME, by adding one rule:
  * `.fabricate-manager .manager-recipe-name-row .manager-chip` gives the row's status pills

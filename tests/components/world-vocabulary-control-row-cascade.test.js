@@ -169,14 +169,14 @@ function panel(kind) {
     // does not draw, and would put the fold 46px per panel lower than it really is.
     '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
-    '<label class="manager-field"><span class="manager-field-label">Name</span>' +
+    '<label class="fabricate-field manager-field"><span class="manager-field-label">Name</span>' +
         // `fab-manager-button` is the primitive's OWN class, and a fixture that wrote the contract
     // class without it is measuring markup `ManagerButton` may have stopped emitting —
     // `tests/manager-button-source-contract.test.js` refuses that.
     '<input type="text"></label>' +
     '<button class="fabricate-button manager-button fab-manager-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
-    '<label class="manager-search"><input type="text"></label>' +
+    '<label class="fabricate-search manager-search"><input type="text"></label>' +
     '<span class="manager-chip">3 entries</span></div>' +
     `<div class="manager-vocabulary-list">${cards}</div></section></section>`
   );

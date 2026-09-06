@@ -114,7 +114,9 @@
   const FALLBACK_HOST = 'div';
 
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
-  const classes = $derived(['manager-field', extraClass].filter(Boolean).join(' '));
+  const classes = $derived(
+    ['fabricate-field', 'manager-field', extraClass].filter(Boolean).join(' ')
+  );
 
   $effect(() => {
     if (HOSTS.has(as)) return;

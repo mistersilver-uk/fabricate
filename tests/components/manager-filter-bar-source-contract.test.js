@@ -81,8 +81,9 @@ const RAW_SEARCH_ALLOWLIST = Object.freeze([
     path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     sites: 2,
     why:
-      'Two character-modifier COMBOBOXES (`:12051`, `:12460`) — near-identical duplicates of ' +
-      'one another, one on the gathering drop inspector and one on the event inspector. Each ' +
+      'Two character-modifier COMBOBOXES (`:14006` and `:14415`, re-measured at issue 1508) — ' +
+      'near-identical duplicates of one another, one on the gathering drop inspector and one on ' +
+      'the event inspector. Each ' +
       'renders a `.manager-tag-suggestions` list inside the label and takes ' +
       '`bind:this` on it for popover positioning, which a component tag cannot supply. A root ' +
       'de-duplication that merged the two would legitimately take this pin to 1 rather than ' +
@@ -92,8 +93,9 @@ const RAW_SEARCH_ALLOWLIST = Object.freeze([
     path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
     sites: 1,
     why:
-      'The component TAG search (`:1746`), which renders a `.manager-tag-suggestions` list ' +
-      'inside its label and swaps the glyph to `fa-tags`. Its three siblings in the same file ' +
+      'The component TAG search (`:1753`, re-measured at issue 1508), which renders a ' +
+      '`.manager-tag-suggestions` list inside its label and swaps the glyph to `fa-tags`. Its ' +
+      'three siblings in the same file ' +
       'converted; this one is a combobox and belongs to `SearchablePopover`, so it is an ' +
       'adjudicated opt-out rather than deferred work.',
   }),

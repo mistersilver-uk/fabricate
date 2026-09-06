@@ -185,7 +185,7 @@ const LIST_SCREEN = `
           </div>
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
-          <label class="manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+          <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
           <div class="manager-tools-membership-filter" role="radiogroup" data-tool-membership-filter="in">
             <label class="is-selected"><input type="radio" name="b" checked><span>In this system (3)</span></label>
             <label><input type="radio" name="b"><span>All world tools (11)</span></label>

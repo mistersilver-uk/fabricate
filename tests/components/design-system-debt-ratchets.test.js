@@ -263,16 +263,28 @@ function focusResetRoot(selector) {
 }
 
 /**
- * The three primitive families that root their own focus chrome, and the one compound each may
- * write for the STRIP half of it (issue 1502).
+ * The five primitive families that root their own focus chrome, and the one compound each may
+ * write for the STRIP half of it (issues 1502 and 1508).
  *
- * `Pagination` is the odd one: its family root is on a `<section>` and the controls it strips for
- * are the buttons inside it, so its compound carries an element where the other two do not.
+ * TWO SHAPES, and the split is the family root's relationship to the control rather than a style.
+ * `ManagerButton` and `IconButton` ARE the control, so their compound is the root alone.
+ * `Pagination`, `Field` and `ManagerSearchField` are not: the root is a `<section>` or a
+ * `<label>`/`<div>`/`<fieldset>` and the controls it strips for are the elements inside it, so
+ * each of those compounds carries an element as well.
+ *
+ * `Field`'s member is the one `:is()` on the list, and it is deliberately not two legs: this
+ * recogniser accepts exactly ONE list member, while the RING half is governed by
+ * {@link bareElementRingRoot}, which reads `<root> <element>:focus-visible` PER MEMBER and would
+ * not see an `:is()` at all. So Field's strip is one `:is(input, textarea):focus` member and its
+ * repaint is two comma-separated legs — the two forms differ because two different recognisers
+ * govern them, and neither may be "unified" into the other.
  */
 const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-button:focus',
+  '.fabricate-field :is(input, textarea):focus',
   '.fabricate-icon-button:focus',
   '.fabricate-pagination button:focus',
+  '.fabricate-search input:focus',
 ]);
 
 /** The strip half's declaration set, exactly — property to normalised value, nothing else. */
@@ -394,8 +406,8 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
 
 test('a primitive family’s focus STRIP half is recognised, and a look-alike is not', () => {
   // THE SECOND EXEMPTION, BOTH POLARITIES, in the shape the clause above uses. The positive half
-  // is the live corpus — three families, named, so a strip being renamed, split or deleted shows
-  // up here rather than as three rows quietly arriving in the baseline. The negative half is
+  // is the live corpus — five families, named, so a strip being renamed, split or deleted shows
+  // up here rather than as five rows quietly arriving in the baseline. The negative half is
   // synthetic, because the tree holds no look-alike today, and a permission nobody has tested
   // against a counterexample is a permission that will eventually exempt something real.
   const { strips } = bareFocusSelectors();
@@ -404,15 +416,22 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
     [...new Set(strips.map((entry) => entry.strip))].sort(byCodePoint),
     [
       '.fabricate-button:focus',
+      '.fabricate-field :is(input, textarea):focus',
       '.fabricate-icon-button:focus',
       '.fabricate-pagination button:focus',
+      '.fabricate-search input:focus',
     ],
     'the set of primitive families declaring their own focus strip has changed. Each of the ' +
-      'three is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
+      'five is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
       'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
-      'carrying neither application root — a deliberate edit here, never a silent one.'
+      'carrying neither application root — a deliberate edit here, never a silent one. `Field` ' +
+      'and `ManagerSearchField` joined at issue 1508, when both families were rooted at the ' +
+      'class they emit; `Field`s member is ONE `:is()` compound because this recogniser accepts ' +
+      'exactly one list member, while its RING half is two comma-separated legs because ' +
+      '`bareElementRingRoot` reads one element per member. Both forms are asserted, here and in ' +
+      'the ring-root clause below, so neither can be "unified" into the other.'
   );
-  assert.equal(strips.length, 3, 'one strip per family, and each family declares exactly one');
+  assert.equal(strips.length, 5, 'one strip per family, and each family declares exactly one');
 
   // `declarationsIn` stamps the file onto each declaration and `primitiveFocusStrip` never reads
   // it back, so the synthetic rules below name the sheet only to look like what they stand for.
@@ -1244,20 +1263,30 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 9 roots over 10 blocks, every one of them
- * legitimate today, which is exactly why an eleventh would not stand out to a reader.
+ * Derived from the sheet rather than asserted: 11 roots over 13 blocks, every one of them
+ * legitimate today, which is exactly why a twelfth would not stand out to a reader. It was 9 over
+ * 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and each
+ * gained the ring half of its own pair. `Field`'s is TWO comma-separated legs — `.fabricate-field
+ * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
+ * `:is(input, textarea)` member, and that is a requirement of this population rather than a
+ * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`
+ * form would fall out of the list by accident of the recogniser while ringing exactly the same
+ * elements at exactly the same rank as the module ring. The STRIP half is the mirror image and
+ * carries the `:is()`; see {@link PRIMITIVE_FOCUS_STRIPS}.
  */
 const RING_ROOTS = Object.freeze(
   [
     MODULE_ROOT,
     '.fabricate-app',
     '.fabricate-button',
+    '.fabricate-field',
     '.fabricate-icon-button',
     '.fabricate-interactable-browser-app',
     '.fabricate-interactable-config-app',
     '.fabricate-interactables-manager',
     '.fabricate-pagination',
     '.fabricate-roll-prompt-dialog',
+    '.fabricate-search',
   ].sort(byCodePoint)
 );
 
@@ -1712,8 +1741,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,101 `(at-context, selector)`
-  // keys under this very keying, of which 2,982 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,115 `(at-context, selector)`
+  // keys under this very keying, of which 2,996 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

@@ -14,6 +14,18 @@
       "count": 2
     },
     {
+      "key": "(top level) | .fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range'])",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-field.manager-field select",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-field.manager-field textarea",
+      "count": 2
+    },
+    {
       "key": "(top level) | .fabricate-icon-button.manager-icon-button",
       "count": 2
     },
@@ -151,18 +163,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-essence-toolbar select",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range'])",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-field select",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-field textarea",
       "count": 2
     },
     {

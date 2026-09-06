@@ -109,11 +109,13 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Eight shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Eleven shared primitives, each with the namespace roots it writes and the class family it owns.
  *
- * The first five PORTAL a panel and so need one root on each side of the portal; the last three
- * (issue 1502) COMPOSE their family in `<script>` rather than writing it in markup and carry one
- * root each — `ManagerButton`, `IconButton` and `Pagination`. A `composesClasses: true` entry
+ * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
+ * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
+ * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field` and
+ * `ManagerSearchField` (issue 1508). NONE of the issue-1508 families portals anything, so one
+ * root each is the whole requirement. A `composesClasses: true` entry
  * opts into reading the `const classes = $derived([…])` array literal (`composedClassRegion`)
  * ALONGSIDE the ordinary markup region, because `class={classes}` is an identifier rather than a
  * `class="…"` string or a `` class={`…`} `` template, so the ordinary markup-only extractors find
@@ -478,6 +480,67 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'fabricate-select', root: 'manager-travel-picker' }),
       Object.freeze({ anchor: 'fabricate-select-popover', root: 'fabricate-picker-popover' }),
       Object.freeze({ anchor: 'fabricate-select-popover', root: 'manager-travel-popover' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── FIELD (issue 1508). The manager's labelled form field, rooted at the class it emits.
+    //
+    // `Field` renders a `<label>`, `<div>` or `<fieldset>` and the CONTROL inside it is the
+    // caller's, so this family owns no control of its own in markup — but the sheet's blanket
+    // `.manager-field input|select|textarea` rules are the field's own chrome and travel with it.
+    // That is why the family declares a font FLOOR (`.fabricate-field :is(input, select,
+    // textarea)`, `font: inherit` alone, in the group below the area baseline) and a SECOND
+    // element-typed chrome rule in its own block, rather than one widened floor.
+    name: 'Field',
+    components: Object.freeze(['src/ui/svelte/components/Field.svelte']),
+    roots: Object.freeze(['fabricate-field']),
+    // One exact class name. `manager-field-error` is a CALLER's class and is deliberately outside
+    // this pattern — `pickerSelectors` anchors on `\.manager-field(?![\w-])`, so a rule naming
+    // it never enters this family and stays caller-owned.
+    family: 'manager-field',
+    anchors: Object.freeze(['manager-field']),
+    // COMPOSES its family in `const classes = $derived([…])` (`Field.svelte`) rather than in
+    // markup: the host is a `<svelte:element … class={classes}>`, an identifier the plain
+    // extractor cannot read.
+    composesClasses: true,
+    // Measured before this change landed: 1 written, 27 family selectors, 9 owned — 15 exempt
+    // (13 whose ancestor chain names a caller's own container, 2 app-root-with-attribute) and 3
+    // caller-CLASS compounds (`.span-2`, and the two that name `.fab-stepper-input` inside a
+    // `:not()`). Twelve selectors are re-rooted: the 9 owned plus those 3, because two of the
+    // three share a selector LIST with owned members and leaving them behind would split a
+    // shipped rule in half. `writtenFloor` is near-vacuous at 1 — this primitive writes exactly
+    // one family class — so the real guard for it is the exact `anchors` list above.
+    writtenFloor: 1,
+    familyFloor: 24,
+    ownedFloor: 8,
+    mirrored: Object.freeze([Object.freeze({ anchor: 'manager-field', root: 'fabricate-field' })]),
+  }),
+  Object.freeze({
+    // ── MANAGERSEARCHFIELD (issue 1508). Owns its own `<input type="search">`, so it declares a
+    // font floor (`.fabricate-search input`) and a focus PAIR on that input. It needs no
+    // `appearance`/`min-height` restatement: the area's element-typed baseline matches no
+    // `type="search"`, and the pill's own re-rooted rule declares its 34 height and 6 radius.
+    name: 'ManagerSearchField',
+    components: Object.freeze(['src/ui/svelte/components/ManagerSearchField.svelte']),
+    roots: Object.freeze(['fabricate-search']),
+    // One exact class name; `manager-tag-search`, `manager-scoped-roster-search` and the rest are
+    // CALLER classes that do not match `\.manager-search(?![\w-])` and never enter this family.
+    family: 'manager-search',
+    anchors: Object.freeze(['manager-search']),
+    // `SIZE_CLASSES` (`is-size-38`) needs no reader: `isPrimitiveOwned` already accepts any `is-*`
+    // token as the primitive's own.
+    composesClasses: true,
+    // Measured before this change landed: 1 written, 31 family selectors, 10 owned, 0
+    // caller-CLASS compounds. Seven are re-rooted; the other three are the Tools browser's own
+    // override of a search field inside its library card, whose ancestor this change RENAMES from
+    // `[data-manager-tools-search]` to the class the caller writes on that same element
+    // (`manager-tools-library-card`) — identical match set, unchanged rank and position — so they
+    // become caller-exempt and stay application-rooted, taking exempt to 24 and owned to 7.
+    writtenFloor: 1,
+    familyFloor: 27,
+    ownedFloor: 6,
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-search', root: 'fabricate-search' }),
     ]),
   }),
 ]);
@@ -1270,6 +1333,26 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'Its attributes depict UNCONVERTED markup on purpose; namespacing them would make the ' +
       'fixture depict a converted site and the discrimination clause would pass vacuously.',
   }),
+  Object.freeze({
+    file: 'tests/components/field-source-contract.test.js',
+    primitive: 'Field',
+    attributeCount: 2,
+    elementCount: 2,
+    why:
+      'the raw-site detector fixtures, which exist to prove the contract finds a hand-written ' +
+      '`class="manager-field"` that never went through `<Field>`. Namespacing them would make ' +
+      'them depict a CONVERTED site and the detector clause would pass vacuously.',
+  }),
+  Object.freeze({
+    file: 'tests/components/manager-filter-bar-source-contract.test.js',
+    primitive: 'ManagerSearchField',
+    attributeCount: 1,
+    elementCount: 1,
+    why:
+      'the raw-site detector fixture for the search half of the filter-bar contract, for the same ' +
+      'reason: it depicts an unconverted `class="manager-search"` on purpose. Keyed by ' +
+      '`file|primitive` because this one file holds a second family\'s detector too.',
+  }),
 ]);
 
 /**
@@ -1393,10 +1476,14 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 54,
+    attributes >= 128,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 54. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing.'
+      'of 128. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1508: 143 today, against 113 before `Field` and ' +
+      '`ManagerSearchField` joined the array. The floor stood at 54 against a population that ' +
+      'had already grown to 113 — issue 1504 added `Select` without re-measuring — so this is ' +
+      'both a raise for the two new families and the repair of a margin that had drifted to ' +
+      'half the population.'
   );
 
   assert.deepEqual(
@@ -1505,10 +1592,12 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 83,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 83. A ` +
+    elements >= 219,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 219. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing.'
+      'below holds over nothing. RE-MEASURED at issue 1508: 244 today, against 214 before ' +
+      '`Field` and `ManagerSearchField` joined the array — the same drifted margin the attribute ' +
+      'floor above records, restored to the ten per cent this file states as its convention.'
   );
 
   assert.deepEqual(
@@ -1612,8 +1701,16 @@ test('each primitive’s own scoped styles name no application root either', () 
   for (const primitive of PRIMITIVES) {
     for (const file of primitive.components) {
       const source = read(file);
+      // GUARDED BY `</script>`, exactly as `markupRegion` guards its own reader, and the guard
+      // is not cosmetic: without it this clause reads a `<style>` NAMED IN DOCBLOCK PROSE as a
+      // scoped block. It held only while no such docblock also quoted a selector — issue 1508's
+      // `Field` docblock quotes `.fabricate-manager .manager-field > span` while explaining that
+      // the component deliberately has NO scoped block, and the clause reported the prose as an
+      // application-rooted scoped selector. A real scoped block always follows `</script>`, so
+      // the guard can never hide one.
+      const afterScript = source.indexOf('</script>');
       const styleAt = source.lastIndexOf('<style>');
-      if (styleAt === -1) continue;
+      if (styleAt === -1 || styleAt < afterScript) continue;
       blocks += 1;
       const gated = selectorsIn(source.slice(styleAt)).filter((selector) =>
         classesOf(selector).some((cls) => isApplicationRoot(cls, primitive))
@@ -1631,12 +1728,11 @@ test('each primitive’s own scoped styles name no application root either', () 
 
   assert.ok(
     blocks >= 2,
-    `only ${blocks} of the nine component files hold a \`<style>\` opener. Five do today: ` +
-      '`SearchablePopover` and `ManagerColorPopover` carry a real scoped block, while ' +
-      '`ActionMenu`, `ManagerButton` and `IconButton` name one in DOCBLOCK PROSE saying they ' +
-      'deliberately have none — the reader takes the LAST opener with no `afterScript` guard, ' +
-      'and neither sliced region carries a `.fabricate-` token, so the clause above stays empty ' +
-      'for them. A lower number means the reader has stopped finding them and this clause ' +
+    `only ${blocks} of the eleven component files hold a REAL scoped \`<style>\` block — one ` +
+      'opened after `</script>`. Two do today, `SearchablePopover` and `ManagerColorPopover`; ' +
+      'the rest name a `<style>` only in DOCBLOCK PROSE, usually to say they deliberately have ' +
+      'none, and the `</script>` guard above is what keeps that prose out of this clause. A ' +
+      'lower number means the reader has stopped finding the real blocks and this clause ' +
       'examined nothing.'
   );
 });

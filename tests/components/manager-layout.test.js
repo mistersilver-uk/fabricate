@@ -177,7 +177,7 @@ async function readRenderedToolGeometry(width, view) {
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
               <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
               <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
                 <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><input type="radio" name="tool-breakage-mode" value="limitedUses" checked><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-hourglass-half"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span></label>
@@ -432,7 +432,7 @@ test('Fabricate app shell suppresses the host outline on the selected-tab state 
 });
 
 test('manager character modifier search suggestions keep icons in row flow', () => {
-  const searchIconBlock = blockFor('.fabricate-manager .manager-search > i');
+  const searchIconBlock = blockFor('.fabricate-search.manager-search > i');
   const characterModifierSuggestionBlock = blockFor(
     '.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion'
   );
@@ -445,7 +445,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
     'search field leading icon should remain positioned inside the input chrome'
   );
   assert.equal(
-    css.includes('.fabricate-manager .manager-search i {\n  position: absolute;'),
+    css.includes('.fabricate-search.manager-search i {\n  position: absolute;'),
     false,
     'search icon positioning must not catch suggestion icons inside search popovers'
   );
@@ -519,7 +519,7 @@ test('manager character modifier search suggestions render with availability-sty
               </section>
 
               <section>
-                <label class="manager-search is-compact manager-character-modifier-add-search">
+                <label class="fabricate-search manager-search is-compact manager-character-modifier-add-search">
                   <i class="fa-solid fa-search" aria-hidden="true"></i>
                   <input type="search" value="wis" aria-label="Search character modifiers">
                   <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers">
@@ -4673,8 +4673,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // retired selector kept inside a live selector list is dead CSS the block-granular
   // dead-class gate cannot see, and a test anchor naming it kept it alive by hand.
   const fieldInputBlock = blockFor(
-    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
-      '.fabricate-manager .manager-field select'
+    ".fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
+      '.fabricate-field.manager-field select'
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
@@ -5843,7 +5843,7 @@ async function readRenderedKnowledgeGeometry(width) {
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="fabricate-search manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -7325,7 +7325,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
         '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
         '<section class="manager-inspector-card manager-drop-editor-card">' +
         '<div class="manager-drop-editor-values">' +
-        '<label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
+        '<label class="fabricate-field manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
         `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></aside>',
     },
@@ -7341,7 +7341,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
         '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
         '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +
         '<div class="manager-task-availability-row">' +
-        '<label class="manager-field manager-drop-rate-editor">' +
+        '<label class="fabricate-field manager-field manager-drop-rate-editor">' +
         `<span>Drop rate (%)</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></main>',
     },
@@ -7929,7 +7929,7 @@ async function checksRollEdges(page, tiersWrapperClass) {
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>
       <div class="manager-checks-card-body">
-        <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">DC source</legend>
           <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
             <label class="manager-resolution-option is-active" data-dc-mode-option="static">
@@ -8089,7 +8089,7 @@ async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
       <h3 class="manager-card-title">Named modifiers</h3>
-      <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+      <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
         <legend class="manager-resolution-mode-legend">How they combine</legend>
         <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
           <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
@@ -9835,11 +9835,11 @@ test('the Checks rail states its own control type scale instead of inheriting on
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
                           </button>
                         </div>
-                        <label class="manager-field">
+                        <label class="fabricate-field manager-field">
                           <span class="visually-hidden">Preview against record</span>
                           <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
                         </label>
-                        <label class="manager-field">
+                        <label class="fabricate-field manager-field">
                           <span>Result difficulties</span>
                           <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
                         </label>
@@ -9863,7 +9863,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
               <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
                    rule, is what the two pickers measured before it existed. -->
               <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
-                <label class="manager-field">
+                <label class="fabricate-field manager-field">
                   <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
                 </label>
               </div>
@@ -9985,7 +9985,7 @@ test('the modifier row gives every field room for its longest content at every m
     const stepper = (bound) =>
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
-      `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+      `<div class="fabricate-field manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
     // The icon field's picker root element, which this copy omitted until issue 1470. The
     // trigger's geometry rules are rooted at it now, so without it the field measures a bare
     // button rather than the 38px combo the row is being asserted to have room for. Since issue
@@ -9997,8 +9997,8 @@ test('the modifier row gives every field room for its longest content at every m
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
-          <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="fabricate-field manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
+          <label class="fabricate-field manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
           </div>
@@ -12786,7 +12786,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
                    row. -->
               <div data-scoped-page="world-vocabulary">
                 <div class="manager-toolbar manager-scoped-list-toolbar">
-                  <div class="manager-search"><input type="text" data-probe="shipped-search"></div>
+                  <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
                   <select data-probe="shipped-select"><option>Name</option></select>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
                     ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
@@ -13635,7 +13635,7 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
                 </div>
               </div>
               <div class="manager-toolbar manager-scoped-list-toolbar">
-                <div class="manager-search"><input type="text" data-scoped-list-search></div>
+                <div class="fabricate-search manager-search"><input type="text" data-scoped-list-search></div>
                 <div class="fabricate-picker manager-travel-picker fabricate-select">
                   <button
                     type="button"

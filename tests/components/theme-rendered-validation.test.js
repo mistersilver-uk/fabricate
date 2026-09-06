@@ -261,7 +261,7 @@ function managerFixture(theme, width, height) {
         </nav>
         <section class="manager-main" data-region data-boundary>
           <div class="manager-toolbar">
-            <input class="manager-search" value="Alchemy and harvesting" aria-label="Search">
+            <input class="fabricate-search manager-search" value="Alchemy and harvesting" aria-label="Search">
             <span class="manager-chip manager-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
             <span class="manager-chip is-warning" data-contrast-soft data-boundary>Warning</span>
           </div>

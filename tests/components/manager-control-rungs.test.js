@@ -234,7 +234,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
   after(() => harness.teardown());
 
-  const fieldRule = '.fabricate-manager .manager-search.is-size-38 input';
+  const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
   const selectRule =
     '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-manager .manager-toolbar select.is-size-38';
   // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own, because
@@ -273,7 +273,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('and the shipped controls it overrides are still 34px, so the opt-in is a real change', () => {
     // Non-vacuity again, and a specificity claim: both shipped rules are (0,2,1) and both state
     // the height, so an opt-in written at the same weight would be decided by source order.
-    assert.equal(pixels(valueOf(bodiesOf('.fabricate-manager .manager-search input')[0], 'height')), 34);
+    assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.manager-search input')[0], 'height')), 34);
     // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
     // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
     // route still rendering a native select there, and this row's controls are triggers now.
@@ -294,10 +294,16 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   it('emits NO size class by default, so every shipped field is unchanged', async () => {
     const root = await harness.mount({ ariaLabel: 'Search' });
+    // THIS EQUALITY IS ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM (issue 1508).
+    // Every other reader of the root is SOURCE TEXT — the area-scope gate reads the `$derived`
+    // array, the host-independence fixtures write the class as a literal — so a component that
+    // declared the array and stopped rendering `class={classes}` would pass all of them while
+    // every re-rooted rule matched nothing. Mounting and comparing the WHOLE class string is what
+    // catches that, which is why the root is asserted here rather than in a separate clause.
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'manager-search',
-      'a field that does not ask for a rung is the hook class and nothing else'
+      'fabricate-search manager-search',
+      'a field that does not ask for a rung is the family root plus the hook class and nothing else'
     );
     harness.remount();
   });
@@ -310,8 +316,8 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     });
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'manager-search is-compact is-size-38 manager-access-roster-search',
-      'the rung sits between the density and the caller class, which is where every hand-rolled site already writes its own extra'
+      'fabricate-search manager-search is-compact is-size-38 manager-access-roster-search',
+      'the family root leads, then the hook class, then the rung between the density and the caller class, which is where every hand-rolled site already writes its own extra'
     );
     harness.remount();
   });

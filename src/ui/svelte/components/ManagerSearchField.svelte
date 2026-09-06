@@ -181,7 +181,9 @@
   );
 
   const classes = $derived(
-    ['manager-search', compact ? 'is-compact' : '', sizeClass, extraClass].filter(Boolean).join(' ')
+    ['fabricate-search', 'manager-search', compact ? 'is-compact' : '', sizeClass, extraClass]
+      .filter(Boolean)
+      .join(' ')
   );
 
   /**
