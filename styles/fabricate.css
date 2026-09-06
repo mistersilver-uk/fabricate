@@ -2692,6 +2692,13 @@
 
    Not `.manager-callout`: that primitive is one glyph plus one sentence, and widening it
    to carry a title, a paragraph and a fact list would make one component two shapes. */
+
+/* skin census (issue 1523): the 11px CARD tuple rather than the 9px field one — with
+   `.manager-component-identity-strip` this block is one of the TWO carriers of
+   `1px solid var(--fab-info-border)` behind `var(--fab-info-soft)` at radius 11, a pair that
+   clears the same two-adopter floor the proposed `.fab-card-skin` clears, so issue 1523 weighs
+   the two together. An unpinned carrier: zero hits for the class under tests/ or scripts/; its
+   sole emitter is `CheckModeCallout.svelte:44`. */
 .fabricate-manager .manager-checks-mode-callout {
   display: flex;
   align-items: flex-start;
@@ -18396,6 +18403,14 @@
 /* `proto:1310`: ONE info-soft callout — the chip, the copy column, the exit — at radius 12
    (snapped to the 11 card rung) with 13/15 padding (snapped to 12/16) and a 13px gap (12).
    `align-items: center`, not `flex-start`: the card is one line of copy beside a 44px chip. */
+
+/* skin census (issue 1523): the 11px CARD tuple rather than the 9px field one — the second
+   carrier of the `1px solid var(--fab-info-border)` / `var(--fab-info-soft)` pair whose first is
+   `.manager-checks-mode-callout`. Pinned three ways: `scripts/lib/managerLayoutGuards.js:129`
+   names the class and `tests/foundry-manager-layout-guard.test.js:128` asserts that list,
+   `scripts/foundry-test-run.mjs:1546` names it again for the smoke walk, and
+   `tests/components/component-studio-font-size.test.js:272` renders fixture markup carrying it.
+   Its sole emitter is `ComponentIdentityStrip.svelte:80`. */
 .fabricate-manager .manager-component-identity-strip {
   display: flex;
   align-items: center;
@@ -25845,8 +25860,11 @@
 /* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by
    a micro-label. */
 
-/* skin census (issue 1523): two unpinned carriers of the target tuple in one rule — zero hits
-   for either class under tests/ or scripts/; both are emitted by `ComponentEditView.svelte`. */
+/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for
+   either under tests/ or scripts/ except this branch's own repetition baseline, which pins
+   `.manager-salvage-dc-card` at two appearances (`tests/components/selector-repetition-
+   baseline.json`), so an adoption that deletes this rule must re-derive that table; both are
+   emitted by `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-routing-card,
 .fabricate-manager .manager-salvage-dc-card {
   padding: var(--fab-space-3);

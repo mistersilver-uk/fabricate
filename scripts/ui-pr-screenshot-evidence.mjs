@@ -1301,12 +1301,13 @@ export const VIEW_RECIPES = Object.freeze([
     // stylesheet, a theme block, or the manager router that hosts every manager view.
     //
     // Chosen to sample every app-AREA shell rather than to enumerate screens, because
-    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks
-    // for button height and alignment are written per area class — so a regression in
-    // one area is invisible in another. The focus pair is no longer among them: issue
-    // 1501 collapsed it onto the module root, which reaches every area at once. Rule counts in that file, which
-    // are a fair proxy for blast radius: `.fabricate-manager` ~2694,
-    // `.fabricate-interactables-manager` ~41, `.fabricate-app` ~18.
+    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks for
+    // button height and alignment are written per area class — so a regression in one area
+    // is invisible in another. The focus pair is no longer among them: issue 1501
+    // collapsed it onto the module root, which reaches every area at once. Selectors
+    // naming an area class in that file are a fair proxy for blast radius; counted
+    // comma-split at every nesting level, `.fabricate-manager` takes 2747 of them,
+    // `.fabricate-interactables-manager` 41 and `.fabricate-app` 11.
     //
     // 1 `manager-default-selection`   — `.fabricate-manager` shell: window chrome, rail,
     //                                   and the crafting-system library rows.

@@ -1176,8 +1176,11 @@ const WITHDRAWN_UTILITIES = Object.freeze([
       'three blocks carry the proposed border, radius and fill five-tuple, up from the one ' +
       "issue 1501 measured — issue 1371's component entry card and component rules card are " +
       'the two new carriers — so this class too is deferred for its per-adoption blocker walk ' +
-      'rather than for want of carriers; of the nine 11px border-and-fill blocks no other fill ' +
-      'choice reaches two',
+      'rather than for want of carriers; of the nine 11px border-and-fill blocks the fills are ' +
+      '`--fab-bg-2` at three (the proposed one), `--fab-info-soft` at two — `:2709-2711` and ' +
+      '`:18420-18422` carry an identical `1px solid var(--fab-info-border)` five-tuple, a second ' +
+      'candidate skin for issue 1523 rather than this one — `--fab-bg-1` at two behind two ' +
+      'DIFFERENT hairlines, and `--fab-surface-soft` and `--fab-bg-3` at one each',
   },
 ]);
 
@@ -1283,10 +1286,10 @@ test('every emitted `data-gap` rung is declared, and each default is written as 
   assert.ok(
     emitted.length >= 12,
     `only ${emitted.length} \`data-gap\` emitters reached this scan, against the 16 the tree ` +
-      'held when this clause was written. The floor carries slack DELIBERATELY, so that removing ' +
-      'one call site reds nothing and only a collapse gets here: a walk that stopped seeing call ' +
-      'sites reports a clean mirror, which is the one direction an absence check cannot ' +
-      'distinguish from success.'
+      "held when this clause was written, 15 after issue 1371 rebuilt the component inspector's " +
+      'hero. The floor carries slack DELIBERATELY, so that removing one call site reds nothing ' +
+      'and only a collapse gets here: a walk that stopped seeing call sites reports a clean ' +
+      'mirror, which is the one direction an absence check cannot distinguish from success.'
   );
   assert.deepEqual(
     [...new Set(emitted.filter((site) => !declared.has(site.key)).map((site) => site.key))].sort(
