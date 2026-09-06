@@ -788,3 +788,196 @@ describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
     );
   });
 });
+
+/**
+ * THE ICON-ONLY CHIP, AND THE NAME IT HAS TO CARRY (issue 1506).
+ *
+ * `CraftingStatusBadge` shipped a `compact` variant — a 20x20 square with its label suppressed
+ * and `title` as its only accessible name — and the recipe browser's row rendered it. Retiring
+ * that component into this one had to answer two questions it left open.
+ *
+ * THE SQUARE IS A BOOLEAN, NOT A SEVENTH DENSITY. No density here can produce one: each states a
+ * BAND (a vertical inset and a type size) and a square needs a SIDE. So the prop composes with
+ * whichever density the caller also asks for and publishes a side for each — which makes it total
+ * over the axis it reads, and makes the failure "a density with no side" impossible rather than
+ * unlikely.
+ *
+ * THE NAME IS REQUIRED AND THE ROLE IS CONDITIONAL, which is the half the shipped badge had
+ * wrong. Its glyph is `aria-hidden`, so the only name it ever had was a `title` — a tooltip, not
+ * a name — and the badge was effectively unannounced. `aria-label` alone does not fix it on a
+ * bare `span`, because ARIA prohibits naming a generic role, so the chip states `role="img"`
+ * beside it. But only where it is NON-INTERACTIVE: on a `button` or an `a` the label is already
+ * the control's name and an `img` role would announce an operable control as a picture. The role
+ * is written BEFORE the rest spread, so a caller that passes its own is never overridden.
+ */
+describe('1506 Chip — the icon-only chip', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /**
+   * The six published sides, as `[selector suffix, side, where the figure comes from]`. Five are
+   * read from the density they belong to; `list` states `min-height: 0` and has none to read,
+   * which is why the six are published rather than computed.
+   */
+  const ICON_ONLY_SIDES = [
+    ['is-icon-only', 20, "the base rule's own min-height"],
+    ['is-icon-only.is-row', 22, "`is-row`'s min-height"],
+    [
+      'is-icon-only.is-list',
+      15,
+      'the 15px stadium `proto:4872` publishes, ~2px above the ~13px a labelled list chip renders',
+    ],
+    ['is-icon-only.is-action', 34, "`is-action`'s min-height, which is the button's own figure"],
+    ['is-icon-only.is-tag-run', 25, "the height `is-tag-run`'s note computes: 6 + 6 + 11 + 2"],
+    [
+      'is-icon-only.is-inspector',
+      20,
+      "the height `is-inspector`'s note computes: 3 + 12 + 3 plus the hairline",
+    ],
+  ];
+
+  it('emits is-icon-only only when asked, and composes with a density rather than replacing it', async () => {
+    const shipped = await harness.mount({ density: 'list' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-list'],
+      'a chip that does not ask for the square is exactly what shipped'
+    );
+    harness.remount();
+
+    // The one converted caller: the recipe browser row's status badge, at `list`.
+    const square = await harness.mount({
+      density: 'list',
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+    });
+    assert.deepEqual(
+      authoredClasses(chipNode(square)).toSorted((a, b) => a.localeCompare(b)),
+      ['is-icon-only', 'is-list', 'manager-chip'],
+      'the square is a class beside the scale, so the two axes compose'
+    );
+  });
+
+  it('publishes a square SIDE for every density, six of them, with equal insets', () => {
+    for (const [selector, side, provenance] of ICON_ONLY_SIDES) {
+      const rule = ruleFor(selector);
+      for (const property of ['width', 'height', 'min-height']) {
+        assert.match(
+          rule,
+          new RegExp(String.raw`(?:^|\n)\s*${property}:\s*${side}px;`),
+          `\`.manager-chip.${selector}\` states ${property}: ${side}px (${provenance}). ` +
+            'All three are stated together: `width` because the base rule sets `fit-content`, ' +
+            '`height` because nothing else would make it a square, and `min-height` because the ' +
+            "base rule's 20px floor would otherwise win at `list` and `is-list`'s own " +
+            '`min-height: 0` would let a column flex parent collapse the square at the rest'
+        );
+      }
+    }
+
+    // Equal insets, which at a fixed side is none at all: every density's padding is
+    // horizontal-only or horizontal-heavy, so carrying one in would push the glyph off centre.
+    assert.match(
+      ruleFor('is-icon-only'),
+      /(?:^|\n)\s*padding:\s*0;/,
+      'the square drops the chip padding and lets the base rule centre the glyph'
+    );
+  });
+
+  it('states each density side as a COMPOUND selector, so it does not depend on rule order', () => {
+    for (const [selector] of ICON_ONLY_SIDES.slice(1)) {
+      // (0,3,0) against the density's own (0,2,0) and the base rule's (0,1,0): the side wins on
+      // specificity, so moving these rules within the block cannot change a rendered square.
+      assert.equal(
+        selector.split('.').length,
+        2,
+        `${selector} names the density it overrides, rather than relying on being written later`
+      );
+      assert.notEqual(
+        ruleIndex(selector.replaceAll('.', String.raw`\.`)),
+        -1,
+        `${selector} has a rule`
+      );
+    }
+  });
+
+  it('names itself through role="img" only where the chip is NON-interactive', async () => {
+    const span = await harness.mount({
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+    });
+    assert.equal(
+      chipNode(span).getAttribute('role'),
+      'img',
+      'a bare span drops an aria-label without one'
+    );
+    assert.equal(chipNode(span).getAttribute('aria-label'), 'Locked', 'and the label is the name');
+    harness.remount();
+
+    for (const tag of ['button', 'a']) {
+      const control = await harness.mount({
+        tag,
+        iconOnly: true,
+        icon: 'fas fa-lock',
+        'aria-label': 'Locked',
+      });
+      assert.ok(
+        !chipNode(control).hasAttribute('role'),
+        `on a ${tag} the label is already the accessible name, and an img role would announce an ` +
+          'operable control as a picture'
+      );
+      harness.remount();
+    }
+
+    const plain = await harness.mount({ icon: 'fas fa-lock' });
+    assert.ok(!chipNode(plain).hasAttribute('role'), 'a labelled chip states no role at all');
+  });
+
+  it('never overrides a role the caller passed', async () => {
+    const passed = await harness.mount({
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+      role: 'status',
+    });
+    assert.equal(
+      chipNode(passed).getAttribute('role'),
+      'status',
+      'the role is written BEFORE the rest spread, so a caller that means something else wins'
+    );
+  });
+});
+
+/**
+ * `density="list"` IS SINGLE-LINE (issue 1506, decision G).
+ *
+ * `is-row` and `is-action` both state `white-space: nowrap`; the base rule states none, because
+ * wrapping is the chip's default for the reason `is-truncated` documents. So `list` was the one
+ * density that inherited the wrap — and `proto:4872`, which that density quotes, describes a
+ * STADIUM, which is a single-line construction. It became load-bearing when twelve player row
+ * pills converged here from three retired look-alikes, every one of which was single-line: two by
+ * declaration and the journal's by a `flex: 0 0 auto` that held it at max-content. In a narrow
+ * player window a have/need pair would otherwise break across two lines.
+ */
+describe('1506 Chip — the list density is single-line', () => {
+  it('states `white-space: nowrap`, as the two densities beside it already do', () => {
+    assert.match(
+      ruleFor('is-list'),
+      /(?:^|\n)\s*white-space:\s*nowrap;/,
+      "the list density inherited the base rule's wrap, and the reference draws a stadium"
+    );
+  });
+
+  it('leaves the SHRINK to the caller, stating no flex of its own', () => {
+    // The retired journal pill held its width with `flex: 0 0 auto`; that is position, and
+    // position stays with the caller per this component's own `density` note.
+    assert.ok(
+      !/(?:^|\n)\s*flex(?:-shrink)?:/.test(ruleFor('is-list')),
+      'a density states how text lays out, never how much room the row gives the chip'
+    );
+  });
+});

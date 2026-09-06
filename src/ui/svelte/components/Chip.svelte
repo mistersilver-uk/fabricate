@@ -175,6 +175,29 @@
      `density` prop is, for the identical reason: a layout context may still size a
      chip's POSITION (a caller sets `flex-shrink` etc. from outside), but never its own
      geometry.
+   - iconOnly: the chip is its GLYPH — a square with equal insets and no label, which is the
+     face a dense browser row draws when the status has already been said in words beside it
+     (issue 1506). It is a boolean rather than a density because it is not a scale: it composes
+     with whichever `density` the caller also asks for, and the side it takes is that density's.
+
+     SIX SIDES ARE PUBLISHED, one per density, because the prop must be total over the axis it
+     reads: 20px at the default (the base rule's own floor), 22px at `row`, 15px at `list`, 34px
+     at `action`, 25px at `tag-run` and 20px at `inspector`. Five of the six are read from the
+     density they belong to — its `min-height`, or the height its own note computes. `list` has
+     none to read, because it is the one density that states `min-height: 0`, so its side is the
+     15px stadium `proto:4872` publishes and the density's own note above quotes. That makes an
+     icon-only list chip about two pixels TALLER than the labelled list chips beside it, which is
+     deliberate: the alternative is a side derived from a height that density declines to have.
+
+     THE ACCESSIBLE NAME IS REQUIRED, AND THE ROLE IS CONDITIONAL. The glyph is `aria-hidden`, so
+     an icon-only chip with no `aria-label` is announced as nothing at all; a `title` is a tooltip
+     and not a name. `role="img"` is emitted BESIDE the label, because `aria-label` on a bare
+     `span` is dropped under ARIA's prohibition on naming a generic role — but only where the chip
+     is NON-INTERACTIVE. On `tag="button"` or `tag="a"` the label is already the control's
+     accessible name and an `img` role would announce an operable control as a picture, so the
+     role is withheld there; and it is written BEFORE the rest spread, so a `role` a caller passes
+     is never overridden. A source contract holds the `aria-label` half at every tag, because a
+     primitive cannot make a caller pass one.
 
   Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`,
   `type`, `disabled` — is forwarded through the rest spread, so a call site is not
@@ -193,6 +216,7 @@
     class: extraClass = '',
     truncate = false,
     density = 'default',
+    iconOnly = false,
     element = $bindable(null),
     children,
     ...rest
@@ -290,6 +314,18 @@
    */
   const EMPHASES = new Set(['outlined', 'lit', 'bare']);
 
+  /**
+   * The elements a chip can be rendered as that carry an operable role of their own. An
+   * `iconOnly` chip states `role="img"` so its `aria-label` is not dropped on a generic `span`,
+   * and stating it on one of these would REPLACE the role that makes the chip operable — a
+   * button announced as a picture. The label is the accessible name at every tag either way.
+   *
+   * @type {ReadonlySet<string>}
+   */
+  const INTERACTIVE_TAGS = new Set(['button', 'a']);
+
+  const iconOnlyRole = $derived(iconOnly && !INTERACTIVE_TAGS.has(tag) ? 'img' : undefined);
+
   const classes = $derived(
     [
       'manager-chip',
@@ -308,6 +344,7 @@
       // either reaching the other's rules.
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
+      iconOnly ? 'is-icon-only' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -324,6 +361,7 @@
   class={classes}
   style={swatchStyle}
   data-chip-tint={safeTint || undefined}
+  role={iconOnlyRole}
   {...rest}
   >{#if safeSwatch}<span
       class="manager-chip-swatch"
@@ -677,6 +715,17 @@
     border-radius: 999px;
     font-size: 9px;
     font-weight: 600;
+    /* SINGLE-LINE, and it is the one density that had to say so (issue 1506). `is-row` and
+       `is-action` both state it; the base rule states none, because wrapping is the chip's
+       default for the reason `is-truncated` gives above. So a list chip inherited the wrap —
+       and `proto:4872`, quoted at the head of this rule, describes a STADIUM, which is a
+       single-line construction. It matters at the twelve player rows that converged here from
+       the three retired look-alikes: every one of them was `nowrap` (two by declaration, the
+       journal's by a `flex: 0 0 auto` that held it at max-content), and a narrow player window
+       would otherwise break a have/need pair across two lines. SHRINK PROTECTION STAYS WITH THE
+       CALLER, per the `density` note above: this states how the text lays out, never how much
+       room the row gives the chip. */
+    white-space: nowrap;
   }
 
   /* ACTION density: a chip standing in the page header's action cluster.
@@ -776,6 +825,69 @@
     border-radius: 999px;
     font-size: 10px;
     font-weight: 600;
+  }
+
+  /* THE ICON-ONLY CHIP (issue 1506): the chip that IS its glyph. The retired
+     `CraftingStatusBadge` drew it as a 20x20 square with its label suppressed, for a browser row
+     that has already said the status in words; no tone and no density can produce a square,
+     because every density here states a BAND — a vertical inset and a type size — and a square
+     needs a side.
+
+     A SIDE PER DENSITY, SIX OF THEM, PUBLISHED RATHER THAN COMPUTED. Five are read from the
+     density they belong to: 20px is the base rule's own `min-height`, 22px is `is-row`'s, 34px is
+     `is-action`'s, 25px is the height `is-tag-run`'s note computes (6 + 6 + 11 + 2) and 20px is
+     the height `is-inspector`'s note computes (3 + 12 + 3 plus the hairline). `is-list` is the
+     exception and the reason these are published: it states `min-height: 0`, so it has no height
+     to read, and its side is the 15px stadium `proto:4872` states and its own note quotes. A
+     labelled list chip renders about 13px, so an icon-only one is deliberately about two pixels
+     taller — the published figure, rather than one derived from a height that density declines
+     to have.
+
+     EQUAL INSETS, WHICH IS `padding: 0`. Every density's padding is horizontal-only or
+     horizontal-heavy, so carrying one into a fixed square would push the glyph off centre; the
+     base rule's `justify-content: center` and `align-items: center` already place it. The
+     `box-sizing: border-box` the base rule declares is what keeps the side the OUTER side, edge
+     included, so the square measures what it says at every density.
+
+     `min-height` IS RESTATED BESIDE `height` on purpose: the base rule's 20px floor would win at
+     `list` (15px) otherwise, and `is-list`'s own `min-height: 0` would let a column flex parent
+     collapse the square at the others. Each compound selector is (0,3,0) and beats both the
+     density it names and the base rule below, so these five do not depend on their order. */
+  .manager-chip.is-icon-only {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+    padding: 0;
+  }
+
+  .manager-chip.is-icon-only.is-row {
+    width: 22px;
+    height: 22px;
+    min-height: 22px;
+  }
+
+  .manager-chip.is-icon-only.is-list {
+    width: 15px;
+    height: 15px;
+    min-height: 15px;
+  }
+
+  .manager-chip.is-icon-only.is-action {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+  }
+
+  .manager-chip.is-icon-only.is-tag-run {
+    width: 25px;
+    height: 25px;
+    min-height: 25px;
+  }
+
+  .manager-chip.is-icon-only.is-inspector {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
   }
 
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
