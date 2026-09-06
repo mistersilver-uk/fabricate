@@ -197,7 +197,21 @@ test('1036/1: a component editor round-trip preserves a disabled essence quantit
   );
 });
 
-test('1036/1 negative control: the editor round-trip drops a quantity whose essence is undefined', () => {
+test('1371 r20: the editor round-trip CARRIES a quantity whose essence this system does not define', () => {
+  // THIS ASSERTION WAS INVERTED AT r20-store3 (reviewer round 6, finding 2). It used to pin the
+  // opposite — "an essence with no definition has no option row, so the round-trip cannot re-emit
+  // it" — which was true and was the defect. `essences` is a world-default SECTION since r18 and
+  // `data-models`, `### Component scope` states that a world map is NOT narrowed to the ids a given
+  // system holds, so a resolved map legitimately carries ids outside this system's roster. A
+  // round-trip that dropped them made every untouched save DIFFER from the resolved map, which the
+  // override rule read as an authored override: the switch flipped and the essence vanished from
+  // what the system resolved, on a save the GM made to change a category.
+  //
+  // The entry is CARRIED rather than OFFERED: it gets no option row, because this system has no
+  // name, icon, colour or control for it. `buildComponentEditorState` reports it as
+  // `carriedEssences` and the rebuild spreads it back.
+  //
+  // WHAT THE ROSTER STILL REFUSES is one layer down and unchanged — see the next case.
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys',
@@ -208,14 +222,39 @@ test('1036/1 negative control: the editor round-trip drops a quantity whose esse
   });
   // Re-attach the orphaned quantity that system normalization already stripped, so the
   // editor round-trip is the ONLY filter under test here.
-  const updates = buildComponentEditorUpdates(
-    buildComponentEditorState(system, { ...system.components[0], essences: { fire: 3 } })
-  );
+  const state = buildComponentEditorState(system, {
+    ...system.components[0],
+    essences: { fire: 3 },
+  });
+  const updates = buildComponentEditorUpdates(state);
 
+  assert.deepEqual(state.carriedEssences, { fire: 3 }, 'carried, and reported as carried');
+  assert.deepEqual(
+    state.essenceOptions.map((option) => option.id),
+    ['water'],
+    'negative control: it is NOT offered — the rendered rows are still the system’s own roster'
+  );
+  assert.equal(updates.essences.fire, 3, 'and the rebuild re-emits it rather than dropping it');
+});
+
+test('1036/1 negative control: the SYSTEM normalizer is what refuses an undefined essence id', () => {
+  // The filter the case above no longer applies still applies HERE, which is what keeps the
+  // carry-forward from being a route around the roster rule: an in-system row may hold only
+  // essences the system defines, and `_normalizeEssenceQuantities` is where that is enforced.
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys',
+    name: 'S',
+    features: { essences: true },
+    components: [{ id: 'wood', name: 'Wood', essences: { fire: 3, water: 1 } }],
+    essenceDefinitions: [{ id: 'water', name: 'Water' }],
+  });
+
+  assert.equal(system.components[0].essences.water, 1);
   assert.equal(
-    Object.hasOwn(updates.essences, 'fire'),
+    Object.hasOwn(system.components[0].essences, 'fire'),
     false,
-    'an essence with no definition has no option row, so the round-trip cannot re-emit it'
+    'so an editor that carries the id forward still cannot persist it onto this system’s own row'
   );
 });
 

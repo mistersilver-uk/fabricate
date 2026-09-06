@@ -133,6 +133,47 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     assert.ok(!button().classList.contains('is-full-width'), button().className);
   });
 
+  // ── THE 38px RUNG (issue 1371) ────────────────────────────────────────────────────────
+  //
+  // `size` is the one prop on this component that can change the control's BOX, so its
+  // default is a compatibility contract across 48 call-site files: absent, it must emit no
+  // class at all. The sheet half — that `is-size-38` is 38px and takes the band's corner
+  // with it — is measured in `manager-control-rungs.test.js` beside M12b's other four
+  // controls, which is where the ladder arithmetic already lives.
+  it('emits NO size class by default, so every shipped button keeps its 34px control', async () => {
+    await harness.mount({ role: 'primary' });
+    assert.equal(button().className, 'manager-button fab-manager-button is-primary');
+  });
+
+  it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
+    await harness.mount({ role: 'primary', size: '38', fullWidth: true, class: 'manager-thing' });
+    // The documented order, and the same one `ManagerSearchField` states for the same token:
+    // the primitive's own modifiers, then the rung, then whatever the caller appended.
+    assert.equal(
+      button().className,
+      'manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
+    );
+  });
+
+  it('takes the rung as a number too, since a caller will write size={38}', async () => {
+    await harness.mount({ size: 38 });
+    assert.equal(button().className, 'manager-button fab-manager-button is-size-38');
+  });
+
+  it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
+    // A retired rung, a rung the sheet has no rule for, an adjective, and the prototype
+    // spelling of a rung that is not this one — each must render the shipped 34px control.
+    for (const size of ['36', '40', 34, 'tall', '', 'toString']) {
+      await harness.mount({ size });
+      assert.equal(
+        button().className,
+        'manager-button fab-manager-button',
+        `size="${String(size)}" is not a rung this button offers`
+      );
+      harness.remount();
+    }
+  });
+
   it('appends the pass-through class after its own, never in place of them', async () => {
     await harness.mount({ role: 'ghost', class: 'is-subtle manager-thing' });
     // A `class` arriving through the rest spread would REPLACE the primitive's classes and

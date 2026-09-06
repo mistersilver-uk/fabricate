@@ -85,6 +85,8 @@
      The state an owner binds must be INITIALISED — an uninitialised `$state()` throws
      `props_invalid_value` on mount; see the frame's own note.
    - onSelect(entityId): called after the write, for an owner that reacts without binding.
+   - autoSelectFirst: inspect the first shown row on open when nothing is selected. Opt-in, off
+     by default; see the frame's prop note.
    - onOpenEntry(entityId): the row's pen, into that entity's world entry editor.
    - rowMeta / inspectorBody / bulk: the lane's three snippets.
 -->
@@ -115,6 +117,19 @@
     inspectorFoot = undefined,
     countUnit = '',
     membershipFilter = true,
+    // Threaded straight to the frame; see its own prop note. OPT-IN, defaulting to the single
+    // toolbar row every catalogue renders today.
+    splitToolbar = false,
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
+    // exactly what the essence and tool catalogues render today: `toolbarLeadSize` is the control
+    // rung the LEAD toolbar row takes (`''` = the shipped 34px, `'38'` = the ladder's next rung,
+    // which is what `proto:577`-`578` draws), and `rowMedallion` is the `{variant, size, glyph}`
+    // descriptor for the tile at the head of a row (`null` = the shipped 40px artwork tile).
+    toolbarLeadSize = '',
+    rowMedallion = null,
+    // Threaded straight to the frame and on to `BulkSelectionToolbar`; see the frame's own prop
+    // note. `'results'` is the shipped band, so the essence and tool catalogues are unchanged.
+    selectAllScope = 'results',
     selectAllLabel = '',
     onOpenSystemRules = null,
     // The list's lifted view-state (issue 1438), passed straight through to the frame. It is
@@ -123,12 +138,31 @@
     browserState = $bindable(null),
     selectedId = $bindable(''),
     onSelect = () => {},
+    // WHETHER THE FIRST SHOWN ROW IS INSPECTED ON OPEN (issue 1371 r13-cat, maintainer ruling
+    // M14). Threaded straight to the frame; see its own prop note for what it yields to. OPT-IN
+    // and OFF by default, so the essence and tool catalogues open on the resting inspector they
+    // always did; the world Component catalogue is the lane that turns it on.
+    autoSelectFirst = false,
+    // WHETHER THE LIST COLUMN RUNS EDGE TO EDGE IN ITS PANE (issue 1371 r16-cat, maintainer
+    // ruling M21). Threaded straight to the frame; see its own prop note. OPT-IN and OFF by
+    // default, so the essence and tool catalogues keep the pane inset they always carried; the
+    // world Component catalogue is the lane that turns it on.
+    flushColumn = false,
+    // WHETHER THE BULK PANEL'S DOCK REACHES THE INSPECTOR COLUMN'S EDGES (issue 1371 r16-cat,
+    // maintainer ruling M24). Threaded straight to the frame; see its own prop note. OPT-IN and
+    // OFF by default, so the tool catalogue's bulk panel keeps the column it shipped in.
+    flushBulkDock = false,
     onOpenEntry = () => {},
     rowMeta = undefined,
     // Threaded straight to the frame; see its own prop notes. All three are OPT-IN and default to
     // exactly what the component and essence catalogues render today.
     rowTrailing = undefined,
     rowSecondLine = 'description',
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN: a lane that draws
+    // its own source pill on the NAME LINE turns the frame's trailing badge off, so one row never
+    // carries two answers to "does this record name a source Item".
+    rowNameTrailing = undefined,
+    rowSourceBadge = true,
     describeEntry = undefined,
     // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
     // exactly what the component and essence catalogues render today.
@@ -148,12 +182,48 @@
     // lane that NAMES the verb gets the design's bordered `Edit <noun>` button instead, which is
     // also what our own system rules list already draws.
     openEntryLabel = '',
+    // WHETHER THAT NAMED VERB IS DRAWN AS A LABELLED BUTTON. It shipped derived from
+    // `openEntryLabel` alone, which made the two questions one: a lane could not name the action
+    // for its `title` and its accessible name — which the reference DOES, `Open catalogue entry`
+    // on a 28px pen (`proto:609`) — without also getting a 104px labelled control. `null` keeps
+    // the derivation, so the world Tool catalogue and both rules lists are unchanged.
+    openEntryLabelled = null,
     // WHAT AN INSPECTOR SYSTEM ROW OFFERS. `manage` is the shipped pair - a `Rules` link for a
     // member and the membership cluster for a non-member. `navigate` is the design's tool
     // catalogue: EVERY row is a link, and the verb that creates a system's record lives on the
     // system's own screen rather than on the world catalogue. Passed through to
     // `SystemRulesRoster`, which owns the row since that panel was extracted.
     systemRowAction = 'manage',
+    // WHETHER THE INSPECTOR DRAWS THE `World defaults` CARD STACK (issue 1371, parity round 4).
+    //
+    // `true` by default, so the essence and tool catalogues are untouched. The COMPONENT
+    // catalogue opts out because its reference inspector has no such card: it draws a source
+    // inset and a `Global tags` inset, and the defaults stack is a differently-shaped card that
+    // was standing in for the second of them. A subject-only card fails the structural parity
+    // pass by design — `visual-parity/README.md`, "a card is a claim about the shape of the
+    // screen" — so it is withheld rather than reshaped, and the lane that owns the reference for
+    // the other two families keeps the card it draws.
+    showWorldDefaults = true,
+    // WHERE THE LANE'S OWN INSPECTOR BLOCKS SIT relative to the two the shell owns: `'trail'`
+    // (the shipped default) or `'lead'`. See the snippet's own note.
+    inspectorBodyPlacement = 'trail',
+    // WHAT THE INSPECTOR'S SYSTEM ROSTER SAYS WHEN NO SYSTEM HAS THE ENTITY (issue 1371). Threaded
+    // straight to `SystemRulesRoster`; see its own prop note for why the branch is opt-in rather
+    // than derived. Empty by default, so the essence and tool catalogues render the roster they
+    // always did, and only a lane that names a sentence gets one.
+    rosterEmptyNote = '',
+    // THE ROSTER'S TWO SURFACE DECISIONS (issue 1371 r9-cat, reviewer finding 7). Threaded
+    // straight to `SystemRulesRoster`, which states both as opt-in props for exactly this:
+    // `rosterRecessed` drops the card one ramp rung to `--fab-bg-0`, and `rosterSearchWell` lifts
+    // its search field back up to a `--fab-bg-1` box with a hairline and the rows' 7px corner, so
+    // a recessed card reads as a container holding two kinds of thing rather than as a flat pane.
+    //
+    // The shell has to carry them because a page composes THIS component and never the roster:
+    // the panel is rendered inside `catalogueInspector`, which is this file's snippet. Both
+    // default to OFF, so the essence and tool catalogues render the card they always did — the
+    // reference for this pair is the world Component catalogue's inspector and no other.
+    rosterRecessed = false,
+    rosterSearchWell = false,
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -188,7 +258,7 @@
       // A LANE THAT NAMES THE VERB GETS THE LABELLED BUTTON. The design's row action reads
       // `Edit tool`, and a bare pen states neither the verb nor the noun; the shipped `Open`
       // icon button stays the default so no other catalogue's row moves.
-      labelled: Boolean(openEntryLabel),
+      labelled: openEntryLabelled === null ? Boolean(openEntryLabel) : openEntryLabelled === true,
       label: openEntryLabel || text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
       run: (entry) => onOpenEntry(entry.id),
     },
@@ -236,6 +306,8 @@
     {rowMeta}
     {rowTrailing}
     {rowSecondLine}
+    {rowNameTrailing}
+    {rowSourceBadge}
     {describeEntry}
     {nameEntry}
     {listLead}
@@ -248,10 +320,17 @@
     {inspectorFoot}
     {countUnit}
     {membershipFilter}
+    {splitToolbar}
+    {toolbarLeadSize}
+    {rowMedallion}
+    {selectAllScope}
     {selectAllLabel}
     bind:browserState
     bind:selectedId
     {onSelect}
+    {autoSelectFirst}
+    {flushColumn}
+    {flushBulkDock}
     bind:armedToken
     inspectorBody={catalogueInspector}
   />
@@ -267,6 +346,23 @@
   {@const counts = entry?.inheritCounts ?? {}}
 
   <!--
+    THE LANE'S OWN BLOCKS COME FIRST WHEN IT SAYS SO (issue 1371, parity round 4).
+
+    The shell used to render its two regions and then the lane's, unconditionally — which is right
+    for a lane whose panel is an ADDITION below them, and wrong for one whose blocks the reference
+    draws ABOVE the system roster. The world Component catalogue is the second: its inspector reads
+    identity, then the source address, then the world vocabulary, then which systems have rules,
+    and rendering the roster first inverted the whole column.
+
+    `inspectorBodyPlacement` names which, and defaults to what shipped, so the essence and tool
+    catalogues are byte-identical. It is a placement rather than a reordering of the shell's own
+    regions, because the two regions the shell owns keep their order relative to each other.
+  -->
+  {#if inspectorBody && inspectorBodyPlacement === 'lead'}
+    {@render inspectorBody(entry, ctx)}
+  {/if}
+
+  <!--
     THE WORLD DEFAULTS ARE CARDS THAT NAME THEIR VALUE, not a label-and-count run.
 
     Each card is `[glyph] {what this default IS} / {how many systems take it}`
@@ -275,42 +371,47 @@
     and the value is the fact. The inherit COUNT is still on the card and still hooked by
     `data-scoped-list-inherit-count`, so nothing that could read it before has lost it.
   -->
-  <section class="manager-scoped-catalogue-section" data-scoped-list-defaults>
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Scoped.List.DefaultsHead', 'World defaults')}
-    </p>
-    {#each sections as section (section)}
-      <div class="manager-scoped-catalogue-card" data-scoped-list-inherit-count={section}>
-        <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
-          <i class={sectionIcons?.[section] || 'fas fa-sliders'}></i>
-        </span>
-        <span class="manager-scoped-catalogue-card-copy">
-          <span class="manager-scoped-catalogue-card-title">
-            {sectionTitles?.[section] || scopedSectionLabel(section, text)}
+  {#if showWorldDefaults}
+    <section class="manager-scoped-catalogue-section" data-scoped-list-defaults>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Scoped.List.DefaultsHead', 'World defaults')}
+      </p>
+      {#each sections as section (section)}
+        <div class="manager-scoped-catalogue-card" data-scoped-list-inherit-count={section}>
+          <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
+            <i class={sectionIcons?.[section] || 'fas fa-sliders'}></i>
           </span>
-          <span class="manager-scoped-catalogue-card-note" data-scoped-list-inherit-note={section}>
-            {sectionNotes?.[section] ||
-              format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
-                count: Number(counts[section]) || 0,
-              })}
+          <span class="manager-scoped-catalogue-card-copy">
+            <span class="manager-scoped-catalogue-card-title">
+              {sectionTitles?.[section] || scopedSectionLabel(section, text)}
+            </span>
+            <span
+              class="manager-scoped-catalogue-card-note"
+              data-scoped-list-inherit-note={section}
+            >
+              {sectionNotes?.[section] ||
+                format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
+                  count: Number(counts[section]) || 0,
+                })}
+            </span>
           </span>
-        </span>
-      </div>
-    {/each}
-    {#each extraCards as card (card.id)}
-      <div class="manager-scoped-catalogue-card" data-scoped-list-extra-card={card.id}>
-        <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
-          <i class={card.icon || 'fas fa-sliders'}></i>
-        </span>
-        <span class="manager-scoped-catalogue-card-copy">
-          <span class="manager-scoped-catalogue-card-title">{card.title}</span>
-          {#if card.note}
-            <span class="manager-scoped-catalogue-card-note">{card.note}</span>
-          {/if}
-        </span>
-      </div>
-    {/each}
-  </section>
+        </div>
+      {/each}
+      {#each extraCards as card (card.id)}
+        <div class="manager-scoped-catalogue-card" data-scoped-list-extra-card={card.id}>
+          <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
+            <i class={card.icon || 'fas fa-sliders'}></i>
+          </span>
+          <span class="manager-scoped-catalogue-card-copy">
+            <span class="manager-scoped-catalogue-card-title">{card.title}</span>
+            {#if card.note}
+              <span class="manager-scoped-catalogue-card-note">{card.note}</span>
+            {/if}
+          </span>
+        </div>
+      {/each}
+    </section>
+  {/if}
 
   <!--
     THE SYSTEM LIST IS `SystemRulesRoster`, COMPOSED RATHER THAN INLINED (issue 1372, maintainer
@@ -329,13 +430,18 @@
     {actions}
     {onOpenSystemRules}
     {systemRowAction}
+    {rosterEmptyNote}
+    recessed={rosterRecessed}
+    searchWell={rosterSearchWell}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}
     resetKey={selectedId}
   />
 
-  {#if inspectorBody}{@render inspectorBody(entry, ctx)}{/if}
+  {#if inspectorBody && inspectorBodyPlacement !== 'lead'}
+    {@render inspectorBody(entry, ctx)}
+  {/if}
 {/snippet}
 
 <style>

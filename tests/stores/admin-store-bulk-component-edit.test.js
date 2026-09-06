@@ -69,7 +69,10 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
       removeTags: ['herb'],
     });
 
-    assert.deepEqual(result, { updated: 2, componentIds: ['c1', 'c2'] });
+    // `refused` joined the result at issue 1371 r20-store3: how many pairs had their `essences`
+    // axis withheld because the world-setting write that would have flipped their switch was
+    // refused. Nothing here stages essences, so it is 0.
+    assert.deepEqual(result, { updated: 2, componentIds: ['c1', 'c2'], refused: 0 });
     assert.equal(calls.length, 1, 'ONE set-apply write for the whole selection');
     assert.equal(calls[0].systemId, 'sys1');
     assert.deepEqual(calls[0].componentIds, ['c1', 'c2']);
@@ -86,7 +89,7 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
 
     const result = await store.applyComponentBulkEdit(new Set(['c2']), { difficulty: 9 });
 
-    assert.deepEqual(result, { updated: 1, componentIds: ['c2'] });
+    assert.deepEqual(result, { updated: 1, componentIds: ['c2'], refused: 0 });
     assert.deepEqual(calls[0].componentIds, ['c2']);
   });
 

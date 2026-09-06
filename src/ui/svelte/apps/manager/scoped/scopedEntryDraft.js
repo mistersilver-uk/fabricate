@@ -104,15 +104,32 @@ function isThenable(value) {
  * A section the world defaults do not carry snapshots as `null`, which is the value
  * `updateWorldDefaultSection` is given to CLEAR one — so "unset" is one value here, not two.
  *
+ * ## A SECTION MAY NAME ITS OWN READER AND WRITER (issue 1371 r18-entry, maintainer ruling M34)
+ *
+ * "Every component edit on the world entry stages and lands on `Save entry`" — and two of the
+ * entry's edits are not world-default sections: its tags land through `setWorldTags` and its
+ * aliases through `updateEntity`'s `aliasItemUuids`, off the entity record. Rather than a second
+ * draft beside this one (two dirty flags, two saves, two guards — the shape this module exists to
+ * end), a shape may hand a `readers[section]` for where the persisted value lives and the flush a
+ * `writers[section]` for how it lands. A section naming neither keeps the world-default reading
+ * and writing it always had, so the essence and tool entries are unchanged by construction.
+ *
  * @param {{entity?: object, defaults?: object}|null|undefined} entry a projected entry.
- * @param {{identityFields?: readonly string[], sections?: readonly string[]}} shape
+ * @param {{identityFields?: readonly string[], sections?: readonly string[],
+ *   readers?: Record<string, (entry: object|null|undefined) => unknown>}} shape
  * @returns {{identity: Record<string, unknown>, defaults: Record<string, unknown>}}
  */
-export function scopedEntryBaseline(entry, { identityFields = [], sections = [] } = {}) {
+export function scopedEntryBaseline(
+  entry,
+  { identityFields = [], sections = [], readers = {} } = {}
+) {
   const identity = {};
   for (const field of identityFields) identity[field] = entry?.entity?.[field] ?? '';
   const defaults = {};
-  for (const section of sections) defaults[section] = entry?.defaults?.[section] ?? null;
+  for (const section of sections) {
+    const read = readers?.[section];
+    defaults[section] = (read ? read(entry) : entry?.defaults?.[section]) ?? null;
+  }
   return { identity, defaults };
 }
 
@@ -196,6 +213,15 @@ export function scopedEntryDirty(draft, persisted) {
 }
 
 /**
+ * The name {@link flushScopedEntryDraft} reports for the identity patch, which is a step of the
+ * sequence but not a SECTION. Exported so a caller's own label map is keyed on this literal rather
+ * than on a second spelling of it.
+ *
+ * @type {string}
+ */
+export const SCOPED_ENTRY_IDENTITY_STEP = 'identity';
+
+/**
  * Flush a draft through one entity type's world-scope write family.
  *
  * The identity patch lands FIRST and the sections after it, in the order the scope descriptor
@@ -207,21 +233,79 @@ export function scopedEntryDirty(draft, persisted) {
  * here — which is what the route-exit guard gates navigation on. A GM whose Save did not land
  * stays on the screen with the edit still in front of them.
  *
+ * A section with a `writers[section]` lands through it instead (M34, see
+ * {@link scopedEntryBaseline}); the writer is handed the action family, the entity id and the
+ * staged value, and answers `false` to refuse exactly as the family's own verbs do.
+ *
+ * ── A REFUSED WRITE IS NOT ALWAYS A `false`: A FOUNDRY-REFUSED ONE REJECTS ─────────────────────
+ * These verbs end in `game.settings.set` on a WORLD setting, which awaits `SocketInterface`'s
+ * dispatch; a server refusal posts Foundry's own `ui.notifications.error(error.message)` and then
+ * REJECTS. Testing `=== false` alone therefore let a real refusal out of this function as a
+ * rejected promise: the route-exit guard's `(await handle.save()) !== false` rejected rather than
+ * declining the exit, the header's `onclick={() => onSave()}` dropped it as an unhandled
+ * rejection, and the GM's only signal was Foundry's raw sentence. That mattered more under M34
+ * than it used to: the four sections land as ONE SEQUENCE, so a rejection at write *k* leaves
+ * `1..k-1` durably landed while the draft stays dirty — and the store publishes its cache BEFORE
+ * awaiting the write, so every open manager surface shows all four as saved until a reload.
+ *
+ * So the whole sequence is caught, the answer is the `false` this function's contract already
+ * promises, and the caller is told WHICH step refused and WHICH had already landed through
+ * `onRefused`. The sentence itself is the caller's, because it is localized and this module has
+ * no localizer — the same division `adminStore`'s membership verbs make, where the store catches
+ * and a named message function says it.
+ *
  * @param {object} options
  * @param {string} options.entityId
  * @param {{identity: Record<string, unknown>|null, sections: Array<{section: string, value: unknown}>}} options.writes
  * @param {object|null} options.actions the entity type's world-scope action family.
+ * @param {Record<string, (actions: object|null, entityId: string, value: unknown) => unknown>} [options.writers]
+ * @param {(refusal: {step: string, error: unknown, landed: string[]}) => void} [options.onRefused]
+ *   Called ONCE, with the step that threw and the steps that had already landed, when a write
+ *   REJECTS. Not called for a `false`: a verb that answers `false` has declined the write itself
+ *   and has already said so its own way, and a second sentence over that one is an echo. Its own
+ *   throw is caught and logged rather than allowed to reject this function.
  * @returns {Promise<boolean>} whether every write landed.
  */
-export async function flushScopedEntryDraft({ entityId, writes, actions }) {
+export async function flushScopedEntryDraft({
+  entityId,
+  writes,
+  actions,
+  writers = {},
+  onRefused,
+}) {
   if (!entityId) return false;
-  if (writes.identity !== null) {
-    const patched = await actions?.updateEntity?.(entityId, writes.identity);
-    if (patched === false) return false;
-  }
-  for (const { section, value } of writes.sections) {
-    const written = await actions?.updateWorldDefaultSection?.(entityId, section, value);
-    if (written === false) return false;
+  const landed = [];
+  let step = SCOPED_ENTRY_IDENTITY_STEP;
+  try {
+    if (writes.identity !== null) {
+      const patched = await actions?.updateEntity?.(entityId, writes.identity);
+      if (patched === false) return false;
+      landed.push(step);
+    }
+    for (const { section, value } of writes.sections) {
+      step = section;
+      const write = writers?.[section];
+      const written = write
+        ? await write(actions, entityId, value)
+        : await actions?.updateWorldDefaultSection?.(entityId, section, value);
+      if (written === false) return false;
+      landed.push(section);
+    }
+  } catch (error) {
+    console.error('Fabricate | A scoped entry save was refused:', error);
+    // THE REPORT MAY NOT RE-REJECT THE FLUSH (issue 1371 r20-entry3, Foundry review round 6
+    // finding 5). `onRefused` is a documented public parameter, and a throw from it inside this
+    // catch would escape as a rejection from the very function whose contract is "answers `false`
+    // when a write refused OR rejected" — putting the route-exit guard back where the uncaught
+    // rejection left it. It is total today (`notifyError` and `localize` are fully optional-chained
+    // on `globalThis`), and that is precisely the guarantee that should not rest on every future
+    // caller's callback.
+    try {
+      onRefused?.({ step, error, landed });
+    } catch (reportError) {
+      console.error('Fabricate | A scoped entry save refusal could not be reported:', reportError);
+    }
+    return false;
   }
   return true;
 }

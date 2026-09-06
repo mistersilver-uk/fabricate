@@ -14,25 +14,53 @@
    - expanded: whether the controlled region is open.
    - controls: the DOM id of the region this header expands (`aria-controls`).
    - onToggle(): called on activation.
+   - collapsible: whether the group can be collapsed at all (issue 1371, maintainer parity
+     round 4). `true` — the shipped default, byte-identical to what every existing caller
+     renders — draws the disclosure chevron on a real `<button aria-expanded aria-controls>`.
+     `false` draws a NON-INTERACTIVE `<div>` with no chevron, because a header that cannot
+     collapse must not claim it can: `aria-expanded` on a control that never changes state is
+     a lie to a screen reader, and a `<button>` that does nothing is a keyboard stop that
+     leads nowhere. The reference's system Component Rules group band (`proto:1071-1074`) is
+     exactly that band — a folder glyph, the category name and a bare mono count — so the
+     grouped list gets its header from this primitive rather than hand-rolling a second one.
 -->
 <script>
-  let { name = '', countText = '', expanded = true, controls = '', onToggle = () => {} } = $props();
+  let {
+    name = '',
+    countText = '',
+    expanded = true,
+    controls = '',
+    collapsible = true,
+    onToggle = () => {},
+  } = $props();
 </script>
 
-<button
-  type="button"
-  class="fab-group-header"
-  data-group-header={name}
-  aria-expanded={expanded}
-  aria-controls={controls || undefined}
-  onclick={() => onToggle()}
->
-  <i class={expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'} aria-hidden="true"></i>
-  <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
-  <span class="fab-group-name">{name}</span>
-  <span class="fab-group-count">{countText}</span>
-  <span class="fab-group-spacer" aria-hidden="true"></span>
-</button>
+{#if collapsible}
+  <button
+    type="button"
+    class="fab-group-header"
+    data-group-header={name}
+    aria-expanded={expanded}
+    aria-controls={controls || undefined}
+    onclick={() => onToggle()}
+  >
+    <i class={expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'} aria-hidden="true"></i>
+    <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
+    <span class="fab-group-name">{name}</span>
+    <span class="fab-group-count">{countText}</span>
+    <span class="fab-group-spacer" aria-hidden="true"></span>
+  </button>
+{:else}
+  <!-- No chevron, no `aria-expanded`, no `aria-controls`: nothing here expands. The band keeps
+       `data-group-header` and every class, so the sheet, the smoke selectors and the mounted
+       assertions that already name this header resolve against both forms. -->
+  <div class="fab-group-header is-static" data-group-header={name}>
+    <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
+    <span class="fab-group-name">{name}</span>
+    <span class="fab-group-count">{countText}</span>
+    <span class="fab-group-spacer" aria-hidden="true"></span>
+  </div>
+{/if}
 
 <style>
   .fab-group-header {
@@ -64,6 +92,36 @@
   .fab-group-header:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  /* The non-collapsible band. It is not a control, so it takes neither the pointer cursor nor
+     the hover repaint, and the radius snaps 8 to the 7 rung (`design-system/spec.md:218`) on a
+     32px band.
+
+     PADDING IS THE SCALE, NOT THE REFERENCE'S OWN `7px 11px` (`proto:1071`). Padding, margin and
+     gap must derive from the published spacing scale, whose neighbouring steps here are 6/8 and
+     12; the raw pair was new debt the ratchet reds on. 6 and 12 are each one pixel from the
+     drawn value, which is inside this band's slack — nothing is pinned to its height.
+
+     TYPE IS THE REFERENCE'S, in px, because font sizes are NOT scale members and are written as
+     literals (`design-system/spec.md:216-220`). The collapsible form's 0.72rem/0.66rem resolve
+     to 11.52px and 10.56px against the 16px root, and the reference draws 11px and 10.5px; both
+     are stated on `.is-static` alone so the RecipesBrowserView's collapsible header is
+     untouched. */
+  .fab-group-header.is-static {
+    padding: var(--fab-space-chip) var(--fab-space-3);
+    border-radius: 7px;
+    font-size: 11px;
+    cursor: default;
+  }
+
+  .fab-group-header.is-static .fab-group-count {
+    font-size: 10.5px;
+  }
+
+  .fab-group-header.is-static:hover {
+    border-color: var(--fab-border);
+    background: var(--fab-surface-soft);
   }
 
   .fab-group-header > i {

@@ -13,6 +13,7 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateCharacterLibrariesToWorldScope } from './migrateCharacterLibrariesToWorldScope.js';
+import { migrateComponentEssenceSections } from './migrateComponentEssenceSections.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
 import { migrateCurrencyToWorldScope } from './migrateCurrencyToWorldScope.js';
 import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
@@ -688,6 +689,30 @@ const MIGRATIONS = [
     // rewritten by either direction.
     downgradeLosesData: false,
     migrate: (data) => migrateToolRequirementSections(data),
+  },
+  {
+    version: '1.32.0',
+    label:
+      'Give every component ONE set of world essence values, shared by the crafting systems ' +
+      'that use it. Each world component now carries the essence values it has in the oldest ' +
+      'system holding rules for it, and every system whose own values already match is marked ' +
+      'as inheriting them, so an edit on the Component Catalogue reaches those systems at once; ' +
+      'a system whose values differ keeps its own as its override and is untouched until you ' +
+      'choose otherwise in its rules editor. NO SYSTEM CHANGES BEHAVIOUR: a system marked as ' +
+      'inheriting already had exactly the world values, and a system that did not keeps what ' +
+      'it had. A component with no essence values anywhere gets no world values until you ' +
+      'author them. DOWNGRADING IS NOT LOSSLESS: 1.31.0 reads each system’s own essence values ' +
+      'and ignores the world values, so any world values you edit after this migration stop ' +
+      'reaching the systems that inherit them, and the world values themselves are dropped from ' +
+      'the setting on the first world-scope save there',
+    downgradeTo: '1.31.0',
+    // The elected map is a COPY of in-system data and its loss costs nothing, but a world map
+    // a GM edits after this pass is authored data that 1.31.0's `COMPONENT_SECTIONS` does not
+    // name: `normalizeWorldDefaults` drops the key on read and the next `save()` drops it from
+    // the setting, while the inheriting systems' in-system rows still hold the pre-edit values.
+    // That is data loss in the registry's sense, and the label says so beside the button.
+    downgradeLosesData: true,
+    migrate: (data) => migrateComponentEssenceSections(data),
   },
   // Future migrations added here in version order
 ];

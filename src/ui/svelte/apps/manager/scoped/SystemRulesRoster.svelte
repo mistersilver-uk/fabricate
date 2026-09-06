@@ -57,6 +57,18 @@
      immediately below for why the tool catalogue takes the second one.
    - armedToken / onArm / onDisarm: the shared arm latch, threaded through so one armed Remove at
      a time survives across the whole screen rather than per row.
+   - recessed / searchWell: the reference's two SURFACE decisions for this card, both opt-in and
+     both absent by default (issue 1371, parity round 5, reviewer finding 7). `recessed` drops the
+     card one ramp rung to `--fab-bg-0`; `searchWell` lifts its search field back up to a
+     `--fab-bg-1` box with a hairline and the rows' own 7px corner, so a recessed card reads as a
+     container holding two kinds of lifted thing.
+
+     THEY ARE PROPS BECAUSE SIX SCREENS COMPOSE THIS COMPONENT. Round 4 landed both as
+     UNCONDITIONAL declarations, which repainted the merged world Essence catalogue and the world
+     Tool catalogue — two other lanes' approved screens — as a side effect of a component parity
+     ruling. A shared primitive that has to behave differently at a second site takes a prop; the
+     default is what those screens rendered before this work, which is a card on the pane's own
+     surface with a bare input on it.
    - resetKey: any value that identifies the SUBJECT. When it changes, the search term and the
      page index reset — without it the panel keeps the previous entity's page three and search
      term and shows an empty system list under a full inspector.
@@ -78,6 +90,21 @@
     actions = null,
     onOpenSystemRules = null,
     systemRowAction = 'manage',
+    // WHAT A ZERO-MEMBER ROSTER SAYS INSTEAD OF LISTING EVERY SYSTEM (issue 1371, round 2).
+    //
+    // Under `systemRowAction="navigate"` EVERY row is a live `Rules ↗`, which is right for an
+    // entity some system has — and wrong for one none does: the world component catalogue drew
+    // `SYSTEM RULES 0 / 6` over six identical live links into six screens that hold no rules for
+    // it. The reference replaces the roster in that state with a sentence.
+    //
+    // OPT-IN AND EMPTY BY DEFAULT, so the essence and tool catalogues render exactly the roster
+    // they always did: this component is shared by six screens, and a branch that fired for all
+    // of them would change two other lanes' output.
+    rosterEmptyNote = '',
+    // The card's two surface decisions, OFF by default so the essence and tool catalogues render
+    // exactly the card they rendered before this work. See the props block above.
+    recessed = false,
+    searchWell = false,
     armedToken = '',
     onArm = () => {},
     onDisarm = () => {},
@@ -200,18 +227,27 @@
     one object read as three unrelated ones, its pager floated against the pinned foot action
     with nothing between them, and a short roster left no boundary at all.
 
-    Its BOX is the geometry the finding names; its SURFACE is not. The design recesses the card
-    one rung below the panel and lifts each part one rung above it, and our own ramp for this
-    route puts the pane at the bottom rung already — so the recess has nowhere to go and the
-    card is drawn the way every other card in this content area is: a hairline on the pane's own
-    surface, no fill. That is the shipped ruling for this region and this does not reopen it.
+    AND ITS SURFACE IS THE RECESS WHERE A CALLER ASKS FOR ONE (issue 1371, parity rounds 4 and 5).
+    Round 3 of the sibling lane recorded "our ramp has nowhere to go" and drew the card with no
+    fill. That was an adaptation argument rather than a measurement: `--fab-bg-0` exists, it IS a
+    rung below the `--fab-bg-2` this inspector pane is painted in, and the reference recesses the
+    card to it while lifting each part inside to `--fab-bg-1`. Three surfaces, three tokens, all
+    published, and the maintainer's parity ruling voids every "our ramp is different" exemption.
+
+    ROUND 4 THEN STATED IT UNCONDITIONALLY, WHICH IS THE HALF THAT IS CORRECTED HERE. Six screens
+    compose this component; a parity finding raised against ONE of them is not a licence to
+    repaint the other five. It is `recessed` now, with `searchWell` for the lifted field that
+    makes the recess legible, and both default to the surface the essence and tool catalogues have
+    always drawn.
   -->
-  <div class="manager-scoped-roster-card">
+  <div class="manager-scoped-roster-card" class:is-recessed={recessed}>
     <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
          on all six screens that draw this card; the trailing `…` was this panel's own addition
          and was the one string in the card that differed from the reference. -->
     <ManagerSearchField
-      class="manager-scoped-roster-search"
+      class={searchWell
+        ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
+        : 'manager-scoped-roster-search'}
       value={systemQuery}
       onInput={(next) => changeSystemQuery(next)}
       placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
@@ -219,69 +255,94 @@
       inputAttrs={{ 'data-scoped-list-system-search': '' }}
     />
 
-    <ul class="manager-scoped-roster-systems" role="list">
-      {#each pageRows as row (row.systemId)}
-        <li
-          class="manager-scoped-roster-system"
-          data-scoped-list-system={row.systemId}
-          data-scoped-system={row.systemId}
-          data-scoped-system-state={membershipState(row)}
-        >
-          <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
-          {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
-            <button
-              type="button"
-              class="manager-scoped-roster-system-link"
-              data-scoped-list-system-rules={row.systemId}
-              title={format(
-                'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
-                'Open {system} rules for {entity}',
-                { system: systemLabel(row), entity: entityName || entityId }
-              )}
-              onclick={() => onOpenSystemRules(entityId, row.systemId)}
-            >
-              <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
-              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-            </button>
-          {:else}
-            <MembershipActions
-              {entityType}
-              {entityId}
-              systemId={row.systemId}
-              {entityName}
-              systemName={systemLabel(row)}
-              member={row.member === true}
-              enabled={row.enabled === true}
-              copyable={false}
-              hint={false}
-              compact={true}
-              {armedToken}
-              onArm={(token) => onArm(token)}
-              onDisarm={() => onDisarm()}
-              onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
-              onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
-              onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
-            />
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    {#if rosterEmptyNote && memberCount === 0}
+      <p class="manager-muted manager-scoped-roster-empty" data-scoped-roster-empty>
+        {rosterEmptyNote}
+      </p>
+    {:else}
+      <ul class="manager-scoped-roster-systems" role="list">
+        {#each pageRows as row (row.systemId)}
+          <li
+            class="manager-scoped-roster-system"
+            data-scoped-list-system={row.systemId}
+            data-scoped-system={row.systemId}
+            data-scoped-system-state={membershipState(row)}
+          >
+            <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
+            {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
+              <button
+                type="button"
+                class="manager-scoped-roster-system-link"
+                data-scoped-list-system-rules={row.systemId}
+                title={format(
+                  'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
+                  'Open {system} rules for {entity}',
+                  { system: systemLabel(row), entity: entityName || entityId }
+                )}
+                onclick={() => onOpenSystemRules(entityId, row.systemId)}
+              >
+                <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
+                <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              </button>
+            {:else}
+              <MembershipActions
+                {entityType}
+                {entityId}
+                systemId={row.systemId}
+                {entityName}
+                systemName={systemLabel(row)}
+                member={row.member === true}
+                enabled={row.enabled === true}
+                copyable={false}
+                hint={false}
+                compact={true}
+                {armedToken}
+                onArm={(token) => onArm(token)}
+                onDisarm={() => onDisarm()}
+                onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
+                onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
+                onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
+              />
+            {/if}
+          </li>
+        {/each}
+      </ul>
 
-    <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
+      <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
          because the reference's pager states five, and a size a GM cannot change is not a control
          they need offered. -->
-    <Pagination
-      persistent={true}
-      showPageSize={false}
-      totalCount={visibleRows.length}
-      {pageIndex}
-      pageSize={SYSTEM_PAGE_SIZE}
-      onPageChange={(next) => (systemPageIndex = next)}
-    />
+      <Pagination
+        persistent={true}
+        showPageSize={false}
+        totalCount={visibleRows.length}
+        {pageIndex}
+        pageSize={SYSTEM_PAGE_SIZE}
+        onPageChange={(next) => (systemPageIndex = next)}
+      />
+    {/if}
   </div>
 </section>
 
 <style>
+  /* The zero-member sentence, in place of a roster of dead links (issue 1371, round 2). */
+  .manager-scoped-roster-empty {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  /* NO MEMBERSHIP MARKER ON A ROSTER ROW, and the absence is deliberate (issue 1371, round 4).
+     Round 2 added `box-shadow: inset 2px 0 0 0 var(--fab-accent)` here on the reasoning that
+     `data-scoped-system-state` was emitted and no sheet read it. The reference draws no such
+     marker: every row is `background:var(--bg1); border:1px solid var(--border); radius:7px` and
+     every row carries `Rules ↗` whichever state it is in. An attribute a sheet does not read is
+     a hook for a test, not a licence to invent a treatment.
+
+     It also could not be caught: `box-shadow` was in no property group in
+     `scripts/visual-parity/lib/schema.js`, and the row is a landmark either way, so `compare` and
+     `inventory` were both silent. The group is added in the same change, and the row regions
+     carry it, so the next invented marker reddens a run. */
+
   /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
      stays at zero.
 
@@ -341,6 +402,15 @@
     border-radius: 9px;
   }
 
+  /* THE RECESS, OPT-IN. One rung below the `--fab-bg-2` pane this card sits in, which is what
+     makes the `--fab-bg-1` search well and the `--fab-bg-1` rows inside it read as lifted. It is
+     a SEPARATE RULE rather than a `background` on the base one because the base one is what five
+     other screens render: an unrecessed card states no fill at all and takes the pane's, which is
+     what it did before this work and what it still does. See the head comment. */
+  .manager-scoped-roster-card.is-recessed {
+    background: var(--fab-bg-0);
+  }
+
   /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
      because the global rule sizes it for a toolbar rather than for a 300px column.
 
@@ -369,6 +439,23 @@
     min-height: 28px;
   }
 
+  /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE (issue 1371, rounds 4 and 5). The reference draws
+     the search as a lifted `--fab-bg-1` box with a hairline and a 7px radius — the same treatment
+     as the rows below it — so that a recessed card reads as a container holding two kinds of
+     lifted thing. Without a fill and a border it read as a caption floating on the card.
+
+     SELECTED ON A SECOND CLASS, not on the one above it. Round 4 wrote this against
+     `.manager-scoped-roster-search`, which is the class EVERY caller passes, so the well landed on
+     the merged world Essence catalogue and the world Tool catalogue too. The `searchWell` prop
+     appends `manager-scoped-roster-search-well` beside it, so the sizing rule above stays shared
+     and only the surface is opted into. `:global` for the reason the two rules above give — the
+     `<input>` belongs to `ManagerSearchField` and never carries this file's scope hash. */
+  :global(.manager-search.manager-scoped-roster-search-well input) {
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    background: var(--fab-bg-1);
+  }
+
   /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), which is the half of this panel a
      screenshot cannot argue about: without a floor the card collapses onto however many systems
      the search left, and the pager — the one control that says there ARE more — walks up and
@@ -393,7 +480,14 @@
     justify-content: space-between;
     /* THE DESIGN'S ROW BOX (`proto:2029`): a step of the scale down each side and a step below
        the card's own inline padding across. It was 2px vertical, which made a row shorter than
-       the 24px control it used to carry and left the name sitting hard against the border. */
+       the 24px control it used to carry and left the name sitting hard against the border.
+
+       THE REFERENCE'S INLINE VALUE IS 9px AND IT SNAPS TO 8 (issue 1371, parity round 4). The
+       published spacing scale has steps at 8 and 12 and `ui-integration/spec.md`'s "Spacing
+       scale" clause makes it mandatory for padding, margin and gap — the same shape of rule as
+       the control-height ladder that snaps the reference's 32 and 36 to 34. One pixel is the
+       whole difference and the token is the rule, so this is a recorded rung rather than a
+       parity defect. */
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;

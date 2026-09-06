@@ -154,6 +154,7 @@ const harness = createMountedComponentHarness({
     // panel it renders over a filtered-to-nothing list. `Chip` directly above is shared with
     // the complication band and is already listed.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',

@@ -1115,7 +1115,7 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
   assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
   for (const stagingControl of [
-    'data-component-bulk-category',
+    'data-component-bulk-category-option',
     'data-bulk-tag',
     'data-stepper-increment',
     'data-component-bulk-difficulty',

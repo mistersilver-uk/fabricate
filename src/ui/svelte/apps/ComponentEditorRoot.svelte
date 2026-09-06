@@ -67,6 +67,14 @@
     if (option) option.quantity = quantity;
   }
 
+  // THE SEED'S TWO FACTS TRAVEL WITH THE DRAFT (issue 1371 r21-store4, the Foundry integrator's
+  // round-7 finding 2). `carriedEssences` is what this system's roster cannot render and the write
+  // must not drop; `baselineEssences` is the map an untouched save of THESE ROWS produces, which
+  // is what the override rule compares the staged map against to answer "did the GM author
+  // anything". Both are facts about the state that was DRAWN, so they are emitted from here —
+  // beside the rows they describe — rather than re-derived from the record at save time, when a
+  // replicated world-scope edit may already have moved it and this window, which registers no
+  // hooks, would never know.
   async function handleSave() {
     if (saving || !editorState.hasEditableFields) return;
     saving = true;
@@ -76,6 +84,8 @@
         showEssences: editorState.showEssences,
         tagOptions: tagDraft,
         essenceOptions: essenceDraft,
+        carriedEssences: editorState.carriedEssences,
+        baselineEssences: editorState.baselineEssences,
       });
     } finally {
       saving = false;

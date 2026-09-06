@@ -12,6 +12,8 @@
  * `tests/**` duplication like `src/`, and its Automatic Analysis ignores `cpd.exclusions`.
  */
 
+import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
+
 /**
  * Raw (uncompiled) modules the harness copies into the temp tree verbatim.
  *
@@ -19,6 +21,9 @@
  * throws for it up front.
  */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
+  // THE COMPONENT SCOPE LEAVES, spread from their own tier rather than restated (issue 1371,
+  // round 3). Four manifests carried this list verbatim; see `COMPONENT_SCOPE_LEAF_MODULES`.
+  ...COMPONENT_SCOPE_LEAF_MODULES,
   // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
   'src/systems/characterLibraries.js',
@@ -38,9 +43,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
   // withhold a disabled essence from the quantity grid.
   'src/utils/essenceValidation.js',
-  // The component category vocabulary (issue 676), imported by ComponentEditView.
-  // A deliberately import-free leaf, so this single entry suffices.
-  'src/utils/componentCategories.js',
+  // The component category vocabulary (issue 676) is imported by ComponentEditView too, and is
+  // no longer restated here: issue 1392 put it in `COMPONENT_SCOPE_LEAF_MODULES` above, because
+  // `worldVocabulary.js` asks it whether a name is the general bucket and every tree spreading
+  // that tier now needs it.
   // The salvage DC control's pure option model (issue 676). Import-free leaf.
   'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
@@ -71,6 +77,11 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // `ItemDropZone`'s payload resolver — it covers BOTH shipped drag shapes, so the macro
   // drop and the identity strip's item drop read one implementation.
   'src/ui/svelte/util/dropUtils.js',
+  // The rules editor's own Validation tab model (issue 1371, parity round 4). It validates ONE
+  // SYSTEM'S rules — the essence contribution, the salvage results, the routing and the
+  // progressive DC — where `componentScopeValidation.js` validates the WORLD record, so the two
+  // are separate modules and both are in this tree's static graph.
+  'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
 ]);
 
 /**
@@ -81,6 +92,14 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
  * omits does not fail — it HANGS, and is reported as `# cancelled`, never `# fail`.
  */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
+  // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
+  // the two system-scope component screens.
+  'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
+  'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/StatusPill.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/apps/manager/Chip.svelte',
   // The manager's ONE icon-only push-button (issue 1422). `ComponentEditView` renders three
@@ -131,5 +150,27 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
+  // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4). The editor grew a two-tab
+  // strip, the Validation tab's shared surface, the roll-budget `Callout` and the
+  // `How players see it` rail — and the rail brings two leaves of its own. Every one is a STATIC
+  // import of `ComponentEditView`, so an omission here HANGS every suite built on this list and
+  // is reported as `# cancelled` rather than `# fail`.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+  // `ExplainerCard`'s own card shell, two rungs down from this tree's root.
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
+  // THE WORLD ENTRY'S OWN RAIL (issue 1371 r18-list, maintainer ruling M27). The rules editor
+  // renders the SAME `How players see it` rail the world Component entry renders, at the system
+  // scope, in place of a rail of its own — so it is a static import of `ComponentEditView` and an
+  // omission here HANGS every suite built on this list.
+  'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
+  // THE RAIL'S ESSENCE RUN (issue 1371 r18-entry, maintainer ruling M31) is the shared essence chip
+  // (M29), a static import of the rail and so two rungs down from this tree's root. Omit it and
+  // every suite built on this list HANGS as `# cancelled`.
+  'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

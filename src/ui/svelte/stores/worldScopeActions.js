@@ -11,9 +11,13 @@
  * and lose the write at reload. Every section-taking action therefore REFUSES a name the
  * scope does not declare and answers `false`.
  *
- * A COMPONENT HAS EXACTLY ONE SECTION. `COMPONENT_SECTIONS` is `['category']`. Its essence
- * quantities, salvage, complications and `difficulty` are not sections and not membership
- * fields - they stay on the in-system `Component` record.
+ * A COMPONENT HAS TWO SECTIONS. `COMPONENT_SECTIONS` is `['category', 'essences']` — the world
+ * essence map joined at issue 1371 r18-store (maintainer ruling M31), so
+ * `updateWorldDefaultSection(id, 'essences', map)` is the write the world entry's editor and
+ * the catalogue's bulk `Essence values` group make, and `setSectionInherited(id, systemId,
+ * 'essences', …)` is the rules editor's inherit choice. Salvage, complications and `difficulty`
+ * are not sections and not membership fields - they stay on the in-system `Component` record,
+ * and so does a system's OWN essence map, which is what an overriding system resolves.
  *
  * ## Three named exceptions, each DELEGATED rather than reimplemented
  *

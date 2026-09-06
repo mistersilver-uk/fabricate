@@ -26,11 +26,16 @@ import {
   adjustBulkEssence,
   bulkDraftHasChanges,
   countComponentsChangingEssences,
+  countSelectedWithCategory,
+  countSelectedWithEssence,
+  countSelectedWithTag,
   createComponentBulkDraft,
   cycleBulkTag,
+  pageBulkInsetRows,
   setBulkCategory,
   setBulkDifficulty,
   setBulkEssence,
+  stagedBulkAxes,
   toBulkComponentEdit,
   toggleBulkDifficultyStaged,
   toggleBulkEssencesStaged,
@@ -281,5 +286,113 @@ describe('component browser state (issue 772)', () => {
     assert.notEqual(first.bulkSelectedComponentIds, second.bulkSelectedComponentIds);
     first.bulkSelectedComponentIds.add('a');
     assert.equal(second.bulkSelectedComponentIds.has('a'), false);
+  });
+});
+
+// ── The system bulk panel's inset anatomy (issue 1371 r16-list, maintainer rulings M23/M24) ──
+//
+// The panel draws each axis as the reference's inline inset — a search well, a fixed window of
+// rows each carrying an `n/N` count of how many SELECTED components already carry the value, and
+// a pager — and its foot names the staged axes. All of that is arithmetic over the draft and the
+// projected cards, so it lives here where it can be pinned without a DOM.
+describe('component bulk edit model (issue 1371 r16-list) — the staged-axis list the foot names', () => {
+  it('names no axis on a fresh draft, and each axis in the reference’s order once staged', () => {
+    assert.deepEqual(stagedBulkAxes(createComponentBulkDraft()), []);
+    let draft = setBulkCategory(createComponentBulkDraft(), 'Metal');
+    assert.deepEqual(stagedBulkAxes(draft), ['category']);
+    draft = cycleBulkTag(draft, 'ore');
+    assert.deepEqual(stagedBulkAxes(draft), ['category', 'tags']);
+    draft = toggleBulkEssencesStaged(draft);
+    assert.deepEqual(stagedBulkAxes(draft), ['category', 'tags', 'essences']);
+    draft = toggleBulkDifficultyStaged(draft);
+    assert.deepEqual(stagedBulkAxes(draft), ['category', 'tags', 'essences', 'difficulty']);
+  });
+
+  it('counts a REMOVAL-ONLY tag draft and a staged all-zero essence map as axes', () => {
+    const removal = cycleBulkTag(cycleBulkTag(createComponentBulkDraft(), 'ore'), 'ore');
+    assert.deepEqual(stagedBulkAxes(removal), ['tags'], 'a removal is a real edit the foot must name');
+    assert.deepEqual(
+      stagedBulkAxes(toggleBulkEssencesStaged(createComponentBulkDraft())),
+      ['essences'],
+      'an all-zero staged map is the CLEAR instruction, and the foot must say so'
+    );
+  });
+});
+
+describe('component bulk edit model (issue 1371 r16-list) — the `n/N` carrier counts', () => {
+  const cards = [
+    { id: 'a', category: 'Metal', tags: ['ore', 'raw'], essences: [{ id: 'fire', quantity: 2 }] },
+    { id: 'b', category: 'Metal', tags: ['ore'], essences: [] },
+    { id: 'c', category: 'Reagent', tags: [], essences: [{ id: 'fire', quantity: 0 }, { id: 'earth', quantity: 1 }] },
+  ];
+
+  it('counts the selected components whose effective category is the row’s', () => {
+    assert.equal(countSelectedWithCategory(cards, 'Metal'), 2);
+    assert.equal(countSelectedWithCategory(cards, 'Reagent'), 1);
+    assert.equal(countSelectedWithCategory(cards, 'Herb'), 0);
+  });
+
+  it('counts the selected components already carrying the tag, case-insensitively', () => {
+    assert.equal(countSelectedWithTag(cards, 'ore'), 2);
+    assert.equal(countSelectedWithTag(cards, 'ORE'), 2, 'the vocabulary is stored lowercase');
+    assert.equal(countSelectedWithTag(cards, 'raw'), 1);
+    assert.equal(countSelectedWithTag(cards, 'rune'), 0);
+  });
+
+  it('counts an essence only where the selected component carries a POSITIVE quantity', () => {
+    assert.equal(countSelectedWithEssence(cards, 'fire'), 1, 'a projected 0 is not a carrier');
+    assert.equal(countSelectedWithEssence(cards, 'earth'), 1);
+    assert.equal(countSelectedWithEssence(cards, 'water'), 0);
+  });
+
+  it('tolerates rows with no tags or essences at all', () => {
+    assert.equal(countSelectedWithTag([{ id: 'x' }], 'ore'), 0);
+    assert.equal(countSelectedWithEssence([{ id: 'x' }], 'fire'), 0);
+    assert.equal(countSelectedWithCategory([{ id: 'x' }], 'Metal'), 0);
+    assert.equal(countSelectedWithCategory(null, 'Metal'), 0);
+  });
+});
+
+describe('component bulk edit model (issue 1371 r16-list) — the inset’s search and page window', () => {
+  const items = ['Earth', 'Flame', 'Metal', 'Reclaimed', 'Refined', 'Water'].map((name) => ({
+    id: name.toLowerCase(),
+    name,
+  }));
+
+  it('windows five rows a page and states the range and page count', () => {
+    const page = pageBulkInsetRows(items, { query: '', pageIndex: 0 });
+    assert.deepEqual(page.rows.map((row) => row.id), ['earth', 'flame', 'metal', 'reclaimed', 'refined']);
+    assert.equal(page.total, 6);
+    assert.equal(page.pageCount, 2);
+    assert.equal(page.pageIndex, 0);
+    assert.equal(page.rangeStart, 1);
+    assert.equal(page.rangeEnd, 5);
+  });
+
+  it('clamps an out-of-range page back onto the last one', () => {
+    const page = pageBulkInsetRows(items, { query: '', pageIndex: 7 });
+    assert.equal(page.pageIndex, 1);
+    assert.deepEqual(page.rows.map((row) => row.id), ['water']);
+    assert.equal(page.rangeStart, 6);
+    assert.equal(page.rangeEnd, 6);
+  });
+
+  it('searches by name, case-insensitively, and reports an empty match as 0-0 of 0', () => {
+    const hit = pageBulkInsetRows(items, { query: 're', pageIndex: 0 });
+    assert.deepEqual(hit.rows.map((row) => row.id), ['reclaimed', 'refined']);
+    assert.equal(hit.rangeStart, 1);
+    assert.equal(hit.rangeEnd, 2);
+    const miss = pageBulkInsetRows(items, { query: 'zzz', pageIndex: 0 });
+    assert.deepEqual(miss.rows, []);
+    assert.equal(miss.total, 0);
+    assert.equal(miss.pageCount, 1, 'an empty window is still one page, so the pager never reads 1/0');
+    assert.equal(miss.rangeStart, 0);
+    assert.equal(miss.rangeEnd, 0);
+  });
+
+  it('takes a caller’s page size, so a taller inset is a parameter and not a copy', () => {
+    const page = pageBulkInsetRows(items, { query: '', pageIndex: 1, pageSize: 4 });
+    assert.deepEqual(page.rows.map((row) => row.id), ['refined', 'water']);
+    assert.equal(page.pageCount, 2);
   });
 });

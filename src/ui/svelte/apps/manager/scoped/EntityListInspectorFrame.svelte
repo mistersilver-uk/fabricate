@@ -193,6 +193,22 @@
     // Separate from `rowMeta` because `rowSecondLine: 'meta'` moves that snippet inside the
     // identity `<button>`, where a control is invalid DOM; see the row markup.
     rowTrailing = undefined,
+    // ── WHAT FOLLOWS THE NAME ON THE NAME LINE (issue 1371 r8-cat) ──────────────────────────
+    // An INERT snippet rendered inside the identity `<button>`, directly after the name, which
+    // is where the reference draws a row's source pill and its exception flag (`proto:601`).
+    // `rowMeta` cannot answer this: under `rowSecondLine: 'description'` that snippet renders in
+    // the TRAILING column, and under `'meta'` it renders on the second line — neither is the
+    // name line. Nothing here may be interactive, for the reason the second-line note gives.
+    //
+    // Absent by default, so every shipped caller renders unchanged.
+    rowNameTrailing = undefined,
+    // ── WHETHER THE FRAME DRAWS ITS OWN SOURCE BADGE (issue 1371 r8-cat) ────────────────────
+    // `true` is the shipped behaviour: a `Linked` / `No source item` pill in the trailing column
+    // under `'description'`, and the warning half inside the fact run under `'meta'`. A lane that
+    // draws the source on the NAME LINE itself — as the reference's component row does, where the
+    // pill states the source TYPE rather than merely its presence — turns this off, so one row
+    // never carries two answers to one question.
+    rowSourceBadge = true,
     // The LINKED-SOURCE rung of `descriptionOf`. A lane that can resolve its entity's source
     // document answers that document's description here, and `''` when it cannot; see
     // `descriptionOf` for why the rung is the lane's and the PRECEDENCE is the frame's.
@@ -240,6 +256,59 @@
     // system" — is already the `n/24 SYSTEMS` stat on every row and the `13 / 24` in the
     // inspector, so the select spent toolbar width on a question the list already answers.
     membershipFilter = true,
+    // ── THE TOOLBAR AS TWO ROWS (issue 1371 r8-cat) ──────────────────────────────────────────
+    // `false` keeps the one row every caller renders today. `true` is the reference's toolbar
+    // (`proto:576`-`586`): a lead row holding the search field and the lane's own filters, and
+    // the filter row below it holding membership, a hairline, the sort pair and the count. The
+    // FILTER ROW keeps its class and its identity either way — it is the row the selection band
+    // joins — so only what stands ABOVE it moves.
+    splitToolbar = false,
+    // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
+    // The control HEIGHT the search field and the lead row's lane-filter selects take, named
+    // after the rung rather than after an adjective, exactly as `ManagerSearchField`'s own
+    // `size` is: `''` is the shipped 34px control and `'38'` is the ladder's next rung up
+    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
+    //
+    // IT GOVERNS THE LEAD ROW AND NOT THE FILTER ROW, because that is what the reference draws:
+    // `proto:577`-`578` puts the search field and the source-type select at 38px, and
+    // `proto:582`-`585` puts the membership select, the sort select and the direction toggle one
+    // row below at 32 — a RETIRED rung, so those three stay on the ladder's 34 under D-C and are
+    // deliberately NOT moved by this prop. A single "toolbar size" would have taken all five.
+    //
+    // Anything outside the closed set renders the shipped 34px control: the field's own prop
+    // drops an unrecognised value, and the select's class is emitted only for a literal match, so
+    // a typo is the default rather than an unstyled `is-size-<whatever the caller composed>`.
+    toolbarLeadSize = '',
+    // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ───────────────────────────
+    // A `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for
+    // the tile at the head of every list row. `null` is the shipped 40px bordered artwork tile,
+    // so the essence and tool catalogues are byte-identical.
+    //
+    // It is a descriptor rather than three props because the three are ONE statement about one
+    // element and are never set apart: the reference's row chip is a 38px borderless slate square
+    // carrying a 15px tinted glyph (`proto:600`), and a caller that set the variant without the
+    // size would get the shipped tile's geometry wearing the reference's edge. The primitive's
+    // own note explains why the size and the glyph stayed its arguments rather than folding into
+    // the variant; this prop keeps them together at the one place a caller states them.
+    //
+    // The INSPECTOR's medallion is deliberately not covered. It is a different site at a
+    // different size on every catalogue, and no reference or region asks it to move.
+    rowMedallion = null,
+    // ── THE SELECTION BAND'S SELECT-ALL, AND WHAT IT REACHES (issue 1371 r9-cat, gap-list 37) ──
+    // `'results'` (the shipped band: a tri-state master box for the page, and `Select all {n}
+    // results` for the whole filtered corpus) or `'shown'` — the reference's band, which draws no
+    // master box at all and offers one text action, `Select all {n} shown` (`proto:592`).
+    //
+    // Threaded straight to `BulkSelectionToolbar`, whose own prop it is. It is a SCOPE and not a
+    // boolean because that is what changes: `results` and `shown` are two populations, and the
+    // caller has to hand over the second one's count and its action as well — this frame does,
+    // from `page.rows`, which is literally the rows it is rendering.
+    //
+    // WHAT IT COSTS, STATED: under `'shown'` the primitive renders NOTHING at zero selection, so
+    // the resting toolbar loses the `All` box. That is the reference's own arrangement — a
+    // selection opens from the ROW's checkbox (`proto:603`) and the band completes it — and it is
+    // the trade the band's own note below already describes.
+    selectAllScope = 'results',
     // The VISIBLE caption on the select-all box. The prototype's reads `All` where the shipped
     // primitive says `Select all`. Only the caption moves: the primitive's `ariaLabel` is
     // untouched, because `All` is not an accessible name a screen-reader user can act on.
@@ -258,6 +327,49 @@
     restingHint = '',
     selectedId = $bindable(''),
     onSelect = () => {},
+    // ── THE FIRST ROW IS INSPECTED ON OPEN, WHEN A LANE ASKS (issue 1371 r13-cat, M14) ─────
+    // "the component library should auto-select the first component when it is opened." OPT-IN
+    // and OFF by default, so a frame that says nothing opens on the resting inspector it always
+    // did and the essence and tool catalogues are byte-identical. The effect below fires ONLY
+    // while nothing at all is selected: a selection the owner hands in — a deep link, a restore
+    // after a refused navigation, a remembered id — is never fought, and a row the GM chose stays
+    // chosen through a sort, a page turn or a filter that hides it (the frame keeps the id so
+    // the row comes back when the filter clears; see `inspectedEntry`). It selects the first row
+    // of the PAGE on screen, which on a remembered page is that page's first, and it does NOT
+    // focus the inspector the way `inspect()` does for a click: a selection the frame made on
+    // its own must not move the keyboard.
+    //
+    // THE ONE THING IT GIVES UP, recorded: while it is on and rows exist, an owner cannot park
+    // the list on the resting inspector by writing `''`, because that is exactly the state it
+    // fills. No caller of this opt-in does; the world Component catalogue never writes `''`.
+    autoSelectFirst = false,
+    // ── THE LIST COLUMN RUNS EDGE TO EDGE (issue 1371 r16-cat, maintainer ruling M21) ────────
+    // "the entire world component catalogue browser has unnecessary padding/whitespace around its
+    // central rail body and does not occupy all of the space available to it." The column below
+    // carries the pane's `--fab-space-4` inset on every side, so the toolbar, the rows scroller
+    // and the pager all stopped 16px short of the pane's edges while the system Component Rules
+    // list beside it — `ComponentsBrowserView`'s `.manager-main`, which carries no inset — runs
+    // its toolbar and footer edge to edge. With this ON the column drops that inset and nothing
+    // else: the toolbar keeps `ManagerToolbar`'s own padding, the rows keep the inline inset the
+    // route sheet gives the scroller, and the pager keeps its own — so the CONTENT sits where it
+    // did and only the dead frame around it goes, which is what the rules list draws.
+    //
+    // OPT-IN and OFF by default. The essence and tool catalogues keep the inset they shipped
+    // with; the ruling names the Component catalogue and that lane is the one that turns it on.
+    flushColumn = false,
+    // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
+    // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
+    // from being full-width." The inspector column below pads `--fab-space-4` and the bulk
+    // panel renders inside a `-scroll` child that owns the `overflow-y` — so `BulkEditPanelShell`'s
+    // sticky dock, whose negative bleeds are sized for the shared rail's `--fab-space-3`, was
+    // CLIPPED at the scroller's edge and stopped 16px short of the column's on every side. With
+    // this ON, and only while the bulk panel is on screen, the column hands its inset to the
+    // bulk scroller: the panel's content sits exactly where it did, the scroller's padding box
+    // is now the column's, and a dock asked to bleed by `space-4` (the shell's `dockBleed`) lands
+    // on the column's divider and its right edge — `proto:791`'s full-width foot.
+    //
+    // OPT-IN and OFF by default; the resting and inspected columns are untouched even when on.
+    flushBulkDock = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
     // Search, membership, the lane filters, the sort pair and the page live on an object the
@@ -363,8 +475,52 @@
     systemId ? SYSTEM_MEMBERSHIP_FILTERS : WORLD_MEMBERSHIP_FILTERS
   );
 
+  // The selection band's population, resolved once. A closed comparison rather than a truthiness
+  // test, so an unrecognised scope keeps the shipped band exactly as `BulkSelectionToolbar`'s own
+  // resolver does with the same value.
+  const shownScope = $derived(selectAllScope === 'shown');
+
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
+
+  /**
+   * The class a LEAD-ROW select carries when the caller asked for the 38px rung, and `undefined`
+   * otherwise.
+   *
+   * `undefined` rather than `''`, and that is the whole reason this is a function rather than a
+   * `class:is-size-38` directive: a `class:` directive writes the attribute whatever the value
+   * is, so an unset opt-in would take every other catalogue's `<select>` from no `class`
+   * attribute at all to `class=""`. Svelte drops an `undefined` attribute, so a caller that does
+   * not ask for the rung renders the exact markup it always did — which the default-output proof
+   * compares byte for byte.
+   *
+   * The token is written as a LITERAL, never composed from `toolbarLeadSize`.
+   * `scripts/lib/stylesheetLiveClasses.js` cannot see a customer for a class a component builds
+   * by template, so `is-size-${size}` would report the sheet's rule as dead; the same reason
+   * `ManagerSearchField` maps its rung to a literal instead of interpolating one.
+   *
+   * @param {object} filter a lane filter descriptor.
+   * @returns {string|undefined}
+   */
+  function leadSelectSizeClass(filter) {
+    const onLeadRow = (filter?.toolbarRow ?? 'lead') === 'lead';
+    return toolbarLeadSize === '38' && onLeadRow ? 'is-size-38' : undefined;
+  }
+
+  /**
+   * The row medallion's three arguments, merged over the shipped tile.
+   *
+   * The defaults restate `Medallion`'s own — `variant: ''`, `size: 40`, `glyph: 0` — rather than
+   * omitting the attributes under an `{#if}`, because a single always-present element is what
+   * keeps the unset case byte-identical: two branches of the same tag is how a keyed list starts
+   * re-creating the node it used to update.
+   */
+  const rowMedallionSpec = $derived({
+    variant: '',
+    size: 40,
+    glyph: 0,
+    ...(rowMedallion && typeof rowMedallion === 'object' ? rowMedallion : {}),
+  });
 
   // A LANE SORT IS ITS OWN WHOLE ORDER, so it is passed through verbatim and the direction
   // toggle goes inert against it. A descriptor supplies one `compare`, not a pair, so composing
@@ -416,6 +572,18 @@
   // Converges in one tick: once they are equal the effect assigns nothing.
   $effect(() => {
     if (page.pageIndex !== pageIndex) ui.pageIndex = page.pageIndex;
+  });
+
+  // THE FIRST SHOWN ROW, WHEN NOTHING IS CHOSEN AND THE LANE OPTED IN (M14; see the prop note).
+  // Guarded on the prop FIRST, so an unset frame never reads a row here. `selectedId` is written
+  // through the binding exactly as `inspect()` writes it, and `onSelect` fires so an owner that
+  // reacts without binding hears it too. Converges in one pass: once written, the guard returns.
+  $effect(() => {
+    if (!autoSelectFirst || selectedId !== '') return;
+    const first = page.rows[0];
+    if (!first) return;
+    selectedId = first.id;
+    onSelect(first.id);
   });
 
   // A filter that shrinks the list must not leave a phantom id in `Apply to {N}`. Guarded on
@@ -531,6 +699,24 @@
     selectedIds = setBulkSelection(
       selectedIds,
       projected.rows.map((entry) => entry.id),
+      true
+    );
+    disarm();
+  }
+
+  /**
+   * `Select all {n} shown` — the reference band's ONE select-all, over the rows on screen.
+   *
+   * The rendered page rather than the filtered corpus, because that is what the word says: a GM
+   * reading `Select all 10 shown` beside ten visible rows has been told which ten. `results`
+   * keeps its own action above, over `projected.rows`, and the two are separate functions rather
+   * than one taking a population — a select-all that silently changed which set it reached with
+   * the caption beside it is the defect this scope exists to make impossible to write.
+   */
+  function selectAllShown() {
+    selectedIds = setBulkSelection(
+      selectedIds,
+      page.rows.map((entry) => entry.id),
       true
     );
     disarm();
@@ -673,14 +859,38 @@
     }))
   );
 
+  // ── `SYSTEM COUNT` RATHER THAN `SYSTEMS` (issue 1371 r11-cat, UX F-C) ─────────────────────
+  // The reference names this key `System count` on BOTH world catalogues it draws — `proto:5228`
+  // for components and `proto:4775` for tools — and it is what the key sorts by: the number of
+  // crafting systems holding the record. `Systems` reads as a sort BY the systems and left
+  // `inventory` reporting `MISSING LABEL "system count"` on this route.
+  //
+  // ONE SHARED STRING RATHER THAN A PER-LANE OVERRIDE, and that is the whole argument for
+  // touching it here: the three catalogues that compose this frame sort by the identical count,
+  // so a prop threaded through the shell to relabel it on one of them would put two names on one
+  // meaning — the failure the design-system spec names first. The row STAT label stays `Systems`
+  // (`proto:5248`), which is a different fact in a different place.
   const sortKeyLabels = $derived({
     name: text('FABRICATE.Admin.Manager.Scoped.List.SortKeyName', 'Name'),
-    systems: text('FABRICATE.Admin.Manager.Scoped.List.SortKeySystems', 'Systems'),
+    systems: text('FABRICATE.Admin.Manager.Scoped.List.SortKeySystems', 'System count'),
   });
 
+  // ── ONE OPTION MAY STAND FOR A PAIR OF DESCRIPTORS (issue 1371 r8-cat) ────────────────────
+  // A lane sort shipped as ONE descriptor and therefore as one whole order, which is why the
+  // direction toggle inerts against it — `systems-asc` did not exist and nothing said so. A lane
+  // that wants its own sort REVERSIBLE declares the pair (`source-type-asc`, `source-type-desc`)
+  // and names the OPTION they share through `optionId`; the composition below then resolves as
+  // it does for the frame's own keys, and the toggle stays live because the composed id is a
+  // real descriptor. A descriptor with no `optionId` is its own option, which is every shipped
+  // one, so the list is byte-identical for them.
   const sortOptions = $derived([
     ...Object.keys(sortKeyLabels).map((id) => ({ id, label: sortKeyLabels[id] })),
-    ...laneSorts.map((descriptor) => ({ id: descriptor.id, label: descriptor.label })),
+    ...laneSorts.reduce((options, descriptor) => {
+      const id = descriptor?.optionId ?? descriptor?.id;
+      if (!id || options.some((option) => option.id === id)) return options;
+      options.push({ id, label: descriptor.label });
+      return options;
+    }, []),
   ]);
 
   const directionLabel = $derived(
@@ -758,7 +968,7 @@
       control disappear — that was its shipped behaviour when the page drew it as a sibling of
       this frame, and the swap to `columnLead` must not quietly change it.
     -->
-    <div class="manager-scoped-list-column">
+    <div class="manager-scoped-list-column" class:is-flush={flushColumn}>
       {#if columnLead}
         <div class="manager-scoped-list-column-lead">{@render columnLead()}</div>
       {/if}
@@ -800,15 +1010,25 @@
             `scoped-list-inspector-geometry.test.js` now measures, at rest and selected, off one
             mount.
           -->
+          <!--
+            ── THE LEAD ROW, WHEN A LANE ASKS FOR TWO (issue 1371 r8-cat) ────────────────────
+
+            `proto:576`-`577` draws the search field and the source-type select on their own row
+            ABOVE the membership/sort row. It is rendered here rather than by re-ordering the
+            filter row's children because the filter row is the row `BulkSelectionToolbar` joins
+            with `is-selection`, so its identity — and everything pinned to its class — must not
+            move. `splitToolbar` is off by default and the two snippets below render in their
+            shipped positions inside the one row, so no other caller's DOM changes.
+          -->
+          {#if splitToolbar}
+            <div class="manager-scoped-list-search-row" data-scoped-list-search-row>
+              {@render searchField()}
+              {@render laneFilterSelects('lead')}
+            </div>
+          {/if}
+
           <div class={TOOLBAR_ROW_CLASS}>
-            <ManagerSearchField
-              value={query}
-              onInput={(next) => changeQuery(next)}
-              placeholder={searchPlaceholder ||
-                text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
-              ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
-              inputAttrs={{ 'data-scoped-list-search': '' }}
-            />
+            {#if !splitToolbar}{@render searchField()}{/if}
 
             <!--
               SEGMENTED CHIPS, NOT A `<select>`. This is the SAME question the system Tool Rules
@@ -837,18 +1057,15 @@
               />
             {/if}
 
-            {#each laneFilters as filter (filter.id)}
-              <select
-                value={filterValues[filter.id] ?? 'all'}
-                data-scoped-list-filter={filter.id}
-                aria-label={filter.label}
-                onchange={(event) => changeFilter(filter.id, event.currentTarget.value)}
-              >
-                {#each filter.options ?? [] as option (option.value)}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
-              </select>
-            {/each}
+            {#if splitToolbar}
+              {@render laneFilterSelects('filters')}
+              <!-- The reference's hairline between the membership control and the sort group
+                   (`proto:582`). It renders only in the two-row toolbar, where there are two
+                   groups on one row for it to separate. -->
+              <span class="manager-scoped-list-toolbar-divider" aria-hidden="true"></span>
+            {:else}
+              {@render laneFilterSelects(null)}
+            {/if}
 
             <span class="manager-scoped-list-sort-label" id="scoped-list-sort-label">
               {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
@@ -922,17 +1139,22 @@
               countAttr={COUNT_ATTR}
               resultsAttr={RESULTS_ATTR}
               clearAttr={CLEAR_ATTR}
+              {selectAllScope}
               pageSelectionState={selection.pageSelectionState}
               count={selection.count}
-              showSelectAllResults={selection.showSelectAllResults}
-              selectAllResultsCount={selection.selectAllResultsCount}
+              showSelectAllResults={shownScope
+                ? selection.count > 0
+                : selection.showSelectAllResults}
+              selectAllResultsCount={shownScope
+                ? page.rows.length
+                : selection.selectAllResultsCount}
               {selectAllLabel}
               hint={selectionHint}
               trailingActions
               bareActions
               countIcon="fa-solid fa-check-double"
               onTogglePage={togglePage}
-              onSelectAllResults={selectAllResults}
+              onSelectAllResults={shownScope ? selectAllShown : selectAllResults}
               onClear={clearSelection}
             />
           {/if}
@@ -1037,10 +1259,25 @@
                       src={thumbnail.src}
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
-                      size={40}
+                      variant={rowMedallionSpec.variant}
+                      size={rowMedallionSpec.size}
+                      glyph={rowMedallionSpec.glyph}
                     />
                     <span class="manager-system-copy">
-                      <span class="manager-system-name" title={name}>{name}</span>
+                      <!--
+                        THE NAME LINE, WHICH MAY CARRY MORE THAN THE NAME (issue 1371 r8-cat).
+                        The reference puts a row's source pill and its exception flag directly
+                        after the name (`proto:601`); both are inert, which is what lets them
+                        live inside the identity `<button>` at all.
+                      -->
+                      {#if rowNameTrailing}
+                        <span class="manager-scoped-list-row-name-line">
+                          <span class="manager-system-name" title={name}>{name}</span>
+                          {@render rowNameTrailing(entry, rowContext(entry))}
+                        </span>
+                      {:else}
+                        <span class="manager-system-name" title={name}>{name}</span>
+                      {/if}
                       <!--
                         THE SECOND LINE IS THE LANE'S CHOICE OF FACT.
 
@@ -1068,7 +1305,7 @@
                           class="manager-scoped-list-row-facts"
                           data-scoped-list-row-facts={entry.id}
                         >
-                          {#if scope?.sourceLinked === true && !sourceLinkedRow(entry)}
+                          {#if rowSourceBadge && scope?.sourceLinked === true && !sourceLinkedRow(entry)}
                             <!-- ONLY THE WARNING HALF. A `Linked` pill on every row of a
                                  catalogue whose whole premise is that each record IS an Item
                                  states the rule rather than the exception; the design carries
@@ -1104,7 +1341,7 @@
                          in the trailing column reads as a third control there. It is rendered
                          inside the fact run instead, which keeps the information and the
                          silhouette at once. -->
-                    {#if scope?.sourceLinked === true && rowSecondLine === 'description'}
+                    {#if rowSourceBadge && scope?.sourceLinked === true && rowSecondLine === 'description'}
                       <span
                         class="manager-scoped-list-source"
                         data-scoped-list-source={sourceLinkedRow(entry) ? 'linked' : 'unlinked'}
@@ -1224,7 +1461,12 @@
         aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
       >
         {#if bulk && selection.count > 0}
-          <div class="manager-scoped-list-inspector-scroll">
+          <!-- THE CLASS IS ON THE SCROLLER, NOT THE ASIDE (M24). A `class:` directive on the aside
+               moves its `class` attribute behind the static ones at render time, which changes the
+               serialized markup of every catalogue at default props; on this element — which is
+               rendered only inside the bulk branch and carries nothing but a class — it changes
+               nothing, and the aside's own inset is lifted by the same-template `:has()` below. -->
+          <div class="manager-scoped-list-inspector-scroll" class:is-flush-bulk={flushBulkDock}>
             {@render bulk([...selectedIds], rowContext(null))}
           </div>
         {:else if inspectedEntry}
@@ -1317,6 +1559,76 @@
   </div>
 </div>
 
+<!--
+  THE TWO TOOLBAR CONTROLS THAT MOVE ROW, WRITTEN ONCE (issue 1371 r8-cat).
+
+  `splitToolbar` decides which row they land in and nothing else about them, so they are snippets
+  rather than two copies under an `{#if}`: a copy is how the one-row and two-row toolbars would
+  start disagreeing about a placeholder or a hook name, and the SonarCloud duplication gate reads
+  a near-identical block as what it is.
+-->
+{#snippet searchField()}
+  <ManagerSearchField
+    value={query}
+    size={toolbarLeadSize}
+    onInput={(next) => changeQuery(next)}
+    placeholder={searchPlaceholder ||
+      text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
+    ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
+    inputAttrs={{ 'data-scoped-list-search': '' }}
+  />
+{/snippet}
+
+<!--
+  `row` is `null` in the one-row toolbar, where every lane filter renders exactly where it always
+  did. Under `splitToolbar` a descriptor chooses its row with `toolbarRow`, defaulting to the
+  LEAD row beside the search field — the reference's own arrangement for the source-type select
+  (`proto:578`) — so only a descriptor that names `'filters'` joins the sort group's row.
+
+  `microLabel` is the second opt-in: the reference labels its membership control with a visible
+  8px micro-label rather than an invisible accessible name (`proto:579`). A descriptor that names
+  none renders the bare `aria-label`led select it always did.
+
+  THE 38px RUNG IS THE ROW'S, NOT THE DESCRIPTOR'S (issue 1371 r9-cat). `proto:577`-`578` draws
+  BOTH controls on the lead row at 38 and `proto:582`-`585` draws all three on the filter row at
+  32, so the height is a fact about which row a control stands in and not about which filter it
+  is. `toolbarLeadSize` therefore says it once for the row, and `leadSelectSizeClass` reads the
+  descriptor only to find out which row it landed in.
+
+  The class rather than a prop is `ManagerToolbar`'s own contract: the manager has no select
+  COMPONENT, because the control beside the field is three different things across eleven bars and
+  the bar takes a slot instead of choosing between them. `styles/fabricate.css`'s `r8-prim` block
+  carries the rule at `.manager-scoped-list-toolbar select.is-size-38` — (0,3,1), which beats the
+  shipped 34px `(0,2,1)` on specificity rather than on source order.
+-->
+{#snippet laneFilterSelects(row)}
+  {#each laneFilters as filter (filter.id)}
+    {#if !row || (filter.toolbarRow ?? 'lead') === row}
+      {#if filter.microLabel}
+        <span
+          class="manager-micro-label manager-scoped-list-filter-label"
+          id={`scoped-list-filter-label-${filter.id}`}
+          data-scoped-list-filter-label={filter.id}
+        >
+          {filter.microLabel}
+        </span>
+      {/if}
+      <select
+        class={leadSelectSizeClass(filter)}
+        value={filterValues[filter.id] ?? 'all'}
+        data-scoped-list-filter={filter.id}
+        aria-label={filter.microLabel ? undefined : filter.label}
+        aria-labelledby={filter.microLabel ? `scoped-list-filter-label-${filter.id}` : undefined}
+        onchange={(event) => changeFilter(filter.id, event.currentTarget.value)}
+      >
+        {#each filter.options ?? [] as option (option.value)}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    {/if}
+  {/each}
+{/snippet}
+
 <style>
   /* THE FRAME IS ITS OWN CONTAINER. `.manager-body` is `220px minmax(0,1fr) 300px`, and under the
      released full-width classification `<main>` is the list column plus the freed 300px — so the
@@ -1386,6 +1698,14 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fab-space-4);
+  }
+
+  /* AND THE ONE CATALOGUE THAT DROPS IT (M21; see `flushColumn`). The inset alone: the column's
+     rhythm, its slack distribution and its children's own insets are untouched, so the toolbar
+     sits at the pane's top edge and the pager flush at its bottom exactly as the system rules
+     list's `.manager-main` places them. */
+  .manager-scoped-list-column.is-flush {
+    padding: 0;
   }
 
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
@@ -1470,6 +1790,68 @@
   .manager-scoped-list-row .manager-system-name {
     font-family: var(--fab-font-serif);
     font-size: 0.76rem;
+  }
+
+  /* ── THE TWO-ROW TOOLBAR'S OWN THREE ELEMENTS (issue 1371 r8-cat) ─────────────────────────
+     Each renders only under `splitToolbar`, so no caller that keeps the one-row toolbar can
+     reach any of them. The lead row takes the SAME metrics as the filter row rather than
+     joining its class, for the reason that class's own note in `styles/fabricate.css` gives:
+     the filter row is pinned by exact string and is the row the selection band joins. */
+  .manager-scoped-list-search-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* `proto:582`'s 1px x 18px rule between the membership control and the sort group. A BOX
+     rather than a border, because it separates two groups inside a flex row where a border
+     would have to hang off one of them and would then move with it. */
+  .manager-scoped-list-toolbar-divider {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 18px;
+    background: var(--fab-border);
+  }
+
+  /* A lane filter's visible micro-label sits on its control's baseline, not above it: this is a
+     labelled control on one row, and `.manager-micro-label`'s shared block margin would push the
+     whole row's alignment down by its own leading. */
+  .manager-scoped-list-filter-label {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  /* ── THE NAME LINE, WHEN A LANE PUTS SOMETHING AFTER THE NAME ─────────────────────────────
+     `proto:601` is `[name] [source pill] [flag]` on one line with the name allowed to ellipsise
+     and the pills held at their intrinsic width. Rendered only when `rowNameTrailing` is
+     supplied, so the shipped single-name row is untouched. */
+  .manager-scoped-list-row-name-line {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  /* AND THE NAME TAKES THE REFERENCE'S 13.5px/600 SERIF (gap-list row 22). The shared rule two
+     blocks up sizes it 0.76rem/700, which is the value the essence and tool rows draw and which
+     the standing E-3 escalation covers for THEM; this rule reaches only a row whose lane supplies
+     `rowNameTrailing`, so neither of those rows moves.
+
+     IT IS HERE AND NOT IN `styles/fabricate.css`, and that is mechanical: this component's scoped
+     block is injected unlayered and that sheet ships at `layer(modules)`, so a route-scoped rule
+     there loses to the shared rule above whatever its specificity — silently, with the selector
+     matching and the declaration unused. The selection band's own note in that sheet records the
+     identical trap. */
+  .manager-scoped-list-row-name-line .manager-system-name {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.844rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /*
@@ -1581,6 +1963,42 @@
     cursor: default;
   }
 
+  /* ── THE WORLD COMPONENT CATALOGUE'S TWO MICRO-TYPE CORRECTIONS (issue 1371 r11-cat) ──────
+     UX round-2 finding F-K. `proto:582` and `proto:585` draw `Membership` and `Sort by` with the
+     IDENTICAL `font:700 8.5px var(--sans);letter-spacing:.09em`, and `proto:587` draws the
+     direction toggle beside them at `font:600 11px var(--sans);color:var(--text2)`. On that route
+     the membership label already measures right and these two do not — 9.28px/600/0.08em and
+     11.52px/400 in the manager's own ink — so one toolbar row draws two micro-labels two ways and
+     one control at a weight its neighbours do not use. That internal inconsistency is what makes
+     these per-site drift rather than a systematic ramp, and no rung, scale or M-number covers it.
+
+     ── AND WHY THEY ARE HERE RATHER THAN IN `styles/fabricate.css` ────────────────────────────
+     That sheet already carries this route's other type corrections, including the membership
+     label's own. It CANNOT carry these two: it is imported at `layer(modules)` while this
+     component's `css: 'injected'` block is UNLAYERED, and an unlayered author declaration beats a
+     layered one at ANY specificity — so a `font-size` for `.manager-scoped-list-sort-label`
+     written there would match, be overridden and never be used. The sheet's own note beside
+     `.manager-scoped-list-count` records that exact loss. The declarations these override are the
+     two rules directly above, so the override lives beside them.
+
+     ── ROUTE-SCOPED, SO THE ESSENCE AND TOOL CATALOGUES DO NOT MOVE ───────────────────────────
+     Three screens compose this frame and only one of them has a reference to be right about. The
+     `:global()` prefix reaches the manager area root, which is outside this component's markup;
+     everything after it stays scoped, so these rules can still only match THIS frame's own
+     elements. Deleting the attribute selector would take both values to all three catalogues. */
+  :global(.fabricate-manager[data-manager-view='world-components'])
+    .manager-scoped-list-sort-label {
+    font-size: 0.531rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+  }
+
+  :global(.fabricate-manager[data-manager-view='world-components']) .manager-scoped-list-direction {
+    color: var(--fab-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
   /* `6 of 6 essences`, pushed to the trailing edge of the row exactly as the prototype draws it.
      `margin-left: auto` rather than a spacer element, so a narrow container wraps it onto its own
      line instead of stranding an empty box. */
@@ -1690,6 +2108,20 @@
     padding: var(--fab-space-4);
     border-left: 1px solid var(--fab-border);
     background: var(--fab-bg-1);
+  }
+
+  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`). Two rules and
+     one value moved between them, so the content does not shift by a pixel: what changes is
+     which box the shell's sticky dock can bleed into. Overflow clips to the PADDING box, so a
+     dock bled into the scroller's own padding is painted where a dock bled past a padding-less
+     scroller was cut off. Both elements are in this template, so the compiler keeps the
+     `:has()` (`ShoppingList.svelte` records the boundary it would prune across). */
+  .manager-scoped-list-inspector:has(> .manager-scoped-list-inspector-scroll.is-flush-bulk) {
+    padding: 0;
+  }
+
+  .manager-scoped-list-inspector-scroll.is-flush-bulk {
+    padding: var(--fab-space-4);
   }
 
   .manager-scoped-list-inspector-scroll {

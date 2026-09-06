@@ -210,9 +210,21 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBulkEditPanel.svelte',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
+  // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE. The system Component rules header states the
+  // system's salvage resolution mode, and `.manager-header` is a sibling of `.manager-main`, so
+  // only the shell can render that band. The module is a frozen option list — a data leaf with no
+  // component and no store — and importing it beat restating the same labels a second time here.
+  './resolutionModeOptions.js',
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
   // beside its sibling below because this list is asserted SORTED. See the note on
   // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
+  // ADDED BY ISSUE 1371's M9 RULING. The system Component Rules list's `Add from catalogue` is
+  // the reference's in-place PICKER, not a route change, and `ManagerModal` portals its panel to
+  // the application root — so, like the folder-mapping and import-report dialogs already pinned
+  // above, it has to be mounted from the shell or it dies with the view that opened it. It mints
+  // no route and renders no `data-scoped-page`; see `component-world-scope-screens.test.js` for
+  // the requirement-7 evidence.
+  './scoped/ComponentAddFromCatalogueDialog.svelte',
   './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',
@@ -221,6 +233,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/WorldToolCataloguePage.svelte',
   './scoped/WorldToolEntryPage.svelte',
   './scoped/WorldVocabularyPage.svelte',
+  // ADDED BY ISSUE 1371's C1/D1 HEADER SUBTITLES. `componentListSubtitle` and
+  // `componentRulesSubtitle` are the same kind of import-free presentation leaf as
+  // `essenceScoped.js` below, and for the same reason: the subtitle belongs to the header band,
+  // which only this file renders, so the page it describes cannot compose its own copy.
+  './scoped/componentScoped.js',
   // ADDED BY ISSUE 1372's HEADER-CREATE SEAM. The prototype puts `+ New essence` in the page
   // header band, which only this file renders; `mintEssenceId` is the epic's own import-free
   // presentation leaf and slugs the new record's id with suffix collision resolution, so the
@@ -553,9 +570,9 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     ['component', 'essence', 'tool', 'vocabulary'],
     'the write path reads the same four store legs the read path does'
   );
-  // TWO verbs are overridden, and only on the essence family: a spread of the generic families
-  // with an essence override. A composition that replaced the whole family, or that reached
-  // another entity type, would be a second write path rather than two seams on two verbs.
+  // TWO verbs are overridden PER COMPOSED FAMILY: a spread of the generic families with an
+  // override on each. A composition that replaced a whole family would be a second write path
+  // rather than two seams on two verbs.
   //
   // The pair is `addToSystem` and `removeFromSystem` (issue 1372), because BOTH have a second
   // half in a store `worldScopeActions.js` cannot reach: joining writes the in-system
@@ -565,6 +582,24 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     adminStore,
     /essence: \{\s*\.\.\.worldScopeFamilies\.essence,\s*addToSystem: joinEssenceToSystem,\s*removeFromSystem: partEssenceFromSystem,\s*\},/,
     'the published write path composes the two essence verbs that have an in-system half'
+  );
+  // THE ESSENCE FAMILY IS NO LONGER THE ONLY COMPOSED ONE (issue 1371). The prose above said it
+  // was, and that sentence was the thing this assertion's twin had to be added beside rather
+  // than under: a component ADOPTION is the same two writes for the same reason, and the read
+  // union's row set is the in-system array's, so a membership record written alone names a
+  // component no reader can see.
+  //
+  // IT IS PINNED HERE BECAUSE NOTHING ELSE CAN SEE IT. The composed verb keeps the GENERIC KEY,
+  // so no call site and no mounted test can distinguish it from the verb it replaces - a mounted
+  // test supplies the `actions` bag itself. Delete the `component:` entry and every button in the
+  // product reaches the membership-only verb; this assertion is the only thing that reds.
+  assert.match(
+    adminStore,
+    // `bulkEditRules` joined the two membership verbs in issue 1371 r16-cat (maintainer ruling M25):
+    // the world bulk panel's essence axis writes per-system RULES — the same kind of verb, whose
+    // second half lives in `CraftingSystemManager`.
+    /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*(?:\/\/[^\n]*\n\s*)*bulkEditRules: bulkEditComponentRules,\s*\},/,
+    'the published write path composes the two component verbs that have an in-system half, plus the rules write'
   );
   // AND EVERY FAMILY IS WRAPPED so a write that lands re-publishes (issue 1372).
   // `buildWorldScopeState()` is read once per publish, so before the wrapper a generic verb

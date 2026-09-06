@@ -249,3 +249,38 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
     );
   });
 });
+
+describe('the withheld-Colour note names the CONDITION it is gated on (issue 1371 r20-store3)', () => {
+  // UX round 6, finding 5. `worldOwnsColour` is `some(row.worldDefined)`, and the panel's fallback
+  // string is what the mounted suite reads — `localize` answers the key in that harness — so the
+  // shipped sentence itself needs a pin of its own or a revert to the ALL-shaped copy is silent.
+  const note = bulkEdit.ColourWorldNote;
+
+  it('is written for ANY, not for ALL', () => {
+    assert.match(note, /^One or more of the selected essences/);
+    assert.ok(
+      !note.startsWith('Colour comes from'),
+      'the old opening asserted the whole selection takes its colour from the catalogue'
+    );
+  });
+
+  it('still names where colour IS edited, and why it is shared', () => {
+    assert.match(note, /Essence Catalogue/);
+    assert.match(note, /shared by every system/);
+    assert.match(note, /not edited here/);
+  });
+
+  it('is the SAME sentence the panel falls back to when the key is missing', () => {
+    // The panel's `text(key, fallback)` helper answers the fallback whenever `localize` echoes the
+    // key, which is the state of every mounted harness — so a reworded key and a stale fallback
+    // would ship two different sentences and the mounted assertion would read the wrong one.
+    const panel = readFileSync(
+      join(ROOT, 'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte'),
+      'utf8'
+    );
+    assert.ok(
+      panel.includes(`'${note}'`),
+      'the component fallback and the localized string must be the same sentence'
+    );
+  });
+});

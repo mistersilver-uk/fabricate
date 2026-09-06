@@ -408,6 +408,83 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     );
   });
 
+  it('breathes the reference`s 13px above Apply and pins the delete at one 11px line (M24, both bulk panels)', async () => {
+    // `proto:791` / `proto:1270` pad the foot `13px 17px`; Apply sat 4px under the hairline (its own
+    // `margin-top`) and the delete wore the host button's 14px type on a 6px corner, wrapping the
+    // system panel's `Remove 2 components from The Herbalist's Compendium…` to two lines. Both are
+    // the SHELL's and the sheet's, so one measurement covers the world and the system panel alike.
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      // Spliced before the LAST `</div></section>`, which closes the dock and the panel: the probe
+      // is a `.manager-button.is-danger` INSIDE the dock, exactly where both panels pin theirs.
+      const dockClose = rendered.markup.lastIndexOf('</div></section>');
+      const probe =
+        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="manager-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
+      // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`), which is what a panel with a delete leg
+      // renders: the column stretches its children to the rail, which is what makes a long label a
+      // CLIPPED label rather than a content-width button.
+      const markupWithFoot = (
+        dockClose === -1
+          ? rendered.markup
+          : rendered.markup.slice(0, dockClose) + probe + rendered.markup.slice(dockClose)
+      ).replace('class="fab-bulk-edit-dock', 'class="fab-bulk-edit-dock has-foot');
+      assert.notEqual(markupWithFoot, rendered.markup, 'NON-VACUITY: the probe delete was placed in the dock');
+      await page.setContent(inspectorPage(markupWithFoot), { waitUntil: 'load' });
+      const measured = await page.evaluate(() => {
+        const dock = document.querySelector('.fab-bulk-edit-dock');
+        const apply = document.querySelector('[data-component-bulk-apply]');
+        const danger = document.querySelector('[data-danger-probe]');
+        const label = danger.querySelector('span');
+        const style = (element) => getComputedStyle(element);
+        return {
+          dockPaddingTop: style(dock).paddingTop,
+          applyMarginTop: style(apply).marginTop,
+          applyTopFromDockTop: apply.getBoundingClientRect().top - dock.getBoundingClientRect().top,
+          dangerHeight: danger.getBoundingClientRect().height,
+          dangerRadius: style(danger).borderTopLeftRadius,
+          dangerFontSize: style(danger).fontSize,
+          dangerFontWeight: style(danger).fontWeight,
+          labelLines: Math.round(label.getBoundingClientRect().height / parseFloat(style(label).lineHeight || '11')),
+          labelNoWrap: style(label).whiteSpace,
+          labelClipped: label.scrollWidth > label.clientWidth,
+          widths: {
+            dock: dock.getBoundingClientRect().width,
+            dockDisplay: style(dock).display,
+            button: danger.getBoundingClientRect().width,
+            buttonDisplay: style(danger).display,
+            labelScroll: label.scrollWidth,
+            labelClient: label.clientWidth,
+            wrapper: danger.parentElement.getBoundingClientRect().width,
+            wrapperMinWidth: style(danger.parentElement).minWidth,
+            dockClass: dock.className,
+            hasFootChildRule: [...document.styleSheets].some((sheet) => {
+              try {
+                return [...sheet.cssRules].some((rule) => /has-foot[^{]*>\s*\*/.test(rule.selectorText || ''));
+              } catch {
+                return false;
+              }
+            }),
+          },
+        };
+      });
+      assert.equal(measured.dockPaddingTop, '12px', 'the dock pads --fab-space-3 above its first control (the reference`s 13)');
+      assert.equal(measured.applyMarginTop, '0px', 'and Apply no longer carries the 4px it used to');
+      assert.equal(Math.round(measured.applyTopFromDockTop), 13, 'so Apply sits 12px + the hairline under the dock`s top edge');
+      assert.equal(Math.round(measured.dangerHeight), 34, 'the delete is on the 34px rung…');
+      assert.equal(measured.dangerRadius, '9px', '…on the 34-38px band`s corner…');
+      assert.equal(measured.dangerFontSize, '11px', '…at the reference`s 11px…');
+      assert.equal(measured.dangerFontWeight, '700', '…and weight 700');
+      assert.equal(measured.labelNoWrap, 'nowrap', 'and its label is ONE line');
+      assert.ok(
+        measured.labelClipped,
+        `NON-VACUITY: this label is longer than the rail, so it is the clipped case (${JSON.stringify(measured.widths)})`
+      );
+    } finally {
+      await browser.close();
+    }
+  });
+
   it('holds the dock on the rail scrollport at the top, middle and bottom of the scroll range', () => {
     // (a) and (b), plus the anti-vacuity preconditions that make them mean anything.
     assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');

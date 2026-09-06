@@ -5,16 +5,23 @@
  * which stays **LIVE AND AUTHORITATIVE** while `## CraftingSystem` requirement 36 holds, and the WORLD IDENTITY
  * SNAPSHOT held on `fabricate.componentScope` / `essenceScope` / `toolScope`. The two are EQUAL
  * AT MIGRATION TIME BY CONSTRUCTION — the migration writes the merged identity back onto every
- * in-system record — and the snapshot goes stale on the GM's first post-migration identity edit,
- * because every shipped identity writer writes the in-system copy and nothing writes the
- * snapshot.
+ * in-system record — and the snapshot goes stale on the GM's first post-migration identity edit.
+ *
+ * **DIVERGENCE IS NOW REACHABLE FROM BOTH DIRECTIONS (issue 1371).** Until the world Component
+ * catalogue and entry shipped, every identity writer wrote the IN-SYSTEM copy and nothing wrote
+ * the snapshot, so the snapshot could only ever fall behind. The world Component entry editor
+ * writes the SNAPSHOT — `name`, `img` and `description` on the world component record — so a GM
+ * can now move either copy without touching the other, and the two can meet a reader carrying
+ * different values in either order. The detector's behaviour is unchanged: it reports a
+ * divergence and never a direction, which was already the right answer and is now the only one.
  *
  * **THIS MODULE IS PURE, AND SINCE ISSUE 1370 IT HAS A PRODUCTION CONSUMER.** `initialize()`
  * calls it once per session on the ACTIVE GM alone, after the three scope stores load and
  * before either manager is constructed, and composes the report into an INFORMATIONAL notice.
  * The report is a DISCLOSURE obligation and not a correctness one: the read union already
- * resolves every divergence in the safe direction, and this tells the GM which of their own
- * edits the snapshot no longer reflects. It repairs nothing and writes nothing.
+ * resolves every divergence in the safe direction, and this tells the GM where their own two
+ * copies of one identity no longer agree — an in-system edit the snapshot has not seen, or a
+ * world-catalogue edit no crafting system reads. It repairs nothing and writes nothing.
  * The claim it makes executable — "the two copies are equal at migration time" — is the whole
  * reason the deferred shed is reconcilable, and an unchecked claim of that kind is exactly the
  * acceptance criterion this programme has already shipped twice unable to fail. The migration's
@@ -29,11 +36,14 @@
  * defined as *paths that never call save* cannot be found by grepping save sites. Naming the
  * detector after the mirror would re-import the claim this module exists because we cannot make.
  *
- * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME
+ * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME — IN-SYSTEM SIDE
  *
  * Issue 1370 repointed the readers and wired this detector into `initialize()`, where it REPORTS
  * every divergence rather than silently resolving it. These are the writers that make divergence
- * reachable, and the list is kept because they are what keeps it reachable SESSION AFTER SESSION:
+ * reachable, and the list is kept because they are what keeps it reachable SESSION AFTER SESSION.
+ *
+ * IT IS ONE HALF OF THE SET, and it is labelled so because a list presented as complete while a
+ * whole direction of divergence is missing is worse than no list. The SNAPSHOT side follows it:
  *
  *   - `CraftingSystemManager#createItem`
  *   - `CraftingSystemManager#addItemFromUuid`
@@ -44,7 +54,20 @@
  *     the `updateItem` hook in `src/main.js`, mutating `name`, `img` and `description` IN PLACE
  *   - `CraftingSystemManager#addRecipeItemFromUuid`
  *
- * **THIS LIST IS NOT PR 2's "five mutation-time bypass sites".** That list was built for the
+ * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME — SNAPSHOT SIDE
+ *
+ * Issue 1371 shipped the first surface in this repository that writes the WORLD half of an
+ * identity, so the enumeration above stopped being the whole set:
+ *
+ *   - `WorldComponentEntryPage` — the world Component entry editor, whose buffered Save writes
+ *     `name`, `img` and `description` onto the world component record through
+ *     `worldScopeActions.updateEntity`
+ *
+ * The essence and tool entry editors write the same half for their own corpora; they are named
+ * here as the shape rather than repeated per type, because what makes a writer belong to this
+ * list is that it addresses the world record and not the in-system one.
+ *
+ * **THE IN-SYSTEM LIST IS NOT PR 2's "five mutation-time bypass sites".** That list was built for the
  * Valid Id BASIS concern and is about which mutations bypass a normalize; this one is about which
  * code paths write a LIFTED IDENTITY FIELD. Reusing that list as the writer set is the easiest
  * way for PR 8 to inherit a wrong enumeration, and it would miss

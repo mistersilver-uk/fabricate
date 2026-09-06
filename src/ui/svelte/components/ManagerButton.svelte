@@ -124,6 +124,31 @@
    - fullWidth: emits `is-full-width`. It is deliberately NOT a role. `dashed` used to
      pin `width: 100%` itself, which is a statement about the CONTAINER rather than
      about the verb, and it stacked a four-up wrapping row into four rows.
+   - size: the control-height RUNG, as a string naming the rung — `''` (the shipped 34px
+     button) or `'38'` (issue 1371). `openspec/specs/design-system/spec.md` publishes six
+     rungs (26 / 28 / 30 / 34 / 38 / 44) and this control ships at 34; the world component
+     catalogue's `+ Register item` (`proto:570`) and the system's `+ Add from catalogue`
+     (`proto:1046`) are both drawn at 38, which is a published rung, so the size becomes
+     REACHABLE rather than the reference being adapted to the shipped control.
+
+     A STRING NAMING A NUMBER rather than a boolean, and the same shape as
+     `ManagerSearchField`'s `size` for the same reason: a boolean can only ever express
+     the second of six rungs, so the next reference drawing a 30px button would add
+     `short`, then `tall`, and the prop would be a bag of adjectives standing in for a
+     published scale. One meaning, one name — a caller who has met the field's `size`
+     has met this one.
+
+     An unrecognised value resolves to `''` — the shipped 34px button — exactly as an
+     unrecognised `role` renders neutral, so a typo shows up as the default control and
+     never as an unstyled `is-size-*`. Adding the next rung is one entry in `SIZE_CLASSES`
+     and one rule in the sheet.
+
+     The class it emits is `is-size-38`, in `styles/fabricate.css`'s appended `r9-prim2`
+     block — this component has no scoped `<style>`, for the reason below — and it is the
+     SAME token `ManagerSearchField` emits, because it names the same rung of the same
+     ladder. The corner needs no companion declaration: 34 and 38 are both inside the
+     radius ladder's 34-38px band, so the 9px the primitive's control rule already states
+     is the right corner at either height.
    - disabled / onclick: forwarded. `disabled` is not a valid attribute on an anchor,
      so it is ignored (and warned about) when an anchor is rendered.
    - class: an EXTRA class, appended to the primitive's own — never a replacement. It
@@ -150,6 +175,17 @@
      into `styles/fabricate.css` when more than one component needs the same rule.
      `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical
      guard that now catches it; it shipped once before that guard existed.
+   - element: bindable, the rendered DOM node. `bind:this` on a component yields the
+     component INSTANCE rather than its node, so a caller that must MEASURE or FOCUS the
+     button has no other way to reach it. `Chip.svelte` — the same manager primitive
+     family, and the other primitive `SearchablePopover` renders its trigger through —
+     already spells this capability that way; one meaning, one name.
+
+     It exists for exactly that caller. `SearchablePopover` anchors its portaled panel on
+     the trigger's bounding box and returns focus to it on close, and its `triggerButton`
+     form renders this component; without the node it would fall back to the picker ROOT,
+     a `position: relative` block-level `<div>` whose width is the flex slot's rather than
+     the button's, and the panel would hang off the wrong edge.
    - children: the label snippet. Content is a snippet rather than a `label` string
      because the shipped call sites interleave an `<i>` glyph with localized text and
      some wrap the text in its own `<span>`.
@@ -168,8 +204,14 @@
     rel = undefined,
     type = 'button',
     fullWidth = false,
+    // The control-height RUNG, named after the rung rather than after an adjective. `''` is the
+    // shipped 34px button; see the props block above for why this is a string.
+    size = '',
     disabled = false,
     onclick = () => {},
+    // The rendered DOM node, for a caller that must measure or focus it. See the props block
+    // above; `null` until mount, and unbound callers never observe it.
+    element = $bindable(null),
     children = undefined,
     // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
     // to be a named prop rather than a rest key: the rest spread lands after `class={…}` in
@@ -213,6 +255,18 @@
   // harness scrapes that array's string literals into its probes.
   const FULL_WIDTH_CLASS = 'is-full-width';
 
+  // The rungs this button can be asked for, and the class each one emits. A NAMED MAPPING
+  // rather than an `is-size-${size}` template, for all three of `ROLE_CLASSES`'s reasons and
+  // `ManagerSearchField`'s fourth: the rung set is closed, the harness above scrapes this
+  // file's string literals, and `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`
+  // class through a positional wildcard — so a class this component only ever BUILT would
+  // leave its sheet rule looking like a rule with no customer.
+  //
+  // The keys are strings because a rung is a NAME here and not an arithmetic quantity:
+  // nothing adds or compares it, and a numeric prop invites `size={38}` and `size={37}` alike
+  // with only the sheet to say which of the two exists.
+  const SIZE_CLASSES = { 38: 'is-size-38' };
+
   const TAGS = new Set(['button', 'a']);
 
   // An anchor with no `href` is not focusable, has no implicit link role and does not
@@ -229,12 +283,25 @@
   // renders neutral, never an unstyled `is-*` — held only for values that are not names on
   // `Object.prototype`. An own-property check is what the contract actually says.
   const roleClass = $derived(Object.hasOwn(ROLE_CLASSES, role) ? ROLE_CLASSES[role] : '');
+
+  // `Object.hasOwn` again, and for the identical reason: a plain index reads `toString` off
+  // `Object.prototype`, so the closed-set contract would hold only for values that are not
+  // names on it.
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
+  );
+
+  // The primitive's own modifiers first, then the rung, then whatever the caller appended —
+  // `manager-button fab-manager-button is-primary is-size-38 <your class>`. That is the order
+  // `ManagerSearchField` documents for the same token, so one rung reads the same way in both
+  // class lists.
   const classes = $derived(
     [
       'manager-button',
       'fab-manager-button',
       roleClass,
       fullWidth ? FULL_WIDTH_CLASS : '',
+      sizeClass,
       extraClass,
     ]
       .filter(Boolean)
@@ -263,6 +330,11 @@
   });
 </script>
 
-<svelte:element this={resolvedTag} class={classes} {...attributes} {onclick} {...rest}
-  >{@render children?.()}</svelte:element
+<svelte:element
+  this={resolvedTag}
+  bind:this={element}
+  class={classes}
+  {...attributes}
+  {onclick}
+  {...rest}>{@render children?.()}</svelte:element
 >

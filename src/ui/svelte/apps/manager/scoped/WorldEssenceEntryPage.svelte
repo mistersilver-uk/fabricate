@@ -53,7 +53,7 @@
      BUFFERED EDIT block below and the props' own note.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localize, notifyError } from '../../../util/foundryBridge.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
@@ -69,8 +69,9 @@
   import { resolveDropUuid } from '../../../util/dropUtils.js';
   import MembershipActions from './MembershipActions.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
-  import { scopedSectionLabel } from './scopedStudio.js';
+  import { reportRefusedScopedEntrySave, scopedSectionLabel } from './scopedStudio.js';
   import {
+    SCOPED_ENTRY_IDENTITY_STEP,
     flushScopedEntryDraft,
     scopedEntryBaseline,
     scopedEntryDirty,
@@ -278,6 +279,32 @@
   const dirty = $derived(scopedEntryDirty(draft, baseline));
 
   /**
+   * The sentence a REFUSED save puts in front of the GM (issue 1371 r20-entry3; Foundry review
+   * round 6 finding 4).
+   *
+   * This screen stages a MULTI-SECTION sequence, so a rejection at write *k* leaves `1..k-1`
+   * landed durably while the draft stays dirty — and the store publishes its cache before
+   * awaiting the write, so every open manager surface shows them as saved until a reload. Until
+   * r20 it passed no `onRefused` at all: the rejection was caught and the route-exit guard
+   * declined the exit, but the GM's only signal was Foundry's own raw `error.message`, which
+   * cannot say which step stopped or which had already landed. The sentence itself is composed by
+   * `reportRefusedScopedEntrySave`, shared with the component and tool entries so the three cannot
+   * drift on what a step of a Save is called.
+   *
+   * @param {{step: string, error: unknown, landed: string[]}} refusal
+   * @returns {void}
+   */
+  function reportRefusedSave(refusal) {
+    reportRefusedScopedEntrySave({
+      refusal,
+      entityType: 'essence',
+      identityStep: SCOPED_ENTRY_IDENTITY_STEP,
+      format,
+      notify: notifyError,
+    });
+  }
+
+  /**
    * Flush the buffered edit. Answers `false` when a write refused, which is what the route-exit
    * guard gates navigation on: a Save that did not land must leave the GM here with the edit
    * still in front of them.
@@ -291,6 +318,7 @@
       entityId: entry?.id ?? '',
       writes: scopedEntryWrites(pending, baseline),
       actions,
+      onRefused: reportRefusedSave,
     });
     if (landed) flushed = pending;
     return landed;

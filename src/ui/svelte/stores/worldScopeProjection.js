@@ -26,7 +26,11 @@ import {
   SOURCE_LINK_FIELDS,
   WORLD_IDENTITY_FIELDS,
 } from '../../../migration/worldScopeEntityGrouping.js';
-import { COMPONENT_SCOPE, COMPONENT_SECTIONS } from '../../../systems/componentScope.js';
+import {
+  COMPONENT_SCOPE,
+  COMPONENT_SECTIONS,
+  normalizeComponentEssenceMap,
+} from '../../../systems/componentScope.js';
 import { ESSENCE_SCOPE, ESSENCE_SECTIONS } from '../../../systems/essenceScope.js';
 import {
   isSectionInherited,
@@ -437,6 +441,63 @@ function indexMemberships(memberships) {
 }
 
 /**
+ * Index every crafting system's IN-SYSTEM component rows, keyed `systemId` then component id.
+ *
+ * THE ONE UNION FACT THIS PROJECTION RE-DERIVES, and only for the component leg (issue 1371
+ * r18-store, M31). The projection publishes the CORPUS, but a world screen stating "which map does
+ * this system resolve" cannot answer it from the corpus alone: an OVERRIDING system's map is its
+ * in-system row — the membership record's stored block is the dormant copy and does not win while
+ * `## CraftingSystem` requirement 36 holds — so the roster's rows are the other half of the
+ * answer. One pass over the raw roster per publish, the same walk the vocabulary leg already
+ * takes over `systems[].components`.
+ *
+ * @param {unknown} systems The RAW crafting-system roster.
+ * @returns {Map<string, Map<string, object>>}
+ */
+function indexInSystemComponents(systems) {
+  const bySystem = new Map();
+  for (const system of Array.isArray(systems) ? systems : []) {
+    const systemId = typeof system?.id === 'string' ? system.id : String(system?.id ?? '');
+    if (!systemId) continue;
+    const rows = new Map();
+    for (const component of Array.isArray(system?.components) ? system.components : []) {
+      const id = typeof component?.id === 'string' ? component.id.trim() : '';
+      if (id && !rows.has(id)) rows.set(id, component);
+    }
+    bySystem.set(systemId, rows);
+  }
+  return bySystem;
+}
+
+/**
+ * Whether a descriptor's scope declares the component `essences` section — derived from the
+ * section list rather than tested against the entity type, so a second type declaring the
+ * section would answer the new shape without this file changing.
+ *
+ * @param {object} descriptor
+ * @returns {boolean}
+ */
+function resolvesEssences(descriptor) {
+  return descriptor?.sections?.includes?.('essences') === true;
+}
+
+/**
+ * The essence map ONE system resolves for an entity: the world map where the switch is on and
+ * the world authored one, the system's own in-system row otherwise — normalized as the row's
+ * own normalizer would, and always a NEW map, never the corpus's or the roster's.
+ *
+ * @param {{inherited: {[section: string]: boolean}}} resolved The resolver's answer.
+ * @param {object|null} worldDefault
+ * @param {object|null} inSystemRow
+ * @returns {Record<string, number>}
+ */
+function resolvedEssencesFor(resolved, worldDefault, inSystemRow) {
+  const world = normalizeComponentEssenceMap(worldDefault?.essences);
+  if (resolved.inherited?.essences !== false && world) return world;
+  return normalizeComponentEssenceMap(inSystemRow?.essences) ?? {};
+}
+
+/**
  * Index the world defaults by entity id.
  *
  * @param {unknown} defaults
@@ -469,14 +530,39 @@ function indexDefaults(defaults) {
  * switch goes off, and clicking it then appears to do nothing. `enabled` is therefore exactly
  * what it was before the master switch existed, so nothing reading it changed meaning.
  *
+ * ── `resolvedEssences` IS THE MAP THIS SYSTEM RESOLVES, AND IT IS A READ FACT ───────────────
+ * On the component leg alone (issue 1371 r18-store, M31): the world map where `inherited.essences`
+ * is on and the world authored one, this system's own in-system row otherwise. It is named for
+ * what it is so no world editor writes it back — the world entry authors `defaults.essences`, and
+ * the rules editor authors the in-system row; this row only says which of the two the system
+ * reads.
+ *
+ * NO SCREEN CONSUMES IT YET, and the docblock said otherwise until r19-store2. The entry's
+ * systems card draws no essence surface, and the rules editor reads `inherited.essences` and the
+ * world entry's `defaults.essences` directly. It is published ahead of its consumer — the
+ * per-system essence run on `WorldComponentEntrySystemsCard`, which is not this lane's file — and
+ * `tests/world-scope-projection.test.js` and `tests/stores/admin-store-component-scope.test.js`
+ * pin the fact it states. The system rules LIST answers the same question from the read union
+ * instead (`adminComponentRowProjection`'s `_resolvedEssencesBySystemComponent`), because that
+ * projection is per SYSTEM and already holds the manager.
+ *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system
  * @param {object|null} membership
  * @param {object|null} worldDefault
  * @param {number} [recipeCount] Recipes in THIS system that reference the entity.
+ * @param {object|null} [inSystemRow] This system's own in-system row for the entity, when the
+ *   roster holds one; read for the component `essences` section alone.
  * @returns {object}
  */
-function buildSystemRow(descriptor, system, membership, worldDefault, recipeCount = 0) {
+function buildSystemRow(
+  descriptor,
+  system,
+  membership,
+  worldDefault,
+  recipeCount = 0,
+  inSystemRow = null
+) {
   const resolved = resolveScopedDefinition(worldDefault, membership, descriptor.scope);
   const row = {
     systemId: system.id,
@@ -489,8 +575,28 @@ function buildSystemRow(descriptor, system, membership, worldDefault, recipeCoun
     recipeCount: Number(recipeCount) || 0,
   };
   if (descriptor.enableable) {
-    row.enabled = descriptor.worldEnableable ? resolved.systemEnabled === true : resolved.enabled === true;
+    row.enabled = descriptor.worldEnableable
+      ? resolved.systemEnabled === true
+      : resolved.enabled === true;
     row.resolvedEnabled = resolved.enabled === true;
+  }
+  // WHICH WORLD TAGS THIS SYSTEM MUTES (issue 1371), for a TAGGABLE type alone — which is the
+  // component family and nothing else, so an essence or tool row is byte-identical to what it was.
+  //
+  // IT IS THE ONE PIECE OF MEMBERSHIP STATE A SCREEN CAN AUTHOR AND COULD NOT READ BACK. Muting
+  // is written through `setMutedTags`, which lands on the membership record — and this row was the
+  // only published view of that record, carrying `member`, `inherited` and `enabled` but not this.
+  // Without it the world entry's mute chips could write a state and never show it, which is the
+  // one failure mode a toggle must not have, and the tag note's "muted in {m} systems" clause
+  // would count zero on every world however many mutes a GM had authored.
+  //
+  // A COPY rather than the stored array, on the same rule the entry roster follows: a consumer
+  // that mutated the published value in place would edit the corpus behind the store's back.
+  if (descriptor.taggable) {
+    row.mutedTags = Array.isArray(membership?.mutedTags) ? [...membership.mutedTags] : [];
+  }
+  if (resolvesEssences(descriptor)) {
+    row.resolvedEssences = resolvedEssencesFor(resolved, worldDefault, inSystemRow);
   }
   return row;
 }
@@ -536,9 +642,19 @@ function entryHasSourceLink(entity) {
  * @param {Array<{id: string, name: string}>} systems
  * @param {Map<string, object>} membershipIndex
  * @param {Record<string, object>|null} [usage] World-wide reference counts per entity id.
+ * @param {Map<string, Map<string, object>>} [inSystemIndex] Each system's in-system rows, from
+ *   {@link indexInSystemComponents}; read for the component `essences` section alone.
  * @returns {object}
  */
-function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, usage = null) {
+function buildEntry(
+  descriptor,
+  entity,
+  worldDefault,
+  systems,
+  membershipIndex,
+  usage = null,
+  inSystemIndex = new Map()
+) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
   const rows = [];
@@ -558,7 +674,8 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
         system,
         membership,
         worldDefault,
-        entityUsage?.recipeCountBySystem?.[system.id]
+        entityUsage?.recipeCountBySystem?.[system.id],
+        inSystemIndex.get(system.id)?.get(entity.id) ?? null
       )
     );
   }
@@ -581,6 +698,20 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // surface with no system context, so it cannot re-derive the list from a selection. Supplied
     // by the caller for the same reason the counts are, and an absent `usage` answers `[]`.
     requiredBy: Array.isArray(entityUsage?.requiredBy) ? [...entityUsage.requiredBy] : [],
+    // AND WHAT PRODUCES IT (issue 1371). The component family's usage leg answers two axes — a
+    // recipe or a gathering task that CONSUMES the component, and one that MAKES it — because the
+    // world entry states them as two lists: "Used by" is what a GM checks before removing a
+    // component, and "Produced by" before deleting the thing that makes it.
+    //
+    // TWO SURFACES DRAW IT: the world component entry's preview rail, through
+    // `componentEntryPreviewGroups` in `scoped/componentScoped.js`, and the component rules
+    // editor's own rail in `ComponentEditView.svelte`. Round 1 computed it and stopped HERE,
+    // which made the leg unobservable from anywhere — and the gathering half of it was reading a
+    // key stored tasks never carry, so it reported nothing on every world and no test could have
+    // said so. Both were fixed together, and a note still saying "no surface draws it yet" would
+    // send the next lane looking for a consumer to write. An absent `usage` answers `[]`, exactly
+    // as `requiredBy` does, so no other entity type moves.
+    producedBy: Array.isArray(entityUsage?.producedBy) ? [...entityUsage.producedBy] : [],
     // WHETHER THE WORLD MASTER SWITCH LEAVES THIS ENTITY ON. Read through `isWorldEnabled`, so
     // an ABSENT flag — every record in every world that has never touched the switch — answers
     // `true` here and the screens draw the state they always drew.
@@ -628,6 +759,8 @@ export function projectWorldScopeEntity({
   const defaultsIndex = indexDefaults(corpus.defaults);
   const membershipIndex = indexMemberships(corpus.membership);
   const projectedSystems = projectSystems(systems);
+  // Walked only for a scope that resolves `essences`; the other two legs never touch the rows.
+  const inSystemIndex = resolvesEssences(descriptor) ? indexInSystemComponents(systems) : new Map();
   const state = {
     entityType,
     sections: [...descriptor.sections],
@@ -650,7 +783,8 @@ export function projectWorldScopeEntity({
         defaultsIndex.get(entity.id) ?? null,
         projectedSystems,
         membershipIndex,
-        usage
+        usage,
+        inSystemIndex
       )
     ),
   };
@@ -740,5 +874,17 @@ export function buildWorldScopeState({ stores = {}, systems = [], recipes = [], 
     componentEntries: worldScope.component?.entries ?? [],
     componentDefaults: Array.isArray(componentCorpus?.defaults) ? componentCorpus.defaults : [],
   });
+  // THE COMPONENT LEG CARRIES THE VOCABULARY'S NAMES (issue 1371 r13-entry, maintainer ruling
+  // M18). The world Component entry offered its category picker from the corpus union of
+  // `defaults.category`, and on a migrated world every default was elected from a system that
+  // already carried it — so the picker listed the SYSTEMS' categories as if the world had
+  // authored them while the vocabulary held none. The shell hands a component screen only this
+  // leg (`componentScopeProps`), never `worldScope.vocabulary`, so the names are attached here,
+  // by the one function that has both legs in hand: bare strings, because that is all an offer
+  // needs, and the decorated rows with their usage counts stay the vocabulary screen's.
+  worldScope.component.worldVocabulary = {
+    categories: worldScope.vocabulary.componentCategories.map((entry) => entry.name),
+    tags: worldScope.vocabulary.componentTags.map((entry) => entry.name),
+  };
   return { worldScope };
 }

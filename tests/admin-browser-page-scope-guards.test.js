@@ -394,8 +394,9 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
    * record, cohort-wide, on every refresh, which is the original defect — leaves every
    * `cache.get` exactly where it is and every counter in this file unmoved.
    *
-   * `itemCardSignature` reads `essenceDefinitionById.get(id)` UNCONDITIONALLY, twice per
-   * essence (name, then icon), while the cheap card build reads that map only when
+   * `itemCardSignature` reads `essenceDefinitionById.get(id)` UNCONDITIONALLY, once per
+   * essence (issue 1371 r18-colour folded the name, icon and colour reads into one; it was twice),
+   * while the cheap card build reads that map only when
    * `showEssences` is true. So with essences DISPLAYED OFF and each component carrying one,
    * a counting facade on that map counts signature computations and nothing else.
    */
@@ -423,13 +424,13 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
       await hydrateItemCards(world.cards.slice(0, PAGE_SIZE));
       assert.equal(
         counters.get('essenceGet'),
-        PAGE_SIZE * 2,
-        'the signature counter CAN go up — 25 signatures, two catalogue reads each'
+        PAGE_SIZE,
+        'the signature counter CAN go up — 25 signatures, one catalogue read each'
       );
 
       // And the tail is reachable, so the bound is page scope rather than a dropped tail.
       await hydrateItemCards(world.cards);
-      assert.equal(counters.get('essenceGet'), COHORT * 2);
+      assert.equal(counters.get('essenceGet'), COHORT, 'one read per essence per signature');
     } finally {
       world.restore();
     }

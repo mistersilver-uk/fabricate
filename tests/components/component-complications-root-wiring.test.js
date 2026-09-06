@@ -126,9 +126,12 @@ describe('1286 the manager root wires the complications section', () => {
       /\{ \.\.\.\(updates \|\| \{\}\), difficulty:/,
       'the payload is spread, not rebuilt'
     );
+    // The PAYLOAD is `merged`, whatever else the call carries beside it: since issue 1371
+    // r22-store4 the editor's stated baseline rides along as a third argument, and that is a fact
+    // about the OVERRIDE rule rather than about the payload this case is quantifying over.
     assert.match(
       body,
-      /store\.updateComponent\?\.\(itemId, merged\)/,
+      /store\.updateComponent\?\.\(itemId, merged[,)]/,
       'and the spread payload is what is persisted'
     );
     assert.ok(

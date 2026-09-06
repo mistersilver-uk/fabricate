@@ -80,9 +80,11 @@ const SYSTEMS = [
   { id: 'sys-alchemy', name: 'Alchemy' },
 ];
 
-test('the descriptor states a component has exactly one section and no enabled flag', () => {
-  assert.deepEqual([...COMPONENT_SECTIONS], ['category']);
-  assert.deepEqual([...WORLD_SCOPE_DESCRIPTORS.component.sections], ['category']);
+test('the descriptor states a component has two sections and no enabled flag', () => {
+  // `essences` joined `category` at issue 1371 r18-store (maintainer ruling M31): the world map
+  // every system with rules for the component inherits unless it overrides with its own.
+  assert.deepEqual([...COMPONENT_SECTIONS], ['category', 'essences']);
+  assert.deepEqual([...WORLD_SCOPE_DESCRIPTORS.component.sections], ['category', 'essences']);
   assert.equal(WORLD_SCOPE_DESCRIPTORS.component.enableable, false);
   assert.equal(WORLD_SCOPE_DESCRIPTORS.component.taggable, true);
   assert.deepEqual([...WORLD_SCOPE_DESCRIPTORS.essence.sections], [...ESSENCE_SECTIONS]);
@@ -134,7 +136,8 @@ test('the projection publishes the WORLD corpus, per-system rows and inherit cou
   const ash = state.entries[0];
   assert.equal(ash.id, 'ash-salt');
   assert.equal(ash.membershipCount, 2);
-  assert.deepEqual(ash.inheritCounts, { category: 1 });
+  // BOTH members omit the `essences` switch, and an omitted switch reads as inheriting.
+  assert.deepEqual(ash.inheritCounts, { category: 1, essences: 2 });
   assert.deepEqual(
     ash.systems.map((row) => [row.systemId, row.systemName, row.member, row.inherited.category]),
     [
@@ -145,7 +148,7 @@ test('the projection publishes the WORLD corpus, per-system rows and inherit cou
 
   const iron = state.entries[1];
   assert.equal(iron.membershipCount, 0);
-  assert.deepEqual(iron.inheritCounts, { category: 0 });
+  assert.deepEqual(iron.inheritCounts, { category: 0, essences: 0 });
   assert.ok(iron.systems.every((row) => row.member === false));
 });
 
@@ -175,6 +178,72 @@ test('a component row carries NO enabled key, an essence and tool row do', () =>
     assert.equal(row[1].enabled, false, `${entityType} non-member is not enabled`);
     assert.equal(row[1].member, false);
   }
+});
+
+test('a component row states the essence map THIS system resolves, and which layer answered it (M31)', () => {
+  // THE ROSTER IS THE RAW ONE, carrying each system's in-system component rows: the projection
+  // publishes the corpus, and the one union fact a world screen needs beside it is which map each
+  // system actually resolves - the world map where the switch is on and the world authored one,
+  // the system's own row otherwise.
+  const roster = [
+    {
+      id: 'sys-forge',
+      name: 'Mythwright Forge',
+      components: [{ id: 'ash-salt', essences: { fire: 3, ' moss ': 1, water: 0 } }],
+    },
+    {
+      id: 'sys-alchemy',
+      name: 'Alchemy',
+      components: [{ id: 'ash-salt', essences: { fire: 1 } }],
+    },
+    { id: 'sys-empty', name: 'Empty', components: [] },
+  ];
+  const corpus = {
+    entities: [{ id: 'ash-salt', name: 'Ash Salt' }],
+    defaults: [{ id: 'ash-salt', essences: { fire: 2 } }],
+    membership: [
+      { entityId: 'ash-salt', systemId: 'sys-forge', inherit: { essences: true } },
+      { entityId: 'ash-salt', systemId: 'sys-alchemy', inherit: { essences: false } },
+      { entityId: 'ash-salt', systemId: 'sys-empty', inherit: {} },
+    ],
+  };
+  const entry = projectWorldScopeEntity({ entityType: 'component', corpus, systems: roster })
+    .entries[0];
+
+  assert.deepEqual(entry.defaults.essences, { fire: 2 }, 'the WORLD map is on the defaults record');
+  assert.deepEqual(entry.inheritCounts, { category: 3, essences: 2 });
+  assert.deepEqual(
+    entry.systems.map((row) => [row.systemId, row.inherited.essences, row.resolvedEssences]),
+    [
+      ['sys-forge', true, { fire: 2 }],
+      ['sys-alchemy', false, { fire: 1 }],
+      ['sys-empty', true, { fire: 2 }],
+    ],
+    'inheriting rows resolve the world map, the overriding row its own'
+  );
+
+  // AND THE WORLD SAYING NOTHING LEAVES EACH SYSTEM ITS OWN, normalized as the row would be.
+  const unauthored = projectWorldScopeEntity({
+    entityType: 'component',
+    corpus: { ...corpus, defaults: [] },
+    systems: roster,
+  }).entries[0];
+  assert.deepEqual(
+    unauthored.systems.map((row) => row.resolvedEssences),
+    [{ fire: 3, moss: 1 }, { fire: 1 }, {}]
+  );
+
+  // A COPY, never the corpus map: a consumer mutating the row must not reach the store.
+  entry.systems[0].resolvedEssences.fire = 99;
+  assert.equal(corpus.defaults[0].essences.fire, 2);
+
+  // AND NO OTHER ENTITY TYPE GROWS THE KEY.
+  const toolRow = projectWorldScopeEntity({
+    entityType: 'tool',
+    corpus: { entities: [{ id: 'hammer' }], defaults: [], membership: [] },
+    systems: roster,
+  }).entries[0].systems[0];
+  assert.equal('resolvedEssences' in toolRow, false);
 });
 
 test('a non-member system still produces a row, so membership is the gate', () => {
@@ -275,7 +344,8 @@ test('every section-taking action REFUSES a name the scope does not declare', as
 
   // Every one of these is a real component field that is NOT a section. The normalizer would
   // silently discard each on the next load, so the action has to refuse rather than accept.
-  for (const section of ['salvage', 'difficulty', 'essences', 'complications', 'tags']) {
+  // `essences` left this list at issue 1371 r18-store (M31): it IS a section now.
+  for (const section of ['salvage', 'difficulty', 'complications', 'tags']) {
     assert.equal(await actions.updateWorldDefaultSection('ash-salt', section, {}), false, section);
     assert.equal(
       await actions.updateMembershipSection('ash-salt', 'sys-forge', section, {}),

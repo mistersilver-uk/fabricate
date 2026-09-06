@@ -326,9 +326,24 @@ const PRIMITIVES = Object.freeze([
   // documented SILENT case — emitted with the caller's hash attached, matching nothing, with no
   // compiler warning and byte-identical `css.code`.
   //
-  // The floor is 0 against a measured census of 1, and the assertion is strictly greater, so it
-  // reds the moment the scan stops resolving that single token. A floor of 1 would pass
-  // vacuously the day the identity strip stops passing a bespoke class.
+  // THE DAY THIS ROW'S OWN COMMENT ANTICIPATED HAS ARRIVED (issue 1371). It used to floor a
+  // token census at 0 against a measured 1 — the identity strip's `triggerClass`, the corpus's
+  // only bespoke `ActionMenu` class — and it warned that "a floor of 1 would pass vacuously the
+  // day the identity strip stops passing a bespoke class". D3 absorbed that kebab into the
+  // callout, so the census is 0 and a token floor can no longer be stated at all: 0 is not
+  // strictly greater than 0, and any floor below it would be unfalsifiable.
+  //
+  // The row is NOT retired, because only one of its two halves was ever token-driven. The
+  // contract half — a component that renders an `<ActionMenu>` and scopes a rule onto
+  // `.manager-action-menu*` — keys on the RENDER site, not on a passed class, and is exactly as
+  // live as it was; so is the `class`-first `classProps` order, which is here to catch the
+  // silent case the moment a caller reaches for the root. What changed is which census proves
+  // the scan still reaches this primitive, so the census moves rather than the floor being
+  // relaxed. A bespoke class is emphatically NOT re-added to feed the old one.
+  //
+  // The floor is 1 against a measured 2 (`ComponentBrowserInspector`, `CompositionList`), and
+  // the assertion is strictly greater, so it reds the moment either caller stops rendering the
+  // primitive or the tag matcher stops resolving it.
   Object.freeze({
     tag: 'ActionMenu',
     classProps: ['class', 'triggerClass', 'menuClass'],
@@ -339,13 +354,17 @@ const PRIMITIVES = Object.freeze([
       'manager-action-menu-panel',
       'manager-action-menu-item',
     ],
-    minimumTokens: 0,
+    minimumRenderSites: 1,
   }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {
   const violations = [];
   const sitesScanned = new Map(PRIMITIVES.map((p) => [p.tag, 0]));
+  // The second census, for a row whose non-vacuity is its RENDER sites rather than the classes
+  // its callers pass. See the `ActionMenu` row: a primitive no caller hands a bespoke class can
+  // still be reached by the contract half of this guard, and only a render count can say so.
+  const renderSitesScanned = new Map(PRIMITIVES.map((p) => [p.tag, 0]));
   let componentsWithScopedCss = 0;
   let contractRulesScanned = 0;
 
@@ -378,6 +397,12 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
         entry.primitive.tag,
         sitesScanned.get(entry.primitive.tag) + entry.tokens.size
       );
+      if (entry.renders) {
+        renderSitesScanned.set(
+          entry.primitive.tag,
+          renderSitesScanned.get(entry.primitive.tag) + 1
+        );
+      }
     }
 
     const { css, pruned } = compiledCss(file, source);
@@ -458,11 +483,17 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
   // such component has a scoped block at all would make the loop above unreachable. Stated
   // PER PRIMITIVE so a healthy `ManagerButton` count cannot mask an `IconButton` scan that
   // stopped resolving anything.
-  for (const { tag, minimumTokens } of PRIMITIVES) {
+  // A row states exactly ONE of the two floors, and which one it states is the claim it is
+  // making about how this guard reaches its primitive — so a row cannot quietly hold both and
+  // pass on whichever happens to be satisfied.
+  for (const { tag, minimumTokens, minimumRenderSites } of PRIMITIVES) {
+    const byRenders = minimumRenderSites !== undefined;
+    const measured = byRenders ? renderSitesScanned.get(tag) : sitesScanned.get(tag);
+    const floor = byRenders ? minimumRenderSites : minimumTokens;
     assert.ok(
-      sitesScanned.get(tag) > minimumTokens,
-      `only ${sitesScanned.get(tag)} ${tag} class tokens found under src, below the ` +
-        `floor of ${minimumTokens}, so this guard is no longer reaching that primitive`
+      measured > floor,
+      `only ${measured} ${tag} ${byRenders ? 'render sites' : 'class tokens'} found under src, ` +
+        `below the floor of ${floor}, so this guard is no longer reaching that primitive`
     );
   }
   assert.ok(

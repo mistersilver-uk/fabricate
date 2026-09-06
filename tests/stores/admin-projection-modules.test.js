@@ -748,7 +748,8 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
       assert.ok(field in cold[0], `the card derives ${field}`);
     }
     assert.deepEqual(cold[0].essences, [
-      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 2 },
+      // `colorToken` since issue 1371 r18-colour (M29): '' when the definition authored none.
+      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: '', quantity: 2 },
     ]);
     assert.equal(cold[0].img, 'icons/svg/item-bag.svg', 'an empty img falls back');
     assert.equal(cold[0].salvageSummary.quantityRequired, 3);

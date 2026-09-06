@@ -298,13 +298,14 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     // pair of buttons a screen spells out for itself. A hand-rolled copy is exactly the recipe
     // drift `design-system/spec.md` orders "back before save" to prevent.
     //
-    // The count is TWO because the world tool entry took this component next (issue 1373),
-    // which is what this seam was extracted for. It is asserted rather than left unbounded so
-    // that a THIRD site - the world component entry, when that lane lands - has to come here
-    // and say so, and so that a second pair inside one branch still reds.
+    // The count is THREE because the world tool entry took this component next (issue 1373) and
+    // the world COMPONENT entry took it third (issue 1371) - which is what this seam was
+    // extracted for, and this is the lane the note below asked to come here and say so. All
+    // three world entry routes now render it; the count stays asserted rather than unbounded so
+    // that a second pair inside one branch still reds.
     assert.equal(
       [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
-      2,
+      3,
       'one scoped-entry action pair per world entry route, and no route carrying two'
     );
     const attributes = staticAttributesAt('ScopedEntryHeaderActions');

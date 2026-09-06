@@ -2626,6 +2626,18 @@ const GATHERING_TASKS = [
       { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, dropRate: 30, enabled: true },
       { id: 'row-3', componentId: 'sm-silver-ore', quantity: 1, dropRate: 15, enabled: true },
       { id: 'row-4', componentId: 'sm-ruby', quantity: 1, dropRate: 5, enabled: true },
+      // COAL, and it is here to close a fixture gap rather than to enrich the seam. `sm-coal` is
+      // the lab's only component carrying world tags, so it is the component the world catalogue
+      // entry's preview rail is photographed on — and nothing in the world produced it, so the
+      // rail's `Produced by` group had no row and could only ever photograph its empty sentence.
+      // A drop row is the cheapest producer: `producedBy` is derived from recipe results and
+      // gathering drop rows alike, and a seam that yields ore yields the coal beside it.
+      //
+      // The four rates above read like a distribution summing to 100, but a `dropRate` is an
+      // INDEPENDENT per-row probability (`GatheringDropReferenceValidator`: an integer 0-100 per
+      // row, with no cross-row constraint), and the task's yield chance is
+      // `1 - ∏(1 - rate/100)`. So this row is appended rather than funded out of the others.
+      { id: 'row-5', componentId: 'sm-coal', quantity: 2, dropRate: 35, enabled: true },
     ],
   },
 ];
@@ -4078,6 +4090,154 @@ export function buildLabContent() {
     // apart. The lab has no `Item.hb-tool-alembic` document to inherit FROM, so what its row
     // shows is the last rung — which is the honest picture of an unresolvable link and the state
     // the catalogue exists to make findable.
+    // ── THE WORLD COMPONENT STATES THE MIGRATION CANNOT PRODUCE (issues 1371 and 1392) ────────
+    //
+    // The `1.30.0` pass already lifts every system's `components[]` into world records, so the
+    // world Component catalogue is populated with no seed at all. What it CANNOT produce is any of
+    // the states below, and each one is a screen one of these two lanes ships.
+    //
+    // Four of them are issue 1371's, enumerated (i) to (iv) here; the fifth is issue 1392's world
+    // Tags & Categories record, whose reasons are stated on the row itself rather than restated
+    // here because it is the only one of the five that is not about a component SCREEN.
+    //
+    // ── (i) AN INHERITING CATEGORY, WHICH NEEDS BOTH HALVES SEEDED ────────────────────────────
+    // The lab's ESSENCE seed is the membership record ALONE, because the migration's defaults half
+    // is gated per ENTITY and would still elect the world default. That option is not available
+    // here: `worldScopeDefaults` REFUSES an elected `category` whose donor value is the reserved
+    // bucket, and it declines the section outright whenever any member system left it unauthored —
+    // so most lab components end the migration with NO world `category` at all, and a bare
+    // `inherit: { category: true }` would render the note's THIRD branch ("no world category is
+    // set") rather than the inheriting one. A frame of a refused election looks exactly like a
+    // correct inheriting frame, which is why the pair is seeded together and stated here.
+    //
+    // Seeding `defaults['sm-iron-ingot']` suppresses that entity's whole election, which is the
+    // point: the value below IS the world default rather than one the migration happened to pick.
+    //
+    // ── (ii) WORLD TAGS AND A MUTE, ON A DIFFERENT COMPONENT ─────────────────────────────────
+    // The migration deliberately leaves world `tags` UNAUTHORED — an additive list is granted to
+    // every member system at once, so no donor rule can rescue it — so the world tag list, the
+    // entry's mute grid and the rules editor's read-only tag card are all unphotographable without
+    // this. `sm-coal` OVERRIDES its category, so the two components between them cover both
+    // branches of the note that has a world value.
+    //
+    // ── (iii) AND (iv) A COMPONENT NO SYSTEM HAS, AND ONE WITH NO SOURCE ITEM ────────────────
+    // Both are seeded through `entities`, which is safe: the migration seeds its id set FROM the
+    // existing payload and only PUSHES ids it does not already hold, never removing one. The first
+    // is the catalogue's `Unused` flag and the world entry's zero-member state — which is also the
+    // only state in which the entry's Delete actually proceeds. The second is the unlinked source
+    // pill and the entry validation tab's one blocking row.
+    componentScope: {
+      entities: [
+        {
+          id: 'lab-wildwood-resin',
+          name: 'Wildwood Resin',
+          // A HARVESTED PATH, and the reason it had to change: the harvest carries no
+          // `icons/commodities/tree` family at all, so this seed 404'd. It was invisible until
+          // C6 restored the ghost row's medallion — nothing requested the image before — and it
+          // then failed `manager-components-world-cohort`'s console-error gate. Amber IS tree
+          // resin, so the subject and the colour the old filename named both survive.
+          img: `${ICON_BASE}/commodities/gems/gem-amber-insect-orange.webp`,
+          description: 'Tapped from the reach’s oldest ironwoods. No system has rules for it yet.',
+          originItemUuid: 'Item.lab-wildwood-resin',
+          registeredItemUuid: 'Item.lab-wildwood-resin',
+          aliasItemUuids: [],
+        },
+        {
+          id: 'lab-unbound-salt',
+          name: 'Unbound Salt',
+          img: '',
+          description: 'Catalogued from a merchant’s ledger, with no game-world Item behind it.',
+        },
+        // ── THE ONE WORLD-ONLY RECORD THE MIGRATION CANNOT PRODUCE (issue 1392) ─────────────
+        //
+        // The lab seeds no `migrationVersion`, so `1.30.0`'s world-scope pass runs on every build
+        // and LIFTS a world component record out of each system's own `components[]`, electing
+        // each record's `category` from the donor system. The rows above extend that lifted half
+        // where the pass cannot reach; this row is the pair of states the world Tags & Categories
+        // screen exists to make readable, and both are authored on it:
+        //
+        //  - a world component default carrying a world CATEGORY that no system component
+        //    carries, so `Curios` publishes `0 references` and is STILL confirm-gated, because
+        //    deleting it rewrites this default. That row is the whole point of the one-click gate
+        //    being a conjunction rather than the reference count alone.
+        //  - a world component default carrying a world TAG, `moss`. The migration deliberately
+        //    leaves world `tags` unauthored (`data-models/spec.md:2349-2350`) because the tag
+        //    merge is additive, so a GM-authored world tag is a world-scope grant no membership
+        //    record mirrors — which is why the reference count INCLUDES the defaults' tags and
+        //    EXCLUDES their category. Without this record that asymmetry is invisible in every
+        //    frame.
+        //
+        // It carries its own `entities` row rather than hanging an orphan default off nothing, on
+        // the `lab-tool-unlinked` precedent above: a world record no system has adopted is a real
+        // state, and it reaches no system's read union because it has no membership record. Its
+        // image is REUSED from a component already in this fixture rather than guessed from the
+        // naming convention — `img` is unvalidated, so a wrong path 404s silently and the capture
+        // harness fails the whole case behind the layout assertion.
+        {
+          id: 'lab-world-component-curio',
+          name: 'Tidewrack Curio',
+          img: `${ICON_BASE}/commodities/stone/ore-chunk-blue.webp`,
+          description: 'A world component record no crafting system has adopted yet.',
+        },
+      ],
+      defaults: {
+        // ── (v) AN INHERITED ESSENCE MAP THAT DIFFERS FROM THE SYSTEM'S OWN ROW ────────────
+        // Issue 1371 r20-store3, reviewer round 6 finding 9. The world `essences` section is
+        // authored for almost every lab component and inherited by 66 pairs — but the `1.32.0`
+        // pass ELECTS each world map from the donor system's own row and only marks a system
+        // inheriting when the two are EQUAL, so in a freshly migrated world the resolved map and
+        // the persisted row are identical by construction and the r19 overlay changes no pixel.
+        // A frame of it therefore proved nothing: it was equally consistent with the list still
+        // drawing `getItems`.
+        //
+        // `air: 1` is the divergence, and it is the smallest one that reaches no arithmetic: the
+        // system's own row is `{earth: 2, fire: 1}`, so `manager-component-edit-inheriting` (which
+        // opens THIS component for exactly its inheriting state) and every rules-list row for it
+        // now draw a third essence the persisted row does not carry. No smithing recipe demands
+        // `air` — the system's essence demands are `fire`, `earth`, `water`, `aether` and `mote` —
+        // so no recipe's craftability moves. `water` would have moved `sm-r-tidebound`'s.
+        //
+        // The membership record below PRE-DECIDES `inherit.essences`, which is what makes the
+        // divergence survive: `markComponentEssenceInheritance` leaves a record that already
+        // carries a boolean alone, and would otherwise mark this pair OVERRIDING on the very
+        // inequality this seed exists to create.
+        'sm-iron-ingot': {
+          id: 'sm-iron-ingot',
+          category: 'Refined',
+          essences: { earth: 2, fire: 1, air: 1 },
+        },
+        // `moss` IS APPLIED HERE TOO (issue 1371 r17, UX F-N2). Under M18 the entry's tag run is
+        // the world VOCABULARY (`ingot` / `moss` / `ore`), and `fuel` / `bulk` sit outside it — so
+        // with those two alone no chip on the lab entry was LIT, and the parity region for a lit
+        // chip measured an unlit one against the prototype's lit `Reclaimed`. `moss` is the one
+        // tag the world both authors and applies, and applying it on `sm-coal` gives the entry
+        // frame its lit chip. `fuel` and `bulk` STAY, so the applied-but-unauthored state is
+        // still photographable and the note beneath the run still counts them (three now).
+        'sm-coal': { id: 'sm-coal', category: 'Raw Materials', tags: ['fuel', 'bulk', 'moss'] },
+        'lab-world-component-curio': {
+          id: 'lab-world-component-curio',
+          category: 'Curios',
+          tags: ['moss'],
+        },
+      },
+      membership: {
+        [`sm-iron-ingot|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-iron-ingot',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          // `essences: true` is stated rather than left to the `1.32.0` pass — see the default
+          // above: the pass decides an undecided record by EQUALITY, and this pair is seeded
+          // unequal on purpose.
+          inherit: { category: true, essences: true },
+        },
+        [`sm-coal|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-coal',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          inherit: { category: false },
+          category: 'Raw Materials',
+          mutedTags: ['bulk'],
+        },
+      },
+    },
     toolScope: {
       entities: [
         ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({
@@ -4190,51 +4350,6 @@ export function buildLabContent() {
       // unauthored state, and the system Tool Rules tri-state has a world token to name.
       toolBreakage: { authority: 'toolSpecific' },
     },
-    // ── THE WORLD COMPONENT SCOPE, SEEDED WITH EXACTLY ONE RECORD (issue 1392) ─────────────
-    //
-    // The lab seeds no `migrationVersion`, so `1.30.0`'s world-scope pass runs on every build
-    // and LIFTS a world component record out of each system's own `components[]`, electing each
-    // record's `category` from the donor system. That is the whole world component corpus this
-    // fixture needs, and it is why nothing here restates it: the migration's per-pair guard
-    // (`migrateWorldScopeEntities`) skips an entity whose default is already present, so
-    // authoring the lifted half by hand would fight the pass rather than extend it.
-    //
-    // WHAT THE MIGRATION CANNOT PRODUCE is the pair of states the world Tags & Categories screen
-    // exists to make readable, and both are authored on this ONE world-only record:
-    //
-    //  - a world component default carrying a world CATEGORY that no system component carries,
-    //    so `Curios` publishes `0 references` and is STILL confirm-gated, because deleting it
-    //    rewrites this default. That row is the whole point of the one-click gate being a
-    //    conjunction rather than the reference count alone.
-    //  - a world component default carrying a world TAG, `moss`. The migration deliberately
-    //    leaves world `tags` unauthored (`data-models/spec.md:2349-2350`) because the tag merge
-    //    is additive, so a GM-authored world tag is a world-scope grant no membership record
-    //    mirrors — which is why the reference count INCLUDES the defaults' tags and EXCLUDES
-    //    their category. Without this record that asymmetry is invisible in every frame.
-    //
-    // It carries its own `entities` row rather than hanging an orphan default off nothing, on
-    // the `lab-tool-unlinked` precedent above: a world record no system has adopted is a real
-    // state, and it reaches no system's read union because it has no membership record. Its
-    // image is REUSED from a component already in this fixture rather than guessed from the
-    // naming convention — `img` is unvalidated, so a wrong path 404s silently and the capture
-    // harness fails the whole case behind the layout assertion.
-    componentScope: {
-      entities: [
-        {
-          id: 'lab-world-component-curio',
-          name: 'Tidewrack Curio',
-          img: `${ICON_BASE}/commodities/stone/ore-chunk-blue.webp`,
-          description: 'A world component record no crafting system has adopted yet.',
-        },
-      ],
-      defaults: {
-        'lab-world-component-curio': {
-          id: 'lab-world-component-curio',
-          category: 'Curios',
-          tags: ['moss'],
-        },
-      },
-    },
     // ── THE WORLD VOCABULARY (issue 1392, epic 1357, PR 7a) ────────────────────────────────
     //
     // Authored so the `world-vocabulary` case photographs a POPULATED screen, and authored to
@@ -4251,9 +4366,10 @@ export function buildLabContent() {
     //    nothing on deletion — the world corpus holds no recipe record — so it renders the muted
     //    `Unused` chip under the destructive delete and goes in one click.
     //
-    // `moss` sits between the first two: its only reference is the world default's tag, so it
-    // reads `1 reference` and is confirm-gated. If the count ever excluded the defaults' tags it
-    // would read `Unused` and offer a one-click delete that silently rewrites a world component.
+    // `moss` sits between the first two: its only references are world defaults' tags — the
+    // curio's and, since issue 1371 r17, `sm-coal`'s — so it reads `2 references` and is
+    // confirm-gated. If the count ever excluded the defaults' tags it would read `Unused` and
+    // offer a one-click delete that silently rewrites two world components.
     //
     // Entry ids are the trimmed lowercased names, which is what the store derives and what
     // `buildVocabularyUsage` keys its maps on. Authoring them here rather than letting the

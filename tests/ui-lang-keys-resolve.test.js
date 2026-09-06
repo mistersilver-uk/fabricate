@@ -163,8 +163,8 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    41,
-    'expected 41 legitimate namespace bases to resolve to an object — ' +
+    42,
+    'expected 42 legitimate namespace bases to resolve to an object — ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
       'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base, and from 43 to 40 ' +
@@ -192,7 +192,7 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       'renders ONE panel block for three vocabularies, so the middle segment is data and the ' +
       'base is the literal. Two more are the Preview and Tabs ' +
       'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
-      'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time.'
+      'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time. One more is `KEY` in `src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte` (issue 1371 r16-list), the `Component.BulkEdit` base the rebuilt system bulk panel composes its forty-odd inset, foot and remove-leg strings under — the same pure-string-table shape, kept as a base so the panel is not forty full literals long.'
   );
 });
 

@@ -441,8 +441,8 @@ function writeInheritedEffectSource(row, value) {
  * How each entity type's world-default SECTIONS are written onto a merged row, per entity type.
  *
  * THE SECTION NAME AND THE SHIPPED FIELD NAME ARE NOT ALWAYS THE SAME, which is the whole reason
- * this table exists rather than a spread. A component's `category` and a tool's `breakage` and
- * `onBreak` are spelled identically at both scopes, so their writers are assignments. An essence's
+ * this table exists rather than a spread. A component's `category` and `essences` and a tool's
+ * `breakage` and `onBreak` are spelled identically at both scopes, so their writers are assignments. An essence's
  * two sections are NEW names that collide with nothing on the in-system record - `effectSource` is
  * a block over three fields and `macro` is `propertyMacroUuid` - so without a projection the
  * resolved value would sit on the row under a key no consumer reads, and "an inheriting system
@@ -464,6 +464,15 @@ const INHERITED_SECTION_WRITERS = Object.freeze({
   components: Object.freeze({
     category(row, value) {
       row.category = value;
+    },
+    // `essences` joined `COMPONENT_SECTIONS` at issue 1371 r18-store (M31), and it is an
+    // assignment because the section is spelled over the shipped `Component.essences` map. A
+    // COPY of the world map rather than the corpus object itself: the row is handed to
+    // consumers that read it as their own, and a normalized section value aliases the corpus
+    // by contract, so an assignment by reference would let a consumer edit the world default
+    // through the row.
+    essences(row, value) {
+      row.essences = value && typeof value === 'object' ? { ...value } : value;
     },
   }),
   essences: Object.freeze({

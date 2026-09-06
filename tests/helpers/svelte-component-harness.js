@@ -211,6 +211,23 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayBounds.js'
 ]);
 
+// The compiled `.svelte` modules `SearchablePopover` ITSELF needs when it is the component under
+// test — the three primitives it renders, plus itself. Hoisted for the same reason its raw list
+// above is, and with one addition of its own: a suite that mounts the popover directly declares
+// this list VERBATIM, so two such suites are two copies of a hand-maintained mirror, which rots
+// silently in one of them and counts as duplicated new code in both. `ManagerButton` is the
+// entry that made it worth hoisting — issue 1371 gave the popover a `triggerButton` form, and
+// a `.svelte` this tree renders but a suite omits does not fail that suite, it CANCELS it.
+//
+// Suites that mount a larger tree keep their own list: they need these plus a screen's worth of
+// components, and spreading a constant into a longer literal buys nothing.
+export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte'
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 // Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
 // test references one source of truth — a component referencing a `.svelte`/`.js`

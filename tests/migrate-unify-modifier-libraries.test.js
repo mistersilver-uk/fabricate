@@ -256,8 +256,8 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
   // force lists into their picked lists, issue 1363's 1.30.0 lifts components, essences and
   // tools to world scope, and issue 1373's 1.31.0 backfills each system's own tool prerequisites
   // and check bonus as its own override; the runner counts every entry it applies.
-  assert.equal(summary.ran, 9);
-  assert.equal(store.get('migrationVersion'), '1.31.0');
+  assert.equal(summary.ran, 10);
+  assert.equal(store.get('migrationVersion'), '1.32.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

@@ -128,7 +128,7 @@ const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');
  * the row and the routing it produces the same fact rather than two.
  */
 const BULK_EDIT_CHROME_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)\.svelte$/;
 
 /**
  * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
@@ -1447,7 +1447,39 @@ export const VIEW_LAB_CASES = Object.freeze([
     // all — they are new here — so there is no smoke frame for any of these six to pair with.
     reaches: 'beyond',
     smokeLabels: [],
-    steps: [{ selector: '#manager-world-nav-component-catalogue' }],
+    // THE ROW IS INSPECTED, NOT MERELY LISTED (issue 1371). The shell's inspector column is
+    // where the world `category` card, its inherit count and the per-system membership rows
+    // live, and none of it renders at rest — so the shipped steps photographed the inspector's
+    // EMPTY state, and the inspector's contents are half of what this screen decides.
+    //
+    // `sm-iron-ingot` is the row whose world default is SEEDED and whose smithing membership
+    // record INHERITS it, which is the state the card's inherit count exists to state.
+    // NARROW THE LIST FIRST, OR THE ROW HAS NO HOOK AT ALL (issue 1371, round 2).
+    //
+    // The shared frame PAGES at ten rows and sorts `name-asc`, and the lab world holds 68 world
+    // components — so `sm-coal` is on page 2, `sm-iron-ingot` on page 4 and `lab-unbound-salt`
+    // on page 7, and none of their row hooks is in the DOM at rest. The capture driver throws
+    // by name on a selector that matches nothing and aborts the WHOLE run, so these four cases
+    // published nothing and took every other case's frame down with them.
+    //
+    // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
+    // to sort onto page one was the alternative and is worse: it would bend the corpus around
+    // the capture rather than driving the screen the way the screen is driven.
+    //
+    // AND THE SEARCH IS CLEARED AGAIN BEFORE THE SHUTTER (issue 1371, round 3). Narrowing to one
+    // row is how the inspection is REACHED; leaving it narrowed is what the frame then shows, and
+    // a browse screen photographed at one row is not a frame of a browse screen. Clearing restores
+    // the full sixty-seven — ten rows, `67 of 67 components`, and the pager reading
+    // `Showing 1-10 of 67 - Page 1 of 7` — while the inspection SURVIVES, because the frame holds
+    // the inspected id on the browser view-state rather than on the rendered row.
+    //
+    // A cleared search is safe HERE and would not be on the sibling case below; see its own note.
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
+      { selector: '[data-scoped-list-inspect="sm-iron-ingot"]' },
+      { selector: '[data-scoped-list-search]', fill: '' },
+    ],
     expectView: 'world-components',
     // The page's own hook, so a route that silently fell back to the systems library fails the
     // capture rather than publishing a frame of the wrong screen.
@@ -1470,12 +1502,526 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '#manager-world-nav-tool-catalogue',
         target: '#manager-world-nav-tool-catalogue > i',
       },
+      // THE PAGER, WHICH IS THE CLEARED SEARCH'S OWN WITNESS. `Pagination` is `multiPageOnly`, so
+      // it renders only over a corpus longer than one page: a frame still narrowed to the one
+      // searched row draws no pager at all and fails here. That makes the clear step assertable
+      // rather than merely written down.
+      {
+        container: '[data-scoped-page="world-components"]',
+        target: '[data-pagination-page]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE PLACEHOLDER CLAIM IS GONE (issue 1371), and dropping it is not optional bookkeeping:
+    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
+    // body" with "that route's page still imports it", so a real body left claiming the
+    // placeholder publishes this route's screen as evidence of a placeholder change.
+    //
+    // The shell primitives this screen now composes are claimed instead, each by the case that
+    // RENDERS it: the catalogue shell, the list frame behind it, the bulk panel the selection
+    // swaps in, and the two pure leaves the row and the inspector read.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      // issue 1371 r8-cat: THE FRAME IS THIS SCREEN TOO. The comment above already named "the
+      // list frame behind it" and the list omitted it, so a change to the row, the toolbar or
+      // the inspector identity block — every one of which this frame writes — published the
+      // essence and tool catalogues' frames and not this one. It is on the sibling catalogues'
+      // cases already; this is the entry that was missing.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+    ],
+  }),
+  managerCase({
+    // THE SELECTION'S OWN FACE (issue 1371). The frame above photographs the inspector
+    // describing ONE component; the moment a row is ticked the frame swaps that panel for the
+    // bulk staging model, and nothing in the resting frame can show it. Four staging groups,
+    // the accent register band and the write count on the Apply dock are all this case's.
+    id: 'world-component-catalogue-bulk',
+    label: 'Manager — World Component catalogue, bulk selection',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // ONE SEARCH OVER BOTH SUBJECTS, AND A STAGED INSTRUCTION (issue 1371, round 3).
+    //
+    // The steps used to search twice, once per row, on the claim that the selection SURVIVES the
+    // second search. It does not: `EntityListInspectorFrame.svelte:421-428` prunes `selectedIds`
+    // against the FILTERED rows, so the second search silently dropped the first tick and the
+    // frame published `1 component selected` under a comment asserting two. Paging does not prune
+    // — the prune is on the filter, not on the slice — so the "spans two pages" half of that claim
+    // was true and the "spans two searches" half was never true.
+    //
+    // `salt` matches three rows and TWO of them are the subjects, so one search reaches both. And
+    // for the same pruning reason there is NO trailing `fill: ''` here: clearing the search is a
+    // filter change like any other, and it would prune the very selection this case exists to
+    // photograph.
+    //
+    // A REMOVAL IS STAGED, because an unstaged panel is a panel at rest and this case's whole
+    // subject is the staging model. `Remove from` is the destructive direction — the one whose
+    // note and chip tone round 2 made legible — and one tag staged for addition puts a second
+    // axis and the dock's write-naming label in the same frame.
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'salt' },
+      { selector: '[data-scoped-list-select="tw-brine-salt"]' },
+      { selector: '[data-scoped-list-select="al-saltpetre"]' },
+      // issue 1371 r8-cat: THE TAG IS STAGED FROM THE INSET ROW. The three staging groups were
+      // `Pick a … ▾` popover triggers and are now the reference's inline search + rows + pager
+      // insets, so the chip this step used to click no longer exists; the row is the stager and
+      // the chip is what a staged direction PUTS on screen.
+      //
+      // issue 1371 r14-cat: THE TAG IS ONE THE WORLD VOCABULARY AUTHORS. The inset offers the
+      // vocabulary's tags and nothing else (maintainer ruling M18 on its second surface), and the
+      // lab world authors `ore`, `ingot` and `moss` — `fuel` is applied by a migrated world default
+      // and was only ever offered by the corpus union this ruling struck. `moss` is the one tag in
+      // both lists, so this step resolves on either side of the change.
+      {
+        selector: '[data-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
+      },
+      // AND THE DIRECTION IS STAGED LAST, WHICH IS ALSO WHAT SCROLLS THE PANEL BACK TO ITS HEAD.
+      // The three insets make this panel taller than the column, so the LAST click decides what
+      // the frame shows: staging the tag last left the shot on the panel's foot, with none of the
+      // register, the standing explanation or the membership track in it — the three things this
+      // case's own `expectContained` list is about. `scroll` cannot fix that (`scrollIntoViewIfNeeded`
+      // is a no-op on an element already partly in view), and the ordering is free: the two axes
+      // are independent, so staging them in either order composes the same instruction.
+      { selector: '[data-world-component-bulk-mode-option="remove"]' },
+    ],
+    expectView: 'world-components',
+    expectSelector: '[data-world-component-bulk-panel]',
+    expectContained: [
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-mode]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-apply]',
+      },
+      // THE TWO STAGED AXES, so the frame is asserted to hold the CHANGED panel rather than the
+      // resting one. The mode note is what `Remove from` swaps in, and the tag stager is the
+      // second axis; a panel that reverted to `Unchanged` still renders the mode track and the
+      // Apply dock above, so those two alone cannot tell the states apart.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-mode-state]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-tag-chip="moss"]',
+      },
+      // AND THE THREE INSETS THEMSELVES (issue 1371 r8-cat, gap-list rows 43-45). A panel that
+      // fell back to the popover triggers still renders the mode track, the Apply dock and a
+      // staged chip, so none of the four assertions above can tell the two forms apart.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-bulk-inset="systems"]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-bulk-inset="tags"]',
+      },
+      // AND THE DANGER LEG (gap-list row 47), which is the one control on this panel that had no
+      // counterpart at all before this revision.
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-danger]',
+      },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE ENTRY EDITOR'S DEFINITION TAB (issue 1371), reached the way a GM reaches it: through
+    // the catalogue row's pen. A case that seeded the route directly would depict a state no
+    // navigation produces, which is the fixture-bypass hazard this registry already carries
+    // against itself.
+    //
+    // `sm-coal` is the subject because it is the ONE lab component carrying world tags AND a
+    // per-system mute — which is what the SIBLING case below photographs, after scrolling to it.
+    //
+    // THIS FRAME PROMISES ONLY WHAT IT SHOWS (issue 1371, round 2). It used to claim "the world
+    // tag list, its note and the N-by-M mute grid … all in one frame", and no frame at 1280x900
+    // can deliver that: the Definition tab's card stack puts the World tags card below the panel's
+    // scroll fold, so the containment test could never be satisfied and the case failed on an
+    // assertion rather than on a defect. The evidence is SPLIT rather than weakened — this case
+    // holds the identity, linked-item and category cards, and `world-component-entry-tags` scrolls
+    // to the tag card and the mute grid.
+    id: 'world-component-entry-definition',
+    label: 'Manager — World Component entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-identity="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-source="sm-coal"]',
+      },
+      // THE PREVIEW RAIL IS THE GRID'S SECOND COLUMN (issue 1371, parity round 4), so it is in
+      // the FIRST frame rather than below a fold: it no longer scrolls with the card stack, and
+      // this claim is what would red if it were nested back inside the tab panel.
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+      // THE CATEGORY CARD'S CLAIMS MOVED TO THE TAGS CASE (issue 1371, round 2), because that is
+      // the frame the card is fully drawn in. It sat one line inside this frame's fold, and the
+      // restored `Edit world vocabulary` exit — a button on the card's head row, where a kicker
+      // used to sit alone — is taller than the line it replaced. The choice was to shrink the
+      // affordance to fit an assertion or to assert it where it is drawn; the tags case already
+      // scrolls to exactly that region, so the claim is unchanged and only its frame moved.
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      // THE THREE CHILDREN THE ENTRY WAS REBUILT AS (issue 1371, parity round 4). Without them a
+      // change to the source card or the rail maps to NO case, and the capture job publishes an
+      // unrelated frame — which is the failure this registry exists to prevent. The systems card
+      // claims the third case below, which is the frame it is drawn in.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySourceCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    // THE OTHER HALF OF THE ENTRY'S DEFINITION TAB (issue 1371, round 2), reached by SCROLLING.
+    //
+    // The driver's `scroll` verb exists for exactly this: `frame.screenshot()` on the outer
+    // application does NOT scroll a nested overflow container, so a card below the panel fold is
+    // absent from the frame while every assertion still passes. Scrolling the tag card into view
+    // moves the identity and linked-item cards off the top, which is why this is a second case
+    // rather than two more steps on the first.
+    //
+    // `sm-coal` again: it is the one lab component with world tags AND a member muting one, so
+    // the tag list, its note and the N-by-M mute grid are all here.
+    id: 'world-component-entry-tags',
+    label: 'Manager — World Component entry, world classification',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-tags="sm-coal"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    // ONE CARD, TWO COLUMNS (issue 1371, parity round 4): `proto:881-910` draws category and tags
+    // in a single `World classification` card, and the two-card split this case used to
+    // photograph is gone. The card is the container for every claim below, which is exactly what
+    // would red if it were split again.
+    //
+    // THE N-BY-M MUTE GRID IS GONE WITH IT, and its claim with it: the reference draws no
+    // per-system tag mute anywhere on this screen, so there is no longer a frame that could show
+    // one. That removal is reported to the maintainer rather than absorbed here.
+    expectSelector: '[data-scoped-entry-category="sm-coal"]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-category-label]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-category-note]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-vocabulary-exit]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-tags="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag-note]',
+      },
+      // ONE LIT CHIP, AND IT IS THE FRAME'S POINT (issue 1371 r17, UX F-N2). Under M18 the run
+      // offers the world vocabulary alone, and `sm-coal`'s migrated `fuel` / `bulk` sit outside
+      // it — so until the lab applied `moss` on this record too, EVERY chip here was unlit and
+      // the parity region for a lit chip measured an unlit one against the prototype's lit
+      // `Reclaimed`. This claim is the lit state: a vocabulary tag the record applies, pressed.
+      // It reds if the lab stops applying `moss` on `sm-coal`, if the run stops drawing
+      // `aria-pressed`, or if the chip leaves the card.
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag="moss"][aria-pressed="true"]',
+      },
+      // THE APPLIED-BUT-UNAUTHORED CHIP (issue 1371 r18-entry, maintainer ruling M33, closing
+      // D-CJ). `sm-coal`'s migrated default applies `fuel` and `bulk`, which the lab's vocabulary
+      // (`ingot` / `moss` / `ore`) never authored; under M18 they were invisible on this run and
+      // only the note counted them. M33 draws each as a LIT, STRUCK, clearable chip after the
+      // vocabulary's, with an accessible name that says it is not in the vocabulary, its clear
+      // staged until `Save entry` (M34). This claim reds if the run stops drawing them, if they
+      // lose the struck face's hook, or if the lab's `sm-coal` stops applying `fuel`.
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target:
+          '[data-scoped-entry-tag="fuel"][aria-pressed="true"][data-scoped-entry-tag-unauthored]',
+      },
+    ],
+    // THE TAG CHIP OWNS ITS OWN CENTRE (issue 1371, revision 8 — UX F13). The world tag run is a
+    // wrapping row of 999-radius chips inside a two-column grid column, and a chip is a real
+    // `<button>` with `aria-pressed`: a run that overflowed its column, or a card head that
+    // overlapped it, would leave a chip present in the DOM, correct in every mounted assertion
+    // and unclickable on screen. `elementFromPoint` at the chip's centre is the only check that
+    // can tell those apart, and no mounted suite can make it — happy-dom lays nothing out.
+    //
+    // issue 1371 r15-entry: THE CHIP IS ONE THE WORLD VOCABULARY AUTHORS. The run offers the
+    // vocabulary's tags and nothing else (maintainer ruling M18 on its last surface), and the lab
+    // world authors `ore`, `ingot` and `moss` — `fuel` is applied by `sm-coal`'s migrated default
+    // and was only ever drawn by the corpus union this ruling struck. `moss` is drawn on either
+    // side of the change, a world default carrying it as well as the vocabulary authoring it, so
+    // this hit-test resolves on both; a selector the run no longer draws aborts the whole capture.
+    // Since issue 1371 r17 `sm-coal` applies `moss` as well, so the chip hit here is the LIT one
+    // the claim above pins.
+    expectCenterHit: '[data-scoped-entry-tag="moss"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
+  }),
+  managerCase({
+    // THE ENTRY'S `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31), reached
+    // by SCROLLING for the reason the tags case gives: the card follows `World classification`, so
+    // at 1280x900 the definition frame shows its head and the tops of its tiles and puts the
+    // steppers under the panel's fold, where every assertion passes on a frame that shows no
+    // control. `sm-coal` again, so all four entry cases follow ONE navigation: the lab's `1.32.0`
+    // pass elects its world map from the smithing row, which is what lights the `fire` tile here
+    // and draws `Fire 2` in the rail.
+    //
+    // THE PROTOTYPE DRAWS NO ESSENCE CARD ON ITS ENTRY SCREEN (`proto:805-1035`); the card is
+    // M31's extra, on the shape of the rules editor's card (`proto:1343-1356`), which is the
+    // reference it is measured against.
+    id: 'world-component-entry-essences',
+    label: 'Manager — World Component entry, essence contribution',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-essences="sm-coal"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-essences="sm-coal"]',
+    expectContained: [
+      // The grid of shared quantity cards, one per WORLD essence, with the elected `fire` value
+      // drawn as a CONTRIBUTING tile; the note that counts the section's inheritors; and the
+      // rail's essence run, which follows the same map and is the frame's other half.
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-scoped-entry-essence-grid]',
+      },
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-component-edit-essence="fire"][data-component-essence-active="true"]',
+      },
+      {
+        container: '[data-scoped-entry-essences="sm-coal"]',
+        target: '[data-scoped-entry-essence-note]',
+      },
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-preview-essences] [data-essence-chip="fire"]',
+      },
+    ],
+    // THE STEPPER IS THE NEW CONTROL (issue 1371 r18-entry): a real pointer hit on its `+`, because
+    // a grid that overflowed its card or a head that overlapped it would leave a control present
+    // in the DOM, correct in every mounted assertion and unclickable on screen.
+    expectCenterHit:
+      '[data-scoped-entry-essences="sm-coal"] [data-component-edit-essence="fire"] [data-stepper-increment]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      // The shared quantity card is the frame's subject too: a change to it moves every tile here.
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceQuantityCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE MAINTAINER'S SECOND EXHIBIT (issue 1371, parity round 4): `Systems using this
+    // component`, and the `Delete from the world` card under it. Neither was photographed by any
+    // case — the systems card sat below the fold of both frames above, and deletion was a header
+    // button until this round moved it into a card at the foot of the tab.
+    //
+    // `sm-coal` again, so all three entry cases follow ONE navigation and differ only in scroll
+    // position, which is what keeps them comparable frame to frame.
+    id: 'world-component-entry-systems',
+    label: 'Manager — World Component entry, systems and deletion',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-delete-card]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-systems="sm-coal"]',
+    expectContained: [
+      // THE HEAD, ITS ACTION AND THE SEGMENTED FILTER, which round 3 drew as a bare kicker
+      // reading the data and a `<select>`.
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-add-to-systems]',
+      },
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-system-filter="without"]',
+      },
+      {
+        container: '[data-scoped-entry-systems="sm-coal"]',
+        target: '[data-scoped-entry-system-count]',
+      },
+      // AND THE DANGER CARD, with its reach note beside the armed control.
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-delete-note]',
+      },
+    ],
+    // TWO POINTER PROOFS ON ONE FRAME (issue 1371, revision 8 — UX F13), because these are the two
+    // controls on this screen a compressed row can swallow and no mounted test can see: happy-dom
+    // lays nothing out, so every mounted assertion about either passes on a zero-sized target.
+    //
+    // `expectCenterHit` takes the member row's EXIT ICON in its IDLE face, which is the narrowest
+    // thing this screen draws — a 26px icon-only control in a trailing cluster that shares one
+    // flex row with an ellipsising summary column and, on a member row, with `View system rules`.
+    // That is the exact geometry the delta names: a row whose middle column refuses to shrink
+    // compresses the cluster instead, and the icon keeps its box in the DOM while losing its
+    // centre.
+    //
+    // `expectClick` takes the DELETE, and it is the stronger check of the two — a real Playwright
+    // pointer click, whose actionability pass fails on an obscured, zero-sized or covered target
+    // rather than dispatching a synthetic event at it. Clicking ARMS the control, which writes
+    // nothing (the token is page-local) and cannot delete anything (`sm-coal` has rules in
+    // `lab-smithing`, so the confirm is refused by the page itself). What it buys beyond the
+    // proof is the frame: this case now publishes the armed REFUSAL — `Cannot delete` over the
+    // note naming the system that causes it — which is the state the refusal exists for and
+    // which no frame has ever shown.
+    expectCenterHit:
+      '[data-scoped-entry-system="lab-smithing"] [data-arm-token="scoped-membership-remove:sm-coal|lab-smithing"]',
+    expectClick: '[data-arm-token="world-component-delete:sm-coal"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySystemsCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE VALIDATION TAB, on the ONE lab component that fails a blocking check: `lab-unbound-salt`
+    // is seeded with no source uuid at all, so `No source item linked` blocks and the two world
+    // classification rows warn. A frame taken on a healthy record would photograph four passes
+    // and prove nothing about the severities this tab exists to distinguish.
+    id: 'world-component-entry-validation',
+    label: 'Manager — World Component entry, validation',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Unbound Salt' },
+      { selector: '[data-scoped-list-inspect="lab-unbound-salt"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-tab="validation"]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-validation]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-validation]',
+        target: '[data-scoped-entry-check="source"]',
+      },
+      {
+        container: '[data-scoped-entry-validation]',
+        target: '[data-scoped-entry-check="worldCategory"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/utils\/componentScopeValidation\.js$/],
+  }),
+  managerCase({
+    // ══ THE SHARED EDITOR FRAME, STACKED (issue 1371 r19-entry2) ═══════════════════════════════
+    //
+    // The frame the world Component entry and the system component rules editor share stacks its
+    // rail under its content column below `@container fabricate-manager (max-width: 1000px)`, and
+    // until this revision NOTHING in the registry reached that state on either consumer — while
+    // their three neighbours (`manager-components-stacked`, `manager-essences-stacked`,
+    // `manager-tags-categories-stacked`) all have one. The state is ordinary: the manager window
+    // is resizable with no minimum and opens sixty pixels above the threshold. What the gap let
+    // through was a rules editor whose content column resolved to `0px` when the pane had a
+    // definite height — no tab strip, neither tab, no card, and no scroller to reach them.
+    //
+    // `expectLayout` IS THE ASSERTION THAT ONLY THE STACKED STATE SATISFIES, and it has to be a
+    // measurement rather than a selector: the stack is a container query, so the DOM is identical
+    // on both sides of the threshold and no `expectSelector` can tell them apart. One resolved
+    // column track on the frame's own grid is the stacked shape and exactly two is the wide one,
+    // so a case that stopped stacking would FAIL the capture rather than publish a wide frame
+    // under a name that says otherwise.
+    //
+    // `expectCenterHit` is the other half, and it is the defect stated as a pointer fact: with
+    // the rail taking the pane the first tab is still in the DOM with a box of its own, and only
+    // `elementFromPoint` says that the rail is drawn over it.
+    id: 'world-component-entry-stacked',
+    label: 'Manager — World Component entry stacked',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      // THE STRIP INTO VIEW BEFORE THE POINTER TEST. Stacked, the frame keeps its content height
+      // and `.manager-body` is the scroller; opening the entry moves focus into the tab panel,
+      // which scrolls the strip off the top of the window. `scrollIntoViewIfNeeded` is a no-op
+      // where it is already in frame, so this states "photograph the top of the frame" rather
+      // than moving the case's subject.
+      { selector: '[data-scoped-entry-tab="definition"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-component-entry-page',
+      expectedTracks: 1,
+    },
+    expectCenterHit: '[data-scoped-entry-tab="definition"]',
+    expectContained: [
+      {
+        container: '.manager-component-entry-page',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
+    // 980 RATHER THAN THE REGISTRY'S USUAL 1024, and the twenty-two pixels are measured rather
+    // than chosen: the lab's manager container resolves to the window width MINUS TWO (measured at
+    // five widths), and the frame's own query is `max-width: 1000px` on that container. A 1024px
+    // window leaves the container at 1022 and the frame WIDE — the capture fails with two resolved
+    // tracks, which is how this number was arrived at. 980 clears the threshold by the same margin
+    // it would otherwise miss it by. The height is the registry's narrow one.
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'world', 'scoped', 'responsive'],
+    // The frame is the SHEET's and the two pages that wear it, so a change to either page or to
+    // the shared rail selects this frame alongside its wide twin.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -3534,9 +4080,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     },
     position: { width: 1024, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
+    // THE PLACEHOLDER CLAIM IS GONE HERE TOO (issue 1371). This case reaches the same route as
+    // the catalogue case above, so it carried the same claim and goes stale in the same way —
+    // and it is the half a lane replacing the body is most likely to miss, because nothing about
+    // this case's own assertions mentions a placeholder.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
   managerCase({
@@ -4749,10 +5298,255 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
+    // issue 1371 r13-list — THE LIST OPENS ON ITS FIRST DRAWN ROW (maintainer ruling M14). This
+    // frame used to photograph the inspector describing the manager's STORED-first card while no
+    // row in the list was marked; it now photographs the first row marked and the inspector it
+    // opened. Both are stated so a regression to the unmarked state fails the capture rather
+    // than publishing a frame that quietly shows it.
+    expectContained: [
+      {
+        container: '.manager-table-scroll',
+        target: '.manager-component-row[aria-current="true"]',
+      },
+      {
+        container: 'aside.manager-inspector',
+        target: '[data-component-inspector-kicker]',
+      },
+    ],
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+    ],
+  }),
+  managerCase({
+    // issue 1371 r18-colour — THE ROW BADGES IN THE ESSENCE'S OWN COLOUR (maintainer ruling M29).
+    // `manager-components-normal` opens on the list's first group, `Finished Goods`, whose rows
+    // carry no essence, so that frame cannot show what this revision changed: each essence badge
+    // and the inspector's essence run now draw in the colour the Essence Catalogue gave the
+    // essence. The essence filter's `Carries any essence` predicate brings the carrying rows to
+    // the top, and the containment names a TINTED chip — `data-chip-tint` is stamped only when a
+    // colour reached the chip — so a regression to grey badges fails the capture rather than
+    // publishing a frame that quietly shows it.
+    id: 'manager-components-essence-chips',
+    label: 'Manager — Components essence chips',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-essence-filter]', select: '__any' },
+      // OPEN A CARRYING ROW, through its identity button rather than through the chip: the list
+      // opens on its first drawn row before the filter narrows it (M14), and that row may carry
+      // nothing, so the inspector's run below is only drawn once a tinted row is the selection.
+      { selector: '.manager-component-row:has([data-chip-tint]) .manager-component-identity' },
+    ],
+    expectView: 'components',
+    expectSelector: '.manager-component-row [data-essence-chip][data-chip-tint]',
+    expectContained: [
+      {
+        container: '.manager-table-scroll',
+        target: '.manager-component-row [data-essence-chip][data-chip-tint]',
+      },
+      {
+        container: 'aside.manager-inspector',
+        target: '[data-component-essence-list] [data-essence-chip][data-chip-tint]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceChip\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/ComponentBrowserInspector\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE INHERITING RULES EDITOR (issue 1371, round 2), and it is the ONLY state that renders the
+    // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1
+    // shipped as a unit-tested constant no frame could contain. `manager-component-edit-normal`
+    // opens the FIRST row, which overrides, so it photographs the warning branch and can never
+    // show this one.
+    //
+    // `sm-iron-ingot` is the pair the lab fixture seeds for exactly this: a membership record that
+    // inherits `category`, PAIRED with an explicit world default, because a refused election
+    // photographs the third branch and looks like a correct inheriting frame.
+    id: 'manager-component-edit-inheriting',
+    label: 'Manager — Component edit inheriting',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-search] input', fill: 'Iron Ingot' },
+      { selector: '[data-component-edit]' },
+    ],
+    expectView: 'component-edit',
+    // THE CATEGORY CONTROL IS ONE SELECT NOW, NOT AN `InheritRow` (issue 1371, parity round 4,
+    // rebuild-spec D4.1 / gap-list rows 132-133): the reference draws a single full-width select
+    // whose FIRST option is `Inherit from world · {category}`, with the state note directly under
+    // it — no separate toggle, no second `Category` label, no floated head control. The
+    // `[data-scoped-inherit-*]` hooks this named still exist on the WORLD ENTRY, which is why the
+    // registry's selector guard stayed green while this case could no longer reach its state.
+    expectSelector: '[data-component-edit-category]',
+    expectContained: [
+      // THE INFO-TONE BRANCH, which is this case's whole subject: `inherited` is the state
+      // `sm-iron-ingot` is in, and `manager-component-edit-normal` opens a row that overrides, so
+      // it photographs the warning branch and can never show this one.
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-component-edit-category-note="inherited"]',
+      },
+      // And the ONE identity callout the two stacked cards collapsed into (D3).
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-component-edit-section="identity"]',
+      },
+      // THE ESSENCE SECTION'S INHERIT CHOICE (issue 1371 r18-entry, maintainer ruling M31). The
+      // world record carries an `essences` section now, elected by the `1.32.0` pass from the
+      // oldest system's row, so `sm-iron-ingot` INHERITS it here as it inherits its category —
+      // and this is the only frame that shows the essence card locked over the world map under
+      // the shared inherit row's `Inherited` chip and the info-tone note. The claim reds if the
+      // row leaves the card, if the lab's ingot stops inheriting, or if the note loses its state.
+      {
+        container: '[data-component-edit-section="essences"]',
+        target: '[data-scoped-inherit-toggle="essences"]',
+      },
+      {
+        container: '[data-component-edit-section="essences"]',
+        target: '[data-component-edit-essence-note="inherited"]',
+      },
+    ],
+    // THE SWITCH IS A NEW CONTROL ON THIS CARD (issue 1371 r18-entry), so it owns a real pointer
+    // hit: an inherit row overlapped by the card head or the grid would be present in the DOM,
+    // correct in every mounted assertion and unclickable on screen, and only `elementFromPoint`
+    // at its centre can tell those apart.
+    expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    // THE RULES EDITOR'S READ-ONLY WORLD TAG CARD (issue 1371, round 3), which no frame reached.
+    //
+    // A SECOND CASE rather than two more steps on the one above, for the reason the entry's own
+    // definition/tags split records: the card sits below the editor's scroll fold, and scrolling
+    // to it moves the identity strip and the inherit row — that case's whole subject — out of
+    // frame. It also needs a DIFFERENT COMPONENT: `sm-iron-ingot` carries no world tags at all, so
+    // the card does not render for it, and `sm-coal` is the one lab component with world tags AND
+    // a member muting one, which is what makes the muted/unmuted chip pair visible here.
+    id: 'manager-component-edit-world-tags',
+    label: 'Manager — Component edit world tags',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-search] input', fill: 'Coal' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-section="world-tags"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '[data-component-edit-section="world-tags"]',
+    expectContained: [
+      // THE COUNT NOTE IS CONTAINED BY THE CARD, not by the world-tag GROUP, and the difference is
+      // what this pair was getting wrong. Parity round 4 rebuilt this card into a head, TWO
+      // labelled groups and a count note; `[data-component-edit-section="world-tags"]` is the
+      // first of those groups, so the note (which sits under BOTH groups, because it counts them
+      // together) is its SIBLING and can never be inside it. The case had asked for exactly that
+      // and failed every render since — "is clipped or extends outside", which reads as a layout
+      // defect and is really a capture state that did not co-evolve with the surface it captures.
+      //
+      // THE `Edit world tags` EXIT WAS THE THIRD PAIR HERE AND IS GONE (revision 8, M11). The
+      // reference draws no action in this card's head, so the shipped head is glyph + title +
+      // subtitle and there is nothing left to contain. A capture state outlives the surface it
+      // captures unless it is edited with it — which is why this entry is removed rather than
+      // left to fail as a layout finding.
+      {
+        container: '[data-component-edit-section="tags"]',
+        target: '[data-component-edit-world-tags-note]',
+      },
+      // The chip states ARE the group's own subject, and stay scoped to it: `bulk` is muted in
+      // this system and `fuel` is not, so a card painting one treatment for both fails here.
+      {
+        container: '[data-component-edit-section="world-tags"]',
+        target: '[data-component-edit-world-tag="bulk"]',
+      },
+      {
+        container: '[data-component-edit-section="world-tags"]',
+        target: '[data-component-edit-world-tag="fuel"]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    // THE WIDENED MEMBERSHIP COHORT (issue 1371, round 2): the ghost rows, their Add, and the
+    // toolbar counting the widened set. It is the ONE route in the product to adopt a world
+    // component into a crafting system, and round 1 shipped it with no frame at all.
+    id: 'manager-components-world-cohort',
+    label: 'Manager — Components world cohort',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      // THE COHORT SWITCH IS A `SegmentedControl`, NOT A `<select>` (issue 1371, parity round 4,
+      // rebuild-spec C6): the reference draws two inline segments and the shipped control now
+      // renders one `<label>` per option carrying `data-component-membership-option="<value>"`
+      // (`data-component-membership-filter` is on the TRACK, and stamps `true`, not a value).
+      // `selectOption` on it threw, so this case reached no state at all.
+      { selector: '[data-component-membership-option="all"]' },
+      // SCROLL TO THE COHORT, because it sits below every member row: the lab world's smithing
+      // system holds a handful of components and the world corpus holds sixty-five, so the ghost
+      // list starts well past the fold and an unscrolled frame photographs the member rows this
+      // case is not about.
+      //
+      // A GHOST ROW IS THE MEMBER ROW, DIMMED AND STATED (rebuild-spec C6), so it is named by the
+      // membership attribute every row carries rather than by a marker only the ghost has: there
+      // is no separate ghost component to hang one on, and inventing an attribute for the test
+      // would be a hook with no product reader.
+      { selector: '.manager-component-row[data-component-member="false"]', scroll: true },
+    ],
+    expectView: 'components',
+    expectSelector: '.manager-component-row[data-component-member="false"]',
+    expectContained: [
+      // A ROW, NOT THE WHOLE `<ul>`. The ghost body is a sixty-row list inside a SCROLLING
+      // container, so it legitimately extends past its own scroller and the containment check
+      // reads that as clipping — an assertion that can only pass on a world small enough for the
+      // whole cohort to fit, which is not a property this case is about. Containing the row the
+      // frame is scrolled to is the real claim: the cohort renders inside the table rather than
+      // spilling out of it.
+      {
+        container: '.manager-table-scroll',
+        target: '.manager-component-row[data-component-member="false"]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  }),
+  managerCase({
+    // THE `Add from catalogue` PICKER, OPEN AND MULTI-SELECTED (issue 1371, M9). The header action
+    // it hangs off had NO frame and no test at all through revision 5 — which is how it shipped
+    // navigating to a token that resolves to nothing. A control with no capture state publishes
+    // an unrelated frame when it changes, which is the failure this registry exists to prevent.
+    id: 'manager-components-add-from-catalogue',
+    label: 'Manager — Components add from catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-add-from-catalogue]' },
+      // TWO ROWS TICKED, BY STATE RATHER THAN BY ID. A picked row carries `is-picked`, so
+      // `:not(.is-picked)` is always the first UNPICKED row and two of these steps tick the first
+      // two — with no dependence on which world components the lab fixture happens to sort first,
+      // which an id-named step would silently acquire.
+      { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
+      { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
+    ],
+    expectView: 'components',
+    expectSelector: '[data-component-add-from-catalogue-dialog]',
+    kinds: ['manager', 'components'],
+    // THE PICKER'S OWN FILE, AND NOT `ManagerModal.svelte`. The shared modal chrome is a BROAD
+    // SIGNAL, so `selectRenderFileCases` never reaches a per-case pattern naming it and the
+    // declaration would do nothing — `design-system-primitives.test.js` (b) reds exactly that.
+    // A chrome change selects the representative pair instead.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
     ],
   }),
   managerCase({
@@ -4763,20 +5557,61 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     // The STAGED face. `data-component-select` sits on a visually hidden input, so the click
     // target is its wrapping `<label>`; two rows, because a one-row selection reads as an
-    // accident. Then the three axes the smoke stages: a category, the tag tri-state at BOTH its
-    // non-default faces (one click = add, two = remove), and one essence increment, which is what
-    // arms the destructive-overwrite warning.
+    // accident. Then the three axes the smoke stages: one essence increment, which is what arms
+    // the destructive-overwrite warning; the tag tri-state at BOTH its non-default faces (one
+    // click = add, two = remove); and a category — an inline inset ROW since issue 1371 r16-list
+    // (M23), so a click rather than a select.
+    //
+    // THE ESSENCE IS STAGED FIRST AND THE CATEGORY LAST (issue 1371 r17-b, quality N4), because
+    // the LAST click decides what the frame shows: the three insets make the panel taller than
+    // its column, and Playwright scrolls the clicked control into view. Ending on the essence
+    // stepper photographed the panel from the tags inset's third row down, with the staged
+    // category and the chip run above the fold; ending on the category row lands the shutter on
+    // the panel's head, as the world twin does. The axes are independent, so the order composes
+    // the same instruction.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
-      { selector: '[data-component-bulk-category]', select: 'Refined' },
-      { selector: '[data-bulk-tag="ore"]' },
-      { selector: '[data-bulk-tag="ingot"]' },
-      { selector: '[data-bulk-tag="ingot"]' },
       { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
+      // The tag inset is a PAGED window over the system's tags (issue 1371 r16-cat converged both
+      // panels on one `BulkStagingInset`), so `ore` and `ingot` sit past page one: reach each
+      // through the inset's own search well, as the world bulk case reaches its rows, then clear
+      // the well so the frame shows the resting inset under the staged chip run.
+      { selector: '[data-bulk-inset-search="tags"]', fill: 'ore' },
+      { selector: '[data-bulk-tag="ore"]' },
+      { selector: '[data-bulk-inset-search="tags"]', fill: 'ingot' },
+      { selector: '[data-bulk-tag="ingot"]' },
+      { selector: '[data-bulk-tag="ingot"]' },
+      { selector: '[data-bulk-inset-search="tags"]', fill: '' },
+      { selector: '[data-component-bulk-category-option="Refined"]' },
     ],
     expectView: 'components',
+    expectSelector: '[data-component-bulk-panel]',
+    // THE THREE STAGED AXES, asserted (issue 1371 r17-b, quality N4): a category radio or tag
+    // tri-state that stopped staging on THIS panel would otherwise still publish a green frame.
+    // The tag states are read off the staged CHIP RUN rather than the rows, because the well is
+    // cleared above and both tags sit past page one of the resting inset.
+    expectContained: [
+      {
+        container: '[data-component-bulk-panel]',
+        target:
+          '[data-component-bulk-category-option="Refined"][data-component-bulk-option-state="on"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target: '[data-component-bulk-tag-chip="ore"][data-component-bulk-tag-chip-state="add"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target:
+          '[data-component-bulk-tag-chip="ingot"][data-component-bulk-tag-chip-state="remove"]',
+      },
+      {
+        container: '[data-component-bulk-panel]',
+        target: '[data-component-bulk-essences-staged="true"]',
+      },
+    ],
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
@@ -4789,18 +5624,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete idle',
     reaches: 'beyond',
     smokeLabels: [],
-    // The UNARMED face of the set delete (issue 1129), and the frame that actually
-    // photographs the impact statement.
+    // The UNARMED face of the set remove (issue 1129; the reference's `Remove N components from
+    // {system}…` leg in the shell's dock since issue 1371 r16-list, M23), and the frame that
+    // photographs its consequence note.
     //
-    // The bulk-edit cases above do NOT photograph it "for free". The delete card sits below
-    // the panel shell and below the sticky Apply dock, which puts it under the rail's fold at
-    // the registry's 1280x820 position — measured on the published
-    // `manager-components-bulk-edit-unstaged` frame, where the rail ends at the essence grid
-    // and the card is simply absent. The armed case only shows it because CLICKING the button
-    // scrolls it into view, and that frame shows the armed state by definition.
-    //
-    // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
-    // containers, so without it the card is out of frame while every assertion still passes.
+    // The bulk-edit cases above do NOT photograph the note "for free": the leg sits in the
+    // pinned dock under the primary, and the note's counted recipe sentences are what this frame
+    // exists for. The `scroll` step is kept so the dock is in frame whatever the rail's fold.
     //
     // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
     // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
@@ -4813,7 +5643,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
-      { selector: '[data-component-bulk-delete-card]', scroll: true },
+      { selector: '[data-component-bulk-remove]', scroll: true },
     ],
     expectView: 'components',
     // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
@@ -4834,10 +5664,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete armed',
     reaches: 'beyond',
     smokeLabels: [],
-    // The ARMED half of the set delete (issue 1129), the twin of
-    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
-    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
-    // written.
+    // The ARMED half of the set remove (issue 1129; in the dock since issue 1371 r16-list), the
+    // twin of `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame
+    // shows `Confirm — remove N from {system}` over the note it is a confirmation OF, with
+    // nothing written.
     //
     // Two frames rather than one because the two states are the point: the idle sibling
     // directly above shows the impact statement rendered BEFORE arming, and this one shows
@@ -4958,11 +5788,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-component-edit-normal'],
     reaches: 'exact',
     query: {},
-    steps: [
-      { selector: '#manager-nav-component-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
-    ],
+    steps: [{ selector: '#manager-nav-component-rules' }, { selector: '[data-component-edit]' }],
     expectView: 'component-edit',
+    // THE SHARED RAIL, IN THIS FRAME (issue 1371 r18-list, maintainer ruling M27): the editor
+    // renders the world entry's `How players see it` rail at the system scope, so the frame must
+    // show the rail's scope sentence and its inventory tile beside the form — the two regions a
+    // rail of the editor's own would draw differently, and the reason the ruling was made.
+    expectContained: [
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-scope-note]',
+      },
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four `*-complications-*` and
     // `*-salvage-stage-strip` cases below, NOT here (issue 1286). This case runs on the
@@ -4973,6 +5814,38 @@ export const VIEW_LAB_CASES = Object.freeze([
     // contain them, which is the unrelated-evidence failure the registry's own orphan check
     // exists to prevent and which no mechanical gate catches: the files ARE in the mounted
     // closure, so both directions of `view-lab-source-coverage` pass either way.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    // THE OTHER CONSUMER OF THE SHARED FRAME, STACKED (issue 1371 r19-entry2). Its twin is
+    // `world-component-entry-stacked`, whose comment carries the whole reasoning; this is the
+    // screen the collapse was actually found on, because its page IS its `<main>` and that
+    // element declares the row template M26 gave it for the full-height rail.
+    id: 'manager-component-edit-stacked',
+    label: 'Manager — Component edit stacked',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-tab="rules"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector: 'main.manager-component-edit-main',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: 'main.manager-component-edit-main',
+      expectedTracks: 1,
+    },
+    expectCenterHit: '[data-component-edit-tab="rules"]',
+    expectContained: [
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-entry-preview-tile]',
+      },
+    ],
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -4990,8 +5863,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="rw-slag"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]',
       },
       { selector: '[data-salvage-routing]', scroll: true },
     ],
@@ -5014,8 +5886,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-chainmail"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-chainmail"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',
@@ -5031,8 +5902,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-longsword"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-longsword"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',
@@ -5070,8 +5940,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="hb-empty-vial"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="hb-empty-vial"] [data-component-edit]',
       },
       { selector: '[data-complications-section]', scroll: true },
     ],
@@ -5099,7 +5968,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
       },
       { selector: '[data-complications-section]', scroll: true },
     ],
@@ -5131,7 +6000,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
       },
       { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
       // The LAST row of the When card, so `scrollIntoViewIfNeeded` — which lands its anchor near
@@ -5166,7 +6035,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       {
         selector:
-          '.manager-component-row[data-component-id="hb-cracked-alembic"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
       },
       { selector: '[data-salvage-stage-complications]', scroll: true },
     ],
@@ -5785,7 +6654,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
-          '.manager-icon-button[aria-label^="Edit"]',
+          '[data-component-edit]',
       },
       { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
     ],
@@ -8893,8 +9762,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       {
-        selector:
-          '.manager-component-row[data-component-id="sm-ruby"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-component-row[data-component-id="sm-ruby"] [data-component-edit]',
       },
     ],
     expectView: 'component-edit',

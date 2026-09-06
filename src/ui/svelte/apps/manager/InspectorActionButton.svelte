@@ -126,7 +126,25 @@
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+
+    /* THE CORNER FOLLOWS THE HEIGHT (issue 1371, maintainer ruling M12a applied to this
+       primitive). This was 6px, which `openspec/specs/design-system/spec.md`'s radius ladder
+       gives to a CHIP at or below 24px; a control of 34 to 38px takes 9. A 34px button on a
+       chip's corner is the identical off-ladder pairing M12a closed one rule up on
+       `.manager-button.fab-manager-button`, and the rules list measured it as the last line on
+       `sys-inspector-foot-action`.
+
+       IT IS A COMPLIANCE FIX AND NOT AN OPT-IN, for M12a's reason: a published ladder is not a
+       per-caller preference, and an opt-in would leave every OTHER inspector foot action on the
+       wrong rung while making the wrongness look deliberate. It moves every inspector foot
+       action by three pixels of corner curvature and nothing else — no box, no stacking context
+       and no hit target moves.
+
+       `.is-primary` below overrides the height to 36px, which is a RETIRED rung and is already
+       booked as debt in `tests/components/control-height-known-literals.js`. It is left exactly
+       as it stands: 36 is inside the 34-38 band this corner serves, so it takes the same 9 and
+       no second value is introduced here. */
+    border-radius: 9px;
     color: var(--fab-text);
 
     /* NO FILL — THE NEUTRAL VERB SITS ON THE PANE, IT DOES NOT STAND OFF IT (issue 1372,

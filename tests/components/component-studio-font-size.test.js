@@ -264,17 +264,18 @@ const FIXTURE = `
 
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="component-edit">
         <form class="manager-component-edit-view">
+          <!-- THE STRIP AS ComponentIdentityStrip.svelte NOW RENDERS IT (issue 1371). The chip,
+               the lock badge, the description paragraph and the 186px drop target are gone from
+               the product, and their rules with them; a fixture that kept drawing them would pin
+               CSS that paints nothing, which is the exact rot this gate exists to catch.
+               No backticks in here: this markup is a template literal. -->
           <section class="manager-component-panel manager-component-identity-strip">
-            <span class="manager-component-identity-chip"><i class="fas fa-box-open"></i></span>
             <div class="manager-component-identity-copy">
               <div class="manager-component-identity-name-row">
                 <button type="button" class="manager-component-identity-name" data-m="identity-name">Iron Ore</button>
-                <span class="manager-chip manager-component-identity-lock" data-m="identity-lock"><span>Linked Items Directory</span></span>
               </div>
-              <p class="manager-component-identity-description" data-m="identity-description">Unrefined metal.</p>
               <p class="manager-component-identity-note" data-m="identity-note"><span>Name, image &amp; description follow the linked item.</span></p>
             </div>
-            <div class="manager-component-source-drop-target" data-m="drop-target"><span>Drop a world or compendium item to replace</span></div>
           </section>
           <section class="manager-component-panel manager-component-inline-panel">
             <div class="manager-task-card-heading">
@@ -282,7 +283,7 @@ const FIXTURE = `
                 <h3 data-m="panel-title">Category</h3>
                 <p class="manager-muted" data-m="panel-sub">Groups this component in the browser.</p>
               </div>
-              <select class="manager-input manager-component-inline-control" data-m="field-select"><option>General</option></select>
+              <select class="manager-input manager-component-category-select" data-m="field-select"><option>General</option></select>
             </div>
           </section>
           <section class="manager-component-panel" data-salvage-section>
@@ -294,7 +295,6 @@ const FIXTURE = `
                 <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
               </div>
             </div>
-            <p class="manager-component-info-banner" data-m="info-banner"><span>Roll budget flows down the list</span></p>
             <div class="manager-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="manager-salvage-stage-list">
@@ -318,7 +318,12 @@ const FIXTURE = `
               </ul>
             </div>
             <div class="manager-component-tag-run">
-              <button type="button" class="manager-chip is-tag" data-m="tag-toggle"><i class="fas fa-tag"></i>Brass<i class="fas fa-circle-check"></i></button>
+              <!-- The label alone: the own-tag run dropped its leading tag glyph and its
+                   trailing state circle at issue 1371 r11 (UX F-F), because proto:1337 draws the
+                   label and carries the selection in the chip's fill. This fixture is a COPY of
+                   the component's markup, so it keeps passing whatever the component emits; it
+                   is re-cut here so the copy does not go on describing a chip nobody renders. -->
+              <button type="button" class="manager-chip is-tag" data-m="tag-toggle">Brass</button>
             </div>
           </section>
           <input type="text" data-m="bleed-baseline" value="bare">
@@ -391,15 +396,24 @@ const EXPECTED = {
   // over. The old map pinned the drift and its own comments admitted it
   // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
   search: 11.52, // 0.72rem — prototype search input 12.5px sans
-  'filter-label': 8.8, // 0.55rem — prototype toolbar micro-label 8.5px @ .08em (was 12.48)
+  // `proto:1062` — the toolbar micro-label at 8.5px, which is now the SHIPPED value rather than
+  // the target this pin's own comment used to name (issue 1371 r11, UX finding F-K). The 0.08em
+  // tracking is unchanged and resolves against this size, so the reference's 0.68px comes with
+  // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
+  // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
+  'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
   // 0.72rem. These were 14 — Foundry's app base bleeding through — because the Component
   // Studio's own bleed patch covers `.manager-search input` and `.manager-toolbar
   // .manager-button` but NOT `select`, and the browser's selects had no font-size rule
   // at all. Joining `.manager-component-toolbar select` to the recipe rule closed it.
-  'filter-select': 11.52, // prototype filter/sort select 11.5px sans — near-exact
-  'sort-select': 11.52,
-  'essence-select': 11.52,
-  'toolbar-button': 11.52, // 0.72rem — the sort-direction toggle at the compact scale
+  // The two FILTER selects moved to the reference's own 12px at issue 1371 r11 (F-K); the SORT
+  // select did not, because the reference draws that one at 11.5px (`proto:1066`) against the
+  // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
+  // bar with two pinned sizes is the reference's own arrangement, not an oversight.
+  'filter-select': 12, // proto:1054 — the category filter (was 11.52)
+  'sort-select': 11.52, // proto:1066 draws 11.5; the residual is 0.02px
+  'essence-select': 12, // proto:1056 — the essence filter (was 11.52)
+  'toolbar-button': 11, // proto:1067 — the sort-direction toggle at `600 11px` (was 11.52)
   // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
   // the deliberate change, not drift: the compact Tool Studio scale is now the only chip
   // scale, so these five roles are re-pinned to it rather than being relaxed or dropped.
@@ -408,8 +422,16 @@ const EXPECTED = {
   'filter-chip': 9.92, // 0.62rem — the one chip scale (was 12)
   count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
   // ── The list.
-  'row-name': 12.16, // 0.76rem serif — bleed fix; prototype row name 13.5px serif
-  'row-description': 12.48, // 0.78rem — prototype row description 11px sans
+  // `proto:1087` (`font:600 13.5px var(--serif)`) — the C5 rebuild writes the row name in the
+  // reference's own 13.5px/600 serif. Authored as a px literal because a font size is a
+  // literal, not a scale member; this pin previously carried the drift its own comment named.
+  // (The cite read `proto:1084`, which is the row's bulk-select checkbox, until issue 1371
+  // revision 8; a cite nobody can check is a pin taken on trust.)
+  'row-name': 13.5,
+  // `proto:1088` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
+  // the reference's own 11px. The pin read 12.48 while its own comment named 11. (The cite
+  // read `proto:1087`, which is the 13.5px serif NAME line above, until revision 8.)
+  'row-description': 11,
   'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
   'row-difficulty': 9.92, // same chip family
   // ── The browser inspector (issue 676). It shares the recipe inspector's rules.
@@ -422,22 +444,45 @@ const EXPECTED = {
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
   'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
-  // 0.82rem. The Category select renders OUTSIDE a `.manager-field` (the heading row),
-  // and `.manager-field`'s 0.82rem is INHERITED — no rule sizes a select directly. This
-  // measured 14 (Foundry's app base) until `.manager-component-inline-control` stated
-  // the size itself. That is precisely the bleed this gate exists to catch, caught here.
-  'field-select': 13.12,
-  // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
-  // Name/Description fields it replaced are gone, and with them `readonly-value`.
-  'identity-name': 18, // 1.125rem serif — prototype identity name 18px/600. Exact.
-  'identity-lock': 9.92, // 0.62rem — prototype lock badge 9px sans (was 12)
-  'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
-  'identity-note': 10, // 0.625rem — prototype premise note 10px sans. Exact.
-  'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
+  // 12px, RETARGETED (issue 1371). The role used to measure a
+  // `.manager-component-inline-control` floated into the panel's heading row, and the
+  // reference gives the Category select a card of its own (`proto:1322`), so the D-parts
+  // rebuild moved it into the card body as `.manager-component-category-select` and the old
+  // class is emitted nowhere. The role follows the control rather than the retired markup:
+  // the fixture names what `ComponentEditView` renders today, and the new rule states 12px
+  // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
+  // (px, not rem: a font size is a literal — `design-system/spec.md:216-220`.)
+  'field-select': 12,
+  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form: the
+  // read-only boxed Name/Description fields it replaced are gone, and with them
+  // `readonly-value`.
+  //
+  // FOUR MORE ROLES RETIRED THE SAME WAY AT ISSUE 1371, and they are named here rather than
+  // silently dropped, because a role that leaves this map with no note reads as coverage
+  // someone chose to give up:
+  //
+  //   `identity-lock`        the lock badge; the strip states provenance in the world pill
+  //                          and the note now, and no source emits the class.
+  //   `identity-description` the description paragraph; the rebuilt strip carries the name
+  //                          row and the attribution note only.
+  //   `drop-target`          the 186px dashed source drop target; replacing a source is the
+  //                          shared `ItemDropZone` primitive's job now.
+  //   `info-banner`          the hand-rolled roll-budget strip; `proto:1374` is the shared
+  //                          `Callout`, which `ComponentEditView` renders instead.
+  //
+  // Each of the four had its rule DELETED from `styles/fabricate.css` in the same change,
+  // because nothing under `src/` emitted the class any more. Keeping the pins would have
+  // meant a fixture drawing markup the product does not render, measured against rules that
+  // paint nothing — the rot this gate exists to catch, wearing the gate's own clothes.
+  // 0.94rem. `proto:1313` is `font:600 15px var(--serif)`: the D3 rebuild reads the identity
+  // name off the callout, where the retired strip had sized it as a page-level heading.
+  'identity-name': 15.04,
+  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`: the note is the attribution
+  // SENTENCE now, prose rather than a glyph-led hint, so it reads a rung above a micro-label.
+  'identity-note': 11.52,
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
-  'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
   'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
   // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
@@ -486,7 +531,10 @@ const EXPECTED = {
   'bulk-subhint': 9.92, // 0.62rem — identical to `bulk-hero-hint`
   'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
-  'bulk-essence-name': 12.16, // 0.76rem — the extracted card, shared with the editor grid
+  // 0.72rem. `proto:1348` is `font:600 11.5px var(--sans);color:var(--text2)`: the tile's
+  // subject is the numeral under it, so the name recedes a rung instead of competing.
+  // Still the extracted card, and still shared with the editor grid.
+  'bulk-essence-name': 11.52,
   'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
   'bulk-dc-copy': 9.92, // 0.62rem
   // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one

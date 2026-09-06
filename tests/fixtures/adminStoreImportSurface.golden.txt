@@ -20,6 +20,7 @@ import {
   normalizeCharacterPrerequisite,
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
+import { componentEssenceOverrideOn } from '../../../systems/componentEssenceOverride.js';
 import {
   buildExportPayload,
   validateImportData,
@@ -94,6 +95,7 @@ import {
   TOOL_BREAKAGE_AUTHORITIES,
   TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
+import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
 import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
 import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
 import {

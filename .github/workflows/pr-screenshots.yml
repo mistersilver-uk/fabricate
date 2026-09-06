@@ -255,16 +255,63 @@ jobs:
             exit 1
           fi
 
-      # Run the chrome-drift suite ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns the
-      # drift test's "no cache, skip" into a failure — but only for a process that actually runs it,
-      # which is why it is set here on the test command rather than on the job. Setting it as a job
-      # env var alongside a job that never runs `npm test` reads as a safety control and is not one;
-      # this file did exactly that until review caught it.
-      - name: Verify the frame builder still transcribes this Foundry build
+      # Run the chrome-dependent suites ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns
+      # "no cache, skip" into a failure — but only for a process that actually runs them, which is
+      # why it is set here on the test command rather than on the job. Setting it as a job env var
+      # alongside a job that never runs `npm test` reads as a safety control and is not one; this
+      # file did exactly that until review caught it.
+      #
+      # ALL THREE suites belong here, and each was a skipped or vacuous test everywhere until it
+      # was added. `tests/view-lab-fixture-assets.test.js` walks every asset path the lab world
+      # names and asserts it resolves in the harvested chrome; the defect it exists for — a 404
+      # fixture path that aborts a capture run and publishes ZERO frames — is precisely a CI
+      # failure mode. `ci.yml`'s `npm test` runner holds no cache, so the suite skipped there, and
+      # this job was the only one that harvests a cache and it ran the drift suite alone. The guard
+      # existed and executed nowhere (issue 1371, quality review r9 F2).
+      #
+      # `tests/components/components-browser-rendered.test.js` joined for the same reason (issue
+      # 1371, quality review round 5 Q2). Its M28 claim — that a component row's medallion stays at
+      # the row's leading edge under a chrome that centres a button's content — is measured under a
+      # HAND-WRITTEN one-line stand-in for Foundry's sheet and, separately, under the harvested
+      # sheet itself. Only the second arm measures Foundry; with no cache it skipped, so in CI the
+      # ruling was carried entirely by the transcription. The suite now also reads a bare `<button>`
+      # under each chrome and asserts the two agree, which is the drift check the mirror never had —
+      # and that check is likewise real only where a harvest exists.
+      #
+      # AND THE TWO ENTRY-FRAME SUITES JOINED IN r20 (issue 1371, Foundry review round 6 finding 3,
+      # quality review round 6 R2). Revision 19 gave both of them arms that re-measure the frame's
+      # whole contract under the harvested sheet, wrote a shared skip policy saying those arms run
+      # on THIS step — and named neither file here. With the harvest moved aside both reported
+      # `tests 40, pass 20, skipped 20` and stayed green even under VIEWLAB_REQUIRE_CHROME=1, so
+      # the arms executed on a maintainer's machine and nowhere else. All three now register
+      # `registerChromeRunnerGuards` from `tests/helpers/harvestedFoundryChrome.js`, which both
+      # fails loudly on a missing harvest and asserts, against this file, that the calling suite is
+      # named on the step below.
+      #
+      # `--conditions=browser` because all three rendered suites MOUNT Svelte components (`npm test`
+      # sets the same condition); without it every mount fails with "mount(...) is not available on
+      # the server". `--test-timeout` matches `npm test` rather than leaving the default of none, so
+      # a hung Chromium fails the step instead of running out the job's clock.
+      #
+      # THE STEP'S NAME IS LOAD-BEARING, and it is now spelled in exactly two places: here, and
+      # `CHROME_STEP_NAME` in `tests/helpers/harvestedFoundryChrome.js`, which every chrome-dependent
+      # component suite asserts this step against. `tests/view-lab-fixture-assets.test.js` quotes it
+      # in prose as well, because it is a root suite that does not mount and so does not import that
+      # helper. Rename it here and those two change with it — the r19 name ("Verify the harvested
+      # chrome still matches, and every lab asset path resolves in it") was left in place precisely
+      # because it was transcribed in more places than that, which is the mirror rot this collapse
+      # ends. No colon inside the name: a plain YAML scalar cannot carry one.
+      - name: Run every chrome-dependent suite, where a missing harvest fails instead of skipping
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
-        run: node --test tests/view-lab-chrome-drift.test.js
+        run: |
+          node --conditions=browser --test --test-timeout=300000 \
+            tests/view-lab-chrome-drift.test.js \
+            tests/view-lab-fixture-assets.test.js \
+            tests/components/components-browser-rendered.test.js \
+            tests/components/component-edit-frame-rendered.test.js \
+            tests/components/world-component-entry-frame-rendered.test.js
 
       - name: Render the selected frames
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'

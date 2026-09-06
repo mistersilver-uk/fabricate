@@ -451,9 +451,9 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
   // (issue 1373).
   // The count is asserted rather than loosened so a TWELFTH migration landing here is noticed
   // rather than absorbed — which is exactly how the fourth through eleventh were.
-  assert.equal(result.ran, 11);
+  assert.equal(result.ran, 12);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.31.0');
+  assert.equal(store.get('migrationVersion'), '1.32.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

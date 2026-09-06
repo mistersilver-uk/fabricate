@@ -521,6 +521,68 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     assert.equal(reported.handle.isDirty(), false);
   });
 
+  // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THIS SCREEN NOW SAYS SO (issue 1371 r20-entry3,
+  // Foundry review round 6 finding 4) ──────────────────────────────────────────────────────────
+  // `Save essence` stages a MULTI-SECTION sequence off `scope.sections`, and a world-setting write
+  // that Foundry's socket layer refuses posts its own raw `error.message` and then REJECTS. r19
+  // caught the rejection here — the route-exit guard declines the exit rather than rejecting — but
+  // passed no `onRefused`, so a rejection at write *k* left `1..k-1` landed DURABLY with the GM
+  // told only Foundry's sentence, which cannot say which step stopped or which had landed. And the
+  // store publishes its cache before awaiting the write, so every open manager surface shows all of
+  // them as saved until a reload.
+  it('a REJECTING section write answers false and names the step that stopped and the one that had landed', async () => {
+    const notified = [];
+    const previousUi = globalThis.ui;
+    Reflect.set(globalThis, 'ui', {
+      notifications: {
+        error: (message) => {
+          notified.push(message);
+        },
+      },
+    });
+    try {
+      const reported = { handle: null };
+      const root = await entryHarness.mount({
+        scope: essenceScope(),
+        actions: {
+          updateEntity: () => true,
+          updateWorldDefaultSection: async () => {
+            throw new Error('The requested Setting update was refused');
+          },
+        },
+        entityId: 'ash',
+        onBackToCatalogue: () => {},
+        onDraftChange: (handle) => (reported.handle = handle),
+        onDirtyChange: () => {},
+      });
+      assert.ok(reported.handle, 'the editor reported no draft handle, so nothing below is measured');
+
+      // The IDENTITY patch lands first and the sections after it, so staging both is what puts a
+      // landed write behind the refused one.
+      const name = root.querySelector('[data-scoped-entry-name]');
+      name.value = 'Aether';
+      name.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      root.querySelector('[data-scoped-world-default-clear]').click();
+      await entryHarness.setProps({});
+
+      assert.equal(
+        await reported.handle.save(),
+        false,
+        'the Save RESOLVES false — the route-exit guard declines the exit rather than rejecting'
+      );
+      assert.deepEqual(
+        notified,
+        [
+          'Saving the active effect source did not complete; the shared identity fields had already been saved. The requested Setting update was refused',
+        ],
+        'ONE sentence, naming the step that stopped and the one that had landed durably before it — and the identity fragment is THIS editor’s field set, which carries its colour token'
+      );
+      assert.equal(reported.handle.isDirty(), true, 'the edit is still in front of the GM');
+    } finally {
+      Reflect.set(globalThis, 'ui', previousUi);
+    }
+  });
+
   it('WITHDRAWS the handle when the editor unmounts, so a stale one cannot answer for it', async () => {
     const { reported } = await mountEntry();
     entryHarness.remount();
@@ -529,6 +591,46 @@ describe('the world essence entry editor buffers its edit until Save', () => {
       null,
       'the shell is still holding a handle on an unmounted editor, which would answer the ' +
         'route-exit guard about a screen nobody is looking at'
+    );
+  });
+});
+
+// ── AN ESSENCE ROW MAY NOT BORROW THE COMPONENT'S CASCADE (issue 1371 r10, r9-cat finding 5b) ──
+//
+// `MembershipActions` is shared by all three scoped entity types, and revision 9 disclosed the
+// COMPONENT removal cascade on the shared `Scoped.Membership.RemoveConsequence` key. That made
+// this screen's Remove announce a repair `partEssenceFromSystem` does not perform: it filters
+// `essenceDefinitions` and writes, with no reference repair and no recipe disable anywhere in it.
+//
+// PINNED HERE, ON THE SCREEN, rather than only on the copy. The component half of the same rule
+// is pinned in `world-component-entry-mounted.test.js` and the descriptor split itself in
+// `scoped-entity-patterns-mounted.test.js`; what only this mount can answer is that the ESSENCE
+// entry — the shared cluster's own caller — renders the honest sentence after the split.
+
+describe('the essence entry row states what an essence removal actually does', () => {
+  afterEach(() => entryHarness.remount());
+
+  it('names the overrides and promises NO recipe repair', async () => {
+    const root = await entryHarness.mount({
+      scope: essenceScope(),
+      actions: {},
+      entityId: 'ash',
+      onBackToCatalogue: () => {},
+    });
+    // `ash` holds a record in `sys-a`, so that row renders the member branch and its armed
+    // Remove. The POSITIVE half first: a `doesNotMatch` over a row that never rendered is the
+    // vacuous shape this file's header refuses.
+    const remove = root
+      .querySelector('[data-scoped-entry-system="sys-a"]')
+      ?.querySelector('[data-arm-token]');
+    assert.ok(Boolean(remove), 'the member row rendered its armed Remove');
+    const note = remove.getAttribute('aria-label');
+    assert.match(note, /Remove Ash from Mythwright Forge/, 'the sentence names this pair');
+    assert.match(note, /Its overrides go with it; the world record and every other system are untouched\./);
+    assert.equal(
+      /recipe/.test(note),
+      false,
+      'an essence removal repairs no recipe, so no essence control may say it does'
     );
   });
 });

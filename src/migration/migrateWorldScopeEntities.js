@@ -70,6 +70,7 @@
  * transient report for the acceptance suite and for the editors of PRs 6a-c.
  */
 
+import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
 import { electWorldDefault } from './worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
@@ -94,7 +95,12 @@ export const SCOPE_PAYLOAD_KEYS = Object.freeze({
   tools: 'toolScope',
 });
 
-/** The membership `inherit` map each entity type is created with — every section OVERRIDDEN. */
+/**
+ * The membership `inherit` map each entity type is created with — every section OVERRIDDEN.
+ *
+ * Component `essences` is deliberately NOT here: its switch is decided by EQUALITY with the
+ * elected world map, in step 3b below, through the `1.32.0` pass's own rule.
+ */
 const OVERRIDING_INHERIT = Object.freeze({
   components: Object.freeze({ category: false }),
   essences: Object.freeze({ effectSource: false, macro: false }),
@@ -622,10 +628,14 @@ export function migrateWorldScopeEntities(data) {
   // that every member system is a MEMBER of, and the membership records that answer it are
   // written above.
   //
-  // NOTHING RESOLVES THROUGH THESE AT MIGRATION TIME. Every membership record still overrides
-  // every section with its own system's value verbatim, so the corpus differential is unchanged
-  // by this block; a world default only ever matters for a system added LATER, or an override a
-  // GM clears later.
+  // THE CORPUS DIFFERENTIAL IS UNCHANGED BY THIS BLOCK, BY TWO DIFFERENT MECHANISMS (issue 1371
+  // r19-store2). For every section but one that is OVERRIDE: the membership record carries its own
+  // system's value verbatim, so the world default it now sits beside resolves for nobody, and only
+  // a system added LATER — or an override a GM clears later — ever reads it. For `essences` it is
+  // EQUALITY: step 3b below marks an inheriting record precisely where its own map EQUALS the
+  // elected one, so that record does resolve through the world default from the first read and
+  // answers the same values it answered before. `destructive-changes-and-migrations` requirement 6
+  // states the same exception.
   // -------------------------------------------------------------------------
   const worldComponentIds = new Set(payloads.components.entities.map((entity) => entity.id));
   const isMemberOf = (componentId, systemId) =>
@@ -663,6 +673,20 @@ export function migrateWorldScopeEntities(data) {
       if (record) payload.defaults[entity.id] = record;
       for (const section of refusedSections) {
         refusedDefaultSections.push({ entityType, entityId: entity.id, section });
+      }
+      // THE `essences` SWITCH IS DECIDED BY EQUALITY, NOT WRITTEN OFF (issue 1371 r18-store,
+      // M31): each live member's record is marked inheriting where its own map equals the
+      // elected one and overriding — carrying its own map — where it does not. This is the
+      // `1.32.0` pass's rule applied here, so a world reaching both passes in one run and a
+      // world that ran `1.30.0` long ago converge on the same corpus.
+      if (entityType === 'components') {
+        for (const member of liveMembers) {
+          markComponentEssenceInheritance(
+            payload.membership[membershipKeyOf(entity.id, member.systemId)],
+            recordFor(member.systemId) ?? null,
+            record?.essences
+          );
+        }
       }
     }
   }

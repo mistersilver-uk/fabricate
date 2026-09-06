@@ -63,9 +63,10 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
   // rebuild, so a field it does not name is invisible to the add-new offer filter no
   // matter how correct the persisted field is. Neither definition above declares it, so
   // both must default to TRUE here — a `false` fixture is asserted below.
+  // `colorToken` since issue 1371 r18-colour (M29): '' when the definition authored none.
   assert.deepEqual(state.essenceOptions, [
-    { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: true, quantity: 2 },
-    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, quantity: 1 }
+    { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: true, colorToken: '', quantity: 2 },
+    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, colorToken: '', quantity: 1 }
   ]);
 });
 

@@ -67,12 +67,15 @@ const SCOPES = Object.freeze([
     resolve: resolveComponent,
     sections: COMPONENT_SECTIONS,
     entity: { id: 'iron', name: 'Iron' },
-    legacy: { id: 'iron', name: 'Iron', category: 'system-metal' },
-    worldValue: { category: 'world-metal' },
+    // `essences` joined `category` at issue 1371 r18-store (M31), and it is read on the SHIPPED
+    // field name: the in-system `Component.essences` map is exactly what the section is spelled
+    // over, so its writer is an assignment, as `category`'s is.
+    legacy: { id: 'iron', name: 'Iron', category: 'system-metal', essences: { iron: 2 } },
+    worldValue: { category: 'world-metal', essences: { fire: 3 } },
     // What a row must READ once the section is inherited, keyed by section.
-    reads: { category: (row) => row.category },
-    expected: { category: 'world-metal' },
-    original: { category: 'system-metal' },
+    reads: { category: (row) => row.category, essences: (row) => row.essences?.fire ?? row.essences?.iron },
+    expected: { category: 'world-metal', essences: 3 },
+    original: { category: 'system-metal', essences: 2 },
   },
   {
     entityType: 'essences',

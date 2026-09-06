@@ -43,6 +43,7 @@ const harness = createMountedComponentHarness({
     // every tab, not just Crafting.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte'

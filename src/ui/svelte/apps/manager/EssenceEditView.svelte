@@ -124,6 +124,14 @@
   let propertyMacroUuid = $state('');
   let sourceComponentId = $state('');
   let sourceTouched = $state(false);
+  // ── THE COLOUR LATCH (issue 1371 r19-store2, Foundry integrator round 5) ──────────────────
+  // `colorToken` is seeded from the `essence` prop, and since M29 that prop carries the WORLD
+  // essence colour overlaid over this system's own row. Sending it unconditionally therefore
+  // persisted the world's colour onto the in-system row on every save — including on the rules
+  // screen, where there is no colour control at all — destroying the row's own value silently and
+  // durably. The latch is `sourceTouched`'s twin: only a GM edit of the colour sends it. CLEARING
+  // sets the latch too, so "clearing an authored colour persists as null" survives.
+  let colourTouched = $state(false);
   let saveFailed = $state(false);
   let macroWarning = $state('');
   let macroName = $state('');
@@ -308,6 +316,7 @@
     propertyMacroUuid = essence?.propertyMacroUuid || '';
     sourceComponentId = sourceIdentity(essence);
     sourceTouched = false;
+    colourTouched = false;
     saveFailed = false;
     macroWarning = '';
     // THE FIRST TAB OF WHICHEVER SET IS RENDERING. A fixed `'identity'` would open the rules
@@ -396,13 +405,16 @@
       name: name.trim(),
       description,
       icon: normalizeEssenceIcon(icon),
-      // Always sent, so clearing an authored colour persists as null rather than leaving
-      // the stored value untouched. `enabled` and `propertyMacroUuid` follow the same rule:
-      // the store's `updateEssence` is presence-gated on `hasOwnProperty`, and both have a
-      // meaningful FALSY value (`false` disables, `null` unlinks).
-      colorToken: normalizeEssenceColorToken(colorToken),
+      // `enabled` and `propertyMacroUuid` are always sent: the store's `updateEssence` is
+      // presence-gated on `hasOwnProperty`, and both have a meaningful FALSY value (`false`
+      // disables, `null` unlinks).
       enabled: enabled !== false,
     };
+    // THE COLOUR IS SENT ONLY WHEN IT WAS EDITED HERE, or on a create draft where every field is
+    // this screen's to author. See `colourTouched`: the seed is the M29-overlaid projection, so an
+    // unconditional send writes the WORLD colour onto the system's own row. Clearing sets the
+    // latch, so an authored colour cleared to nothing still persists as `null`.
+    if (isNew || colourTouched) updates.colorToken = normalizeEssenceColorToken(colorToken);
     if (showPropertyMacroUi) updates.propertyMacroUuid = propertyMacroUuid || null;
     if (showSourceUi && (isNew || sourceTouched)) {
       updates.sourceComponentId = sourceComponentId || null;
@@ -572,7 +584,10 @@
           onNameChange={(value) => (name = value)}
           onDescriptionChange={(value) => (description = value)}
           onIconChange={(value) => (icon = value)}
-          onColourChange={(value) => (colorToken = normalizeEssenceColorToken(value) || '')}
+          onColourChange={(value) => {
+            colorToken = normalizeEssenceColorToken(value) || '';
+            colourTouched = true;
+          }}
           onEnabledChange={(value) => (enabled = value !== false)}
         />
       {:else}

@@ -207,6 +207,8 @@ function sectionPasses({
   entityMemberSystems,
 }) {
   if (entityType === 'components') {
+    // An `essences` map carries no reference and the reserved-bucket rule is `category`'s alone.
+    if (section === 'essences') return { ok: true };
     // `general` is the reserved implicit bucket; a world default carrying it would reset every
     // inheriting system's category on the first resolve.
     return value === RESERVED_CATEGORY ? { ok: false, referenceValue: section } : { ok: true };

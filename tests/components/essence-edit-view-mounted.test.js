@@ -867,6 +867,83 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
     harness.remount();
   });
 
+  // ── THE READ OVERLAY MUST NOT LEAK INTO A WRITE (issue 1371 r19-store2) ──────────────────────
+  //
+  // M29 overlays the WORLD essence colour onto the projection every system-scope screen reads, and
+  // this editor seeded `colorToken` from that projection and sent it on EVERY save. On the rules
+  // screen there is no colour control at all, so an unrelated save silently persisted the world's
+  // colour onto this system's own stored row — durably, into a world setting replicated to every
+  // client, and invisibly, because the overlay then drew the world colour over it. It surfaced
+  // only when the GM cleared the world colour, at which point the row answered the world's OLD
+  // colour rather than its own.
+
+  it('sends NO colorToken from the rules screen, where the colour has no control at all', async () => {
+    const saves = [];
+    const root = await mountRules({
+      onSave: (id, updates) => {
+        saves.push([id, updates]);
+        return true;
+      },
+    });
+
+    // A real on-craft edit: the per-system enable switch, which is what this screen is for.
+    root.querySelector('[data-recipe-section="enabled"] [data-recipe-field="essence-enabled"]').click();
+    flushSync();
+    root.querySelector('#manager-essence-edit-form').dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+
+    assert.equal(saves.length, 1, 'the save ran');
+    assert.equal(
+      Object.hasOwn(saves[0][1], 'colorToken'),
+      false,
+      'the key is ABSENT, so the presence-gated store write leaves the row’s own colour alone'
+    );
+    assert.equal(
+      saves[0][1].enabled,
+      true,
+      'and the change the GM actually made — enabling a disabled essence here — IS sent'
+    );
+    harness.remount();
+  });
+
+  it('but a GM edit of the colour IS sent, and clearing one still persists as nothing', async () => {
+    // THE LATCH'S OTHER HALF, and the reason it is a latch rather than a dirty comparison: an
+    // essence the world corpus does not hold renders the identity screen, where the colour is
+    // this system's to author. `''` is the cleared state and must reach the store, which is why
+    // `onColourChange` sets the latch on the CLEAR path too.
+    const saves = [];
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(
+      props({
+        onSave: (id, updates) => {
+          saves.push([id, updates]);
+          return true;
+        },
+      })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    openTab(root, 'identity');
+
+    const palette = root.querySelector('[data-manager-essence-colour]');
+    assert.ok(palette, 'the identity screen HAS a colour control — the non-vacuity half');
+    palette.querySelector('[data-manager-color-none]').click();
+    flushSync();
+    root.querySelector('#manager-essence-edit-form').dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+
+    assert.equal(saves.length, 1);
+    assert.equal(Object.hasOwn(saves[0][1], 'colorToken'), true, 'the touched colour is sent');
+    assert.ok(!saves[0][1].colorToken, 'and the cleared authored colour persists as nothing');
+    harness.remount();
+  });
+
   it('states the block and offers only the Add when this system holds no record', async () => {
     const root = await mountRules({ scope: worldScope({}, false) });
 

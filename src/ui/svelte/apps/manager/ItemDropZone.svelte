@@ -39,6 +39,21 @@
 
   `subline` is a SECOND sub-line under `hint`, for a card that carries both a uuid and a
   description. It renders only when supplied, so every existing call site is unchanged.
+
+  ── `compact`: A PROMPT, NEVER A SUMMARY (issue 1371, maintainer parity round 4) ─
+  The default form resolves a document and then DESCRIBES it — art, name, address, hint and an
+  action cluster. The reference has two zones that must never do that: the world Component
+  entry's identity card carries a small trailing "drop to replace" target beside a component it
+  is already showing in full, and its Source identity card carries the same target under a uuid
+  it has just printed. In both places the default form draws the linked item a second time, in
+  the same card, at a smaller size.
+
+  `compact` is therefore not a density knob: it SUPPRESSES the identity block and the actions
+  outright and renders exactly a glyph over a title over a note, whatever `item` holds. The
+  caller keeps `item` for the drop guard and for `state`, and says what the zone is FOR in
+  `title` / `hint` rather than having the primitive restate what it is already looking at.
+
+  Two callers, which is the extend-before-add bar in `design-system/spec.md:25-67`.
 -->
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
@@ -57,6 +72,9 @@
     uuid = '',
     subline = '',
     emptyIcon = 'fas fa-download',
+    // PROMPT-ONLY. See the note above: this is not a density variant, it is a different claim
+    // about what the zone is for. `false` by default, so every shipped caller is byte-identical.
+    compact = false,
     kind = '',
     documentType = 'Item',
     state = 'linked',
@@ -87,7 +105,8 @@
 
 <div
   class="manager-item-drop-zone"
-  class:is-linked={Boolean(item)}
+  class:is-compact={compact}
+  class:is-linked={Boolean(item) && !compact}
   class:is-missing={isMissing}
   class:is-disabled={disabled}
   data-manager-item-drop-zone
@@ -103,17 +122,22 @@
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
   <span class="manager-item-drop-zone-icon" aria-hidden="true">
-    {#if item?.img}<img src={item.img} alt="" />{:else}<i class={emptyIcon}></i>{/if}
+    <!-- THE GLYPH, NOT THE ART, in the compact form: the art is the identity the card beside
+         this zone is already showing, and repeating it at 13px is the duplication that made the
+         default form wrong for these two sites. -->
+    {#if item?.img && !compact}<img src={item.img} alt="" />{:else}<i class={emptyIcon}></i>{/if}
   </span>
   <span class="manager-item-drop-zone-copy">
-    <strong>{item?.name || title}</strong>
-    {#if uuid}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid>{uuid}</code>{/if}
+    <strong>{compact ? title : item?.name || title}</strong>
+    {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
+        >{uuid}</code
+      >{/if}
     {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}
         >{hint}</small
       >{/if}
     {#if subline}<small data-item-drop-zone-subline>{subline}</small>{/if}
   </span>
-  {#if item && (onCopy || onUnlink)}
+  {#if item && !compact && (onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
       {#if onCopy}
         <IconButton

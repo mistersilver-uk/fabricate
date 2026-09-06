@@ -75,7 +75,11 @@ const harness = createMountedComponentHarness({
     // deleted — this suite's whole value is that it did not move while the tree around it
     // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
     // the omission into a failure here rather than a hung suite.
+    // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
+    // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
+    // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.

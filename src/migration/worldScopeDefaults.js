@@ -3,8 +3,15 @@
  *
  * The maintainer's ruling extends `#### D3`'s oldest-wins rule from IDENTITY to BEHAVIOUR: each
  * world default is elected from the OLDEST contributing system, the same donor that wins identity.
- * Six sections take one - component `category`, essence `effectSource` and `macro`, tool
- * `breakage`, `onBreak` and the seeded `repairRequirements`.
+ * Seven sections take one - component `category` and `essences`, essence `effectSource` and
+ * `macro`, tool `breakage`, `onBreak` and the seeded `repairRequirements`.
+ *
+ * **Component `essences` joined at `1.32.0`** (issue 1371 r18-store, maintainer ruling M31), and
+ * it is the one section whose membership switches are decided by EQUALITY rather than written
+ * uniformly off: `migrateComponentEssenceSections.js` owns that rule and the `1.30.0` pass
+ * applies it to the records it writes, so a donor map elected here is followed at migration time
+ * only by the systems whose own map already equals it. It needs no constraint: an essence map
+ * carries no reference, `{}` is a storable override, and an empty donor map elects nothing.
  *
  * ## What is deliberately NOT lifted, and why each reason is different
  *
@@ -100,11 +107,13 @@
  *    own system.
  */
 
+import { normalizeComponentEssenceMap } from '../systems/componentScope.js';
+
 import { ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
 
 /** The world-default section each entity type may take, in the order they are elected. */
 export const WORLD_DEFAULT_SECTIONS = Object.freeze({
-  components: Object.freeze(['category']),
+  components: Object.freeze(['category', 'essences']),
   essences: Object.freeze(['effectSource', 'macro']),
   tools: Object.freeze(['breakage', 'onBreak', 'repairRequirements']),
 });
@@ -143,7 +152,11 @@ export const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBre
  * @returns {boolean}
  */
 export function sectionIsAuthoredBy(record, entityType, section) {
-  if (entityType === 'components') return Boolean(trimmedString(record.category));
+  // A component `essences` map can express emptiness, so it is never fallback-exposed and the
+  // question does not arise; only `category` is judged here.
+  if (entityType === 'components') {
+    return section === 'essences' || Boolean(trimmedString(record.category));
+  }
   if (section === 'breakage') return record.breakage !== undefined;
   if (section === 'onBreak') return record.onBreak !== undefined;
   return true;
@@ -285,6 +298,15 @@ function electSection({
   isMemberOf,
   memberSystemIds,
 }) {
+  if (entityType === 'components' && section === 'essences') {
+    // The donor's own map, normalized; an EMPTY one elects nothing, absence-preserving as
+    // `category` is. No constraint applies: the map carries no reference.
+    const essences = normalizeComponentEssenceMap(donorRecord.essences);
+    return essences && Object.keys(essences).length > 0
+      ? { value: essences, refused: false }
+      : { value: undefined, refused: false };
+  }
+
   if (entityType === 'components') {
     const category = trimmedString(donorRecord.category);
     if (!category) return { value: undefined, refused: false };

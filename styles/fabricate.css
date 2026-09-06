@@ -1387,10 +1387,9 @@
   did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
   Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
   against these surfaces rather than as a missing border. Selects were themed
-  per-container instead — `.fabricate-manager .manager-field select` and
-  `.manager-component-inline-control` (both further down this file) — so a select that leaves
-  a `.manager-field` and carries only `.manager-input` reverted, exactly as the note on that
-  rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
+  per-container instead — `.fabricate-manager .manager-field select` (further down this
+  file) — so a select that leaves a `.manager-field` and carries only `.manager-input`
+  reverted, exactly as the note on that rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
   found it: both sit in a revealed input strip rather than a field wrapper, and both painted
   Foundry's default beside a correctly themed `<input>` on the same row.
 
@@ -1803,9 +1802,31 @@
    (0,3,0) wins outright, which is what lifts the Modifiers card.
    `manager-layout.test.js` measures the result in a real browser rather than trusting
    that arithmetic. */
+
+/* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px
+   control and no corner, so every converted manager button fell through to the base
+   `.fabricate-manager .manager-button` rule's 6px — and `design-system/spec.md`'s radius ladder
+   puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. A 34px button at 6px
+   was off the ladder everywhere at once, which four parity regions across three screens measured
+   as the same one-line drift (`cat-inspector-foot-action`, `sys-header-action`,
+   `sys-inspector-foot-action`, `entry-header-back`/`-save`).
+
+   IT IS DECLARED HERE AND NOT ON THE BASE RULE, and the distinction is the height: this is the
+   rule that says a manager button is 34px, so it is the rule the 34-38px rung's corner belongs
+   to. `.manager-icon-button` shares the base rule's 6px and is a different control at a different
+   size, and the hand-written `.manager-button` strings that never gain this class (the
+   `SearchablePopover` triggers, `ArmedDangerButton`) keep whatever their own site states.
+
+   TWO CONVERTED SITES SIT BELOW THE BAND and would have inherited this corner: `.manager-clear-
+   filters` at 30px and the drop inspector's stack at 28px, both of which declare a height and no
+   radius. They take the ladder's 7px for the 26-32px band in the appended block at the foot of
+   this file rather than this rule's 9 — this edit's blast radius is the 34-38px band, and a
+   30px control taking a 34px control's corner would be the same off-ladder mistake in the
+   opposite direction. */
 .fabricate-manager .manager-button.fab-manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
+  border-radius: 9px;
   font-size: 0.72rem;
 }
 
@@ -9771,16 +9792,6 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .environment-stale-warning,
-.fabricate-manager .environment-field-error {
-  font-size: 0.74rem;
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .environment-stale-warning {
-  color: var(--fab-danger-text);
-}
-
 .fabricate-manager .manager-edit-card {
   display: flex;
   flex-direction: column;
@@ -10268,8 +10279,12 @@
    itself — `.manager-input` has no rule anywhere in this file and never has. A control
    that leaves a `.manager-field` therefore silently reverts to Foundry's unstyled native
    widget against a dark panel, and keeping `class="manager-input"` on it makes that look
-   intentional. `.manager-component-inline-control` is joined here for exactly that
-   reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
+   intentional. A control that renders outside a `.manager-field` is joined to these lists
+   for exactly that reason; the one that used to be — `.manager-component-inline-control`,
+   the Category panel's heading-row select — is emitted by no source file since the issue
+   1371 rebuild gave the Category select a card of its own, so it is gone from all three
+   lists. A retired selector kept in a list nothing emits is dead CSS the block-granular
+   dead-class gate cannot see, because the block's other selectors are live. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
    (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
@@ -10304,8 +10319,7 @@
    input in the codebase, and it always wants a transparent, unpadded control. */
 .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
-.fabricate-manager .manager-field textarea,
-.fabricate-manager .manager-component-inline-control {
+.fabricate-manager .manager-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -10317,14 +10331,12 @@
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood
    36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
 .fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select,
-.fabricate-manager .manager-component-inline-control {
+.fabricate-manager .manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-field select:disabled,
-.fabricate-manager select.manager-component-inline-control:disabled {
+.fabricate-manager .manager-field select:disabled {
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
@@ -11538,6 +11550,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--fab-space-2);
+}
+
+/* `proto:1419`: a FIXED 120px outcome label against a `flex: 1` select, so a routed system's
+   rows line up whatever its tiers are named. */
+.fabricate-manager .manager-salvage-routing-row > span:first-child {
+  flex: 0 0 120px;
+  width: 120px;
 }
 
 .fabricate-manager .manager-salvage-routing-row > span {
@@ -17660,6 +17679,53 @@
   background: var(--fab-overlay-light-04);
 }
 
+/* THE COMPACT FORM (issue 1371, round 4): a glyph over a one-line title over a one-line note,
+   centred, with no identity block and no action cluster. The reference draws it as a small
+   trailing target beside a card that is ALREADY showing the linked item, so the default form's
+   44px art column and `max-content` action column are exactly what must not be here — see the
+   component's own note for why this is a different claim rather than a density knob.
+   Radius 9 rather than the default 10: `design-system/spec.md:218` puts a well on 9. */
+.fabricate-manager .manager-item-drop-zone.is-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-1);
+  width: auto;
+  min-height: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-radius: 9px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
+  width: auto;
+  height: auto;
+  font-size: 0.82rem;
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fab-space-2xs);
+  text-align: center;
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
+  font-size: 0.63rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
+  font-size: 0.59rem;
+  line-height: 1.45;
+  color: var(--fab-text-subtle);
+}
+
 .fabricate-manager .manager-item-drop-zone.is-drop-active {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
@@ -18082,18 +18148,31 @@
 
 }
 
-.fabricate-manager .manager-component-edit-main {
-  min-height: 0;
-  overflow: auto;
-}
+/* ── D0 (issue 1371, parity round 4; re-based r18-list, maintainer ruling M27). `proto:1301`:
+   the rules editor is a two-column grid — the content column and a 326px `How players see it`
+   rail, each scrolling independently. The editor was one scrolling column with no rail at all
+   (gap-list row 128).
 
-.fabricate-manager .manager-component-edit-view {
+   THE TWO COLUMNS ARE THE WORLD ENTRY'S PAGE FRAME NOW, not a grid of this route's own. The
+   reference draws the entry and the editor on one frame, and the rail the editor renders since
+   M27 IS the entry's rail — painted by rules keyed on `.manager-component-entry-page`, which this
+   route's `<main>` therefore carries itself, its form and rail as the two columns. What this rule
+   keeps is the ROUTE's own job: one
+   `minmax(0, 1fr)` row in place of the base `.manager-main` template's `auto auto 1fr`, so the
+   frame fills the pane and its rail's hairline runs the pane's height (maintainer ruling M26: the
+   hairline ended part way down in the maintainer's Foundry; the View Lab did not reproduce it at
+   the base, so the fix is the structural one — this route now stands on the frame of the screen
+   whose rail ran full height in the same live test). The narrow-container stacking is the page
+   frame's own query, so this rule carries none.
+
+   The selector gains `.manager-main` to reach (0,3,0): the route's own `.manager-main` rule is
+   written EARLIER in this sheet at the same (0,2,0), so a bare
+   `.manager-component-edit-main` here would lose to it. */
+.fabricate-manager .manager-main.manager-component-edit-main {
   display: grid;
-  align-content: start;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  overflow: auto;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── The component editor's panel surface (issue 676) ──────────────────────────────
@@ -18141,47 +18220,24 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-inline-control {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 200px;
+/* The identity strip (issue 676, rebuilt at 1371): ONE copy column — the name row over the
+   attribution note. It is display, not a form; see the component's header note. The chip, the
+   lock badge, the description paragraph and the 186px drop target it used to carry are gone
+   from `ComponentIdentityStrip.svelte`, and their rules went with them rather than staying on
+   to paint nothing. */
 
-  /* `.manager-field` sets `font-size: 0.82rem` and its controls INHERIT it — no rule
-     sizes a `select` directly. A control outside a `.manager-field` therefore falls back
-     to Foundry's 14px app base, which is the bleed the font gate exists to catch. State
-     it explicitly at the same size. */
-  font-size: 0.82rem;
-}
-
-/* The identity strip (issue 676): chip · copy · drop target on ONE row. It is display,
-   not a form — see the component's header note. */
+/* `proto:1310`: ONE info-soft callout — the chip, the copy column, the exit — at radius 12
+   (snapped to the 11 card rung) with 13/15 padding (snapped to 12/16) and a 13px gap (12).
+   `align-items: center`, not `flex-start`: the card is one line of copy beside a 44px chip. */
 .fabricate-manager .manager-component-identity-strip {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--fab-space-3);
   flex-wrap: wrap;
-}
-
-.fabricate-manager .manager-component-identity-chip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 60px;
-  height: 60px;
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 12px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text-muted);
-  font-size: 1.4rem;
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-component-identity-chip img {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  object-fit: cover;
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 11px;
+  background: var(--fab-info-soft);
 }
 
 .fabricate-manager .manager-component-identity-copy {
@@ -18200,9 +18256,10 @@
   min-width: 0;
 }
 
-/* Foundry's button reset: a custom-content `<button>` inherits core's fixed height,
-   centred content and control font. The name is a button (it opens the source sheet)
-   but must read as a heading. */
+/* `proto:1312`: 15px/600 serif. It is no longer a `<button>` — identity is authored on the
+   world entry and the card has one exit — but the Foundry button reset stays, because the rule
+   is joined below by `button.manager-component-identity-name` for any host that still renders
+   one, and removing it would leave that selector declaring nothing. */
 .fabricate-manager .manager-component-identity-name {
   height: auto;
   min-width: 0;
@@ -18212,7 +18269,7 @@
   background: none;
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
-  font-size: 1.125rem;
+  font-size: 0.94rem;
   font-weight: 600;
   line-height: 1.3;
   text-align: left;
@@ -18230,92 +18287,22 @@
   text-decoration: underline;
 }
 
-.fabricate-manager .manager-component-identity-lock {
-  flex: 0 0 auto;
-}
+/* `proto:1314`: the attribution sentence at 11.5px/1.55 in the muted ink, 3px under the name
+   row. It is prose now rather than a glyph-led hint, so the flex row and its `gap` go with the
+   glyph they were spacing.
 
-/* The kebab belongs at the far edge of the name row, not tucked against the lock badge
-   as though it acted on it. */
-.fabricate-manager .manager-component-identity-name-row .manager-component-overflow-trigger {
-  margin-left: auto;
-}
-
-/* Flowing prose, at the prototype's 400 13px/1.65. `text-wrap: pretty` keeps the last
-   line from stranding a single word. */
-.fabricate-manager .manager-component-identity-description {
-  margin: 0;
-
-  /* The prototype's `--text2`. Fabricate's manager palette has no second-tier text
-     token; `--fab-text-muted` is what the component browser inspector's flavour
-     text already uses for this exact content (the item's description as prose), so the
-     two surfaces render the same string the same way. */
-  color: var(--fab-text-muted);
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.65;
-  text-wrap: pretty;
-  overflow-wrap: break-word;
-}
-
+   AND SO, AT LAST, DOES THE GLYPH'S OWN RULE (r11, reviewer finding 7). A
+   `.manager-component-identity-note i` rule outlived the glyph here, as
+   `.manager-component-identity-strip.is-drop-active` outlived the drop target below it —
+   `ComponentIdentityStrip` renders both branches as bare `<p>` prose and attaches no `dragDrop`.
+   Neither was visible to `styles-dead-classes`: that gate reads CLASSES, and every class in both
+   selectors is live somewhere, so a compound that can never match reads as two live tokens. */
 .fabricate-manager .manager-component-identity-note {
-  display: flex;
-  align-items: baseline;
-  gap: var(--fab-space-chip);
-  margin: var(--fab-space-chip) 0 0;
+  margin: var(--fab-space-1) 0 0;
   color: var(--fab-text-muted);
-  font-size: 0.625rem;
+  font-size: 0.72rem;
   font-weight: 400;
-  line-height: 1.5;
-}
-
-.fabricate-manager .manager-component-identity-note i {
-  flex: 0 0 auto;
-  font-size: 0.56rem;
-}
-
-/* The 186px drop target sits at the RIGHT of the strip and wraps UNDER the copy rather
-   than compressing beside it: the manager runs on container queries at 1320/1120/960/680px
-   and the smoke harness photographs a stacked component surface whether or not it is
-   designed. */
-.fabricate-manager .manager-component-source-drop-target {
-  display: flex;
-  flex: 0 1 186px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1.5px dashed var(--fab-border-strong);
-  border-radius: 10px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text-muted);
-  font-size: 0.625rem;
-  font-weight: 600;
-  line-height: 1.4;
-  text-align: center;
-  transition:
-    border-color 0.12s,
-    color 0.12s,
-    background 0.12s;
-}
-
-.fabricate-manager .manager-component-source-drop-target i {
-  font-size: 1.0625rem;
-}
-
-/* The WHOLE strip is the drop target (issue 676, brief §C6). Only the small inner zone
-   used to react, so a GM aiming at the strip's name — most of its area — got no
-   feedback and had to hunt for the box. `dragDrop` is attached at strip level and this
-   is its `activeClass`. */
-.fabricate-manager .manager-component-identity-strip.is-drop-active {
-  border: 1.5px dashed var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
-  border-color: var(--fab-accent);
-  color: var(--fab-accent);
+  line-height: 1.55;
 }
 
 /* The custom salvage DC is the only numeric control in this block; its siblings are a
@@ -18376,28 +18363,6 @@
   flex: 0 0 auto;
 }
 
-/* The roll-budget banner above the progressive stage list. */
-.fabricate-manager .manager-component-info-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-info-border);
-  border-radius: 8px;
-  background: var(--fab-info-soft);
-  color: var(--fab-text-muted);
-  font-size: 0.66rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.fabricate-manager .manager-component-info-banner i {
-  flex: 0 0 auto;
-  color: var(--fab-info);
-  font-size: 0.7rem;
-}
-
 /* ── Tag pill run (issue 676, converted in issue 772) ─────────────────────────────
    One pill per tag in the system's vocabulary; the pill IS the control. The pill itself
    is now the shared `Chip` (`tone="tag"` carries the purple this block used to declare),
@@ -18435,22 +18400,12 @@
   opacity: 0.6;
 }
 
-/* Foundry's button reset: a custom-content `<button>` inherits core's fixed height and
-   centred content, which crops taller children and centres the label. The overflow
-   trigger is one. */
-.fabricate-manager .manager-component-overflow-trigger {
-  flex: 0 0 auto;
-  height: auto;
-  min-height: 34px;
-  justify-content: center;
-  line-height: normal;
-}
-
 /* A section micro-label inside the editor's panels (the salvage block's "Result groups",
    "Outcome routing", "DC override"). The identity strip's read-only VALUE boxes that
    used to share this family are gone: they rendered the linked item's name and
    description as inert, `opacity: .8`, input-shaped boxes, which read as a disabled
-   form. Identity is display now — see `.manager-component-identity-description`. */
+   form. Identity is display now, and the strip states it in the name row and its attribution
+   note; the boxed description that rule described is gone with the rest of the old strip. */
 .fabricate-manager .manager-component-readonly-label {
   display: inline-flex;
   align-items: center;
@@ -23928,4 +23883,2375 @@
 .fabricate-manager [data-tool-library-scroll] .manager-tools-row {
   scroll-snap-align: start;
   scroll-margin-top: var(--fab-space-1);
+}
+
+/* ── THE WORLD COMPONENT CATALOGUE'S ROW STATES (issue 1371) ─────────────────────────────────
+   A NEW BLOCK, APPENDED. No existing rule above is edited: this route declared none of the four
+   selectors below, so every one of them is an addition rather than an override of something the
+   sheet already said.
+
+   IT IS IN THIS SHEET RATHER THAN IN THE PAGE'S OWN `<style>`, and that is structural. The rows
+   are written by `EntityListInspectorFrame`, so a page-scoped rule carries the PAGE's
+   `svelte-<hash>` and never matches them; both sibling world catalogues authored the identical
+   block here for the same reason.
+
+   THE FOUR RULES ARE ONE SHAPE, and each of the other three is load-bearing on its own:
+
+    - FLATTEN. The row and the pager lose their fills, so the 1px border is what makes a row a
+      row — the reference's construction on every scoped list screen.
+    - HOVER, restated one rung up from the pane, because with the resting fill gone the shared
+      hover ladder points at a rung that no longer starts where it assumed.
+    - SELECTION and BULK SELECTION, restated for the route. The flatten above is (0,3,0) and
+      stands LATER in this file than the shared `.is-selected` / `.is-bulk-selected` rules at the
+      same specificity, so without these two a chosen row and a ticked row would both render with
+      no fill at all — the exact defect both sibling lanes shipped once and then closed here.
+
+    Hover EXCLUDES both marked states rather than being written less specifically: hover and
+    selection are different questions about the same row, and the honest statement is that a
+    marked row has no hover paint of its own. `tool-catalogue-row-state-cascade` measures the
+    arbitration in a real browser, because happy-dom computes no cascade and would report
+    nothing at all. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row,
+.fabricate-manager[data-manager-view='world-components'] .manager-pagination {
+  background: transparent;
+}
+
+.fabricate-manager[data-manager-view='world-components']
+  .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-selected {
+  background: var(--fab-bg-1);
+}
+
+/* ON ONE LINE, and that is load-bearing rather than a formatting choice: the joined-selector
+   guard in `manager-layout.test.js` takes each `.is-bulk-selected` selector back to the start of
+   its own LINE so the route attribute travels with it, and a wrapped selector reads as an
+   UNSCOPED second statement of the shared rule. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-bulk-selected {
+  background: var(--fab-surface-active);
+}
+
+/* THE WORLD COMPONENT ENTRY'S PER-SYSTEM `Open rules` EXIT (issue 1371, round 3).
+   It shares the row head with the system name, the mode chip and the membership cluster, and the
+   head is a flex row whose name takes the slack — so without an explicit basis the control either
+   stretches or shrinks its own label to an ellipsis on a long system name. The rule is GLOBAL
+   rather than scoped to the page because the class lands on a `ManagerButton`, and Svelte stamps a
+   scoped hash only onto elements the component itself writes. */
+.fabricate-manager .manager-component-entry-system-rules {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* THE PREVIEW RAIL'S TWO NEW REGIONS (issue 1371, round 4): the leading scope note under the
+   head block, and a fact group's empty sentence. Both are the reference's own values — a 10px
+   muted line and a dashed 10px disabled sentence — and both are global rather than scoped to the
+   rail's own `<style>`, because the class prefix is a PROP: the shell composes its class names
+   from `classPrefix`, so Svelte cannot prove a scoped selector is used and prunes it. */
+.fabricate-manager .manager-tool-preview-scope-note,
+.fabricate-manager .manager-scoped-preview-scope-note {
+  margin: 0;
+  font-size: 0.63rem;
+  line-height: 1.45;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-tool-preview-fact-empty,
+.fabricate-manager .manager-scoped-preview-fact-empty {
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-border);
+  border-radius: 9px;
+  font-size: 0.63rem;
+  line-height: 1.5;
+  color: var(--fab-text-disabled);
+  text-align: center;
+}
+
+/* ── TWO SHARED LEAVES THE REFERENCE USES EVERYWHERE (issue 1371, parity round 4) ──────────────
+   Both are GLOBAL rather than scoped to one page, because both appear in three of the four
+   component surfaces and a scoped copy per surface is the duplication a shared sheet exists to
+   stop — and because the second lands on markup a child component owns in two of those places,
+   where a scoped rule never reaches.
+
+   `manager-micro-label` is the reference's 8px uppercase field label: the line above a uuid, a
+   category select or a tag run that says what the value below it IS. It is NOT `manager-kicker`,
+   which is a SECTION eyebrow at 9.5px with wider tracking; the two sit one above the other in the
+   same inspector, so collapsing them would make a field label and a section head the same thing.
+
+   `manager-inline-link` is the bare accent-ink text action with a trailing external-link mark.
+   `ManagerButton role="ghost"` is the nearest primitive and is not this: it carries a control
+   height and a hover fill, and every site here is a 9-10.5px link inside a head row that is
+   shorter than the primitive's smallest rung. */
+.fabricate-manager .manager-micro-label {
+  margin: 0 0 var(--fab-space-1);
+  color: var(--fab-text-subtle);
+  font-weight: 700;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fab-accent);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.59rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-inline-link:hover,
+.fabricate-manager .manager-inline-link:focus-visible {
+  color: var(--fab-accent-strong);
+  text-decoration: underline;
+}
+
+.fabricate-manager .manager-inline-link i {
+  font-size: 0.44rem;
+}
+
+/* ══ PART A — THE WORLD COMPONENT CATALOGUE ENTRY (issue 1371, maintainer parity round 4) ══════
+   `proto:805-1022`, rebuilt card by card. EVERY RULE HERE IS GLOBAL RATHER THAN SCOPED, and that
+   is forced rather than preferred: over half of them paint markup a CHILD component renders — the
+   `InspectorCard` shell, `ManagerButton`, `ManagerSearchField`, `SegmentedControl`,
+   `ArmedDangerButton`, `ItemDropZone` and `ScopedEntityPreview` — and a Svelte-scoped rule stamps
+   its hash only on the elements the declaring component itself writes, so every one of them would
+   compile to a selector nothing carries.
+
+   GEOMETRY FOLLOWS `openspec/specs/design-system/spec.md:213-237` wherever the reference falls
+   between rungs, and each snap is named at the declaration rather than left as a silent value:
+   card radius 12 -> 11, control radius on a 26-32px control -> 7 and on a 34-38px one -> 9, the
+   reference's 15px card padding -> `--fab-space-4`, its 14px stack gap and 10/11px band paddings
+   -> `--fab-space-3`, its 22px page inline padding -> `--fab-space-5` at first and, under
+   maintainer ruling M32 (issue 1371 r18-frame), to NONE on the tab strip and `--fab-space-3` on
+   the panel — the A0 rules below say why. Radius, width, height and font size are NOT
+   spacing-scale members (`spec.md:230`) and are written as literals. */
+
+/* ── A0. THE PAGE FRAME ──────────────────────────────────────────────────────────────────────
+   TWO COLUMNS, AND THE RAIL IS THE SECOND ONE. Round 3 nested the rail inside the tab panel, so
+   it scrolled away with the cards and was absent from the Validation tab entirely. Each column
+   owns its own scroller, which is what keeps the rail in place while the panel moves. */
+.fabricate-manager .manager-component-entry-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 326px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fabricate-manager .manager-component-entry-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* THE TAB STRIP'S OWN BAND (`proto:823`): a 22px gap snapped to `--fab-space-5`, on a bottom
+   hairline. `flex: 0 0 auto` is load-bearing — a flex item defaults to `flex-shrink: 1`, and on a
+   short window the strip would compress into the panel.
+
+   IT CARRIES NO INLINE INSET (issue 1371 r18-frame, maintainer ruling M32). The reference pads
+   the strip 22px each side (`proto:823`, `proto:1302`) and this rule carried that as
+   `--fab-space-5`; the maintainer's fourth live test read the result as a tab bar that "doesn't
+   span the whole central rail" — the hairline ran edge to edge (measured in the lab at 1280 and
+   1600 wide), but the tabs began 20px inside the column and nothing else marked the strip's
+   extent. The ruling outranks the reference where they touch, and the shape it holds up is the
+   catalogue's under M21 — a flush column whose toolbar begins at the column's own edge — so the
+   strip's inline padding goes and the first tab's box starts where the column starts. The tab
+   button's own `0 var(--fab-space-3)` is then the label's whole inset: the catalogue's
+   toolbar-control gutter, and the gutter the panel below gives its cards, so the tabs and the
+   cards read from one edge. Keyed on the column, so the world entry and the rules editor — one
+   frame, two consumers — move together; `component-edit-frame-rendered.test.js` and
+   `world-component-entry-frame-rendered.test.js` measure it on both. */
+.fabricate-manager .manager-component-entry-column > .manager-editor-tabs {
+  flex: 0 0 auto;
+  gap: var(--fab-space-5);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* The tab's own scale on this strip (`proto:824`): 12px at 600, against the shared strip's
+   12.48px at 700. A SIZE and a weight from the layout context. */
+.fabricate-manager .manager-component-entry-column > .manager-editor-tabs .manager-editor-tab-button {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* THE SCROLLER. `padding-bottom: 40px` is the reference's own value and is a documented literal
+   exemption from the spacing scale (`ui-integration`: one-off fixed dimensions in the 34-42px
+   range), because it is breathing room under the last card rather than a rhythm step.
+
+   THE CARDS' GUTTER IS THE CATALOGUE'S (issue 1371 r18-frame, maintainer ruling M32). The inline
+   inset was the reference's 22px (`proto:831`, `proto:1307`) snapped to `--fab-space-5`; under
+   the ruling — "neither does the scroll area" span the column — it is `--fab-space-3`, the gutter
+   M21's flush catalogue column gives its toolbar controls and its rows
+   (`[data-manager-view='world-components'] .manager-scoped-list-rows { padding-inline }`). The
+   gutter stays INSIDE the panel, whose box is the column's: the panel scrolls edge to edge, its
+   scrollbar at the rail's divider, and the cards breathe inside it as the catalogue's rows do
+   inside their scroller. The 16px top and the 40px foot are unchanged. */
+.fabricate-manager .manager-component-entry-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--fab-space-4) var(--fab-space-3) 40px;
+  overflow: auto;
+}
+
+/* Every region the panel stacks is `flex: 0 0 auto` for the reason above: a card carrying
+   `overflow: hidden` collapses to nothing on a short window while every selector naming it still
+   matches, which is a defect no assertion can see. */
+.fabricate-manager .manager-component-entry-panel > * {
+  flex: 0 0 auto;
+}
+
+/* ── THE CARD, AND THE HEAD EVERY CARD SHARES ────────────────────────────────────────────────
+   `proto:845`, `:882` and `:921` draw one head: a 12px glyph in the card's own ink, an `h3` at
+   14px serif, a 10px muted subtitle, and an optional trailing action. Round 3 drew a bare
+   uppercase kicker on each, which is a FIELD label doing a SECTION head's job. */
+.fabricate-manager .manager-component-entry-card {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  background: var(--fab-bg-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+}
+
+.fabricate-manager .manager-component-entry-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-card-head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.fabricate-manager .manager-card-glyph {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
+  font-size: 0.75rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-card-glyph.is-info {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-card-glyph.is-tag {
+  color: var(--fab-purple);
+}
+
+.fabricate-manager .manager-card-glyph.is-accent {
+  color: var(--fab-accent);
+}
+
+/* SERIF AND SENTENCE CASE, at 14px. It is NOT `.manager-card-title`, which is this manager's
+   UPPERCASE micro-label at 700 — the two would otherwise be the same element wearing two
+   meanings, and the reference draws both, one above the other, inside the same card. */
+.fabricate-manager .manager-card-heading {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* The card subtitle is the header band's `.manager-subtitle` at the CARD's scale. A size taken
+   from the layout context is permitted; the family, weight and ink stay the primitive's. */
+.fabricate-manager .manager-component-entry-card-head .manager-subtitle {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* The head's trailing text action at the CARD's scale. `manager-inline-link` ships at the
+   catalogue inspector's 9px; the reference draws this one at 10.5px, and a size taken from the
+   layout context is the one thing a container may state about a primitive. */
+.fabricate-manager .manager-component-entry-card-head .manager-inline-link {
+  font-size: 10.5px;
+}
+
+.fabricate-manager .manager-component-entry-note {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-component-entry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* ── A3. THE IDENTITY CARD ───────────────────────────────────────────────────────────────────
+   `proto:833-843`: a 56px chip and a copy column. The trailing compact drop target the
+   reference draws at `proto:842` is NOT drawn (issue 1371 r13-entry, maintainer ruling M17):
+   the source card below carries the one zone, and the description runs the card's full width.
+
+   ITS FILL IS `surface-soft` RATHER THAN A RAMP STEP, which is the one card on this tab that
+   differs: the reference lifts the identity card off the panel and recesses the three below
+   it. */
+.fabricate-manager .manager-component-entry-identity {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-component-entry-identity-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-identity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-identity-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* THE NAME IS A VALUE, NOT A FIELD, for a linked record: 18px serif at 600. */
+.fabricate-manager .manager-component-entry-identity-name {
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* And a field ONLY where there is no linked item to refresh from, at the same 18px so the two
+   states are the same line rather than two layouts. */
+.fabricate-manager .manager-component-entry-identity-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-identity-description {
+  margin: 0;
+  color: var(--fab-text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.fabricate-manager .manager-component-entry-identity-textarea {
+  min-width: 0;
+  padding: var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-component-entry-identity-note {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* THE COMPACT PROMPT IS TRANSPARENT ON A DASHED HAIRLINE (`proto:856`), where the primitive's
+   default face carries a fill. The source card is the one entry site that takes it (M17). */
+.fabricate-manager .manager-component-entry-card .manager-item-drop-zone.is-compact {
+  padding: var(--fab-space-3);
+  background: transparent;
+}
+
+/* ── A4. THE SOURCE IDENTITY CARD ────────────────────────────────────────────────────────────
+   `proto:845-879`. The uuid well is a `--fab-bg-1` inset at the row rung (radius 9). */
+.fabricate-manager .manager-component-entry-uuid-well {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-component-entry-uuid-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-uuid-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+}
+
+/* The linked Item's own address, in the mono face because it is an identifier a GM copies rather
+   than reads. `tabular-nums` is not wanted: this is not a column of numerals. The mono face ships
+   400 and 500 only, so the reference's 500 lands unchanged. */
+.fabricate-manager .manager-component-entry-uuid {
+  display: block;
+  min-width: 0;
+
+  /* `proto:5411` writes the uuid in `--text2` at full opacity: it is the value a GM reads
+     character by character before copying it, so it is not held back to 74%. */
+  color: var(--fab-text-secondary);
+  font-family: var(--fab-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias.
+   28 IS a rung, so it is kept rather than snapped up, and radius 7 is its ladder partner. */
+.fabricate-manager .manager-component-entry-mini-action.manager-button.fab-manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-2);
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires:
+   switching a control off must take its colours from `.manager-button:disabled` and keep the
+   shape it had when enabled.
+
+   THE FACE IS `surface-soft` ON A HAIRLINE (`proto:5412`), not the primitive's 6%-on-12%
+   neutral, and the ink is `--fab-text-secondary` rather than the same hue at 74%. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-secondary);
+}
+
+.fabricate-manager .manager-component-entry-alias-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-alias-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+}
+
+.fabricate-manager .manager-component-entry-alias-field > i {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.56rem;
+}
+
+.fabricate-manager .manager-component-entry-alias-field > input {
+  flex: 1;
+  min-width: 0;
+
+  /* THE WELL OWNS THE HEIGHT, so the input must not take the sheet's 34px field rung inside a
+     28px band — it would push the well open from the inside. */
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+}
+
+/* Zero aliases is the NORMAL state of a healthy record, so it is a sentence rather than a count. */
+.fabricate-manager .manager-component-entry-alias-empty {
+  color: var(--fab-text-disabled);
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-component-entry-duplicate {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-duplicate .manager-callout {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── A5. THE WORLD CLASSIFICATION CARD ───────────────────────────────────────────────────────
+   ONE card, two columns (`proto:888`). Round 3 shipped two cards with one kicker each. */
+.fabricate-manager .manager-component-entry-classification-body {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-classification-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* THE CATEGORY PICKER (`proto:890-893`). A picker over the world's vocabulary, not a free-text
+   input with a datalist — and, since issue 1371 revision 8, `SearchablePopover`'s trigger rather
+   than a native `<select>`, so the drop-down it opens is the app's own rather than the operating
+   system's. 34px is the snapped rung and 9 is its radius; the reference draws 8, which is on no
+   rung (`design-system/spec.md` puts 34-38px on 9).
+
+   THE FILL IS THE REFERENCE'S. It was `--fab-bg-1` for as long as the element was a `<select>`: a
+   translucent select background opens a LIGHT native popup in every browser, which
+   `manager-layout.test.js` gates. A popover panel is painted by this sheet, so that constraint
+   left with the element and `--fab-surface-soft` is `proto:890`'s own value. */
+.fabricate-manager .manager-component-entry-category-picker {
+  width: 100%;
+}
+
+.fabricate-manager .manager-component-entry-category-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* THE VALUE SPAN, REACHED THROUGH THE PRIMITIVE'S OWN `valueClass` SEAM rather than by naming
+   `.manager-travel-picker-value` from outside it. Both selectors would paint the same element, and
+   the difference is that the second adds a rule to a class family whose count `SearchablePopover`
+   states in its own register row — `design-system-coverage.test.js` re-derives that number from
+   this sheet and fails on a claim that has drifted, which is exactly what happened when this rule
+   was first written that way. A category name is a GM's own word and can be long, so it
+   ellipsises rather than pushing the chevron off the control. */
+.fabricate-manager .manager-component-entry-category-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-category-trigger:hover,
+.fabricate-manager .manager-component-entry-category-trigger:focus-visible {
+  border-color: var(--fab-accent-border);
+  outline: none;
+}
+
+/* ── A6. SYSTEMS USING THIS COMPONENT ────────────────────────────────────────────────────────
+   `proto:920-953`. The card pads NOTHING and clips its children; each band pads itself, which is
+   what lets the rows band scroll inside the card's own radius. */
+.fabricate-manager .manager-component-entry-systems-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-component-entry-systems-head {
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
+.fabricate-manager .manager-component-entry-head-action.manager-button.fab-manager-button {
+  flex: 0 0 auto;
+  height: 30px;
+  min-height: 30px;
+  margin-left: auto;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager
+  .manager-component-entry-head-action.manager-button.fab-manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-component-entry-systems-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+/* A 150px input inside a 30px well, not a full-width search bar (`proto:928`). The wrapper caps
+   the primitive's own `flex: 1 1 260px`, and the fill and rung are the reference's. */
+.fabricate-manager .manager-component-entry-systems-search {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-systems-search .manager-search {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-systems-search .manager-search input {
+  width: 190px;
+  height: 30px;
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+}
+
+.fabricate-manager .manager-component-entry-system-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* IT SCROLLS AT 330px. The row count is a property of the WORLD's crafting-system roster rather
+   than of the component, so on a twenty-system world an unbounded list makes this card the tab. */
+.fabricate-manager .manager-component-entry-systems {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+  max-height: 330px;
+  overflow: auto;
+}
+
+/* EVERY ROW SITS ON THE CARD'S OWN SURFACE, WITH A HAIRLINE BENEATH (issue 1371 r13-entry,
+   maintainer ruling M15). The reference draws its rows on one surface (`proto:931`), and the
+   surface is DECLARED here rather than left to fall through: this sheet loads at `layer(modules)`
+   and wins on any property it states, but a property it leaves unstated is the host's to paint,
+   and the banding the ruling names is exactly what an undeclared row background lets in. */
+.fabricate-manager .manager-component-entry-system {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-4);
+  background: transparent;
+  border-bottom: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-component-entry-system:last-child {
+  border-bottom: 0;
+}
+
+/* THE FIXED NAME COLUMN. 196px is a track size, not a spacing step, so it is a literal. */
+.fabricate-manager .manager-component-entry-system-identity {
+  flex: 0 0 auto;
+  width: 196px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-system-name {
+  display: block;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* THE NAME IS FULL INK ON EVERY ROW, member or not (`proto:932` draws `var(--text)` with no
+   member branch). The without-rules row used to mute it, which is one of the two paints
+   maintainer ruling M15 names; the row's summary already says the system has no rules. */
+
+/* THE MODE SUB-LINE, which round 3 replaced with a warning-toned chip stating a different fact. */
+.fabricate-manager .manager-component-entry-system-mode {
+  display: block;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+/* THE MIDDLE COLUMN: one ellipsised line, never a paragraph under the row. */
+.fabricate-manager .manager-component-entry-system-summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-system-summary.is-absent {
+  color: var(--fab-text-disabled);
+}
+
+.fabricate-manager .manager-component-entry-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-component-entry-system-rules.manager-button.fab-manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager
+  .manager-component-entry-system-rules.manager-button.fab-manager-button:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-secondary);
+}
+
+/* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3
+   drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the
+   reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
+.fabricate-manager .manager-component-entry-system-add.manager-button.fab-manager-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: dashed;
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager
+  .manager-component-entry-system-add.manager-button.fab-manager-button:not(:disabled) {
+  background: transparent;
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-secondary);
+}
+
+/* THE EXIT ICON: a 26px square in the row's own clothing (`proto:944`), not a labelled danger
+   button. The CONTROL is still the shared `ArmedDangerButton` — its arm/disarm two-step, its
+   Escape and blur disarm and its single-armed-token invariant are exactly the shipped ones — and
+   only its skin is the row's, which is a SIZE and a surface taken from the layout context rather
+   than a re-derived control. The danger ink returns the moment it is armed, which is the state
+   where the colour is the warning. */
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: 0.625rem;
+}
+
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger:not(:disabled) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border);
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager
+  .manager-component-entry-row-actions
+  .manager-button.is-danger.is-armed:not(:disabled) {
+  width: auto;
+  padding: 0 var(--fab-space-2);
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger > span:empty {
+  display: none;
+}
+
+.fabricate-manager .manager-component-entry-system-empty {
+  padding: var(--fab-space-3) var(--fab-space-4);
+  color: var(--fab-text-disabled);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ── A7. DELETE FROM THE WORLD ───────────────────────────────────────────────────────────────
+   `proto:928-936`: the danger card at the foot, in place of the header `Delete`. */
+.fabricate-manager .manager-scoped-entry-danger {
+  padding: var(--fab-space-3) var(--fab-space-4);
+  background: var(--fab-danger-soft);
+  border-color: var(--fab-danger-border);
+}
+
+.fabricate-manager .manager-component-entry-danger-body {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-danger-body > i {
+  flex: 0 0 auto;
+  color: var(--fab-danger-text);
+  font-size: 0.81rem;
+}
+
+.fabricate-manager .manager-component-entry-danger-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-danger-title {
+  margin: 0;
+  color: var(--fab-danger-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-danger-note {
+  margin: var(--fab-space-2xs) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* The armed danger control at the 34px rung (32 is retired), radius 9, transparent on the card's
+   own danger hairline rather than the sheet's filled danger treatment. */
+.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger {
+  flex: 0 0 auto;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger:not(:disabled) {
+  background: transparent;
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+/* ── A8. THE PREVIEW RAIL ────────────────────────────────────────────────────────────────────
+   `proto:985-1020`. The rail is the grid's second column with its own scroller and a left
+   hairline, so it stays put while the panel scrolls and is drawn on BOTH tabs. */
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview {
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--fab-space-4);
+  background: var(--fab-bg-2);
+  border-left: 1px solid var(--fab-border);
+  overflow: auto;
+}
+
+/* THE SHARED RAIL LEAVES AT THIS RAIL'S SCALE. `manager-scoped-preview-scope-note` and
+   `-live` ship at the Tool rails' values; the reference draws this rail's scope note at 10px and
+   its live strip as a `--fab-bg-1` ROW rather than a bare line (`proto:1019`). Sizes and a
+   surface from the layout context, on markup the shell owns. */
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-scope-note {
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-live {
+  align-items: center;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-component-entry-preview-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile-column {
+  flex: 0 0 118px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile-label {
+  margin: 0 0 var(--fab-space-chip);
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+/* THE TILE ITSELF, which round 3 did not draw at all. It is the one region of this screen that
+   shows a GM what a player meets, so it draws the art THE WAY THE PLAYER'S INVENTORY TILE DOES
+   (issue 1371 r13-entry, maintainer ruling M16): a square that fills its 118px column
+   (`proto:993` writes `width:100%;aspect-ratio:1`), with the art covering the whole box —
+   `InventoryItemCard.svelte`'s `.inventory-card-thumb` and `.inventory-card-art img` are the
+   authority and are copied declaration for declaration, which
+   `scoped-shell-prop-contract.test.js` pins. It used to be a 118x110 band with the icon at
+   64px letterboxed in the middle, which is not what a player sees. The edge is
+   `--fab-border-strong` because that is what `proto:993` draws on a lit tile; the radius is
+   the ladder's 11 against the reference's 12. The glyph branch — a record with no linked item —
+   keeps the centred glyph, so the flex centring stays. */
+.fabricate-manager .manager-component-entry-preview-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 11px;
+  color: var(--fab-accent);
+  font-size: 1.75rem;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-component-entry-preview-tile > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-component-entry-preview-quantity {
+  position: absolute;
+  top: var(--fab-space-1);
+  right: var(--fab-space-1);
+  padding: 0 var(--fab-space-1);
+  background: var(--fab-bg-0);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.56rem;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-component-entry-preview-status {
+  position: absolute;
+  right: var(--fab-space-1);
+  bottom: var(--fab-space-1);
+  left: var(--fab-space-1);
+  padding: var(--fab-space-2xs) var(--fab-space-1);
+  background: var(--fab-warning-soft);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  font-size: 0.53rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.fabricate-manager .manager-component-entry-preview-name {
+  margin: var(--fab-space-chip) 0 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 11.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-entry-preview-facts {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-category {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-component-entry-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-entry-preview-art {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+/* THE RAIL STACKS UNDER THE PANEL below the threshold rather than compressing to a column too
+   narrow to read, which is the ruling the shared list frame already makes about its inspector.
+
+   ── STACKED, EACH HALF KEEPS ITS CONTENT AND THE FRAME SCROLLS (issue 1371 r19-entry2) ────────
+   Stacking on the COLUMN axis alone leaves the ROWS to whatever the frame's own template says,
+   and the two consumers say different things. The world entry's page is a `<div>` inside `main`,
+   so both halves land in implicit `auto` rows. The rules editor's page IS its `main`, and that
+   element declares `grid-template-rows: minmax(0, 1fr)` for M26's full-height rail — one
+   FLEXIBLE row for the content column and an implicit `auto` one for the rail beneath it. Give
+   that grid a definite height and a flexible track takes only what the non-flexible ones leave,
+   which here is nothing: measured in the View Lab at a 900px window with the pane constrained,
+   `grid-template-rows` resolved to `0px 640px` and `0px 520px`, the content column to `0px`
+   tall, and `overflow: hidden` on that same main left no scroller to reach it — no tab strip,
+   neither tab, and no card.
+
+   THE ANSWER IS THE ONE THIS SHEET ALREADY GIVES FOR A STACKED REGION, at `.manager-body`'s own
+   `@container (max-width: 1120px)` rule: `max-content` tracks cannot be squeezed, so each region
+   keeps its own height and the CONTAINER does the scrolling — "which is what the stacked reading
+   order always assumed". Two `max-content` rows plus `overflow: auto` on the frame is that rule
+   restated for this frame; it also restores what the route's deleted `@container (max-width:
+   960px)` block did before M26's row template arrived, and it leaves the shipped narrow geometry
+   byte-identical where the pane is content-sized (the ordinary case, since `.manager-body` hands
+   `main` a `max-content` track below 1120), because `max-content` and `auto` agree there.
+
+   NOT two `minmax(0, 1fr)` rows: that also clears the collapse, but it forces BOTH halves to the
+   taller one's height, so the shorter half — usually the rail — ends in several hundred pixels of
+   dead space in the ordinary content-sized case. Measured before it was rejected.
+
+   TWO SELECTORS FOR ONE RULE, and the second is not decoration: a container query adds no
+   specificity, and the rules editor's `.fabricate-manager .manager-main.manager-component-edit-main`
+   block earlier in this sheet is (0,3,0), so the (0,2,0) frame selector alone would lose the row
+   template and the overflow to it on that consumer no matter where it is written. The (0,3,0)
+   twin matches only the editor's main — the entry's page is a div — and beats that block on
+   source order. */
+@container fabricate-manager (max-width: 1000px) {
+  .fabricate-manager .manager-component-entry-page,
+  .fabricate-manager .manager-main.manager-component-entry-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    overflow: auto;
+  }
+
+  .fabricate-manager .manager-component-entry-page > .manager-scoped-preview {
+    border-left: 0;
+    border-top: 1px solid var(--fab-border);
+  }
+}
+
+/* ══ ISSUE 1371 · PARTS C AND D — THE SYSTEM COMPONENT RULES LIST AND ITS EDITOR ═══════════════
+   Maintainer parity round 4. Everything below is transcribed from the design reference at the
+   line cited beside it (`artifacts/proto-markup.txt`) and specified in
+   `artifacts/parity-audit-r4/rebuild-spec.md` Parts C and D.
+
+   IT IS ONE APPEND-ONLY BLOCK, at the foot of the sheet, and that is mechanical rather than
+   tidy: several of the rules below restate a property a JOINED selector earlier in this file
+   already declares (`.manager-component-row`'s fill, radius and padding join four other browser
+   rows), and editing those joins in place would have re-skinned the recipe, environment,
+   gathering and essence rows with it.
+
+   THE ROW RULES ARE SCOPED BY `.manager-components-list`, AND THAT IS NOT DECORATION. Stylelint's
+   `no-duplicate-selectors` refuses a second `.fabricate-manager .manager-component-row` block
+   anywhere in this sheet, so appending at the same specificity is not available; and appending at
+   the SAME specificity would lose anyway, because the five-row join at `:8039` is written AFTER
+   the row's own block at `:7729`. The list wrapper is a real ancestor of every row this screen
+   draws, so it buys both a selector this sheet has not used and the (0,3,0) that beats the join.
+
+   THE STANDING RULES THIS BLOCK TAKES, each a recorded deviation from the reference rather than
+   a silent value (`rebuild-spec.md`, "Standing rules"):
+     · every `padding` / `margin` / `gap` snaps to the 4px spacing scale, which
+       `openspec/specs/ui-integration/spec.md` makes mandatory — 11 and 13 to 12, 10 and 9 to 8,
+       7 to 8, 5 and 6 to 4 or 6;
+     · a 32px or 36px control height snaps to the 34 rung and a 26-32px control's radius to 7;
+     · a 12px card radius snaps to 11 and a 10px one to 9;
+     · a `700 … var(--mono)` numeral ships at weight 500 — the mono face has no 700;
+     · every raw hex maps to the nearest `--fab-*` token.
+   ════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge. Snapped
+   to the spacing scale, which has no 14: 12 and 20 are the neighbouring steps. Measured before this
+   rule: a flat 12px on all four sides, so the band was inset 8px too little on each side.
+
+   THE FOOT IS `--fab-space-3`, NOT THE REFERENCE'S ZERO (issue 1371 r16-list, maintainer ruling
+   M22). The zero shipped on the claim that "the second row already carries its own bottom margin"
+   — no rule in this sheet or in the view's scoped block gives `.is-secondary` one, so the last
+   row (`Select all · GROUP BY CATEGORY · SORT BY · N of M catalogue entries`) sat flush against
+   the band's bottom border while the gap above it was the toolbar's normal row gap. The reference
+   draws that spacing as the row's `margin-bottom: 11px` (`proto:1058`), which snaps to 12 on the
+   4px scale; written here as the band's own padding rather than as a row margin because that is
+   what the world catalogue's `.manager-toolbar` does — one box owns all four edges — and the
+   rendered geometry test (`components-browser-rendered.test.js`) measures the band. */
+.fabricate-manager .manager-component-toolbar {
+  padding: var(--fab-space-3) var(--fab-space-5);
+}
+
+/* ── C3. THE TOOLBAR'S SECOND ROW ──────────────────────────────────────────────────────────
+   `proto:1058` puts the selection register, the two VIEW controls and the count on ONE row.
+   The register is a `display: contents` shim declared in `ComponentsBrowserView`'s own scoped
+   block, so its children are items of this row; the count is pinned to the trailing edge. */
+.fabricate-manager .manager-component-filter-row.is-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* `proto:1069`: quiet trailing metadata at 11px/500 in the subtle ink, never a control. */
+.fabricate-manager .manager-component-filter-row.is-secondary .manager-component-count {
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* The 1px x 16px hairlines between the register and each VIEW control (`proto:1060`). */
+.fabricate-manager .manager-component-filter-row.is-secondary .manager-component-filter-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 16px;
+  background: var(--fab-border);
+}
+
+/* ── C5. THE ROW ───────────────────────────────────────────────────────────────────────────
+   `proto:1078`: gap 11 (snapped to 12), padding 10/13 (snapped to 12), radius 9, the `--fab-bg-1`
+   fill and a hairline. The shipped row carried `--fab-overlay-light-03` at radius 8 — which is
+   not a rung — through the five-row join above.
+
+   `flex-wrap: nowrap` IS THE ROW'S SHAPE, and it is the one thing the property compare could not
+   see. The base `.manager-component-row` wraps, which was right when the row was three parts; C5
+   makes it FIVE — the leading box, the medallion, the copy column, the trailing stat cluster and
+   the labelled control — and at the lab's 734px list column their content widths exceed one line,
+   so the row wrapped into THREE: the checkbox alone, then the identity grown to the full 708px,
+   then the `Recipes` stat and `Edit rules` orphaned at the LEFT of a third line. Measured, before
+   this declaration: row 132px tall against the reference's ~62, identity 708px wide inside a
+   734px row. Every per-region property in the parity spec still matched, because a padding and a
+   radius are the same whether the row is one line or three — the composite is what showed it.
+
+   Nothing else has to change to make it fit: the identity is already `flex: 1 1 auto; min-width:
+   0` with an ellipsised description, so once the line stops wrapping it shrinks to whatever the
+   stat and the control leave, which is exactly what the reference draws. */
+.fabricate-manager .manager-components-list .manager-component-row {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-3);
+  min-height: 0;
+  padding: var(--fab-space-3);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* `proto:1078`'s selected paint: the ACTIVE surface behind an accent edge. */
+.fabricate-manager .manager-components-list .manager-component-row.is-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* ── C6. THE GHOST ROW ─────────────────────────────────────────────────────────────────────
+   `proto:5001`: the SAME row on `--fab-surface-soft` at `opacity: .72`. It is not a stub and
+   not a dashed outline — the dimming and the `Not in this system` pill are what say it. */
+.fabricate-manager .manager-components-list .manager-component-row.is-ghost {
+  border-color: var(--fab-border);
+  background: var(--fab-surface-soft);
+  opacity: 0.72;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-identity {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--fab-space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+/* The name LINE: the name, then whichever state pills this row carries (`proto:1084`). */
+.fabricate-manager .manager-component-name-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+/* `proto:1084`: 13.5px/600 SERIF, where the shipped row wrote 12.16px/700 sans. */
+.fabricate-manager .manager-components-list .manager-component-row .manager-system-name {
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+/* `proto:1085`: one 11px line, ellipsised, in the muted ink. */
+.fabricate-manager .manager-components-list .manager-component-row .manager-system-description {
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-weight: 400;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* `proto:1088`: the trailing cluster, 12px between its three parts, never wrapping. */
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-row-meta {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-essence-dots {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-1);
+}
+
+/* `proto:1089`: the `Recipes` stat — a right-aligned 50px-minimum column, the mono value over
+   an uppercase micro-label. The mono numeral ships at 500; the face has no 700. */
+.fabricate-manager .manager-component-recipes-stat {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 50px;
+}
+
+.fabricate-manager .manager-component-recipes-value {
+  color: var(--fab-text-secondary);
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-component-recipes-label {
+  color: var(--fab-text-subtle);
+  font-weight: 600;
+  font-size: 0.5rem;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* `proto:1090` and `proto:5580`: the row's ONE control, LABELLED. 30 is a live rung, so it does
+   not move; the radius snaps to 7 for a control in the 26-32 band. The dashed ghost variant
+   takes its edge from `ManagerButton role="dashed"` and only its metrics from here.
+
+   THE HAIRLINE IS THE STRONG ONE, which the reference states and the neutral button does not
+   give it: `proto:1093` draws this control on `border-strong` so it reads as the row's one
+   affordance among a run of hairlines at the quieter weight. Measured drift before this rule: the
+   control took `--fab-border`'s alpha where the reference draws `--fab-border-strong`'s. (The two
+   values are not quoted: the theme-colour contract scans prose as well as declarations.) It is
+   a BORDER COLOUR taken from the row, which the design system permits a layout context to state;
+   the button's font, radius and fill stay the primitive's. */
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-row-open {
+  flex: 0 0 auto;
+  gap: var(--fab-space-chip);
+  height: 30px;
+  min-height: 30px;
+  padding: 0 var(--fab-space-3);
+  border-color: var(--fab-border-strong);
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-row-open i {
+  font-size: 0.5rem;
+}
+
+/* ── C7. THE INSPECTOR ─────────────────────────────────────────────────────────────────────
+   `proto:1247`: a scrolling body at 17px padding (snapped to 16) with 13px gaps (snapped to 12),
+   over a PINNED foot. The foot is sticky rather than a grid track because this component renders
+   INTO the shell's inspector column and owns no grid of its own — introducing one here would be
+   a second inspector nested in the first. */
+.fabricate-manager .manager-component-browser-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+.fabricate-manager .manager-component-inspector-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-inspector-title-row {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+/* `proto:1249`: the kicker is 9.5px/700 at `.1em`. The shared `.manager-micro-label` scale it
+   inherits resolves to 8.5px, so the reference's own value is stated here, in px — font sizes are
+   not spacing-scale members and are written as literals (`design-system/spec.md:216-220`). It is
+   stated on THIS panel's own hook rather than on `.manager-kicker`, so no other kicker moves. */
+.fabricate-manager .manager-component-inspector-title-row .manager-kicker {
+  margin: 0;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+
+/* `proto:1250`: the 40px medallion and an 11px gap (snapped to 12). */
+.fabricate-manager .manager-component-inspector-identity {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-inspector-identity-copy {
+  min-width: 0;
+}
+
+/* `proto:1250`: 16px/600 SERIF. The shipped panel wrote 21.6px/700, which read as a page title
+   inside a rail. */
+.fabricate-manager .manager-component-inspector-name {
+  margin: 0;
+  overflow: hidden;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The `{n} tags · {m} essences` subline that replaced the two stat tiles. */
+.fabricate-manager .manager-component-inspector-subline {
+  margin: var(--fab-space-1) 0 0;
+  color: var(--fab-text-subtle);
+  font-weight: 500;
+  font-size: 10px;
+}
+
+/* `proto:1251`: the `Shared identity` card — an info-soft fill inside an info hairline, radius 9,
+   padding 10/11 snapped to 12. Its micro-label is inked `--fab-info-text` rather than the subtle
+   ink every other label on this panel takes, which is what marks the card as a different scope. */
+.fabricate-manager .manager-component-shared-identity {
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 9px;
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-component-shared-identity .manager-micro-label.is-info {
+  color: var(--fab-info-text);
+}
+
+.fabricate-manager .manager-component-shared-identity-note {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-weight: 400;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* The shared inline link carries `margin-left: auto` for the head rows it was written for; here
+   it is a block-level action under a sentence, so it gives that margin back. */
+.fabricate-manager .manager-component-shared-identity .manager-inline-link {
+  margin-top: var(--fab-space-2);
+  margin-left: 0;
+  font-size: 10.5px;
+}
+
+.fabricate-manager .manager-component-inspector-block {
+  min-width: 0;
+}
+
+/* `proto:1256`: the block head — its micro-label, and the split counter or source line pinned
+   opposite it at 9.5px/500. */
+.fabricate-manager .manager-component-inspector-block-head {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: baseline;
+  min-width: 0;
+}
+
+/* `proto:1256` and `proto:1263`: the block micro-labels are 8.5px/700 at `.11em`, one step above
+   the shared utility's 8px/`.1em`. Scoped to this inspector's own block heads for the reason the
+   kicker above records. */
+.fabricate-manager .manager-component-inspector-block-head .manager-micro-label {
+  margin-bottom: 0;
+}
+
+/* Two selectors rather than one: the head's label sits in a flex row and drops its margin, while
+   the salvage block's label heads its own well and KEEPS it. Only the type is shared. */
+.fabricate-manager .manager-component-inspector-block-head .manager-micro-label,
+.fabricate-manager .manager-component-browser-inspector [data-component-salvage-label] {
+  font-size: 8.5px;
+  letter-spacing: 0.11em;
+}
+
+.fabricate-manager .manager-component-inspector-split {
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-weight: 500;
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-inspector-block-head + .manager-chip-row,
+.fabricate-manager .manager-component-inspector-block-head + .manager-component-inspector-empty,
+.fabricate-manager .manager-component-inspector-block-head + .manager-component-inspector-well {
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-component-inspector-empty {
+  margin: 0;
+  color: var(--fab-text-disabled);
+  font-weight: 400;
+  font-size: 0.66rem;
+}
+
+/* `proto:1261` and `proto:1264`: a recessed well on `--fab-bg-1` behind a hairline at radius 9.
+   The category value is 11.5px/600 serif; the salvage note is 11px/1.5 sans in the muted ink. */
+.fabricate-manager .manager-component-inspector-well {
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-weight: 600;
+  font-size: 11.5px;
+}
+
+.fabricate-manager .manager-component-inspector-note {
+  color: var(--fab-text-muted);
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* THE DANGLING-SOURCE REMEDIATION PARAGRAPH. Not a parity rule — the reference draws no such
+   paragraph at all (`proto:1247-1266` enumerates the inspector's five blocks and this is not one
+   of them), and it is recorded as a retained subject-only element beside the markup that emits
+   it. This rule exists because C7 RENAMED the class and never wrote the replacement: on `main`
+   the paragraph carried `environment-stale-warning` and borrowed that block's pair, so after the
+   rename it rendered as unstyled body text — the one thing on this panel a GM has to act on,
+   drawn as though it were prose. The pair is carried across verbatim rather than re-derived,
+   because nothing about the warning changed except where its markup lives.
+
+   THE DONOR BLOCK IS GONE and is deliberately not cited by line any more. This rule was its last
+   reader, so once it landed the `.environment-stale-warning` / `.environment-field-error` pair
+   matched no element under `src/` and `tests/styles-dead-classes.test.js` named both blocks; they
+   were deleted rather than kept alive by a comment pointing at them. */
+.fabricate-manager .manager-component-inspector-warning {
+  margin: 0;
+  color: var(--fab-danger-text);
+  font-size: 0.74rem;
+}
+
+/* `proto:1268`: the pinned foot — a top hairline over the inspector's own surface, holding ONE
+   primary action. `position: sticky` keeps it at the bottom of the scrolling column without this
+   component owning a grid. */
+.fabricate-manager .manager-component-inspector-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-4);
+  padding-top: var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
+}
+
+/* ══ ISSUE 1371 · PART D — THE COMPONENT RULES EDITOR ═══════════════════════════════════════════
+   `rebuild-spec.md` Part D, `proto:1282-1501`. The standing rules stated at the head of the Part C
+   block apply here unchanged: spacing snaps to the 4px scale, a 12px card radius snaps to 11, a
+   32/36px control height snaps to 34, a mono numeral ships at weight 500, and every raw hex maps
+   to its `--fab-*` token.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* `proto:1316`: the callout's one exit — a 30px control on `--fab-bg-1` behind a `border-strong`
+   hairline. 30 is a live rung; the radius snaps to 7 for a control in the 26-32 band. */
+
+/* `.fab-manager-button` IS CHAINED, and it is load-bearing rather than tidiness. The shared
+   contract block `.fabricate-manager .manager-button.fab-manager-button` is (0,3,0) and declares
+   `min-height: 34px`, its own padding and its own type; this selector was (0,2,0), so it lost all
+   three and the exit rendered at the 34px toolbar scale in the primitive's font. Measured before
+   the chain: `rules-identity-action.height 34px` and `.fontSize 11.52px` against the reference's
+   30 and 10.5 (`proto:1316`). Chaining reaches (0,3,0) and, being later in the sheet, wins.
+   The row's own `Edit rules` control needed no chain — its selector is already (0,4,0).
+
+   Type is stated in px for the reason the sizes above it are: font sizes are not spacing-scale
+   members and are written as literals (`design-system/spec.md:216-220`). */
+.fabricate-manager .manager-button.fab-manager-button.manager-component-identity-exit {
+  flex: 0 0 auto;
+  gap: var(--fab-space-chip);
+  height: 30px;
+  min-height: 30px;
+  padding: 0 var(--fab-space-3);
+  border-color: var(--fab-border-strong);
+  border-radius: 7px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text-secondary);
+  font-weight: 600;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-identity-exit i {
+  font-size: 0.56rem;
+}
+
+/* THE `World catalogue` PILL'S PAINT IS NOT WRITEABLE HERE, and the six declarations that used
+   to try are deleted rather than kept as a comment on a rule nobody could see (issue 1371,
+   parity round 6). `proto:1313` draws it as a flat `--bg1` plate inside an info hairline inked
+   `--fab-info-text`; the rule stated exactly that at `.fabricate-manager .manager-chip.…`, and
+   `compare` measured the pill's `border-color`, `border-radius`, `background`, `color`,
+   `font-weight` and `font-size` ALL landing on `Chip.svelte`'s own defaults. Layers decide, not
+   specificity: `module.json` gives this sheet no layer so Foundry imports it at
+   `layer(modules)`, `Chip`'s `css: 'injected'` block lands unlayered, and an unlayered
+   declaration beats a layered one at any specificity.
+
+   ALL SIX NOW COME FROM THE PRIMITIVE (parity round 7). The scale is `density="list"`, and the
+   three colours the round-6 note left open as a finding are `tone="info"` composed with
+   `emphasis="outlined"` — the emphasis states only the fill, so the tone keeps the info
+   hairline and the info ink and the plate lands on `--fab-bg-1`. Nothing is left for this sheet
+   to say about that pill, which is why there is a note here and no rule. */
+
+/* ── D4. CATEGORY ALONGSIDE TAGS (`proto:1319`) ──────────────────────────────────────────── */
+.fabricate-manager .manager-component-rules-duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* The two cards stack before the tag card's chip runs start wrapping to one chip a line. */
+@container (max-width: 960px) {
+  .fabricate-manager .manager-component-rules-duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* `proto:1320`: every card in this editor is `--fab-bg-2` behind a hairline at radius 12
+   (snapped to 11) with 15px padding (snapped to 16). */
+.fabricate-manager .manager-component-rules-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+/* `proto:1321`: the head is a glyph beside a 14px/600 SERIF title over a 10px subtitle. The
+   editor's cards carried 16px/700 sans titles and no glyph at all (gap-list rows 134, 135). */
+.fabricate-manager .manager-component-rules-card-head {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: flex-start;
+  min-width: 0;
+  margin-bottom: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-component-rules-card-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-rules-card-head h3 {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-component-rules-card-sub {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-weight: 400;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* Four glyphs, four families (`proto:1321`, `:1329`, `:1341`, `:1352`). Each is a token rather
+   than the reference's raw value, and each names the card's subject rather than its state. */
+.fabricate-manager .manager-component-rules-card-glyph {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager .manager-component-rules-card-glyph.is-accent {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-component-rules-card-glyph.is-info {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-component-rules-card-glyph.is-tag {
+  color: var(--fab-purple);
+}
+
+/* `proto:1324`: ONE full-width select, 38px, radius 9, behind a `border-strong` hairline. It was
+   a floated head control at the card's trailing edge (gap-list row 133).
+
+   THE FILL IS OPAQUE, NOT THE REFERENCE'S `surface-soft` (LIBRARY-FORCED). A native `<select>`
+   inherits its own popup's background from the control, so a translucent fill opens a LIGHT
+   popup over Foundry's chrome — the defect `every manager select paints an opaque background, so
+   its popup opens dark` exists to stop. `--fab-bg-1` is the opaque step every other manager
+   select already takes, so this select matches its siblings rather than the reference here.
+
+   TYPE IS THE REFERENCE'S 12px, in px: font sizes are not spacing-scale members and are written
+   as literals (`design-system/spec.md:216-220`), and 0.75rem resolved to 12px only by accident of
+   the 16px root. */
+.fabricate-manager .manager-component-category-select {
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  border-color: var(--fab-border-strong);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* `proto:1327`: the note sits DIRECTLY under the select, glyph-led, at 10px/1.45 weight 500, in
+   the ink of the state it names. The inheriting branch's raw pale-blue literal maps to the info
+   token (LIBRARY-FORCED, recorded as E-4); the hex is deliberately not quoted, because the
+   theme-colour contract scans prose as well as declarations. */
+.fabricate-manager .manager-component-cat-note {
+  display: flex;
+  gap: var(--fab-space-1);
+  align-items: baseline;
+  margin: var(--fab-space-2) 0 0;
+  font-weight: 500;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.fabricate-manager .manager-component-cat-note i {
+  flex: 0 0 auto;
+  font-size: 0.56rem;
+}
+
+.fabricate-manager .manager-component-cat-note.is-info {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-component-cat-note.is-warning {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager .manager-component-cat-note.is-muted {
+  color: var(--fab-text-subtle);
+}
+
+/* ── D4.2. THE TAG CARD'S TWO LABELLED GROUPS (`proto:1331`) ─────────────────────────────── */
+.fabricate-manager .manager-component-tag-group {
+  min-width: 0;
+}
+
+/* `proto:1338`: the merge note under BOTH groups, at 9.5px/1.45 in the subtle ink. */
+.fabricate-manager .manager-component-tag-merge-note {
+  margin: var(--fab-space-2) 0 0;
+  color: var(--fab-text-subtle);
+  font-weight: 400;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+/* ── D5. THE ESSENCE GRID IS FOUR COLUMNS (`proto:1343`) ─────────────────────────────────── */
+.fabricate-manager .manager-component-rules-card .manager-component-essence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+@container (max-width: 960px) {
+  .fabricate-manager .manager-component-rules-card .manager-component-essence-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */
+
+/* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a
+   `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
+.fabricate-manager .manager-salvage-group-card {
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  list-style: none;
+}
+
+/* `proto:1405`: the group's count in the mono face. Weight 500, because the face ships 400 and
+   500 only and the reference's 700 has nowhere to land. */
+.fabricate-manager .manager-salvage-group-count {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 0.63rem;
+}
+
+/* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by
+   a micro-label. */
+.fabricate-manager .manager-salvage-routing-card,
+.fabricate-manager .manager-salvage-dc-card {
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* `proto:1429`: `Salvage check DC` is a title over a note, with the preset select at the trailing
+   edge — 32px snapped to the 34 rung, radius 9, `surface-soft` behind a `border-strong` hairline. */
+.fabricate-manager .manager-salvage-dc-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
+  align-items: center;
+}
+
+.fabricate-manager .manager-salvage-dc-copy {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-dc-title {
+  color: var(--fab-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-salvage-dc-note {
+  color: var(--fab-text-subtle);
+  font-weight: 400;
+  font-size: 0.63rem;
+  line-height: 1.45;
+}
+
+.fabricate-manager .manager-salvage-dc-card .manager-input {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  margin-left: auto;
+  border-color: var(--fab-border-strong);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  font-weight: 500;
+  font-size: 0.72rem;
+}
+
+/* ══ THE WORLD COMPONENT ENTRY, SECOND PARITY PASS (issue 1371, r5a) ═══════════════════════════
+   The second parity pass over Part A, measured with `scripts/visual-parity` against
+   `artifacts/proto-markup.txt` rather than read off the frames. Every rule below closes one
+   line the `compare --screen entry` run reported, and the line it closes is cited beside it.
+   The rules that are NOT here are the ones whose remaining difference is a licensed rung, a
+   ramp step or a shared primitive this lane does not own; those are recorded on the change
+   rather than papered over locally. */
+
+/* THE ENTRY BODY HAS NO INSET (`proto:822`). The shell's `.manager-main` pads every route by
+   16px, and on this page that gutter runs BETWEEN the rail and the window: the reference makes
+   the rail the second column of a full-bleed grid, flush to the edge with only its left
+   hairline, and gives the inset to the tab strip and the panel instead — both of which already
+   carry their own. Scoped to this route by its own page hook, so no sibling route moves. */
+.fabricate-manager .manager-main[data-scoped-page='world-component-entry'] {
+  padding: 0;
+}
+
+/* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ───────────
+   The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter
+   (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint
+   can be written here, at any specificity. That is a fact about the CASCADE rather than about
+   the selectors:
+
+   `module.json` publishes exactly one stylesheet, `styles/fabricate.css`, and Foundry imports an
+   unlayered module sheet at `layer(modules)` — `tests/view-lab/cascade.css` reproduces that. A
+   Svelte component's own `<style>` block is injected by the bundler as an UNLAYERED `<style>`
+   element, and an unlayered normal declaration beats a layered one no matter how specific the
+   layered selector is. Measured, not reasoned: with the chip rule written here as
+   `.fabricate-manager .manager-component-entry-classification .manager-component-entry-chips
+   .manager-chip[data-scoped-entry-tag]` — five compound selectors against the primitive's three
+   — the chip stayed at the primitive's 9.92px, and marking the SAME declaration `!important`
+   (which reverses layer order) moved it to 11px while the non-important `font-weight` beside it
+   stayed at 700.
+
+   So all three are said by an OPT-IN PROP on the primitive instead, and the entry passes them:
+   `StatusPill emphasis="outlined"`, `Chip density="tag-run"` and `SegmentedControl shape="pill"
+   tone="accent-soft"`. `!important` would also have worked and was not taken: it wins the same
+   argument for every other caller of that primitive too, which is the opposite of what a
+   per-site variant is for. There is deliberately NO rule in this block for any of the three —
+   a rule that cannot change a measured value is dead, so none was written.
+
+   The same cascade fact means the shipped
+   `.fabricate-manager [data-tool-player-preview] .fab-status-pill.is-subtle` rule above (issue
+   1373) is inert. Reported rather than deleted from a lane that does not own that screen; its
+   fix is the `emphasis` prop this screen now uses. */
+
+/* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ───────────
+   Copy and Unlink share one geometry and one surface, and the reference separates them by INK
+   alone: Unlink carries the danger edge and the danger text while it is still linked, and falls
+   back to the neutral pair once there is nothing left to unlink. This lane's card withholds the
+   control entirely in that second state, so only the danger face is declared. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
+    :disabled
+  ) {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+/* `Add alias` STATES WHETHER IT WILL DO ANYTHING (`proto:5436-5438`). With an empty field the
+   reference draws it transparent on a plain hairline in the disabled ink; with a uuid typed it
+   lifts onto `surface-soft` behind a strong edge in the full text ink. The primitive's `ghost`
+   role paints one 4%-on-12% face for both, so the control looked live before it was. */
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
+  background: transparent;
+  border-color: var(--fab-border);
+  color: var(--fab-text-disabled);
+}
+
+.fabricate-manager
+  .manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:not(
+    :disabled
+  ) {
+  background: var(--fab-surface-soft);
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text);
+}
+
+/* A ROW WITH NO RULES SITS ON THE SAME SURFACE AS ONE WITH RULES (issue 1371 r13-entry,
+   maintainer ruling M15). `proto:5462` does tint the non-member row with a 5% `surface-soft`
+   wash; on the reference's own ramp that wash is invisible and the maintainer's reading of the
+   prototype frame is one uniform surface, while on this product's ramp — and under a host
+   theme — it drew the with-rules row as a dark band between lighter ones. The wash is retired
+   and the row rule above states `transparent` for every row; the cohorts still separate by the
+   summary's ink and by the dashed `Add to system` against the bordered `View system rules`. */
+
+/* ── A1. THE UNSAVED MARKER IN THE HEADER BAND (`proto:817`) ─────────────────────────────────
+   A 7px warning dot and the words beside the action pair, shown only while the draft is dirty.
+   The dot is a DECORATION rather than a control, so its 7px is a shape and not a ladder rung;
+   the gap and the inline margin are the scale's. */
+.fabricate-manager .manager-header-unsaved {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  margin-right: var(--fab-space-1);
+  color: var(--fab-warning-text);
+  font-weight: 600;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-header-unsaved-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fab-warning);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r8-prim — the shared primitives' opt-in sizes, and the two corners the M12a edit
+   would otherwise have moved off the ladder. Appended; no rule above is edited by this block.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.manager-button.fab-manager-button` now
+   declares the 34-38px rung's 9px corner, and both of these declare a height under that band and
+   no corner of their own, so without this they would take a 34px control's corner at 30px and
+   28px. `design-system/spec.md`'s ladder puts a 26-32px control on 7px, which is what they take.
+   Each selector is (0,4,0) and beats the primitive's (0,3,0) on specificity rather than on where
+   in this file it stands. */
+.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters,
+.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button {
+  border-radius: 7px;
+}
+
+/* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ──────────────────────────────
+   38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired),
+   and the reference draws the catalogue toolbar's search and membership filter and the system
+   rules list's search and two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the
+   34px these controls ship at. That is a size the ladder already publishes and nothing licensed
+   the drop, so the size becomes reachable rather than the reference being adapted to it.
+
+   IT IS OPT-IN AND ABSENT BY DEFAULT. `ManagerSearchField` emits `is-size-38` from its `size`
+   prop; a `<select>` in a toolbar carries the class directly, because the manager has no select
+   COMPONENT — `ManagerToolbar`'s own header records that the control beside the field is three
+   different things across eleven bars and that the bar deliberately takes a slot rather than
+   choosing between them, so the contract a caller opts into is this class rather than a prop on
+   a primitive that does not exist.
+
+   THE CLASS IS `is-size-38`, NOT `is-38`. The token names the AXIS as well as the rung: read in
+   a class list beside `is-compact` and `is-selection`, a bare `is-38` states a number and not
+   what the number is of.
+
+   SPECIFICITY, NOT SOURCE ORDER. `.manager-search input` and `.manager-scoped-list-toolbar
+   select` are both (0,2,1) and both declare the 34px height; each selector below adds a class, so
+   the size wins at (0,3,1) wherever it is written. Radius 9 is the band's ladder partner and is
+   stated with the height, because a control that changed rung and kept its old corner is the
+   defect M12a exists to close one rule up. */
+.fabricate-manager .manager-search.is-size-38 input {
+  height: 38px;
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-filter.is-size-38 select,
+.fabricate-manager .manager-toolbar select.is-size-38,
+.fabricate-manager .manager-scoped-list-toolbar select.is-size-38 {
+  height: 38px;
+  border-radius: 9px;
+}
+
+
+/* ── issue 1371 r8-cat: THE WORLD COMPONENT CATALOGUE'S REBUILT LIST AND INSPECTOR ────────────
+   An APPENDED BLOCK. No rule above is edited: every selector below either names markup this
+   revision introduced or re-states a route-scoped value LATER in this file than the rule it
+   supersedes, at equal or greater specificity, which is the arbitration the two sibling world
+   catalogues' own blocks already use.
+
+   IT IS IN THIS SHEET RATHER THAN IN A PAGE'S `<style>` for the reason the route block above
+   records: the rows, the inspector identity block and the toolbar are written by
+   `EntityListInspectorFrame` and by primitives it composes, so a page-scoped rule carries the
+   PAGE's `svelte-<hash>` and never matches them. */
+
+/* ── THE ROW IS A FILLED CARD (gap-list rows 18-20) ──────────────────────────────────────────
+   `proto:598` fills every row `--bg1` on a 9px corner with an 11px column gap. The route block
+   above FLATTENED the row to transparent, which was this screen's own earlier reading of the
+   reference and is the value the r4 audit measures as drift; the fill is restored here.
+
+   RADIUS 9 rather than the shared 8: `design-system/spec.md:218` puts rows and wells on 9 and 8
+   is on no rung at all, so this is a ladder correction as well as a parity one.
+
+   THE GAP SNAPS. The reference draws 11px and the published 4px scale has no such step, so it
+   lands on `--fab-space-3` (12px) — the same class of recorded deviation as the control-height
+   ladder snapping 32 and 36 to 34. The row's PADDING is left where it is: the r4 audit's own
+   classification puts `cat-row.padding` 11 against 10 in the 4px-scale band. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row {
+  gap: var(--fab-space-3);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* HOVER AND THE INSPECTED STATE, RESTATED ONE RUNG UP. With the row's resting fill restored,
+   the route block's hover and selection values above are now the SAME colour as rest, so a
+   hovered row and a chosen row would be indistinguishable from an idle one. Each is stated on
+   its own line so the joined-selector guard in `manager-layout.test.js` reads the route
+   attribute as travelling with it.
+
+   BOTH ARE QUALIFIED BY THE SCROLLER, `.manager-scoped-list-rows`, and that is mechanical
+   rather than decorative: stylelint's `no-duplicate-selectors` refuses a second block under a
+   selector this file already writes, and the route block above writes both of these. The
+   scroller is the row list's own parent in every state the frame renders, so the reach is
+   identical and the arbitration is the added class plus source order. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row.is-selected {
+  background: var(--fab-surface-soft);
+}
+
+/* ── THE TOOLBAR AND THE ROWS SHARE THEIR INLINE EDGES (r8 GATES alignment
+   `catalogue-list-rows`) ─────────────────────────────────────────────────────────────────────
+   `proto:576` pads the toolbar `14px 20px 0` and `proto:597` pads the row scroller
+   `2px 20px 18px`, so the filter line and every row beneath it start and end together. The
+   subject padded only the TOOLBAR — `.manager-toolbar` carries `--fab-space-3` — and left the
+   scroller flush, so the filter row sat 12px inside the rows on the left and the rows ran 12px
+   past it on the right.
+
+   NOTHING ANY ROW MEASURES MOVES, which is exactly why the alignment pass exists and the
+   region pass could not see it: every row's own box, type and fill were already right, and the
+   whole column was drawn 12px out of line with the bar above it.
+
+   THE ROWS TAKE THE TOOLBAR'S INSET rather than the toolbar losing its own: the toolbar's
+   padding is `ManagerToolbar`'s, shared with every manager browse screen, and this is a scroller
+   with no declared padding at all — `EntityListInspectorFrame`'s scoped block sets its flex,
+   overflow and scroll behaviour and no box. A layered rule here therefore wins uncontested,
+   which is not true the other way round.
+
+   INLINE ONLY. The block padding is the list's own rhythm and the alignment group states
+   nothing about it. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows {
+  padding-inline: var(--fab-space-3);
+}
+
+/* ── THE ROW'S OPEN CONTROL IS A 28px PEN (gap-list row 17) ──────────────────────────────────
+   `proto:609` draws a 28x28 square on a 7px corner, titled `Open catalogue entry`. The shared
+   `.manager-icon-button` is 34px on a 6px corner; 28 is a rung and 7 is the radius the ladder
+   gives a 26-32px control, so both values are on the published scale. The pager's own icon
+   buttons already take exactly this treatment one block up, which is the precedent. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row .manager-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: 0 0 28px;
+}
+
+/* ── THE TOOLBAR COUNT AND THE MEMBERSHIP LABEL (gap-list rows 5 and 9) ──────────────────────
+   `proto:586` writes the count at 11px/500 and `proto:579` writes the micro-label at 8.5px on
+   0.09em of tracking. Only the count's WEIGHT is stated here, and the omission is deliberate:
+   `EntityListInspectorFrame`'s scoped block declares `.manager-scoped-list-count`'s font-size and
+   is injected UNLAYERED, so a size stated in this layered sheet would match, be overridden and
+   never be used — the silent loss the selection band's note above records at length. The
+   residual is 10.88px against 11px, which is a tenth of a pixel. The label carries no such
+   competitor: `.manager-micro-label` is authored in this same sheet. */
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-count] {
+  font-weight: 500;
+}
+
+.fabricate-manager[data-manager-view='world-components']
+  [data-scoped-list-filter-label='membership'] {
+  font-size: 0.531rem;
+  letter-spacing: 0.09em;
+}
+
+/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ───────────────────────────────────────
+   `proto:578` and `proto:583` ink every toolbar select `--text2` at weight 500, where the shared
+   scoped-list rule inks them `--fab-text` at the inherited 400 — so the two filters and the sort
+   key read at the same weight as the row names below them. The FILL stays as it is: an opaque
+   select is library-forced and pinned by `manager-layout.test.js`. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-toolbar select {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* ── THE INSPECTOR'S IDENTITY TYPE (UX F4, gap-list rows 25-26) ──────────────────────────────
+   `proto:641`-`642`: a 9.5px kicker over a 16px/600 serif name. The shipped values are 8.5px and
+   21.6px/700, so the name is drawn a third larger than the reference's and the kicker a step
+   smaller — the pair the r4 log has reported unchanged since round 4. No rung governs type size,
+   so these are the reference's own numbers.
+
+   SCOPED TO THIS ROUTE, because `.manager-kicker` and `.manager-inspector-name` are shared
+   classes that every manager inspector wears; the essence and tool catalogues keep theirs. */
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-inspector-kicker] {
+  font-size: 0.594rem;
+
+  /* `proto:641` tracks it 0.1em; the shared kicker tracks 0.11em, which at 9.5px is a fifth of a
+     pixel wider per letter and is the only remaining line on this region. */
+  letter-spacing: 0.1em;
+}
+
+.fabricate-manager[data-manager-view='world-components'] [data-scoped-list-inspector-name] {
+  font-family: var(--fab-font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ── THE BULK PANEL'S STAGED COUNT IS A NUMERAL (gap-list row 46) ────────────────────────────
+   `proto:629` writes each group's staged count in the MONO face beside its label, which is what
+   distinguishes it from the sentence-shaped hints the same slot carries elsewhere in the manager.
+   `BulkEditSection` owns that element, so the rule is authored here and scoped to this panel;
+   the Component, Recipe and Essence Studios' own sections are untouched.
+
+   The face ships 400 and 500 only (`design-system/spec.md:230-231`), so the reference's 600
+   lands on 500. */
+.fabricate-manager [data-world-component-bulk-panel] .fab-bulk-edit-hint {
+  font-family: var(--fab-font-mono);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r9-prim2 — the manager button's opt-in 38px rung. Appended; no rule above this
+   block is edited by it.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── THE 38px BUTTON (issue 1371, gap-list rows 1 and 22) ────────────────────────────────────
+   38 IS A RUNG (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with
+   32 / 36 / 40 retired), and the reference draws the world component catalogue's
+   `+ Register item` (`proto:570`) and the system's `+ Add from catalogue` (`proto:1046`) at 38
+   against the 34 this control ships at. That is a size the ladder already publishes, so nothing
+   licensed the drop: the rung becomes reachable rather than the reference being adapted to it.
+   It is the same ruling M12b made for the toolbar's field and selects one block up, and it emits
+   the same `is-size-38` token, because it names the same rung of the same ladder.
+
+   IT IS OPT-IN AND ABSENT BY DEFAULT. `ManagerButton` emits `is-size-38` from its `size` prop
+   and emits nothing at all without one, so every shipped button is untouched by this rule.
+
+   THE HEIGHT ONLY, AND THE CORNER DELIBERATELY NOT. 34 and 38 are both inside the radius
+   ladder's 34-38px band, so the 9px `.manager-button.fab-manager-button` already states is the
+   right corner at either height — restating it here would be a second source of truth for one
+   value, which is the failure the primitive's own docblock exists to end. `min-height`, not
+   `height`, because that is the property the rule this overrides declares: a `height` here
+   would win the size argument while leaving a 34px floor underneath it.
+
+   SPECIFICITY, NOT SOURCE ORDER. `.fabricate-manager .manager-button.fab-manager-button` is
+   (0,3,0) and declares the 34px control; this adds the rung class, so it decides at (0,4,0)
+   wherever in the sheet it is written. */
+.fabricate-manager .manager-button.fab-manager-button.is-size-38 {
+  min-height: 38px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K).
+   Appended; no rule above this block is edited by it, and every selector below is scoped to
+   `[data-manager-view="components"]`, which is this one route. The rules these override are
+   shared with the Recipe Studio and the Essence library, and neither of those is drawn by this
+   reference at all — an unscoped edit would re-type two studios nobody measured.
+
+   WHAT THE FINDING IS. Twenty `compare` lines, each one internally inconsistent with a sibling
+   control in the SAME toolbar that is already right — which is what makes them per-site drift
+   rather than the systematic rem-ramp the classification puts the residual `11.52px` cluster in.
+   Twelve of them are this screen's, and every one is a TOKEN or a WEIGHT: not a rung, not the
+   spacing scale, not the background ramp.
+
+   THE CATALOGUE ALREADY CLOSED ITS HALF and this copies that answer rather than inventing a
+   second one: `[data-manager-view='world-components'] .manager-scoped-list-toolbar select` sets
+   `--fab-text-secondary` at weight 500 for exactly the same reference declaration.
+   `--fab-text-secondary` IS the reference's `--text2` at the same value; the sibling
+   `--fab-text-muted` this bar reads is that colour at 74% alpha, which is why the run reported a
+   translucent ink against a solid one rather than a different hue.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the
+   sort key) all ink their select `var(--text2)` at weight 500. The shared scoped rule inks them
+   `--fab-text` at the inherited 400, so the filters read at the weight and colour of the row
+   NAMES below them rather than as quiet chrome.
+
+   THE FILL IS DELIBERATELY NOT HERE. An opaque select is library-forced and pinned by
+   `manager-layout.test.js`; the `backgroundColor` line on these three regions is that recorded
+   deviation and not this one. */
+.fabricate-manager[data-manager-view="components"] .manager-component-toolbar select {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* And the two FILTER selects at the reference's own 12px. The sort select is deliberately absent:
+   the reference draws IT at 11.5px (`proto:1066`) against the shipped 11.52px, a fiftieth of a
+   pixel, which belongs to the rounding class rather than to this finding. Absolute px rather than a rem
+   step for the reason the count one block up gives — these are the reference's own numbers, and
+   the rem ramp has no step between 11.52 and 12.16. */
+.fabricate-manager[data-manager-view="components"] .manager-component-category-filter,
+.fabricate-manager[data-manager-view="components"] .manager-component-essence-filter {
+  font-size: 12px;
+}
+
+/* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. The weight is already
+   600 from the shared sort-direction rule; the ink and the size are this screen's drift.
+   (0,5,0) against that rule's (0,4,0), so it decides by specificity rather than by source order. */
+.fabricate-manager[data-manager-view="components"]
+  .manager-button.fab-manager-button.manager-component-sort-direction {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+}
+
+/* `proto:1062`: the two micro-labels on the second row at 8.5px. The shared label rule draws
+   8.8px, and the 0.08em tracking it already carries resolves against the element's OWN size, so
+   the `letterSpacing` line closes with the size and needs no declaration of its own. */
+.fabricate-manager[data-manager-view="components"] .manager-component-filter-label {
+  font-size: 8.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   issue 1371 r16-cat — the world Component catalogue's foot pager, second pass (maintainer
+   ruling M21, superseding r13-cat's M19 rule that stood here). Appended; no rule above this block
+   is edited by it. The two `+ Register item` rules that stood in the r8-cat block above were
+   DELETED by r13-cat in the same change that added M19 (M13 removed the control).
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── THE PAGER IS A FULL-WIDTH BAND BY CONSTRUCTION NOW (M21) ────────────────────────────────
+   M19 ("the pagination footer on the component browser is not full width") was closed in r13 by
+   bleeding the pager through the list column's `--fab-space-4` inset with three negative margins.
+   M21 then ruled on the inset itself — "the entire world component catalogue browser has
+   unnecessary padding/whitespace around its central rail body" — and the column drops it on this
+   route (`EntityListInspectorFrame`'s `flushColumn`, turned on by the catalogue page), so the
+   toolbar, the rows scroller and this pager all start and end at the pane's edges without any
+   rule bleeding anything. The negative margins are RETIRED with the inset they bled through: a
+   margin that walks a band into padding that no longer exists would overhang the pane instead.
+
+   WHAT STAYS IS THE WASH, for the reason r13 recorded: the route flatten above painted this pager
+   transparent when the rows were flattened, r8 gave the rows their `--fab-bg-1` fill back and
+   left the band, and a full-width transparent band reads as a hairline floating under the list
+   rather than as the rules list's footer. The wash restated here is the shared
+   `.manager-pagination` one the rules list draws.
+
+   SPECIFICITY, NOT SOURCE ORDER, as before: the route flatten is (0,3,0); this is (0,4,0) through
+   the column class, so it decides wherever it is written. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .manager-pagination {
+  background: var(--fab-overlay-light-03);
+}
+
+/* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG, ON EVERY BULK PANEL (M24) ─────────────────
+   `proto:5340` (the world panel) and `proto:5638` (the system panel) draw the dock's destructive
+   action `height:34px; border-radius:8px; font:700 11px` on a `--danger-soft` fill inside a
+   `--danger-border` hairline, as ONE 11px line. `ArmedDangerButton` renders a bare
+   `.manager-button.is-danger`, which the sheet leaves at the host button's 6px corner and 14px type
+   — measured in the lab at radius 6 and 14px against a 34px height, and at 14px the system panel's
+   `Remove 2 components from The Herbalist's Compendium…` wrapped to two lines. The world Component
+   ENTRY's danger card already corrected the identical control to the ladder
+   (`.manager-component-entry-danger-body .manager-button.is-danger`, above: 34px, radius 9 for the
+   34-38px band, 11px/700), and that is the example copied here rather than a second reading of the
+   same reference — the one difference is the fill, which the reference draws soft where the entry's
+   card, sitting on a danger hairline of its own, draws it transparent.
+
+   SCOPED TO THE SHELL'S DOCK, `.fab-bulk-edit-dock`, because `.manager-button.is-danger` is every
+   armed delete in the manager and the dock is where both bulk panels pin theirs — so the two panels
+   cannot differ here. A CLASS and not a panel's hook: `manager-layout.test.js` renders every
+   ancestor compound of a manager-button rule to prove the disabled paint wins in it, and it can
+   build a div for a class where it cannot for an attribute. */
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: center;
+
+  /* FULL WIDTH, as both prototypes' `delStyle` is (a `display:flex` child of the foot column). The
+     host's button base sizes it to its content otherwise, which is how a one-line label would run
+     past the rail rather than ellipsise inside it. */
+  width: 100%;
+  max-width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ONE LINE, as the reference draws it: a label longer than the rail ellipsises rather than wrapping
+   the 34px control into a 48px one. The armed label carries the same sentence in the accessible
+   name, so nothing a GM needs is lost to the ellipsis. */
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger:not(:disabled):not(.is-armed) {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+/* ══ issue 1371 r18-list — THE RULES LIST ROW'S MEDALLION SITS AT THE LEADING EDGE ═══════════════
+   Maintainer ruling M28: rows reading `No description` drew their medallion shunted to the middle
+   of the row while rows with a description sat flush.
+
+   THE ROW'S IDENTITY IS A `<button>`, AND FOUNDRY'S OWN CHROME CENTRES A BUTTON'S CONTENT.
+   Measured in Chromium against the harvested 14.365 sheet (`components-browser-rendered.test.js`):
+   the identity resolved `justify-content: center` under it and `normal` without it. The list rule
+   above sets the identity to `display: flex` and never says where its content sits, so the chrome
+   decided; and the copy column beside the medallion was `flex: 0 1 auto`, so on a short description
+   the medallion-and-copy pair floated to the centre of whatever width the row left them — 190px in
+   on a `No description` row, ~45px in on a described one. A long description happened to fill the
+   column and hide it.
+
+   TWO DECLARATIONS, ONE PER CAUSE. The identity states its own alignment, so no host sheet can
+   re-arbitrate it; and the copy takes the free space, so there is none left to float in. The type
+   selector on the first is the point rather than a specificity trick: it names the element whose
+   user-agent and host defaults are being overruled. Appended, because the four-class list rule
+   above is written once and `no-duplicate-selectors` refuses a second block under it. */
+.fabricate-manager .manager-components-list .manager-component-row button.manager-component-identity {
+  justify-content: flex-start;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row .manager-component-identity .manager-system-copy {
+  flex: 1 1 auto;
+}
+
+/* ── issue 1371 r18-list, maintainer ruling M26 — THE CONTENT COLUMN'S PANEL TAKES THE SLACK ──
+   The rules editor's form is the world entry's content column now (`.manager-component-entry-column`,
+   with the entry's own panel scrolling under a flush tab strip), and the maintainer's ruling is
+   that the form "must occupy the column's full width and height like the catalogue's list column".
+   The entry's panel rule declares `min-height: 0; overflow: auto` and no flex basis, so as a flex
+   item it is CONTENT-SIZED until its cards overflow: a short editor left the column's foot empty
+   below the last card, and the panel's box ended 288px above the pane's (measured in
+   `component-edit-frame-rendered.test.js`). The reference's panel is `flex:1;min-height:0;
+   overflow:auto` (`proto:1307`) — it fills the column and scrolls inside it — and this declares
+   that one missing third. Keyed on the column's child so it reaches the entry's panel too, whose
+   box also grows to the column; that paints nothing, because the panel has no fill or edge and
+   every card in it is `flex: 0 0 auto`. */
+.fabricate-manager .manager-component-entry-column > .manager-component-entry-panel {
+  flex: 1 1 auto;
+}
+
+/* ══ issue 1371 r18-entry, maintainer ruling M31 — THE ENTRY'S ESSENCE GRID BREAKS AS THE EDITOR'S ═══
+   The world Component entry's `Essence contribution` card renders the shared 4-up
+   `.manager-component-essence-grid`, the same grid the rules editor's card renders (D5,
+   `proto:1343`). The editor's copy narrows to 2-up under 960px through the rule keyed on
+   `.manager-component-rules-card`; the entry's card is an `InspectorCard` on the entry's own
+   class family, so it needs the same break stated on its own key or four tiles squeeze where the
+   editor's would already have wrapped. One declaration, the editor's, copied rather than
+   re-derived. */
+@container (max-width: 960px) {
+  .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

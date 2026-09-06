@@ -65,6 +65,37 @@
                    name handed to a button in THIS component can never reach. Callers
                    pass only their own modifier class in `triggerClass`; the chip's own
                    class hook comes from the primitive.
+    triggerButton — render the trigger through the shared `ManagerButton` primitive instead
+                   of a bare `<button>` (issue 1371), as `{ role, size, fullWidth }` — the
+                   primitive's own prop names, so a caller who has met that component has met
+                   this. Any object turns the form ON; `null` (the default) leaves every
+                   shipped consumer rendering the exact bare button it rendered before.
+
+                   IT IS AN OBJECT AND `triggerChip` IS A BOOLEAN, and the difference is not
+                   an inconsistency. A chip form has nothing to configure — `Chip`'s own
+                   variation arrives on `triggerClass` — while a manager button's ROLE and
+                   control-height RUNG are a closed vocabulary the primitive publishes and
+                   the class string cannot carry: `.manager-button.fab-manager-button.is-size-38`
+                   demands `fab-manager-button`, which only that component writes, so
+                   `triggerClass="manager-button is-size-38"` matches nothing at all. That is
+                   the defect this form exists to end.
+
+                   THIRTEEN CALL SITES IMITATE THE PRIMITIVE WITH A CLASS STRING today
+                   (`triggerClass="manager-button …"`, population B in
+                   `tests/components/manager-button-cascade-inventory.test.js`), and each one
+                   pays for it with a per-site sheet rule restating a height and a corner the
+                   primitive already owns. `WorldComponentCataloguePage`'s `+ Register item`
+                   is the first converted, because the reference draws it at the 38px rung and
+                   38 is reachable ONLY through the primitive. The other twelve are a
+                   follow-up: converting one is a change to its own paint, and twelve at once
+                   is twelve repaints in a change about a trigger contract.
+
+                   `triggerClass` still travels — it lands on `ManagerButton`'s own `class`
+                   prop, which APPENDS to `manager-button fab-manager-button is-<role>` rather
+                   than replacing it — so a converting site drops only the `manager-button`
+                   token it used to hand-write and keeps its own modifier. Beware the scoped-
+                   style trap the primitive's header records: a rule in the CALLING component
+                   never reached this trigger anyway, because `SearchablePopover` renders it.
     triggerIcon  — leading icon class on the trigger (optional)
     triggerImg   — leading portrait image src on the trigger (optional; mirrors
                    how list options render `option.img`), shown before the label
@@ -210,6 +241,7 @@
   import { tick } from 'svelte';
   import Chip from '../apps/manager/Chip.svelte';
   import EmptyState from '../apps/manager/EmptyState.svelte';
+  import ManagerButton from './ManagerButton.svelte';
   import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
@@ -242,6 +274,10 @@
     disabled = false,
     triggerClass = '',
     triggerChip = false,
+    // `{ role, size, fullWidth }` to render the trigger as the shared `ManagerButton`, or
+    // `null` (the default) for the bare `<button>` every shipped consumer renders. See the
+    // props block above.
+    triggerButton = null,
     triggerIcon = '',
     triggerImg = '',
     triggerLabel = '',
@@ -292,7 +328,20 @@
   let search = $state('');
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
-  let triggerButton = $state(null);
+  // The trigger's rendered DOM node — RENAMED from `triggerButton`, which is now the name of
+  // the prop that chooses the trigger's FORM. All three forms write it: the bare `<button>` by
+  // `bind:this`, and `Chip` and `ManagerButton` by the `element` binding each of those
+  // primitives publishes for exactly this caller.
+  //
+  // THE BINDING IS WHAT ANCHORS THE PANEL, and issue 1500's `anchoredPopover` made that matter
+  // MORE rather than less. The action anchors on whatever element this component hands its
+  // `trigger`, so a form that published no node would leave this null and the `?? pickerRoot`
+  // fallback below would silently anchor the panel on `.fabricate-picker`'s full-width block box
+  // instead of on the button — the same hazard the deleted in-component pass had. What changed
+  // is the blast radius: that one element now also resolves the overlay HOST and seeds the
+  // clipping-bounds walk (`resolveHost(anchor)`, `resolveBounds(hostRect, anchor)`), where the
+  // deleted pass took both from `pickerRoot` and read only the rect from the trigger.
+  let triggerElement = $state(null);
   let searchInput = $state(null);
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
@@ -351,7 +400,7 @@
 
   // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
   // mode the trigger is UNMOUNTED while open, so `bind:this` has already nulled
-  // `triggerButton` when `close()` runs: the element focus must return to does not exist
+  // `triggerElement` when `close()` runs: the element focus must return to does not exist
   // yet, and the restore is only correct once Svelte has remounted it. A `queueMicrotask`
   // callback lands on a null reference and silently does nothing unless Svelte's own flush
   // happens to have been scheduled first — true today, but an internal ordering of the
@@ -361,7 +410,7 @@
   // on the mode.
   function restoreTriggerFocus() {
     tick().then(() => {
-      const target = triggerButton ?? pickerRoot?.querySelector?.('button');
+      const target = triggerElement ?? pickerRoot?.querySelector?.('button');
       if (target?.isConnected !== false) target?.focus?.();
     });
   }
@@ -488,11 +537,27 @@
       </button>
     </div>
   {:else if triggerChip}
-    <Chip tag="button" bind:element={triggerButton} class={triggerClass} {...triggerAttributes}
+    <Chip tag="button" bind:element={triggerElement} class={triggerClass} {...triggerAttributes}
       >{@render triggerBody()}</Chip
     >
+  {:else if triggerButton}
+    <!-- THE `ManagerButton` FORM (issue 1371). `triggerAttributes` is spread FIRST for the
+         reason the bare `<button>` branch relies on implicitly and this branch has to state:
+         `type`, `disabled` and `onclick` are NAMED props on that primitive, so the spread has
+         to reach them as props rather than as rest attributes, and `class` is deliberately NOT
+         in the spread — it is the primitive's one destructured-and-merged prop, so passing
+         `triggerClass` through it APPENDS to `manager-button fab-manager-button is-<role>`
+         instead of replacing it. -->
+    <ManagerButton
+      bind:element={triggerElement}
+      {...triggerAttributes}
+      role={triggerButton.role ?? 'neutral'}
+      size={triggerButton.size ?? ''}
+      fullWidth={triggerButton.fullWidth ?? false}
+      class={triggerClass}>{@render triggerBody()}</ManagerButton
+    >
   {:else}
-    <button bind:this={triggerButton} class={triggerClass} {...triggerAttributes}>
+    <button bind:this={triggerElement} class={triggerClass} {...triggerAttributes}>
       {@render triggerBody()}
     </button>
   {/if}
@@ -514,7 +579,7 @@
         // field takes its place), so the anchor falls back to the picker root — which is the
         // element the inline field occupies. Without the fallback the panel would keep its last
         // style and drift on scroll. Both are read EAGERLY, so the swap re-runs the measure.
-        trigger: triggerButton ?? pickerRoot,
+        trigger: triggerElement ?? pickerRoot,
         layout: popoverLayout,
         // `minWidth`/`maxWidth` are read INSIDE this closure, so they are not dependencies of the
         // action's `update`: the action re-runs the closure on its next measure rather than when

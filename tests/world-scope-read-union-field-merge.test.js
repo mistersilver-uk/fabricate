@@ -350,6 +350,7 @@ describe('the two spread hazards stay RETIRED for a row with no section to inher
       entityType: 'components',
     });
     assert.equal(union[0].member, true);
-    assert.deepEqual(union[0].inherited, { category: false });
+    // Both component sections since issue 1371 r18-store (M31); the omitted `essences` switch inherits.
+    assert.deepEqual(union[0].inherited, { category: false, essences: true });
   });
 });
