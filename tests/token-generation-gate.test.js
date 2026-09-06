@@ -475,8 +475,10 @@ test('a rule is cited at the line its own selector starts on', () => {
  *
  * THE SET IS COMPUTED, NOT NAMED, and that is the change issue 1497 made here. A prefix gate asks
  * whether an author remembered to say a property was area-scoped; this asks where the property IS.
- * Measured on this corpus, the two answers are 5 and 24 — so the prefix rule was policing a fifth
- * of its own population and the other nineteen names were gated by nothing at all.
+ * Measured on this corpus, the two answers are 5 and 17 — so the prefix rule was policing under a
+ * third of its own population and the other twelve names were gated by nothing at all. The pair
+ * read 5 and 24 until issue 1508 re-rooted seven names out of the area; see
+ * `KNOWN_AREA_SCOPED_STRING_USES` for which, and why that is the ratchet moving the right way.
  *
  * EVERY compound of every declaring rule's selector list has to be inside the area, not merely one
  * of them, for the reason trap 4 gives: the cascade applies a comma-joined rule to each compound
@@ -540,11 +542,11 @@ test('the area-scoped set is measured, and the prefix still means what it says',
   assert.ok(
     sites.size > 100,
     `only ${sites.size} distinct \`${TOKEN_PREFIX}\` properties are declared anywhere, against the ` +
-      '~140 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
+      '~141 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
   );
   assert.ok(
     names.length >= 10,
-    `only ${names.length} properties measured as area-scoped, against the 24 this tree holds. A ` +
+    `only ${names.length} properties measured as area-scoped, against the 17 this tree holds. A ` +
       'set that has collapsed makes every clause below an absence check over nothing.'
   );
 
@@ -740,12 +742,14 @@ test('no module or template under src/ spells an area-scoped property into a str
   // documentation. `styles/` is excluded because the global sheet is where these properties
   // legitimately live; the first clause is what polices it.
   //
-  // THE FIVE ROWS ARE TWO DIFFERENT MISTAKES and the shapes tell them apart. `WorldToolEntryPage`
-  // and `ToolBreakageTab` READ `--fab-tool-breakage-chance-track-gradient` through a component
-  // prop, which is the `var(` shape. `ChanceSlider` DECLARES three of them into an inline `style`
-  // attribute, which is the declaration shape — and that one is invisible to every CSS clause
-  // here, because `maskNonStyleRegions` blanks the markup those declarations live in. A component
-  // in `components/` writing an area-scoped name is the widest version of this defect.
+  // THE TWO ROWS ARE ONE MISTAKE, in the `var(` shape: `WorldToolEntryPage` and `ToolBreakageTab`
+  // READ `--fab-tool-breakage-chance-track-gradient` through a component prop. The declaration
+  // shape is the one this clause exists for even so, because it is invisible to every CSS clause
+  // here — `maskNonStyleRegions` blanks the markup an inline `style` attribute lives in — and a
+  // component in `components/` writing an area-scoped name is the widest version of the defect.
+  // `ChanceSlider` held three such rows until issue 1508 re-rooted the sheet rules that declare
+  // those names onto `.fabricate-slider`, at which point the names stopped being area-scoped and
+  // this clause stopped having anything to say about them. See `KNOWN_AREA_SCOPED_STRING_USES`.
   const sources = collectWorkingTreeSources(['src'], ['.js', '.svelte']);
   const files = Object.keys(sources);
   const { names } = areaScopedProperties();

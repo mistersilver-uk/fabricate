@@ -291,10 +291,7 @@
   ],
   "areaScopedStringUses": [
     "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | --fab-tool-breakage-chance-track-gradient | 1",
-    "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-chance-slider-track-gradient | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-color | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-value | 1"
+    "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1"
   ],
   "untranslatedNameDefaults": [
     "src/ui/svelte/apps/manager/EditorValidationSurface.svelte | viewLabel | View | 1",

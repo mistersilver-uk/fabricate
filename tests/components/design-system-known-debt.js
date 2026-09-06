@@ -335,10 +335,14 @@ export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 308;
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
  *
- * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`. 24 of the 140 distinct
- * `--fab-*` names have every one of their declaration sites inside a `.fabricate-manager`
- * compound, and 19 of those 24 carry no `--fab-manager-` prefix — which is why that gate now
- * computes its population instead of matching the prefix, and why these rows appeared at all.
+ * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`, and RE-MEASURED after issue
+ * 1508's re-root. 17 of the 141 distinct `--fab-*` names have every one of their declaration
+ * sites inside a `.fabricate-manager` compound — the predicate `areaScopedProperties` applies is
+ * that EVERY compound of EVERY rule declaring the name matches `.fabricate-manager` with a
+ * right-hand boundary — and 12 of those 17 carry no `--fab-manager-`
+ * prefix, which is why that gate computes its population instead of matching the prefix, and why
+ * these rows appeared at all. The pair was 24 and 19 before the re-root; see
+ * {@link KNOWN_AREA_SCOPED_STRING_USES} for the seven names that left.
  *
  * All six read ONE property, `--fab-recipe-control-font`, for their control type. Every one of
  * the three components does render inside the manager today and not one of them can prove it: a
@@ -355,22 +359,33 @@ export const KNOWN_AREA_SCOPED_STYLE_READ_TOTAL = 6;
  * An area-scoped `--fab-*` property spelled into a template or module string, keyed
  * `file | property`.
  *
- * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read. Five sites, and
- * they are two different mistakes. `WorldToolEntryPage` and `ToolBreakageTab` READ
- * `--fab-tool-breakage-chance-track-gradient` through a component prop. `ChanceSlider` DECLARES
- * three area-scoped names into an inline `style` attribute — and that one is invisible to every
- * CSS clause in this repository, because the mask that isolates a `<style>` block blanks exactly
- * the markup those declarations live in. It is also the widest version of the defect: a component
- * under `components/` renders wherever a caller puts it.
+ * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read, and RE-MEASURED
+ * after issue 1508's re-root. TWO sites remain, and they are one mistake: `WorldToolEntryPage` and
+ * `ToolBreakageTab` READ `--fab-tool-breakage-chance-track-gradient` through a component prop.
+ * That shape is the `var(` one, which is also the pair the issue behind this baseline predicted.
  *
- * The issue predicted TWO rows here, because its audit looked only for the `var(` shape. The three
- * `ChanceSlider` declarations are found by the shape that matches a name followed by a colon, and
- * they are real.
+ * THREE `ChanceSlider` ROWS RETIRED WITH ISSUE 1508'S RE-ROOT, and they are not a repair of the
+ * debt — they are the re-root's intended effect. The component DECLARES
+ * `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color` and `--fab-drop-rate-value` into
+ * an inline `style` attribute exactly as before; what changed is where the sheet declares them.
+ * Issue 1508 re-rooted the slider family's rules from `.fabricate-manager .manager-drop-rate-*`
+ * onto `.fabricate-slider …`, so those three names no longer have every declaration site inside
+ * the area, no longer measure as area-scoped, and are rightly no longer flagged. A family-rooted
+ * property travels with the component: it is declared wherever the component's own root class is
+ * emitted, which is the guarantee the area-scoped shape could not give, and it is why the debt
+ * ended rather than moved.
+ *
+ * SEVEN names left the area-scoped set in that re-root, 24 → 17. Three had rows here and so read
+ * as VANISHED: `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color`,
+ * `--fab-drop-rate-value`. Four left silently, having none: `--fab-toggle-track`,
+ * `--fab-toggle-track-border`, `--fab-toggle-knob` (re-rooted onto `.fabricate-toggle`) and
+ * `--fab-chance-slider-thumb-radius` (onto `.fabricate-slider`). The exact-set pin that would
+ * make a silent departure loud is a follow-up; this note is the published record until it lands.
  */
 export const KNOWN_AREA_SCOPED_STRING_USES = knownDebt('areaScopedStringUses');
 
 /** @see KNOWN_AREA_SCOPED_STRING_USES */
-export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 5;
+export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 2;
 
 /**
  * A name-bearing prop defaulting to untranslated English, keyed `file | prop | default`.
