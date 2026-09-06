@@ -89,7 +89,7 @@ const FIXTURE = `
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
-              <button class="manager-status-toggle is-on" data-component-group-by-category>
+              <button class="fabricate-toggle manager-status-toggle is-on" data-component-group-by-category>
                 <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
               </button>
             </div>

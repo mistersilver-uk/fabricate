@@ -354,7 +354,8 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   it('lets the respawn unit select size to its content, on specificity not source order', () => {
     // The interval row is `display: flex` with two `width: 100%` children — the filled stepper
     // and the unit `<select>`, which takes its width from the blanket
-    // `.fabricate-manager .manager-field select` rule. They split the track 50/50, leaving the
+    // `.fabricate-field.manager-field select` rule (issue 1508 re-rooted it at the class `Field`
+    // emits, at unchanged (0,2,1)). They split the track 50/50, leaving the
     // typeable half at ~22-42px: under half of what an unfilled stepper offers, and not enough
     // for "1440". The remedy pins the SIBLING, so the stepper keeps `fill` and takes the rest.
     //
@@ -375,7 +376,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
     assert.ok(
       classColumn.length > 2,
-      `${selector.trim()} must out-specify \`.fabricate-manager .manager-field select\` (0,2,1), `
+      `${selector.trim()} must out-specify \`.fabricate-field.manager-field select\` (0,2,1), `
         + `but its class column is ${classColumn.length}`
     );
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');

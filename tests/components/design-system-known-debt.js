@@ -124,11 +124,19 @@ export function knownDebt(gate) {
  * 29 of them are the six Foundry-core reset blocks the gate allow-lists by shape, leaving these.
  * Issue 1501 collapses the `.fabricate-app`/`.fabricate-manager` pair, and issue 1520 deletes the
  * three interactables copies; both will move the allow-list rather than this table.
+ *
+ * RE-MEASURED at 24 → 23 by issue 1508's third phase, which paid one row down by ROOTING it:
+ * `.fabricate-manager .manager-status-toggle:focus` became
+ * `.fabricate-toggle.manager-status-toggle:focus`, the strip half of the pair `StatusToggle`
+ * already declared, and a recognised member of `PRIMITIVE_FOCUS_STRIPS` rather than debt. The
+ * three OTHER strips that phase adds — the toggle's checkbox-host input, and `ChanceSlider`'s —
+ * are new and exempt, so they add no row; a strip is required chrome and booking one here would
+ * file a requirement as a defect.
  */
 export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
 
 /** @see KNOWN_BARE_FOCUS_SELECTORS */
-export const KNOWN_BARE_FOCUS_TOTAL = 24;
+export const KNOWN_BARE_FOCUS_TOTAL = 23;
 
 /**
  * An `@media` query that is not a user preference, keyed `file | query`.
@@ -475,9 +483,21 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * `{...triggerAttributes}`, which this source-level scanner cannot see, so nothing is being
  * quietly banked that the scanner did not measure.
  *
+ * 274 → 272 with issue 1508's third phase, across two rows that leave entirely:
+ * `StatusToggle.svelte` 1 → 0 and `ModifierPillSelect.svelte` 1 → 0. Each declares
+ * `data-keyboard-focus="true"` on the one formless `<button>` it writes — the toggle's `button`
+ * host, and the pill row's remove button.
+ *
+ * ITS SIZE IS THE POINT, exactly as issue 1502's one-row entry above records. This scanner counts
+ * SOURCE elements, never component call sites, so `StatusToggle`'s single `<button>` leaves while
+ * the 42 render sites across 28 importing files that now answer `hasFocus` true are invisible to
+ * it. `ModifierPillSelect`'s MENU button is `SearchablePopover`'s trigger and was never on this
+ * row. The two hand-rolled `manager-status-toggle` buttons in `CraftingSystemManagerRoot.svelte`
+ * are `<span>`s and a `<button>` inside the root's own rows, and their file's row is unmoved.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 272;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

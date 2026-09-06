@@ -231,9 +231,13 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     // R1 is the one field allowed to keep a bare input AND lose its arrows, because its sibling
     // `type="range"` track already gives a pointer a way to step the same value. Without this the
     // register entry would be a claim in a comment with nothing behind it.
+    // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508), not at the manager area: the rule is
+    // `.fabricate-slider .manager-drop-rate-percent …` at the same rank and the same position it
+    // held before, so the suppression travels with the component into a host that carries no
+    // `.fabricate-manager` — which is where R1's `iff` has to hold too.
     const rule = ruleBody(
       globalCss,
-      String.raw`\.fabricate-manager \.manager-drop-rate-percent input\[type="number"\]::-webkit-outer-spin-button`
+      String.raw`\.fabricate-slider \.manager-drop-rate-percent input\[type="number"\]::-webkit-outer-spin-button`
     );
     assert.match(rule, /appearance: none;/);
     assert.match(rule, /-webkit-appearance: none;/);

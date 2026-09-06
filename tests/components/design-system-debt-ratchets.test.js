@@ -263,14 +263,20 @@ function focusResetRoot(selector) {
 }
 
 /**
- * The five primitive families that root their own focus chrome, and the one compound each may
- * write for the STRIP half of it (issues 1502 and 1508).
+ * The seven primitive families that root their own focus chrome, and the compounds they may write
+ * for the STRIP half of it — eight, because one family declares two (issues 1502 and 1508).
  *
- * TWO SHAPES, and the split is the family root's relationship to the control rather than a style.
- * `ManagerButton` and `IconButton` ARE the control, so their compound is the root alone.
- * `Pagination`, `Field` and `ManagerSearchField` are not: the root is a `<section>` or a
- * `<label>`/`<div>`/`<fieldset>` and the controls it strips for are the elements inside it, so
- * each of those compounds carries an element as well.
+ * THREE SHAPES, and the split is the family root's relationship to the control rather than a
+ * style. `ManagerButton` and `IconButton` ARE the control, so their compound is the root alone.
+ * `Pagination`, `Field`, `ManagerSearchField` and `ChanceSlider` are not: the root is a
+ * `<section>`, a `<label>`/`<div>`/`<fieldset>` or a `<span>` and the controls it strips for are
+ * the elements inside it, so each of those compounds carries an element as well. `StatusToggle` is
+ * BOTH, which is why it has two members: its `button` and `indicator` hosts ARE the control and
+ * take the root-plus-hook compound, while its `checkbox` host is a `<label>` — an element that
+ * never matches `:focus` at all — so the strip for that host is written on the transparent
+ * `<input type="checkbox">` the label wraps, which is the element that actually takes focus. Its
+ * repaint is a `:has()` ring on the label, so the pair's two halves are on two DIFFERENT elements
+ * by construction rather than by choice, and `design-system/spec.md` records that case.
  *
  * `Field`'s member is the one `:is()` on the list, and it is deliberately not two legs: this
  * recogniser accepts exactly ONE list member, while the RING half is governed by
@@ -285,6 +291,9 @@ const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-icon-button:focus',
   '.fabricate-pagination button:focus',
   '.fabricate-search input:focus',
+  '.fabricate-slider input:focus',
+  '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
+  '.fabricate-toggle.manager-status-toggle:focus',
 ]);
 
 /** The strip half's declaration set, exactly — property to normalised value, nothing else. */
@@ -406,8 +415,9 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
 
 test('a primitive family’s focus STRIP half is recognised, and a look-alike is not', () => {
   // THE SECOND EXEMPTION, BOTH POLARITIES, in the shape the clause above uses. The positive half
-  // is the live corpus — five families, named, so a strip being renamed, split or deleted shows
-  // up here rather than as five rows quietly arriving in the baseline. The negative half is
+  // is the live corpus — eight compounds over seven families, named, so a strip being renamed,
+  // split or deleted shows up here rather than as eight rows quietly arriving in the baseline.
+  // The negative half is
   // synthetic, because the tree holds no look-alike today, and a permission nobody has tested
   // against a counterexample is a permission that will eventually exempt something real.
   const { strips } = bareFocusSelectors();
@@ -420,18 +430,30 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '.fabricate-icon-button:focus',
       '.fabricate-pagination button:focus',
       '.fabricate-search input:focus',
+      '.fabricate-slider input:focus',
+      '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
+      '.fabricate-toggle.manager-status-toggle:focus',
     ],
     'the set of primitive families declaring their own focus strip has changed. Each of the ' +
-      'five is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
+      'eight is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
       'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
       'carrying neither application root — a deliberate edit here, never a silent one. `Field` ' +
-      'and `ManagerSearchField` joined at issue 1508, when both families were rooted at the ' +
-      'class they emit; `Field`s member is ONE `:is()` compound because this recogniser accepts ' +
+      'and `ManagerSearchField` joined at issue 1508 phase 1 and `ChanceSlider` and ' +
+      '`StatusToggle` at its phase 3, as each family was rooted at the class it emits; ' +
+      '`Field`s member is ONE `:is()` compound because this recogniser accepts ' +
       'exactly one list member, while its RING half is two comma-separated legs because ' +
       '`bareElementRingRoot` reads one element per member. Both forms are asserted, here and in ' +
-      'the ring-root clause below, so neither can be "unified" into the other.'
+      'the ring-root clause below, so neither can be "unified" into the other. `StatusToggle` is ' +
+      'the one family with TWO members: its checkbox host is a `<label>`, which never matches ' +
+      '`:focus`, so that host`s strip is written on the `<input>` the label wraps while its ' +
+      'repaint stays a `:has()` ring on the label itself.'
   );
-  assert.equal(strips.length, 5, 'one strip per family, and each family declares exactly one');
+  assert.equal(
+    strips.length,
+    8,
+    'one strip per family and per host that takes focus separately — seven families, eight ' +
+      'compounds, the extra being StatusToggle`s checkbox host'
+  );
 
   // `declarationsIn` stamps the file onto each declaration and `primitiveFocusStrip` never reads
   // it back, so the synthetic rules below name the sheet only to look like what they stand for.
@@ -1263,16 +1285,24 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 11 roots over 13 blocks, every one of them
- * legitimate today, which is exactly why a twelfth would not stand out to a reader. It was 9 over
- * 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and each
- * gained the ring half of its own pair. `Field`'s is TWO comma-separated legs — `.fabricate-field
+ * Derived from the sheet rather than asserted: 12 roots over 14 blocks, every one of them
+ * legitimate today, which is exactly why a thirteenth would not stand out to a reader. It was 9
+ * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
+ * each gained the ring half of its own pair, and 11 over 13 until its third phase did the same
+ * for `ChanceSlider`. `Field`'s is TWO comma-separated legs — `.fabricate-field
  * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
  * `:is(input, textarea)` member, and that is a requirement of this population rather than a
  * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`
  * form would fall out of the list by accident of the recogniser while ringing exactly the same
  * elements at exactly the same rank as the module ring. The STRIP half is the mirror image and
  * carries the `:is()`; see {@link PRIMITIVE_FOCUS_STRIPS}.
+ *
+ * `StatusToggle` is NOT here and must not be, for a structural reason rather than an oversight:
+ * both of its repaints escape the two recognised shapes. One is a two-class compound
+ * (`.fabricate-toggle.manager-status-toggle:focus-visible`), which {@link SELF_RING_COMPOUND}'s
+ * single `.[\w-]+` cannot match; the other is a `:has()` compound on the checkbox host's
+ * `<label>`. Neither rings a BARE ELEMENT, which is the population this list is about — each
+ * paints on the family's own class — so neither belongs on it.
  */
 const RING_ROOTS = Object.freeze(
   [
@@ -1287,6 +1317,7 @@ const RING_ROOTS = Object.freeze(
     '.fabricate-pagination',
     '.fabricate-roll-prompt-dialog',
     '.fabricate-search',
+    '.fabricate-slider',
   ].sort(byCodePoint)
 );
 
@@ -1741,8 +1772,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,115 `(at-context, selector)`
-  // keys under this very keying, of which 2,996 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,120 `(at-context, selector)`
+  // keys under this very keying, of which 3,001 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

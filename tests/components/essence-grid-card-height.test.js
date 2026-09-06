@@ -141,7 +141,7 @@ function card(essence) {
   </button>
   <label class="fab-selection-checkbox"><input type="checkbox" class="fab-selection-input"><span class="fab-selection-check is-lg"><i class="fas fa-check"></i></span></label>
   <div class="fab-library-card-footer">
-    <button type="button" class="manager-status-toggle ${essence.off ? 'is-off' : 'is-on'}"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>
+    <button type="button" class="fabricate-toggle manager-status-toggle ${essence.off ? 'is-off' : 'is-on'}"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>
     <span class="fab-library-card-footer-end"><button type="button" class="fabricate-icon-button manager-icon-button manager-essence-edit"><i class="fas fa-pen"></i></button></span>
   </div>
 </li>`;

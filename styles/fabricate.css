@@ -1441,13 +1441,16 @@
 
 /* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issue 1508).
 
-   `Field` and `ManagerSearchField` are rooted at the class each of them emits, so both now render
-   in hosts carrying no `.fabricate-manager` — and the control each owns is a bare `<input>`,
-   `<select>` or `<textarea>` that would otherwise take Foundry's own font there. Where a family
-   root IS the control the floor is written at that root alone, (0,1,0), as the two button
-   families' is; where the root is NOT the control it is written at the family root plus the bare
-   element it owns, (0,1,1) — the SAME rank as the baseline above, which it therefore TIES and
-   beats on source order with that baseline's own declaration.
+   `Field`, `ManagerSearchField` and `ChanceSlider` are rooted at the class each of them emits, so
+   all three now render in hosts carrying no `.fabricate-manager` — and the control each owns is a
+   bare `<input>`, `<select>` or `<textarea>` that would otherwise take Foundry's own font there.
+   Where a family root IS the control the floor is written at that root alone, (0,1,0), as the two
+   button families' and `StatusToggle`'s are; where the root is NOT the control it is written at
+   the family root plus the bare element it owns, (0,1,1) — the SAME rank as the baseline above,
+   which it therefore TIES and beats on source order with that baseline's own declaration.
+
+   The slider's member covers BOTH inputs it owns — the `type="number"` half and the `type="range"`
+   track — because `input` names the element rather than a type, and both are the primitive's own.
 
    `font: inherit` AND NOTHING ELSE, because a tie is not a loss: any declaration this rule
    carries that the baseline does not is a real move inside the manager. `appearance` and
@@ -1460,13 +1463,14 @@
    for a measured reason. `font` is a SHORTHAND and resets `line-height` with the rest, and at
    (0,1,1) this rule ties every LATER same-rank rule in the area as well. Two of those restate a
    `font` longhand for controls these floors reach: `.fabricate-manager textarea
-   { line-height: 1.4 }` at `styles/fabricate.css:1537-1541`, in the free-text baseline block just
-   below, and `.fabricate-manager select { line-height: 1 }` at `:1663-1670`, inside `@supports
+   { line-height: 1.4 }` at `styles/fabricate.css:1541-1545`, in the free-text baseline block just
+   below, and `.fabricate-manager select { line-height: 1 }` at `:1667-1674`, inside `@supports
    (appearance: base-select)`. Declared in a family block thousands of lines further down, this
    group would win both and silently re-type every manager textarea and select. Immediately below
    the baseline is the first position from which the interval walk comes back empty. */
 .fabricate-field :is(input, select, textarea),
-.fabricate-search input {
+.fabricate-search input,
+.fabricate-slider input {
   font: inherit;
 }
 
@@ -3404,7 +3408,7 @@
 
 /* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same
    drawing — and adds only that there is nothing to press. */
-.fabricate-manager .manager-status-toggle.is-locked {
+.fabricate-toggle.manager-status-toggle.is-locked {
   cursor: default;
 }
 
@@ -7601,6 +7605,26 @@
   cursor: default;
 }
 
+/* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, at the family root ALONE (issue 1508). The switch's
+   root IS its control — a `<button>`, a `<label>` or a `<span role="img">` — so the floor is
+   written at (0,1,0), the same rank and the same shape the two button families' floor takes.
+   That is enough to beat the UA button font in a host that declares nothing, and deliberately
+   NOT enough to beat a caller's own per-site rule at (0,2,0) or the family's own
+   `.manager-status-toggle-label` type at (0,2,0) below.
+
+   Inside the manager it restates the area's own bare-element baseline
+   (`.fabricate-manager button, … textarea { font: inherit }`, near the top of this file, (0,1,1))
+   and is a no-op, because that baseline out-ranks it and declares the identical value. Its
+   position is therefore free, and it sits with the family it belongs to rather than in the
+   (0,1,1) floor group above — that group's position is load-bearing precisely because those
+   members TIE the area baseline, and this one does not.
+
+   `font: inherit` AND NOTHING ELSE, for the reason the group above states: any declaration the
+   area baseline does not also carry would be a real move inside the manager. */
+.fabricate-toggle {
+  font: inherit;
+}
+
 /* Switch (issue 643). The state colour now lives on the TRACK, and the button
    itself is a bare flex row rather than a tinted pill — so the control reads as a
    switch rather than a badge, and the row it sits in stays calm. The `is-on` /
@@ -7610,7 +7634,7 @@
    Off is NEUTRAL (bg-3 / border-strong), not amber: a disabled recipe, component
    or environment is an ordinary state, not a warning. `is-danger` keeps its tint,
    because a delete-on-depletion toggle genuinely is one. */
-.fabricate-manager .manager-status-toggle {
+.fabricate-toggle.manager-status-toggle {
   --fab-toggle-track: var(--fab-bg-3);
   --fab-toggle-track-border: var(--fab-border-strong);
   --fab-toggle-knob: var(--fab-text-secondary);
@@ -7655,13 +7679,13 @@
    position a raised neutral track with a SUBTLE knob: one hue, and the lit state is the loud
    one. `is-danger` below keeps its own family, because a delete-on-depletion toggle genuinely
    is a hazard. */
-.fabricate-manager .manager-status-toggle.is-on {
+.fabricate-toggle.manager-status-toggle.is-on {
   --fab-toggle-track: var(--fab-accent);
   --fab-toggle-track-border: var(--fab-accent-border);
   --fab-toggle-knob: var(--fab-on-accent);
 }
 
-.fabricate-manager .manager-status-toggle.is-off {
+.fabricate-toggle.manager-status-toggle.is-off {
   --fab-toggle-track: var(--fab-surface-raised);
   --fab-toggle-track-border: var(--fab-border);
   --fab-toggle-knob: var(--fab-text-subtle);
@@ -7672,7 +7696,7 @@
 /* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
    alongside `is-on` so the irreversible-delete signal lands on the toggle itself
    (the adjacent `manager-chip is-danger` alert reinforces it). */
-.fabricate-manager .manager-status-toggle.is-danger {
+.fabricate-toggle.manager-status-toggle.is-danger {
   --fab-toggle-track: var(--fab-danger);
   --fab-toggle-track-border: var(--fab-danger-border);
   --fab-toggle-knob: var(--fab-on-accent);
@@ -7694,17 +7718,17 @@
    could throw. `:disabled` cannot match a span and `.is-disabled` would be the wrong claim
    about it (nothing is disabled; there is nothing to press), so the state is excluded by
    name. */
-.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
+.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
   border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
   background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }
 
-.fabricate-manager .manager-status-toggle:focus {
+.fabricate-toggle.manager-status-toggle:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-status-toggle:focus-visible {
+.fabricate-toggle.manager-status-toggle:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
   box-shadow: none;
@@ -7713,7 +7737,7 @@
 /* 34x20 track, 14x14 knob inset 2px — the knob travels 34 - 2 - 14 - 2 = 16px,
    i.e. left:2px -> left:16px. Animated with `transform`, not `left`: it is the
    same visual travel without laying out on every frame. */
-.fabricate-manager .manager-status-toggle-track {
+.fabricate-toggle .manager-status-toggle-track {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -7727,7 +7751,7 @@
   transition: background-color 150ms ease, border-color 150ms ease;
 }
 
-.fabricate-manager .manager-status-toggle-knob {
+.fabricate-toggle .manager-status-toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -7738,11 +7762,11 @@
   transition: transform 150ms ease, background-color 150ms ease;
 }
 
-.fabricate-manager .manager-status-toggle.is-on .manager-status-toggle-knob {
+.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob {
   transform: translateX(14px);
 }
 
-.fabricate-manager .manager-status-toggle-label {
+.fabricate-toggle .manager-status-toggle-label {
   min-width: 0;
   overflow: hidden;
   color: inherit;
@@ -15665,21 +15689,21 @@
   display: block;
 }
 
-.fabricate-manager .manager-drop-rate-value {
+.fabricate-slider.manager-drop-rate-value {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-drop-rate-percent {
+.fabricate-slider .manager-drop-rate-percent {
   position: relative;
   display: block;
   color: var(--fab-text);
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
+.fabricate-slider .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   width: 100%;
   min-width: 0;
   height: 28px;
@@ -15720,8 +15744,8 @@
   positioned at `right: 6px` over the padding this reserves; the spinner used to draw
   underneath it.
 */
-.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
-.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
@@ -15734,7 +15758,7 @@
   box-shadow: none;
 }
 
-.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"] {
+.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
   right: 6px;
   top: 50%;
@@ -15742,7 +15766,7 @@
   transform: translateY(-50%);
 }
 
-.fabricate-manager .manager-drop-rate-control {
+.fabricate-slider .manager-drop-rate-control {
   --fab-drop-rate-value: 1%;
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
   --fab-chance-slider-track-gradient: var(--fab-drop-rate-color);
@@ -15754,35 +15778,35 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-drop-rate-control.is-guaranteed {
+.fabricate-slider .manager-drop-rate-control.is-guaranteed {
   --fab-drop-rate-color: var(--fab-drop-rate-guaranteed);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-common {
+.fabricate-slider .manager-drop-rate-control.is-common {
   --fab-drop-rate-color: var(--fab-drop-rate-common);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-uncommon {
+.fabricate-slider .manager-drop-rate-control.is-uncommon {
   --fab-drop-rate-color: var(--fab-drop-rate-uncommon);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-rare {
+.fabricate-slider .manager-drop-rate-control.is-rare {
   --fab-drop-rate-color: var(--fab-drop-rate-rare);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-very-rare {
+.fabricate-slider .manager-drop-rate-control.is-very-rare {
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-legendary {
+.fabricate-slider .manager-drop-rate-control.is-legendary {
   --fab-drop-rate-color: var(--fab-drop-rate-legendary);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-none {
+.fabricate-slider .manager-drop-rate-control.is-none {
   --fab-drop-rate-color: var(--fab-drop-rate-none);
 }
 
-.fabricate-manager .manager-drop-rate-track {
+.fabricate-slider .manager-drop-rate-track {
   position: absolute;
   left: var(--fab-chance-slider-thumb-radius);
   right: var(--fab-chance-slider-thumb-radius);
@@ -15797,19 +15821,19 @@
   transform: translateY(-50%);
 }
 
-.fabricate-manager .manager-drop-rate-fill {
+.fabricate-slider .manager-drop-rate-fill {
   display: block;
   width: var(--fab-drop-rate-value);
   height: 100%;
   background: var(--fab-drop-rate-color);
 }
 
-.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
+.fabricate-slider .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
   width: 100%;
   background: var(--fab-chance-slider-track-gradient);
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"] {
+.fabricate-slider .manager-drop-rate-control input[type="range"] {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
@@ -15825,14 +15849,14 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: 14px;
@@ -15843,25 +15867,48 @@
   background: var(--fab-drop-rate-color);
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-track {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-progress {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-progress {
   height: 6px;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border: 2px solid var(--fab-bg-1);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
+}
+
+/* THE SLIDER FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-search input:focus`: core's `input:focus` paints an orange outline and a 4px glow
+   that the module reset removes inside every Fabricate window, and this family now renders in
+   hosts that have no Fabricate root at all. The declarations are the module strip's verbatim, so
+   nothing moves where that reset already reaches. ONE member over the bare `input` this family
+   owns, which is both of them — the `type="number"` half and the `type="range"` track. Written
+   ABOVE the repaint because the two halves tie at (0,2,1) and a keyboard-focused input matches
+   both, so source order decides. */
+.fabricate-slider input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE SLIDER FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the
+   module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so
+   this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host,
+   where a primitive leaning on the module ring would render none. ONE member, in the
+   `<root> <element>:focus-visible` shape the ring-root recogniser reads. */
+.fabricate-slider input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
@@ -16639,8 +16686,8 @@
   max-width: 160px;
 }
 
-.fabricate-manager .manager-status-toggle.is-disabled,
-.fabricate-manager .manager-status-toggle:disabled {
+.fabricate-toggle.manager-status-toggle.is-disabled,
+.fabricate-toggle.manager-status-toggle:disabled {
   cursor: not-allowed;
 }
 
@@ -18413,13 +18460,13 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-tool-setting-toggle {
+.fabricate-toggle.manager-tool-setting-toggle {
   position: relative;
   flex: 0 0 34px;
   width: 34px;
 }
 
-.fabricate-manager .manager-tool-setting-toggle-input {
+.fabricate-toggle .manager-tool-setting-toggle-input {
   position: absolute;
   z-index: 1;
   inset: 2px 0 auto;
@@ -18430,7 +18477,30 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible) {
+/* THE STRIP HALF OF THE CHECKBOX HOST'S PAIR (issue 1508), written on the element that can
+   actually TAKE focus. The repaint below is a `:has()` ring on the `<label>` host, and a label
+   never matches `:focus` at all, so the strip cannot be written on the same element the ring
+   paints: it goes on the transparent `<input type="checkbox">` the label wraps, which is what
+   the pointer and the keyboard both land on.
+
+   RECORDED WITH IT, because it changes how this pair should be read: that input is
+   `opacity: 0` (its own block above), so NEITHER Foundry core's focus treatment nor this strip
+   is visible on it. The pair is declared because the requirement is about the PAIR — a family
+   that repaints a focus ring declares the strip that removes what it is repainting over — and
+   because the ring on the host is real chrome that now travels to a bare host. Declared
+   immediately above the repaint: the two do not tie (the strip is (0,3,0) and the repaint
+   (0,4,0)), and the ordering is the family convention rather than a cascade requirement.
+
+   WHAT IT DOES MOVE, stated because the interval walk for it is not empty: at (0,3,0) this strip
+   beats the module's own `.fabricate input:focus-visible` ring (0,2,1) on this input, where that
+   ring wins today. On an `opacity: 0` element that is zero pixels, and the ring a keyboard user
+   sees is the host's `:has()` repaint below, which nothing here touches. */
+.fabricate-toggle .manager-tool-setting-toggle-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-toggle.manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible) {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }

@@ -1448,7 +1448,7 @@ function describeBlindSpots({ sites, unbalanced, atRisk }) {
     'Specificity is COMPUTED, not measured. `manager-layout.test.js` remains the real-browser ' +
       'gate; this module tells it where to look.',
     'Custom-property indirection is NOT resolved, so a reported value change can still compute ' +
-      'identically. `.fabricate-manager .manager-status-toggle` declares ' +
+      'identically. `.fabricate-toggle.manager-status-toggle` declares ' +
       '`--fab-toggle-track: var(--fab-bg-3)`, so a winner change between `--fab-toggle-track` ' +
       'and `--fab-bg-3` is a zero-pixel change this report nevertheless prints as a change.',
     '`@media` and `@container` rules are scored like any other and carry their condition in the ' +

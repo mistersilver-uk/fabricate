@@ -89,7 +89,19 @@
   }
 </script>
 
-<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>
+<!-- THE FAMILY ROOT, WRITTEN INLINE (issue 1508). This component composes no class array — it
+     writes every class it emits as a literal — so its namespace root is the FIRST token of this
+     root element's own attribute, exactly as `Pagination.svelte` writes its. Every rule this
+     family owns is rooted at that class in `styles/fabricate.css`: the one naming this element
+     itself as a COMPOUND, and every other as a descendant chain beneath it. A hand-built
+     fixture that copies this tree therefore has to copy the root as well — one that copies only
+     the descendant is a mirror with no root above it, which measures an unstyled default while
+     still reporting on this primitive by name.
+
+     The root also carries the family's font FLOOR for the two `<input>`s below, which is declared
+     as `.fabricate-slider input` beside the other families' floors near the top of the sheet
+     rather than in this family's own block. -->
+<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-chance-slider>
   <span class="manager-chance-slider-number manager-drop-rate-percent">
     <input
       {...numberInputProps}

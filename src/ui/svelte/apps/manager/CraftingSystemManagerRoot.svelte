@@ -14151,7 +14151,7 @@
                               <div class="manager-character-modifier-override-row">
                                 <button
                                   type="button"
-                                  class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                                  class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
                                   aria-pressed={hasOverride}
                                   aria-label={text(
                                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
@@ -14551,7 +14551,7 @@
                           <div class="manager-character-modifier-override-row">
                             <button
                               type="button"
-                              class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                              class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
                               aria-pressed={hasOverride}
                               aria-label={text(
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',

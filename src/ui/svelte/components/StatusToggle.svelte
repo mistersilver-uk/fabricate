@@ -59,14 +59,28 @@
   that compiles anything rendering it, and a missing entry HANGS that suite as
   `# cancelled` rather than failing it — and this leaf is rendered by 25 components.
 
+  ── THE FAMILY ROOT, AND WHY IT LEADS THE ARRAY (issue 1508) ──────────────────────
+  `fabricate-toggle` is the class this family's stylesheet rules are rooted at, so the
+  switch paints in a host carrying no `.fabricate-manager` — which is the whole of what
+  the re-root buys. Its POSITION at the head of the array is a constraint rather than a
+  style note. `tests/components/searchable-popover-area-scope.test.js` reads this array
+  by taking the first `]` after the opener, and the first `]` in this array is
+  `HOST_CLASSES[host]`'s own — so only the literals BEFORE that expression are read, and
+  a root moved below it is a root that gate reports as unemitted while every re-rooted
+  rule in the sheet keeps matching.
+
+  The same gate reads `HOST_CLASSES` itself, through its `classMaps` field, because
+  `manager-tool-setting-toggle` reaches the DOM from that frozen map rather than from
+  this array or from the markup — and two shipped rules name it.
+
   ── CLASS ORDER IS DELIBERATE ─────────────────────────────────────────────────────
-  `manager-status-toggle`, then the host's own class, then the caller's extra, then the
-  state. That is not an aesthetic choice: it is the order all 37 hand-rolled sites
-  already wrote (`manager-status-toggle manager-environment-override-toggle is-on`,
-  `manager-status-toggle is-locked is-on`), so every converted site emits a
-  byte-identical class attribute and the conversion is a no-op in the DOM as well as on
-  screen. Class order changes no cascade; reproducing it is what makes the diff
-  reviewable.
+  The family root, then `manager-status-toggle`, then the host's own class, then the
+  caller's extra, then the state. Everything after the root is the order all 37
+  hand-rolled sites already wrote (`manager-status-toggle
+  manager-environment-override-toggle is-on`, `manager-status-toggle is-locked is-on`),
+  so every converted site emits the same class attribute with one token PREPENDED and
+  the conversion is a no-op on screen. Class order changes no cascade; reproducing it is
+  what makes the diff reviewable.
 
   Props:
    - as: `'button'` (default), `'indicator'` or `'checkbox'`. A CLOSED set — see above.
@@ -97,6 +111,17 @@
      elements the component itself writes and a `class` handed to a child is forwarded
      verbatim. `RecipeItemEditor.svelte` shipped exactly one such rule and carries the
      `:global(...)` repair.
+
+  `data-keyboard-focus="true"` is written on the BUTTON host only, and on the SAME SIDE
+  of the rest spread as `class={classes}` — the placement is prescribed rather than
+  incidental (issues 1502 and 1508). A spread that lands LATER wins, so a caller's own
+  `data-*` bag could unset the attribute by accident if it were written after the
+  spread, and deliberately if a call site ever needs to. Only the button host takes it:
+  the indicator is a `<span role="img">` and the checkbox host renders a native
+  `<input type="checkbox">`, which Foundry's `KeyboardManager#hasFocus` already treats
+  as focused on its own. While a button-hosted switch outside a `<form>` holds focus,
+  Foundry's Space/arrow/Tab bindings stop firing — the intended behaviour change, not a
+  side effect.
 
   Every other attribute — `data-*` hooks, `aria-labelledby`, `title`, `onkeydown` — is
   forwarded through the rest spread onto THE HOST'S INTERACTIVE ELEMENT: the `<button>`,
@@ -159,6 +184,7 @@
 
   const classes = $derived(
     [
+      'fabricate-toggle',
       'manager-status-toggle',
       HOST_CLASSES[host] ?? '',
       extraClass,
@@ -230,6 +256,7 @@
   <button
     type="button"
     class={classes}
+    data-keyboard-focus="true"
     aria-pressed={on}
     aria-label={accessibleName}
     {disabled}

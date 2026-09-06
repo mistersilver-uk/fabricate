@@ -153,7 +153,7 @@ function managerRows() {
           <p>Recipe, component, essence, and environment management</p>
         </div>
       </div>
-      <button type="button" class="manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
+      <button type="button" class="fabricate-toggle manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
         <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>

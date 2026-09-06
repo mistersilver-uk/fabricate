@@ -709,16 +709,16 @@ test('manager systems text and action cells are constrained at normal widths', (
 });
 
 test('manager systems status cells use stable interactive on-off toggles', () => {
-  const toggleBlock = blockFor('.fabricate-manager .manager-status-toggle');
-  const onBlock = blockFor('.fabricate-manager .manager-status-toggle.is-on');
-  const offBlock = blockFor('.fabricate-manager .manager-status-toggle.is-off');
-  const trackBlock = blockFor('.fabricate-manager .manager-status-toggle-track');
-  const knobBlock = blockFor('.fabricate-manager .manager-status-toggle-knob');
+  const toggleBlock = blockFor('.fabricate-toggle.manager-status-toggle');
+  const onBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-on');
+  const offBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-off');
+  const trackBlock = blockFor('.fabricate-toggle .manager-status-toggle-track');
+  const knobBlock = blockFor('.fabricate-toggle .manager-status-toggle-knob');
   const onKnobBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle.is-on .manager-status-toggle-knob'
+    '.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob'
   );
-  const focusBlock = blockFor('.fabricate-manager .manager-status-toggle:focus');
-  const focusVisibleBlock = blockFor('.fabricate-manager .manager-status-toggle:focus-visible');
+  const focusBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus');
+  const focusVisibleBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus-visible');
 
   assert.ok(
     toggleBlock.includes('appearance: none;'),
@@ -780,7 +780,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // the button is inert. The hover affordance has to live on the TRACK, which is the
   // part with an edge — otherwise every switch in the manager has no hover state at all.
   const toggleHoverBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
+    '.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
@@ -2658,58 +2658,58 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-component-button .manager-system-name'
   );
   const dropRateBlock = blockFor('.fabricate-manager .manager-drop-rate-cell');
-  const dropRateValueBlock = blockFor('.fabricate-manager .manager-drop-rate-value');
-  const dropRatePercentBlock = blockFor('.fabricate-manager .manager-drop-rate-percent');
+  const dropRateValueBlock = blockFor('.fabricate-slider.manager-drop-rate-value');
+  const dropRatePercentBlock = blockFor('.fabricate-slider .manager-drop-rate-percent');
   const dropRatePercentInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-percent input:is([type="text"], [type="number"])'
+    '.fabricate-slider .manager-drop-rate-percent input:is([type="text"], [type="number"])'
   );
   const dropRatePercentInputOverrideBlock = blockFor(
     '.fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"])'
   );
   const dropRatePercentSuffixBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"]'
+    '.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"]'
   );
-  const dropRateControlBlock = blockFor('.fabricate-manager .manager-drop-rate-control');
+  const dropRateControlBlock = blockFor('.fabricate-slider .manager-drop-rate-control');
   const guaranteedDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-guaranteed'
+    '.fabricate-slider .manager-drop-rate-control.is-guaranteed'
   );
   const commonDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-common'
+    '.fabricate-slider .manager-drop-rate-control.is-common'
   );
   const uncommonDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-uncommon'
+    '.fabricate-slider .manager-drop-rate-control.is-uncommon'
   );
   const rareDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-rare'
+    '.fabricate-slider .manager-drop-rate-control.is-rare'
   );
   const veryRareDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-very-rare'
+    '.fabricate-slider .manager-drop-rate-control.is-very-rare'
   );
   const legendaryDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-legendary'
+    '.fabricate-slider .manager-drop-rate-control.is-legendary'
   );
   const noneDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-none'
+    '.fabricate-slider .manager-drop-rate-control.is-none'
   );
-  const dropRateTrackBlock = blockFor('.fabricate-manager .manager-drop-rate-track');
-  const dropRateFillBlock = blockFor('.fabricate-manager .manager-drop-rate-fill');
+  const dropRateTrackBlock = blockFor('.fabricate-slider .manager-drop-rate-track');
+  const dropRateFillBlock = blockFor('.fabricate-slider .manager-drop-rate-fill');
   const continuousGradientFillBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill'
+    '.fabricate-slider .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill'
   );
   const dropRateRangeBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]'
   );
   const dropRateWebkitTrackBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track'
   );
   const dropRateWebkitThumbBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb'
   );
   const dropRateMozProgressBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-progress'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-progress'
   );
   const dropRateMozThumbBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-thumb'
   );
   const toolBreakageChanceControlBlock = blockFor(
     '.fabricate-manager .manager-tool-breakage-chance-control'
@@ -3130,7 +3130,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;'
+      '.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;'
     ) && css.includes('pointer-events: none;'),
     'drop chance row percent suffix should keep its existing placement'
   );
@@ -3175,7 +3175,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-track'
+      '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-track'
     ).includes('border: 0;'),
     'the Firefox native track should stay invisible behind the inset shared rail'
   );
@@ -3484,6 +3484,21 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
 });
 
+// EACH CONTROL IS WRAPPED IN A BARE `<span class="fabricate-slider">` (issue 1508), and the shape
+// of the repair is load-bearing rather than cosmetic. `ChanceSlider` writes
+// `manager-drop-rate-control` on a CHILD of its root span, so every rule this fixture depends on
+// re-roots to a DESCENDANT chain — `.fabricate-slider .manager-drop-rate-control`,
+// `.fabricate-slider .manager-drop-rate-track`, `.fabricate-slider .manager-drop-rate-fill` and the
+// six `input[type="range"]` rules beneath them. A token added to the control ELEMENT matches none
+// of those, so it would satisfy `searchable-popover-area-scope.test.js`'s ancestry clause — which
+// reads an element's own classes as part of its ancestry — while leaving this test measuring an
+// unstyled span, and the `leftInset` assertion below is the only thing in the repository that can
+// tell the two repairs apart.
+//
+// The wrapper moves nothing it is measuring: no rule matches `.fabricate-slider` alone (every
+// family rule is either a compound with a `manager-*` class or a descendant chain), each control
+// keeps its own inline `width: 240px`, and every assertion below is relative to the control's own
+// rect.
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
   const context = await sharedBrowser.newContext({
     viewport: { width: 640, height: 240 },
@@ -3495,6 +3510,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
     await page.setContent(`
       <style>${css}</style><style>${partiesTabScoped.css}</style>
       <main class="fabricate-manager" style="padding: 24px;">
+        <span class="fabricate-slider">
         <span
           class="manager-drop-rate-control has-continuous-gradient"
           data-slider="tool"
@@ -3503,6 +3519,8 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
           <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
           <input type="range" min="0" max="100" value="62">
         </span>
+        </span>
+        <span class="fabricate-slider">
         <span
           class="manager-drop-rate-control is-uncommon"
           data-slider="gathering"
@@ -3510,6 +3528,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
         >
           <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
           <input type="range" min="0" max="100" value="40">
+        </span>
         </span>
       </main>
     `);
@@ -7163,7 +7182,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
             `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"><div class="${view}">` +
             '<div class="manager-gathering-task-drop-row" role="row" style="width:640px">' +
             '<span role="cell" class="manager-drop-cell manager-drop-rate-cell">' +
-            '<span class="manager-chance-slider manager-drop-rate-value">' +
+            '<span class="fabricate-slider manager-chance-slider manager-drop-rate-value">' +
             '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
             'style="--fab-drop-rate-value:90%; --fab-drop-rate-color:#5EC3B0;">' +
             '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
@@ -7286,7 +7305,7 @@ test('the gathering inspector rail cards render as one card, not three treatment
 // because the conversion moved those fields from `[type="text"]` to `[type="number"]`, so a
 // stylesheet still keyed on the old type would leave them unstyled and this would catch it.
 const CHANCE_SLIDER_FIXTURE =
-  '<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
+  '<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
   '<span class="manager-chance-slider-number manager-drop-rate-percent">' +
   '<input type="number" min="0" max="100" step="1" value="80" aria-label="Chance"/>' +
   '<span aria-hidden="true">%</span></span>' +
@@ -8686,10 +8705,10 @@ test('the locked activation indicator offers no hover affordance', async () => {
   try {
     await page.setContent(
       `<style>${css}</style><div class="fabricate-manager">` +
-        `<button type="button" class="manager-status-toggle is-on" id="live">` +
+        `<button type="button" class="fabricate-toggle manager-status-toggle is-on" id="live">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></button>` +
-        `<span class="manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="fabricate-toggle manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></span>` +
         `</div>`

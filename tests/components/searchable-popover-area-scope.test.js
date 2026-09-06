@@ -109,17 +109,20 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Eleven shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Fifteen shared primitives, each with the namespace roots it writes and the class family it owns.
  *
  * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
  * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
- * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field` and
- * `ManagerSearchField` (issue 1508). NONE of the issue-1508 families portals anything, so one
+ * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field`,
+ * `ManagerSearchField`, `ManagerToolbar`, `InspectorCard`, `StatusToggle` and `ChanceSlider`
+ * (issue 1508). NONE of the issue-1508 families portals anything, so one
  * root each is the whole requirement. A `composesClasses: true` entry
  * opts into reading the `const classes = $derived([…])` array literal (`composedClassRegion`)
  * ALONGSIDE the ordinary markup region, because `class={classes}` is an identifier rather than a
  * `class="…"` string or a `` class={`…`} `` template, so the ordinary markup-only extractors find
- * nothing for either button primitive on their own.
+ * nothing for either button primitive on their own. A `classMaps` entry opts into a THIRD reader
+ * (`classMapRegion`) for a family class the component chooses per host out of a frozen map in
+ * `<script>`, which neither of the other two regions covers; only `StatusToggle` declares one.
  *
  * `family` is a PREFIX pattern rather than a class list because the list is derived from markup:
  * it decides which of the component's classes belong to the primitive's own family, so that
@@ -606,6 +609,110 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-inspector-card', root: 'fabricate-card' }),
     ]),
   }),
+  Object.freeze({
+    // ── STATUSTOGGLE (issue 1508). The manager's on/off switch, rooted at the class it emits.
+    //
+    // Its root IS its control — a `<button>`, a `<label>` or a `<span role="img">` — so the font
+    // floor is written at the family root ALONE, (0,1,0), the shape `ManagerButton` and
+    // `IconButton` take. The family already declared its own focus PAIR before this change
+    // (`:focus` strip plus `:focus-visible` repaint, both (0,3,0)); both were re-rooted IN PLACE
+    // rather than replaced, at unchanged specificity and unchanged declarations.
+    name: 'StatusToggle',
+    components: Object.freeze(['src/ui/svelte/components/StatusToggle.svelte']),
+    roots: Object.freeze(['fabricate-toggle']),
+    // TWO prefixes, because this family really is two: the switch tree (`manager-status-toggle`
+    // and its `-track`/`-knob`/`-label` children) and the checkbox host's own structural pair
+    // (`manager-tool-setting-toggle` and its `-input`), which the component emits per host.
+    // `manager-tool-settings-*` and the rest of the Tool Studio's vocabulary are CALLER classes
+    // and match neither prefix.
+    family: 'manager-status-toggle[\\w-]*|manager-tool-setting-toggle[\\w-]*',
+    anchors: Object.freeze([
+      'manager-status-toggle',
+      'manager-status-toggle-track',
+      'manager-status-toggle-knob',
+      'manager-status-toggle-label',
+      'manager-tool-setting-toggle',
+      'manager-tool-setting-toggle-input',
+    ]),
+    // COMPOSES its family in `const classes = $derived([…])`, and DECLARES A CLASS MAP besides.
+    // The two readers are not interchangeable here: `composedClassRegion` truncates at the first
+    // `]` in the file after the array opener, and in this component's array that `]` is
+    // `HOST_CLASSES[host]`'s own — so the composed reader sees the root and
+    // `manager-status-toggle` and stops, and `manager-tool-setting-toggle` reaches the family
+    // only through `classMaps`.
+    composesClasses: true,
+    classMaps: Object.freeze(['HOST_CLASSES']),
+    // Measured at this commit: 6 written, 25 family selectors, 18 owned — 7 exempt (all ancestor
+    // chains naming a caller's own row or card) and 0 caller-CLASS compounds. SEVENTEEN of the 18
+    // are re-rooted shipped rules and the eighteenth is the checkbox host's new `:focus` strip,
+    // which this change ADDS and which enters the family through
+    // `manager-tool-setting-toggle-input`; before it landed the pair was 24 and 17.
+    //
+    // BOTH of the checkbox host's shipped rules are owned ONLY because of the class map above.
+    // Without it `written` is 5, the family is 24 and owned is 16: `.manager-tool-setting-toggle`
+    // falls outside the family altogether, and the `:has()` ring that also names it is judged
+    // caller-owned. The clause below measures that difference rather than restating it.
+    writtenFloor: 5,
+    familyFloor: 21,
+    ownedFloor: 15,
+    // TWO anchors, and the second matches ZERO fixtures today — measured, and recorded here
+    // rather than left out because of it. Both of the checkbox host's rules are re-rooted at
+    // `fabricate-toggle` by this change, so a future fixture writing `manager-tool-setting-toggle`
+    // on its own would be a root-less mirror measuring an unstyled default, and with no entry
+    // here there would be no gate signal at all.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-status-toggle', root: 'fabricate-toggle' }),
+      Object.freeze({ anchor: 'manager-tool-setting-toggle', root: 'fabricate-toggle' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── CHANCESLIDER (issue 1508). The number-plus-range percentage control, rooted at the class
+    // it emits.
+    //
+    // It owns TWO controls — its `<input type="number">` and its `<input type="range">` — and its
+    // root is a `<span>` that is neither, so its font floor is `.fabricate-slider input` at
+    // (0,1,1) in the group below the area baseline, and its focus pair is written over the same
+    // bare `input`. It needs no `appearance`/`min-height` restatement: the area's element-typed
+    // baseline matches neither `type="number"` nor `type="range"`, and the family's own rules
+    // declare the 28px heights both halves take.
+    name: 'ChanceSlider',
+    components: Object.freeze(['src/ui/svelte/components/ChanceSlider.svelte']),
+    roots: Object.freeze(['fabricate-slider']),
+    // TWO prefixes again, and for a plainer reason: this component writes eight classes across
+    // two naming generations. `manager-drop-rate-cell` and `manager-drop-rate-editor` are CALLER
+    // classes — the component writes neither — so no rule naming one enters this family, which is
+    // why `pickerSelectors` is anchored on the written NAMES rather than on this pattern.
+    family: 'manager-chance-slider[\\w-]*|manager-drop-rate[\\w-]*',
+    anchors: Object.freeze([
+      'manager-chance-slider',
+      'manager-chance-slider-number',
+      'manager-chance-slider-control',
+      'manager-drop-rate-value',
+      'manager-drop-rate-percent',
+      'manager-drop-rate-control',
+      'manager-drop-rate-track',
+      'manager-drop-rate-fill',
+    ]),
+    // NO `composesClasses`: this component writes every class it emits as a literal, its root
+    // inline on the root `<span>` exactly as `Pagination` does. Two of the eight arrive through a
+    // `` class={`…`} `` template, which `classAttributeValues` already reads.
+    // Measured at this commit: 8 written, 35 family selectors, 22 owned — 12 exempt (the
+    // gathering task editor's and the drop editor card's own overrides) and 1 caller-CLASS
+    // compound, `.manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill`.
+    // TWENTY-THREE are re-rooted: the 22 owned plus that compound, whose modifier is a caller's
+    // and which would be split from the fill rule it overrides if it stayed behind.
+    writtenFloor: 7,
+    familyFloor: 31,
+    ownedFloor: 20,
+    // The ROOT-ELEMENT anchor, which is what a fixture copying this tree has to carry. Its two
+    // ancestry-only mirrors in `manager-layout.test.js` carry `manager-drop-rate-control`
+    // instead — a class this component writes on a CHILD — so they are repaired by WRAPPING them
+    // in the root element the mirror omitted rather than by a token, because every rule naming
+    // that class re-roots to a DESCENDANT chain that a token on the element itself never matches.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-chance-slider', root: 'fabricate-slider' }),
+    ]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -714,6 +821,61 @@ function composedClassRegion(file) {
       'than deleting the assertion.'
   );
   return source.slice(open, close + 1);
+}
+
+/**
+ * The text of a frozen class MAP a component declares in `<script>` — `const <NAME> =
+ * Object.freeze({…})` — located by that exact opener and its matching `}`.
+ *
+ * WHY A SECOND READER, AND WHY IT IS OPT-IN (issue 1508). A family class a component chooses PER
+ * HOST lives in neither region the two readers above cover. `StatusToggle`'s `HOST_CLASSES`
+ * is the shipped instance: `manager-tool-setting-toggle` reaches the DOM through
+ * `HOST_CLASSES[host]` inside the composed array, and neither `markupRegion` (which slices after
+ * `</script>`) nor `composedClassRegion` (which truncates at the FIRST `]`, which is that
+ * expression's own) can see the string. Without this reader the family is short by one class and
+ * TWO shipped rules are invisible to the ownership assertions below — one outside `family`
+ * altogether and one inside it but judged caller-owned — while the gate reports the family clean.
+ *
+ * Opt-in per entry through `classMaps`, and only `StatusToggle` declares it. `ManagerSearchField`'s
+ * `SIZE_CLASSES` needs nothing: an `is-*` token is already accepted by `isPrimitiveOwned`.
+ *
+ * NAMED-ERROR DISCIPLINE, the same as `markupRegion` and `composedClassRegion`: a declared map the
+ * reader cannot find is an EXTRACTOR failure and not an empty result, because falling silent here
+ * puts the family back exactly where it was before this reader existed and the gate goes on
+ * reporting it clean.
+ *
+ * @param {string} file Repository-relative component path.
+ * @param {string} constName The map's declared name.
+ * @returns {string} The object literal's text, braces included.
+ */
+function classMapRegion(file, constName) {
+  const source = read(file);
+  const opener = `const ${constName} = Object.freeze({`;
+  const at = source.indexOf(opener);
+  assert.ok(
+    at !== -1,
+    `${file} no longer declares \`${opener}\`, so the class map this gate reads cannot be ` +
+      'located. Retarget the extractor rather than deleting the assertion.'
+  );
+  const open = source.indexOf('{', at + opener.length - 1);
+  let depth = 0;
+  let end = -1;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        end = index;
+        break;
+      }
+    }
+  }
+  assert.ok(
+    end !== -1,
+    `${file}'s \`${constName}\` object literal never closes, so the class map this gate reads ` +
+      'cannot be located. Retarget the extractor rather than deleting the assertion.'
+  );
+  return source.slice(open, end + 1);
 }
 
 /** The unconditional string literals inside a composed-class array — the tokens no caller omits. */
@@ -831,6 +993,23 @@ function classValuesFor(primitive, file) {
 }
 
 /**
+ * The class-map values a primitive declares, one value per map, whitespace-joined.
+ *
+ * Kept OUT of `classValuesFor` on purpose. That function feeds the root-emission clause, and a
+ * namespace root belongs on an element the primitive writes rather than in a per-host map — so
+ * folding a map into it would let a future entry satisfy the emission clause with a root that
+ * only some hosts render. The family reader (`classesWrittenBy`) is the one that needs the map,
+ * and it reads it directly.
+ *
+ * @param {{classMaps?: readonly string[]}} primitive
+ * @param {string} file Repository-relative component path.
+ * @returns {string[]} One value per declared map.
+ */
+function classMapValues(primitive, file) {
+  return (primitive.classMaps ?? []).map((name) => classMapRegion(file, name));
+}
+
+/**
  * Every family class the primitive puts on an element of its own.
  *
  * The class-prop VALUES join the region (issue 1504) for the same reason `classValuesFor` counts
@@ -847,6 +1026,9 @@ function classesWrittenBy(primitive) {
     const region = [
       markup,
       primitive.composesClasses ? composedClassRegion(file) : '',
+      // And every DECLARED class map (issue 1508), for the reason `classMapRegion` states: a
+      // family class chosen per host lives in `<script>` in neither of the two regions above.
+      ...(primitive.classMaps ?? []).map((name) => classMapRegion(file, name)),
       ...classPropValues(primitive, file, markup),
     ].join(' ');
     for (const cls of region.match(new RegExp(primitive.family, 'g')) ?? []) {
@@ -1254,6 +1436,79 @@ test('the composed-class region is read from the actual array literal, not the m
   }
 });
 
+test('the class-map reader is what puts the per-host class in the family, and it fires', () => {
+  // CLAUSE (d), and the shape is the composed-region clause's above: a reader that stopped
+  // finding the map must RED rather than fall back to the two regions that cannot see it,
+  // because falling back puts the family exactly where it was before this reader existed —
+  // short by one class, with two shipped rules unexamined — while every assertion below goes on
+  // reporting the family clean.
+  const toggle = PRIMITIVES.find((entry) => entry.name === 'StatusToggle');
+  assert.deepEqual(
+    toggle.classMaps,
+    ['HOST_CLASSES'],
+    'StatusToggle is the one entry that declares a class map, and this clause is stated over it'
+  );
+
+  // POSITIVE CONTROL 1: the region really holds the string.
+  const region = classMapRegion(toggle.components[0], 'HOST_CLASSES');
+  assert.ok(
+    region.includes("'manager-tool-setting-toggle'"),
+    `${toggle.components[0]}'s HOST_CLASSES no longer contains the class this gate reads for the ` +
+      'checkbox host, so a reader that stops finding the map would examine a family short by one ' +
+      'class instead of reporting the regression'
+  );
+  // AND THE OTHER TWO REGIONS CANNOT SEE IT, which is the whole reason the reader exists. The
+  // composed region truncates at the first `]` in the file after the array opener, and in this
+  // component that `]` is `HOST_CLASSES[host]`'s own.
+  assert.ok(
+    !markupRegion(toggle.components[0]).includes('manager-tool-setting-toggle"') &&
+      !composedClassRegion(toggle.components[0]).includes('manager-tool-setting-toggle'),
+    'the checkbox host class has moved into the markup or into the composed array, so this ' +
+      'reader is no longer the thing that credits it and the control below proves nothing'
+  );
+
+  // POSITIVE CONTROL 2: dropping the field really costs the family those two rules. Stated as a
+  // measured DIFFERENCE rather than as remembered numbers, over a copy of the entry with
+  // `classMaps` removed — the exact state the tree was in before this reader landed.
+  const withoutMap = Object.freeze({ ...toggle, classMaps: undefined });
+  const withMap = classesWrittenBy(toggle);
+  const without = classesWrittenBy(withoutMap);
+  assert.ok(
+    withMap.has('manager-tool-setting-toggle') && !without.has('manager-tool-setting-toggle'),
+    'the class map is not what credits `manager-tool-setting-toggle`, so dropping it costs the ' +
+      'family nothing and this control is vacuous'
+  );
+
+  const family = (entry, written) => pickerSelectors(written, entry);
+  const lost = family(toggle, withMap).filter(
+    (selector) => !family(withoutMap, without).includes(selector)
+  );
+  assert.deepEqual(
+    lost.sort(),
+    ['.fabricate-toggle.manager-tool-setting-toggle'],
+    'dropping the class map must take the checkbox host`s own 34px box out of the family ' +
+      'altogether — that selector names no other class this primitive writes, so without the ' +
+      'reader nothing in this file examines it at all'
+  );
+
+  // AND THE OWNERSHIP HALF: the `:has()` ring stays IN the family without the map (it enters
+  // through `-toggle-input`) but is judged CALLER-owned there, because the host class it also
+  // names is not in `written`. Two rules unexamined, by two different mechanisms, from one
+  // missing reader.
+  const ownedWith = family(toggle, withMap).filter((selector) =>
+    isPrimitiveOwned(selector, withMap, toggle)
+  );
+  const ownedWithout = family(withoutMap, without).filter((selector) =>
+    isPrimitiveOwned(selector, without, withoutMap)
+  );
+  assert.equal(
+    ownedWith.length - ownedWithout.length,
+    2,
+    'the class map must move exactly two selectors into the owned set — the checkbox host`s box ' +
+      'and the `:has()` ring on it. Neither is re-rooted without it, and the sheet reports clean.'
+  );
+});
+
 test('the application-root-attribute clause names a caller’s own container', () => {
   const managerButton = PRIMITIVES.find((entry) => entry.name === 'ManagerButton');
   const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
@@ -1550,15 +1805,16 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 152,
+    attributes >= 163,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 152. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1508 phase 2: 169 today, against 143 before ' +
-      '`ManagerToolbar` and `InspectorCard` joined the array and 113 before `Field` and ' +
+      'of 163. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1508 phase 3: 181 today, against 169 before ' +
+      '`StatusToggle` and `ChanceSlider` joined the array, 143 before `ManagerToolbar` and ' +
+      '`InspectorCard` did and 113 before `Field` and ' +
       '`ManagerSearchField` did. The floor stood at 54 against a population that had already ' +
       'grown to 113 — issue 1504 added `Select` without re-measuring — so the phase-1 raise was ' +
       'both a raise for two new families and the repair of a margin that had drifted to half ' +
-      'the population, and this one keeps it at the ten per cent this file states as its ' +
+      'the population, and each raise since keeps it at the ten per cent this file states as its ' +
       'convention.'
   );
 
@@ -1668,13 +1924,17 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 243,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 243. A ` +
+    elements >= 289,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 289. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing. RE-MEASURED at issue 1508 phase 2: 270 today, against 244 ' +
-      'before `ManagerToolbar` and `InspectorCard` joined the array and 214 before `Field` and ' +
+      'below holds over nothing. RE-MEASURED at issue 1508 phase 3: 321 today, against 270 ' +
+      'before `StatusToggle` and `ChanceSlider` joined the array, 244 before `ManagerToolbar` and ' +
+      '`InspectorCard` did and 214 before `Field` and ' +
       '`ManagerSearchField` did — the same drifted margin the attribute floor above records, ' +
-      'kept at the ten per cent this file states as its convention.'
+      'kept at the ten per cent this file states as its convention. This clause grows faster ' +
+      'than the attribute one for both new families, and that is the difference the two clauses ' +
+      'exist to keep apart: it counts every fixture ELEMENT in a family, so a switch fixture ' +
+      'brings its track, its knob and its label with it and a slider fixture brings five.'
   );
 
   assert.deepEqual(

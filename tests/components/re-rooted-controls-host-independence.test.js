@@ -178,6 +178,31 @@ const CARD_CLASSES = composedClasses(
   'InspectorCard'
 ).join(' ');
 
+/**
+ * `StatusToggle`'s array holds MORE than its unconditional literals — the host's own class, the
+ * caller's extra and the state modifier all follow — but the reader above stops at the array's
+ * first `]`, which in this component is `HOST_CLASSES[host]`'s own. So it sees exactly the two
+ * literals a default `button`-host render emits first, which is what the fixture writes.
+ *
+ * That truncation is not a limitation being worked around here: it is the CONSTRAINT the
+ * area-scope gate depends on, and asserting `[0]` below says so out loud.
+ */
+const TOGGLE_CLASSES = composedClasses(
+  read('src/ui/svelte/components/StatusToggle.svelte'),
+  'StatusToggle'
+).join(' ');
+
+/**
+ * `ChanceSlider` composes nothing: it writes every class it emits as a literal, its root inline on
+ * its root `<span>`, so its contract is read from the markup exactly as `Pagination`'s is.
+ */
+const SLIDER_CLASSES = (() => {
+  const source = read('src/ui/svelte/components/ChanceSlider.svelte');
+  const match = source.match(/class="(fabricate-slider[^"]*)"/);
+  assert.ok(match, 'ChanceSlider must write its family root inline on its root element');
+  return match[1];
+})();
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -188,7 +213,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the seven class strings under measurement are the ones the primitives emit', () => {
+test('the nine class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -196,6 +221,8 @@ test('the seven class strings under measurement are the ones the primitives emit
   assert.equal(SEARCH_CLASSES, 'fabricate-search manager-search');
   assert.equal(TOOLBAR_CLASSES, 'fabricate-filter-bar manager-toolbar');
   assert.equal(CARD_CLASSES, 'fabricate-card manager-inspector-card');
+  assert.equal(TOGGLE_CLASSES, 'fabricate-toggle manager-status-toggle');
+  assert.equal(SLIDER_CLASSES, 'fabricate-slider manager-chance-slider manager-drop-rate-value');
 
   // AND THE ROOT IS THE ARRAY'S FIRST LITERAL, for both. This is a CONSTRAINT rather than a
   // style note: `searchable-popover-area-scope.test.js` reads the composed region by taking the
@@ -206,6 +233,7 @@ test('the seven class strings under measurement are the ones the primitives emit
     ['src/ui/svelte/components/ManagerSearchField.svelte', 'ManagerSearchField', 'fabricate-search'],
     ['src/ui/svelte/components/ManagerToolbar.svelte', 'ManagerToolbar', 'fabricate-filter-bar'],
     ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
+    ['src/ui/svelte/components/StatusToggle.svelte', 'StatusToggle', 'fabricate-toggle'],
   ]) {
     assert.equal(
       composedClasses(read(file), label)[0],
@@ -312,6 +340,35 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<section class="fabricate-card manager-inspector-card" data-probe="${host}-card"><h3>Matching evidence</h3><p>Body</p></section>`,
   }),
+  // THE PROBE IS THE ROOT AGAIN FOR THE TOGGLE, and here that is not a shortcut either: the
+  // switch's root IS its control, a `<button>`, which is why its font floor is written at the
+  // family root alone. Its track and knob are measured as separate probes below, because the
+  // 34x20 / 14x14 geometry the switch is recognisable by lives on those two children and a
+  // comparison on the button alone would not see it move.
+  Object.freeze({
+    id: 'toggle',
+    classes: TOGGLE_CLASSES,
+    // OPTED OUT OF THE BOX COMPARISON, for the field's reason and no other. The switch's own box
+    // is `width: auto`, solved from its content, and its content is the 34x20 TRACK — which
+    // declares a 1px border over a 34x20 size and therefore lays out at 36x22 wherever
+    // `box-sizing` falls to `content-box`. That is this core-less harness outside
+    // `.fabricate-manager`, and it is nowhere in Foundry, where core's `@layer reset` declares the
+    // universal rule for every host. Both halves are asserted by the box-sizing clause below, so
+    // the opt-out cannot outlive its reason.
+    comparesBox: false,
+    markup: (host) =>
+      `<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="${host}-toggle" data-keyboard-focus="true"><span class="manager-status-toggle-track" data-probe="${host}-toggle-track"><span class="manager-status-toggle-knob" data-probe="${host}-toggle-knob"></span></span><span class="manager-status-toggle-label" data-probe="${host}-toggle-label">On</span></button>`,
+  }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE SLIDER. Its root `<span>` is neither of the two controls
+  // it owns, so the root carries the class string the pinning test reads while the number input,
+  // the range input, the rail and the fill each carry a probe of their own — those are what the
+  // family's rules actually paint.
+  Object.freeze({
+    id: 'slider',
+    classes: SLIDER_CLASSES,
+    markup: (host) =>
+      `<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-probe="${host}-slider-root" data-chance-slider><span class="manager-chance-slider-number manager-drop-rate-percent" data-probe="${host}-slider-percent"><input type="number" min="0" max="100" step="1" value="40" data-probe="${host}-slider-number"><span aria-hidden="true">%</span></span><span class="manager-chance-slider-control manager-drop-rate-control is-common" data-probe="${host}-slider" style="width: 240px; --fab-drop-rate-value: 40%;"><span class="manager-drop-rate-track" data-probe="${host}-slider-track"><span class="manager-drop-rate-fill" data-probe="${host}-slider-fill"></span></span><input type="range" min="0" max="100" step="1" value="40" data-probe="${host}-slider-range"></span></span>`,
+  }),
 ]);
 
 /**
@@ -321,7 +378,55 @@ const CONTROLS = Object.freeze([
  * has no class string of its own to pin and no entry above; the bar's markup renders it and the
  * rung clause below is what asks about it.
  */
-const EXTRA_PROBES = Object.freeze(['toolbar-select']);
+const EXTRA_PROBES = Object.freeze([
+  'toolbar-select',
+  'toggle-track',
+  'toggle-knob',
+  'toggle-label',
+  'slider-root',
+  'slider-percent',
+  'slider-number',
+  'slider-range',
+  'slider-track',
+  'slider-fill',
+]);
+
+/**
+ * The extra probes that are the issue-1508 families' OWN elements, and are therefore held to the
+ * same three-host equality the `CONTROLS` entries are.
+ *
+ * `toolbar-select` is deliberately absent: it is a CALLER's control inside the bar, only two of
+ * whose properties travel, and its own clause below measures both halves of that residue. These
+ * ten are different — every one of them is an element `StatusToggle` or `ChanceSlider` writes
+ * itself, painted by a rule this change re-rooted, so nothing about them may depend on the host.
+ */
+const FAMILY_EXTRA_PROBES = Object.freeze(
+  EXTRA_PROBES.filter((probe) => probe !== 'toolbar-select')
+);
+
+/**
+ * The two family RAILS whose rendered border box follows the host's `box-sizing`.
+ *
+ * Both declare a 1px border over a size they also declare — the switch's 34x20 rail and the
+ * slider's 6px-high rail — so in this core-less harness they lay out 2px larger in each dimension
+ * wherever `box-sizing` falls to `content-box`, which is every host but the manager. That
+ * difference does not exist in Foundry, where core's `@layer reset` declares the universal rule
+ * for every host; it is a property of the fixture. Both halves are asserted by the box-sizing
+ * clause below so neither opt-out can outlive its reason.
+ */
+const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
+
+/**
+ * Those two rails, plus the fill INSIDE one of them, which inherits the same dependence.
+ *
+ * `.fabricate-slider .manager-drop-rate-fill` is `width: var(--fab-drop-rate-value)` and
+ * `height: 100%` — both percentages, both resolved against its rail's CONTENT box, which is the
+ * box the keyword decides. So the fill's size differs by host for exactly the rail's reason and
+ * not for one of its own, and comparing it as a VALUE would report the harness rather than the
+ * sheet. What the family actually promises about it is a RELATIONSHIP — the fill fills its rail —
+ * and that is asserted directly by the box-sizing clause below, in every host.
+ */
+const HOST_BOX_DEPENDENT_PROBES = Object.freeze([...BORDERED_TRACK_PROBES, 'slider-fill']);
 
 /**
  * The family's shared base rule, as the browser serialises its prelude.
@@ -345,14 +450,25 @@ const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
 /**
  * The issue-1508 families' font floor, as the browser serialises its prelude.
  *
- * ONE rule with one member per family, declared as a group immediately below the area's own
- * bare-element baseline. Phase 3 of this change adds `.fabricate-slider input` to it.
+ * ONE rule with one member per family whose root is NOT its control, declared as a group
+ * immediately below the area's own bare-element baseline. All three members are (0,1,1) and every
+ * one of them TIES that baseline, which is what makes the group's position load-bearing and is
+ * asserted as a CSSOM index below.
+ *
+ * `StatusToggle` has a font floor too and is deliberately not on this list: its root IS its
+ * control, so its floor is `.fabricate-toggle` alone at (0,1,0), which LOSES to the area baseline
+ * rather than tying it. Its position is therefore free and it sits in the family's own block, as
+ * the two button families' floor does. `TOGGLE_FONT_FLOOR_SELECTOR` below is what asserts that.
  */
 const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
   '.fabricate-field :is(input, select, textarea)',
   '.fabricate-search input',
+  '.fabricate-slider input',
 ]);
 const FAMILY_FONT_FLOOR_SELECTOR = FAMILY_FONT_FLOOR_MEMBERS.join(', ');
+
+/** `StatusToggle`'s floor, at the family root ALONE — the (0,1,0) shape, not the (0,1,1) one. */
+const TOGGLE_FONT_FLOOR_SELECTOR = '.fabricate-toggle';
 
 /**
  * `Field`'s element-typed chrome rule, as the browser serialises its prelude.
@@ -548,6 +664,119 @@ const CARD_COMPARED = Object.freeze([
 const TOOLBAR_SELECT_COMPARED = Object.freeze(['height', 'border-radius']);
 
 /**
+ * What acceptance 2 compares on the switch itself — its root `<button>`, which IS the control.
+ *
+ * Every one is a declaration the family's own base rule makes: `width: auto` and the 78px cap that
+ * keep the switch from filling a status column, the 24px height, the 999px corner and the
+ * `border: 0` that makes it a bare flex row rather than a tinted pill. `font-*` and `line-height`
+ * are compared because the family declares its own (0,1,0) floor for them, which is what a bare
+ * host has instead of the area's bare-element baseline.
+ */
+const TOGGLE_COMPARED = Object.freeze([
+  'max-width',
+  'height',
+  'border-radius',
+  'border-top-width',
+  'border-top-style',
+  'display',
+  'align-items',
+  'gap',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+
+/**
+ * The 34x20 rail and the 14x14 knob, which is the geometry the switch is recognisable by.
+ *
+ * The rail's `width`/`height` are compared as the family's own DECLARED 34 and 20 rather than as a
+ * rendered box: it declares a 1px border, so its border box is 36x22 wherever `box-sizing` falls
+ * to `content-box` and 34x20 where the host supplies `border-box`. The knob declares no border and
+ * lays out identically in every host, so it keeps the box comparison.
+ */
+const TOGGLE_TRACK_COMPARED = Object.freeze([
+  'width',
+  'height',
+  'border-radius',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'background-color',
+  'position',
+  'display',
+  'align-items',
+]);
+const TOGGLE_KNOB_COMPARED = Object.freeze([
+  'width',
+  'height',
+  'border-radius',
+  'background-color',
+  'position',
+  'top',
+  'left',
+]);
+/** The reading beside the rail, whose type is the family's own at (0,2,0). */
+const TOGGLE_LABEL_COMPARED = Object.freeze([
+  'font-size',
+  'font-weight',
+  'line-height',
+  'overflow',
+  'text-overflow',
+]);
+
+/**
+ * What acceptance 2 compares on the slider's two INPUTS, which are the controls it owns.
+ *
+ * The `font-*` triple is the point of the family's floor and is compared on both halves. The
+ * number input adds the box its own rule paints — the 28px height, the 6px corner, the border and
+ * the fill — and the range input adds the 28px track height and the `appearance: none` that
+ * removes the platform slider so the family's own rail can show through.
+ */
+const SLIDER_NUMBER_COMPARED = Object.freeze([
+  'height',
+  'box-sizing',
+  'border-radius',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'background-color',
+  'text-align',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+const SLIDER_RANGE_COMPARED = Object.freeze([
+  'appearance',
+  '-webkit-appearance',
+  'height',
+  'border-top-width',
+  'background-color',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+/** And the rail and the fill the range input is laid over. */
+const SLIDER_TRACK_COMPARED = Object.freeze([
+  'height',
+  'border-radius',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'background-color',
+  'position',
+  'overflow',
+]);
+const SLIDER_FILL_COMPARED = Object.freeze(['display', 'background-color']);
+/** The control span and the number wrapper, which lay the two halves out. */
+const SLIDER_CONTROL_COMPARED = Object.freeze(['position', 'display', 'align-items', 'min-width']);
+const SLIDER_ROOT_COMPARED = Object.freeze([
+  'display',
+  'grid-template-columns',
+  'align-items',
+  'gap',
+]);
+
+/**
  * The compared set per control, for the entries that do not take the button families' default.
  *
  * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
@@ -559,16 +788,24 @@ const COMPARED_BY_CONTROL = Object.freeze({
   search: SEARCH_COMPARED,
   toolbar: TOOLBAR_COMPARED,
   card: CARD_COMPARED,
+  toggle: TOGGLE_COMPARED,
+  'toggle-track': TOGGLE_TRACK_COMPARED,
+  'toggle-knob': TOGGLE_KNOB_COMPARED,
+  'toggle-label': TOGGLE_LABEL_COMPARED,
+  slider: SLIDER_CONTROL_COMPARED,
+  'slider-root': SLIDER_ROOT_COMPARED,
+  'slider-percent': SLIDER_CONTROL_COMPARED,
+  'slider-number': SLIDER_NUMBER_COMPARED,
+  'slider-range': SLIDER_RANGE_COMPARED,
+  'slider-track': SLIDER_TRACK_COMPARED,
+  'slider-fill': SLIDER_FILL_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
 const ALL_COMPARED = Object.freeze([
   ...new Set([
     ...COMPARED,
-    ...FIELD_COMPARED,
-    ...SEARCH_COMPARED,
-    ...TOOLBAR_COMPARED,
-    ...CARD_COMPARED,
+    ...Object.values(COMPARED_BY_CONTROL).flat(),
     ...TOOLBAR_SELECT_COMPARED,
   ]),
 ]);
@@ -666,14 +903,36 @@ async function measure(css) {
   }
 }
 
+/**
+ * Every probe held to the three-host equality, and whether its laid-out BOX is compared too.
+ *
+ * The `CONTROLS` entries and the families' own extra probes are one population for this clause:
+ * the question asked of `.fabricate-toggle .manager-status-toggle-track` is exactly the question
+ * asked of `.fabricate-card.manager-inspector-card`, and splitting them into two loops would be
+ * two copies of it. `toolbar-select` is the one probe outside this list, because it is a CALLER's
+ * control and only part of it travels; its own clause below measures both halves of that.
+ */
+const MEASURED_PROBES = Object.freeze([
+  ...CONTROLS.map((control) =>
+    Object.freeze({ id: control.id, comparesBox: control.comparesBox !== false })
+  ),
+  // TWO PROBES OPT OUT, and both for the switch's own reason above: each declares a 1px border
+  // over a declared size, so its BORDER box follows the host's `box-sizing` while the size it
+  // declares does not. `toggle-track` is 34x20 + 1 and `slider-track` is 6 high + 1. Everything
+  // else here either declares its own `box-sizing` (the slider's number input does, in its own
+  // rule) or declares no border over a declared size, and lays out identically in all three hosts.
+  ...FAMILY_EXTRA_PROBES.map((id) =>
+    Object.freeze({ id, comparesBox: !HOST_BOX_DEPENDENT_PROBES.includes(id) })
+  ),
+]);
+
 test('each re-rooted control computes the same geometry and type in all three hosts', async () => {
   const measured = await measure(sheet);
 
-  for (const { id: control } of CONTROLS) {
+  for (const { id: control, comparesBox } of MEASURED_PROBES) {
     for (const { id: host } of HOSTS) {
       assert.ok(measured[control]?.[host], `the ${host} host rendered no ${control} probe`);
     }
-    const entry = CONTROLS.find((one) => one.id === control);
     const compared = COMPARED_BY_CONTROL[control] ?? COMPARED;
     for (const property of compared) {
       const values = HOSTS.map((host) => measured[control][host.id][property]);
@@ -707,7 +966,7 @@ test('each re-rooted control computes the same geometry and type in all three ho
     // sheet. `search` is NOT opted out and must not be: its control is an `<input type="search">`,
     // which the UA sheet gives `border-box` in every host, so its box is comparable and is
     // compared. The clause below asserts both halves, so neither can outlive its reason.
-    if (entry.comparesBox === false) continue;
+    if (!comparesBox) continue;
     const boxes = HOSTS.map((host) => measured[control][host.id]['rendered-size']);
     assert.ok(
       boxes.every((box) => box !== '0x0'),
@@ -1179,6 +1438,23 @@ test('each re-rooted family declares its own focus ring, and none of them reache
         '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
       ],
       ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
+      ['.fabricate-slider input:focus', '.fabricate-slider input:focus-visible'],
+      // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added: it
+      // existed at (0,3,0) before the re-root and was re-rooted in place, declarations and rank
+      // unchanged. The second is the checkbox host's, and its two halves sit on two DIFFERENT
+      // elements by construction: the host is a `<label>`, which never matches `:focus`, so the
+      // strip is written on the transparent `<input>` the label wraps while the repaint stays a
+      // `:has()` ring on the label. `design-system/spec.md` records that case; the ordering
+      // assertion below still holds, and the strip's own reach is measured by the negative
+      // controls rather than argued.
+      [
+        '.fabricate-toggle.manager-status-toggle:focus',
+        '.fabricate-toggle.manager-status-toggle:focus-visible',
+      ],
+      [
+        '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
+        '.fabricate-toggle.manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible)',
+      ],
     ]) {
       const ring = rules.filter((rule) => rule.selectorText === repaint);
       assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
@@ -1241,6 +1517,8 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       'fabricate-pagination',
       'fabricate-field',
       'fabricate-search',
+      'fabricate-slider',
+      'fabricate-toggle',
     ];
     const selectReach = rules
       .filter((rule) => roots.some((root) => rule.selectorText.includes(`.${root}`)))
@@ -1252,7 +1530,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     assert.deepEqual(
       selectReach.map((rule) => rule.selectorText),
       [],
-      'a rule rooted at one of the three new namespace classes reaches a focused `select`, which ' +
+      'a rule rooted at one of the seven namespace classes reaches a focused `select`, which ' +
         'is what would displace the inset ring above'
     );
   } finally {
@@ -1318,6 +1596,121 @@ test('the issue-1508 families declare their own control chrome rather than inher
   assert.match(search['font-family'], /Signika/);
 });
 
+/** The switch and the slider's two halves, in a bare host, at the values their own rules declare. */
+test('the toggle and the slider declare their own control chrome rather than inheriting it', async () => {
+  const measured = await measure(sheet);
+  const bare = (probe) => measured[probe].bare;
+
+  // NON-VACUITY FIRST, the clause above's own guard: an engine returning `''` would satisfy every
+  // equality below.
+  for (const probe of ['toggle', 'toggle-track', 'toggle-knob', 'slider-number', 'slider-range']) {
+    for (const property of COMPARED_BY_CONTROL[probe]) {
+      assert.ok(
+        bare(probe)[property] !== undefined,
+        `${probe} computed nothing at all for \`${property}\`, so the pins below prove nothing`
+      );
+    }
+  }
+
+  // THE SWITCH. `max-width: 78px`, `height: 24px`, the 999px corner and `border: 0` are the whole
+  // of what makes it a bare flex row rather than a tinted pill, and all four now come from the
+  // family's own re-rooted base rule rather than from the manager.
+  const toggle = bare('toggle');
+  assert.equal(toggle['max-width'], '78px');
+  assert.equal(toggle.height, '24px');
+  assert.equal(toggle['border-radius'], '999px');
+  assert.equal(toggle['border-top-width'], '0px', 'the switch declares `border: 0` on the BUTTON');
+  assert.equal(toggle.display, 'inline-flex');
+  assert.match(
+    toggle['font-family'],
+    /Signika/,
+    'a bare-host switch must inherit the ambient font family, or its own (0,1,0) `font: inherit` ' +
+      'floor is not reaching it'
+  );
+
+  // AND `width: auto` IS READ AS A DECLARATION, never as a resolved value. The switch's used width
+  // is solved from its content, so a resolved reading would be a fact about the fixture's label
+  // rather than about the sheet — and it is the `auto` keyword that keeps the switch from filling
+  // a status column, which is what the family's own rule promises.
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    const base = rules.filter(
+      (rule) => rule.selectorText === '.fabricate-toggle.manager-status-toggle'
+    );
+    assert.equal(base.length, 1, 'the switch`s base rule must be declared exactly once');
+    assert.match(base[0].cssText, /width:\s*auto/, 'the switch sizes to its content, not its cell');
+    assert.match(base[0].cssText, /max-width:\s*78px/);
+
+    // THE TOGGLE'S FLOOR IS AT THE FAMILY ROOT ALONE, and is NOT in the (0,1,1) group. That is the
+    // whole reason its position is free: at (0,1,0) it LOSES to the area's bare-element baseline
+    // rather than tying it, so it cannot re-type a manager textarea or select whatever comes
+    // after it. A later editor folding it into the group above would change that, and reds here.
+    const floor = rules.filter((rule) => rule.selectorText === TOGGLE_FONT_FLOOR_SELECTOR);
+    assert.equal(floor.length, 1, 'the switch`s font floor must be declared exactly once');
+    assert.deepEqual(
+      specificityOf(TOGGLE_FONT_FLOOR_SELECTOR),
+      [0, 1, 0],
+      'the switch`s root IS its control, so its floor is written at that root ALONE — the shape ' +
+        'the two button families take, and the reason its position in the sheet is free'
+    );
+    assert.match(
+      floor[0].cssText,
+      /font(?:-family)?:\s*inherit/,
+      `the switch's floor must declare \`font: inherit\`; declared: ${floor[0].cssText}`
+    );
+    // AND NOTHING ELSE, read as the `font` SHORTHAND'S OWN LONGHANDS, which is how the CSSOM
+    // reports it — the same reading the (0,1,1) group's clause below uses, so a declaration of
+    // any other kind reds here by name.
+    assert.deepEqual(
+      floor[0].properties.filter(
+        (property) => !property.startsWith('font') && property !== 'line-height'
+      ),
+      [],
+      'the switch`s floor must declare `font: inherit` and nothing else, for the (0,1,1) group`s ' +
+        `own reason. Declared: ${floor[0].properties.join(', ')}`
+    );
+    assert.ok(
+      !FAMILY_FONT_FLOOR_MEMBERS.includes(TOGGLE_FONT_FLOOR_SELECTOR),
+      'the switch`s floor must stay out of the (0,1,1) group: that group is positioned where it ' +
+        'is because its members TIE the area baseline, and this one does not'
+    );
+  } finally {
+    await tab.close();
+  }
+
+  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 6px corner, border and
+  // fill; the range half declares `appearance: none` so the platform slider is replaced by the
+  // family's own rail, and its own 28px height. BOTH inherit the ambient font, which is what the
+  // family's `.fabricate-slider input` floor is for and what a bare host would otherwise lose.
+  const number = bare('slider-number');
+  assert.equal(number.height, '28px');
+  assert.equal(number['border-radius'], '6px');
+  assert.equal(number['border-top-width'], '1px');
+  assert.equal(number['text-align'], 'center');
+  assert.match(number['font-family'], /Signika/);
+
+  const range = bare('slider-range');
+  assert.equal(range.appearance, 'none');
+  assert.equal(range['-webkit-appearance'], 'none');
+  assert.equal(range.height, '28px');
+  assert.match(
+    range['font-family'],
+    /Signika/,
+    'the family`s floor is `.fabricate-slider input`, which names the ELEMENT rather than a type, ' +
+      'so it must reach the range half as well as the number half'
+  );
+
+  // AND THE RAIL AND KNOB GEOMETRY the two families are recognisable by, declared rather than
+  // inherited: 34x20 and 14x14 for the switch, 6px high for the slider's rail.
+  assert.equal(bare('toggle-track').width, '34px');
+  assert.equal(bare('toggle-track').height, '20px');
+  assert.equal(bare('toggle-knob').width, '14px');
+  assert.equal(bare('toggle-knob').height, '14px');
+  assert.equal(bare('slider-track').height, '6px');
+});
+
 test('the issue-1508 controls depend on host chrome for box-sizing, and nothing lets that render', async () => {
   // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT, exactly as the pager's
   // is. Neither `<input>` declares a `box-sizing`: in the manager the area's universal rule
@@ -1364,6 +1757,63 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
       measured[control].manager['box-sizing'],
       'border-box',
       `the manager area's universal rule must still be what supplies the ${control} its border-box`
+    );
+  }
+
+  // THE TWO BORDERED RAILS, which are the field's case rather than the pager's: each declares a
+  // 1px border over a size it also declares, so the two keywords really do produce two different
+  // border boxes and the rendered-box equality is what has to be opted out of. Their DECLARED
+  // sizes are compared instead, and are equal in all three hosts, which is the claim that matters:
+  // the rail is 34x20 and 6 high because the family says so, not because a host does.
+  for (const probe of BORDERED_TRACK_PROBES) {
+    assert.equal(
+      measured[probe].bare['box-sizing'],
+      'content-box',
+      `the ${probe} rail declares no \`box-sizing\` of its own and takes it from host chrome; a ` +
+        'change here means the family has started declaring one and `comparesBox` should go with it'
+    );
+    assert.equal(
+      measured[probe].manager['box-sizing'],
+      'border-box',
+      `the manager area's universal rule must still be what supplies the ${probe} rail its border-box`
+    );
+    assert.equal(
+      measured[probe].bare['border-top-width'],
+      '1px',
+      `the ${probe} rail must still declare the 1px border that is why its border box differs by ` +
+        'host at all; without it the opt-out above would be hiding a real move'
+    );
+  }
+
+  // AND THE SLIDER'S NUMBER INPUT DOES DECLARE ONE, in its own rule, which is why it is NOT opted
+  // out and its box is compared in every host.
+  for (const host of HOSTS) {
+    assert.equal(
+      measured['slider-number'][host.id]['box-sizing'],
+      'border-box',
+      'the slider`s number input declares `box-sizing: border-box` in the family`s own rule, so ' +
+        'its box is comparable in every host and is compared'
+    );
+  }
+
+  // THE FILL FILLS ITS RAIL, IN EVERY HOST. Its `height: 100%` and percentage `width` resolve
+  // against the rail's CONTENT box, so their values follow the keyword — but the relationship does
+  // not, and the relationship is the whole of what the family declares. Asserted as the fill's
+  // rendered box against the rail's own content box, which is the rail's border box less its two
+  // borders, so a fill that stopped filling reds here whichever keyword is in force.
+  for (const host of HOSTS) {
+    const railBox = measured['slider-track'][host.id]['rendered-size'].split('x').map(Number);
+    const fillBox = measured['slider-fill'][host.id]['rendered-size'].split('x').map(Number);
+    const border = Number.parseFloat(measured['slider-track'][host.id]['border-top-width']);
+    assert.equal(
+      fillBox[1],
+      railBox[1] - 2 * border,
+      `the slider fill must be the full height of its rail's content box in the ${host.id} host`
+    );
+    assert.ok(
+      Math.abs(fillBox[0] / (railBox[0] - 2 * border) - 0.4) <= 0.01,
+      `the slider fill must be 40 per cent of its rail's content width in the ${host.id} host, ` +
+        `which is what \`--fab-drop-rate-value\` sets; measured ${fillBox[0]} of ${railBox[0]}`
     );
   }
 });
@@ -1597,7 +2047,17 @@ const NEGATIVE_CONTROLS =
   '<span class="fab-stepper"><input type="number" class="fab-stepper-input" data-probe="neg-stepper"></span>' +
   '<select data-probe="neg-select"><option>A</option></select>' +
   '<textarea data-probe="neg-textarea"></textarea>' +
-  '</fieldset>';
+  '</fieldset>' +
+  // OUTSIDE THE FIELDSET, because a switch is not a field's control and nesting it inside one
+  // would make the comparison below answer a question about `Field` rather than about the toggle.
+  // It is here so the toggle's own (0,1,0) floor has something to be measured on: inside the
+  // manager the area's bare-element baseline OUT-RANKS that floor at (0,1,1) and declares the
+  // identical value, so the floor is a no-op — and this is what says so with a measurement rather
+  // than with an argument. The checkbox host is rendered too, because its `:focus` strip is the
+  // one rule in this change whose interval walk is not empty and the input it lands on is
+  // `opacity: 0`, which is the fact that makes the move zero pixels.
+  '<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="neg-toggle"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>' +
+  '<label class="fabricate-toggle manager-tool-setting-toggle" data-probe="neg-toggle-host"><input type="checkbox" class="manager-tool-setting-toggle-input" data-probe="neg-toggle-input"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></label>';
 
 /**
  * Those elements measured in the manager host under a given sheet text.
@@ -1627,6 +2087,10 @@ async function measureNegativeControls(css) {
           appearance: style.appearance,
           'line-height': style['line-height'],
           'font-size': style['font-size'],
+          'font-family': style['font-family'],
+          // READ FOR THE TOGGLE'S CHECKBOX INPUT, whose `opacity: 0` is what makes the one
+          // non-empty interval this change has cost zero pixels.
+          opacity: style.opacity,
           box: `${Math.round(box.width)}x${Math.round(box.height)}`,
         };
       }
@@ -1646,7 +2110,9 @@ async function measureNegativeControls(css) {
  * asserted by the ring clause below and by the select-reach check inside it.
  */
 const ADDED_BLOCKS = Object.freeze([
-  '.fabricate-field :is(input, select, textarea),\n.fabricate-search input {\n  font: inherit;\n}',
+  '.fabricate-field :is(input, select, textarea),\n.fabricate-search input,\n' +
+    '.fabricate-slider input {\n  font: inherit;\n}',
+  '.fabricate-toggle {\n  font: inherit;\n}',
   '.fabricate-field input[type="text"],\n.fabricate-field input[type="url"],\n' +
     '.fabricate-field input[type="email"],\n.fabricate-field input[type="tel"],\n' +
     '.fabricate-field input[type="password"],\n.fabricate-field input:not([type]),\n' +
