@@ -33,6 +33,7 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night'],
 });
+const OBJECT_STRINGIFICATION = '[object object]';
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
 const VOCABULARY_DIMENSIONS = ['biomes'];
 const BIOME_COLOR_TOKENS = new Set([
@@ -280,12 +281,14 @@ export class GatheringRichStateService {
   async setConditions({ weather, timeOfDay } = {}) {
     const config = this._config();
     const nextConditions = { ...config.conditions };
+    let nextSystems = config.systems;
     if (weather !== undefined) {
       const tag = normalizeConditionId(weather);
       if (!normalizeConditionIdList(config.vocabularies.weather).includes(tag)) {
         throw new Error(`Unknown gathering weather tag: ${weather}`);
       }
       nextConditions.weather = tag;
+      nextSystems = withSystemCurrentCondition(nextSystems, 'weather', tag);
     }
     if (timeOfDay !== undefined) {
       const tag = normalizeConditionId(timeOfDay);
@@ -293,9 +296,10 @@ export class GatheringRichStateService {
         throw new Error(`Unknown gathering time-of-day tag: ${timeOfDay}`);
       }
       nextConditions.timeOfDay = tag;
+      nextSystems = withSystemCurrentCondition(nextSystems, 'timeOfDay', tag);
     }
 
-    const next = { ...config, conditions: nextConditions };
+    const next = { ...config, conditions: nextConditions, systems: nextSystems };
     await this._saveConfig(next);
     this._callHook('fabricate.gathering.conditionsUpdated', {
       conditions: cloneJson(nextConditions),
@@ -1941,10 +1945,21 @@ function normalizeGatheringEconomy(raw = {}) {
 
 function normalizeGatheringConfig(raw = {}) {
   const vocabularies = {
+    // `weather` / `timeOfDay` are condition-option ids (kebab-cased, as `setConditions`
+    // stores them); `biomes` / `danger` are tags (lower-cased only, as the biome
+    // modifier lookup and authored task/event biomes match them).
     biomes: seedVocabulary(raw?.vocabularies?.biomes, DEFAULT_VOCABULARIES.biomes),
     danger: seedVocabulary(raw?.vocabularies?.danger, DEFAULT_VOCABULARIES.danger),
-    weather: seedVocabulary(raw?.vocabularies?.weather, DEFAULT_VOCABULARIES.weather),
-    timeOfDay: seedVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_VOCABULARIES.timeOfDay),
+    weather: seedVocabulary(
+      raw?.vocabularies?.weather,
+      DEFAULT_VOCABULARIES.weather,
+      normalizeConditionId
+    ),
+    timeOfDay: seedVocabulary(
+      raw?.vocabularies?.timeOfDay,
+      DEFAULT_VOCABULARIES.timeOfDay,
+      normalizeConditionId
+    ),
   };
   const weather = normalizeConditionId(raw?.conditions?.weather) || DEFAULT_CONDITIONS.weather;
   const timeOfDay =
@@ -2028,6 +2043,27 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
     };
   }
   return normalized;
+}
+
+/**
+ * Carry a validated global condition onto every system that offers it.
+ *
+ * Runtime composition gates on `systems[id].conditions[kind].current`, not the global
+ * current, so without this the public setter is a no-op for any world the manager has
+ * saved. A system whose own `values` exclude the id keeps its current: storing a value
+ * outside `values` is only snapped back to `values[0]` on the next read. `enabled`
+ * governs runtime gating, not storage, so a disabled dimension is updated too.
+ */
+function withSystemCurrentCondition(systems, kind, current) {
+  const next = {};
+  for (const [systemId, config] of Object.entries(systems || {})) {
+    const dimension = config?.conditions?.[kind];
+    const offersCurrent = (dimension?.values || []).some((option) => option?.id === current);
+    next[systemId] = offersCurrent
+      ? { ...config, conditions: { ...config.conditions, [kind]: { ...dimension, current } } }
+      : config;
+  }
+  return next;
 }
 
 function conditionSettingsToCurrent(settings) {
@@ -2704,9 +2740,25 @@ function selectDrops(drops, mode, limit = 1) {
   return highest ? [cloneJson(highest)] : [];
 }
 
-function seedVocabulary(raw, defaults) {
-  const values = normalizeTagList(raw);
-  return values.length > 0 ? values : [...defaults];
+function seedVocabulary(raw, defaults, normalizeId = normalizeTag) {
+  const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  // The manager persists these lists as option records while the service reads ids,
+  // and stringifying a record yielded `[object object]`, which was then saved back as
+  // the whole vocabulary. So unwrap records to their id, and discard that
+  // stringification under the SAME normalizer the dimension uses -- the manager
+  // kebab-cases condition ids, so the poison reaches this list as `object-object`
+  // there and as `[object object]` in the lower-cased tag dimensions. A list that is
+  // nothing but poison is left empty and re-seeds the documented defaults.
+  const sentinel = normalizeId(OBJECT_STRINGIFICATION);
+  const ids = values
+    .map((value) =>
+      normalizeId(
+        value && typeof value === 'object' ? (value.id ?? value.value ?? value.label) : value
+      )
+    )
+    .filter((id) => id && id !== sentinel);
+  const unique = [...new Set(ids)];
+  return unique.length > 0 ? unique : [...defaults];
 }
 
 function vocabularyLabelFromId(id) {
