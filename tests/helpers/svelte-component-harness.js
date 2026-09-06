@@ -261,6 +261,23 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopover.svelte'
 ]);
 
+// THE ONE TONE MAP the retired status pill's call sites read (issue 1506). Every screen that
+// bound a pill tone dynamically — the salvage yield rows, the bulk report's outcome table, the
+// recipe browser's row pills, the world Essence rollup, the Tool player preview and the world
+// Component catalogue's source badge — now routes that read through `statusChipTone.js`, so the
+// module is in the closure of any tree holding one of those components whether or not a test
+// exercises the tone.
+//
+// Hoisted rather than written per suite because it reaches more than two of them, which is the
+// threshold this file's other rosters record: a hand-copied manifest entry rots silently in one
+// copy and counts as duplicated new code in all of them. Flat, and one entry, so the static
+// guard in `mounted-harness-primitive-allowlist.test.js` can read the literal it quotes.
+//
+// A raw module missing from a manifest is INVISIBLE to that guard, which quantifies over
+// compiled COMPONENTS — the only symptom is the harness throwing its named "add it to
+// rawModules" error in `before()`, which cancels the suite's subtests rather than failing one.
+export const STATUS_TONE_RAW_MODULES = Object.freeze(['src/ui/svelte/util/statusChipTone.js']);
+
 // THE MARKS AND NOTICES the design-system pass of issue 1505 closed, as ONE closure. Every
 // suite whose tree reaches any of them names all four, because they compose each other and a
 // module a tree renders but a manifest omits does not fail that suite — it CANCELS it, and
