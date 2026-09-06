@@ -32,7 +32,7 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ManagerButton from '../../components/ManagerButton.svelte';
-  import Medallion from '../../components/Medallion.svelte';
+  import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
   import { createKnowledgeRosterBrowserState } from '../../../../utils/managerBrowserViewState.js';
@@ -193,7 +193,7 @@
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">
-          <Medallion art={selectedCharacter.img} icon="fas fa-user" size={50} alt="" />
+          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={50} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
             <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>

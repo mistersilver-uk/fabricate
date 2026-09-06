@@ -79,6 +79,11 @@ const sharedComponentNames = [
   // MUST still be compiled into this tree: a `.svelte` the mounted root renders but
   // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
   'Medallion',
+  // The actor portrait (issue 1506), reached through the Knowledge roster and detail header,
+  // both of which are in this root's static graph. It is deliberately NOT on
+  // `SHARED_PRIMITIVES` at two callers, so omitting it HANGS every mounted manager test as
+  // `# cancelled` rather than failing one by name.
+  'Avatar',
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',

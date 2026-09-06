@@ -164,6 +164,13 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
+  // Every other entry here was earned by an existing component acquiring a state its frames could
+  // not reach; this one exists because a new `components/` file is a broad signal the moment it
+  // is written, and the rule three components followed at issue 1505 is that a new broad-signal
+  // component ships with an override naming a frame that draws it. One frame, because one frame
+  // draws both of its call sites.
+  'src/ui/svelte/components/Avatar.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
@@ -356,6 +363,11 @@ test('the inputs every property below quantifies over are alive', () => {
   // component that had quietly crossed the bar, and the first time three arrived together. The
   // non-member set is unmoved at 12: this change promotes nothing out of it and demotes nothing
   // into it.
+  // 53 UNMOVED as of issue 1506, and the stillness is the fact rather than the absence of one:
+  // that change DELETED `components/StatusPill.svelte`'s row when the pill retired into the chip
+  // and ADDED `components/Avatar.svelte`'s when the actor portrait shipped, so the set is
+  // net-neutral across the branch and this pin is deliberately not edited. Between those two
+  // commits it is the one register red the change declares in advance.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 53, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');

@@ -48,6 +48,11 @@ const harness = createMountedComponentHarness({
   // this suite does not spread.
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
+    // The actor portrait (issue 1506). The roster row and the detail header render it; the two
+    // owned-copy/learned rows still render `Medallion`, which is why BOTH art tiles are here.
+    // `Avatar` is NOT on `SHARED_PRIMITIVES` at two callers, so omitting it HANGS this suite
+    // (# cancelled) rather than failing it by name.
+    'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).

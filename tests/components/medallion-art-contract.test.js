@@ -61,14 +61,21 @@ const ART_RESOLVER = 'resolveCraftingArt(';
  * no art-bearing tiles in it, which is exactly what a scan that stopped matching would produce.
  * So the population is counted, not just quantified over.
  *
- * Every shipped file imports the component under this one name (measured: twenty importers, two
- * specifier depths, one local name), which is what makes a tag-name scan the whole population
- * rather than most of it.
+ * Every shipped file imports the component under this one name (measured on this tree: forty-two
+ * importers, two specifier depths, one local name), which is what makes a tag-name scan the
+ * whole population rather than most of it.
+ *
+ * 65 -> 63 (issue 1506): the GM Knowledge surface's roster row and detail header LEFT this
+ * population for `components/Avatar.svelte`, which is the actor portrait rather than a record's
+ * tile. Both were art-bearing and both passed `alt=""`, so the second count falls by the same
+ * two. Their contract did not lapse with the move — `avatar-source-contract.test.js` states the
+ * same clause over the same two sites — and this file's domain is now the RECORD tile alone,
+ * which is what its clauses were always about.
  */
-const MEDALLION_SITES = 65;
+const MEDALLION_SITES = 63;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 52;
+const ART_BEARING_SITES = 50;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

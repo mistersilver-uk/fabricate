@@ -244,7 +244,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 29 library entries with no shipped implementation.
+ * The 28 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -254,9 +254,15 @@ test('every manifest library name resolves to a library entry', () => {
  * `Kicker`, `Notice` and `StatBox` left it at issue 1505, which built all three. `InfoStrip` STAYS:
  * that change measured five candidate call sites for it and exactly one qualifies, which is below
  * the two-independent-importer membership bar, so it defers rather than shipping on one caller.
+ *
+ * `Avatar` left it at issue 1506, which built it: the GM Knowledge surface's roster row and its
+ * detail header are two independent callers, which is the bar, and both were rendering the icon
+ * chip with a person glyph until then. The count above is re-measured on the tree rather than
+ * subtracted, and `Rail`, `LogList` and `TierTrack` — the three names sharing its specimen block —
+ * all STAY, because building one name in a multi-name block builds one name.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
+  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard',
   'ChoiceGroup', 'DataTable', 'InfoStrip', 'ListRow',
   'LogList', 'Menu', 'Meter', 'NavSidebar', 'PageHeader',
   'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',

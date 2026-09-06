@@ -500,6 +500,30 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
+  // AN ACTOR'S PORTRAIT (issue 1506), and the first entry in this table gained by a primitive
+  // ARRIVING rather than by an extraction leaving one state unphotographed. Neither
+  // representative frame is a Knowledge screen: `manager-components-normal` is the component
+  // browser and `fabricate-app-shell` is the PLAYER window, which has no GM Knowledge surface at
+  // all — so without this entry every change to the portrait would publish two frames that
+  // structurally cannot contain one.
+  //
+  // ONE frame, because one frame holds BOTH call sites. `manager-knowledge-owned-copies` opens
+  // the Knowledge route with the projection's default character selected, so it draws the
+  // roster's 34px row portraits down the second column and the detail header's 50px portrait
+  // beside the name stack in the third — the two sites this conversion moves, in the same
+  // photograph, at the geometry each renders at.
+  //
+  // `manager-knowledge-narrow` is deliberately NOT a second entry. It is the same two sites at
+  // 880px, and this component is fixed-size at both widths, so it would publish a second frame
+  // of a treatment the first already shows. It is still selected on a change to either CALLER,
+  // through the `knowledge/` directory pattern those cases already carry; what this table is for
+  // is the states a broad primitive's own frames cannot reach.
+  //
+  // The INITIALS state is reached by no case in the registry and is recorded as such rather than
+  // covered by an override that cannot draw it: it renders only when an actor has no artwork, and
+  // Foundry assigns default artwork on creation, so no lab character is art-less. It is held by
+  // `tests/components/avatar-mounted.test.js` instead.
+  'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
   // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
   // representative frame can contain one, and that is established from the static import
   // closure rather than from looking at a frame: walking every transitive `.svelte` import,

@@ -1013,10 +1013,25 @@ test('no corner radius leaves the published ladder', () => {
 const ART_SIZE_LADDER = new Set([22, 26, 30, 38]);
 
 /**
- * The components that ARE the art tile. One name today; the avatar joins it when it ships, and
- * the list is the seam that keeps this scan from being re-derived then.
+ * The components that ARE the art tile, each against the `size` it renders at when a call site
+ * names none.
+ *
+ * TWO names since issue 1506 shipped the avatar, and the map rather than a set is what that
+ * arrival forced: the two primitives default to different rungs — 40 for the icon chip, which is
+ * historical, and 32 for the avatar, which is the specimen's single-mark size — so a set would
+ * have recorded a future default-size avatar at a rung it does not draw. The absent-`size` branch
+ * below reads this table rather than a constant for that reason.
+ *
+ * The population is keyed by CALL SITE, not by primitive, so retiring one of the two into the
+ * other moves no key; what moves a key is a call site changing file or size. That is also why
+ * adding a name here is load-bearing rather than cosmetic: with the avatar missing, the two
+ * knowledge sites that converted to it would leave this scan silently and `assertRatchet` would
+ * report two VANISHED rows.
  */
-const ART_TILE_COMPONENTS = new Set(['Medallion']);
+const ART_TILE_COMPONENTS = new Map([
+  ['Medallion', 40],
+  ['Avatar', 32],
+]);
 
 /**
  * Every art-tile render site, as `{ file, size }` with `size` a number or the string `dynamic`.
@@ -1038,9 +1053,10 @@ function artTileSizes() {
     walkElements(ast.fragment ?? ast, (element) => {
       if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
       const text = attributeText(source, element, 'size');
-      // An absent `size` takes the primitive's own default, which is a number this scan knows.
+      // An absent `size` takes the primitive's OWN default, which differs between the two and is
+      // recorded beside its name above rather than written here as one number.
       if (text === null) {
-        found.push({ file, size: 40 });
+        found.push({ file, size: ART_TILE_COMPONENTS.get(element.name) });
         return;
       }
       const literal = /^size=\{\s*(\d+(?:\.\d+)?)\s*\}$/u.exec(text);
