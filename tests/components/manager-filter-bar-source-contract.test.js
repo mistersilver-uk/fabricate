@@ -2,7 +2,7 @@
  * The END STATE of the `.manager-toolbar` and `.manager-search` conversions (issue 1039).
  *
  * ── TWO PRIMITIVES, ONE FILE, AND WHY THAT IS THE HONEST SHAPE ──────────────────────────
- * `openspec/specs/design-system/library.html:1233` sketches ONE `<FilterBar>` owning `query`
+ * `openspec/specs/design-system/library.html:1306` sketches ONE `<FilterBar>` owning `query`
  * and `onQueryChange`, so the expected extraction is a bar that renders its own field. The
  * corpus refuses it, and the census is the argument. Measured by walking every component's
  * Svelte AST on the tree this change started from: 11 bars, every one a `<section>`; 22 search

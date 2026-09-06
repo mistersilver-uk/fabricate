@@ -200,7 +200,7 @@ test('the avatar renders one of two published, non-interactive shapes, and nothi
   assert.deepEqual(
     shapes,
     ['round', 'square'],
-    'the shape union is what `library.html:1358` publishes: round for people, rounded-square ' +
+    'the shape union is what `library.html:1431` publishes: round for people, rounded-square ' +
       'for parties, vehicles and places. A third member is a ruling about what an actor mark may be'
   );
 

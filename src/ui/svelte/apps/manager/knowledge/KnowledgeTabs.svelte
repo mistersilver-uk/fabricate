@@ -8,7 +8,7 @@
   through `<Chip tone="neutral">`, the ISSUE-SUMMARY vehicle. The Rail Marker Family in
   `DOMAIN.md` and design-system spec.md requirement "Near-neighbour primitives are routed by
   a stated rule" both say the four marks MUST NOT be substituted for one another, so that
-  was a live violation and not a local styling choice: `library.html:1008`'s own `<TabBar>`
+  was a live violation and not a local styling choice: `library.html:1081`'s own `<TabBar>`
   specimen draws its two record counts as bare numerals and reserves the filled badge for
   Validation. The count is a bare mono tabular numeral now.
 

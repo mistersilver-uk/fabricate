@@ -1363,7 +1363,7 @@ export function componentBulkWriteCount({ selected, systems, category, tags, ess
 /**
  * The bulk dock's primary label, which NAMES THE WRITE rather than counting edits.
  *
- * `design-system/spec.md:415` requires a bulk commit action to name the number of records it
+ * `design-system/spec.md:434` requires a bulk commit action to name the number of records it
  * writes to, and `Apply 2 changes` names neither the records nor the verb — two GMs reading it
  * cannot tell "add these to two systems" from "set a category and a tag". The reference words the
  * unstaged state as an instruction (`Pick systems to add 1 component to`, `proto:685`) and the

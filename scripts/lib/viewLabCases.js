@@ -322,6 +322,19 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
     'manager-tool-prerequisites-selected-1280x720',
   ]),
+  // THE APP'S ONE ART TILE (issue 1506), which is the change that earned it an entry. That change
+  // retired both crafting thumbnails into this tile — 35 render sites across two windows — and it
+  // moved the tile's `tint` from a surface WASH onto the GLYPH alone. Both representative frames
+  // draw the tile and NEITHER draws a tinted one: `manager-components-normal`'s component rows bind
+  // a colour no file in `src/` produces, so they render untinted, and `fabricate-app-shell` lists
+  // recipes, which carry artwork rather than a palette key. `world-component-entry-essences` is the
+  // one published frame whose tiles are genuinely tinted — its essence contribution cards draw the
+  // glyph-chip variant from the world essence catalogue's own `colorToken` — so it is the frame
+  // that can show the wash's absence at all.
+  //
+  // ADDITIVE, like every entry here: the representative pair is still added, so a change to the
+  // tile still publishes the two browse surfaces that draw its untinted and artwork faces.
+  'src/ui/svelte/components/Medallion.svelte': Object.freeze(['world-component-entry-essences']),
   // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
   // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
   // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a

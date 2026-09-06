@@ -126,7 +126,7 @@
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-2);
     /* `proto:5716`: a contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an
-       accent wash. Radius 10 snaps to the 9 rung (`design-system/spec.md:218`). */
+       accent wash. Radius 10 snaps to the 9 rung (`design-system/spec.md:220`). */
     border: 1px solid var(--fab-border-strong);
     border-radius: 9px;
     background: var(--fab-bg-1);

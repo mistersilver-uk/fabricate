@@ -25,7 +25,7 @@
   `Delete component`) scrolled inline with the body and gave four commands equal weight where
   the design pins one. `Edit system rules` is the pinned primary; the other three move onto the
   shared `ActionMenu`, which is the primitive that owns "two or more commands behind one
-  trigger" (`design-system/spec.md:466-495`). Nothing is lost and nothing is a text link.
+  trigger" (`design-system/spec.md:485-514`). Nothing is lost and nothing is a text link.
 
   Strings are localized here; the CALLER resolves nothing but the actions and the world facts
   this screen's own row set cannot answer.

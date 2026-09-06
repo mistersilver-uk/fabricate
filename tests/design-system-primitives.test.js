@@ -194,6 +194,13 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
+  // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
+  // `manager-components-normal` draws the untinted variant — that row binds a colour nothing in
+  // `src/` produces — and `fabricate-app-shell` draws the plain artwork tile, so the tint, which
+  // is the axis this change moved from a surface wash onto the glyph, is absent from both. It
+  // leaves `PRIMITIVES_WITH_NO_FRAME` in the same change, which is the direction that list moves.
+  'src/ui/svelte/components/Medallion.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
@@ -306,6 +313,11 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * Three components shipped under `components/` in that same change — `Kicker`, `Notice` and
  * `StatBox` — and NONE of them entered this list, because each arrived with its own override
  * naming a frame that draws it, which is the only way a new broad-signal component may ship.
+ * `Medallion` left it at issue 1506, the same way and for a reason that change created: absorbing
+ * both crafting thumbnails made it the app's ONE art tile, and moving its tint from a surface wash
+ * onto the glyph gave it a state neither representative frame draws. Its override names the one
+ * published frame that draws a TINTED tile. `Avatar`, which arrived in the same change, never
+ * entered this list either, and for the rule stated above rather than as an exception.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -323,7 +335,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
 ];

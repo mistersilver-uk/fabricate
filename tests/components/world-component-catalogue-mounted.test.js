@@ -1281,7 +1281,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     });
 
     it('names the WRITE on the dock rather than counting edits', async () => {
-      // Gap-list row 48. `design-system/spec.md:415` requires a bulk commit action to name the
+      // Gap-list row 48. `design-system/spec.md:434` requires a bulk commit action to name the
       // records it writes to; `Apply 2 changes` names neither the records nor the verb.
       const { target } = await selectedCatalogue();
       const apply = () => target.querySelector('[data-world-component-bulk-apply]');

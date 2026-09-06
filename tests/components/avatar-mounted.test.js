@@ -4,7 +4,7 @@
  * The GM Knowledge surface drew its roster rows and its detail header with the RECORD tile and a
  * `fas fa-user` glyph, which is the icon chip answering a question it was not asked: a record
  * falls back to a glyph and an actor falls back to INITIALS, and a person's mark is round while a
- * party's, a vehicle's or a place's is a rounded square (`library.html:1352-1358`).
+ * party's, a vehicle's or a place's is a rounded square (`library.html:1425-1431`).
  *
  * ── WHAT THIS SUITE IS FOR, AND WHY IT IS NOT A FRAME ─────────────────────────────────────
  * Both shipped call sites pass a real `character.img`, and Foundry assigns default artwork on
@@ -203,7 +203,7 @@ describe('Avatar (mounted) — the tint is class-gated, and the ring is the edge
   it('states the tint as a SEPARATE rule, and the ring as the edge`s colour', () => {
     // The DOM half above proves the vehicle is absent when unset; this proves the rules that read
     // it are gated too, which is the other half of the same argument and is unreachable from a
-    // mounted tree. A `box-shadow` ring — which is how `library.html:1354-1355` draws it — would
+    // mounted tree. A `box-shadow` ring — which is how `library.html:1427-1428` draws it — would
     // grow the tinted tile 1px per side relative to an untinted sibling in the same roster, so
     // the ring REPLACES the border colour instead.
     const styles = /<style>([\s\S]*)<\/style>/.exec(

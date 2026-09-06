@@ -34,7 +34,7 @@
   substituted for one another. Which one a strip draws is decided by what the mark MEANS:
 
    - `count`  a RECORD COUNT — how many records. A bare mono tabular numeral, no fill and
-              no border. `library.html:1008`'s `<TabBar>` specimen already draws two of
+              no border. `library.html:1081`'s `<TabBar>` specimen already draws two of
               them (`Tiers 3`, `Businesses 23`) beside one warning badge, so the tab bar
               carrying both vehicles is specified, not an extension of the specification.
    - `issue`  an ISSUE SUMMARY — how many things want attention. The filled chip, toned.

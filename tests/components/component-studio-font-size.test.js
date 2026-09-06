@@ -478,7 +478,7 @@ const EXPECTED = {
   // class is emitted nowhere. The role follows the control rather than the retired markup:
   // the fixture names what `ComponentEditView` renders today, and the new rule states 12px
   // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
-  // (px, not rem: a font size is a literal — `design-system/spec.md:216-220`.)
+  // (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
   'field-select': 12,
   // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form: the
   // read-only boxed Name/Description fields it replaced are gone, and with them

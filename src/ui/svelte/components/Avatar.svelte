@@ -3,7 +3,7 @@
   AN ACTOR'S PORTRAIT (issue 1506).
 
   ── WHY IT IS NOT THE ICON CHIP ───────────────────────────────────────────────────
-  `library.html:1352-1358` publishes the `Avatar` entry beside `Rail`, `LogList` and
+  `library.html:1425-1431` publishes the `Avatar` entry beside `Rail`, `LogList` and
   `TierTrack`, and §14's routing row separates it from the `IconChip` entry on WHAT THE
   MARK IS ABOUT: the icon chip carries a RECORD's artwork with a glyph fallback, and this
   carries an ACTOR's — a person, a party, a vehicle or a place — with an INITIALS
@@ -12,7 +12,7 @@
   taking a `kind` prop would have been two components sharing a file.
 
   ── THE SHAPE IS THE CALLER'S, AND SO IS THE KIND ─────────────────────────────────
-  `library.html:1358` states it in terms: round for people, rounded-square for
+  `library.html:1431` states it in terms: round for people, rounded-square for
   parties, vehicles and places, "but `shape` is caller-supplied, not derived: actor
   type is system-defined, and eligibility here comes from a GM world setting, not a
   type map". `shape` IS the kind, expressed as the one thing the kind decides — a
@@ -33,7 +33,7 @@
 
   THE FALLBACK TRIGGER IS THE CALLER'S. This renders initials when it is passed no
   `art`, and never compares against Foundry's default-artwork constant — which is
-  what `library.html:1360` describes and what would make this an importing component
+  what `library.html:1436` describes and what would make this an importing component
   rather than a leaf. Core assigns default artwork on creation, so the initials state
   is genuinely rare; it is specified because it is the state this tile OWNS, not
   because a shipped screen reaches it today.
@@ -65,7 +65,7 @@
 
   ── AND WHY THE RING IS A BORDER COLOUR RATHER THAN A SHADOW ─────────────────────
   The specimen's tinted tiles draw their ring as `box-shadow: 0 0 0 1px <tint>`
-  (`library.html:1354-1355`). Reproduced literally on top of the `--fab-border` edge
+  (`library.html:1427-1428`). Reproduced literally on top of the `--fab-border` edge
   this component already carries, that would be TWO hairlines where the specimen draws
   one, and it would grow the tinted tile's visual footprint by 1px per side relative
   to the untinted one — a tinted avatar and an untinted avatar in the same roster
@@ -95,7 +95,7 @@
      sentence was written. `avatar-source-contract.test.js` reds on an art-bearing
      call site that names no `alt`.
    - size: edge length in px (default 32, the specimen's single-mark rung; 26 is its
-     stacked rung). NOT restricted to the art ladder: `library.html:1352`'s caption is
+     stacked rung). NOT restricted to the art ladder: `library.html:1425`'s caption is
      "avatar, stack, member row" and says nothing about a detail header, where a 32px
      portrait would sit beside a two-line name stack taller than itself. The shipped
      population is recorded on `design-system-known-debt.json`'s `offLadderArtSizes`
@@ -131,7 +131,7 @@
   /**
    * The initials type scale, as the fraction of the box the specimen draws.
    *
-   * `library.html:1354` sets 10px inside a 32px tile, which is this ratio exactly; its stacked
+   * `library.html:1427` sets 10px inside a 32px tile, which is this ratio exactly; its stacked
    * 26px tile sets 9px, which this reproduces as 8. DERIVED rather than a prop, which is the
    * opposite of the choice `Medallion.svelte` makes for its glyph — and the difference is that
    * deriving the medallion's would have re-typed forty shipped tiles at once, while this
@@ -216,7 +216,7 @@
     /* The edge is on the BASE rule, so it is the edge in BOTH the tinted and the untinted
        state; the tinted rule recolours it rather than adding a second one. */
     border: 1px solid var(--fab-border);
-    /* A person. `library.html:1354` draws the round mark and `:1358` says which actors take
+    /* A person. `library.html:1427` draws the round mark and `:1431` says which actors take
        it. `999px` and not `50%`, because the published radius ladder carries the pill value
        and a non-square box should clamp rather than become an ellipse. */
     border-radius: 999px;
@@ -224,7 +224,7 @@
     background: var(--fab-bg-3);
   }
 
-  /* A party, a vehicle or a place (`library.html:1355`, `:1358`). r9 is the avatar ladder's own
+  /* A party, a vehicle or a place (`library.html:1428`, `:1431`). r9 is the avatar ladder's own
      rounded-square value, published in `spec.md`'s geometry requirement with this change. */
   .fab-avatar.is-square {
     border-radius: 9px;

@@ -82,7 +82,7 @@ const KNOWN_BELOW_MARK_FLOOR = new Map([['foundry-native/mauve', 2.72]]);
  * selected one. Nine of the fifty-six pairs fall under AA there, on four of the seven themes.
  *
  * They are PINNED AT THEIR MEASURED VALUES rather than waived, on the same terms as the pair
- * above: the shortfall is the palette's — `design-system/spec.md:209-212` already records
+ * above: the shortfall is the palette's — `design-system/spec.md:211-214` already records
  * re-deriving the eight offered tints as a planned migration — and not this chip's, which draws
  * whatever token the picker offers. `foundry-native` is where it bites hardest, and that theme's
  * tokens are the ones the spec's migration names. A pair listed here must not fall further; a pair

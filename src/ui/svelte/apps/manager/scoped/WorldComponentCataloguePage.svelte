@@ -940,7 +940,7 @@
   .manager-world-component-row-stat-value {
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
-    /* 500, WHICH IS THE ONLY WEIGHT THE FACE SHIPS. `design-system/spec.md:230-231` publishes
+    /* 500, WHICH IS THE ONLY WEIGHT THE FACE SHIPS. `design-system/spec.md:232-233` publishes
        the mono family at 400 and 500 only, so the reference's `font:700 12px var(--mono)` snaps
        here exactly as the control-height ladder snaps 32 and 36 to 34. */
     font-weight: 500;
@@ -988,7 +988,7 @@
   }
 
   /* THE INSPECTOR'S TWO INSETS (issue 1371, round 4). Each is a `--fab-bg-1` well lifted out of
-     the `--fab-bg-2` pane, hairline, radius 9 — `design-system/spec.md:218` puts a well on 9,
+     the `--fab-bg-2` pane, hairline, radius 9 — `design-system/spec.md:220` puts a well on 9,
      which is the reference's own value.
 
      ITS PADDING SNAPS. The reference draws 10px block / 11px inline and the published spacing
@@ -1017,7 +1017,7 @@
     margin: 0;
   }
 
-  /* THE ADDRESS, in the mono face at the weight the face ships (`spec.md:230-231`). It breaks
+  /* THE ADDRESS, in the mono face at the weight the face ships (`spec.md:232-233`). It breaks
      inside a word because a uuid has no spaces and a 300px column has no room for one. */
   .manager-world-component-inspector-uuid {
     margin: 0;
