@@ -92,7 +92,7 @@ function installDeterminismStyles() {
 
       \`scrollbar-gutter: stable\` reserves gutter space on any element that is a SCROLL CONTAINER,
       and \`overflow: hidden\` makes one. The \`*\` therefore carved ~10px out of the content box of
-      every clipping element under the window — \`.crafting-thumb\` measured a 44px box with a 34px
+      every clipping element under the window — the crafting recipe row's 44px art tile measured a 34px
       content box, so every item image in every published frame was drawn narrow, left-aligned and
       needlessly cropped by its own \`object-fit: cover\`.
 

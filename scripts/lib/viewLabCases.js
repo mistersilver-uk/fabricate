@@ -11427,9 +11427,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-essence-shopping',
     label: 'Player app — Crafting essence shopping',
     smokeLabels: ['player-crafting-essence-shopping'],
-    // The counterpart's condition is an essence thumb inside the shopping list's acquire card:
-    // `[data-shopping-acquire-components] .crafting-essence-thumb`, reached by pressing a recipe
-    // row's cart button.
+    // The counterpart's condition is an essence tile inside the shopping list's acquire card:
+    // `[data-shopping-acquire-components] [data-medallion="glyph"]`, reached by pressing a recipe
+    // row's cart button. (Issue 1506 retired the crafting essence thumb into the shared art
+    // tile, so the smoke waits on that tile's glyph face rather than on a class of its own.)
     //
     // Rivet Chainmail Shirt rather than the previously-selected Deepbind, because the card lists
     // what is MISSING and Deepbind's essences are fully fundable — adding it produced "0 missing

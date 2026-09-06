@@ -17,9 +17,10 @@
   datum lives in the view-model but drives no rendering here).
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
   import Chip from '../../../../components/Chip.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { toolStates = [] } = $props();
 
@@ -39,7 +40,7 @@
         data-inventory-salvage-tool={tool.componentId ?? tool.name ?? ''}
         data-io-satisfied={tool.available ? 'true' : 'false'}
       >
-        <CraftingThumb src={tool.img ?? ''} alt="" size={24} />
+        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={24} />
         <span class="salvage-tools-name">{tool.name}</span>
         {#if tool.available}
           <Chip tone="positive" icon="fas fa-screwdriver-wrench"

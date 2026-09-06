@@ -1430,12 +1430,15 @@ describe('recipe image readers resolve the recipe own image through the shared h
   // prop is `selectedRecipe` and it has no `recipe` in scope at its render site at all.
   //
   // READ AS TAGS RATHER THAN AS A LITERAL PREFIX (issue 1506). These four assertions pinned
-  // `'<Medallion src={resolveRecipeImage(recipe)}'` as a substring, which is a claim about the
-  // FORMATTING as much as about the call: renaming the prop `art` widened two of these tags past
-  // the print width and Prettier broke them over five lines, at which point the substring matched
-  // nothing and the guard reported a borrow that had not happened. The property is unchanged —
-  // this surface resolves ITS OWN identifier through the one shared chokepoint — and it is now
-  // asked of the tag rather than of the line.
+  // `'<Medallion src={resolveRecipeImage(recipe)}'` and `'<img class="manager-recipe-thumb" …'`
+  // as substrings, which is a claim about the FORMATTING as much as about the call: renaming the
+  // prop `art` widened two of these tags past the print width and Prettier broke them over five
+  // lines, at which point the substring matched nothing and the guard reported a borrow that had
+  // not happened. The two Access surfaces went further and stopped being raw `<img>` elements at
+  // all when the art-tile unification converted them, so their DOM shape is no longer the
+  // distinguishing fact either. The property is unchanged — each surface resolves ITS OWN
+  // identifier through the one shared chokepoint — and it is now asked of the tag rather than of
+  // the line, over all four surfaces rather than over two shapes.
   it('calls the resolver at each existing render site with that surface own identifier', () => {
     const bindsArtThrough = (source, expression) =>
       openingTagsNamed(source, 'Medallion').some((tag) =>
@@ -1450,16 +1453,12 @@ describe('recipe image readers resolve the recipe own image through the shared h
       'the library inspector hero resolves its selectedRecipe prop'
     );
     assert.ok(
-      accessSurfaceSource.includes(
-        '<img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)}'
-      ),
-      'the Access row keeps its plain thumbnail element and only changes the src'
+      bindsArtThrough(accessSurfaceSource, 'recipe'),
+      'the Access row resolves the row recipe through the same chokepoint'
     );
     assert.ok(
-      grantAccessInspectorSource.includes(
-        '<img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)}'
-      ),
-      'the Grant Access header keeps its plain thumbnail element and only changes the src'
+      bindsArtThrough(grantAccessInspectorSource, 'recipe'),
+      'and so does the Grant Access header'
     );
   });
 

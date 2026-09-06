@@ -12,10 +12,11 @@
   meta chip. Warning/neutral/info blockers keep the compact meta badge.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
-  import CraftingThumb from './CraftingThumb.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
 
   let {
@@ -83,7 +84,7 @@
   >
     <span class="crafting-recipe-row-thumb" class:is-uncraftable={uncraftable}>
       <span class="crafting-recipe-row-thumb-media">
-        <CraftingThumb src={recipe?.img} alt="" size={44} />
+        <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={44} />
       </span>
       {#if uncraftable}
         <span class="crafting-recipe-row-thumb-scrim" aria-hidden="true"></span>
@@ -220,11 +221,12 @@
     opacity: 0.4;
   }
 
-  /* Flat error wash over the dimmed thumbnail (matches CraftingThumb's radius). */
+  /* Flat error wash over the dimmed thumbnail (matches the shared tile's radius, which
+     issue 1506 moved from the retired thumb's 6px to the medallion's 9px). */
   .crafting-recipe-row-thumb-scrim {
     position: absolute;
     inset: 0;
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-danger-soft);
     pointer-events: none;
   }

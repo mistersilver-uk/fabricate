@@ -142,7 +142,9 @@ describe('ShoppingList mounted behavior', () => {
     const card = target.querySelector('[data-shopping-acquire-components]');
     assert.ok(card, 'components card rendered for the essence');
     assert.match(card.textContent, /Fire/);
-    const thumb = card.querySelector('.crafting-essence-thumb');
+    // Issue 1506: the acquire card's essence row draws the ONE shared art tile in its glyph
+    // face, so it is read by that tile's own hook rather than by a retired class.
+    const thumb = card.querySelector('[data-medallion="glyph"]');
     assert.ok(thumb, 'essence icon tile rendered');
     assert.match(thumb.getAttribute('style'), /28px/, 'shopping glyph keeps 28px geometry');
     assert.ok(thumb.querySelector('i').classList.contains('fa-fire'));

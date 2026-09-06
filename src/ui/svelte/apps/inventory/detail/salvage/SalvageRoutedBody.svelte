@@ -22,9 +22,10 @@
   runless salvage, which records nothing — no tier is marked.
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
   import Chip from '../../../../components/Chip.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { salvage = null, result = null } = $props();
 
@@ -102,9 +103,9 @@
                   class="salvage-outcome-result"
                   data-inventory-salvage-result={entry.componentId}
                 >
-                  <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
-                       rather than a broken-image glyph. -->
-                  <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
+                  <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: missing
+                       art gets the house fallback rather than a broken-image glyph. -->
+                  <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={14} />
                   <span class="salvage-outcome-result-name">{entry.name}</span>
                   <span class="salvage-outcome-result-qty">×{entry.quantity}</span>
                 </li>

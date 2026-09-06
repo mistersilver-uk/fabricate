@@ -24,12 +24,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
     // The shared eyebrow (issue 1505). The panel's title is a `<Kicker>` inside the
     // panel's own flex row, so omitting it HANGS this suite (# cancelled), never fails it.

@@ -221,7 +221,12 @@ export function isExemptSpacingPixels(pixels) {
 // 892 -> 890 (issue 1506): the crafting `QuantityTag` was the third and last of the retired
 // look-alikes, taking a 5px gap and an 8px padding. Seven occupancies in all, one per rule those
 // three files declared; the chip they converged onto declares its own once.
-export const KNOWN_RAW_SPACING_TOTAL = 890;
+// 890 -> 889 (issue 1506): the crafting `CraftingThumb` was DELETED with the art-tile
+// unification, taking the ONE occupancy it declared — the 6px padding its `is-fallback` rule
+// insetted a house-fallback image by. That treatment is dropped rather than restated, so the
+// slot is not left open anywhere; `CraftingEssenceThumb` went in the same commit and had no
+// spacing row at all. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 889;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

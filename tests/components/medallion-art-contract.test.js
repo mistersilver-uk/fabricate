@@ -40,6 +40,21 @@ const ART = 'art';
 const DEPRECATED_ALIAS = 'src';
 
 /**
+ * THE THIRD WAY A CALL SITE PASSES ART, and the reason this is not just an attribute scan.
+ *
+ * The thirty-two converted crafting tiles do not write `art=` at all: they spread the shared art
+ * resolver, `<Medallion {...resolveCraftingArt(row.img)} alt="" size={30} />`, because the choice
+ * between a record's own image, Foundry's item-bag sentinel, a fallback glyph and the house
+ * blueprint is one decision and belongs in one place. A scan that read attributes alone would
+ * report thirty-two art-bearing tiles as glyph-only and exempt every one of them from the clause
+ * below — the largest hole this contract could have, and a silent one.
+ *
+ * The spread counts because the resolver's return ALWAYS carries an `art` key, in both branches,
+ * which `crafting-art-resolution.test.js` pins directly.
+ */
+const ART_RESOLVER = 'resolveCraftingArt(';
+
+/**
  * EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing.
  *
  * A negative clause — "no art-bearing tile is silent about `alt`" — is satisfied by a tree with
@@ -50,10 +65,10 @@ const DEPRECATED_ALIAS = 'src';
  * specifier depths, one local name), which is what makes a tag-name scan the whole population
  * rather than most of it.
  */
-const MEDALLION_SITES = 27;
+const MEDALLION_SITES = 65;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 17;
+const ART_BEARING_SITES = 52;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
@@ -82,6 +97,16 @@ function names(tag, prop) {
   );
 }
 
+/**
+ * Does this tag pass artwork, by any of the three routes a call site has?
+ *
+ * @param {string} tag one opening tag's source text
+ * @returns {boolean}
+ */
+function bindsArt(tag) {
+  return names(tag, ART) || names(tag, DEPRECATED_ALIAS) || tag.includes(ART_RESOLVER);
+}
+
 describe('1506 the medallion art contract — its domain', () => {
   it('is every render site in `src/`, counted so the clauses below cannot be vacuous', () => {
     assert.equal(
@@ -92,7 +117,7 @@ describe('1506 the medallion art contract — its domain', () => {
         'below honest, so it is re-measured deliberately rather than left to drift.'
     );
     assert.equal(
-      TAGS.filter(({ tag }) => names(tag, ART) || names(tag, DEPRECATED_ALIAS)).length,
+      TAGS.filter(({ tag }) => bindsArt(tag)).length,
       ART_BEARING_SITES,
       'the art-bearing population moved; the rest of the sites are glyph-only, where `alt` is moot'
     );
@@ -101,9 +126,9 @@ describe('1506 the medallion art contract — its domain', () => {
 
 describe('1506 the medallion art contract — `alt` is a decision, not a default', () => {
   it('is named at every call site that passes artwork, in either spelling', () => {
-    const silent = TAGS.filter(
-      ({ tag }) => (names(tag, ART) || names(tag, DEPRECATED_ALIAS)) && !names(tag, 'alt')
-    ).map(({ path, tag }) => `${path}: ${tag.replaceAll(/\s+/g, ' ')}`);
+    const silent = TAGS.filter(({ tag }) => bindsArt(tag) && !names(tag, 'alt')).map(
+      ({ path, tag }) => `${path}: ${tag.replaceAll(/\s+/g, ' ')}`
+    );
 
     assert.deepEqual(
       silent,
@@ -138,18 +163,19 @@ describe('1506 the medallion art contract — `alt` is a decision, not a default
       '<Medallion src={row.img} size={40} />',
       '<Medallion art={row.img} alt="" size={40} />',
       '<Medallion {art} {alt} size={40} />',
+      '<Medallion {...resolveCraftingArt(row.img)} size={40} />',
       '<Medallion icon="fas fa-cube" size={40} />',
     ].join('\n');
     const tags = openingTagsNamed(fixture, 'Medallion');
-    assert.equal(tags.length, 5, 'the tag reader finds every call in the fixture');
+    assert.equal(tags.length, 6, 'the tag reader finds every call in the fixture');
     assert.deepEqual(
       tags.map(
-        (tag) =>
-          `${names(tag, ART) || names(tag, DEPRECATED_ALIAS) ? 'art' : 'glyph'}/${names(tag, 'alt') ? 'alt' : 'silent'}`
+        (tag) => `${bindsArt(tag) ? 'art' : 'glyph'}/${names(tag, 'alt') ? 'alt' : 'silent'}`
       ),
-      ['art/silent', 'art/silent', 'art/alt', 'art/alt', 'glyph/silent'],
-      'the detector reads the shorthand binding as well as the attribute one, and reads the ' +
-        'deprecated alias as artwork — the two ways a silent site would otherwise escape'
+      ['art/silent', 'art/silent', 'art/alt', 'art/alt', 'art/silent', 'glyph/silent'],
+      'the detector reads the shorthand binding as well as the attribute one, reads the ' +
+        'deprecated alias as artwork, and reads a spread of the shared resolver as artwork — ' +
+        'the three ways a silent site would otherwise escape'
     );
   });
 });

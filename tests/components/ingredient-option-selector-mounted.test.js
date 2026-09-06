@@ -24,13 +24,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     // Issue 1506: the have/need tag retired into the shared chip, which this list reaches
     // through the `<Select>` closure rather than by a hand-written literal of its own.
     ...SELECT_COMPILED_MODULES,
@@ -92,11 +92,13 @@ describe('IngredientOptionSelector mounted behavior', () => {
     };
     const target = await harness.mount({ choices: [choice], onChoose: null });
     const radio = target.querySelectorAll('[role="radio"]')[1];
-    const thumb = radio.querySelector('.crafting-essence-thumb');
-    assert.ok(thumb, 'essence alternative uses a glyph thumb');
+    // Issue 1506 retired the crafting essence tile into the ONE shared tile, so the glyph
+    // face is now a `[data-medallion="glyph"]` rather than a class of its own.
+    const thumb = radio.querySelector('[data-medallion="glyph"]');
+    assert.ok(thumb, 'essence alternative uses a glyph tile');
     assert.match(thumb.getAttribute('style'), /40px/, 'alternative glyph keeps 40px geometry');
     assert.ok(thumb.querySelector('i').classList.contains('fa-heart'));
-    assert.equal(radio.querySelector('img'), null);
+    assert.ok(!radio.querySelector('img'), 'and draws no artwork beside it');
     assert.equal(radio.getAttribute('aria-checked'), 'false');
     assert.match(radio.getAttribute('aria-label'), /Restorative essence/);
     assert.match(radio.textContent, /0\/1/, 'have/need remains visible');

@@ -490,8 +490,13 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // literal cannot see through a second level of spread — and argued once at that roster.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/StatBox.svelte',
-  'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-  'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
+  // The ONE art tile (issue 1506). It replaced `CraftingThumb` and `CraftingEssenceThumb`, which
+  // were entries here, and it joins IN PLACE for the reason they were here: the eleven suites
+  // that spread this constant render it, and ten of them never named a thumb path at all, so a
+  // roster of its own would have left ten suites HANGING (# cancelled) with nothing naming the
+  // omission. It is also a `SHARED_PRIMITIVES` member now, so an omission is the NAMED failure
+  // of `mounted-harness-primitive-allowlist.test.js` rather than a silent hang.
+  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/CraftButton.svelte',

@@ -23,9 +23,10 @@
   Prop-driven; learning routes back through the store seams.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';
-  import CraftingThumb from '../../crafting/CraftingThumb.svelte';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
 
@@ -298,7 +299,7 @@
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
         <div class="inventory-detail-accordion-header">
           <span class="inventory-detail-book-recipe-static">
-            <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
+            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
             <span class="inventory-detail-row-name">{recipe.name}</span>
           </span>
           {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(
@@ -341,7 +342,7 @@
                   aria-expanded={expanded}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
-                  <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
                   <span class="inventory-detail-row-name">{recipe.name}</span>
                   <i
                     class="fas inventory-detail-accordion-caret"

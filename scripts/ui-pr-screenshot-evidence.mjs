@@ -980,37 +980,37 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-essence-legacy',
     label: 'Player crafting — legacy set-level essence authored icon',
     smokeLabels: ['player-crafting-essence-legacy'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
-    ],
+    // Issue 1506 DELETED the second matcher, `CraftingEssenceThumb.svelte`, rather than
+    // re-pointing it: that component was retired into the shared art tile, so the pattern
+    // could never match again while this test went on passing — a mirror whose guard cannot
+    // see its own staleness. Re-pointing it at the shared tile would hang four smoke-only
+    // labels on every future change to a primitive with forty-four importers, and those
+    // labels are producible only by the local ~26-minute Foundry run. The surviving
+    // co-located matcher carries the recipe on its own: legacy set-level essences keep their
+    // row presentation inside the IO table.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/],
   },
   {
     id: 'player-crafting-essence-ingredient',
     label: 'Player crafting — first-class essence ingredient authored icon',
     smokeLabels: ['player-crafting-essence-ingredient'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
-    ],
+    // The essence-thumb matcher is deleted here too; see the block above for why, and for why
+    // the IO table alone still carries this recipe.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/],
   },
   {
     id: 'player-crafting-essence-alternative',
     label: 'Player crafting — essence OR-alternative authored icon',
     smokeLabels: ['player-crafting-essence-alternative'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/,
-    ],
+    // Essence-thumb matcher deleted; see above. The option card is this recipe's own surface.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/],
   },
   {
     id: 'player-crafting-essence-shopping',
     label: 'Player crafting — Shopping List essence shortage authored icon',
     smokeLabels: ['player-crafting-essence-shopping'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/,
-    ],
+    // Essence-thumb matcher deleted; see above. The shopping list is this recipe's own surface.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/],
   },
   {
     id: 'player-crafting-stacked',

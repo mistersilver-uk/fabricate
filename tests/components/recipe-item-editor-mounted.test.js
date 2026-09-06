@@ -36,6 +36,7 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
@@ -47,6 +48,7 @@ const harness = createMountedComponentHarness({
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
     // ONE chip (issue 883) and the shared no-state primitive (issue 785).
@@ -56,7 +58,6 @@ const harness = createMountedComponentHarness({
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
     // the compiled router imports every child statically, so the whole `detail/` tree

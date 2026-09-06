@@ -498,7 +498,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
   // The RecipeItemEditor's "How players see it" rail embeds the REAL player
-  // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
+  // InventoryDetail (which pulls in the shared art tile → craftingArtResolution) fed a
   // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
   // or mounting the manager tree that renders the editor HANGS (# cancelled).
   // InventoryDetail is a thin router (issue 675); its `{#if}` branches do NOT keep the
@@ -527,7 +527,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [
     'RecipeItemEditorTabs',
     'RecipeItemOverviewTab',
@@ -722,6 +721,10 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    // The art decision the retired crafting tile owned (issue 1506). The embedded player
+    // preview's whole `detail/` tree resolves its tiles through it, and this suite has NO
+    // dependency validator, so omitting it HANGS the suite as `# cancelled`.
+    'craftingArtResolution.js',
     // The essence colour fold (issue 1036), shared by the player card's tile and pips and by
     // the inventory inspector's tile and essence chips. `InventoryItemCard` is compiled into
     // this tree for the editor's "How players see it" preview and imports it statically, so

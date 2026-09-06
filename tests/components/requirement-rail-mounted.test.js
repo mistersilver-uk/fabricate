@@ -109,14 +109,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/requirementSlots.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`, so
     // omitting it HANGS this suite (# cancelled), never fails it.
@@ -239,29 +239,36 @@ describe('RequirementRail mounted behavior', () => {
     assert.deepEqual(pips, ['2/2', '0/1', '2/4']);
   });
 
+  // ISSUE 1506 MOVED THE VEHICLE, not the behaviour. The authored key used to reach the glyph as
+  // a `--fab-chip-color` inherited from the slot wrapper, because the retired essence tile took
+  // no colour argument. The shared tile takes a `tint` PROP, so the property is emitted by the
+  // tile itself and the wrapper carries no style at all.
   it('tints an authored essence glyph through the shared tag palette', async () => {
     const target = await harness.mount({ slots: slots() });
     const essence = tilesIn(target)[2];
-    const tile = essence.querySelector('.requirement-slot-tile');
-    assert.match(tile.getAttribute('style'), /--fab-chip-color: var\(--fab-tag-butter\)/);
-    assert.ok(essence.querySelector('.requirement-slot-glyph i').classList.contains('fa-sun'));
+    const glyph = essence.querySelector('[data-medallion="glyph"]');
+    assert.equal(glyph.dataset.medallionTint, 'butter', 'the authored key reaches the tile');
+    assert.match(glyph.getAttribute('style'), /--fab-medallion-tint:\s*var\(--fab-tag-butter\)/);
+    assert.ok(glyph.querySelector('i').classList.contains('fa-sun'));
   });
 
-  // One essence, ONE component. The rail used to inline its own glyph box while
-  // CraftingEssenceThumb still rendered the same essence in the alternatives picker and
-  // the shopping list, so one screen drew the same thing two ways. The tint survives the
-  // component boundary because it is an inherited custom property on the ANCESTOR, which
-  // is exactly why a second component was never needed to carry it.
-  it('draws the essence glyph with the shared CraftingEssenceThumb', async () => {
+  // One essence, ONE component — and since issue 1506 one component for the whole app, not just
+  // for the Crafting tab. The rail used to inline its own glyph box; then the crafting essence
+  // tile carried it; now the shared `Medallion` does, so the alternatives picker, the shopping
+  // list and this rail draw the same essence through the same tile as every manager screen.
+  //
+  // The smoke harness waits inside `[data-slot-kind="essence"]` on the tile's own data hook,
+  // which is what the retired caller-owned `requirement-slot-glyph` class used to provide; the
+  // shared tile has no `class` prop and needs none, so the hook must survive HERE.
+  it('draws the essence glyph with the shared tile', async () => {
     const target = await harness.mount({ slots: slots() });
-    const glyph = tilesIn(target)[2].querySelector('.requirement-slot-glyph');
-    assert.ok(glyph.classList.contains('crafting-essence-thumb'), 'the shared thumb renders it');
-    // The smoke harness waits on `.requirement-slot-glyph`, so the hook must survive.
+    const glyph = tilesIn(target)[2].querySelector('[data-medallion]');
+    assert.ok(Boolean(glyph), 'the shared tile renders it, and the smoke harness can find it');
     const style = glyph.getAttribute('style');
-    assert.match(style, /--crafting-essence-thumb-size:\s*44px/);
-    // 44 * 0.42 rounds to the 18px the rail hard-coded before it shared this component.
-    assert.match(style, /--crafting-essence-icon-size:\s*18px/);
-    assert.match(style, /--crafting-essence-thumb-radius:\s*8px/);
+    assert.match(style, /width:\s*44px;\s*height:\s*44px/);
+    // 44 * 0.42 rounded to the 18px the retired tile computed, passed explicitly so the glyph
+    // does not fall back to the primitive's flat 0.9rem and shrink inside a 44px slot.
+    assert.match(style, /--fab-medallion-glyph:\s*18px/);
   });
 
   // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, or
@@ -279,8 +286,15 @@ describe('RequirementRail mounted behavior', () => {
     const target = await harness.mount({
       slots: slots([{ ...STATES[2], colorToken: null }]),
     });
-    const tile = tilesIn(target)[0].querySelector('.requirement-slot-tile');
-    assert.equal(tile.getAttribute('style'), '', 'no custom property, so the CSS default applies');
+    const glyph = tilesIn(target)[0].querySelector('[data-medallion="glyph"]');
+    assert.ok(
+      !glyph.hasAttribute('data-medallion-tint'),
+      'no authored key, so the tile emits no tint hook'
+    );
+    assert.ok(
+      !/--fab-medallion-tint/.test(glyph.getAttribute('style')),
+      'and no custom property, so the primitive own `var()` fallback paints the theme accent'
+    );
   });
 
   it('reports the opened slot id on click', async () => {

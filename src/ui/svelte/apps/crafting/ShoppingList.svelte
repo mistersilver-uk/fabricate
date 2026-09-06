@@ -8,10 +8,11 @@
   repair. Fully-owned components never appear.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
+  import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingEssenceThumb from './CraftingEssenceThumb.svelte';
   import StatBox from '../../components/StatBox.svelte';
-  import CraftingThumb from './CraftingThumb.svelte';
 
   let {
     aggregate = null,
@@ -264,7 +265,7 @@
                 title={entry.name}
                 onclick={() => onIncrement?.(entry.recipeId)}
               >
-                <CraftingThumb src={entry.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={28} />
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
@@ -291,9 +292,9 @@
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <CraftingEssenceThumb icon={row.icon} size={28} />
+                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={28} glyph={12} />
                 {:else}
-                  <CraftingThumb src={row.img} alt="" size={28} />
+                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
                 <span
@@ -317,7 +318,7 @@
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
-                <CraftingThumb src={tool.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
                 <span class="crafting-shopping-acquire-name" title={tool.name}>{tool.name}</span>
                 <span
                   class={`crafting-shopping-chip ${tool.needsRepair ? 'tone-warning' : 'tone-danger'}`}

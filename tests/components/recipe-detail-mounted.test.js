@@ -175,7 +175,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
     assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
 
-    assert.ok(sufficient.querySelector('.crafting-thumb img'), 'tile renders the component image');
+    assert.ok(sufficient.querySelector('[data-medallion="image"] img'), 'tile renders the image');
     assert.equal(
       sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
       '2/2',
@@ -223,14 +223,17 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
-    const essenceGlyph = tiles[0].querySelector('.requirement-slot-glyph i');
+    const essenceGlyph = tiles[0].querySelector('[data-medallion="glyph"] i');
     assert.ok(essenceGlyph, 'first-class essence renders an authored glyph, not an image');
     assert.ok(essenceGlyph.classList.contains('fa-heart'));
     assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
     assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
-    assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
+    assert.equal(
+      tiles[1].querySelector('[data-medallion="image"] img').getAttribute('src'),
+      'icons/iron.webp'
+    );
 
     const legacyIcons = target.querySelectorAll(
       '[data-io-group="essences"] .crafting-io-essence-icon'
@@ -255,7 +258,7 @@ describe('RecipeDetail mounted behavior', () => {
       '[data-io-group="tools"] .crafting-io-row .crafting-io-tool-label'
     );
     assert.ok(label, 'tool label wrapper rendered');
-    const thumb = label.querySelector('.crafting-thumb img');
+    const thumb = label.querySelector('[data-medallion="image"] img');
     const name = label.querySelector('.crafting-io-name');
     assert.ok(thumb, 'tool image rendered');
     assert.equal(name.textContent.trim(), 'Mortar & Pestle');
@@ -322,7 +325,10 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
 
     // Product tile with a quantity pip.
-    assert.ok(cardA.querySelector('.crafting-option-product .crafting-thumb img'), 'product image');
+    assert.ok(
+      cardA.querySelector('.crafting-option-product [data-medallion="image"] img'),
+      'product image'
+    );
     assert.equal(
       cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
       '×1',

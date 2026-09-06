@@ -12758,24 +12758,30 @@ async function main() {
             const firstClass = await selectCraftingRecipeByName(
               'Smoke First-Class Essence Draught'
             );
-            // Issue 917 re-point: a first-class essence requirement is no longer a
-            // CraftingEssenceThumb inside the ingredient image grid — it is a rail slot
-            // whose glyph carries the authored icon and colour token. The predecessor
-            // selector paired the ingredients group with that thumb class; it now matches
-            // nothing here (the thumb survives only on the alternatives option cards and
-            // in the Shopping List), so waiting on it would time out and fail the whole
-            // step. The `data-io-group="ingredients"` wrapper itself survives as the rail's
-            // container, which is why the wait below re-anchors on the rail section rather
-            // than on that wrapper.
+            // Issue 917 re-point: a first-class essence requirement is no longer a separate
+            // essence thumb inside the ingredient image grid — it is a rail slot whose glyph
+            // carries the authored icon and colour token. The predecessor selector paired the
+            // ingredients group with that thumb class; it matches nothing here, so waiting on
+            // it would time out and fail the whole step. The `data-io-group="ingredients"`
+            // wrapper itself survives as the rail's container, which is why this wait anchors
+            // on the rail section rather than on that wrapper.
+            //
+            // Issue 1506 re-point: the slot's glyph is the ONE shared art tile now, which has
+            // no `class` prop, so the caller-owned `requirement-slot-glyph` hook is gone. The
+            // tile's own `data-medallion` attribute says the same thing inside a slot this
+            // selector already narrows by kind.
             await appShell
-              .locator('[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] .requirement-slot-glyph')
+              .locator('[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] [data-medallion]')
               .first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-ingredient');
 
             await firstClass.row.locator('.crafting-recipe-row-add').click({ timeout: 5_000 });
-            await appShell.locator('[data-shopping-acquire-components] .crafting-essence-thumb').first()
+            // Issue 1506: the acquire card's essence row draws the shared art tile in its
+            // GLYPH face. `[data-medallion="glyph"]` keeps that row distinct from the item
+            // rows above it, which draw the same tile carrying artwork.
+            await appShell.locator('[data-shopping-acquire-components] [data-medallion="glyph"]').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-shopping');
@@ -12881,7 +12887,8 @@ async function main() {
                 slots: rail.querySelectorAll('[data-requirement-slot]').length,
                 bagImages: Array.from(rail.querySelectorAll('img'))
                   .filter((img) => String(img.getAttribute('src') ?? '').includes('item-bag')).length,
-                glyphTiles: rail.querySelectorAll('.crafting-thumb.is-glyph').length,
+                // Issue 1506: the fallback glyph is the shared art tile's glyph face.
+                glyphTiles: rail.querySelectorAll('[data-medallion="glyph"]').length,
                 openChoosers: document.querySelectorAll(
                   '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
                 ).length

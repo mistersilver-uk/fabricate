@@ -40,10 +40,12 @@ const harness = createMountedComponentHarness({
     // so this one entry covers both edges.
     'src/systems/companionContract.js',
   ],
-  // `Medallion.svelte` is NOT in the shared CRAFTING_APP_COMPILED_MODULES list, and
-  // a `.svelte` the tree renders but the allowlist omits HANGS this file (reported
-  // as `# cancelled`) rather than failing it. Both lists are inlined here, following
-  // the tool-studio-mounted precedent.
+  // Both lists are inlined here, following the tool-studio-mounted precedent. A `.svelte` the
+  // tree renders but the allowlist omits HANGS this file (reported as `# cancelled`) rather
+  // than failing it — except for `Medallion`, which issue 1506 put on `SHARED_PRIMITIVES`, so
+  // its omission is now the named failure of `mounted-harness-primitive-allowlist.test.js`. It
+  // is still listed here rather than reached through `CRAFTING_APP_COMPILED_MODULES`, which
+  // this suite does not spread.
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',

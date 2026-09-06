@@ -431,8 +431,6 @@
   "unregisteredSharedComponents": [
     "src/ui/svelte/apps/alchemy/EssenceChips.svelte | 1",
     "src/ui/svelte/apps/crafting/CraftButton.svelte | 1",
-    "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte | 1",
-    "src/ui/svelte/apps/crafting/CraftingThumb.svelte | 1",
     "src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte | 1",
     "src/ui/svelte/apps/crafting/detail/IoTable.svelte | 1",
     "src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte | 1",

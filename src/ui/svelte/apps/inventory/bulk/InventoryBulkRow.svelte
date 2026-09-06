@@ -14,11 +14,13 @@
   `.inventory-detail-row-name` leaf, the ellipsis behaviour, the box — which is the
   point: this is the ONE place that markup exists instead of four near-copies.
 
-  `CraftingThumb` at a FIXED 30px. `InventoryItemCard`'s recorded reason for
-  declining it (its hard-set width/height fights a responsive `aspect-ratio`
-  square) does not apply to a row thumb that is a fixed size by design, and using
-  it means a result with no authored artwork gets the house fallback rather than a
-  broken-image glyph.
+  The shared `Medallion` at a FIXED 30px, through `resolveCraftingArt` (issue 1506;
+  it was `CraftingThumb` until that change retired the crafting tiles into the one
+  primitive). `InventoryItemCard`'s recorded reason for declining the retired thumb
+  (its hard-set width/height fights a responsive `aspect-ratio` square) does not
+  apply to a row thumb that is a fixed size by design, and resolving through the
+  shared helper means a result with no authored artwork gets the house fallback
+  rather than a broken-image glyph.
 
   Props:
    - img / name: the row's artwork and its (already-localized or authored) name.
@@ -28,13 +30,14 @@
    - trailing: the right-hand snippet described above.
 -->
 <script>
-  import CraftingThumb from '../../crafting/CraftingThumb.svelte';
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
 
   let { img = '', name = '', note = '', attrs = {}, trailing = null } = $props();
 </script>
 
 <li class="bulk-row" {...attrs}>
-  <CraftingThumb src={img} alt="" size={30} />
+  <Medallion {...resolveCraftingArt(img)} alt="" size={30} />
   <span class="bulk-row-text">
     <!-- The shell's shared leaf, not a private copy: the queue row's name then
          reads exactly like the inspector's own row names. -->

@@ -958,7 +958,7 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
   assert.ok(
     domain.length >= 60,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 75 this tree holds. With none, the register below is empty and ` +
+      `caller bar, against the 71 this tree holds. With none, the register below is empty and ` +
       'this property is satisfied by a broken scan.'
   );
   assert.ok(

@@ -787,21 +787,38 @@ describe('UI PR screenshot evidence', () => {
 
   it('maps all four player crafting essence icon states to dedicated evidence views', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
-    const views = mapChangedFilesToViews([
-      'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-    ]);
-    const ids = views.map((view) => view.id);
-    for (const id of [
-      'player-crafting-essence-legacy',
-      'player-crafting-essence-ingredient',
-      'player-crafting-essence-alternative',
-      'player-crafting-essence-shopping',
-    ]) {
-      assert.ok(ids.includes(id), `${id} is collected for the shared essence thumb`);
+
+    // RE-DRIVEN from the surviving co-located matchers (issue 1506). All four recipes used to
+    // name `CraftingEssenceThumb.svelte` as well, and this test drove all four from that one
+    // path; the change retired that component into the shared art tile, so the path can never
+    // match again. Each recipe is now driven from the surface it actually photographs, which is
+    // also the check that has teeth: a recipe left resting on a deleted matcher alone would
+    // collect nothing and this loop would say so.
+    const drivenBy = {
+      'player-crafting-essence-legacy': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+      'player-crafting-essence-ingredient': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+      'player-crafting-essence-alternative':
+        'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
+      'player-crafting-essence-shopping': 'src/ui/svelte/apps/crafting/ShoppingList.svelte',
+    };
+    for (const [id, changedFile] of Object.entries(drivenBy)) {
+      const views = mapChangedFilesToViews([changedFile]);
       const view = views.find((candidate) => candidate.id === id);
+      assert.ok(Boolean(view), `${id} is collected for ${changedFile}`);
       assert.deepEqual(view.smokeLabels, [id]);
       assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
     }
+
+    // And none of the four DEDICATED recipes claims the retired path any more. It still selects
+    // the broad `apps/crafting/` frames, which is the glob's business and not this loop's; what
+    // must not survive is a single-label essence recipe resting on a matcher that can never fire.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte'])
+        .map((view) => view.id)
+        .filter((id) => id in drivenBy),
+      [],
+      'no essence evidence view may be selected by a component that is not in the tree'
+    );
     assert.match(harness, /icon: 'fas fa-star-of-life'/);
     assert.match(harness, /name: 'Smoke Legacy Essence Seal'/);
     assert.match(harness, /name: 'Smoke First-Class Essence Draught'/);
@@ -928,24 +945,25 @@ describe('UI PR screenshot evidence', () => {
   it('re-points the pinned crafting selectors the requirement rail moved', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 
-    // DEAD: a first-class essence requirement is no longer a CraftingEssenceThumb in the
-    // ingredient image grid, so this selector matches nothing and would time out.
+    // DEAD: a first-class essence requirement is no longer an essence thumb in the ingredient
+    // image grid, so this selector matches nothing and would time out. Issue 1506 retired that
+    // component outright, so the class it named cannot be rendered by anything.
     assert.equal(
-      harness.includes(`[data-io-group="ingredients"] .crafting-essence-thumb`),
+      harness.includes(`.crafting-essence-thumb`),
       false,
-      'the ingredient-grid essence-thumb selector must be re-pointed at the rail'
+      'the retired essence-thumb class must not be waited on anywhere in the walk'
     );
     assert.ok(
       harness.includes(
-        `[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] .requirement-slot-glyph`
+        `[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] [data-medallion]`
       ),
-      'the first-class essence wait must target the rail slot glyph'
+      'the first-class essence wait must target the rail slot tile'
     );
 
     // SURVIVES: legacy set-level essences keep their row presentation, and the Shopping
-    // List still renders the shared essence thumb.
+    // List still renders an essence tile — the shared one, in its glyph face, since 1506.
     assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
-    assert.ok(harness.includes(`[data-shopping-acquire-components] .crafting-essence-thumb`));
+    assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
     // The alternatives picker is now the chooser ONE slot opens, so the walk must open
     // that slot before waiting on the section.

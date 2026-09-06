@@ -269,10 +269,12 @@ export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
  * A `var()` token is RESOLVED through the corpus's own definitions and pinned as
  * `raw => resolved`, so moving a banned literal into a private token does not pay the debt down.
  * One token is live debt on this base: `--fab-books-control-radius` is 5px and is read three
- * times. Two others resolve to compliant values and are correctly absent —
- * `--fab-books-panel-radius` is 6px, which is on the ladder, and
- * `--crafting-essence-thumb-radius` is set from markup so the scan reaches only its 6px fallback.
- * The issue predicted the panel token would be debt; it measured compliant, so it has no row.
+ * times. One other resolves to a compliant value and is correctly absent —
+ * `--fab-books-panel-radius` is 6px, which is on the ladder. The issue predicted the panel token
+ * would be debt; it measured compliant, so it has no row. A second worked example stood here
+ * until issue 1506 — `--crafting-essence-thumb-radius`, set from markup so the scan reached only
+ * its 6px fallback — and the art-tile unification deleted the component that declared it, so
+ * the token and the note about it go together.
  */
 export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 
@@ -480,10 +482,11 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
  *
- * MEASURED at `6a2c3b46b` by `tests/design-system-primitives.test.js`: 49 files under
- * `src/ui/svelte/` but outside `components/` are imported by two or more independent callers —
- * the bar `openspec/specs/design-system/spec.md` sets for membership of the primitive set — and
- * carry no row in either manifest table. 75 clear the bar in that domain and 26 are registered.
+ * RE-MEASURED by `tests/design-system-primitives.test.js` after issue 1506's art-tile
+ * unification: 45 files under `src/ui/svelte/` but outside `components/` are imported by two or
+ * more independent callers — the bar `openspec/specs/design-system/spec.md` sets for membership
+ * of the primitive set — and carry no row in either manifest table. 71 clear the bar in that
+ * domain and 26 are registered.
  *
  * This register is the EXCLUSION MECHANISM rather than a list of offenders. A path leaves it only
  * by gaining a manifest row, in either table, and enters it only by being added here, so a name
@@ -541,4 +544,10 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // callers rendering the shared chip. Re-measured: 74 clear the bar, 26 are registered, 48 are not.
 // 48 -> 47 (issue 1506): the crafting `QuantityTag` LEFT, the last of the three retired
 // look-alikes. Re-measured: 73 clear the two-caller bar, 26 are registered, 47 are not.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;
+// 47 -> 45 (issue 1506): the crafting `CraftingThumb` and `CraftingEssenceThumb` LEFT together,
+// by being DELETED. Their thirty-five render sites across twenty-one files draw the registered
+// `components/Medallion.svelte` now, so the art tile is one component with a manifest row rather
+// than three without one — which is this register working rather than a name slipping out of it.
+// Re-measured on the tree, not subtracted: 71 clear the two-caller bar, 26 are registered, 45
+// are not, and the docblock above is re-measured with it.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 45;

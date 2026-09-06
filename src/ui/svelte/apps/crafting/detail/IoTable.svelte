@@ -19,6 +19,8 @@
   (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
@@ -29,7 +31,6 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import { countText } from '../../../util/craftingQuantityReading.js';
   import Chip from '../../../components/Chip.svelte';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import IngredientOptionSelector from './IngredientOptionSelector.svelte';
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
@@ -163,7 +164,7 @@
         {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
           <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
             <span class="crafting-io-tool-label">
-              <CraftingThumb src={tool.img} alt="" size={28} />
+              <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
               <span class="crafting-io-name">{tool.name}</span>
             </span>
             <Chip
@@ -186,7 +187,7 @@
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
           <li class="crafting-io-output" data-io-output>
-            <CraftingThumb src={item.img} alt="" size={32} />
+            <Medallion {...resolveCraftingArt(item.img)} alt="" size={32} />
             <span class="crafting-io-output-name">{item.name}</span>
             <span class="crafting-io-output-qty">×{item.qty}</span>
           </li>
