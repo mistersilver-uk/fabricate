@@ -1421,17 +1421,14 @@ describe('world Component entry editor (issue 1371)', () => {
       );
     });
 
-    it('heads a BLOCKED record with the count, SINGULAR, over the sentence that says why', async () => {
-      // `resin` is linked and named but no system has rules for it, so `systemRules` is the ONE
-      // blocking check it fails — which is what makes it the fixture for the singular key.
+    it('heads a record with NO RULES in the system in view as a warning, not a block', async () => {
+      // `resin` is linked and named but no system has rules for it. That is a normal state for a
+      // world record (maintainer, 2026-09-06), so `systemRules` warns rather than blocking and the
+      // hero reads the warning verdict — nothing on this record stops a save.
       const copy = heroCopy(await validationTab('resin'));
-      assert.equal(copy.title, '1 blocking issue');
-      assert.equal(copy.sub, 'Clear these before saving.');
-      assert.match(
-        copy.glyph,
-        /fa-circle-exclamation/,
-        'and the glyph is the surface’s own blocking icon, not the tab strip’s clipboard'
-      );
+      assert.equal(copy.title, 'Passing with warnings');
+      assert.match(copy.sub, /^\d+ warnings? will not stop a save\.$/);
+      assert.match(copy.glyph, /fa-triangle-exclamation/);
     });
 
     it('and the count MOVES when another blocking check fails, in the plural spelling', async () => {

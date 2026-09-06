@@ -25847,6 +25847,14 @@
   padding: 0;
 }
 
+/* The rules editor stands on the SAME frame (issue 1371, maintainer rulings M26/M32) but its
+   `main` carries no scoped-page hook, so the shell's 16px pad survived on that route alone and
+   the column sat inset from the sidebar and the rail in Foundry. Keyed on the shared page class
+   so both consumers lose the pad by one declaration. */
+.fabricate-manager .manager-main.manager-component-entry-page {
+  padding: 0;
+}
+
 /* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ───────────
    The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter
    (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint
