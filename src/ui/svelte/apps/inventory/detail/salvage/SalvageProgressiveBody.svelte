@@ -129,8 +129,9 @@
   };
 </script>
 
-<!-- The house chip primitive, not a fourth hand-rolled one: StatusPill is what the
-     Journal (a player surface) and the manager already use. -->
+<!-- The house chip primitive, not a fourth hand-rolled one: `Chip` is what the Journal
+     (a player surface) and the manager already use, and since issue 1506 it is the only
+     one — the status pill this snippet used to render retired into it. -->
 {#snippet stateChip(stage)}
   {@const state = stateOf(stage)}
   {@const pill = STATES[state]}
@@ -266,8 +267,8 @@
     color: var(--fab-text-muted);
   }
 
-  /* A positioning wrapper only — the pill inside is the shared StatusPill, which owns
-     every ramp, the radius, the padding and the type. */
+  /* A positioning wrapper only — the chip inside is the shared `Chip`, which owns every
+     ramp, the radius, the padding and the type. */
   .salvage-state-chip {
     display: inline-flex;
     flex: 0 0 auto;

@@ -26,7 +26,7 @@
   `src/utils/browserPagination.js`, and filter/sort/memoisation is
   `src/utils/scopedEntityListModel.js`. The chrome is the shipped primitives:
   `BulkSelectionToolbar`, `Pagination`, `EmptyState`, `SelectionCheckbox`, `Medallion`,
-  `StatusPill`, `Callout`.
+  `Chip`, `Callout`.
 
   THE CLAMP IS A DEFECT SURFACE, NOT FREE SAFETY. `paginateRows` clamps the index IT RETURNS;
   `Pagination` computes its displayed range from the index its OWNER hands it. A frame that

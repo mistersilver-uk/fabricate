@@ -185,7 +185,7 @@
     background: var(--fab-accent-soft);
   }
 
-  /* A positioning wrapper only — the shared StatusPill inside owns the ramp and type. */
+  /* A positioning wrapper only — the shared `Chip` inside owns the ramp and type. */
   .salvage-outcome-rolled {
     display: inline-flex;
     flex: 0 0 auto;

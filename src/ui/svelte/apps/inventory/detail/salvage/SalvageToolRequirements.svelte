@@ -5,8 +5,8 @@
   at attempt time, as a notification — so the player could spend the irreversible roll on
   an attempt the engine would reject for a missing tool.
 
-  Each row is a thumb + the tool's display name + a StatusPill availability treatment
-  (the salvage tree's own availability primitive — NOT the crafting `QuantityTag`):
+  Each row is a thumb + the tool's display name + a `Chip` availability treatment
+  (the shared chip, on its default scale — NOT the crafting `QuantityTag`):
   success/`fa-screwdriver-wrench`/"Available" or danger/`fa-triangle-exclamation`/
   "Unavailable". Two signals — icon + label — never colour alone.
 
