@@ -178,7 +178,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     assert.ok(status, 'the region renders');
     assert.equal(status.getAttribute('aria-live'), 'polite');
     // `.sr-only` was retired in issue 1501: the utility is declared once at `.fabricate` under
-    // the name 21 of its 24 sites already carried.
+    // the name 22 of its 25 sites already carried.
     assert.ok(status.classList.contains('visually-hidden'), 'and is visually hidden');
     assert.equal(status.textContent.trim(), 'Fine Blade moved to position 1 of 3');
   });

@@ -1104,8 +1104,9 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  *
  * A ring on a WIDGET CLASS is NOT in this population and must not be. `.fabricate-manager
  * .manager-nav-button:focus-visible` is per-widget chrome the design system allows, and the sheet
- * holds 30 of those against these 10 blocks — pinning them would pin the manager's whole widget
- * inventory to this list.
+ * holds 37 selector members of the shape `<root> .widget-class:focus-visible` against these 10
+ * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
+ * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
  * Derived from the sheet rather than asserted: 9 roots over 10 blocks, every one of them
  * legitimate today, which is exactly why an eleventh would not stand out to a reader.
@@ -1154,22 +1155,29 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-list-reset',
     why:
-      'the sheet holds 20 list-reset rules and not one of them declares only that set — every ' +
+      'the sheet holds 21 list-reset rules and not one of them declares only that set — every ' +
       'one carries two to five further declarations, so none of them could adopt the utility ' +
       'without keeping its own rule anyway',
   },
   {
     name: 'fab-field-skin',
     why:
-      'measured at five candidate blocks, four of which are PINNED by a test or a script that ' +
-      'reads their selectors, leaving one adopter — below the two-adopter floor, which makes it ' +
-      'a rename rather than a shared treatment',
+      'measured at fifteen carriers of the target tuple: four are PINNED by a test or a script ' +
+      'that reads their selectors, six are recorded non-adopters and five are unpinned. Issue ' +
+      '1501 measured ONE unpinned carrier and withdrew the class under the two-adopter floor; ' +
+      "issue 1371's catalogue, entry and salvage screens then landed four more beneath it, so " +
+      'the floor is met and what defers the class now is the work rather than the population — ' +
+      "each adoption owes criterion 5's scoped blocker walk over the interval between the " +
+      'module root and its own donor, published with both specificities',
   },
   {
     name: 'fab-card-skin',
     why:
-      'exactly one block in the sheet carries the proposed border, radius and fill five-tuple, ' +
-      'and one carrier is a rename rather than a shared treatment',
+      'three blocks carry the proposed border, radius and fill five-tuple, up from the one ' +
+      "issue 1501 measured — issue 1371's component entry card and component rules card are " +
+      'the two new carriers — so this class too is deferred for its per-adoption blocker walk ' +
+      'rather than for want of carriers; of the nine 11px border-and-fill blocks no other fill ' +
+      'choice reaches two',
   },
 ]);
 
@@ -1395,8 +1403,8 @@ const repetitionKey = (entry) =>
   rowKey(entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)', entry.selector);
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 2,863 `(at-context, selector)`
-  // keys under this very keying, of which 2,744 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,073 `(at-context, selector)`
+  // keys under this very keying, of which 2,949 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

@@ -240,9 +240,10 @@ sans; mono is only for dice formulas and run IDs.
   row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
   Shadow tint is theme-scoped, keyed off each theme's darkest channel rather than fixed black.
-- **Focus ring:** the Foundry orange ring is overridden per app-area in `styles/fabricate.css`,
-  not in scoped Svelte `<style>` — see the "Foundry vs Fabricate CSS overrides" section of
-  `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
+- **Focus ring:** the Foundry orange ring is overridden once for the whole module in
+  `styles/fabricate.css`, at the module root `.fabricate` every Fabricate application emits, not
+  in scoped Svelte `<style>` (issue 1501) — see the "Foundry vs Fabricate CSS overrides" section
+  of `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
 
 ## 5. Shipped primitive inventory
 

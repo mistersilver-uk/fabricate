@@ -33,7 +33,7 @@
  * whole LIST matches. The `shared between two lists` row is the one that separates them: the
  * census reports `.a .b` twice and the merge predicate reports no candidate at all. That is the
  * shape almost all of the real sheet's repetition takes, so a reader who conflates the two figures
- * concludes there are 119 merges waiting to be done.
+ * concludes there are 124 merges waiting to be done.
  *
  * ── WHY THE NINE "SANDWICH" ROWS ARE A TABLE, NOT NINE FIXTURES ─────────────────────────
  * Nine of the rows below (criterion (c), the property and specificity admission gates, `!important`

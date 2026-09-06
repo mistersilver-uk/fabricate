@@ -1302,8 +1302,9 @@ export const VIEW_RECIPES = Object.freeze([
     //
     // Chosen to sample every app-AREA shell rather than to enumerate screens, because
     // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks
-    // (button height/alignment, focus rings) are written per area class — so a
-    // regression in one area is invisible in another. Rule counts in that file, which
+    // for button height and alignment are written per area class — so a regression in
+    // one area is invisible in another. The focus pair is no longer among them: issue
+    // 1501 collapsed it onto the module root, which reaches every area at once. Rule counts in that file, which
     // are a fair proxy for blast radius: `.fabricate-manager` ~2694,
     // `.fabricate-interactables-manager` ~41, `.fabricate-app` ~18.
     //

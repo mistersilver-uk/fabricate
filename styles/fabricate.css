@@ -1100,7 +1100,7 @@
 
    A utility ships only where TWO OR MORE rules already declared its set property for property
    and value for value; one adopter is a rename rather than a shared treatment. `.fab-list-reset`
-   is NOT declared for that reason — all 20 list-reset rules in this sheet carry other
+   is NOT declared for that reason — all 21 list-reset rules in this sheet carry other
    declarations too, so none of them could adopt it (issue 1523).
 
    The `data-gap` mapping declares only the rungs the actual adopters use. The dead-class gate
@@ -1116,7 +1116,7 @@
    (issue 1501).
 
    A FOURTH UTILITY IS NOT DECLARED HERE. `.fabricate .visually-hidden` obeys the same rule and
-   the same rooting, about 4,350 lines below: each utility sits at the earliest of its own donors'
+   the same rooting, about 4,370 lines below: each utility sits at the earliest of its own donors'
    positions, decided by that adoption's blocker walk rather than by this section. */
 
 .fabricate .fab-truncate {
@@ -5480,7 +5480,7 @@
 /* THE VISUALLY-HIDDEN UTILITY, declared ONCE for the whole module (issue 1501). It was three
    byte-identical copies — `.fabricate-manager .visually-hidden` here, `.fabricate-manager
    .sr-only` and `.fabricate-app .sr-only` about 10,400 lines below — under two class names.
-   `.visually-hidden` is the surviving name, which 21 of the 24 markup sites already carried;
+   `.visually-hidden` is the surviving name, which 22 of the 25 markup sites already carried;
    the three `.sr-only` sites are renamed onto it. `.fabricate` is the module's OWN root, the
    class every Fabricate application root emits, so rooting here is not the unscoped utility
    the deleted copy's comment warned would leak into Foundry's own chrome.
@@ -17781,9 +17781,12 @@
   font-weight: 600;
 }
 
-/* skin census (issue 1523): the single unpinned carrier of the target tuple at this
-   tree — zero hits under tests/ or scripts/; its sole emitter is
-   `ToolBehaviorPreview.svelte:429`. */
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under
+   tests/ or scripts/; its sole emitter is `ToolBehaviorPreview.svelte:429`. It was the SINGLE
+   unpinned carrier when issue 1501 measured this census, which is what took `.fab-field-skin`
+   below the two-adopter floor; issue 1371's catalogue, entry and salvage screens then landed
+   four more, so the floor is met and the class is deferred for its per-adoption blocker walk
+   instead. */
 .fabricate-manager .manager-tool-actor-select {
   width: 100%;
   min-width: 0;
@@ -24463,6 +24466,9 @@
 
 /* ── A4. THE SOURCE IDENTITY CARD ────────────────────────────────────────────────────────────
    `proto:845-879`. The uuid well is a `--fab-bg-1` inset at the row rung (radius 9). */
+
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/
+   or scripts/; its sole emitter is `WorldComponentEntrySourceCard.svelte:106`. */
 .fabricate-manager .manager-component-entry-uuid-well {
   display: flex;
   align-items: center;
@@ -24975,6 +24981,11 @@
   font-size: 10px;
 }
 
+/* skin census (issue 1523): not an adopter — a CONTEXTUAL override keyed on an ancestor chain
+   (`.manager-component-entry-page >` the shared rail), which a class stamped on the element
+   cannot express: the same strip paints at the Tool rails' values everywhere else, so the
+   stamped set would be wider than the matched set. The class itself is read at
+   `tests/components/component-rules-world-scope-mounted.test.js:932`. */
 .fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-live {
   align-items: center;
   padding: var(--fab-space-2) var(--fab-space-3);
@@ -25526,6 +25537,9 @@
 
 /* `proto:1261` and `proto:1264`: a recessed well on `--fab-bg-1` behind a hairline at radius 9.
    The category value is 11.5px/600 serif; the salvage note is 11px/1.5 sans in the muted ink. */
+
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/
+   or scripts/; both of its emitters are in `ComponentBrowserInspector.svelte`. */
 .fabricate-manager .manager-component-inspector-well {
   margin: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
@@ -25805,6 +25819,9 @@
 
 /* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a
    `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
+
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/
+   or scripts/; its sole emitter is `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-group-card {
   min-width: 0;
   padding: var(--fab-space-3);
@@ -25827,6 +25844,9 @@
 
 /* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by
    a micro-label. */
+
+/* skin census (issue 1523): two unpinned carriers of the target tuple in one rule — zero hits
+   for either class under tests/ or scripts/; both are emitted by `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-routing-card,
 .fabricate-manager .manager-salvage-dc-card {
   padding: var(--fab-space-3);
