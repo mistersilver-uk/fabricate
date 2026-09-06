@@ -179,6 +179,11 @@ const GATE_TARGETS = [
   'scripts/lib/fontAwesomeSmokeExpectations.js',
   'scripts/foundry-icon-bundle-assert.mjs',
   'scripts/generate-icon-catalogue.mjs',
+  // The archive-completeness gate (issue 1565): the pure derivation behind the refusal that no
+  // published archive may be short a chunk its own entry script references. Only `release-s3.js`
+  // imports it from a gated file, and `scripts/release.js` — its other caller — is acknowledged
+  // ungated debt, so without this entry the new file would be formatted by nothing.
+  'scripts/lib/releaseZipChunks.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
