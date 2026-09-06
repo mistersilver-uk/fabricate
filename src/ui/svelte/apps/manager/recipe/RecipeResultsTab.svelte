@@ -164,7 +164,9 @@
          tint for a note about LIVE state, and the sentence above says in terms that this
          strip states an invariant. It also sits directly above an info-tinted ToggleCard, so
          tinting it spent the colour twice and made the standing rule read as the lesser of
-         the two boxes. -->
+         the two boxes. The salvage editor's twin follows THIS one on the tone, which is the
+         reverse of the placement debt above: salvage led on where the pair sits, the recipe
+         side led on how loud the upper box is. -->
     <Callout
       tone="neutral"
       icon="fas fa-dice-d20"
