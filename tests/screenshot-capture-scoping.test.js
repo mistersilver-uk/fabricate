@@ -1124,8 +1124,8 @@ test('no View Lab step drives a converted select with the registry’s native `s
   }
   // NON-VACUITY, the same floor the ban above keeps: five `select:` steps survive on genuinely
   // native selects (the recipe category filter, the world currency strategy twice, the system
-  // Component Rules list's essence filter and the tool catalogue's sort), which issues 1510 and
-  // 1511 own. At zero the clause quantifies over nothing.
+  // Component Rules list's essence filter and the system Tool Rules list's sort), which issues
+  // 1510 and 1511 own. At zero the clause quantifies over nothing.
   assert.ok(
     steps.length >= 4,
     `only ${steps.length} \`select:\` steps remain in the registry, against a floor of 4. If the ` +
