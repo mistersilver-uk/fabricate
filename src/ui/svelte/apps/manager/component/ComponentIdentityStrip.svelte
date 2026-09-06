@@ -83,7 +83,13 @@
 >
   <!-- `proto:1310`: a 44px chip at radius 11. `Medallion` ships radius 9 and takes the size; the
        11 is the card rung and is stated on the card, not manufactured here. -->
-  <Medallion src={component?.img} icon="fas fa-cube" size={44} tint={component?.color || ''} />
+  <Medallion
+    art={component?.img}
+    alt=""
+    icon="fas fa-cube"
+    size={44}
+    tint={component?.color || ''}
+  />
 
   <div class="manager-component-identity-copy" data-component-edit-section="source">
     <div class="manager-component-identity-name-row">

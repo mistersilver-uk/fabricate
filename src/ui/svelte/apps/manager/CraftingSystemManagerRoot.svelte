@@ -10597,7 +10597,12 @@
              glyph-only avatar — a recipe HAS an img), its name, and the
              "<category> · <resolution mode>" subline. -->
           <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-            <Medallion src={resolveRecipeImage(recipeDraft)} icon="fas fa-scroll" size={44} />
+            <Medallion
+              art={resolveRecipeImage(recipeDraft)}
+              alt=""
+              icon="fas fa-scroll"
+              size={44}
+            />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={recipeDraft.name || ''}>
                 {recipeDraft.name || viewTitle()}
@@ -10612,7 +10617,7 @@
              item's real image, its NAME, and the "<category> · Linked <source>" subline.
              It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
           <div class="manager-recipe-edit-heading" data-component-edit-heading>
-            <Medallion src={componentForEdit.img} icon="fas fa-cube" size={44} />
+            <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={componentForEdit.name || ''}>
                 {componentForEdit.name || viewTitle()}
@@ -10634,7 +10639,8 @@
              route's own, so a companion that names neither still cannot reach this branch. -->
           <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
             <Medallion
-              src={downtimeHeaderArtwork.image ?? ''}
+              art={downtimeHeaderArtwork.image ?? ''}
+              alt=""
               icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
               size={44}
             />
@@ -10647,8 +10653,8 @@
           <!-- The essence's own identity header. See `worldEssenceEntryRecord` above for why it
              is derived in the shell and why it reuses the recipe editor's heading block. The
              medallion carries the essence's colour the way every other essence tile in the
-             manager does — `tint` recolours the glyph and washes the surface, and unset
-             resolves to the accent.
+             manager does — `tint` recolours the glyph and nothing else since issue 1506, and
+             unset resolves to the accent.
 
              `glyph` is set because the other two headings that reuse this block carry an
              IMAGE, and `Medallion`'s 0.9rem default is sized for the 40px row tiles: left
@@ -10708,7 +10714,8 @@
                  `borderTopLeftRadius 9 !== 10` survives on purpose: 10 is on no published rung
                  and 9 is the 34-38px band's corner (D-C). -->
             <Medallion
-              src={worldComponentEntryImage}
+              art={worldComponentEntryImage}
+              alt=""
               icon="fas fa-cube"
               size={42}
               glyph={22}
@@ -10730,7 +10737,8 @@
              screen has to draw without inventing a picture for. -->
           <div class="manager-recipe-edit-heading" data-world-tool-entry-heading>
             <Medallion
-              src={worldToolEntryRecord.entity?.img ?? ''}
+              art={worldToolEntryRecord.entity?.img ?? ''}
+              alt=""
               icon="fas fa-screwdriver-wrench"
               size={44}
               glyph={22}

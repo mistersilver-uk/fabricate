@@ -147,9 +147,10 @@
    * THE ROW'S LEADING TILE, as the reference draws it (`proto:600`, UX finding F12).
    *
    * `width:38px;height:38px;border-radius:9px;font-size:15px` with a slate fill and no border at
-   * all. `glyph-chip` is the two halves of that a caller cannot state — the absent edge, and the
-   * fact that a tinted glyph on this chip does not bring a tinted SURFACE with it — and 38 and 15
-   * are the primitive's own `size` and `glyph`, which is why they are written here beside it.
+   * all. `glyph-chip` is the half of that a caller cannot state — the absent edge — and 38 and 15
+   * are the primitive's own `size` and `glyph`, which is why they are written here beside it. The
+   * variant's other half, that a tinted glyph brings no tinted SURFACE with it, became true of
+   * every medallion in issue 1506 and is no longer this variant's to say.
    *
    * A MODULE CONSTANT rather than an inline object literal, because a fresh object every render
    * is a fresh prop value every render: the frame merges it into a `$derived`, and an inline
@@ -475,8 +476,9 @@
      under D-C and this prop deliberately does not reach them.
    - `rowMedallion` (UX F12): `proto:600` draws the row's leading tile as a borderless slate
      square at 38px carrying a 15px tinted glyph, against the shipped 40px bordered artwork tile.
-     The variant owns only the absent edge and the cancelled surface wash; the size and the glyph
-     are the primitive's own arguments, which is why the descriptor states all three together.
+     The variant owns only the absent edge since issue 1506 deleted the surface wash it also used
+     to cancel; the size and the glyph are the primitive's own arguments, which is why the
+     descriptor states all three together.
    - `rosterRecessed` / `rosterSearchWell` (reviewer 7): the reference's system-roster card is a
      recess with its search field LIFTED out of it. Both were restyled in place for all three
      catalogues before lane PRIM turned them into props; this screen is the one that wants them.

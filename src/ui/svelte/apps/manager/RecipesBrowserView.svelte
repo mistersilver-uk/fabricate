@@ -759,7 +759,12 @@
                       class="manager-recipe-identity"
                       onclick={() => onSelectRecipe(recipe.id)}
                     >
-                      <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
+                      <Medallion
+                        art={resolveRecipeImage(recipe)}
+                        alt=""
+                        icon="fas fa-scroll"
+                        size={40}
+                      />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>

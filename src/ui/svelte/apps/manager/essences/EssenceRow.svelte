@@ -217,8 +217,8 @@
   });
 </script>
 
-<!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and
-     washes the surface; unset resolves to the accent, which is the shipped render. -->
+<!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and, since
+     issue 1506, nothing else; unset resolves to the accent, which is the shipped render. -->
 {#snippet medallionTile()}
   <Medallion
     icon={essence.icon || 'fas fa-mortar-pestle'}

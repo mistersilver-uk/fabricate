@@ -126,7 +126,7 @@ function card(essence) {
 <li class="fab-library-card manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
   <button type="button" class="fab-library-card-body manager-essence-identity">
     <span class="fab-library-card-header">
-      <span class="fab-medallion has-tint" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
+      <span class="fab-medallion" data-medallion-tint="sage" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
       <span class="fab-library-card-heading">
         <span class="fab-library-card-name manager-system-name" title="${essence.name}">${essence.name}</span>
       </span>

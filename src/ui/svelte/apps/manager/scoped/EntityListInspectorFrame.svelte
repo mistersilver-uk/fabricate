@@ -1287,7 +1287,8 @@
                     onclick={() => inspect(entry.id)}
                   >
                     <Medallion
-                      src={thumbnail.src}
+                      art={thumbnail.src}
+                      alt=""
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
                       variant={rowMedallionSpec.variant}
@@ -1517,7 +1518,8 @@
             <div class="manager-inspector-title-row">
               <span class="manager-inspector-icon">
                 <Medallion
-                  src={thumbnail.src}
+                  art={thumbnail.src}
+                  alt=""
                   icon={thumbnail.icon}
                   tint={thumbnail.tint}
                   size={42}

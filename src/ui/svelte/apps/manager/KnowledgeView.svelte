@@ -193,7 +193,7 @@
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">
-          <Medallion src={selectedCharacter.img} icon="fas fa-user" size={50} alt="" />
+          <Medallion art={selectedCharacter.img} icon="fas fa-user" size={50} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
             <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>

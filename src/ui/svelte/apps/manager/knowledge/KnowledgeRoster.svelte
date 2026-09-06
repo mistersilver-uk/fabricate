@@ -104,7 +104,7 @@
             data-knowledge-actor={character.id}
             onclick={() => onSelect(character.id)}
           >
-            <Medallion src={character.img} icon="fas fa-user" size={34} alt="" />
+            <Medallion art={character.img} icon="fas fa-user" size={34} alt="" />
             <span class="manager-knowledge-roster-copy">
               <strong class="manager-knowledge-roster-name" title={character.name}
                 >{character.name}</strong

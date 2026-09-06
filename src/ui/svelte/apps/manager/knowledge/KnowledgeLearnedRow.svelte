@@ -161,7 +161,7 @@
 {#if learned}
   <li class="manager-knowledge-learned-row" data-knowledge-learned={learned.recipeId}>
     <span class="manager-knowledge-copy-identity">
-      <Medallion src={learned.img} icon="fas fa-scroll" size={38} alt="" />
+      <Medallion art={learned.img} icon="fas fa-scroll" size={38} alt="" />
       <span class="manager-knowledge-copy-copy">
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={learned.name}>{learned.name}</strong>

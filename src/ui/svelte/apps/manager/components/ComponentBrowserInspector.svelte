@@ -198,7 +198,8 @@
 
       <div class="manager-component-inspector-identity">
         <Medallion
-          src={selectedComponent.img}
+          art={selectedComponent.img}
+          alt=""
           icon="fas fa-cube"
           size={40}
           tint={selectedComponent.color || ''}

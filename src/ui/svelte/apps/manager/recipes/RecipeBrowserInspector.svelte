@@ -401,7 +401,7 @@
     </p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion src={resolveRecipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
+      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={52} />
       <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!--

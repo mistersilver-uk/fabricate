@@ -52,7 +52,13 @@ const MEDALLION_PATH = 'src/ui/svelte/components/Medallion.svelte';
 const COMPILED = [CHIP_PATH, ESSENCE_CHIP_PATH, MEDALLION_PATH];
 
 /** Every theme the sheet declares a root block for — read, not listed, so a new theme is measured. */
-const THEMES = [...new Set([...fabricateCss.matchAll(/\.fabricate\[data-fabricate-theme="([\w-]+)"\]/g)].map(([, name]) => name))];
+const THEMES = [
+  ...new Set(
+    [...fabricateCss.matchAll(/\.fabricate\[data-fabricate-theme="([\w-]+)"\]/g)].map(
+      ([, name]) => name
+    )
+  ),
+];
 
 const LABEL_MIN_RATIO = 4.5;
 const MARK_MIN_RATIO = 3;
@@ -114,8 +120,10 @@ function holdContrast(t, ratioOf, floor, pinned, what) {
       const ratio = ratioOf(measured.get(key));
       if (!worst || ratio < worst.ratio) worst = { tint, ratio };
       if (pinned.has(key)) {
-        if (ratio < pinned.get(key)) failures.push(`${key} ${ratio.toFixed(2)}:1 fell below its pinned ${pinned.get(key)}:1`);
-        if (ratio >= floor) cleared.push(`${key} ${ratio.toFixed(2)}:1 now clears ${floor}:1 — remove its pin`);
+        if (ratio < pinned.get(key))
+          failures.push(`${key} ${ratio.toFixed(2)}:1 fell below its pinned ${pinned.get(key)}:1`);
+        if (ratio >= floor)
+          cleared.push(`${key} ${ratio.toFixed(2)}:1 now clears ${floor}:1 — remove its pin`);
       } else if (ratio < floor) {
         failures.push(`${key} ${ratio.toFixed(2)}:1`);
       }
@@ -255,7 +263,13 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     }
     await medallion.setup();
     try {
-      const target = await medallion.mount({ icon: 'fas fa-fire', size: 22, glyph: 10, tint: 'TINT', variant: 'glyph-chip' });
+      const target = await medallion.mount({
+        icon: 'fas fa-fire',
+        size: 22,
+        glyph: 10,
+        tint: 'TINT',
+        variant: 'glyph-chip',
+      });
       markup.tile = target.innerHTML;
     } finally {
       medallion.teardown();
@@ -268,7 +282,9 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     try {
       const tab = await browser.newPage({ viewport: { width: 400, height: 200 } });
       for (const theme of THEMES) {
-        await tab.setContent(page(theme, '', markup.chip, markup.tile, scoped), { waitUntil: 'load' });
+        await tab.setContent(page(theme, '', markup.chip, markup.tile, scoped), {
+          waitUntil: 'load',
+        });
         measured.set(`${theme}/`, await tab.evaluate(readColours));
         for (const tint of MANAGER_COLOR_TOKEN_KEYS) {
           const tinted = {
@@ -276,12 +292,20 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
               /class="([^"]*manager-chip[^"]*)"/,
               `class="$1 has-tint" style="--fab-chip-color:var(--fab-tag-${tint})" data-chip-tint="${tint}"`
             ),
-            tile: markup.tile.replace(
-              /class="([^"]*fab-medallion[^"]*)" /,
-              `class="$1 has-tint" data-medallion-tint="${tint}" `
-            ).replace(/style="([^"]*)"/, `style="$1;--fab-medallion-tint:var(--fab-tag-${tint})"`),
+            // No `has-tint` on the tile: issue 1506 deleted the surface wash and its gating class,
+            // so the tinted tile is the untinted one plus the data hook and the custom property
+            // the base rule inks the GLYPH from. Re-stamping a class the primitive no longer
+            // emits would measure an element the app does not ship.
+            tile: markup.tile
+              .replace(
+                /class="([^"]*fab-medallion[^"]*)" /,
+                `class="$1" data-medallion-tint="${tint}" `
+              )
+              .replace(/style="([^"]*)"/, `style="$1;--fab-medallion-tint:var(--fab-tag-${tint})"`),
           };
-          await tab.setContent(page(theme, tint, tinted.chip, tinted.tile, scoped), { waitUntil: 'load' });
+          await tab.setContent(page(theme, tint, tinted.chip, tinted.tile, scoped), {
+            waitUntil: 'load',
+          });
           measured.set(`${theme}/${tint}`, await tab.evaluate(readColours));
         }
       }
@@ -298,7 +322,10 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     assert.ok(THEMES.length >= 7, `the sheet declares ${THEMES.length} theme roots`);
     assert.ok(MANAGER_COLOR_TOKEN_KEYS.length >= 8, 'the picker offers at least the shipped eight');
     assert.equal(measured.size, THEMES.length * (MANAGER_COLOR_TOKEN_KEYS.length + 1));
-    assert.ok(markup.chip.includes('fab-essence-chip'), 'the chip markup is the rendered primitive');
+    assert.ok(
+      markup.chip.includes('fab-essence-chip'),
+      'the chip markup is the rendered primitive'
+    );
     assert.ok(markup.tile.includes('is-glyph-chip'), 'the tile markup is the rendered primitive');
   });
 
@@ -306,9 +333,21 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     for (const theme of THEMES) {
       const control = measured.get(`${theme}/`);
       const tinted = measured.get(`${theme}/${MANAGER_COLOR_TOKEN_KEYS[0]}`);
-      assert.notDeepEqual(tinted.chipInk, control.chipInk, `${theme}: the chip’s ink moved with the tint`);
-      assert.notDeepEqual(tinted.tileGlyphInk, control.tileGlyphInk, `${theme}: the tile’s glyph moved with the tint`);
-      assert.deepEqual(tinted.chipGlyphInk, tinted.chipInk, `${theme}: the glyph and the label share one ink`);
+      assert.notDeepEqual(
+        tinted.chipInk,
+        control.chipInk,
+        `${theme}: the chip’s ink moved with the tint`
+      );
+      assert.notDeepEqual(
+        tinted.tileGlyphInk,
+        control.tileGlyphInk,
+        `${theme}: the tile’s glyph moved with the tint`
+      );
+      assert.deepEqual(
+        tinted.chipGlyphInk,
+        tinted.chipInk,
+        `${theme}: the glyph and the label share one ink`
+      );
     }
   });
 
@@ -319,7 +358,9 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     for (const theme of THEMES) {
       const sample = measured.get(`${theme}/${MANAGER_COLOR_TOKEN_KEYS[0]}`);
       const plain = luminance(composite(sample.surface, [0, 0, 0]));
-      const selected = luminance(composite(sample.selectedRowFill, composite(sample.selectedRowHost, [0, 0, 0])));
+      const selected = luminance(
+        composite(sample.selectedRowFill, composite(sample.selectedRowHost, [0, 0, 0]))
+      );
       assert.ok(
         selected > plain,
         `${theme}: the selected row composited to luminance ${selected.toFixed(4)} against the ordinary row's ${plain.toFixed(4)} — the two probes are drawing the same surface`
@@ -344,7 +385,11 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
   it('keeps the tile’s GLYPH at the non-text minimum against the slate tile on every theme and every tint', (t) => {
     holdContrast(
       t,
-      (sample) => contrast(sample.tileGlyphInk, composite(sample.tileFill, composite(sample.tileHost, [0, 0, 0]))),
+      (sample) =>
+        contrast(
+          sample.tileGlyphInk,
+          composite(sample.tileFill, composite(sample.tileHost, [0, 0, 0]))
+        ),
       MARK_MIN_RATIO,
       KNOWN_BELOW_MARK_FLOOR,
       'tile glyph'

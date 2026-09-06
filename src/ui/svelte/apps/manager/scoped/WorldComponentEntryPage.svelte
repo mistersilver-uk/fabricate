@@ -810,7 +810,7 @@
               data-scoped-entry-identity-card=""
             >
               <div class="manager-component-entry-identity-body">
-                <Medallion src={shownImage} icon={PAGE_ICON} size={56} glyph={26} />
+                <Medallion art={shownImage} alt="" icon={PAGE_ICON} size={56} glyph={26} />
                 <div class="manager-component-entry-identity-copy">
                   <div class="manager-component-entry-identity-name-row">
                     {#if sourceLinked}
