@@ -40,9 +40,10 @@
   No `class`, no `style` and no rest spread. A caller that needs LAYOUT — a flex row,
   an ellipsis, a min-width — keeps its OWN wrapper element and nests this inside it,
   which is the shape `library.html:883` already draws (a plain kicker span inside a
-  caller-owned flex row). `StepRequirementsList.svelte` and `ConsumptionPlanPanel.svelte`
-  are the two conversions that exercise it: each keeps its wrapper, stripped to the
-  flex properties that are genuinely the caller's, with the kicker inside.
+  caller-owned flex row). `ConsumptionPlanPanel.svelte` and `EssencePoolPanel.svelte`
+  are the two conversions that exercise it: each keeps its OWN wrapper, stripped to what
+  is genuinely the caller's — the flex row and its glyph in the first, and in the second
+  the one outer margin this primitive zeroes — with the kicker inside.
 
   A named test/screenshot HOOK is the exception, because a hook is not layout: see
   `dataAttr`/`dataValue` below.

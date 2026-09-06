@@ -729,7 +729,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
     'manager-recipe-edit-crafting-modifier-cap-reached',
   ]),
-  // THE UPPERCASE MICRO-LABEL (issue 1505), on fourteen converted eyebrow sites across ten files.
+  // THE UPPERCASE MICRO-LABEL (issue 1505), on sixteen converted eyebrow sites across nine files.
   // Neither representative frame draws one it renders: `manager-components-normal` is the
   // component browser and `fabricate-app-shell` is the player shell, and every converted site is
   // inside a crafting recipe detail or the recipe-item editor.
