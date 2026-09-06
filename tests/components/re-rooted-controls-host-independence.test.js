@@ -1991,34 +1991,49 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
       );
     }
 
-    // AND THE ONE FAMILY RULE THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY NAME.
+    // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT.
     // `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` is declared a
-    // second time inside `@container fabricate-manager (max-width: 680px)`. That container NAME
-    // is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
-    // `styles/fabricate.css:1382`), so the rule cannot travel to a bare host WHATEVER it is
-    // rooted at. It re-roots for family consistency and moves nothing; the inability to travel
-    // is a residue of the responsive layer rather than a defect of this change, and it is named
-    // here so that the equality above is not read as covering it.
-    const containerScoped = rules.filter(
-      (rule) => /\.fabricate-filter-bar(?![\w-])/.test(rule.selectorText) && rule.at !== ''
-    );
-    assert.equal(
-      containerScoped.length,
-      1,
-      `expected exactly one container-scoped filter-bar rule, found ${containerScoped.length}: ` +
-        containerScoped.map((rule) => `${rule.at} :: ${rule.selectorText}`).join(', ')
-    );
-    assert.match(
-      containerScoped[0].at,
-      /fabricate-manager/,
-      'the excluded rule must be the one inside the `fabricate-manager` container query; a rule ' +
-        'under any other condition is not covered by this exclusion and needs its own reason'
-    );
+    // second time inside `@container fabricate-manager (max-width: 680px)`, and so are the
+    // search family's `.is-compact { width: 100% }` and `{ flex-basis: 100% }`. That container
+    // NAME is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
+    // `styles/fabricate.css:1382`), so none of them can travel to a bare host WHATEVER it is
+    // rooted at. They re-root for family consistency and move nothing; the inability to travel
+    // is a residue of the responsive layer rather than a defect of this change, and they are
+    // named here so that the equality above is not read as covering them.
+    //
+    // COUNTED PER ROOT rather than asserted as one exclusion, because the two families reached
+    // this state independently: an unrecorded THIRD rule under either root is a residue nobody
+    // has decided about, which is exactly what this clause exists to make loud.
+    for (const [root, expected] of [
+      ['.fabricate-filter-bar', 1],
+      ['.fabricate-search', 2],
+    ]) {
+      const named = new RegExp(`\\${root}(?![\\w-])`);
+      const containerScoped = rules.filter(
+        (rule) => named.test(rule.selectorText) && rule.at !== ''
+      );
+      assert.equal(
+        containerScoped.length,
+        expected,
+        `expected exactly ${expected} container-scoped \`${root}\` rule(s), found ` +
+          `${containerScoped.length}: ` +
+          containerScoped.map((rule) => `${rule.at} :: ${rule.selectorText}`).join(', ')
+      );
+      for (const rule of containerScoped) {
+        assert.match(
+          rule.at,
+          /fabricate-manager/,
+          `an excluded \`${root}\` rule must be inside the \`fabricate-manager\` container ` +
+            'query; a rule under any other condition is not covered by this exclusion and needs ' +
+            `its own reason — ${rule.at} :: ${rule.selectorText}`
+        );
+      }
+    }
     assert.match(
       sheet,
       /container-name: fabricate-manager;/,
       'the container NAME must still be established by `.fabricate-manager` itself, which is the ' +
-        'whole reason that one rule cannot travel to a bare host'
+        'whole reason those rules cannot travel to a bare host'
     );
   } finally {
     await tab.close();

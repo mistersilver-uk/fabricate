@@ -2065,7 +2065,7 @@ test('each primitive’s own scoped styles name no application root either', () 
 
   assert.ok(
     blocks >= 2,
-    `only ${blocks} of the eleven component files hold a REAL scoped \`<style>\` block — one ` +
+    `only ${blocks} of the sixteen component files hold a REAL scoped \`<style>\` block — one ` +
       'opened after `</script>`. Two do today, `SearchablePopover` and `ManagerColorPopover`; ' +
       'the rest name a `<style>` only in DOCBLOCK PROSE, usually to say they deliberately have ' +
       'none, and the `</script>` guard above is what keeps that prose out of this clause. A ' +
