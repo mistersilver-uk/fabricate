@@ -108,6 +108,12 @@ export const SCOPED_LIST_RAW_MODULES = Object.freeze([
  * boundary is a value from `overlayBounds.js`. `ActionMenu` reaches the same two through the same
  * action, so a tree with a kebab needs them even when it renders no picker at all.
  *
+ * `listboxNavigation.js` joined it at issue 1503, which gave the popover its
+ * `aria-activedescendant` cursor: the primitive imports the arithmetic STATICALLY, so it is in the
+ * closure whether or not a test presses an arrow key. A raw module missing from a manifest does
+ * not fail the suite that needs it — the closure validator throws in `before()` and `node --test`
+ * reports every test in the file as `# cancelled`.
+ *
  * @type {readonly string[]}
  */
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
@@ -115,6 +121,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);

@@ -71,6 +71,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Rendered by `SearchablePopover`'s `triggerButton` form (issue 1371), so it is in this
+    // tree's closure even though no picker asks for that form.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     ICON_PICKER,
   ],

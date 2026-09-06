@@ -99,11 +99,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
   ],
   compiledModules: [
-    // The primitive this component now renders, plus the two import-free leaves it renders
-    // itself. A `.svelte` the mounted tree reaches but the harness omits does not fail — the
+    // The primitive this component now renders, plus the three leaves it renders itself —
+    // `ManagerButton` among them since issue 1371 gave the popover a `triggerButton` trigger
+    // form. A `.svelte` the mounted tree reaches but the harness omits does not fail — the
     // closure validator throws in `before()` and `node --test` reports `# cancelled`.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     SOURCE_SELECTOR,
   ],

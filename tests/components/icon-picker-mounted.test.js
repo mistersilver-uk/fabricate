@@ -57,7 +57,8 @@ const harness = createMountedComponentHarness({
   ],
   // THE PICKER RENDERS THROUGH THE SHARED PRIMITIVE (issue 1503), so its panel, its search row,
   // its option rows and its empty note are `SearchablePopover`'s elements — and `SearchablePopover`
-  // renders `Chip` and `EmptyState`. A `.svelte` the mounted tree renders but this list omits does
+  // renders `Chip`, `EmptyState` and, since issue 1371 gave it a `triggerButton` form,
+  // `ManagerButton`. A `.svelte` the mounted tree renders but this list omits does
   // NOT fail the suite: `validateMountedComponentDependencies` throws in `before()` and
   // `node --test` reports every test here as `# cancelled`, never `# fail`.
   //
@@ -68,6 +69,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     ICON_PICKER,
   ],

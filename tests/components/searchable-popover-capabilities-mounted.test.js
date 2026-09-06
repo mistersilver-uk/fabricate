@@ -54,6 +54,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -96,10 +97,10 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-capabilities-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
+  // The hoisted popover list — the popover plus the three primitives it renders, `ManagerButton`
+  // among them since issue 1371's trigger form — plus this suite's own host fixture.
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'tests/fixtures/searchable-popover/CapabilityHost.svelte',
   ],
   componentPath: 'tests/fixtures/searchable-popover/CapabilityHost.svelte',
@@ -550,7 +551,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       assert.deepEqual(
         optionRows(panel()).map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
         ['Anvil'],
-        'the default is today’s exact filter, so all 21 shipped importers are unchanged'
+        'the default is today’s exact filter, so all 22 shipped importers are unchanged'
       );
       harness.remount();
     });
@@ -658,7 +659,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
 
       assert.ok(
         !listOf(open).hasAttribute('style'),
-        'no callback means no `targets.list`, so the 21 shipped importers keep a list the action ' +
+        'no callback means no `targets.list`, so the 22 shipped importers keep a list the action ' +
           'never writes to at all'
       );
       harness.remount();

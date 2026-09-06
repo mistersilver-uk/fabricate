@@ -35,6 +35,7 @@ import { after, before, describe, it } from 'node:test';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { placeCaret } from '../helpers/listboxKeyboardDriver.js';
 import {
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -51,11 +52,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-keyboard-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
-  compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-  ],
+  // The hoisted list, which is exactly what this suite needs: the popover plus the three
+  // primitives it renders. Naming them again here would be the second copy that constant's own
+  // header exists to prevent, and issue 1371's `ManagerButton` trigger form is the entry that
+  // proves the point — a `.svelte` this tree renders but a manifest omits CANCELS the suite.
+  compiledModules: SEARCHABLE_POPOVER_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/components/SearchablePopover.svelte',
 });
 
