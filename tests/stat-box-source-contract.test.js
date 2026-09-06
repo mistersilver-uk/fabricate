@@ -24,24 +24,16 @@
  *
  * ── THE CONTRACT CLASS ────────────────────────────────────────────────────────────────────
  * `fab-stat-box`, a new token written by nothing else in the tree, measured before it was
- * chosen. The exemption table has ONE entry — the primitive — and no deferral row, which is
- * what a new token buys. The primitive is still in the corpus and still has to write the class:
- * `primitiveSourceContract.js` carries a positive control asserting exactly that, and excluding
- * the primitive from the corpus instead would disable the class-only clause for every other
- * file.
+ * chosen. The exemption below has ONE entry — the primitive — and no deferral row, which is
+ * what a new token buys.
  *
- * ── WHERE THE SHARED CLAUSES LIVE ─────────────────────────────────────────────────────────
- * `tests/helpers/primitiveSourceContract.js`, shared with `icon-button-source-contract.test.js`,
- * `inspector-card-source-contract.test.js` and `kicker-source-contract.test.js`. That file
- * records why: SonarCloud measured 88 duplicated lines between the first two guards while each
- * carried its own copy, `sonar.cpd.exclusions` does not relieve `tests/**`, and two copies
- * drift into disagreeing about what a call site IS. This file supplies the facts those clauses
- * are stated over and adds the two of its own above.
+ * Everything else — the four shared clauses and the closed-token shape — is
+ * `tests/helpers/primitiveSourceContract.js`, and argued there rather than again here.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
+import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. A NEW token: nothing else in the tree writes it. */
 const CONTRACT_CLASS = 'fab-stat-box';
@@ -63,16 +55,23 @@ const DECLARED_PROPS = Object.freeze([
 /** The hook props whose VALUE is an attribute name the component spreads onto an element. */
 const HOOK_NAME_PROPS = Object.freeze(['dataAttr', 'valueDataAttr', 'labelDataAttr']);
 
-/**
- * The `.svelte` files under `src/` that may still write the class, each with its reason and the
- * exact number of times it writes it.
- *
- * ONE entry, and that is what the new token bought. Counted rather than merely listed, and
- * keyed on the class rather than on a line number, which rots on the first edit above it.
- */
-const CLASS_EXCEPTIONS = Object.freeze([
-  Object.freeze({
-    file: PRIMITIVE,
+const contract = defineClosedTokenContract({
+  label: 'stat-box',
+  tag: 'StatBox',
+  contractClass: CONTRACT_CLASS,
+  primitive: PRIMITIVE,
+
+  // Exactly 2 files render the primitive as this lands — one player screen and one manager
+  // screen — which is the membership bar itself, so the floor is the measurement.
+  callSiteFloor: 2,
+
+  // Two tokens, asserted separately so the failure names the one that went missing. The class is
+  // what the restatement clause polices. The tone attribute is what a mounted suite reads to tell
+  // an alerting card from a resting one now that the caller's own `is-alert` class is gone —
+  // invisible in the DOM diff, and nothing else would notice its loss.
+  emits: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-stat-tone={resolvedTone}']),
+
+  primitiveWrites: {
     count: 3,
     why:
       'the primitive itself, which writes the class so that no call site has to remember it. ' +
@@ -80,57 +79,19 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'it — `fab-stat-box-value` and `fab-stat-box-figure` — and the shared clause matches by ' +
       'substring. That is the shape a caller writing any of the three would be caught by, so ' +
       'the stem is deliberately not renamed to make this number 1',
-  }),
-]);
-
-const contract = definePrimitiveSourceContract({
-  label: 'stat-box',
-  tag: 'StatBox',
-  contractClass: CONTRACT_CLASS,
-  primitive: PRIMITIVE,
-  exemptions: CLASS_EXCEPTIONS,
-
-  // Exactly 2 files render the primitive as this lands — one player screen and one manager
-  // screen — which is the membership bar itself, so the floor is the measurement.
-  callSiteFloor: 2,
-
-  primitiveEmits: {
-    // Two tokens, asserted separately so the failure names the one that went missing. The class
-    // is what the restatement clause polices. The tone attribute is what a mounted suite reads
-    // to tell an alerting card from a resting one now that the caller's own `is-alert` class is
-    // gone — invisible in the DOM diff, and nothing else would notice its loss.
-    source: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-stat-tone={resolvedTone}']),
-    otherwise:
-      'the primitive no longer emits something it is the single source of, so a clause here is ' +
-      'policing a token that reaches nothing',
   },
-
-  // Three probes. `class` and `style` are the pass-throughs this primitive deliberately does
-  // NOT have: on a `<StatBox>` tag they are props nothing reads, so Svelte drops them SILENTLY —
-  // the grid still renders and the rule the caller was reaching for never lands.
-  restatements: Object.freeze([
-    Object.freeze({ name: 'class', present: (tag) => /\bclass=/.test(tag) }),
-    Object.freeze({ name: 'style', present: (tag) => /\bstyle=/.test(tag) }),
-    Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
-  ]),
 
   classOnlyRemedy:
     'an at-a-glance figure is a `<StatBox>`, never a hand-written `class="fab-stat-box"` and ' +
-    'never a fresh scoped rule restating the r9 box, the serif numeral and the kicker label. ' +
-    "The grid the boxes sit in stays the caller's own element, and a per-site test hook rides " +
-    'the named `dataAttr` / `dataValue` / `valueDataAttr` / `labelDataAttr` props — see ' +
-    '`StatBox.svelte`',
+    'never a fresh scoped rule restating the r9 box, the serif numeral and the kicker label',
 
-  restatementRemedy:
-    'this primitive exposes no `class`, no `style` and no rest spread, so an attribute the tag ' +
-    'does not name is a prop nothing reads and Svelte drops it without a word. Put the layout ' +
-    'on the caller-owned grid and pass hooks through the four named props',
+  keepInstead:
+    "The grid the boxes sit in stays the caller's own element and carries the layout, and a " +
+    'per-site test hook rides the four named props — see `StatBox.svelte`',
 
-  bareDataRemedy:
-    'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on an ' +
-    'element, so it renders `="true"` where the hand-rolled element rendered `=""`. All six ' +
-    'hooks these two screens carry were written bare, and every assertion that reads them is a ' +
-    'presence selector that resolves either way. Pass the name through a hook prop instead',
+  hookAdvice:
+    'All six hooks these two screens carry were written bare, and every assertion that reads ' +
+    'them is a presence selector. Pass the name through a hook prop instead',
 });
 
 /**
@@ -148,14 +109,11 @@ const contract = definePrimitiveSourceContract({
  * unreachable by any caller and therefore unphotographable too.
  */
 test('the stat box accepts exactly its declared props, none of which is a handler', () => {
-  contract.assertCallSitesAlive();
-
-  const source = contract.components[PRIMITIVE] ?? '';
-  assert.ok(source.length > 0, `${PRIMITIVE} is not in the corpus`);
-
-  const destructured = /let \{([\s\S]*?)\} = \$props\(\);/.exec(source);
-  assert.ok(destructured, 'the primitive no longer destructures its props in one statement');
-  const props = [...destructured[1].matchAll(/^\s*(\w+)\s*=/gm)].map(([, name]) => name);
+  const props = contract.declaredList({
+    declaration: /let \{([\s\S]*?)\} = \$props\(\);/,
+    member: /^\s*(\w+)\s*=/gm,
+    absent: 'the primitive no longer destructures its props in one statement',
+  });
 
   assert.deepEqual(
     props,
@@ -170,9 +128,7 @@ test('the stat box accepts exactly its declared props, none of which is a handle
 
   // The other half of the same rule: nothing it EMITS may be actionable either. A handler on an
   // element inside the component would be reachable without any prop at all.
-  const emitted = [/<button\b/, /<a\s/, /<input\b/, /<select\b/, /\son[a-z]+=/];
-  const found = emitted.filter((pattern) => pattern.test(source)).map(String);
-  assert.deepEqual(found, [], `the stat box emits an interactive element: ${found.join(', ')}`);
+  contract.assertNothingInteractive('the stat box emits an interactive element');
 });
 
 /**

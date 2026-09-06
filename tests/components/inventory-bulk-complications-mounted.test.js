@@ -20,7 +20,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -40,8 +43,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
-    // The shared notice the inventory bulk report's banner composes (issue 1505).
-    'src/ui/svelte/components/Notice.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',

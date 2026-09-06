@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
@@ -229,18 +230,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
-    // The shared notice the inventory bulk report's banner composes (issue 1505).
-    'src/ui/svelte/components/Notice.svelte',
-    // The salvage banner became the shared standing-statement strip (issue 1505), which is
-    // that primitive's first player importer.
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/components/Stepper.svelte',
-    // Issue 1505: the eyebrow nine crafting detail components render. A module missing from a
-    // manifest does not fail this suite; it is reported as `# cancelled`, never `# fail`.
-    'src/ui/svelte/components/Kicker.svelte',
-    // Issue 1505: the figure box the Shopping list's three summary cards are. It composes the
-    // `Kicker` above, so it reaches that entry on a second, invisible route.
-    'src/ui/svelte/components/StatBox.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/FabricateAppRoot.svelte',
