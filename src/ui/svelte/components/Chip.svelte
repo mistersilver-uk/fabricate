@@ -459,7 +459,9 @@
      them. `truncate` is for chips whose ROW HEIGHT must not move (a toolbar beside 34px
      buttons), and a caller that sets it should pass `title` so the full text stays
      reachable. The pill returns here: a truncated chip is single-line by construction,
-     so the stadium is always correct (issue 883). */
+     so the stadium is always correct (issue 883). `overflow: hidden` also makes the chip
+     a flex scroll container, so its automatic minimum size becomes 0 — in a shrinkable
+     row the caller must give it `flex-shrink: 0` unless clipping is what it wants. */
   .manager-chip.is-truncated {
     flex-wrap: nowrap;
     white-space: nowrap;

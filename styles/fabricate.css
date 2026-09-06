@@ -6118,6 +6118,15 @@
   white-space: nowrap;
 }
 
+/* The pills are what must survive, and `truncate` made them shrinkable: `overflow: hidden`
+   makes a flex item a scroll container, and a scroll container's automatic minimum size is
+   0 rather than min-content. Without this the flex algorithm takes room from the pills as
+   well as the name and they render squeezed onto their own text, ink on the border. The
+   row's own `overflow: hidden` above remains the backstop. */
+.fabricate-manager .manager-recipe-name-row .manager-chip {
+  flex: 0 0 auto;
+}
+
 .fabricate-manager .manager-recipe-description {
   overflow: hidden;
   text-overflow: ellipsis;
