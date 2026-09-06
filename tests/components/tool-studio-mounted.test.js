@@ -2294,6 +2294,33 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
+  it('routes out of the identity notice to the world Tool, from inside the callout body', async () => {
+    // ACTS, rather than seeing (issue 1505). This control is the ONLY route out of "it cannot be
+    // saved until that link is restored", and the conversion re-parented it from a sibling
+    // `<div>` into a snippet the shared `Callout` renders — which is exactly when a handler
+    // binding is lost silently. The header's `[data-tool-editor-world-tool]` route above is a
+    // DIFFERENT button, so nothing else in the tree presses this one.
+    const routed = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'validation',
+        validation: {
+          valid: false,
+          errors: ['a tool requires either a componentId or its own source references'],
+        },
+        scope: { entries: [{ id: 'hammer' }] },
+        onEditWorldTool: (id) => {
+          routed.push(id);
+        },
+      })
+    );
+
+    const route = root.querySelector('[data-tool-identity-route]');
+    assert.ok(route, 'the identity notice offers the route out of the blocked save');
+    route.click();
+    assert.deepEqual(routed, ['hammer'], 'and it forwards the Tool id, from inside the callout body');
+  });
+
   it('accepts every complete repair match kind and rejects an incomplete option', async () => {
     const completeRepairRequirements = [
       {
