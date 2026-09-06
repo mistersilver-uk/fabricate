@@ -321,6 +321,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // carries `foundryBridge.js`, so this list does not restate it.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
+  // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
+  // converted tile reads. It joins this roster IN PLACE rather than as a roster of its own:
+  // the eleven suites that spread this constant are exactly the suites whose trees reach it,
+  // and a raw module a tree imports but a manifest omits HANGS the suite (# cancelled) rather
+  // than failing one test in it. It imports `craftingImageDefaults.js` alone, which is the
+  // entry directly above, so the two together close it.
+  'src/ui/svelte/util/craftingArtResolution.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters
   // so a bar reads as the same essence as the pip that filled it; the panel is already in
