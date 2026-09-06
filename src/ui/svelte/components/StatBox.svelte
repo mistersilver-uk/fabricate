@@ -152,6 +152,13 @@
     border-radius: 9px;
     background: var(--fab-bg-1);
     text-align: center;
+    /* The STRUT the composed label rides on (issue 1505). `Kicker`'s own `line-height: 1.3`
+       governs only the sites where the kicker IS the block; here it is an `as="span"` inline
+       inside this box's anonymous block, whose line box takes this strut instead. Without it
+       every label inherits the host's ~1.5 — about 12.75px of leading on 8.5px type — and the
+       two-line labels in the player Shopping list read as two loose lines. The value declares
+       its own 1.1 and is unaffected. */
+    line-height: 1.3;
   }
 
   /* `display: block` is the specimen's `.k-stat .v`. The value and the label are the only two

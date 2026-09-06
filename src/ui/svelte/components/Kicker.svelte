@@ -128,11 +128,16 @@
     letter-spacing: 0.11em;
     text-transform: uppercase;
     /* Recorded deviation from `library.html:120`, which declares none because the specimen
-       never draws a wrapped kicker. Every StatBox label wraps to two lines in the player
-       Shopping list, and without this each pair inherits the host's ~1.5 — about 12.75px of
-       leading on 8.5px type, which reads as two loose lines rather than one label. The rules
-       this component replaces declared 1.2; 1.3 keeps a two-line label together without
-       crowding the descenders. */
+       never draws a wrapped kicker. Without this a wrapped kicker inherits the host's ~1.5 —
+       about 12.75px of leading on 8.5px type, which reads as two loose lines rather than one
+       label. The rules this component replaces declared 1.2; 1.3 keeps a two-line label
+       together without crowding the descenders.
+
+       It sets the leading of a kicker that is ITSELF the block — the `as="p"` sites, where it
+       tightens the recipe-item Overview tab visibly. An `as="span"` kicker is an inline box
+       whose line box is governed by its HOST block's strut, not by its own `line-height`, so
+       this declaration does not reach it; that is why `StatBox.svelte` declares the same 1.3
+       on `.fab-stat-box` for the label it composes. */
     line-height: 1.3;
   }
 

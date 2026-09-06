@@ -151,8 +151,13 @@
     It sits here, below the roll summary, because after a roll it is the rule that
     explains the row states directly beneath it.
   -->
+  <!-- NEUTRAL, not info (issue 1505): the mode banner above derives `info` in progressive mode,
+       the only mode this body renders in, so tinting this strip too would spend the colour twice
+       and read the two boxes as a matched pair rather than a headline and its explanation. The
+       rule the conversion deleted refused that fill in terms, and the sentence below is an
+       invariant of the mode rather than a note about live state. -->
   <Callout
-    tone="info"
+    tone="neutral"
     icon="fas fa-arrow-down-long"
     text={localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}
     dataAttr="data-inventory-salvage-flow"
