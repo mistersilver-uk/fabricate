@@ -4,9 +4,11 @@
  * ── WHY A MODULE AND NOT A TEMPLATE LITERAL PER CALL SITE ───────────────────────────────
  *
  * The retired have/need tag was the shared chip for the recipe detail's material economy and the
- * alternatives picker. It formatted NOTHING: every one of its six call sites composed
- * the value itself and handed the finished string over — `state.have ?? 0` twice, a
- * `${have}/${need}` ratio once, a `×${have}` stack count once. Retiring that component into the
+ * alternatives picker. It formatted NOTHING: FOUR of its six call sites composed the value
+ * themselves and handed the finished string over — `state.have ?? 0` twice, a `${have}/${need}`
+ * ratio once, a `×${have}` stack count once — and the other two passed something already
+ * finished straight through: a currency label (`option.costLabel`) and, on the tool row, an
+ * empty `value` whose whole reading lived in the label. Retiring that component into the
  * shared `Chip` therefore had a choice to make about four readings that had never had a home,
  * because the only thing holding them together was the component they were passed to.
  *

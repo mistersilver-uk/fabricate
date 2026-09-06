@@ -98,7 +98,8 @@
    * `ManagerButton`'s `ROLE_CLASSES` and `Chip`'s `TONES` both follow.
    *
    * It resolves to a BOOLEAN feeding a `class:` directive rather than to a class string joined
-   * into the attribute, which is what `has-tint` beside it already does. That keeps the class
+   * into the attribute, which is what `components/Avatar.svelte`'s `class:has-tint` does — the
+   * directive this component carried until issue 1506 deleted its tint wash. That keeps the class
    * attribute a static literal, so an unset variant renders the exact token list this component
    * has always rendered, and it keeps the class name a literal in the source for the tooling that
    * reads one.

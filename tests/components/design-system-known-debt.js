@@ -512,7 +512,8 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
  * ── WHY THIS EXISTS, AND WHY IT IS A RECORD RATHER THAN A CORRECTION ────────────────────
  * The published ladder for the icon chip is 22 / 26 / 30 / 38, default 26. Measured when issue
  * 1506 unified the tree's art tiles into one primitive, the shipped population renders at
- * eighteen distinct sizes and only four of them are rungs. Restricting `size` would therefore
+ * nineteen distinct numeric sizes plus one `dynamic` size key, and only four of the nineteen are
+ * rungs. Restricting `size` would therefore
  * move almost every art tile in the app, which is a geometry correction with its own frames and
  * its own screen-by-screen judgement; the size-ladder sweep owns that, and this table is what
  * lets that sweep LOWER a pin rather than re-derive a census from nothing.

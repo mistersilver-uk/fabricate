@@ -223,7 +223,7 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/Notice.svelte',
   // THE ONE ART TILE (issue 1506), and the widest case this list has been offered. It was the
   // manager's tile; that change retired the player Crafting tab's two tiles into it, so it is now
-  // rendered from forty-four files across the manager and crafting trees — a third tree many
+  // rendered from forty-two files across the manager and crafting trees — a third tree many
   // times over, which is this list's own bar. It is also the entry with the most to gain from
   // membership: measured before that change, ZERO of the eleven mounted suites that named a
   // crafting-thumb path carried a Medallion entry, so every one of them would have taken the
