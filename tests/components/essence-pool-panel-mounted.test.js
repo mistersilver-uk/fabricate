@@ -98,6 +98,23 @@ describe('EssencePoolPanel mounted behavior', () => {
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
+  // ONE RUNG, NOT TWO (issue 1505). The panel's own heading converted to `<Kicker>` while the
+  // sub-labels beneath it kept a 10px rule of their own, which inverted the pair: the title that
+  // NAMES the section rendered smaller than the label nested under it. Both are kickers now, and
+  // this asserts it at the DOM rather than leaving it to a frame nobody diffs.
+  it('renders its heading and its sub-labels at the same kicker rung', async () => {
+    const target = await harness.mount({ pool: SHARED });
+    const panel = target.querySelector('[data-recipe-section="essence-pool"]');
+    const kickers = [...panel.querySelectorAll('.fab-kicker')];
+    assert.ok(kickers.length >= 2, 'the heading and at least one sub-label are both kickers');
+    const subtitle = panel.querySelector('.essence-pool-subtitle');
+    assert.ok(Boolean(subtitle), 'the sub-label wrapper survives for its margin');
+    assert.ok(
+      Boolean(subtitle.querySelector('.fab-kicker')),
+      'and the type inside it is the shared kicker, not a second 10px rule'
+    );
+  });
+
   it('labels the panel back at the tile that opened it', async () => {
     const target = await harness.mount({
       pool: SHARED,

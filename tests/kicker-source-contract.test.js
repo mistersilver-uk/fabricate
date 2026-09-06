@@ -77,9 +77,12 @@ const contract = definePrimitiveSourceContract({
   primitive: PRIMITIVE,
   exemptions: CLASS_EXCEPTIONS,
 
-  // 11 files render the primitive as this lands — nine in the player crafting detail tree, the
-  // manager's recipe-item Overview tab, and `StatBox`, which composes it. 10 is a real floor
-  // with headroom.
+  // 10 files render the primitive as this lands — eight in the player crafting detail tree, the
+  // manager's recipe-item Overview tab, and `StatBox`, which composes it. The floor is EXACT
+  // rather than slack: the eleventh candidate, `StepRequirementsList`'s step label, was measured
+  // and sent out of scope, because that label is the step's headline and the kicker rung ranked
+  // it below the "Requirements" label beneath it. An exact floor is the stricter ratchet, and a
+  // conversion that removes a site now has to say so here.
   callSiteFloor: 10,
 
   primitiveEmits: {

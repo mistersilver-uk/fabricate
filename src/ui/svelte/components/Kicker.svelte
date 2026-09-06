@@ -32,7 +32,7 @@
   re-skins with it.
 
   `margin: 0` IS declared, and it is not in the specimen: the specimen draws its
-  kicker only as a `<span>`, while nine of this change's fourteen call sites are a
+  kicker only as a `<span>`, while nine of this change's seventeen call sites are a
   `<p>` that zeroes the user-agent margin itself today. Without it every one of those
   frames would move by the browser's default block margin.
 
@@ -57,7 +57,9 @@
    - as: `'p' | 'span' | 'h3'`. The element it renders, because a micro-label is
      sometimes a heading and sometimes not. The union is MEASURED rather than
      forward-looking: across `src/ui/svelte/**` the hosts are 62 `<p>`, 3 `<span>` and
-     1 `<h3>`; `h2` and `h4` have no caller and are withdrawn.
+     1 `<h3>`; `h2` and `h4` have no caller and are withdrawn. `h3` is the one member of
+     that union no shipped site reaches — nine pass `p` and eight pass `span` — and is kept
+     on the measurement rather than on a caller.
    - tone: `'default' | 'accent'`. `accent` is `--fab-accent` (`library.html:121`), and
      the specimen states when: "Accent only when it names a whole section"
      (`library.html:884`). It is on the specimen — the rule, the drawn example and the
@@ -116,7 +118,7 @@
      reference wherever it is written. Both tokens below are declared in `:root` and in all seven
      `.fabricate[data-fabricate-theme="…"]` blocks, which every Fabricate surface carries. */
   .fab-kicker {
-    /* Declared, not inherited: nine of the fourteen converted sites render as a `<p>` and each
+    /* Declared, not inherited: nine of the seventeen converted sites render as a `<p>` and each
        zeroes the user-agent block margin itself today. */
     margin: 0;
     color: var(--fab-text-subtle);
@@ -124,6 +126,13 @@
     font-weight: 700;
     letter-spacing: 0.11em;
     text-transform: uppercase;
+    /* Recorded deviation from `library.html:120`, which declares none because the specimen
+       never draws a wrapped kicker. Every StatBox label wraps to two lines in the player
+       Shopping list, and without this each pair inherits the host's ~1.5 — about 12.75px of
+       leading on 8.5px type, which reads as two loose lines rather than one label. The rules
+       this component replaces declared 1.2; 1.3 keeps a two-line label together without
+       crowding the descenders. */
+    line-height: 1.3;
   }
 
   /* `tone` changes the ink. Nothing else — a tone that changed the size would reintroduce

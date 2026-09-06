@@ -21,7 +21,6 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
   import IoTable from './IoTable.svelte';
-  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     steps = [],
@@ -72,7 +71,7 @@
       >
         <p class="crafting-step-label" data-recipe-step-label>
           <span class="crafting-step-ordinal" aria-hidden="true">{index + 1}</span>
-          <span class="crafting-step-name"><Kicker as="span">{step.label}</Kicker></span>
+          <span class="crafting-step-name">{step.label}</span>
           {#if step.duration}
             <span
               class="crafting-step-duration"
@@ -135,16 +134,25 @@
     background: var(--fab-surface-soft);
   }
 
-  /* The caller's own flex row, kept: it carries the ordinal, the ellipsised name and the
-     duration chip, and `library.html:883` draws the kicker as a plain span inside a row the
-     caller owns. Everything the kicker now owns is gone from here — which also means the
-     ordinal no longer inherits `letter-spacing`, a sub-pixel re-centring inside its 20px
-     circle rather than a defect. */
+  /* NOT a kicker, and deliberately OUT OF SCOPE for the conversion. This label is the only
+     one of the candidates whose content is authored GM data rather than a fixed localized
+     category word, and it is the step's HEADLINE: converting it to the 8.5px
+     `--fab-text-subtle` rung collapsed it onto the same level as the "Requirements" label
+     BENEATH it, and left it smaller and fainter than both the 11px accent ordinal to its left
+     and the 10px duration chip to its right — so a duration chip became the most prominent
+     text in the row. A shape that ranks below the things it introduces is not the shape the
+     kicker names, so the type half stays here until the hierarchy is designed rather than
+     inherited. */
   .crafting-step-label {
     display: flex;
     align-items: center;
     gap: 8px;
     margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fab-text-muted);
   }
 
   .crafting-step-ordinal {

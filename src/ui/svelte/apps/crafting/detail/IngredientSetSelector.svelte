@@ -73,9 +73,9 @@
           </span>
           {#if products.length > 0}
             <div class="crafting-option-products">
-              <span class="crafting-option-products-caption">
+              <Kicker as="span">
                 {localize('FABRICATE.App.Crafting.Detail.OptionProduces')}
-              </span>
+              </Kicker>
               <ul class="crafting-option-product-grid">
                 {#each products as product, index (product.name + index)}
                   <li class="crafting-option-product" title={product.name}>
@@ -212,13 +212,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .crafting-option-products-caption {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 
   .crafting-option-product-grid {
