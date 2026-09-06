@@ -47,6 +47,7 @@
   import { localize } from '../../../../util/foundryBridge.js';
   import StatusPill from '../../../../components/StatusPill.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
+  import Callout from '../../../manager/Callout.svelte';
 
   let {
     stages = [],
@@ -150,10 +151,12 @@
     It sits here, below the roll summary, because after a roll it is the rule that
     explains the row states directly beneath it.
   -->
-  <p class="salvage-flow" data-inventory-salvage-flow>
-    <i class="fas fa-arrow-down-long" aria-hidden="true"></i>
-    <span>{localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}</span>
-  </p>
+  <Callout
+    tone="info"
+    icon="fas fa-arrow-down-long"
+    text={localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}
+    dataAttr="data-inventory-salvage-flow"
+  />
 
   <!-- The eyebrow's right slot tracks the list's state rather than emptying out: before
        a roll it says what will resolve the list, after one it says how far the roll got.
@@ -201,21 +204,24 @@
          hidden — while the order is already the GM's, so the note's shape does not
          change under the player as they drag. -->
     {#if canReorder}
-      <p class="salvage-reorder-note" data-inventory-salvage-reorder-note>
-        <i class="fas fa-hand-pointer" aria-hidden="true"></i>
-        <span class="salvage-reorder-note-text">
-          {localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
-        </span>
-        <button
-          type="button"
-          class="salvage-reorder-reset"
-          data-inventory-salvage-reorder-reset
-          disabled={!canResetOrder}
-          onclick={() => onResetOrder?.()}
-        >
-          {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
-        </button>
-      </p>
+      <Callout
+        tone="neutral"
+        icon="fas fa-hand-pointer"
+        text={localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
+        dataAttr="data-inventory-salvage-reorder-note"
+      >
+        {#snippet actions()}
+          <button
+            type="button"
+            class="salvage-reorder-reset"
+            data-inventory-salvage-reorder-reset
+            disabled={!canResetOrder}
+            onclick={() => onResetOrder?.()}
+          >
+            {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
+          </button>
+        {/snippet}
+      </Callout>
     {/if}
   {/if}
 </div>
@@ -259,46 +265,6 @@
   .salvage-state-chip {
     display: inline-flex;
     flex: 0 0 auto;
-  }
-
-  /* The mechanic banner. It takes the panel banner's box but NOT its tone fill: two
-     saturated boxes stacked make neither one the headline. This is the quieter of the
-     pair — the mode banner names the mode, this explains it. */
-  .salvage-flow {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface);
-    color: var(--fab-info);
-    font-size: 11px;
-    line-height: 1.5;
-  }
-
-  .salvage-flow span {
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-reorder-note {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface);
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-reorder-note-text {
-    flex: 1 1 auto;
-    min-width: 0;
   }
 
   /* An inline text button, matching the panel ribbon's "Salvage again": a quiet way

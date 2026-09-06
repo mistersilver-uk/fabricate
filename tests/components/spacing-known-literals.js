@@ -203,8 +203,15 @@ export function isExemptSpacingPixels(pixels) {
  * `padding: 10px` and its title/rule `gap: 2px`, each that file's only occurrence, so both rows
  * are DELETED. Every one of the five is now `var(--fab-space-3)` or the specimen's own
  * `margin-top` inside the primitive, so none of them left a slot open.
+ *
+ * It fell a further four when the same issue converted the salvage body's two remaining
+ * hand-rolled callouts — the progressive flow strip and the reorder note — onto that same
+ * widened primitive. Both declared `padding: 8px 10px`, so `SalvageProgressiveBody.svelte`'s
+ * `padding | 10 | 2` and `padding | 8 | 2` rows are DELETED rather than lowered: the file has
+ * no other occurrence of either. The padding is `var(--fab-space-3)` inside the primitive now,
+ * so neither slot is left open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 901;
+export const KNOWN_RAW_SPACING_TOTAL = 897;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

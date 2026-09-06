@@ -789,7 +789,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // `blocking`. Neither shipped caller reaches any of the three, so `tests/components/
   // notice-mounted.test.js` ACTS on them rather than a frame showing them.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
-  // THE STANDING STATEMENT (issue 1505), widened onto its specimen and re-authored at 14
+  // THE STANDING STATEMENT (issue 1505), widened onto its specimen and re-authored at 15
   // importing files. It reached this table through `MANAGER_PRIMITIVES` long before it had an
   // entry, and it was in `PRIMITIVES_WITH_NO_FRAME` for exactly that reason: neither
   // representative frame draws one. `manager-components-normal` is the component browser, whose
@@ -803,12 +803,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // move there, because the shipped component was info-tinted by default. `player-salvage` is the
   // TINTED, TITLE-BEARING form and the first player frame this primitive has ever had: the salvage
   // banner passes a title, so it exercises the `role="note"` rooting, the per-tone title ink and
-  // the tinted glyph ink in one picture.
-  //
-  // Still uncovered, and named rather than left to be discovered: the `actions` snippet's only
-  // caller. It renders on `identityBroken`, which no published frame reaches, so the control now
-  // nested inside the callout body is held by `tests/components/manager-layout.test.js`'s pointer
-  // hit-test rather than by a frame.
+  // the tinted glyph ink in one picture. That frame ALSO draws the `actions` snippet, because the
+  // salvage reorder note converted onto it with its Reset control in that slot — so the snippet's
+  // geometry is photographed rather than argued from source. Its other caller, the Tool Studio's
+  // identity notice, renders on `identityBroken`, which no published frame reaches; that one is
+  // held by `tests/components/tool-studio-mounted.test.js`, which clicks the route and asserts the
+  // Tool id it forwards, and by `tests/components/manager-layout.test.js`'s pointer hit-test.
   'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
