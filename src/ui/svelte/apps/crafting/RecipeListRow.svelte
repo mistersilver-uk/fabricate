@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   RecipeListRow is one selectable recipe in the left-column browser list. It shows
-  the recipe thumbnail, name, mode chip, and a status badge (from
+  the recipe thumbnail, name, mode chip, and a status chip (from
   craftingRecipeStatus). Clicking it selects the recipe (drives the centre detail)
   and highlights the row. An "add to shopping list" affordance is exposed via a
   trailing button so a player can queue materials without opening the detail.
@@ -13,8 +13,9 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
   import CraftingThumb from './CraftingThumb.svelte';
-  import CraftingStatusBadge from './CraftingStatusBadge.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
 
   let {
@@ -102,7 +103,18 @@
       <span class="crafting-recipe-row-meta">
         <span class="crafting-recipe-row-system">{systemName}</span>
         {#if !uncraftable}
-          <CraftingStatusBadge {status} compact />
+          <!-- The row has already said the status in words on the recipe beside it, so this is
+               the chip's icon-only face: a square with the label as its accessible NAME rather
+               than as a tooltip, which is all the retired badge ever gave it. -->
+          <Chip
+            density="list"
+            iconOnly
+            tone={statusChipTone(descriptor.tone)}
+            icon={descriptor.icon}
+            data-crafting-status={status}
+            aria-label={statusLabel}
+            title={statusLabel}
+          />
         {/if}
         {#if showCategory}
           <span class="crafting-recipe-row-category" title={categoryLabel}>{categoryLabel}</span>

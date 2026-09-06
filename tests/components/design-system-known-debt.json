@@ -432,7 +432,6 @@
     "src/ui/svelte/apps/alchemy/EssenceChips.svelte | 1",
     "src/ui/svelte/apps/crafting/CraftButton.svelte | 1",
     "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte | 1",
-    "src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte | 1",
     "src/ui/svelte/apps/crafting/CraftingThumb.svelte | 1",
     "src/ui/svelte/apps/crafting/QuantityTag.svelte | 1",
     "src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte | 1",

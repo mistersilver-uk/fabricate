@@ -8,6 +8,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
   essenceCraftability,
@@ -858,5 +859,20 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'no thumbnail pip when craftable'
     );
+  });
+
+  it('draws that badge as the shared chip, in the tone the map routes it to', async () => {
+    // Issue 1506: `AVAILABLE` returns `tone: 'success'`, which `Chip` does not paint. Bound
+    // straight on, the craftable header would have lost its green with nothing red anywhere.
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available' }),
+      selectedSetId: recipe().defaultSetId,
+    });
+
+    const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+    assert.ok(chip.classList.contains('manager-chip'), 'the badge IS the shared chip now');
+    assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
+    assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');
+    assert.ok(chip.textContent.trim().length > 0, 'the detail header keeps its label');
   });
 });

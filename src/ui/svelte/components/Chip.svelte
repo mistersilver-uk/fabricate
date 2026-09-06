@@ -828,7 +828,7 @@
   }
 
   /* THE ICON-ONLY CHIP (issue 1506): the chip that IS its glyph. The retired
-     `CraftingStatusBadge` drew it as a 20x20 square with its label suppressed, for a browser row
+     crafting status badge drew it as a 20x20 square with its label suppressed, for a browser row
      that has already said the status in words; no tone and no density can produce a square,
      because every density here states a BAND — a vertical inset and a type size — and a square
      needs a side.

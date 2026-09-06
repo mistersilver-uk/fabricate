@@ -69,13 +69,14 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
  * projection reads and six ternaries — and every one of them routes through the map. The four
  * journal run sites join them: each reads a `RunModel.derivedStatus` through the run-status
  * vocabulary, whose `ready`, `succeeded` and `cancelled` entries emit `success` and `neutral`,
- * neither of which is a chip tone under that spelling.
+ * neither of which is a chip tone under that spelling. The two recipe browse-status sites join
+ * them on the same fact, from the crafting vocabulary's `AVAILABLE` and `LOCKED`.
  *
  * The floor is stated rather than derived because the clause it guards is a NEGATIVE: "no chip in
  * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
  * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-const MAPPED_TONE_SITES = 16;
+const MAPPED_TONE_SITES = 18;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -106,10 +107,10 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the fifteen files the conversion routed through it', () => {
+  it('is read by the seventeen files the conversion routed through it', () => {
     assert.equal(
       MAP_READERS.length,
-      15,
+      17,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
         'site that has gone back to binding a projected tone straight onto a chip, which ' +
@@ -208,6 +209,48 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
         'retired pill carried that on itself; the shared chip carries no flex at all, so the ' +
         'chip gives up width to a name beside it that was meant to absorb the squeeze. Position ' +
         'stays with the caller, which is exactly why each caller has to say it'
+    );
+  });
+});
+
+/**
+ * THE ICON-ONLY CHIP CARRIES A NAME (issue 1506).
+ *
+ * `iconOnly` suppresses the label, and the glyph the chip draws is `aria-hidden`, so an icon-only
+ * chip with no `aria-label` is announced as nothing at all. The primitive states `role="img"`
+ * where it can, but it cannot supply a name it was never given — the `title` the retired badge
+ * carried is a tooltip, and a tooltip is not an accessible name.
+ *
+ * This is a CALL-SITE census rather than a mounted case for that reason: the defect is a caller
+ * omitting a prop, which renders perfectly and fails nothing. The floor is stated beside it so the
+ * negative cannot pass over an empty corpus — exactly one converted caller ships today.
+ */
+describe('1506 the icon-only chip — the accessible name it must carry', () => {
+  it('ships with an `aria-label` at every one of its call sites', () => {
+    const sites = [];
+    const unnamed = [];
+    for (const { path, source } of COMPONENTS) {
+      for (const tag of openingTagsNamed(source, 'Chip')) {
+        if (!/(?:^|\s)iconOnly(?![\w-])/.test(tag)) continue;
+        sites.push(path);
+        if (!/(?:^|\s)aria-label=/.test(tag)) unnamed.push(path);
+      }
+    }
+
+    assert.deepEqual(
+      unnamed,
+      [],
+      'an icon-only chip ships with no `aria-label`. Its glyph is `aria-hidden` and its label is ' +
+        'suppressed, so it is announced as nothing at all — and a `title` is a tooltip rather ' +
+        'than a name, which is precisely the defect this face was converted to stop reproducing'
+    );
+
+    assert.equal(
+      sites.length,
+      1,
+      'the icon-only face has exactly one caller — the recipe browser row, whose status is ' +
+        'already spelled out in words beside it. The count is pinned so the clause above cannot ' +
+        `be satisfied by a tree that has stopped rendering the face at all. Found: ${sites}`
     );
   });
 });

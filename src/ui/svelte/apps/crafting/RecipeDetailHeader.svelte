@@ -7,8 +7,9 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
   import CraftingThumb from './CraftingThumb.svelte';
-  import CraftingStatusBadge from './CraftingStatusBadge.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
@@ -100,7 +101,13 @@
              badge is dropped here to avoid a duplicate icon; the blocking-reasons
              callout below still spells out the reason. -->
         {#if !uncraftable}
-          <CraftingStatusBadge {status} />
+          <Chip
+            density="list"
+            tone={statusChipTone(descriptor.tone)}
+            icon={descriptor.icon}
+            data-crafting-status={status}
+            title={statusLabel}>{statusLabel}</Chip
+          >
         {/if}
       </div>
     </div>

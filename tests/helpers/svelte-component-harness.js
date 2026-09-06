@@ -321,6 +321,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
+  // THE ONE TONE MAP (issue 1506), spread from its own roster rather than copied. The recipe
+  // browser's row and the detail header draw their status through `<Chip>` now, and the browse
+  // status vocabulary above emits `success` and `neutral`, neither of which is a chip tone under
+  // that spelling — so the map is in this tree's closure wherever that vocabulary is read.
+  ...STATUS_TONE_RAW_MODULES,
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
   // is already in the compiled graph and imports it, so omitting this HANGS every
@@ -472,7 +477,6 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',
-  'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/CraftButton.svelte',
