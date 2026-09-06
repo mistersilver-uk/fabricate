@@ -536,14 +536,29 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
  * the only art tile in the tree already compliant on both, and converting it to the shared
  * primitive kept its size while moving its corner to a flat 9px and adding a hairline. Radius is
  * not recordable on a `path | size` table, so it is stated in that change's pull request.
+ *
+ * ── TWO PRIMITIVES, ONE POPULATION, AND WHY THE SAME CHANGE MOVED NO KEY ────────────────
+ * The same issue then shipped `components/Avatar.svelte`, an ACTOR's portrait, and converted the
+ * GM Knowledge surface's roster row and detail header onto it. The population is unchanged at 65
+ * because a call site is a call site whichever tile it renders, and the two keys those sites hold
+ * — `KnowledgeRoster.svelte | 34` and `KnowledgeView.svelte | 50`, still the tree's only carriers
+ * of either value — did not move either, because THIS TABLE IS KEYED BY CALL SITE AND NOT BY
+ * PRIMITIVE. What that conversion had to move instead is the extractor's own list of tile names,
+ * and that is load-bearing rather than clerical: with the portrait missing from it those two
+ * sites leave the scan silently and `assertRatchet` reports them VANISHED, which is a scan that
+ * stopped seeing a tile wearing the costume of debt that had been paid. The two names default to
+ * different rungs — 40 for the icon chip and 32 for the portrait — so the list carries the
+ * default beside each name rather than one constant beside the scan.
  */
 export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
 
 /**
  * @see KNOWN_OFF_LADDER_ART_SIZES
  *
- * MEASURED after issue 1506's art-tile unification: 57 off-ladder render sites across 40
- * `path | size` keys, out of 65 art-tile render sites in the tree.
+ * MEASURED after issue 1506's art-tile unification and re-measured after the portrait shipped:
+ * 57 off-ladder render sites across 40 `path | size` keys, out of 65 art-tile render sites in the
+ * tree — 63 icon chips and 2 portraits, with 8 of the 65 on a rung. Unchanged by the portrait
+ * conversion, for the reason the docblock above gives.
  */
 export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 57;
 

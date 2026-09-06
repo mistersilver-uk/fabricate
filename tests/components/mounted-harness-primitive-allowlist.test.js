@@ -229,9 +229,41 @@ const SHARED_PRIMITIVES = [
   // crafting-thumb path carried a Medallion entry, so every one of them would have taken the
   // silent `# cancelled` rather than the named "mounts a tree that renders it but never compiles
   // it" failure. Its sibling `Avatar` deliberately does NOT join at two callers, which is this
-  // list's rule read the other way and is stated there.
+  // list's rule read the other way; the two rulings were taken as one question and the second is
+  // recorded below rather than by silence.
   'src/ui/svelte/components/Medallion.svelte',
 ];
+
+/**
+ * The one component adjudicated AGAINST membership, and why a non-entry is worth recording.
+ *
+ * `components/Avatar.svelte` shipped at issue 1506 with exactly two callers — the GM Knowledge
+ * surface's roster row and its detail header — and both sit under ONE mounted tree, the manager
+ * root. The list above goes on at a THIRD tree, so the portrait does not qualify, and the two
+ * suites that mount it name it in their own `compiledModules` instead. That is a real cost and it
+ * is taken deliberately: until a third tree renders one, an omitted portrait entry is a silent
+ * `# cancelled` rather than the named failure the entries above buy. It joins the moment a third
+ * caller in a third tree arrives, which is what makes this a criterion rather than a preference.
+ *
+ * Recorded here rather than left unsaid because its sibling `Medallion` JOINED in the same
+ * change, and one ruling stated beside its opposite is a decision; one stated alone is an
+ * omission that reads like an oversight.
+ */
+const ADJUDICATED_NON_MEMBERS = Object.freeze(['src/ui/svelte/components/Avatar.svelte']);
+
+test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
+  // Two ways this record rots, and both leave it looking like configuration. A path that no
+  // longer exists is a ruling about nothing; a path that has since been ADDED above is a ruling
+  // the tree has already overturned, and the comment would go on claiming the opposite.
+  for (const file of ADJUDICATED_NON_MEMBERS) {
+    assert.ok(existsSync(resolve(repoRoot, file)), `${file} is adjudicated and is not on disk`);
+    assert.ok(
+      !SHARED_PRIMITIVES.includes(file),
+      `${file} is recorded as adjudicated OUT of the shared set and is also in it. One of the ` +
+        'two is stale, and the list is the one every suite is checked against.'
+    );
+  }
+});
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
 const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
