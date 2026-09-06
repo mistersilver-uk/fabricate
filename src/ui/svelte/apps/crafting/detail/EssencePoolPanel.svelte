@@ -142,7 +142,9 @@
       {/each}
     </div>
 
-    <p class="essence-pool-subtitle">{localize('FABRICATE.App.Crafting.Pool.AddComponents')}</p>
+    <p class="essence-pool-subtitle">
+      <Kicker as="span">{localize('FABRICATE.App.Crafting.Pool.AddComponents')}</Kicker>
+    </p>
     {#if carriers.length === 0}
       <p class="essence-pool-empty">{localize('FABRICATE.App.Crafting.Pool.NoCarriers')}</p>
     {:else}
@@ -191,7 +193,9 @@
     {/if}
 
     {#if allocated.length > 0}
-      <p class="essence-pool-subtitle">{localize('FABRICATE.App.Crafting.Pool.YourSelection')}</p>
+      <p class="essence-pool-subtitle">
+        <Kicker as="span">{localize('FABRICATE.App.Crafting.Pool.YourSelection')}</Kicker>
+      </p>
       <ul class="essence-pool-picked">
         {#each allocated as carrier (carrier.itemKey)}
           <li class="essence-pool-picked-row" data-essence-picked={carrier.itemKey}>
@@ -357,13 +361,12 @@
     }
   }
 
+  /* LAYOUT ONLY. This sub-label kept its own 10px rung when the section title above it
+     converted, which inverted the pair: the title that names the section rendered SMALLER
+     than the label nested under it. The type is the kicker's now; the wrapper survives for
+     the one margin that separates it from the meters above, which the kicker zeroes. */
   .essence-pool-subtitle {
     margin: var(--fab-space-1) 0 0;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--fab-text-subtle);
   }
 
   .essence-pool-empty {
