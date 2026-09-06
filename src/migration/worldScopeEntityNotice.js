@@ -11,20 +11,17 @@
  * identity-flag remap runs later in the same `ready` body and can only report what it found once
  * it has walked every actor, and the world identity DRIFT audit (issue 1370) runs on EVERY
  * session, long after any migration, once the three world-scope stores have loaded.
+ *
+ * The localizer's fallback semantics live in `src/utils/localizeWithFallback.js` (issue 1565).
+ * They were private here, and one copy of that rule is the right number: the deferred-chunk
+ * notices compose the same way and must not drift on what an empty string, a returned key or a
+ * throwing localizer mean.
  */
+
+import { localizeWith } from '../utils/localizeWithFallback.js';
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
-}
-
-/** Localize with a literal-string fallback, so a missing key never renders as a key. */
-function localizeWith(localize, key, data, fallback) {
-  try {
-    const value = typeof localize === 'function' ? localize(key, data) : null;
-    return typeof value === 'string' && value && value !== key ? value : fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 /**
