@@ -100,6 +100,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    // `SearchablePopover` renders its trigger through the shared `ManagerButton` primitive
+    // (issue 1371's `triggerButton` form), reached by the same route as the trio above.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/StatusPill.svelte',

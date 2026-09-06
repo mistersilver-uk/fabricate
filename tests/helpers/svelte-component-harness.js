@@ -385,6 +385,12 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // `SearchablePopover` renders its trigger through the shared `ManagerButton` primitive
+  // (issue 1371's `triggerButton` form), and `Select` renders a `SearchablePopover` for the
+  // pager's page-size control, so `ManagerButton` reaches this PLAYER-app list by the same
+  // `Pagination` -> `Select` -> `SearchablePopover` route. Omitting it HANGS every mounted
+  // crafting suite (# cancelled), not just `Select`'s own one.
+  'src/ui/svelte/components/ManagerButton.svelte',
   // `Chip` is listed further down with the complication band that also renders it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // The manager's icon-only push-button (issue 1422). It reaches this PLAYER-app list by two
