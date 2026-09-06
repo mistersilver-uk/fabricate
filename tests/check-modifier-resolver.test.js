@@ -226,7 +226,10 @@ test('resolveEligibleModifierIds TRUNCATES a bySubject pick to maxModifierPicks,
   const context = {
     catalogue: CATALOGUE,
     systemPolicy: 'bySubject',
-    defaultModifierIds: ['med'],
+    // MARKED in full. The check's mark bounds the roll under `bySubject` (issue 1608), so a
+    // fixture marking only `med` would drop the other two before the cap ever counted and
+    // this suite would be asserting the intersection instead of the truncation.
+    defaultModifierIds: ['herb', 'med', 'alch'],
     subjectModifierIds: ['herb', 'med', 'alch'],
   };
   assert.deepEqual(
@@ -274,6 +277,106 @@ test('resolveEligibleModifierIds does NOT truncate the playerPicks option list',
     ['med', 'alch', 'herb'],
     'a cap of 1 still offers all three options; it bounds what the player may pick FROM them'
   );
+});
+
+// ── the check's MARK bounds the roll under bySubject (issue 1608) ─────────────
+//
+// `bySubject` hands the SELECTION to the subject, and the check's `defaultModifierIds`
+// is what it may select FROM — the Checks studio's per-row pill reads "Selectable" /
+// "Not selectable" over exactly that list. Before this, `known` was the CATALOGUE alone,
+// so a modifier picked on a recipe and later un-marked on the check went on rolling: the
+// screen said "Not selectable" and the dice disagreed.
+//
+// The subject's stored ids are NOT pruned by any of this. The bound is applied on READ,
+// here, for the same reason the cap is — "a UI control's constraint is never an
+// invariant" — so re-marking the entry restores the roll with no re-authoring.
+
+test('resolveEligibleModifierIds: a bySubject pick the check no longer MARKS does not roll', () => {
+  const context = {
+    catalogue: CATALOGUE,
+    systemPolicy: 'bySubject',
+    defaultModifierIds: ['med', 'alch'],
+    subjectModifierIds: ['med', 'herb', 'alch'],
+  };
+  assert.deepEqual(
+    resolveEligibleModifierIds(context),
+    ['med', 'alch'],
+    'herb is catalogued and picked, but the check does not mark it — so it does not roll'
+  );
+  // …and the ORDER is the subject's, not the mark's: the subject authored the sequence and
+  // the mark only says which of it survives.
+  assert.deepEqual(
+    resolveEligibleModifierIds({ ...context, subjectModifierIds: ['alch', 'herb', 'med'] }),
+    ['alch', 'med'],
+    'the surviving picks keep the order the subject authored them in'
+  );
+});
+
+test('resolveEligibleModifierIds: re-MARKING restores a suppressed pick, unchanged', () => {
+  // THE ROUND TRIP, and the reason nothing prunes. The subject's stored ids are identical
+  // across all three readings; only the check's mark moves.
+  const subjectModifierIds = ['med', 'herb'];
+  const marked = (defaultModifierIds) =>
+    resolveEligibleModifierIds({
+      catalogue: CATALOGUE,
+      systemPolicy: 'bySubject',
+      defaultModifierIds,
+      subjectModifierIds,
+    });
+  assert.deepEqual(marked(['med', 'herb']), ['med', 'herb'], 'both marked → both roll');
+  assert.deepEqual(marked(['med']), ['med'], 'un-marking herb stops it rolling');
+  assert.deepEqual(
+    marked(['med', 'herb']),
+    ['med', 'herb'],
+    're-marking brings it back with no re-authoring, because nothing was ever pruned'
+  );
+  assert.deepEqual(
+    marked([]),
+    [],
+    'an EMPTY mark means nothing is selectable, the same reading the picker gives it'
+  );
+});
+
+test('resolveEligibleModifierIds: the mark drops a pick BEFORE the cap counts it', () => {
+  // The cap counts SURVIVORS, exactly as it already does for an unknown id: an un-marked
+  // pick ahead of the cap must not consume a slot a marked pick was entitled to.
+  assert.deepEqual(
+    resolveEligibleModifierIds({
+      catalogue: CATALOGUE,
+      systemPolicy: 'bySubject',
+      defaultModifierIds: ['med', 'alch'],
+      subjectModifierIds: ['herb', 'med', 'alch'],
+      maxModifierPicks: 2,
+    }),
+    ['med', 'alch'],
+    'the un-marked herb is dropped before the cap is counted, not counted and then dropped'
+  );
+});
+
+test('resolveEligibleModifierIds: the mark bounds bySubject ONLY, and only when it is an array', () => {
+  const base = {
+    catalogue: CATALOGUE,
+    defaultModifierIds: ['med'],
+    subjectModifierIds: ['med', 'herb'],
+  };
+  // Under every non-selecting rule the mark IS the source already, so there is nothing to
+  // intersect and the stored pick stays ignored outright.
+  for (const systemPolicy of ['addAll', 'highest', 'playerPicks', undefined, 'bogus']) {
+    assert.deepEqual(
+      resolveEligibleModifierIds({ ...base, systemPolicy }),
+      ['med'],
+      `at ${String(systemPolicy)} the mark is the SOURCE, not a bound on a pick that is ignored`
+    );
+  }
+  // A non-array mark is the unknown-basis sentinel `_normalizeCheckModifierSelection` uses
+  // for `validIds`: bound nothing rather than let an unknown basis silently empty the roll.
+  for (const defaultModifierIds of [undefined, null, 'med', 42]) {
+    assert.deepEqual(
+      resolveEligibleModifierIds({ ...base, systemPolicy: 'bySubject', defaultModifierIds }),
+      ['med', 'herb'],
+      `${String(defaultModifierIds)} is no basis to bound against, so the whole pick rolls`
+    );
+  }
 });
 
 // ── the one shared context bag (issue 1055) ──────────────────────────────────
@@ -1311,23 +1414,20 @@ test('buildCheckModifierChoice offers the CLAMPED value the roll will append', (
 // ── bySubject on all THREE activities (issue 1095) ───────────────────────────
 
 test('bySubject resolves and truncates identically on crafting, salvage and gathering', () => {
+  // Each activity MARKS all three entries. The mark bounds the roll under `bySubject`
+  // (issue 1608), so a mark of `['med']` would drop `herb` and `alch` before the cap ever
+  // counted and this test would be asserting the intersection instead of the truncation it
+  // is named for. Its sibling below pins that the bound itself is per-activity.
+  const selection = {
+    defaultModifierPolicy: 'bySubject',
+    defaultModifierIds: ['med', 'alch', 'herb'],
+    maxModifierPicks: 2,
+  };
   const system = {
     modifiers: CATALOGUE,
-    craftingCheck: {
-      defaultModifierPolicy: 'bySubject',
-      defaultModifierIds: ['med'],
-      maxModifierPicks: 2,
-    },
-    salvageCraftingCheck: {
-      defaultModifierPolicy: 'bySubject',
-      defaultModifierIds: ['med'],
-      maxModifierPicks: 2,
-    },
-    gatheringCraftingCheck: {
-      defaultModifierPolicy: 'bySubject',
-      defaultModifierIds: ['med'],
-      maxModifierPicks: 2,
-    },
+    craftingCheck: { ...selection },
+    salvageCraftingCheck: { ...selection },
+    gatheringCraftingCheck: { ...selection },
   };
   const subjects = {
     crafting: { craftingModifier: { modifierIds: ['herb', 'med', 'alch'] } },
@@ -1343,6 +1443,36 @@ test('bySubject resolves and truncates identically on crafting, salvage and gath
       `${activity}: the FIRST N in authored order survive the cap, never the best N`
     );
     assert.equal(scalarOf(context, evaluate), 7, `${activity}: 4 + 3`);
+  }
+});
+
+test('the bySubject bound is each activity’s OWN mark, never another activity’s (issue 1608)', () => {
+  // The catalogue is SHARED and the selection is not, so a bound read off the wrong
+  // activity's check is invisible on any screen and silently changes what rolls. Each
+  // activity marks a DIFFERENT single entry here, and the subject picks all three, so the
+  // three activities can only agree if one of them is reading another's mark.
+  const system = {
+    modifiers: CATALOGUE,
+    craftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['med'] },
+    salvageCraftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['alch'] },
+    gatheringCraftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['herb'] },
+  };
+  const picks = ['med', 'alch', 'herb'];
+  const subjects = {
+    crafting: { craftingModifier: { modifierIds: picks } },
+    salvage: { salvage: { checkModifierIds: picks } },
+    gathering: { checkModifierIds: picks },
+  };
+  for (const [activity, expected] of [
+    ['crafting', ['med']],
+    ['salvage', ['alch']],
+    ['gathering', ['herb']],
+  ]) {
+    assert.deepEqual(
+      resolveEligibleModifierIds(buildCheckModifierContext(system, activity, subjects[activity])),
+      expected,
+      `${activity}: bounded by its own check's mark, from one shared catalogue and one pick`
+    );
   }
 });
 

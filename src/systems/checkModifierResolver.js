@@ -556,6 +556,24 @@ export function resolveModifierPolicy(context = {}) {
  * under every other rule the activity's `defaultModifierIds` is the source and a stored
  * subject subset is ignored outright.
  *
+ * Under `bySubject` the activity's `defaultModifierIds` BOUNDS that source (issue 1608).
+ * It is not a mere default to fall back on there: it is the set the Checks studio MARKS
+ * as selectable — its per-row pill reads "Selectable" / "Not selectable" over exactly this
+ * list, and its intro promises "Mark which of the system's modifiers the recipe may choose
+ * from". A pick the check does not mark therefore does not roll, so the screen and the dice
+ * agree; before this the validation was against the catalogue alone, and a modifier picked
+ * on a recipe and later un-marked on the check went on rolling.
+ *
+ * THE BOUND IS APPLIED ON READ AND PRUNES NOTHING. The subject's stored ids survive
+ * un-marking untouched — no authoring surface narrows them — so re-marking the entry
+ * restores its contribution with no re-authoring, exactly as the cap's read-time truncation
+ * does. An EMPTY mark consequently means no eligible modifier at all, which is the same
+ * reading an empty default set already has under every other rule. A non-array mark is the
+ * unknown-basis sentinel `CraftingSystemManager._normalizeCheckModifierSelection` uses for
+ * `validIds`: bound nothing, rather than let a caller that cannot vouch for the mark
+ * silently empty the roll. An ABSENT key is such a non-array — the mark is read raw, with
+ * no `= []` default — so only a mark the check actually authored can suppress a pick.
+ *
  * Under `bySubject` the resolved list is TRUNCATED to {@link resolveMaxModifierPicks},
  * keeping the first N in authored order. The bound is enforced here and not only at the
  * picker, per "A UI control's constraint is never an invariant" — a GM who lowers the cap
@@ -574,25 +592,62 @@ export function resolveModifierPolicy(context = {}) {
  * @returns {string[]}
  */
 export function resolveEligibleModifierIds(context = {}) {
-  const { catalogue = [], defaultModifierIds = [], subjectModifierIds = null } = context ?? {};
-  const known = new Set(
-    (Array.isArray(catalogue) ? catalogue : [])
-      .map((entry) => (entry && typeof entry === 'object' ? entry.id : null))
-      .filter((id) => typeof id === 'string' && id !== '')
-  );
+  const { catalogue = [], subjectModifierIds = null } = context ?? {};
+  // The check's MARK, read RAW — no `= []` destructuring default. That default would make
+  // an ABSENT mark indistinguishable from an authored empty one, and as a BOUND an empty
+  // basis suppresses every pick: the exact failure
+  // `CraftingSystemManager._normalizeCheckModifierSelection` names in its own guard ("an
+  // empty basis prunes every id on every run"). `null` is therefore "no mark authored".
+  const mark = Array.isArray(context?.defaultModifierIds) ? context.defaultModifierIds : null;
   const subjectPicks =
     resolveModifierPolicy(context) === 'bySubject' && Array.isArray(subjectModifierIds);
-  const source = subjectPicks
-    ? subjectModifierIds
-    : Array.isArray(defaultModifierIds)
-      ? defaultModifierIds
-      : [];
-  const limit = subjectPicks ? resolveMaxModifierPicks(context) : Infinity;
+  return takeEligibleModifierIds(subjectPicks ? subjectModifierIds : (mark ?? []), {
+    known: knownModifierIds(catalogue),
+    // The mark BOUNDS only under `bySubject`; under every other rule it IS the source
+    // above, so intersecting it with itself would say nothing.
+    marked: subjectPicks && mark ? new Set(mark) : null,
+    limit: subjectPicks ? resolveMaxModifierPicks(context) : Infinity,
+  });
+}
+
+/**
+ * The catalogue's usable ids. An entry that is not an object, or whose `id` is not a
+ * non-empty string, names nothing and is dropped rather than admitted as `undefined`.
+ *
+ * @param {Array|unknown} catalogue The world modifier library.
+ * @returns {Set<string>}
+ */
+function knownModifierIds(catalogue) {
+  const ids = new Set();
+  for (const entry of Array.isArray(catalogue) ? catalogue : []) {
+    const id = entry && typeof entry === 'object' ? entry.id : null;
+    if (typeof id === 'string' && id !== '') ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * The ordered survivors of `source`: source order is preserved, and an id is dropped when
+ * it is not a string, is a duplicate, names nothing in `known`, or — when `marked` is a
+ * Set rather than `null` — is not in it.
+ *
+ * EVERY DROP HAPPENS BEFORE `limit` IS COUNTED, which is the reason this is one loop and
+ * not a chain of filters followed by a slice: the cap counts SURVIVORS, so an unknown or
+ * un-marked id ahead of the cap must not consume a slot a real, marked pick was entitled
+ * to.
+ *
+ * @param {Iterable<unknown>} source The ids to draw from, in authored order.
+ * @param {{ known: Set<string>, marked: Set<string>|null, limit: number }} bounds
+ * @returns {string[]}
+ */
+function takeEligibleModifierIds(source, { known, marked, limit }) {
   const seen = new Set();
   const ids = [];
   for (const id of source) {
     if (ids.length >= limit) break;
-    if (typeof id !== 'string' || !known.has(id) || seen.has(id)) continue;
+    if (typeof id !== 'string' || seen.has(id)) continue;
+    if (!known.has(id)) continue;
+    if (marked && !marked.has(id)) continue;
     seen.add(id);
     ids.push(id);
   }
