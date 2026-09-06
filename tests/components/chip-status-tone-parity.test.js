@@ -112,9 +112,22 @@ const MAPPED_FACES = Object.freeze([
 ]);
 
 /** The recessive ink ladder, strongest first (issue 1506). */
-const INK_LADDER = ['--fab-text-secondary', '--fab-text-muted', '--fab-text-subtle', '--fab-text-disabled'];
+const INK_LADDER = [
+  '--fab-text-secondary',
+  '--fab-text-muted',
+  '--fab-text-subtle',
+  '--fab-text-disabled',
+];
 
-const TOKEN_PROBES = [...new Set(MAPPED_FACES.flatMap((face) => [face.ink, face.edge, face.fill, face.retiredInk]).filter(Boolean)), ...INK_LADDER, '--fab-bg-1'];
+const TOKEN_PROBES = [
+  ...new Set(
+    MAPPED_FACES.flatMap((face) => [face.ink, face.edge, face.fill, face.retiredInk]).filter(
+      Boolean
+    )
+  ),
+  ...INK_LADDER,
+  '--fab-bg-1',
+];
 
 const value = (token) => (token.startsWith('--') ? `var(${token})` : token);
 
