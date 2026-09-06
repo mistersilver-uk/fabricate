@@ -1082,7 +1082,7 @@ It MUST also name the library entry it corresponds to, unless the primitive ship
 The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
 An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference.
-The library records which entries currently do so: section 16's "Entries carried without an API" row names the twenty-five, across eight specimens, and closing that list is tracked as a debt rather than presented as complete.
+The library records which entries currently do so: section 16's "Entries carried without an API" row names the twenty-two, across eight specimens, and closing that list is tracked as a debt rather than presented as complete.
 
 A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
 `tests/design-system-coverage.test.js` is the gate those prohibitions are enforced through: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.

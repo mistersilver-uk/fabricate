@@ -292,7 +292,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * THE 10px ROW IS UNTOUCHED and stays owed. 10px is not on the ladder either — the shared panel's
  * own corner is one of the thirteen occurrences that row counts — so that change moved one
  * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
- * is a net −1 rather than a snap, and the snap is still owed against the `10px | 13` row.
+ * is a net −1 rather than a snap, and the snap is still owed against the `10px` row.
  *
  * 313 → 312 with issue 1504, and this one IS a snap. `apps/manager/BulkEditSelect.svelte |
  * border-radius | 8px | 1` is deleted: the component's whole scoped block went with its native
