@@ -706,8 +706,15 @@ describe('decideScreenshotGate', () => {
     // timeout was raised to 75 (issue 1594), and a queue that no longer outlasts the timeout tests
     // nothing at all here; the ceiling assertion is the other end, because a queue long enough to
     // trip `maxWaitMs` would be ended by the ceiling instead of by the anchor.
-    const step = 10 * 60_000;
-    const queuedFor = Math.floor(CAPTURE_TIMEOUT_MS / step) + 1;
+    //
+    // The queue must outlast BOTH readings this case discriminates against: a gate-start anchor
+    // (capture + slack measured from zero) and a `run_started_at` anchor populated while the run is
+    // still queued (that timestamp + capture + slack). Deriving from CAPTURE_TIMEOUT_MS alone leaves
+    // the second reading alive and ties the first exactly, which is no margin at all.
+    const runStartedAtMs = 60_000;
+    const step = 5 * 60_000;
+    const mutantDeadline = runStartedAtMs + CAPTURE_TIMEOUT_MS + SLACK_MS;
+    const queuedFor = Math.floor(mutantDeadline / step) + 1;
     assert.ok(
       (queuedFor + 1) * step < MAX_WAIT_MS,
       `this fixture concludes at ${(queuedFor + 1) * step}ms, which is not inside the gate ceiling (${MAX_WAIT_MS}ms), so the ceiling would end it rather than the anchor`
@@ -716,15 +723,23 @@ describe('decideScreenshotGate', () => {
       runs: (state) => {
         if (state.runListCalls < queuedFor) {
           return [
-            workflowRun({ status: 'queued', conclusion: null, runStartedAt: atClock(60_000) }),
+            workflowRun({
+              status: 'queued',
+              conclusion: null,
+              runStartedAt: atClock(runStartedAtMs),
+            }),
           ];
         }
         if (state.runListCalls === queuedFor) {
           return [
-            workflowRun({ status: 'in_progress', conclusion: null, runStartedAt: atClock(60_000) }),
+            workflowRun({
+              status: 'in_progress',
+              conclusion: null,
+              runStartedAt: atClock(runStartedAtMs),
+            }),
           ];
         }
-        return [workflowRun({ runStartedAt: atClock(60_000) })];
+        return [workflowRun({ runStartedAt: atClock(runStartedAtMs) })];
       },
       body: bodyWithBlock(),
     });
@@ -734,8 +749,8 @@ describe('decideScreenshotGate', () => {
 
     assert.equal(decision.exitCode, 0, decision.message);
     assert.ok(
-      clock.now() > CAPTURE_TIMEOUT_MS,
-      'the fixture must actually spend longer queued than the capture timeout'
+      queuedFor * step > mutantDeadline,
+      `the fixture must spend longer queued (${queuedFor * step}ms) than either mutant deadline (${mutantDeadline}ms), or neither anchor reading is discriminated against`
     );
   });
 
