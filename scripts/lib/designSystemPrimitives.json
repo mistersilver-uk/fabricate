@@ -5,7 +5,7 @@
       "library": null,
       "status": "target",
       "evidence": "broad",
-      "why": "The two-step arm-then-confirm destructive control (4 callers). `library.html:581-582` specifies `danger` as one of six ROLES on the single button primitive and `library.html:1891` records a bespoke destructive panel as a surface Foundry already owns, so the arm is a carve-out neither entry claims by name. It is a hand-written carrier of `ManagerButton`'s CSS contract rather than a caller of it, and since issue 1502 that contract is rooted at the class the primitive emits, so this file writes `class=\"fabricate-button manager-button is-danger\"` — the root token, first, with no `fab-manager-button`. The deferral is unchanged and still count-pinned; only the class list moved."
+      "why": "The two-step arm-then-confirm destructive control (4 callers). `library.html:581-582` specifies `danger` as one of six ROLES on the single button primitive and `library.html:1998` records a bespoke destructive panel as a surface Foundry already owns, so the arm is a carve-out neither entry claims by name. It is a hand-written carrier of `ManagerButton`'s CSS contract rather than a caller of it, and since issue 1502 that contract is rooted at the class the primitive emits, so this file writes `class=\"fabricate-button manager-button is-danger\"` — the root token, first, with no `fab-manager-button`. The deferral is unchanged and still count-pinned; only the class list moved."
     },
     {
       "path": "src/ui/svelte/components/Avatar.svelte",

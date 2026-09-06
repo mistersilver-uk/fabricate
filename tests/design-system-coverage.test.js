@@ -749,7 +749,7 @@ const CITED_WITHOUT_ENTRY = [
   {
     name: 'RoutingOverview',
     why:
-      'Cited at `library.html:1652` and `:1664` as the element two specimens render. NOT a loose ' +
+      'Cited at `library.html:1756` and `:1768` as the element two specimens render. NOT a loose ' +
       'citation: spec.md requirement "Sets and groups are the container layer above the row" ' +
       'already MANDATES the surface — "The routing is authored in TWO surfaces" and "A ROUTING ' +
       'OVERVIEW lists every source with the set it produces". This is a bound requirement whose ' +

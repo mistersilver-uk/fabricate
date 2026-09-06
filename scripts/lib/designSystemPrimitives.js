@@ -440,7 +440,7 @@ export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 
 /**
  * The ruled-out register, mirroring spec.md requirement "The ruled-out register is part of the
- * specification" and `library.html:1878-1894`.
+ * specification" and `library.html:1985-2002`.
  *
  * Part of the specification, not commentary: that requirement has declined candidates recorded
  * with the reasoning that declined them "so that the absence of a primitive is legible as a
@@ -460,8 +460,8 @@ export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
  * `'out-of-scope'` (declined for a product reason rather than a structural one) or `'foundry-owns'`
  * (Foundry already provides the surface). `replacement` is the composition or the API to use.
  *
- * The library's two aggregate wells are deliberately NOT rows here. "Five more" (`:1891`) names
- * five candidates in a sentence without individual reasoning, and "Graph canvas" (`:1892`) is a
+ * The library's two aggregate wells are deliberately NOT rows here. "Five more" (`:1999`) names
+ * five candidates in a sentence without individual reasoning, and "Graph canvas" (`:2000`) is a
  * zero-caller placeholder behind an experimental flag that "re-enters the set with the work that
  * ships it" — neither is a declined candidate with its own recorded judgement, and inventing rows
  * for them would put words in the register that the specification does not contain.
