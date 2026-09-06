@@ -96,8 +96,13 @@
      glyph-only (`spec.md:439`, scenario at `spec.md:458`); the empty-string default
      exists only so an unset label omits `aria-label` instead of emptying it.
      Dismissal is this component's own state — the notice leaves the DOM.
-   - blocking: `role="alert"` when true and `aria-live="polite"` otherwise, which is
-     what announces a notice that appears without a focus change. The PAGE-LEVEL
+   - blocking: `role="alert"` when true and `role="status"` with `aria-live="polite"`
+     otherwise, which is what announces a notice that appears without a focus change. The
+     ROLE is what carries it, not the attribute alone: both shipped callers INSERT this
+     component together with its text, and a live region created in the same mutation as its
+     content is not announced — only its later updates are. A live-region role is recognised
+     on insertion, so the polite half announces for the callers that actually exist. The
+     PAGE-LEVEL
      arbitration the design system requires — one blocking bar at a time, the rest
      stacking beneath it — belongs to the shared region that has not shipped yet, and
      this prop does not claim it.
@@ -167,7 +172,7 @@
 {#if !dismissed}
   <div
     class="fab-notice is-{resolvedTone}"
-    role={blocking ? 'alert' : undefined}
+    role={blocking ? 'alert' : 'status'}
     aria-live={blocking ? undefined : 'polite'}
     data-notice-tone={resolvedTone}
     {...hookAttributes}
