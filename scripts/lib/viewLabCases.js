@@ -13093,8 +13093,9 @@ function rendersInPlayerWindow(viewCase) {
  * for completeness. Keying on `kinds` instead would need a hand-listed set of nav selectors to
  * police, which is the hand-maintained list this whole table refuses.
  *
- * `ItemPageInspector.svelte` is here even though only `manager-books-scrolls-normal` renders it in
- * a captured frame today: `manager-system-edit-normal` declares it in `sourceMatches` too, and
+ * `ItemPageInspector.svelte` is here because two cases render it in a captured frame today —
+ * `manager-books-scrolls-normal` draws the aside's empty branch and `manager-books-scrolls-item`
+ * its populated one — and `manager-system-edit-normal` declares it in `sourceMatches` too:
  * honouring a case's own declaration costs one frame and removes the need to second-guess it.
  *
  * Exported so `tests/view-lab-cases.test.js` can check THESE strings resolve to tracked files,
