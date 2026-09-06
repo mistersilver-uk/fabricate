@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 214 repeated selectors
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
  * rather than these 121, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,071 `(at-context, selector)` keys, of which 2,950 appear exactly
+ * Unfiltered, the sheet holds 3,072 `(at-context, selector)` keys, of which 2,951 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -37,10 +37,11 @@
  * is a VANISHED row rather than a silent pass.
  *
  * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
- * MEASURED over this branch's own head, rebased onto issue 1501's final tree, by `the sheet's
- * cross-list selector repetition does not move` in `design-system-debt-ratchets.test.js`, over
+ * MEASURED over this branch's own head, rebased onto the merged main at 75dd8bf9 (which carries
+ * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
+ * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,570 rules at that head, 121 repeated keys and 247 appearances
+ * printed from. The sheet holds 2,571 rules at that head, 121 repeated keys and 247 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * A COMMIT SHA IS NOT THE ANCHOR, deliberately. An earlier draft of this docblock cited the
