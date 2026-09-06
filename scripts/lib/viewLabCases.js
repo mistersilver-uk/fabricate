@@ -755,17 +755,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // reason is structural rather than incidental: the component has exactly two callers, the
   // player crafting app's Shopping list and the manager's Books & Scrolls inspector aside.
   //
-  // ONE entry, and the OTHER caller is recorded here as unphotographed rather than named.
-  // `player-crafting-essence-shopping` is the frame: its steps press a recipe row's cart button,
-  // so the list is non-empty and its three summary cards are in the picture — and the recipe it
-  // adds can never be funded, which puts one of the three cards in the `danger` tone, so the frame
-  // carries the tone model as well as the box. The manager caller is NOT here because no case
-  // draws it: `manager-books-scrolls-normal` renders the inspector's EMPTY branch, since nothing
-  // in the registry clicks `[data-books-scrolls-select]`, and the two recipe-item cases route
-  // past the aside into the editor. That conversion is held by
-  // `tests/components/item-page-inspector-mounted.test.js` and by `manager-mounted`, which pin all
-  // six of its `data-*` hooks, and a case selecting a Books & Scrolls row is what would close it.
-  'src/ui/svelte/components/StatBox.svelte': Object.freeze(['player-crafting-essence-shopping']),
+  // TWO entries, one per caller, because both are now drawn. `player-crafting-essence-shopping`
+  // is the player frame: its steps press a recipe row's cart button, so the list is non-empty and
+  // its three summary cards are in the picture — and the recipe it adds can never be funded, which
+  // puts one of the three cards in the `danger` tone, so the frame carries the tone model as well
+  // as the box. `manager-books-scrolls-item` is the manager frame, and it was ADDED for this
+  // component: `manager-books-scrolls-normal` renders the inspector's EMPTY branch, since nothing
+  // in the registry clicked `[data-books-scrolls-select]`, and the two recipe-item cases route past
+  // the aside into the editor — so the item page's three tiles were unphotographed, and with them
+  // `tone="info"`, whose only reach anywhere in the tree is the middle one. That case's
+  // `expectSelector` requires the accented tile inside the grid, so the frame cannot go green
+  // without it. The conversion is ALSO held by `tests/components/item-page-inspector-mounted.
+  // test.js` and by `manager-mounted`, which pin all six of its `data-*` hooks.
+  'src/ui/svelte/components/StatBox.svelte': Object.freeze([
+    'player-crafting-essence-shopping',
+    'manager-books-scrolls-item',
+  ]),
   // THE SURFACE THAT REPORTS SOMETHING THAT JUST HAPPENED (issue 1505), on two callers.
   // `manager-components-normal` and `fabricate-app-shell` are both resting browse surfaces, so
   // neither can contain a notice at all — a notice exists because something happened.
@@ -4737,6 +4742,43 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
+  }),
+  managerCase({
+    id: 'manager-books-scrolls-item',
+    label: 'Manager — Books scrolls item',
+    // THE STAT GRID NO FRAME DREW (issue 1505). `manager-books-scrolls-normal` above renders this
+    // route's inspector aside in its EMPTY branch — `selectedRecipeItemId` initialises `''` and
+    // nothing in the registry clicked `[data-books-scrolls-select]` — and the two recipe-item
+    // cases route PAST the aside into the editor. So the aside's populated branch, and with it the
+    // three `<StatBox>` tiles the conversion moved onto the shared primitive, was drawn by no case
+    // at all, and an inspector change published a frame that does not contain the thing it changed.
+    //
+    // This is `manager-books-scrolls-normal`'s steps PLUS one row click. `hb-book` is the row to
+    // click for the same reason the recipe-item cases open it: it is the herbalism world's one
+    // definition that links a world item and three recipes and caps learning at a positive number,
+    // so every tile in the grid carries a real figure rather than a zero.
+    //
+    // `beyond` with NO smoke label: the smoke's Books & Scrolls walk captures the resting route
+    // and never selects a row, so an `exact` claim here would name a counterpart that does not
+    // exist.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-select="hb-book"]' },
+    ],
+    expectView: 'books-scrolls',
+    // The GRID with its accented tile inside it, not the aside root: an inspector that kept its
+    // chrome while the tiles stopped rendering would leave every other claim here true, and
+    // `tone="info"` on the middle tile is the one reach of that tone anywhere in the tree.
+    expectSelector: '[data-item-page-stats] [data-stat-tone="info"]',
+    kinds: ['manager', 'books-scrolls'],
+    // The INSPECTOR only. `BooksScrollsView.svelte` is not claimed here because the case above
+    // already photographs the list this one merely clicks through, and two near-identical frames
+    // for one list change is the unrelated-evidence noise the source map exists to avoid.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/],
   }),
   managerCase({
     id: 'manager-crafting-settings',
