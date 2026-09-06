@@ -77,7 +77,7 @@ const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">
-        <section class="manager-toolbar manager-component-toolbar">
+        <section class="fabricate-filter-bar manager-toolbar manager-component-toolbar">
           <div class="manager-component-filter-row">
             <label class="fabricate-search manager-search">
               <input type="search" data-m="search" value="iron">

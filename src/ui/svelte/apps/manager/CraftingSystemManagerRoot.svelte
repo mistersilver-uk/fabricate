@@ -13433,7 +13433,7 @@
     {#if !fullWidthLayout}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
-          <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
+          <section class="fabricate-card manager-inspector-card" data-tags-evidence="at-a-glance">
             <h3 class="manager-card-title">
               {text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}
             </h3>
@@ -13516,7 +13516,10 @@
           {#if (currentView === 'environments' && displayedGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
             {#if selectedGatheringTask}
               {#if currentView !== 'gathering-task-edit'}
-                <section class="manager-inspector-card" data-gathering-task-inspector>
+                <section
+                  class="fabricate-card manager-inspector-card"
+                  data-gathering-task-inspector
+                >
                   <div class="manager-inspector-title-row is-hero-large">
                     <img
                       class="manager-recipe-preview"
@@ -13558,7 +13561,7 @@
                   </p>
                 </section>
 
-                <section class="manager-inspector-card">
+                <section class="fabricate-card manager-inspector-card">
                   <h3 class="manager-card-title">
                     {text(
                       'FABRICATE.Admin.Manager.Environment.Tasks.Details',
@@ -13603,7 +13606,7 @@
                   </div>
                 </section>
 
-                <section class="manager-inspector-card" data-task-drops-summary>
+                <section class="fabricate-card manager-inspector-card" data-task-drops-summary>
                   <h3 class="manager-card-title">
                     {text(
                       'FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary',
@@ -13643,7 +13646,7 @@
                 </section>
 
                 <section
-                  class="manager-inspector-card manager-task-environment-usage-card"
+                  class="fabricate-card manager-inspector-card manager-task-environment-usage-card"
                   data-task-environment-usage
                 >
                   <h3 class="manager-card-title">
@@ -13686,7 +13689,9 @@
               {#if currentView === 'gathering-task-edit'}
                 {#if selectedGatheringDrop}
                   <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
-                    <section class="manager-inspector-card manager-drop-editor-header-card">
+                    <section
+                      class="fabricate-card manager-inspector-card manager-drop-editor-header-card"
+                    >
                       <h3 class="manager-card-title">
                         {text(
                           'FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop',
@@ -13749,7 +13754,9 @@
                     <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
 
                     <div class="manager-drop-inspector-scroll">
-                      <section class="manager-inspector-card manager-drop-editor-card">
+                      <section
+                        class="fabricate-card manager-inspector-card manager-drop-editor-card"
+                      >
                         <div class="manager-drop-editor-values">
                           <label
                             class="fabricate-field manager-field manager-drop-rate-editor"
@@ -13831,7 +13838,7 @@
                           kind
                         )}
                         <section
-                          class="manager-inspector-card manager-drop-editor-condition-modifier-card"
+                          class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
                           data-gathering-drop-condition-modifiers={kind}
                         >
                           <header class="manager-character-modifier-row-card-header">
@@ -13983,7 +13990,7 @@
                       {/each}
 
                       <section
-                        class="manager-inspector-card manager-character-modifier-row-card"
+                        class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
                         data-gathering-drop-character-modifiers
                       >
                         <header class="manager-character-modifier-row-card-header">
@@ -14220,7 +14227,10 @@
                     </div>
                   </div>
                 {:else}
-                  <section class="manager-inspector-card" data-gathering-task-drop-inspector>
+                  <section
+                    class="fabricate-card manager-inspector-card"
+                    data-gathering-task-drop-inspector
+                  >
                     <h3 class="manager-card-title">
                       {text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop',
@@ -14266,7 +14276,7 @@
                       kind
                     )}
                     <section
-                      class="manager-inspector-card manager-drop-editor-condition-modifier-card"
+                      class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
                       data-gathering-event-condition-modifiers={kind}
                     >
                       <header class="manager-character-modifier-row-card-header">
@@ -14394,7 +14404,7 @@
                   {/each}
 
                   <section
-                    class="manager-inspector-card manager-character-modifier-row-card"
+                    class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
                     data-gathering-event-character-modifiers
                   >
                     <header class="manager-character-modifier-row-card-header">
@@ -14614,7 +14624,7 @@
                 </div>
               </div>
             {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
-              <section class="manager-inspector-card" data-gathering-event-inspector>
+              <section class="fabricate-card manager-inspector-card" data-gathering-event-inspector>
                 <div class="manager-inspector-title-row is-hero-large">
                   <img
                     class="manager-recipe-preview"
@@ -14658,7 +14668,7 @@
                 </p>
               </section>
 
-              <section class="manager-inspector-card">
+              <section class="fabricate-card manager-inspector-card">
                 <h3 class="manager-card-title">
                   {text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}
                 </h3>
@@ -14710,7 +14720,7 @@
               </section>
 
               <section
-                class="manager-inspector-card manager-event-environment-usage-card"
+                class="fabricate-card manager-inspector-card manager-event-environment-usage-card"
                 data-event-environment-usage
               >
                 <h3 class="manager-card-title">
@@ -14762,7 +14772,7 @@
             {/if}
           {:else if currentView === 'environments' && displayedGatheringTab === 'settings'}
             <section
-              class="manager-inspector-card manager-gathering-rules-card"
+              class="fabricate-card manager-inspector-card manager-gathering-rules-card"
               data-gathering-inspector-rules
             >
               <div class="manager-inspector-title-row">
@@ -15248,7 +15258,7 @@
             </section>
           {:else if isWorldTravelRoute}
             <section
-              class="manager-inspector-card manager-travel-inspector"
+              class="fabricate-card manager-inspector-card manager-travel-inspector"
               data-gathering-inspector-travel
               data-travel-inspector={worldTravelTab}
               aria-label={worldTravelTab === 'map'
@@ -15291,7 +15301,7 @@
                     </ManagerButton>
                   </div>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <RealmNameField
                       name={selectedTravelRealm.name}
                       disabled={$viewState.travelSaving === true}
@@ -15299,7 +15309,7 @@
                     />
                   </section>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <h3 class="manager-card-title">
                       <i class="fas fa-seedling" aria-hidden="true"></i>
                       {text(
@@ -15330,7 +15340,7 @@
                     {/if}
                   </section>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <h3 class="manager-card-title">
                       <i class="fas fa-people-group" aria-hidden="true"></i>
                       {text(
@@ -15370,7 +15380,9 @@
                 {/if}
               {:else if worldTravelTab === 'map'}
                 {#if selectedMapRegion}
-                  <section class="manager-inspector-card manager-map-link-region-card">
+                  <section
+                    class="fabricate-card manager-inspector-card manager-map-link-region-card"
+                  >
                     <div class="manager-inspector-title-row">
                       <span
                         class="manager-inspector-icon manager-map-link-inspector-swatch"
@@ -15397,7 +15409,7 @@
                     </div>
                   </section>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <h3 class="manager-card-title">
                       <i class="fas fa-link" aria-hidden="true"></i>
                       {text(
@@ -15441,7 +15453,7 @@
                     {/if}
                   </section>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <h3 class="manager-card-title">
                       <i class="fas fa-map-location-dot" aria-hidden="true"></i>
                       {text(
@@ -15472,7 +15484,7 @@
                     {/if}
                   </section>
 
-                  <section class="manager-inspector-card">
+                  <section class="fabricate-card manager-inspector-card">
                     <h3 class="manager-card-title">
                       <i class="fas fa-people-group" aria-hidden="true"></i>
                       {text(
@@ -15521,7 +15533,7 @@
             </section>
           {:else if currentView === 'environments' && activeGatheringInspectorTab}
             <section
-              class="manager-inspector-card"
+              class="fabricate-card manager-inspector-card"
               data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}
             >
               <div class="manager-inspector-title-row is-hero-large">
@@ -15551,7 +15563,7 @@
               </p>
             </section>
           {:else if selectedEnvironment}
-            <section class="manager-inspector-card">
+            <section class="fabricate-card manager-inspector-card">
               <img
                 class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`}
                 src={environmentImage(selectedEnvironment)}
@@ -15584,7 +15596,7 @@
               </p>
             </section>
 
-            <section class="manager-inspector-card">
+            <section class="fabricate-card manager-inspector-card">
               <h3 class="manager-card-title">
                 {text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}
               </h3>
@@ -15614,7 +15626,7 @@
             </section>
 
             {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || $viewState.environmentSaveError}
-              <section class="manager-inspector-card">
+              <section class="fabricate-card manager-inspector-card">
                 <h3 class="manager-card-title">
                   {text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}
                 </h3>
@@ -16145,7 +16157,7 @@
             onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
           />
         {:else if selectedSystem}
-          <section class="manager-inspector-card">
+          <section class="fabricate-card manager-inspector-card">
             <div class="manager-inspector-title-row is-hero-large">
               <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
                 <i class="fas fa-layer-group"></i>
@@ -16177,7 +16189,7 @@
             </p>
           </section>
 
-          <section class="manager-inspector-card">
+          <section class="fabricate-card manager-inspector-card">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
             <div class="manager-fact-grid">
               {#each selectedCountFacts as fact (fact.id)}
@@ -16209,7 +16221,7 @@
           </section>
 
           <section
-            class="manager-inspector-card"
+            class="fabricate-card manager-inspector-card"
             aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
           >
             <h3 class="manager-card-title">
@@ -16233,7 +16245,7 @@
 
           {#if selectedGatheringConditionShortcuts.length > 0}
             <section
-              class="manager-inspector-card manager-condition-shortcut-card"
+              class="fabricate-card manager-inspector-card manager-condition-shortcut-card"
               data-systems-gathering-conditions
               aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
             >

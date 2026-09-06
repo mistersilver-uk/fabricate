@@ -56,6 +56,15 @@
  * the singleton count each rise by fourteen and the rule count by six, while the repeated table is
  * untouched.
  *
+ * ISSUE 1508 PHASE 2 RE-KEYED TWO MORE ROWS AND MOVED NOTHING ELSE, which is the shape a pure
+ * re-root takes. Rooting `ManagerToolbar` and `InspectorCard` at the classes they emit rewrites
+ * the leading compound of both families, so `.fabricate-manager .manager-inspector-card` becomes
+ * `.fabricate-card.manager-inspector-card` and `.fabricate-manager .manager-toolbar` becomes
+ * `.fabricate-filter-bar.manager-toolbar`. Each row keeps its count of 2 because both members of
+ * each pair re-rooted in the same commit, and unlike phase 1 this phase ADDS no rule at all —
+ * neither family owns a control, so neither declares a font floor or a focus pair — so the rule,
+ * key and singleton counts are all unchanged and `pinnedTotal` stays 243 across 119 rows.
+ *
  * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES A THIRD TIME, by adding one rule:
  * `.fabricate-manager .manager-recipe-name-row .manager-chip` gives the row's status pills
  * `flex: 0 0 auto`, so `truncate`'s `overflow: hidden` cannot zero their automatic minimum

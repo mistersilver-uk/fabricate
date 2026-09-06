@@ -2494,7 +2494,7 @@
    order. The prototype's card carries NO padding of its own: its head and body each own
    theirs, which is what lets the head sit flush at the top and the tier list run to the
    card's own edge. */
-.fabricate-manager .manager-inspector-card.manager-checks-card {
+.fabricate-card.manager-inspector-card.manager-checks-card {
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -5511,7 +5511,7 @@
 }
 
 .fabricate-manager .manager-section-header,
-.fabricate-manager .manager-toolbar {
+.fabricate-filter-bar.manager-toolbar {
   min-width: 0;
   padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
@@ -5524,7 +5524,7 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-toolbar {
+.fabricate-filter-bar.manager-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -5532,7 +5532,7 @@
   background: var(--fab-overlay-light-03);
 }
 
-.fabricate-manager .manager-toolbar:not(:has(.manager-toolbar-primary)) {
+.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -9832,7 +9832,23 @@
    clause in that suite is a WRAP guard the direction button's own `min-height: 34px` keeps
    green whatever happens here, so it could never have been the proof. The CI-armed half is a
    sheet-text clause in `manager-layout.test.js`, because that suite skips itself whole without
-   a harvested Foundry chrome. */
+   a harvested Foundry chrome.
+
+   AND IT IS THE ONE FILTER-BAR RULE ISSUE 1508 LEFT APPLICATION-ROOTED — the family's named
+   residue, recorded here rather than in a ledger nobody reads beside the rule. The other five
+   `.manager-toolbar` rules are rooted at `.fabricate-filter-bar`, the class `ManagerToolbar`
+   emits; this one cannot be, because the family compound stands THIRD, behind an ATTRIBUTE
+   ancestor that is not the application root. The root at position one would match nothing (it
+   sits on the bar, a DESCENDANT of the attributed element), and dropping `.fabricate-manager`
+   would leave the first compound with no namespace class at all. The rewrite the three
+   Tools-browser search rules took — name the caller's container by a class the caller writes on
+   that same element — is not available either: `[data-scoped-page='world-vocabulary']` is written
+   by the manager ROUTE, not by a caller container carrying a class of its own. The rule trips no
+   assertion in either state, because `manager-scoped-list-toolbar` is not a class the primitive
+   writes, so `isPrimitiveOwned` classes the selector CALLER-owned and neither the gated nor the
+   rootless clause of `tests/components/searchable-popover-area-scope.test.js` sees it. Its rank
+   is (0,4,1) here and would be (0,4,1) re-rooted, so nothing about specificity is at stake. It
+   retires with the rest of the `manager-*` names in issue 1507. */
 .fabricate-manager
   [data-scoped-page='world-vocabulary']
   .manager-toolbar.manager-scoped-list-toolbar
@@ -12992,7 +13008,7 @@
 
 .fabricate-manager .manager-nav,
 .fabricate-manager .manager-rail-block,
-.fabricate-manager .manager-inspector-card {
+.fabricate-card.manager-inspector-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -13736,7 +13752,7 @@
   background: var(--fab-warning);
 }
 
-.fabricate-manager .manager-inspector-card {
+.fabricate-card.manager-inspector-card {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
@@ -17064,7 +17080,7 @@
   }
 
   .fabricate-manager .manager-toolbar-primary,
-  .fabricate-manager .manager-toolbar:not(:has(.manager-toolbar-primary)),
+  .fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)),
   .fabricate-manager .manager-header-actions,
   .fabricate-manager .manager-action-group {
     justify-content: flex-start;
@@ -26754,7 +26770,7 @@
 }
 
 .fabricate-manager .manager-filter.is-size-38 select,
-.fabricate-manager .manager-toolbar select.is-size-38 {
+.fabricate-filter-bar.manager-toolbar select.is-size-38 {
   height: 38px;
   border-radius: 9px;
 }

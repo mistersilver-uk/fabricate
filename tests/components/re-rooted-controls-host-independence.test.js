@@ -164,6 +164,20 @@ const SEARCH_CLASSES = composedClasses(
   .slice(0, 2)
   .join(' ');
 
+/**
+ * `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals — their
+ * root and their hook class — so the whole array is what a default render emits. Neither owns a
+ * control of its own, which is why neither appears in the floor or the ring populations below.
+ */
+const TOOLBAR_CLASSES = composedClasses(
+  read('src/ui/svelte/components/ManagerToolbar.svelte'),
+  'ManagerToolbar'
+).join(' ');
+const CARD_CLASSES = composedClasses(
+  read('src/ui/svelte/components/InspectorCard.svelte'),
+  'InspectorCard'
+).join(' ');
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -174,12 +188,14 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the five class strings under measurement are the ones the primitives emit', () => {
+test('the seven class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
   assert.equal(FIELD_CLASSES, 'fabricate-field manager-field');
   assert.equal(SEARCH_CLASSES, 'fabricate-search manager-search');
+  assert.equal(TOOLBAR_CLASSES, 'fabricate-filter-bar manager-toolbar');
+  assert.equal(CARD_CLASSES, 'fabricate-card manager-inspector-card');
 
   // AND THE ROOT IS THE ARRAY'S FIRST LITERAL, for both. This is a CONSTRAINT rather than a
   // style note: `searchable-popover-area-scope.test.js` reads the composed region by taking the
@@ -188,6 +204,8 @@ test('the five class strings under measurement are the ones the primitives emit'
   for (const [file, label, root] of [
     ['src/ui/svelte/components/Field.svelte', 'Field', 'fabricate-field'],
     ['src/ui/svelte/components/ManagerSearchField.svelte', 'ManagerSearchField', 'fabricate-search'],
+    ['src/ui/svelte/components/ManagerToolbar.svelte', 'ManagerToolbar', 'fabricate-filter-bar'],
+    ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
   ]) {
     assert.equal(
       composedClasses(read(file), label)[0],
@@ -276,7 +294,34 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<label class="fabricate-search manager-search" data-probe="${host}-search-root"><i class="fas fa-search"></i><input type="search" data-probe="${host}-search"></label>`,
   }),
+  // THE PROBE IS THE ROOT FOR BOTH OF THESE, and that is the point rather than a shortcut. The
+  // bar and the card own NO control: each renders its caller's children, so the whole of what
+  // either family declares is on the `<section>` itself. The bar carries one `<select>` all the
+  // same, because `.fabricate-filter-bar.manager-toolbar select.is-size-38` is the one family
+  // rule that REACHES a caller's control, and its own clause below measures what does and does
+  // not travel with it.
+  Object.freeze({
+    id: 'toolbar',
+    classes: TOOLBAR_CLASSES,
+    markup: (host) =>
+      `<section class="fabricate-filter-bar manager-toolbar" data-probe="${host}-toolbar" aria-label="Filter"><div><select class="is-size-38" data-probe="${host}-toolbar-select"><option>All</option></select></div></section>`,
+  }),
+  Object.freeze({
+    id: 'card',
+    classes: CARD_CLASSES,
+    markup: (host) =>
+      `<section class="fabricate-card manager-inspector-card" data-probe="${host}-card"><h3>Matching evidence</h3><p>Body</p></section>`,
+  }),
 ]);
+
+/**
+ * Probes measured across the three hosts that are not themselves `CONTROLS` entries.
+ *
+ * `toolbar-select` is a caller's control INSIDE the bar rather than a control of the bar's, so it
+ * has no class string of its own to pin and no entry above; the bar's markup renders it and the
+ * rung clause below is what asks about it.
+ */
+const EXTRA_PROBES = Object.freeze(['toolbar-select']);
 
 /**
  * The family's shared base rule, as the browser serialises its prelude.
@@ -437,6 +482,72 @@ const SEARCH_COMPARED = Object.freeze([
 ]);
 
 /**
+ * What acceptance 2 compares on the filter bar's own `<section>`.
+ *
+ * Every one of these is a declaration the bar's three re-rooted rules make: the `--fab-space-3`
+ * padding and the hairline bottom rule from its box, the overlay fill and the flex row from the
+ * always-taken `:not(:has(.manager-toolbar-primary))` branch. `border-TOP-color` is deliberately
+ * absent and `border-BOTTOM-*` present: the bar declares a bottom border only, so the top edge
+ * resolves to `currentColor` and differs by host for a reason that belongs to the area's own
+ * `color`, not to this family. `box-sizing` is excluded for the pager's reason and is asserted
+ * separately below; `font-*` and `line-height` are compared because they must be INHERITED — the
+ * bar owns no control and declares no floor, so a family rule that started typing this section
+ * would show up here.
+ */
+const TOOLBAR_COMPARED = Object.freeze([
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-bottom-width',
+  'border-bottom-style',
+  'border-bottom-color',
+  'background-color',
+  'display',
+  'align-items',
+  'flex-wrap',
+  'gap',
+  'min-height',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+
+/**
+ * And on the card's own `<section>` — the padding, the hairline border on ALL four edges, the 8px
+ * corner, the surface fill and the stacked column its two re-rooted rules declare between them.
+ */
+const CARD_COMPARED = Object.freeze([
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'background-color',
+  'display',
+  'flex-direction',
+  'gap',
+  'min-height',
+  'font-family',
+  'font-size',
+  'line-height',
+]);
+
+/**
+ * The two properties the bar's one control-reaching rule declares, and the only two of that
+ * select's that may be compared across hosts.
+ *
+ * `.fabricate-filter-bar.manager-toolbar select.is-size-38` states 38px and the 34-38px band's 9px
+ * corner and NOTHING else, because the bar owns no control and therefore declares no font floor
+ * for one. So the rung travels and the select's type does not — measured below as a pair, because
+ * the residue is as much a fact of this change as the rung is.
+ */
+const TOOLBAR_SELECT_COMPARED = Object.freeze(['height', 'border-radius']);
+
+/**
  * The compared set per control, for the entries that do not take the button families' default.
  *
  * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
@@ -446,11 +557,20 @@ const COMPARED_BY_CONTROL = Object.freeze({
   pagination: COMPARED_PAGINATION,
   field: FIELD_COMPARED,
   search: SEARCH_COMPARED,
+  toolbar: TOOLBAR_COMPARED,
+  card: CARD_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
 const ALL_COMPARED = Object.freeze([
-  ...new Set([...COMPARED, ...FIELD_COMPARED, ...SEARCH_COMPARED]),
+  ...new Set([
+    ...COMPARED,
+    ...FIELD_COMPARED,
+    ...SEARCH_COMPARED,
+    ...TOOLBAR_COMPARED,
+    ...CARD_COMPARED,
+    ...TOOLBAR_SELECT_COMPARED,
+  ]),
 ]);
 
 /**
@@ -537,7 +657,7 @@ async function measure(css) {
       },
       {
         hosts: HOSTS.map((host) => host.id),
-        controls: CONTROLS.map((control) => control.id),
+        controls: [...CONTROLS.map((control) => control.id), ...EXTRA_PROBES],
         compared: ALL_COMPARED,
       }
     );
@@ -1224,6 +1344,234 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
       'a `type="search"` input takes `border-box` from the UA sheet in EVERY host, which is why ' +
         'this control compares its rendered box while the field does not'
     );
+  }
+
+  // THE BAR AND THE CARD TAKE THE SAME DEPENDENCE and are NOT opted out of the box comparison,
+  // which is the pager's case rather than the field's: both are block `<section>`s with `width:
+  // auto` and no declared height, so the used width is solved to fill the containing block and
+  // the used height is solved from the content WHATEVER the keyword says. Measured on this tree,
+  // all three hosts lay each of them out at an identical border box, which is why `comparesBox`
+  // is left at its default for both and the equality above is the assertion with teeth. The
+  // keyword itself is stated here so the difference cannot be mistaken for one this change made.
+  for (const control of ['toolbar', 'card']) {
+    assert.equal(
+      measured[control].bare['box-sizing'],
+      'content-box',
+      `the ${control} declares no \`box-sizing\` of its own and takes it from host chrome; a ` +
+        'change here means the family has started declaring one'
+    );
+    assert.equal(
+      measured[control].manager['box-sizing'],
+      'border-box',
+      `the manager area's universal rule must still be what supplies the ${control} its border-box`
+    );
+  }
+});
+
+/*
+ * ── THE TWO FAMILIES THAT OWN NO CONTROL (issue 1508, phase 2) ──────────────────────────────
+ *
+ * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
+ * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
+ * card renders its caller's children. So they declare no font floor and no focus pair, and the
+ * three clauses below are the two halves of that decision plus its one residue.
+ */
+
+test('the filter bar and the card declare their own box rather than inheriting it', async () => {
+  const measured = await measure(sheet);
+  const toolbar = measured.toolbar.bare;
+  const card = measured.card.bare;
+
+  // NON-VACUITY FIRST, as everywhere else in this file: an engine returning `''` would satisfy
+  // every equality below and the three-host comparison above along with it.
+  for (const [label, style, properties] of [
+    ['toolbar', toolbar, TOOLBAR_COMPARED],
+    ['card', card, CARD_COMPARED],
+  ]) {
+    for (const property of properties) {
+      assert.ok(
+        style[property] !== undefined && style[property] !== '',
+        `${label} computed nothing at all for \`${property}\`, so the pins below prove nothing`
+      );
+    }
+  }
+
+  // THE BAR. `--fab-space-3` padding, the hairline bottom rule, the `--fab-overlay-light-03` fill
+  // and the wrapping flex row — the four things eleven hand-rolled bars used to get from
+  // `.fabricate-manager .manager-toolbar`, now declared by the family itself.
+  assert.equal(toolbar['padding-top'], '12px');
+  assert.equal(toolbar['padding-left'], '12px');
+  assert.equal(toolbar['border-bottom-width'], '1px');
+  assert.equal(toolbar['border-bottom-style'], 'solid');
+  assert.equal(toolbar.display, 'flex');
+  assert.equal(toolbar['flex-wrap'], 'wrap');
+  assert.equal(toolbar['align-items'], 'center');
+  assert.equal(toolbar.gap, '8px');
+  assert.notEqual(
+    toolbar['background-color'],
+    'rgba(0, 0, 0, 0)',
+    'the bar declares its own translucent fill; a transparent one means the rule stopped matching'
+  );
+
+  // AND THE BRANCH THAT PAINTS IT IS THE FLEX ONE. `display: grid` is what
+  // `.fabricate-filter-bar.manager-toolbar` states on its own; the `:not(:has(…))` branch
+  // overrides it to `flex`, and no component under `src/` writes `manager-toolbar-primary`, so
+  // that branch is ALWAYS taken. Measuring `flex` here is what says the branch re-rooted too —
+  // leaving it behind would give a bare-host bar the grid form nothing ships.
+  assert.equal(
+    toolbar.display,
+    'flex',
+    'the always-taken `:not(:has(.manager-toolbar-primary))` branch must travel with the family, ' +
+      'or a bar outside the manager renders the grid form no screen in the product uses'
+  );
+
+  // THE CARD. Padding, a hairline border on all four edges, the 8px corner, the surface fill and
+  // the stacked column.
+  assert.equal(card['padding-top'], '12px');
+  assert.equal(card['border-top-width'], '1px');
+  assert.equal(card['border-top-style'], 'solid');
+  assert.equal(card['border-radius'], '8px');
+  assert.equal(card.display, 'flex');
+  assert.equal(card['flex-direction'], 'column');
+  assert.equal(card.gap, '8px');
+  assert.notEqual(
+    card['background-color'],
+    'rgba(0, 0, 0, 0)',
+    'the card declares its own surface fill; a transparent one means the rule stopped matching'
+  );
+
+  // AND NEITHER IS TYPED BY ITS FAMILY. Both inherit the harness's ambient font, which is what a
+  // section that declares no floor does. A family rule that started declaring type here would
+  // show up as a font-family that is not the body's.
+  for (const [label, style] of [['toolbar', toolbar], ['card', card]]) {
+    assert.match(
+      style['font-family'],
+      /Signika/,
+      `${label} must INHERIT its type: neither family owns a control, so neither declares a floor`
+    );
+  }
+});
+
+test('the bar`s 38px select rung travels with the family, and the select`s type does not', async () => {
+  // THE ONE FAMILY RULE THAT REACHES A CALLER'S CONTROL, and both halves of what that means.
+  //
+  // `.fabricate-filter-bar.manager-toolbar select.is-size-38` states 38px and the 34-38px band's
+  // 9px corner, so those two travel to a bare host with the family. Everything else about that
+  // select does NOT, because the bar declares no font floor for a control it does not own — a
+  // stated residue owned by issues 1510/1511, not a defect of this change. Asserting the rung
+  // without the residue would read as a claim that the whole control travels.
+  const measured = await measure(sheet);
+  for (const property of TOOLBAR_SELECT_COMPARED) {
+    const values = HOSTS.map((host) => measured['toolbar-select'][host.id][property]);
+    assert.ok(
+      values.some((value) => value !== ''),
+      `the rung computed an empty \`${property}\` in every host, so comparing them proves nothing`
+    );
+    assert.equal(
+      new Set(values).size,
+      1,
+      `the toolbar select rung computes a different \`${property}\` depending on which ` +
+        `application class is above it — ${HOSTS.map((host, index) => `${host.id}=${values[index]}`).join(', ')}`
+    );
+  }
+  assert.equal(measured['toolbar-select'].bare.height, '38px', 'the rung is the ladder`s 38');
+  assert.equal(measured['toolbar-select'].bare['border-radius'], '9px', 'and the band`s 9 corner');
+
+  // THE RESIDUE, MEASURED. Outside the manager that select takes Foundry-less defaults for its
+  // type, because no rule this family declares reaches it.
+  assert.doesNotMatch(
+    measured['toolbar-select'].bare['font-family'],
+    /Signika/,
+    'the toolbar select inherits the ambient font outside the manager, which would mean some ' +
+      'rule IS flooring a control the bar does not own — the thing this family deliberately ' +
+      'refuses to declare'
+  );
+  assert.match(
+    measured['toolbar-select'].manager['font-family'],
+    /Signika/,
+    'inside the manager the AREA`s own bare-element baseline still types that select, which is ' +
+      'what makes the bare-host difference a residue rather than a regression'
+  );
+});
+
+test('neither the filter bar nor the card declares a font floor or a focus pair', async () => {
+  // THE NEGATIVE CONTROL FOR A POSITIVE DECISION. `openspec/specs/design-system/spec.md` forbids
+  // a primitive displacing an area's chrome for a control it does not own — the clause the
+  // pager's `<select>` established. These two families own no control at all, so the honest
+  // shape of "they declare neither" is an assertion that no rule rooted at either names a focus
+  // state or carries type. Without it, a later change adding a floor "for consistency with the
+  // other four" would pass every other gate in this repository.
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    for (const root of ['.fabricate-filter-bar', '.fabricate-card']) {
+      const named = new RegExp(`\\${root}(?![\\w-])`);
+      const family = rules.filter((rule) => named.test(rule.selectorText));
+      assert.ok(
+        family.length >= 3,
+        `only ${family.length} rules are rooted at \`${root}\`, so the absences below hold over ` +
+          'nothing. The family has been renamed or the re-root has been undone.'
+      );
+
+      const focused = family.filter((rule) => /:focus/.test(rule.selectorText));
+      assert.deepEqual(
+        focused.map((rule) => rule.selectorText),
+        [],
+        `\`${root}\` declares a focus rule. This family owns no control of its own, so a strip ` +
+          'or a repaint here paints chrome for a control the caller owns — which is what the ' +
+          'design-system requirement forbids. The four families that DO own a control declare ' +
+          'the pair; these two must not.'
+      );
+
+      const typed = family.filter((rule) =>
+        rule.properties.some(
+          (property) => property.startsWith('font') || property === 'line-height'
+        )
+      );
+      assert.deepEqual(
+        typed.map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
+        [],
+        `\`${root}\` declares type. Neither of these families owns a control, so neither gets a ` +
+          'font floor: the bar`s own `select.is-size-38` rung reaches a control the CALLER owns, ' +
+          'and flooring it here is the displacement the requirement refuses. Its unfloored type ' +
+          'in a bare host is a recorded residue owned by issues 1510/1511.'
+      );
+    }
+
+    // AND THE ONE FAMILY RULE THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY NAME.
+    // `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` is declared a
+    // second time inside `@container fabricate-manager (max-width: 680px)`. That container NAME
+    // is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
+    // `styles/fabricate.css:1382`), so the rule cannot travel to a bare host WHATEVER it is
+    // rooted at. It re-roots for family consistency and moves nothing; the inability to travel
+    // is a residue of the responsive layer rather than a defect of this change, and it is named
+    // here so that the equality above is not read as covering it.
+    const containerScoped = rules.filter(
+      (rule) => /\.fabricate-filter-bar(?![\w-])/.test(rule.selectorText) && rule.at !== ''
+    );
+    assert.equal(
+      containerScoped.length,
+      1,
+      `expected exactly one container-scoped filter-bar rule, found ${containerScoped.length}: ` +
+        containerScoped.map((rule) => `${rule.at} :: ${rule.selectorText}`).join(', ')
+    );
+    assert.match(
+      containerScoped[0].at,
+      /fabricate-manager/,
+      'the excluded rule must be the one inside the `fabricate-manager` container query; a rule ' +
+        'under any other condition is not covered by this exclusion and needs its own reason'
+    );
+    assert.match(
+      sheet,
+      /container-name: fabricate-manager;/,
+      'the container NAME must still be established by `.fabricate-manager` itself, which is the ' +
+        'whole reason that one rule cannot travel to a bare host'
+    );
+  } finally {
+    await tab.close();
   }
 });
 

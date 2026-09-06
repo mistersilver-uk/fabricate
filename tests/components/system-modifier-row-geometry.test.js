@@ -124,7 +124,7 @@ const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
-      <section class="manager-inspector-card" data-world-modifiers style="width: 720px">
+      <section class="fabricate-card manager-inspector-card" data-world-modifiers style="width: 720px">
         <ul class="manager-character-modifier-list">
           ${modifierRow('Survival', '@skills.sur.mod')}
           ${modifierRow('Modifier', '')}

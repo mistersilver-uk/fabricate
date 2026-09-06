@@ -3569,8 +3569,10 @@ test('manager components browser defines drop target and compact responsive list
   const listBlock = blockFor('.fabricate-manager .manager-components-list');
   const rowBlock = blockFor('.fabricate-manager .manager-component-row');
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
+  // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508): the bar's own rules are
+  // `.fabricate-filter-bar.manager-toolbar`, not `.fabricate-manager .manager-toolbar`.
   const toolbarBlock = Array.from(
-    css.matchAll(/\.fabricate-manager \.manager-toolbar\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-filter-bar\.manager-toolbar\s*\{[\s\S]*?\}/g)
   )
     .map((match) => match[0])
     .join('\n');
@@ -4221,7 +4223,7 @@ test('manager environment inspector evidence table wraps compact pills without h
         </head>
         <body>
           <main class="fabricate-manager">
-            <section class="manager-inspector-card harness">
+            <section class="fabricate-card manager-inspector-card harness">
               <h3 class="manager-card-title">Matching evidence</h3>
               <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label="Matching evidence">
                 <tbody>
@@ -5032,7 +5034,7 @@ function shortWindowRailMarkup(navItems) {
           <nav class="manager-nav">${items}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
-        <aside class="manager-inspector"><section class="manager-inspector-card">Inspector</section></aside>
+        <aside class="manager-inspector"><section class="fabricate-card manager-inspector-card">Inspector</section></aside>
       </div>
     </div>`;
 }
@@ -7212,16 +7214,16 @@ test('the gathering inspector rail cards render as one card, not three treatment
       `<style>${css}</style>` +
         '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
         '<aside class="manager-inspector" style="width:320px">' +
-        '<section class="manager-inspector-card" data-card="details">' +
+        '<section class="fabricate-card manager-inspector-card" data-card="details">' +
         '<h3 class="manager-card-title">Gathering task details</h3><p>Three facts</p>' +
         '</section>' +
-        '<section class="manager-inspector-card" data-task-drops-summary data-card="drops">' +
+        '<section class="fabricate-card manager-inspector-card" data-task-drops-summary data-card="drops">' +
         '<h3 class="manager-card-title">Drops summary</h3>' +
         '<div class="manager-task-drops-summary-list"><span class="manager-task-drop-summary-chip">' +
         '<span class="manager-task-drop-summary-label">Nightshade</span>' +
         '<strong class="manager-task-drop-summary-percent">80%</strong></span></div>' +
         '</section>' +
-        '<section class="manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
+        '<section class="fabricate-card manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
         '<h3 class="manager-card-title">Used in environments</h3><p>Not used yet.</p>' +
         '</section>' +
         '</aside></div>'
@@ -7323,7 +7325,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       percentHeight: 28,
       markup:
         '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
-        '<section class="manager-inspector-card manager-drop-editor-card">' +
+        '<section class="fabricate-card manager-inspector-card manager-drop-editor-card">' +
         '<div class="manager-drop-editor-values">' +
         '<label class="fabricate-field manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
         `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
@@ -7924,7 +7926,7 @@ test('the Checks Studio really renders into the classes those measurements measu
 // browser behind it is this file's shared one or a fresh one.
 async function checksRollEdges(page, tiersWrapperClass) {
   const difficultyCard = `
-    <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+    <section class="fabricate-card manager-inspector-card manager-checks-card" data-check-difficulty-card>
       <div class="manager-checks-card-head">
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>
@@ -8013,7 +8015,10 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   try {
     const page = await context.newPage();
 
-    const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
+    const edges = await checksRollEdges(
+      page,
+      'fabricate-card manager-inspector-card manager-checks-card'
+    );
     assert.equal(
       edges.rowLeft,
       edges.radioLeft,
@@ -8038,7 +8043,14 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
     // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
     // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
     // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
-    const broken = await checksRollEdges(page, 'manager-inspector-card');
+    //
+    // THE CONTROL ARM CARRIES THE FAMILY ROOT TOO (issue 1508). What this arm removes is the
+    // CALLER's `manager-checks-card`, not the primitive's root: since the card family is rooted
+    // at `fabricate-card`, an arm written without it matches no card rule at all, so both arms
+    // would render unstyled and the `notEqual`s below would pass on two identical defaults —
+    // a mutation proof turned into a vacuous one. Both arms are rooted; only the caller class
+    // differs between them, which is the difference the assertions are about.
+    const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
     assert.notEqual(
       broken.rowLeft,
       broken.radioLeft,
@@ -8052,6 +8064,59 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   } finally {
     await context.close();
   }
+});
+
+test('both interpolated card fixtures are rooted at the class the primitive emits', () => {
+  // THE ONE CARRIER NO SCANNER SEES, GUARDED (issue 1508). The two card fixtures above build
+  // their `class` attribute by INTERPOLATION — `<section class="${tiersWrapperClass}">` and
+  // `<section class="${cardWrapperClass}">` — so `searchable-popover-area-scope.test.js`'s
+  // fixture clauses, which walk `class="…"` in `tests/**`, cannot read either one. That blind
+  // spot is the defect that cost issue 1502 a whole extra phase, when twelve `triggerClass="…"`
+  // sites went unrepaired because the census probe only matched `class="manager-button`.
+  //
+  // AND THE MUTATION-CONTROL ARMS ARE THE HALF THAT FAILS SILENTLY. Each pair's control arm is a
+  // one-sided `notEqual`, so an arm that lost the family root would go on satisfying it — the
+  // bare CARD SHELL and an UNSTYLED `<section>` both differ from the studio card, and the suite
+  // cannot tell which one it measured. Measured on this tree: unrooting only the two control
+  // arms leaves all 128 tests in this file green. So the root is asserted on all four call
+  // sites here, read out of `InspectorCard.svelte` rather than restated, which is what makes
+  // that mutation red.
+  const card = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/InspectorCard.svelte'),
+    'utf8'
+  );
+  const array = card.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
+  assert.ok(array, 'InspectorCard must declare its emitted classes as one array literal');
+  const root = (array[1].match(/'([a-z][\w-]*)'/) ?? [])[1];
+  assert.equal(
+    root,
+    'fabricate-card',
+    'InspectorCard must emit its family root as the FIRST literal of its class array; the ' +
+      'fixtures below are rooted at whatever it emits, so a rename here is a rename there'
+  );
+
+  const suite = readFileSync(resolve(__dirname, 'manager-layout.test.js'), 'utf8');
+  const wrapperArguments = [
+    ...suite.matchAll(
+      /(?:checksRollEdges|modifiersCombinationRuleMetrics)\(\s*page,\s*'([^']*)'\s*\)/g
+    ),
+  ].map(([, value]) => value);
+  assert.equal(
+    wrapperArguments.length,
+    4,
+    `expected four interpolated card-fixture call sites and read ${wrapperArguments.length}. ` +
+      'Either a call site moved to a form this reader cannot see — in which case retarget the ' +
+      'reader rather than deleting the assertion — or one was added or removed.'
+  );
+  // TWO fixed arms and TWO controls, so the pair below is a discriminator rather than one value
+  // four times: the controls drop the CALLER's `manager-checks-card` and keep the root.
+  assert.deepEqual(
+    [...new Set(wrapperArguments)].sort(),
+    [`${root} manager-inspector-card`, `${root} manager-inspector-card manager-checks-card`],
+    'every interpolated card fixture must carry the family root; the control arms remove the ' +
+      'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +
+      'from the one those tests are proofs of'
+  );
 });
 
 test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
@@ -8135,7 +8200,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
 
     const fixed = await modifiersCombinationRuleMetrics(
       page,
-      'manager-inspector-card manager-checks-card'
+      'fabricate-card manager-inspector-card manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
     assert.equal(
@@ -8155,7 +8220,14 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     // must desynchronise both the card's own look AND the combination-rule scale, because the
     // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
     // and fires only then. If this cannot fail, the assertions above prove nothing.
-    const broken = await modifiersCombinationRuleMetrics(page, 'manager-inspector-card');
+    //
+    // BOTH ARMS CARRY `fabricate-card` (issue 1508), for the reason the tier-row control above
+    // records: the arm removes the CALLER's class, never the family's root, and an unrooted
+    // control arm would compare two unstyled defaults instead of two card treatments.
+    const broken = await modifiersCombinationRuleMetrics(
+      page,
+      'fabricate-card manager-inspector-card'
+    );
     assert.notEqual(
       broken.cardRadius,
       fixed.cardRadius,
@@ -8799,7 +8871,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
-        '<section class="manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<section class="fabricate-card manager-inspector-card manager-checks-card" data-outcome-bands>' +
         '<div class="manager-checks-card-body is-roomy">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +
@@ -9708,7 +9780,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="manager-toolbar">${toggles}${bare}${unconverted}</div>
+            <div class="fabricate-filter-bar manager-toolbar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -9828,7 +9900,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                   <div class="manager-environment-workspace">
                     <div class="manager-environment-tab-panel"></div>
                     <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
-                      <section class="manager-inspector-card" data-checks-preview-as>
+                      <section class="fabricate-card manager-inspector-card" data-checks-preview-as>
                         <div class="fabricate-picker manager-travel-picker manager-checks-preview-actor">
                           <button type="button" data-probe="preview-actor" data-checks-preview-actor
                             class="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
@@ -9844,7 +9916,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                           <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
                         </label>
                       </section>
-                      <section class="manager-inspector-card" data-checks-simulator>
+                      <section class="fabricate-card manager-inspector-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
                             class="fabricate-button manager-button fab-manager-button is-primary manager-checks-simulator-roll">
@@ -12368,7 +12440,7 @@ const SOURCE_TRIGGER_SITES = [
          </div>
        </form>
      </main>`,
-    '<section class="manager-inspector-card">Inspector</section>'
+    '<section class="fabricate-card manager-inspector-card">Inspector</section>'
   ),
   // THE PICKER'S OWN RULE, outside any drop zone: the 140px square the component ships with
   // wherever a caller does not override it. Both sites above DO override it, so without this
@@ -12785,7 +12857,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
                    direction toggle are unaffected by the narrowing and are measured in the same
                    row. -->
               <div data-scoped-page="world-vocabulary">
-                <div class="manager-toolbar manager-scoped-list-toolbar">
+                <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
                   <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
                   <select data-probe="shipped-select"><option>Name</option></select>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
@@ -13634,7 +13706,7 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
                     class="fas fa-chevron-down" aria-hidden="true"></i></button>
                 </div>
               </div>
-              <div class="manager-toolbar manager-scoped-list-toolbar">
+              <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
                 <div class="fabricate-search manager-search"><input type="text" data-scoped-list-search></div>
                 <div class="fabricate-picker manager-travel-picker fabricate-select">
                   <button

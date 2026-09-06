@@ -235,8 +235,11 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   after(() => harness.teardown());
 
   const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
+  // The SECOND member re-rooted at issue 1508 — `ManagerToolbar`'s family is `.fabricate-filter-bar`
+  // now — while the first names `.manager-filter`, a CALLER class no primitive emits, so it stays
+  // application-rooted. `bodiesOf` looks the list up by exact text, so both halves are stated here.
   const selectRule =
-    '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-manager .manager-toolbar select.is-size-38';
+    '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-filter-bar.manager-toolbar select.is-size-38';
   // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own, because
   // that toolbar's lane filters are shared `<Select>`s now: the class rides the SELECT ROOT and
   // the rung has to reach the `<button>` trigger beneath it. It states `min-height` rather than

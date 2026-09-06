@@ -170,7 +170,7 @@ const LIST_SCREEN = `
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main" data-tool-library data-probe="pane">
       <div class="manager-tools-main-content" data-probe="toolbar-stack">
-        <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
+        <section class="fabricate-card manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
           <div class="manager-tools-authority-heading">
             <span><i class="fas fa-sliders"></i></span>
             <div class="manager-tools-authority-title">
@@ -212,7 +212,7 @@ const LIST_SCREEN = `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -369,7 +369,7 @@ function inspectorColumn(sections, footState) {
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">

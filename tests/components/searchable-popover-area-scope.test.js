@@ -543,6 +543,69 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-search', root: 'fabricate-search' }),
     ]),
   }),
+  Object.freeze({
+    // ── MANAGERTOOLBAR (issue 1508). The manager's filter bar, rooted at the class it emits.
+    //
+    // It declares NO font floor and NO focus pair, and that is a positive decision rather than a
+    // gap: the bar renders `{@render children?.()}` and owns no control of its own, and
+    // `openspec/specs/design-system/spec.md` forbids a primitive displacing an area's chrome for
+    // a control it does not own. One family rule nonetheless REACHES a caller's control — the
+    // `select.is-size-38` rung — and travels with the family unfloored, which is a recorded
+    // residue owned by issues 1510/1511.
+    name: 'ManagerToolbar',
+    components: Object.freeze(['src/ui/svelte/components/ManagerToolbar.svelte']),
+    roots: Object.freeze(['fabricate-filter-bar']),
+    // One exact class name. `manager-toolbar-pills` (`fabricate.css:5553`) and
+    // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
+    // `\.manager-toolbar(?![\w-])`, so neither enters this family.
+    family: 'manager-toolbar',
+    anchors: Object.freeze(['manager-toolbar']),
+    // COMPOSES its family in `const classes = $derived([…])` rather than in markup: the host is
+    // `<section class={classes}>`, an identifier the plain extractor cannot read.
+    composesClasses: true,
+    // Measured at this commit: 1 written, 10 family selectors, 3 owned — 4 exempt (one
+    // app-root-with-attribute per-view override and three more) and 3 caller-CLASS compounds
+    // (`:not(:has(.manager-toolbar-primary))` twice, once at the top level and once inside
+    // `@container fabricate-manager`, and the world-vocabulary sort select). FIVE are re-rooted:
+    // the 3 owned plus the two `:not(:has(…))` branches, which paint every shipped bar and would
+    // leave a bare-host bar `display: grid` if they stayed behind. The SIXTH caller-class
+    // compound, `fabricate.css:9852`, is the family's one NAMED RESIDUE: its family compound
+    // stands third behind an attribute ancestor that is not the application root, so neither
+    // re-rooting form exists for it. It is caller-owned, so neither `gated` nor `rootless`
+    // below sees it, and the reason is recorded beside the rule in the sheet.
+    writtenFloor: 1,
+    familyFloor: 9,
+    ownedFloor: 2,
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-toolbar', root: 'fabricate-filter-bar' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── INSPECTORCARD (issue 1508). The manager's card shell, rooted at the class it emits.
+    //
+    // No floor and no pair here either, and for the same reason: the card renders its caller's
+    // children and owns no control at all. Unlike the toolbar it has no control-reaching rule, so
+    // it carries no residue of that kind.
+    name: 'InspectorCard',
+    components: Object.freeze(['src/ui/svelte/components/InspectorCard.svelte']),
+    roots: Object.freeze(['fabricate-card']),
+    // One exact class name. `manager-checks-card`, `manager-card-title` and the rest are CALLER
+    // classes and never enter this family.
+    family: 'manager-inspector-card',
+    anchors: Object.freeze(['manager-inspector-card']),
+    composesClasses: true,
+    // Measured at this commit: 1 written, 7 family selectors, 2 owned — 4 exempt (the Checks
+    // rail's two ancestor chains and the essence and tool inspectors' per-view overrides) and 1
+    // caller-CLASS compound, the Checks Studio's `.manager-checks-card` treatment. THREE are
+    // re-rooted: the 2 owned plus that compound, which is the card's own box under a caller's
+    // modifier and would be split from its family if it stayed behind.
+    writtenFloor: 1,
+    familyFloor: 6,
+    ownedFloor: 1,
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-inspector-card', root: 'fabricate-card' }),
+    ]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -1353,6 +1416,17 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'reason: it depicts an unconverted `class="manager-search"` on purpose. Keyed by ' +
       '`file|primitive` because this one file holds a second family\'s detector too.',
   }),
+  Object.freeze({
+    file: 'tests/components/manager-filter-bar-source-contract.test.js',
+    primitive: 'ManagerToolbar',
+    attributeCount: 1,
+    elementCount: 1,
+    why:
+      'the raw-site detector fixture for the BAR half of the same file, which depicts an ' +
+      'unconverted `class="manager-toolbar"` on purpose. This is the second of the two entries ' +
+      'that made the ledger `file|primitive` rather than `file`: one file, two families, two ' +
+      'independently counted detector fixtures.',
+  }),
 ]);
 
 /**
@@ -1476,14 +1550,16 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 128,
+    attributes >= 152,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 128. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1508: 143 today, against 113 before `Field` and ' +
-      '`ManagerSearchField` joined the array. The floor stood at 54 against a population that ' +
-      'had already grown to 113 — issue 1504 added `Select` without re-measuring — so this is ' +
-      'both a raise for the two new families and the repair of a margin that had drifted to ' +
-      'half the population.'
+      'of 152. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1508 phase 2: 169 today, against 143 before ' +
+      '`ManagerToolbar` and `InspectorCard` joined the array and 113 before `Field` and ' +
+      '`ManagerSearchField` did. The floor stood at 54 against a population that had already ' +
+      'grown to 113 — issue 1504 added `Select` without re-measuring — so the phase-1 raise was ' +
+      'both a raise for two new families and the repair of a margin that had drifted to half ' +
+      'the population, and this one keeps it at the ten per cent this file states as its ' +
+      'convention.'
   );
 
   assert.deepEqual(
@@ -1592,12 +1668,13 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 219,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 219. A ` +
+    elements >= 243,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 243. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing. RE-MEASURED at issue 1508: 244 today, against 214 before ' +
-      '`Field` and `ManagerSearchField` joined the array — the same drifted margin the attribute ' +
-      'floor above records, restored to the ten per cent this file states as its convention.'
+      'below holds over nothing. RE-MEASURED at issue 1508 phase 2: 270 today, against 244 ' +
+      'before `ManagerToolbar` and `InspectorCard` joined the array and 214 before `Field` and ' +
+      '`ManagerSearchField` did — the same drifted margin the attribute floor above records, ' +
+      'kept at the ten per cent this file states as its convention.'
   );
 
   assert.deepEqual(

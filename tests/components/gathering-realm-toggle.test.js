@@ -159,8 +159,13 @@ describe('World and Travel navigation', () => {
     assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
     // Unlike World > Currency it KEEPS the right-hand inspector: the realm detail pane is the
     // authoring surface, whereas currency's unit editors expand in place.
+    // The class string carries the CARD FAMILY'S ROOT since issue 1508 rooted `InspectorCard` at
+    // `fabricate-card`: this is one of the root's 32 deferred hand-rolled cards, and every one of
+    // them gained the token so that the family's re-rooted sheet rules still reach it.
     assert.ok(
-      managerRootSource.includes('{:else if isWorldTravelRoute} <section class="manager-inspector-card manager-travel-inspector"'),
+      managerRootSource.includes(
+        '{:else if isWorldTravelRoute} <section class="fabricate-card manager-inspector-card manager-travel-inspector"'
+      ),
       'the realm/map inspector lives under the new route'
     );
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);

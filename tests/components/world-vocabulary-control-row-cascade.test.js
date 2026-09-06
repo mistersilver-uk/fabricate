@@ -156,7 +156,7 @@ function panel(kind) {
     '<h3 class="manager-checks-card-title">Component categories</h3>' +
     '<p class="manager-subtitle">One per component, offered by every crafting system.</p>' +
     '</div></header>' +
-    '<section class="manager-toolbar manager-scoped-list-toolbar" aria-label="Sort">' +
+    '<section class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar" aria-label="Sort">' +
     `<span class="wvocab-sort-label ${page.hashClass}" id="sort-${kind}">Sort by</span>` +
     `<select data-wvocab-sort="${kind}" aria-labelledby="sort-${kind}">` +
     '<option>Name</option><option>References</option></select>' +
