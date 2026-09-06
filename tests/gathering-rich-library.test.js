@@ -301,6 +301,34 @@ test('a global condition change propagates to the per-system current condition',
     'enabled governs runtime gating, not whether the stored current is maintained');
 });
 
+test('one setConditions call carries both dimensions into a single write', async () => {
+  const { service, writes } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: {
+            weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: true, current: 'day', values: ['day', 'night'] }
+          }
+        }
+      }
+    }
+  });
+
+  const before = writes.length;
+  await service.setConditions({ weather: 'rain', timeOfDay: 'night' });
+
+  assert.equal(writes.length - before, 1, 'both dimensions are persisted by one save');
+  const saved = writes.at(-1).value.systems['system-a'].conditions;
+  assert.equal(saved.weather.current, 'rain');
+  assert.equal(saved.timeOfDay.current, 'night',
+    'the second dimension propagates onto the systems map the first produced, not the stale config');
+  assert.deepEqual(service.composeEnvironment(environment(), system).conditions,
+    { weather: 'rain', timeOfDay: 'night' },
+    'the runtime reads both propagated currents back');
+});
+
 test('condition propagation is bounded to systems whose values offer the tag', async () => {
   const { service, writes } = makeRichState({
     config: {
