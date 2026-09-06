@@ -2,7 +2,7 @@
  * THE NOTICE'S CONTRACT (issue 1505), pinned at the PRIMITIVE rather than through a caller.
  *
  * ── WHY THE UNREACHED PROPS ARE THE POINT OF THIS FILE ───────────────────────────────────────
- * `library.html:958` states this component's API in full, so it ships whole rather than trimmed
+ * `library.html:987` states this component's API in full, so it ships whole rather than trimmed
  * to what two callers happen to need — and neither shipped caller reaches `action`,
  * `dismissable` or `blocking`. The alchemy banner is a glyph and one sentence; the bulk report
  * is a glyph, a title and a summary. A prop no caller reaches and no test ACTS on is unreachable
@@ -202,7 +202,8 @@ describe('1505 Notice — the API the library states', () => {
     assert.equal(
       unlabelled.querySelector('[data-notice-dismiss]').getAttribute('aria-label'),
       null,
-      'an unnamed control omits the attribute — an EMPTY aria-label suppresses the name instead'
+      'the attribute is OMITTED because an empty aria-label suppresses the name rather than ' +
+        'falling back to content — a glyph-only control still owes a `dismissLabel`'
     );
     harness.remount();
   });

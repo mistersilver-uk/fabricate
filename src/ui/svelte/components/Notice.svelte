@@ -3,7 +3,7 @@
   THE BAR THAT REPORTS WHAT JUST HAPPENED, OR WHAT IS WRONG RIGHT NOW (issue 1505).
 
   ── WHY IT EXISTS, AND HOW IT DIFFERS FROM `Callout` ──────────────────────────────
-  `library.html:957` states the routing rule in four lines, and two of them are these
+  `library.html:985` states the routing rule in four lines, and two of them are these
   two components: a CALLOUT is documentation — always true, stays put — while a NOTICE
   is state: it just happened, and it goes away. The two shipped surfaces converted here
   are both the second kind. The alchemy workbench reports the brew that just resolved,
@@ -11,7 +11,7 @@
   true a moment before the player acted.
 
   ── THE API IS THE LIBRARY'S, NOT A NEW ONE ───────────────────────────────────────
-  `library.html:958` states this component's API in full — `tone`, `title`, `detail`,
+  `library.html:987` states this component's API in full — `tone`, `title`, `detail`,
   `action {label, onClick}`, `dismissable`, `blocking` — so it is followed VERBATIM,
   including its spellings, rather than re-designed. Four recorded deviations follow.
 
@@ -32,7 +32,7 @@
   wrong. It is stated here because the alchemy banner is `align-items: center` today
   and its conversion moves for this reason rather than by accident.
 
-  ── THE FOUR RECORDED DEVIATIONS FROM `library.html:958` ──────────────────────────
+  ── THE FOUR RECORDED DEVIATIONS FROM `library.html:987` ──────────────────────────
   1. `tone` also accepts `accent`. `InventoryBulkReport.svelte` derives it for the
      destroy run and for the mixed outcome — two of its four states — over the comment
      that says why: "Mixed" is neither of the other two, so it takes the neutral accent
@@ -54,7 +54,7 @@
      resolve to the SAME tone, so no per-tone default can express them. Without the prop
      the conversion silently repaints six glyphs. A per-tone default is still supplied,
      for the caller that has nothing more specific to say.
-  4. The hook props below, which `library.html:958` does not enumerate because the
+  4. The hook props below, which `library.html:987` does not enumerate because the
      specimen has no test harness. They are attribute-only and carry no behaviour.
 
   ── WHAT IT DOES NOT TAKE ─────────────────────────────────────────────────────────
@@ -63,10 +63,16 @@
   exercises it, keeping `.alchemy-banner` stripped to the one `margin-bottom` that
   genuinely separates the banner from the Brew button beneath it.
 
-  No English-defaulted label. `dismissLabel` defaults to the empty string and its
-  binding is guarded (`aria-label={dismissLabel || undefined}`), because an empty
-  `aria-label` SUPPRESSES an element's accessible name rather than falling back to its
-  content. Every button this component emits carries `data-keyboard-focus="true"`, so
+  No English-defaulted label. `dismissLabel` is REQUIRED of any caller that passes
+  `dismissable`: the dismiss control's only visible content is a glyph, and
+  `spec.md:439` with its icon-only scenario at `spec.md:458` makes such a control's
+  accessible name a required prop rather than an optional one. It is nevertheless
+  DECLARED with an empty-string default and a guarded binding
+  (`aria-label={dismissLabel || undefined}`) — the shape `IconButton.svelte` uses —
+  because an empty `aria-label` SUPPRESSES an element's accessible name rather than
+  falling back to its content, so an unset label must OMIT the attribute rather than
+  write an empty one. The default is the failure mode's mitigation, not permission to
+  leave the control unnamed. Every button this component emits carries `data-keyboard-focus="true"`, so
   Foundry's `KeyboardManager#hasFocus` sees the focus and Space does not pause the game
   behind the open application.
 
@@ -86,6 +92,9 @@
    - action: `{ label, onClick }`, rendered as one button. The handler is called with
      the click event.
    - dismissable / dismissLabel: an opt-in dismiss control and its accessible name.
+     The label is REQUIRED whenever `dismissable` is true, because the control is
+     glyph-only (`spec.md:439`, scenario at `spec.md:458`); the empty-string default
+     exists only so an unset label omits `aria-label` instead of emptying it.
      Dismissal is this component's own state — the notice leaves the DOM.
    - blocking: `role="alert"` when true and `aria-live="polite"` otherwise, which is
      what announces a notice that appears without a focus change. The PAGE-LEVEL
@@ -128,7 +137,7 @@
 
   const DEFAULT_ICONS = {
     // The specimen draws the SAME alert glyph at `danger` and at `warning`
-    // (`library.html:940-941`, `#i-alert` in both), so they share one default here.
+    // (`library.html:968-969`, `#i-alert` in both), so they share one default here.
     danger: 'fas fa-triangle-exclamation',
     warning: 'fas fa-triangle-exclamation',
     info: 'fas fa-circle-info',
@@ -143,7 +152,7 @@
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'danger');
   const resolvedIcon = $derived(icon || DEFAULT_ICONS[resolvedTone]);
 
-  // Dismissal is the component's own state: `library.html:958` declares `dismissable` as
+  // Dismissal is the component's own state: `library.html:987` declares `dismissable` as
   // a boolean and no caller to tell, so the notice simply leaves the DOM.
   let dismissed = $state(false);
 
@@ -250,7 +259,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* `.k-btn` at the 28px the specimen's own notice buttons take (`library.html:940-942`),
+  /* `.k-btn` at the 28px the specimen's own notice buttons take (`library.html:968-970`),
      which is a live rung of the control-height ladder. */
   .fab-notice-button {
     flex: none;
