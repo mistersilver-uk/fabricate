@@ -726,6 +726,12 @@
     `proto:618` puts it there and the panel put it last, immediately above the Apply dock — which
     inverts what it is for: it says what CANNOT be bulk-edited, so it belongs before the groups a
     GM is about to read rather than after the decision they have already made.
+
+    INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). Re-read against the widened
+    tone union, whose rule is that the tint is opt-in and reached only for a note about LIVE
+    STATE: this is the standing explanation of what bulk cannot change, which that reading
+    would put at neutral. `proto:618` asks for the tint on this box, so it stands and the
+    tension is recorded rather than resolved here.
   -->
   <Callout
     tone="info"

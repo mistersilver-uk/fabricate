@@ -2202,7 +2202,14 @@
             {#if salvageShowChrome && salvageProgressive}
               <!-- `proto:1374`: the shared info `Callout`, in the reference's own words. The
                hand-rolled `manager-component-info-banner` said the same thing in a second
-               vehicle. -->
+               vehicle.
+
+               INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). The tone union
+               widened to six, the default became neutral, and the tint became opt-in for a
+               note about LIVE STATE — under which reading a standing rule about how roll
+               budget works is a neutral note. The tint is this box's own prototype
+               instruction, so it stands and the tension is recorded rather than resolved
+               here. -->
               <Callout
                 tone="info"
                 icon="fas fa-circle-info"

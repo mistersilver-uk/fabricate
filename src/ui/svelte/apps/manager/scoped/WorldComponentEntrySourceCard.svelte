@@ -238,6 +238,9 @@
          `<p>` with no snippet slot, and a control nested inside a paragraph is invalid markup a
          primitive extension would have to introduce for one call site with no route to offer. -->
     <div class="manager-component-entry-duplicate">
+      <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: `duplicateCount`
+           is live state on this record that an import would act on, which is the conditional
+           hazard warning names rather than a standing note. -->
       <Callout
         tone="warning"
         icon="fas fa-clone"
