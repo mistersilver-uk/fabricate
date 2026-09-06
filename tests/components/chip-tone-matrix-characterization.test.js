@@ -705,6 +705,83 @@ describe('1506 Chip — the bare emphasis', () => {
     );
   });
 
+  /**
+   * The stylesheet the mount INJECTED, comments stripped.
+   *
+   * `styleBlock` above reads what the file authors; this reads what the compiler emitted and
+   * `css: 'injected'` put in `document.head`, which is the artefact that ships and the only one
+   * that can answer a question about scoping. Comments must go first for the reason
+   * `withoutComments` exists: this rule's own docblock quotes the emitted selector in prose two
+   * lines above the declaration, so an unstripped scan matches the DOCUMENTATION of the rule and
+   * reports green with the rule deleted.
+   *
+   * @returns {string}
+   */
+  function injectedCss() {
+    return withoutComments(
+      [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
+    );
+  }
+
+  /**
+   * The computed `font-size`, in px, of the glyph a chip rendered from its `icon` prop.
+   *
+   * @param {Element} target the mounted container
+   * @returns {number}
+   */
+  function glyphFontSize(target) {
+    const glyph = chipNode(target).querySelector('i');
+    assert.ok(Boolean(glyph), 'the chip rendered a glyph from its `icon` prop');
+    return Number.parseFloat(getComputedStyle(glyph).fontSize);
+  }
+
+  it('emits the status dot rule, at the size that makes a dot a MARK', async () => {
+    // The one rule in this component with no `is-*` class of its own, so nothing above reaches
+    // it: reverting `0.36rem` to a glyph size, or renaming the selector, ships every status dot
+    // at full glyph size with every other assertion in this file still green. Read off the
+    // COMPILED text because the claim is about what Svelte emits — `:global(i.fa-circle)` or a
+    // hoist into the global sheet would keep the authored block looking right while moving marks
+    // on screens that never asked for one.
+    await harness.mount({ icon: 'fa-solid fa-circle' });
+    const [rule] = [...injectedCss().matchAll(/[^{}]*\bi\.fa-circle[^{}]*\{[^}]*\}/g)].map(
+      ([match]) => match
+    );
+    assert.ok(
+      Boolean(rule),
+      'the compiled sheet no longer states a rule for the status dot at all'
+    );
+    assert.match(
+      rule,
+      /font-size:\s*0\.36rem/,
+      `the dot must draw at 0.36rem, and the compiled rule says: ${rule}`
+    );
+    assert.match(
+      rule,
+      /\.manager-chip\.svelte-\w+ i\.fa-circle/,
+      `the rule must stay scoped to a chip's own glyph, but emitted: ${rule}`
+    );
+  });
+
+  it('draws the dot STRICTLY smaller than the same chip drawn with any other glyph', async () => {
+    // The compiled rule above proves the declaration; this proves it ARRIVES. Two mounts that
+    // differ in the icon class alone, so the only thing that can separate the two sizes is the
+    // dot rule matching one of them. A floor is asserted first because an unresolved size reads
+    // as `NaN` and every comparison against it is false — which fails, but for the wrong reason.
+    const dot = await harness.mount({ icon: 'fa-solid fa-circle' });
+    const dotSize = glyphFontSize(dot);
+    harness.remount();
+    const glyph = await harness.mount({ icon: 'fa-solid fa-lock' });
+    const glyphSize = glyphFontSize(glyph);
+    assert.ok(
+      dotSize > 0 && glyphSize > 0,
+      `both glyphs must resolve to a real size, but read ${dotSize}px and ${glyphSize}px`
+    );
+    assert.ok(
+      dotSize < glyphSize,
+      `the dot must be a mark rather than a glyph, but read ${dotSize}px beside ${glyphSize}px`
+    );
+  });
+
   it('drops its glyph to the reference 7px WITHOUT touching the status dot', () => {
     const glyphRule = styleBlock.search(/\.manager-chip\.is-bare i:not\(\.fa-circle\)/);
     assert.notEqual(glyphRule, -1, 'the bare face states its own glyph size');

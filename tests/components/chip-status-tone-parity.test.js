@@ -60,7 +60,9 @@ const THEMES = [...sheet.matchAll(/\.fabricate\[data-fabricate-theme='?"([\w-]+)
  * is required to be built from. `accent` is the one row whose ink is deliberately NOT the family
  * base the retired pill used: `--fab-accent` over `--fab-accent-soft` measures under AA in
  * `ironblood-forge`, and `--fab-accent-text` is the repair. The row records both, and the test
- * below asserts the repair is a real difference rather than a rename.
+ * below asserts the repair is a real difference rather than a rename. `neutral` is the seventh
+ * row and the one the retired pill never declared: only the look-alike vocabulary emitted it, it
+ * is the widened domain's ONE non-identical pair, and its move is in the ground, not ink or edge.
  */
 const MAPPED_FACES = Object.freeze([
   Object.freeze({
@@ -102,6 +104,16 @@ const MAPPED_FACES = Object.freeze([
     fill: '--fab-surface-raised',
   }),
   Object.freeze({
+    pillTone: 'neutral',
+    chipTone: 'neutral',
+    // The look-alikes declared `--fab-surface-raised` on their own base rule; `is-neutral`
+    // declares no `background` and inherits the base overlay. This is the widened domain's
+    // ONE non-identical pair, and the pair is in the ground rather than in ink or edge.
+    ink: '--fab-text-muted',
+    edge: '--fab-border',
+    fill: '--fab-overlay-light-06',
+  }),
+  Object.freeze({
     pillTone: 'accent',
     chipTone: 'accent',
     ink: '--fab-accent-text',
@@ -119,14 +131,17 @@ const INK_LADDER = [
   '--fab-text-disabled',
 ];
 
+/** The two roots where `--fab-surface-raised` and `--fab-overlay-light-06` are byte-identical. */
+const EQUAL_GROUND_THEMES = new Set(['mythwright', 'foundry-native']);
+
 const TOKEN_PROBES = [
-  ...new Set(
-    MAPPED_FACES.flatMap((face) => [face.ink, face.edge, face.fill, face.retiredInk]).filter(
+  ...new Set([
+    ...MAPPED_FACES.flatMap((face) => [face.ink, face.edge, face.fill, face.retiredInk]).filter(
       Boolean
-    )
-  ),
-  ...INK_LADDER,
-  '--fab-bg-1',
+    ),
+    ...INK_LADDER,
+    '--fab-bg-1',
+  ]),
 ];
 
 const value = (token) => (token.startsWith('--') ? `var(${token})` : token);
@@ -287,6 +302,20 @@ describe('1506 Chip — the converted status faces, per theme', () => {
           repaired[0],
           retired[0],
           'the accent ink the chip uses must not be the one the retired pill used'
+        );
+      });
+
+      it("pins `neutral`'s ground move as a five/two per-theme split", async () => {
+        // Decision LLL: an unconditional UNEQUAL reds on a CORRECT implementation in the two
+        // themes whose ground tokens are byte-identical, the same degeneracy DDD corrects for
+        // the inks. The split is pinned as DATA so a token edit that flattened a sixth theme
+        // reds instead of silently widening the EQUAL set.
+        const raised = await tripleOf('data-token', `${theme}---fab-surface-raised`);
+        const overlay = await tripleOf('data-token', `${theme}---fab-overlay-light-06`);
+        (EQUAL_GROUND_THEMES.has(theme) ? assert.equal : assert.notEqual)(
+          overlay[2],
+          raised[2],
+          `the converted \`neutral\` chips take ${overlay[2]} where the retired look-alikes took ${raised[2]}`
         );
       });
 
