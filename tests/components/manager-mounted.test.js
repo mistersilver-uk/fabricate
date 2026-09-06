@@ -29,6 +29,7 @@ import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   rewriteClientImports,
 } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
@@ -322,8 +323,10 @@ function compileManagerRoot() {
   // theirs in parallel with no ordering between them, so each adds all three idempotently. A
   // duplicate is a one-minute textual conflict; an omission is a silent hang somebody bisects.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte');
-  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-  for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, and
+  // issue 1506's tone map, which the converted status pills on the essence, recipe, tool and
+  // world Component routes read at every dynamic site.
+  for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, ...STATUS_TONE_RAW_MODULES]) {
     const rawDestination = join(tempRoot, rawModule);
     mkdirSync(dirname(rawDestination), { recursive: true });
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -7610,12 +7613,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Restricted (none selected)'));
     // r2 is incomplete AND off, so enabling it would be REFUSED — the row says that
     // rather than merely "incomplete" (issue 643 §2's four row states, rendered
-    // through the shared StatusPill).
-    const r2Blocked = target.querySelector('[data-recipe-id="r2"] [data-status-pill="danger"]');
+    // through the shared chip since issue 1506).
+    const r2Blocked = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-danger');
     assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
     assert.equal(r2Blocked.textContent.trim(), "Can't enable");
     assert.equal(
-      target.querySelector('[data-recipe-id="r1"] [data-status-pill="warning"]'),
+      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
       null,
       'a complete recipe row should not render an authoring-state pill'
     );
@@ -8928,7 +8931,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // The reference's system row carries ONE state pill — `Salvage` — because the source belongs
     // to the world catalogue and the category is the group band's job.
     assert.ok(
-      !target.querySelector('[data-component-id="c1"] [data-status-pill="accent"]'),
+      !target.querySelector('[data-component-id="c1"] .manager-chip.is-accent'),
       'no `Compendium` / `Items Directory` pill on a system rules row'
     );
     assert.ok(

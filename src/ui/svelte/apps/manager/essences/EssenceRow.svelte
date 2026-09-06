@@ -62,7 +62,6 @@
   import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
@@ -235,17 +234,13 @@
   <span class="manager-essence-name-row">
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
     {#if absent}
-      <StatusPill
-        tone="subtle"
-        icon="fas fa-circle-minus"
-        label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
-      />
+      <Chip tone="subtle" icon="fas fa-circle-minus"
+        >{text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}</Chip
+      >
     {:else if disabled}
-      <StatusPill
-        tone="subtle"
-        icon="fas fa-circle-pause"
-        label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-      />
+      <Chip tone="subtle" icon="fas fa-circle-pause"
+        >{text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}</Chip
+      >
     {/if}
   </span>
 {/snippet}
@@ -438,17 +433,13 @@
     {#snippet media()}{@render medallionTile()}{/snippet}
     {#snippet badges()}
       {#if absent}
-        <StatusPill
-          tone="subtle"
-          icon="fas fa-circle-minus"
-          label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
-        />
+        <Chip tone="subtle" icon="fas fa-circle-minus"
+          >{text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}</Chip
+        >
       {:else if disabled}
-        <StatusPill
-          tone="subtle"
-          icon="fas fa-circle-pause"
-          label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-        />
+        <Chip tone="subtle" icon="fas fa-circle-pause"
+          >{text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}</Chip
+        >
       {/if}
       {@render capabilityPills('is-card-badges')}
     {/snippet}

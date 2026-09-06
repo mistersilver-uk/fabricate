@@ -62,7 +62,6 @@
   import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -328,7 +327,7 @@
               <code class="manager-essence-locked-uuid">{lockedSourceUuid}</code>
             {/if}
           </span>
-          <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />
+          <Chip tone="subtle" icon="fas fa-globe">{worldDefaultLabel}</Chip>
         </div>
       {:else}
         {#if sourceLinked}
@@ -446,7 +445,7 @@
               <code class="manager-essence-locked-uuid">{lockedMacroUuid}</code>
             {/if}
           </span>
-          <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />
+          <Chip tone="subtle" icon="fas fa-globe">{worldDefaultLabel}</Chip>
         </div>
       {:else}
         <ItemDropZone

@@ -9525,7 +9525,7 @@ async function main() {
             // Callout is the plain browser frame under a step named for the warning.
             await bulkPanel.locator('[data-recipe-bulk-blocked-warning]')
               .first().waitFor({ state: 'visible', timeout: 5_000 });
-            await page.locator('.fabricate-manager .manager-recipe-row:has-text("Temper a Blade") [data-status-pill="danger"]')
+            await page.locator('.fabricate-manager .manager-recipe-row:has-text("Temper a Blade") .manager-chip.is-danger')
               .first().waitFor({ state: 'visible', timeout: 5_000 });
           },
         });

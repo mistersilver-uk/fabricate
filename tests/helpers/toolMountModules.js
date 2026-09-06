@@ -66,6 +66,10 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/overlayHost.js',
+  // The one tone map the converted status chips read (issue 1506). `ToolBehaviorPreview` binds
+  // the player preview's pill tone through it, and every mounted tool tree renders that preview,
+  // so it belongs in this roster rather than in each suite that spreads it.
+  'src/ui/svelte/util/statusChipTone.js',
 ]);
 
 /**

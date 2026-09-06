@@ -4472,7 +4472,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the DOM implementations disagree.
     expectSelector:
       '.fabricate-manager:has([data-recipe-bulk-blocked-warning]) ' +
-      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has([data-status-pill="danger"])',
+      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has(.manager-chip.is-danger)',
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),

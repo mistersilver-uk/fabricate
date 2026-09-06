@@ -48,7 +48,6 @@
   import EssenceChip from './EssenceChip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
@@ -151,12 +150,12 @@
       <span class="manager-component-name-line">
         <span class="manager-system-name" title={component?.name}>{component?.name}</span>
         {#if member && salvageLabel}
-          <StatusPill tone="info" icon="fas fa-recycle" label={salvageLabel} />
+          <Chip tone="info" icon="fas fa-recycle">{salvageLabel}</Chip>
         {/if}
         {#if !member && notInSystemLabel}
           <!-- `subtle` is the reference's own paint for this pill: the soft surface, the
                hairline and the disabled ink (`proto:4997`). -->
-          <StatusPill tone="subtle" label={notInSystemLabel} />
+          <Chip tone="subtle">{notInSystemLabel}</Chip>
         {/if}
         {#if member && difficultyBadge}
           <Chip

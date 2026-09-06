@@ -106,8 +106,13 @@ function card(essence) {
   const pills = (essence.pills || [])
     .map((pill) => chip(pill.label, { tone: pill.tone, icon: pill.icon }))
     .join('');
+  // The row's Disabled badge is the same shared chip as the capability badges beside it
+  // (issue 1506); before that it was a second pill component, and this fixture stamped its
+  // markup by hand. It is built through `chip()` for the reason the badges are: a fixture that
+  // spells a component's markup itself keeps measuring the old anatomy after the app stops
+  // rendering it.
   const disabledPill = essence.off
-    ? '<span class="fab-status-pill is-neutral"><i class="fas fa-circle-pause"></i><span class="fab-status-pill-label">Disabled</span></span>'
+    ? chip('Disabled', { tone: 'subtle', icon: 'fas fa-circle-pause' })
     : '';
   // The card is the shared `LibraryCard` anatomy: a header pairing the medallion with the
   // name to its right, a badges row, the fixed 2-line description box, the recessed facts
