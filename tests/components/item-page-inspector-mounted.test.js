@@ -63,10 +63,29 @@ describe('ItemPageInspector (mounted)', () => {
     assert.equal(itemMode.querySelector('[data-item-page-mid-label]').textContent.trim(), 'Uses');
     assert.equal(itemMode.querySelector('[data-item-page-mid-value]').textContent.trim(), '4');
 
+    // The middle figure is the accented one, and it is the ONLY site in the tree that reaches
+    // `StatBox tone="info"` — no registry case drew this grid when the tone shipped, so this is
+    // its discharge. Before the conversion the ink was a hard-coded `is-accent` class here.
+    assert.equal(
+      itemMode.querySelector('[data-item-page-stat="uses"]').getAttribute('data-stat-tone'),
+      'info',
+      'the middle tile keeps the accented ink the caller used to paint with `is-accent`'
+    );
+    assert.equal(
+      itemMode.querySelector('[data-item-page-stat="recipes"]').getAttribute('data-stat-tone'),
+      'default',
+      'and the tiles either side of it stay at the resting tone'
+    );
+
     harness.remount();
     const knowledge = await harness.mount({ item: makeItem(), visibilityMode: 'knowledge' });
     assert.equal(knowledge.querySelector('[data-item-page-mid-label]').textContent.trim(), 'Learning');
     assert.equal(knowledge.querySelector('[data-item-page-mid-value]').textContent.trim(), '1×');
+    assert.equal(
+      knowledge.querySelector('[data-item-page-stat="learning"]').getAttribute('data-stat-tone'),
+      'info',
+      'and it keeps that ink when the mode switch renames the tile'
+    );
   });
 
   it('renders the name, type, description, and a "recipes inside" preview with a +N more line', async () => {
