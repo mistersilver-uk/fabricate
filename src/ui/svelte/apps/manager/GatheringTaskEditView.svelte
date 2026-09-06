@@ -2327,7 +2327,7 @@
   }
 
   /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from
-     the blanket `.fabricate-manager .manager-field select` rule.
+     the blanket `.fabricate-field.manager-field select` rule.
 
      Both flex items are `width: 100%` otherwise — the filled stepper by the `fill` variant
      and the select by that blanket rule — so they split a `minmax(160px, 1fr)` track 50/50

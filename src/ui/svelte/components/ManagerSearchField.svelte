@@ -17,8 +17,50 @@
   Before this component the field was a CSS CONVENTION: `class="manager-search"` on a
   `<label>` wrapping an `<i class="fas fa-search">` and an `<input type="search">`, and
   `styles/fabricate.css` turns that into the relative box and its `1 1 260px` basis
-  (`:5714`), the 34px pill with its 34px side padding (`:5730`) and the absolutely
-  positioned leading glyph (`:5858`).
+  (`:5566`), the 34px pill with its 34px side padding (`:5582`) and the absolutely
+  positioned leading glyph (`:5718`).
+
+  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
+  Those three rules are written `.fabricate-search.manager-search…` rather than
+  `.fabricate-manager .manager-search…`, so the pill paints wherever it is rendered
+  instead of only inside the manager. `fabricate-search` is the FIRST literal of the
+  class array below, and that position is a constraint rather than a style note:
+  `tests/components/searchable-popover-area-scope.test.js` reads the composed region up
+  to the first `]`, so a root moved off the head of the array is a root that gate
+  reports as unemitted while every re-rooted rule keeps matching.
+
+  THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK. This family's root is not its control —
+  the root is the `<label>` and the control is the bare `<input>` inside it — so the
+  floor is written at the family root PLUS the element it owns, `.fabricate-search input`
+  at (0,1,1), grouped with `Field`'s and `ChanceSlider`'s members immediately below the
+  area's own bare-element baseline (`fabricate.css:1471`). Position is load-bearing:
+  `font` is a shorthand that resets `line-height`, and at (0,1,1) the group ties every
+  LATER same-rank rule in the area, two of which restate a `font` longhand for controls
+  these floors reach. Declared thousands of lines down in this family's own block it
+  would win both and silently re-type every manager textarea and select. The group
+  carries `font: inherit` AND NOTHING ELSE, because at a tie any declaration the baseline
+  does not also carry is a real move inside the manager.
+
+  IT OWNS ITS CONTROL, SO IT DECLARES BOTH HALVES OF THE PAIR: the strip
+  `.fabricate-search input:focus` (`fabricate.css:5599`), which restates verbatim the
+  module reset that removes core's orange outline and 4px glow, and the repaint
+  `.fabricate-search input:focus-visible` (`:5609`), copied verbatim from the module
+  ring. Both are (0,2,1) and the strip is written ABOVE the repaint, because a
+  keyboard-focused input matches both and source order decides the tie. Neither moves
+  anything where a Fabricate root is an ancestor; what they are FOR is the bare host,
+  where a primitive leaning on the module ring would render none.
+
+  TWO FAMILY RULES CANNOT TRAVEL, and they are named rather than silently left behind.
+  `.fabricate-search.manager-search.is-compact { width: 100% }` (`fabricate.css:17146`)
+  and `.fabricate-search.manager-search { flex-basis: 100% }` (`:17150`) are declared
+  inside `@container fabricate-manager (max-width: 680px)` (`:17111`), and that container
+  NAME is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
+  `:1382`). They re-root for family consistency and move nothing; in a host with no
+  `.fabricate-manager` above them there is no such container to query, so the responsive
+  narrowing simply does not apply. That is a residue of the responsive layer rather than
+  a defect of this change, owned by issue 1518, and
+  `tests/components/re-rooted-controls-host-independence.test.js` excludes exactly these
+  two by count so the host-equality walk is not read as covering them.
 
   ── ONE HOST, AND THE CENSUS THAT ESTABLISHED IT ──────────────────────────────────
   All 23 sites are a `<label>`, measured by walking each component's Svelte AST rather
@@ -83,7 +125,7 @@
      something more than store the string — resetting a pager is the common one.
    - placeholder / ariaLabel: already localized. Both are present at all 19 sites.
    - compact: emits `is-compact`, the 32px-tall `min(220px, 30%)` density
-     (`fabricate.css:14791`). Three converted sites take it, all in the gathering task
+     (`fabricate.css:15152`). Three converted sites take it, all in the gathering task
      editor. A boolean rather than a `density` string because the sheet declares
      exactly two states and the base one is the absence of the class.
    - size: the control-height RUNG, as a string naming the rung — `''` (the shipped 34px
@@ -141,7 +183,7 @@
     // The input's accessible name, already localized. The `<label>` wraps an icon and an input
     // and no text, so it contributes no name of its own.
     ariaLabel = undefined,
-    // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:14791`).
+    // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:15152`).
     compact = false,
     // The control-height RUNG, named after the rung rather than after an adjective. `''` is the
     // shipped 34px field; see the props block above for why this is a string and `compact` is not.

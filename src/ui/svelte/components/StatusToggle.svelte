@@ -115,13 +115,13 @@
   `data-keyboard-focus="true"` is written on the BUTTON host only, and on the SAME SIDE
   of the rest spread as `class={classes}` — the placement is prescribed rather than
   incidental (issues 1502 and 1508). A spread that lands LATER wins, so a caller's own
-  `data-*` bag could unset the attribute by accident if it were written after the
-  spread, and deliberately if a call site ever needs to. Only the button host takes it:
-  the indicator is a `<span role="img">` and the checkbox host renders a native
-  `<input type="checkbox">`, which Foundry's `KeyboardManager#hasFocus` already treats
-  as focused on its own. While a button-hosted switch outside a `<form>` holds focus,
-  Foundry's Space/arrow/Tab bindings stop firing — the intended behaviour change, not a
-  side effect.
+  `data-*` bag could unset the attribute by accident, and deliberately if a call site
+  ever needs to, which is why it is written before the spread rather than after. Only
+  the button host takes it: the indicator is a `<span role="img">` and the checkbox
+  host renders a native `<input type="checkbox">`, which Foundry's
+  `KeyboardManager#hasFocus` already treats as focused on its own. While a
+  button-hosted switch outside a `<form>` holds focus, Foundry's Space/arrow/Tab
+  bindings stop firing — the intended behaviour change, not a side effect.
 
   Every other attribute — `data-*` hooks, `aria-labelledby`, `title`, `onkeydown` — is
   forwarded through the rest spread onto THE HOST'S INTERACTIVE ELEMENT: the `<button>`,

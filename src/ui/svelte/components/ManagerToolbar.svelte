@@ -7,8 +7,8 @@
   a fixed element of every browse screen, and until this component the bar was a CSS
   CONVENTION: write `class="manager-toolbar"` on a `<section>` and the sheet gives you
   the `--fab-space-3` padding, the hairline bottom rule, the `--fab-overlay-light-03`
-  fill and the wrapping flex row (`fabricate.css:5514` for the box, `:5527` for the
-  never-rendered grid form and `:5535` for the flex branch every bar actually takes).
+  fill and the wrapping flex row (`fabricate.css:5517` for the box, `:5531` for the
+  never-rendered grid form and `:5539` for the flex branch every bar actually takes).
   Eleven sites across eleven components wrote that out by hand.
 
   ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
@@ -26,14 +26,14 @@
   `{@render children?.()}` and nothing else — and `openspec/specs/design-system/
   spec.md`'s pair requirement forbids a primitive displacing an area's chrome for a
   control it does not own. The one family rule that REACHES a caller's control,
-  `.fabricate-filter-bar.manager-toolbar select.is-size-38` (`fabricate.css:26772`),
+  `.fabricate-filter-bar.manager-toolbar select.is-size-38` (`fabricate.css:26843`),
   travels with the family and takes Foundry's own type and chrome in a bare host; that
   is a recorded residue owned by issues 1510/1511, not a licence to floor it here.
   `tests/components/re-rooted-controls-host-independence.test.js` carries the negative
   control that asserts neither half exists.
 
   ONE rule stays application-rooted, named rather than silently left behind:
-  `fabricate.css:9852`'s `.fabricate-manager [data-scoped-page='world-vocabulary']
+  `fabricate.css:9876`'s `.fabricate-manager [data-scoped-page='world-vocabulary']
   .manager-toolbar.manager-scoped-list-toolbar select`. Its family compound stands
   THIRD, behind an attribute ancestor that is not the application root, so neither
   re-rooting form exists for it. The reason is recorded beside the rule in the sheet.
@@ -78,13 +78,13 @@
 
   NO VARIANT PROP. The sheet paints four further treatments and they are not one
   vocabulary: `.manager-environments-toolbar` and `.manager-task-toolbar` cap the bar
-  at 100px and 112px and scroll it (`fabricate.css:5541`, `:5547`);
+  at 100px and 112px and scroll it (`fabricate.css:5545`, `:5551`);
   `.manager-scoped-list-toolbar` is sized from a SCOPED rule in
   `scoped/EntityListInspectorFrame.svelte` rather than from the sheet at all; and
-  `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` (`:5535`)
+  `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` (`:5539`)
   switches the bar from grid to flex — a branch that is ALWAYS taken, because no
   component under `src/` writes `.manager-toolbar-primary`, measured, so the grid form
-  at `:5527` is declared and never rendered. Every modifier therefore travels as a
+  at `:5531` is declared and never rendered. Every modifier therefore travels as a
   pass-through on `class`, spelled as it is spelled today.
 
   It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s,

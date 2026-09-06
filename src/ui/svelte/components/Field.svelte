@@ -6,10 +6,49 @@
   `.manager-field` was a CSS CONVENTION and nothing else: write
   `class="manager-field"`, then remember which HOST element the field is supposed to
   be. The sheet declares the box once —
-  `styles/fabricate.css:10523`, `display: flex; flex-direction: column;
+  `styles/fabricate.css:10123`, `display: flex; flex-direction: column;
   gap: var(--fab-space-chip); font-size: 0.82rem; font-weight: 700` — and 88 sites
   across 24 components re-typed the class onto an element each of them chose for
   itself.
+
+  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
+  That box rule and the family's control chrome are written `.fabricate-field…` rather
+  than `.fabricate-manager .manager-field…`, so a field paints wherever it is rendered
+  instead of only inside the manager. `fabricate-field` is the FIRST literal of the
+  class array below, and that position is a constraint rather than a style note:
+  `tests/components/searchable-popover-area-scope.test.js` reads the composed region up
+  to the first `]`, so a root moved off the head of the array is a root that gate
+  reports as unemitted while every re-rooted rule keeps matching.
+
+  THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK. This family's root is not its control —
+  the field is a column and the control is a bare `<input>`, `<select>` or `<textarea>`
+  inside it — so the floor is written at the family root PLUS the element it owns,
+  `.fabricate-field :is(input, select, textarea)` at (0,1,1), grouped with
+  `ManagerSearchField`'s and `ChanceSlider`'s members immediately below the area's own
+  bare-element baseline (`fabricate.css:1471`). Position is load-bearing: `font` is a
+  shorthand that resets `line-height`, and at (0,1,1) the group ties every LATER
+  same-rank rule in the area, two of which restate a `font` longhand for controls these
+  floors reach. Declared thousands of lines further down in this family's own block it
+  would win both and silently re-type every manager textarea and select.
+
+  The group carries `font: inherit` AND NOTHING ELSE, because at a tie a declaration the
+  baseline does not also carry is a real move inside the manager. `appearance` and
+  `min-height` are the two this family would like and cannot have at that rank, so
+  Field's element-typed chrome is a SECOND rule in the family's own block
+  (`fabricate.css:10625`) that restates the area baseline's element predicate leg for
+  leg — six `input` legs and `textarea` — and carries only that block's `appearance`,
+  `-webkit-appearance` and `min-height`. Widening the floor instead would take the radios
+  inside a `<Field as="fieldset">` from 16px to 34, a range input from 28 to 34 and a
+  `.fab-stepper-input` from 22 to 34.
+
+  THE PAIR EXCLUDES `select`, DELIBERATELY. The family declares both halves — the strip
+  `.fabricate-field :is(input, textarea):focus` (`fabricate.css:10709`) and the repaint
+  `.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible`
+  (`:10724`) — over `input` and `textarea` only. A `select` leg would be (0,2,1), tie
+  `.fabricate-app select:focus-visible` and win on source order, deleting the inset ring
+  that exists because an outset outline on a select is clipped by an overflow-clipped
+  container. A `<select>` in a Field therefore keeps the area's ring and the area's
+  `appearance`, a stated residue owned by issues 1504 and 1510.
 
   ── THE HOST IS THE WHOLE POINT, WHICH IS WHY IT IS A REQUIRED-SHAPED PROP ────────
   Measured on the tree this extraction started from, those 88 sites used THREE hosts:

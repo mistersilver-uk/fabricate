@@ -6,11 +6,11 @@
   Before this component the manager's card was a CSS CONVENTION and nothing else:
   write `class="manager-inspector-card"` on a `<section>` and the sheet gives you the
   padding, the hairline border, the 8px radius, the surface fill and the stacked
-  `gap` (`fabricate.css:13009` for the stack, `:13755` for the box). 80 sites across
+  `gap` (`fabricate.css:13033` for the stack, `:13779` for the box). 80 sites across
   20 components wrote that out by hand.
 
   ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
-  Those two rules and the Checks Studio's `.manager-checks-card` override (`:2497`)
+  Those two rules and the Checks Studio's `.manager-checks-card` override (`:2501`)
   are written `.fabricate-card.manager-inspector-card…` rather than `.fabricate-manager
   .manager-inspector-card…`, so the shell paints wherever it is rendered instead of only
   inside the manager. `fabricate-card` is the FIRST literal of the class array below,
@@ -50,9 +50,9 @@
   ── WHAT THIS COMPONENT DOES NOT OWN ──────────────────────────────────────────────
   No variant prop, and that is a deliberate scope line. The card has three painted
   treatments in the sheet and they are not one vocabulary: the base box;
-  `.manager-checks-card` (radius 11, padding 0, `--fab-bg-2`; `fabricate.css:2500`),
-  keyed on the card's own modifier class; and the Checks rail's box (`:3308`) and its
-  `.is-rail-list` compaction (`:3447`), the first of which is keyed on an ANCESTOR
+  `.manager-checks-card` (radius 11, padding 0, `--fab-bg-2`; `fabricate.css:2501`),
+  keyed on the card's own modifier class; and the Checks rail's box (`:3309`) and its
+  `.is-rail-list` compaction (`:3448`), the first of which is keyed on an ANCESTOR
   (`.manager-checks-rail`) and reaches cards carrying no modifier at all. A fourth,
   `.is-sticky`, had no call site anywhere under `src/` — measured, not assumed — and
   was deleted from the sheet in issue 1498. A closed `variant` set spanning two
