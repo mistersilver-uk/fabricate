@@ -109,12 +109,19 @@
   sweep sees them as a pair.
 
   Props:
-   - role: `'neutral'` (default — the bare `.manager-button`, which is a real and
+   - role: `'neutral'` (default — NO `is-*` token at all, which is a real and
      correct treatment for a secondary verb), `'primary'`, `'ghost'`, `'danger'`,
-     `'dashed'` or `'warning'`. Neutral is the default because it is what a bare
-     `class="manager-button"` already renders, so converting an existing site is
-     mechanical. The set is CLOSED: a per-site visual tweak is a pass-through class
-     on `class`, never a seventh role — see `ui-integration/spec.md`.
+     `'dashed'` or `'warning'`. Neutral is the default because it is what the
+     family's own base rule renders with no role class present: the shared control
+     block at `styles/fabricate.css:13559-13560`, keyed
+     `.fabricate-button.manager-button`, states the border, the colour and the
+     background a role-less button paints. It is also what the hand-written sites
+     this component replaced carried, so converting one was mechanical — though
+     since issue 1502 the bare `class="manager-button"` they wrote matches nothing
+     in the family without the root beside it, which is why the carriers held out
+     of the conversion write that root themselves. The set is CLOSED: a per-site
+     visual tweak is a pass-through class on `class`, never a seventh role — see
+     `ui-integration/spec.md`.
    - tag: `'button'` (default) or `'a'`. Named `tag` because `Chip.svelte`, the same
      manager primitive family, already spells this capability that way; one meaning,
      one name. An unrecognised value renders a `<button>`. `tag="a"` with an empty

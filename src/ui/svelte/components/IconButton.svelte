@@ -107,8 +107,8 @@
    - class: an EXTRA class, appended to the primitive's own, never a replacement. It
      has to be a named prop rather than a rest key, because the rest spread lands
      after `class={classes}` and a `class` passed through it would REPLACE
-     `manager-icon-button` outright — silently unstyling the control while every
-     `data-*` selector in the tests kept resolving.
+     `fabricate-icon-button manager-icon-button` outright — silently unstyling the
+     control while every `data-*` selector in the tests kept resolving.
 
      Before writing a rule against it, read `ManagerButton.svelte`'s note on the same
      prop. A scoped `<style>` rule in the CALLING component stops reaching the element
@@ -154,9 +154,9 @@
     children = undefined,
     // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
     // to be a named prop rather than a rest key: the rest spread lands after `class={…}` in
-    // the markup, so a `class` passed through it would REPLACE `manager-icon-button`
-    // outright and silently unstyle the control while every `data-*` selector in the tests
-    // kept resolving.
+    // the markup, so a `class` passed through it would REPLACE
+    // `fabricate-icon-button manager-icon-button` outright and silently unstyle the control
+    // while every `data-*` selector in the tests kept resolving.
     class: extraClass = '',
     // OPTIONAL `$bindable` handle on the rendered `<button>` (issue 1477, default `null` so all
     // 36 existing callers are unaffected). `ActionMenu` needs it for two things a class cannot
