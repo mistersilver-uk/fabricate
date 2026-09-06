@@ -907,7 +907,7 @@ test('the capture runner threads and asserts declared layouts before taking a sc
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Nine selectors in this registry pin a rule option by its VALUE, and NOTHING else could
+  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting
   // hooks ("Attribute VALUES are not hooks"), so a renamed value passes it; `expectSelector`
   // is not scanned by it at all. Issue 1095 renamed exactly such a value — `byRecipe` to
@@ -936,16 +936,18 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
   }
 
   // NON-EMPTY, and of the EXPECTED CARDINALITY. Either half alone goes vacuous: an empty
-  // set satisfies the membership assertion, and a non-empty one satisfies it while eight of
-  // the nine selectors have quietly lost the attribute.
+  // set satisfies the membership assertion, and a non-empty one satisfies it while nine of
+  // the ten selectors have quietly lost the attribute.
   //
-  // NINE since issue 1095's review: the two SUBJECT-PICKER cases each click the rule card
+  // NINE since issue 1095's review (the two SUBJECT-PICKER cases each click the rule card
   // before routing to their editor, because the picker renders under `bySubject` alone and
-  // both lab systems author a non-selecting rule.
+  // both lab systems author a non-selecting rule), and a TENTH since issue 1608's
+  // `manager-recipe-edit-crafting-modifier-suppressed`, which also clicks the rule card
+  // before un-marking a modifier's eligibility on the same tab.
   assert.equal(
     found.length,
-    9,
-    `expected 9 combination-rule selectors in the registry, found ${found.length} — ` +
+    10,
+    `expected 10 combination-rule selectors in the registry, found ${found.length} — ` +
       `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
       'renamed here, or cases carrying it were added or deleted'
   );
