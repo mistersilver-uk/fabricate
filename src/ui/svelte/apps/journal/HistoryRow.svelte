@@ -1,13 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   HistoryRow renders one terminal run in the Journal history list: a small thumb,
-  the run name, a status pill, the relative finish time (pre-formatted by the
+  the run name, a status chip, the relative finish time (pre-formatted by the
   parent), and an "×N" quantity badge when the run produced more than one result.
   Selectable via role=button + Enter/Space so clicking it opens the run detail.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import RunStatusPill from './RunStatusPill.svelte';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
+  import { runStatusPresentation } from './journalRunStatus.js';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 
@@ -17,6 +19,7 @@
   const title = $derived(String(run?.names?.title ?? ''));
   const img = $derived(String(run?.img ?? '') || DEFAULT_RUN_IMAGE);
   const status = $derived(String(run?.derivedStatus ?? 'succeeded'));
+  const runStatus = $derived(runStatusPresentation(status));
 
   // Total produced quantity across the run's results (badge shown when > 1).
   const totalQuantity = $derived(
@@ -52,7 +55,13 @@
   <div class="journal-history-copy">
     <span class="journal-history-name" {title}>{title}</span>
     <div class="journal-history-meta">
-      <RunStatusPill {status} />
+      <Chip
+        class="journal-run-status"
+        density="list"
+        tone={statusChipTone(runStatus.tone)}
+        icon={`fas ${runStatus.icon}`}
+        data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+      >
       {#if relativeTime !== ''}
         <span class="journal-history-time">{relativeTime}</span>
       {/if}
@@ -121,6 +130,14 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+  }
+
+  /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
+     `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
+     caller's and geometry is the primitive's — the rule its own `density` note states. So the one
+     property that was doing work here is restated here, where the row that squeezes it lives. */
+  .journal-history-meta :global(.journal-run-status) {
+    flex: 0 0 auto;
   }
 
   .journal-history-time {

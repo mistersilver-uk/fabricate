@@ -531,4 +531,10 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // r16-list by dropping BELOW the bar, never by adjudication, so the decision it records is the same
 // one as then: a manifest row with a `library.html` specimen, or a `notAPrimitive` row with this
 // measurement behind it.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 50;
+// 50 -> 49 (issue 1506): `apps/journal/RunStatusPill.svelte` LEFT by being DELETED. Its four
+// callers render the shared `<Chip>` directly now, so the file this row named is gone and the
+// register's own rule — a name departing unrecorded is a failure — is satisfied by removing it in
+// the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
+// the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
+// already states.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 49;

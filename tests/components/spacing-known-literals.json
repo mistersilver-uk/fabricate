@@ -380,8 +380,6 @@
   "src/ui/svelte/apps/journal/RunDetail.svelte | gap | 6 | 1",
   "src/ui/svelte/apps/journal/RunDetail.svelte | gap | 8 | 1",
   "src/ui/svelte/apps/journal/RunDetail.svelte | padding | 8 | 1",
-  "src/ui/svelte/apps/journal/RunStatusPill.svelte | gap | 5 | 1",
-  "src/ui/svelte/apps/journal/RunStatusPill.svelte | padding | 8 | 1",
   "src/ui/svelte/apps/journal/StepDetails.svelte | gap | 2 | 1",
   "src/ui/svelte/apps/journal/StepDetails.svelte | gap | 8 | 1",
   "src/ui/svelte/apps/journal/StepTimeline.svelte | gap | 4 | 1",

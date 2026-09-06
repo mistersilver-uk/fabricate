@@ -26,6 +26,12 @@
  * salvage yields, the bulk report's outcomes, the recipe row pills and the Tool player preview
  * lose their green and nothing anywhere says so.
  *
+ * ── THE SHRINK FAILURE, WHICH IS A MIRROR RATHER THAN A DROP ────────────────────────────────
+ * The journal's retired run pill declared `flex: 0 0 auto` on ITSELF. `Chip` declares no flex at
+ * all, because position is the caller's and geometry is the primitive's — so the property has to
+ * be restated once per call site, and four copies of one rule is a mirror that rots the first time
+ * a fifth row renders the chip and nobody remembers. The clause below is what keeps them honest.
+ *
  * ── THE EMPHASIS FAILURE, WHICH IS THE OPPOSITE SHAPE ───────────────────────────────────────
  * `emphasis="outlined"` is RECOGNISED on the chip and means the opposite of what it meant on the
  * pill: the pill's outlined face superseded the tone's edge and ink and kept its fill, and the
@@ -59,13 +65,17 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
 /**
  * THE CONVERTED SITES, COUNTED, so the clause below cannot pass over nothing.
  *
- * Twelve of the 36 converted sites bound their tone dynamically — six opaque projection reads and
- * six ternaries — and every one of them routes through the map. The floor is stated rather than
- * derived because the clause it guards is a NEGATIVE: "no chip in this corpus binds a tone the
- * map never sees" is satisfied by a corpus with no dynamic chips in it at all, which is exactly
- * what a regression that reverted the conversion would produce.
+ * Twelve of the retired status pill's 36 sites bound their tone dynamically — six opaque
+ * projection reads and six ternaries — and every one of them routes through the map. The four
+ * journal run sites join them: each reads a `RunModel.derivedStatus` through the run-status
+ * vocabulary, whose `ready`, `succeeded` and `cancelled` entries emit `success` and `neutral`,
+ * neither of which is a chip tone under that spelling.
+ *
+ * The floor is stated rather than derived because the clause it guards is a NEGATIVE: "no chip in
+ * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
+ * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-const MAPPED_TONE_SITES = 12;
+const MAPPED_TONE_SITES = 16;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -96,10 +106,10 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the eleven files the conversion routed through it', () => {
+  it('is read by the fifteen files the conversion routed through it', () => {
     assert.equal(
       MAP_READERS.length,
-      11,
+      15,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
         'site that has gone back to binding a projected tone straight onto a chip, which ' +
@@ -163,6 +173,41 @@ describe('1506 the outlined emphasis — an exact census', () => {
         "a badge carrying the RETIRED pill's prop of the same name forward — a value this chip " +
         'recognises and draws as the opposite face, silently. The shipped pair for that face is ' +
         '`tone="secondary" density="list"`'
+    );
+  });
+});
+
+/**
+ * The class the four journal rows pass to their status chip. It is the caller's own name rather
+ * than the chip's, so the rule below cannot be answered by a rule about chips in general.
+ */
+const RUN_CHIP_CLASS = 'journal-run-status';
+
+describe('1506 the journal run chip — its shrink protection is restated per caller', () => {
+  it('is declared by every file that renders it, and by no other', () => {
+    const callers = COMPONENTS.filter(({ source }) => source.includes(`class="${RUN_CHIP_CLASS}"`));
+    assert.equal(
+      callers.length,
+      4,
+      'the run status chip is rendered by the four journal rows that rendered the retired pill. ' +
+        `Found: ${callers.map(({ path }) => path).join(', ')}`
+    );
+
+    const missing = callers
+      .filter(
+        ({ source }) =>
+          !new RegExp(
+            String.raw`:global\(\.${RUN_CHIP_CLASS}\)\s*\{[^}]*flex:\s*0 0 auto;`
+          ).test(source)
+      )
+      .map(({ path }) => path);
+    assert.deepEqual(
+      missing,
+      [],
+      'a journal row renders the status chip without restating `flex: 0 0 auto` for it. The ' +
+        'retired pill carried that on itself; the shared chip carries no flex at all, so the ' +
+        'chip gives up width to a name beside it that was meant to absorb the squeeze. Position ' +
+        'stays with the caller, which is exactly why each caller has to say it'
     );
   });
 });

@@ -211,7 +211,11 @@ export function isExemptSpacingPixels(pixels) {
  * no other occurrence of either. The padding is `var(--fab-space-3)` inside the primitive now,
  * so neither slot is left open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 897;
+// 897 -> 895 (issue 1506): `apps/journal/RunStatusPill.svelte` was DELETED, and its two
+// occupancies — a 5px gap and an 8px padding — vanished with it. `assertRatchet` fails on a
+// VANISHED row as loudly as on a new one, so the rows and this total move in the commit that
+// deletes the file. Measured, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 895;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
