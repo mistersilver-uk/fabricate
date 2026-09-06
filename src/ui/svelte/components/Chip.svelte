@@ -31,13 +31,33 @@
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
      `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
-     `secondary`, `tag`, or '' for the default neutral fill. Tone is colour only and never
-     changes the size; a tone that resized would reintroduce the drift this component removes.
-   - emphasis: '' (the shipped chip), 'outlined' or 'lit'. It is a SECOND AXIS and not an
+     `secondary`, `subtle`, `tag`, or '' for the default neutral fill. Tone is colour only and
+     never changes the size; a tone that resized would reintroduce the drift this component
+     removes.
+
+     FOUR OF THE THIRTEEN ARE ONE RECESSIVE LADDER, AND IT IS AN ORDER RATHER THAN A SET OF
+     PERCENTAGES. `secondary`, `neutral`, `subtle` and `muted` run from loudest to quietest in
+     that order, each measurably weaker than the last in every theme this app ships. The
+     quantity that orders them is the CONTRAST of each ink composited over that theme's own
+     ground — never an alpha and never a channel, because the themes do not agree on a model:
+     five state the ladder as one opaque hue at three descending percentages of itself, one
+     mixes two percentages with a different base triple beneath them, and one states the first
+     three as three DIFFERENT opaque hues plus one alpha, where an alpha comparison ties three of
+     the four. The ORDER survives all three shapes; a percentage would not.
+
+     A CALLER ROUTES BY MEANING, NEVER BY MATCHING A TONE NAME TO A TOKEN NAME. `secondary` names
+     the rule the GM is reading, on a surface of its own; `neutral` is a fact that is merely
+     present; `subtle` is a quiet, non-actionable state; `muted` is unavailable. The names do NOT
+     track the tokens and that is worth stating rather than discovering: `muted` inks with
+     `--fab-text-disabled` and `neutral` inks with `--fab-text-muted`, so only `subtle` and
+     `secondary` are spelled the same as the token they use.
+   - emphasis: '' (the shipped chip), 'outlined', 'lit' or 'bare'. It is a SECOND AXIS and not an
      eleventh tone: `tone` says which family the chip belongs to, `emphasis` says HOW that
      family arrives. Anything else resolves to '', exactly as an unrecognised `tone` does, so a
-     chip that does not ask for one is byte-identical to what shipped. Both rules are the last
-     in the style block and carry the full notes.
+     chip that does not ask for one is byte-identical to what shipped. The three are
+     ALTERNATIVES rather than a composition — a plate, a wash and no edge are three answers to
+     one question — and all their rules are the last in the style block and carry the full
+     notes.
      · 'outlined' — the chip as a FLAT PLATE rather than a tinted wash, for a badge that has to
        stand ON a panel of its own colour family (`proto:1313`).
      · 'lit' — the family's colour on the INK too, over a 16% wash of it and nothing else
@@ -47,6 +67,14 @@
        chips that declare a colour of their own — `tone="tag"` and any `swatch` — because those
        are the ones with a colour to be lit in; on any other chip the rule does not match and
        nothing moves.
+     · 'bare' — NO EDGE (issue 1506), for a badge the reference draws edgeless inside a dense
+       list row. `border: 0` is the whole of it, and it is on this axis because neither a tone
+       nor a density can REMOVE an edge: a tone paints `border-color` and a density paints the
+       band. It pairs with `density="list"`, which owns the stadium and the 9px/600 type; a bare
+       chip's own glyph draws at 7px through the one rule this face carries. IT IS THE ONE
+       EMPHASIS THAT DOES NOT COMPOSE WITH `struck`, because its `border` shorthand resets the
+       dashed `border-style` that prop states — the opposite of what 'outlined' promises, so it
+       is written here rather than left to be found.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
@@ -240,6 +268,15 @@
     // pill is a step louder than that — it names the rule the GM is reading, on a surface of
     // its own — and a step quieter than every semantic family.
     'secondary',
+    // SUBTLE (issue 1506): a quiet, non-actionable STATE, the third rank of the recessive ink
+    // ladder and the one tone `StatusPill` had that this component did not. It is a
+    // REPRODUCTION rather than a new statement — `--fab-text-subtle` over
+    // `--fab-surface-raised` behind no visible edge is byte-for-byte the pill's own default
+    // face — so the sites that converge onto it keep their paint. It is genuinely distinct from
+    // `secondary` above, which is one rank louder, carries a real `--fab-border` hairline and
+    // grounds on `--fab-surface-soft`; routing this cohort there would move all three
+    // properties where a reproduction is available.
+    'subtle',
   ]);
 
   /**
@@ -251,7 +288,7 @@
    *
    * @type {ReadonlySet<string>}
    */
-  const EMPHASES = new Set(['outlined', 'lit']);
+  const EMPHASES = new Set(['outlined', 'lit', 'bare']);
 
   const classes = $derived(
     [
@@ -397,6 +434,27 @@
     flex: 0 0 auto;
   }
 
+  /* THE STATUS DOT (issue 1506): `fa-circle` is not a glyph, it is a MARK, and its whole meaning
+     is that it is small. Transcribed verbatim from `StatusPill.svelte`, which has drawn it at
+     0.36rem since it shipped; without this rule a dot inherits the base rule's 0.62rem and
+     inflates by 72% on a mark that is meant to read as a bullet.
+
+     A RULE, NOT A PROP AND NOT A PER-SITE STYLE, in the shape `is-truncated > i` above already
+     uses: a caller cannot be asked to remember to shrink a dot it did not choose to be a dot.
+
+     IT REACHES THIS COMPONENT'S OWN GLYPH AND NOTHING ELSE, and that boundary is the compiler's
+     rather than this file's. Svelte emits this as
+     `.manager-chip.svelte-<hash> i.fa-circle:where(.svelte-<hash>)`, so the `<i>` must carry
+     THIS component's scope hash — which is true of the glyph rendered from the `icon` prop below
+     and false of any `<i>` a caller writes into the children snippet, since that one carries the
+     caller's hash. Widening it to `:global(i.fa-circle)`, or hoisting it into
+     `styles/fabricate.css`, would erase exactly that asymmetry and move marks on screens that
+     never asked. Measured across every importer at the time it landed, the rule reaches two
+     `icon`-prop sites and five live `fa-circle` elements outside any chip stay where they are. */
+  .manager-chip i.fa-circle {
+    font-size: 0.36rem;
+  }
+
   /* A chip rendered as a `button` must beat Foundry's host button geometry, which sets a
      fixed height and its own font. Those are the properties the host actually imposes;
      everything else the base rule above already covers. */
@@ -495,6 +553,29 @@
     border-color: var(--fab-border);
     color: var(--fab-text-secondary);
     background: var(--fab-surface-soft);
+  }
+
+  /* SUBTLE (issue 1506): a quiet, non-actionable state — the third rank of the recessive ink
+     ladder, one step below `neutral` and one above `muted`. It is transcribed from
+     `StatusPill.svelte`'s own default face, which declares `color` and `background` and takes a
+     transparent edge from that component's base rule.
+
+     THREE DECLARATIONS, NOT TWO, and the third is the whole reason this tone can be a
+     reproduction rather than a move. That pill's base states `border: 1px solid transparent`;
+     THIS component's base states `1px solid var(--fab-border)` a few rules above, so restating
+     only the pill's two would put a visible hairline on every subtle chip and the tone would
+     read one rank louder than it is. `border-color` rather than the `border` shorthand, for the
+     reason `is-struck` gives: the shorthand would reset `border-style` too.
+
+     ONE DIVERGENCE IS RECORDED RATHER THAN ABSORBED. `--fab-surface-raised` is documented as the
+     HOVER ground, not a resting one. Re-pointing this fill to `--fab-surface-soft` would move
+     every site that converges here, so the reproduction is kept and the follow-up is stated
+     precisely instead: re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle`
+     and `secondary` differ in ink and edge alone. */
+  .manager-chip.is-subtle {
+    border-color: transparent;
+    color: var(--fab-text-subtle);
+    background: var(--fab-surface-raised);
   }
 
   /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
@@ -831,5 +912,51 @@
   .manager-chip.has-tint.is-lit {
     color: var(--fab-chip-color);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
+  }
+
+  /* THE BARE EMPHASIS (issue 1506): the chip with NO EDGE AT ALL, and `border: 0` is the whole
+     of it.
+
+     WHY IT EARNS A VALUE ON THIS AXIS RATHER THAN A THIRTEENTH TONE. A tone paints
+     `border-color` and a density paints the band; NEITHER CAN REMOVE THE EDGE, because this
+     component's base rule states `1px solid var(--fab-border)` and a colour cannot subtract a
+     width. That gap is the entire justification, and it is the same gap `Medallion`'s
+     `glyph-chip` variant fills with `border: 0` one component over. The reference draws an
+     edgeless attribution badge inside a dense list row and there is no combination of the
+     thirteen tones that says it.
+
+     `border` RATHER THAN `border-width: 0`, and the difference is measurable rather than
+     stylistic: the shorthand resets `border-color` to `currentColor`, which is what the
+     reference's own computed edge is, where the longhand would leave a zero-width edge at a
+     different computed colour for anything that later read it.
+
+     THE BAND AND THE TYPE SIZE ARE `density="list"`'s, NOT THIS EMPHASIS'S. Paint and scale stay
+     on separate axes here, exactly as the `tag-run` note above states, so a bare chip takes its
+     stadium and its 9px/600 from the density its caller also asks for. Minting a fourth emphasis
+     value that stated a scale would be the `micro`-density trap the props block already refuses,
+     one axis over.
+
+     THE ONE EMPHASIS THAT DOES NOT COMPOSE WITH `struck`, stated here rather than discovered.
+     `is-struck` above deliberately uses the `border-style` LONGHAND so the tone's own
+     `border-color` survives; this rule is written later and its SHORTHAND resets `border-style`
+     to `none`, so a struck bare chip loses the dashed edge that says "switched off". That is the
+     opposite of the composition `is-outlined` promises a line below, and it is the honest
+     consequence of the one declaration this face is. No caller pairs the two. */
+  .manager-chip.is-bare {
+    border: 0;
+  }
+
+  /* The bare face's glyph, and `:not(.fa-circle)` is LOAD-BEARING rather than defensive. At
+     `density="list"` a glyph inherits 9px and the reference draws 7px, so this rule is real work
+     and not a restatement. But the status-dot rule near the top of this block is
+     `.manager-chip i.fa-circle` at (0,2,1), and an unqualified `.manager-chip.is-bare i` is
+     ALSO (0,2,1) — a tie, decided by order, and this rule is later, so a bare chip's dot would
+     inflate from 5.76px to 7px. Excluding the dot by selector is the only form that cannot lose
+     that race, and it is the form `StatusPill.svelte` reached for the identical reason.
+
+     WRITTEN AFTER EVERY TONE RULE, after `has-tint` and after `is-outlined` and the lit pair,
+     for the equal-specificity ordering argument each of those already carries. */
+  .manager-chip.is-bare i:not(.fa-circle) {
+    font-size: 7px;
   }
 </style>

@@ -405,11 +405,14 @@ describe('emphasis is one axis across the two primitives that have it', () => {
     // over a wash of it (`proto:5401`, `proto:5665`); no `StatusPill` in the reference does that,
     // and the pill has no `--fab-chip-color` vehicle to do it through.
     Chip: ['lit'],
-    // `StatusPill` only. The reference draws an EDGELESS attribution badge inside a dense list
-    // row (`proto:601`, the catalogue row's source pill); every `Chip` the reference draws in a
-    // row keeps an edge, and a chip's own `outlined` face exists to neutralise a FILL rather
-    // than an edge, so the word would mean the opposite thing there.
-    StatusPill: ['bare']
+    // `StatusPill` only: EMPTY since issue 1506, and the empty entry is kept rather than deleted
+    // so the loop below still quantifies over both primitives. `bare` was pinned here while the
+    // chip could not say it — a tone paints `border-color` and a density paints the band, and
+    // neither can REMOVE an edge — which is exactly the gap that earned it a value on the chip's
+    // own `emphasis` axis. It is now SHARED, so the pin goes: the ratchet below says in its own
+    // words that once the other primitive draws a pinned value, the pin is deleted rather than
+    // kept beside it.
+    StatusPill: []
   };
 
   it('spells the SAME word for every face BOTH primitives draw', () => {
