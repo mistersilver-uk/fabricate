@@ -75,13 +75,13 @@
                    an inconsistency. A chip form has nothing to configure — `Chip`'s own
                    variation arrives on `triggerClass` — while a manager button's ROLE and
                    control-height RUNG are a closed vocabulary the primitive publishes and
-                   the class string cannot carry: `.manager-button.fab-manager-button.is-size-38`
+                   the class string cannot carry: `.fabricate-button.manager-button.fab-manager-button.is-size-38`
                    demands `fab-manager-button`, which only that component writes, so
-                   `triggerClass="manager-button is-size-38"` matches nothing at all. That is
+                   `triggerClass="fabricate-button manager-button is-size-38"` matches nothing at all. That is
                    the defect this form exists to end.
 
                    THIRTEEN CALL SITES IMITATE THE PRIMITIVE WITH A CLASS STRING today
-                   (`triggerClass="manager-button …"`, population B in
+                   (`triggerClass="fabricate-button manager-button …"`, population B in
                    `tests/components/manager-button-cascade-inventory.test.js`), and each one
                    pays for it with a per-site sheet rule restating a height and a corner the
                    primitive already owns. `WorldComponentCataloguePage`'s `+ Register item`
@@ -91,9 +91,10 @@
                    is twelve repaints in a change about a trigger contract.
 
                    `triggerClass` still travels — it lands on `ManagerButton`'s own `class`
-                   prop, which APPENDS to `manager-button fab-manager-button is-<role>` rather
-                   than replacing it — so a converting site drops only the `manager-button`
-                   token it used to hand-write and keeps its own modifier. Beware the scoped-
+                   prop, which APPENDS to `fabricate-button manager-button fab-manager-button
+                   is-<role>` rather than replacing it — so a converting site drops both the
+                   root and the `manager-button` token it used to hand-write, and keeps its own
+                   modifier. Beware the scoped-
                    style trap the primitive's header records: a rule in the CALLING component
                    never reached this trigger anyway, because `SearchablePopover` renders it.
     triggerIcon  — leading icon class on the trigger (optional)
@@ -546,8 +547,8 @@
          `type`, `disabled` and `onclick` are NAMED props on that primitive, so the spread has
          to reach them as props rather than as rest attributes, and `class` is deliberately NOT
          in the spread — it is the primitive's one destructured-and-merged prop, so passing
-         `triggerClass` through it APPENDS to `manager-button fab-manager-button is-<role>`
-         instead of replacing it. -->
+         `triggerClass` through it APPENDS to `fabricate-button manager-button fab-manager-button
+         is-<role>` instead of replacing it. -->
     <ManagerButton
       bind:element={triggerElement}
       {...triggerAttributes}

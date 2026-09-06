@@ -1630,7 +1630,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
       'not being parsed at all'
   );
   // A repaint is a winner change on an UNCONVERTED literal site, so with the sweep complete
-  // there can be none. That makes this the regression detector for the whole change: a new raw
+  // there can be none. That makes this the regression detector for the whole change.
   // A bare `manager-button` class token landing anywhere under `src/` puts a site back in the
   // corpus and reappears here as a measured repaint.
   assert.deepEqual(
