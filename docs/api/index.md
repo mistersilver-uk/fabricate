@@ -103,6 +103,10 @@ fabricate.openRecipeManager()
 fabricate.listCraftingSystems()
 ```
 
+`fabricate.openRecipeManager()` returns a promise that resolves once the manager's code has loaded and the window has been asked to open.
+It carries no GM gate itself, so calling it as a non-GM user still resolves the promise, but the manager shows the user a GM-only notification instead of opening.
+If the browser is running a stale, cached copy of Fabricate and the manager's code cannot be loaded, it notifies the user with a message telling them to reload, and the returned promise still rejects with the original error so a macro's `await` sees the failure.
+
 ### Class Constructors
 
 ```javascript
@@ -138,6 +142,10 @@ backward compatibility, but it now throws until the manager has been opened at
 least once (i.e. until `loadCraftingSystemManagerAppClass()`, the header button,
 or `fabricate.openRecipeManager()` has loaded the chunk).
 Prefer the async accessor.
+
+Called directly like this, `loadCraftingSystemManagerAppClass()` does not notify the user on a failed load.
+It is a raw accessor, so a caller that awaits it is responsible for reporting the failure to its own user.
+`fabricate.openRecipeManager()` is the wrapped equivalent that does notify.
 
 ### Crafting Runtime Facade
 
