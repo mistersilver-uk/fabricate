@@ -88,6 +88,8 @@ import {
   KNOWN_NATIVE_SELECTS_IN_JS_TOTAL,
   KNOWN_NATIVE_SELECT_ELEMENTS,
   KNOWN_NATIVE_SELECT_TOTAL,
+  KNOWN_OFF_LADDER_ART_SIZES,
+  KNOWN_OFF_LADDER_ART_SIZE_TOTAL,
   KNOWN_OFF_LADDER_RADII,
   KNOWN_OFF_LADDER_RADIUS_TOTAL,
   KNOWN_OFF_SCALE_FONT_WEIGHTS,
@@ -1004,6 +1006,83 @@ test('no corner radius leaves the published ladder', () => {
       'plus `0`, `999px` for a pill and `50%` for a circle — 8px is not on it however natural it ' +
       'looks beside a 16px inset. Pick the nearer rung. Writing the value into a custom property ' +
       'does not help: this scan resolves `var()`, so the row survives with its text changed.',
+  });
+});
+
+/** The four rungs the icon-chip size ladder publishes. */
+const ART_SIZE_LADDER = new Set([22, 26, 30, 38]);
+
+/**
+ * The components that ARE the art tile. One name today; the avatar joins it when it ships, and
+ * the list is the seam that keeps this scan from being re-derived then.
+ */
+const ART_TILE_COMPONENTS = new Set(['Medallion']);
+
+/**
+ * Every art-tile render site, as `{ file, size }` with `size` a number or the string `dynamic`.
+ *
+ * `dynamic` is a RECORDED value rather than a skip. Two sites forward a `size` from a prop or a
+ * caller-supplied descriptor, and dropping them would make them invisible to the `scanned` floor
+ * as well as to the table — a scan that had stopped reading expression attributes would look
+ * exactly like a tidier tree.
+ *
+ * Read from the parsed template rather than by a text scan, for the reason every gate in this
+ * file is: the attribute this reads sits among expression attributes whose `>` ends a naive
+ * match early, and a truncated tag reports clean rather than failing.
+ *
+ * @returns {{ file: string, size: number|'dynamic' }[]}
+ */
+function artTileSizes() {
+  const found = [];
+  for (const { file, source, ast } of parsedTemplates()) {
+    walkElements(ast.fragment ?? ast, (element) => {
+      if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
+      const text = attributeText(source, element, 'size');
+      // An absent `size` takes the primitive's own default, which is a number this scan knows.
+      if (text === null) {
+        found.push({ file, size: 40 });
+        return;
+      }
+      const literal = /^size=\{\s*(\d+(?:\.\d+)?)\s*\}$/u.exec(text);
+      found.push({ file, size: literal ? Number(literal[1]) : 'dynamic' });
+    });
+  }
+  return found;
+}
+
+test('no new art tile renders at an off-ladder size', () => {
+  const sites = artTileSizes();
+  const offLadder = sites.filter(
+    (site) => site.size === 'dynamic' || !ART_SIZE_LADDER.has(site.size)
+  );
+
+  // NON-VACUITY, and it is worth its own line here. Every clause below quantifies over
+  // `offLadder`, and the population it is drawn from is the whole reason this table can be
+  // trusted: a scan that had stopped recognising the tile's component name would produce an
+  // empty `sites`, an empty `offLadder`, and forty VANISHED rows — loud, but reported as debt
+  // paid rather than as a broken scan. The `scanned` floor below says the same thing in
+  // `assertRatchet`'s own language; this says it about the tile itself.
+  assert.ok(
+    sites.some((site) => ART_SIZE_LADDER.has(site.size)),
+    'no art tile in the tree renders at a published rung, so the ladder this gate filters ' +
+      'against is matching nothing and every site would be recorded as debt'
+  );
+
+  assertRatchet({
+    label: 'off-ladder art-tile sizes',
+    baseline: KNOWN_OFF_LADDER_ART_SIZES,
+    pinnedTotal: KNOWN_OFF_LADDER_ART_SIZE_TOTAL,
+    observed: tallyByKey(offLadder, (site) => `${site.file} | ${site.size}`),
+    scanned: sites.length,
+    floor: 40,
+    guidance:
+      'Art and portraits carry their own size ladder — 22, 26, 30 and 38, default 26 — and this ' +
+      'table records every render site that is off it. A NEW row is not automatically wrong: ' +
+      'restricting `size` would move almost every art tile in the app, so the geometry sweep ' +
+      'owns that correction and this pin is what lets it lower a number rather than re-derive a ' +
+      'census. What a new row does mean is that a decision was taken about one tile in ' +
+      'isolation, so state the rung you rejected and why. A VANISHED row is the sweep working, ' +
+      'or a scan that has stopped seeing the tile — check which before banking it.',
   });
 });
 

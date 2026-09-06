@@ -506,6 +506,47 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
  * specimen and an `evidence` derivation, or a `notAPrimitive` row with the measurement behind it;
  * recording it here says only that it crossed the bar and that the decision is outstanding.
  */
+/**
+ * An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`.
+ *
+ * ── WHY THIS EXISTS, AND WHY IT IS A RECORD RATHER THAN A CORRECTION ────────────────────
+ * The published ladder for the icon chip is 22 / 26 / 30 / 38, default 26. Measured when issue
+ * 1506 unified the tree's art tiles into one primitive, the shipped population renders at
+ * eighteen distinct sizes and only four of them are rungs. Restricting `size` would therefore
+ * move almost every art tile in the app, which is a geometry correction with its own frames and
+ * its own screen-by-screen judgement; the size-ladder sweep owns that, and this table is what
+ * lets that sweep LOWER a pin rather than re-derive a census from nothing.
+ *
+ * ── WHY IT IS MEASURED AFTER THE UNIFICATION AND NOT BEFORE ─────────────────────────────
+ * Before that change the same population was spread across four implementations — the manager's
+ * tile, two crafting tiles and three raw image elements — and every key would have named a file
+ * that no longer renders one. A pre-unification baseline is wholly VANISHED afterwards, which
+ * `assertRatchet` reports as loudly as a new row and for no useful reason.
+ *
+ * ── THE TWO `dynamic` KEYS ARE EXPLICIT, AND THAT IS THE POINT ──────────────────────────
+ * Two sites forward a `size` this scan cannot read: the player inventory detail header passes
+ * its own `{size}` prop through, and the scoped list inspector's row tile takes one from a
+ * caller-supplied descriptor. Each is recorded as an explicit `dynamic` key rather than dropped,
+ * because a silently dropped site is invisible to the `scanned` floor as well as to the table —
+ * a scan that had stopped reading expression attributes would look like a tidier tree.
+ *
+ * The ladder-COMPLIANT sites are deliberately absent: this is a debt table, and eight render
+ * sites currently sit on a rung. One of them is a REGRESSION rather than a survivor and is
+ * recorded here as such — the recipe-item contents row drew at 30px on radius 7 with no edge,
+ * the only art tile in the tree already compliant on both, and converting it to the shared
+ * primitive kept its size while moving its corner to a flat 9px and adding a hairline. Radius is
+ * not recordable on a `path | size` table, so it is stated in that change's pull request.
+ */
+export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
+
+/**
+ * @see KNOWN_OFF_LADDER_ART_SIZES
+ *
+ * MEASURED after issue 1506's art-tile unification: 57 off-ladder render sites across 40
+ * `path | size` keys, out of 65 art-tile render sites in the tree.
+ */
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 57;
+
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
 /** @see KNOWN_UNREGISTERED_SHARED_COMPONENTS */
