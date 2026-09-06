@@ -13,7 +13,7 @@
   adjacent tabs of one screen.
 
   ── WHAT A CALLOUT IS, AS AGAINST A NOTICE ────────────────────────────────────────────
-  `library.html:957` states the routing rule in four lines, and the first two are the pair
+  `library.html:985` states the routing rule in four lines, and the first two are the pair
   that is easy to confuse: a CALLOUT is documentation — always true, stays put — while a
   NOTICE is state, which just happened and goes away. `components/Notice.svelte` is the
   other one; a sentence that would be false a moment ago belongs there, not here.

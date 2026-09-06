@@ -136,7 +136,7 @@
   }
 
   /* The caller's own flex row, kept: it carries the ordinal, the ellipsised name and the
-     duration chip, and `library.html:879` draws the kicker as a plain span inside a row the
+     duration chip, and `library.html:883` draws the kicker as a plain span inside a row the
      caller owns. Everything the kicker now owns is gone from here — which also means the
      ordinal no longer inherits `letter-spacing`, a sub-pixel re-centring inside its 20px
      circle rather than a defect. */

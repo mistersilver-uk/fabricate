@@ -3,8 +3,9 @@
   THE UPPERCASE MICRO-LABEL THAT NAMES WHAT FOLLOWS (issue 1505).
 
   ── WHY IT EXISTS ─────────────────────────────────────────────────────────────────
-  The eyebrow is the most-restated shape in the product. `library.html:879` draws it
-  once and captions it "Roughly 400 instances across the corpus, in 55 versions", and
+  The eyebrow is the most-restated shape in the product. `library.html:883` draws it
+  once and `:884` captions it "Roughly 400 instances across the corpus, in 55
+  versions", and
   the seven byte-identical `.crafting-detail-section-title` blocks this change deletes
   are the measured proof that the eighth restatement arrives unbidden: seven files in
   ONE directory each declare the same six declarations, three of them under a comment
@@ -38,7 +39,7 @@
   ── WHAT IT DOES NOT TAKE ─────────────────────────────────────────────────────────
   No `class`, no `style` and no rest spread. A caller that needs LAYOUT — a flex row,
   an ellipsis, a min-width — keeps its OWN wrapper element and nests this inside it,
-  which is the shape `library.html:879` already draws (a plain kicker span inside a
+  which is the shape `library.html:883` already draws (a plain kicker span inside a
   caller-owned flex row). `StepRequirementsList.svelte` and `ConsumptionPlanPanel.svelte`
   are the two conversions that exercise it: each keeps its wrapper, stripped to the
   flex properties that are genuinely the caller's, with the kicker inside.
@@ -59,7 +60,7 @@
      1 `<h3>`; `h2` and `h4` have no caller and are withdrawn.
    - tone: `'default' | 'accent'`. `accent` is `--fab-accent` (`library.html:121`), and
      the specimen states when: "Accent only when it names a whole section"
-     (`library.html:880`). It is on the specimen — the rule, the drawn example and the
+     (`library.html:884`). It is on the specimen — the rule, the drawn example and the
      caption are all there — which is why it survives the unreachable-configuration
      rule that withdrew `StatBox`'s `accent`.
    - children: the label text, already localized by the caller. A nested child is
