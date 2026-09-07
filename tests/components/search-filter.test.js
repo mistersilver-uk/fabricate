@@ -139,13 +139,20 @@ describe('SearchBar debounce logic', () => {
 
 // --- SearchBar DOM structure tests ---
 
+// The class strings below are this file's OWN synthetic markup: it builds a SearchBar shell with
+// `document.createElement` to assert element order and attributes, and no component renders it.
+// They are `demo-search*` rather than `fabricate-search*` because issue 1508 made
+// `fabricate-search` the namespace ROOT that `ManagerSearchField.svelte` emits. A fixture
+// writing a primitive's root claims that primitive's family, and every reader that counts
+// root-carrying fixture markup would count these — a hand-built shell that models no shipped
+// control and measures none of its rules. The prefix names what the fixture is instead.
 describe('SearchBar DOM structure', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
   it('creates expected DOM structure', () => {
     const container = document.createElement('div');
-    container.className = 'fabricate-search has-clear-button';
+    container.className = 'demo-search has-clear-button';
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -156,7 +163,7 @@ describe('SearchBar DOM structure', () => {
 
     const clearButton = document.createElement('button');
     clearButton.type = 'button';
-    clearButton.className = 'fabricate-search-clear';
+    clearButton.className = 'demo-search-clear';
     clearButton.setAttribute('aria-label', 'Clear search');
     container.appendChild(clearButton);
 
@@ -165,7 +172,7 @@ describe('SearchBar DOM structure', () => {
     clearButton.appendChild(clearIcon);
 
     const icon = document.createElement('span');
-    icon.className = 'fabricate-search-icon';
+    icon.className = 'demo-search-icon';
     container.appendChild(icon);
 
     const iconGlyph = document.createElement('i');
@@ -173,8 +180,8 @@ describe('SearchBar DOM structure', () => {
     icon.appendChild(iconGlyph);
 
     assert.ok(container.querySelector('input[type="text"]'));
-    assert.ok(container.querySelector('button.fabricate-search-clear'));
-    assert.ok(container.querySelector('.fabricate-search-icon i.fas.fa-search'));
+    assert.ok(container.querySelector('button.demo-search-clear'));
+    assert.ok(container.querySelector('.demo-search-icon i.fas.fa-search'));
     assert.equal(container.querySelector('input').placeholder, 'Search recipes...');
     assert.equal(container.querySelector('input').getAttribute('aria-label'), 'Search');
     assert.equal(container.querySelector('input').name, 'search');
@@ -185,11 +192,11 @@ describe('SearchBar DOM structure', () => {
     const container = document.createElement('div');
 
     const clearButton = document.createElement('button');
-    clearButton.className = 'fabricate-search-clear';
+    clearButton.className = 'demo-search-clear';
     container.appendChild(clearButton);
 
     const icon = document.createElement('span');
-    icon.className = 'fabricate-search-icon';
+    icon.className = 'demo-search-icon';
     container.appendChild(icon);
 
     const children = [...container.children];

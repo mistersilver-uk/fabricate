@@ -153,7 +153,7 @@ function managerRows() {
           <p>Recipe, component, essence, and environment management</p>
         </div>
       </div>
-      <button type="button" class="manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
+      <button type="button" class="fabricate-toggle manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
         <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>
@@ -260,8 +260,8 @@ function managerFixture(theme, width, height) {
           </button>
         </nav>
         <section class="manager-main" data-region data-boundary>
-          <div class="manager-toolbar">
-            <input class="manager-search" value="Alchemy and harvesting" aria-label="Search">
+          <div class="fabricate-filter-bar manager-toolbar">
+            <input class="fabricate-search manager-search" value="Alchemy and harvesting" aria-label="Search">
             <span class="manager-chip manager-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
             <span class="manager-chip is-warning" data-contrast-soft data-boundary>Warning</span>
           </div>
@@ -556,7 +556,7 @@ function liveUpdateFixture(origin) {
           <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button manager-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
             <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
-            <main class="manager-main"><div class="manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
+            <main class="manager-main"><div class="fabricate-filter-bar manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
             <aside class="manager-inspector"><p>Inspector stays mounted.</p></aside>
           </div>
         </section>

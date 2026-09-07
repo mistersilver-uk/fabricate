@@ -16,6 +16,7 @@
  */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
@@ -36,6 +37,22 @@ const harness = createMountedComponentHarness({
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
+
+/**
+ * The class string `ChanceSlider` writes inline on its root element, READ out of the component.
+ *
+ * A probe built from a restated string keeps measuring the old control after the component stops
+ * emitting it, and reports green while doing so — the same reason
+ * `re-rooted-controls-host-independence.test.js` reads this value rather than restating it. What
+ * this file adds on top is the comparison against the RENDERED attribute, which is the half source
+ * text cannot answer.
+ */
+const ROOT_CLASSES = (() => {
+  const source = readFileSync(resolve(repoRoot, CHANCE_SLIDER), 'utf8');
+  const match = source.match(/class="(fabricate-slider[^"]*)"/);
+  assert.ok(match, 'ChanceSlider must write its family root inline on its root element');
+  return match[1];
+})();
 
 /** Mount a slider and return its two inputs plus the recorded `onChange` arguments. */
 async function mountSlider(props = {}) {
@@ -93,6 +110,59 @@ const KEYBOARD_CASES = [
     ],
   },
 ];
+
+describe('ChanceSlider root emission (issue 1508)', () => {
+  // THE ROOT-EMISSION PROOF ON THE RENDERED DOM, and it is the one reader that can fail on the
+  // tree this change most needs to exclude. Every other reader of `fabricate-slider` is SOURCE
+  // TEXT: `searchable-popover-area-scope.test.js` scans this component's markup region, and
+  // `re-rooted-controls-host-independence.test.js` writes the class string into its own fixture as
+  // a literal and measures the sheet against it. Both would go on passing on a tree where the
+  // component declared the class and stopped rendering it — and on that tree all twenty-three
+  // re-rooted rules in `styles/fabricate.css` match nothing, in both applications.
+  it('renders its root span carrying the family root FIRST, on the element itself', async () => {
+    const root = await harness.mount({ value: 40, min: 0, max: 100, step: 1 });
+    const node = root.querySelector('[data-chance-slider]');
+    assert.ok(Boolean(node), 'the slider renders its root element');
+    assert.equal(node.tagName, 'SPAN');
+
+    const value = node.getAttribute('class');
+    // NAMED, rather than a `TypeError` on `null.split`: a component that stopped writing the
+    // attribute is exactly the failure this clause exists to produce, so it says what happened.
+    assert.ok(
+      typeof value === 'string',
+      'the slider rendered its root element with NO `class` attribute at all, so every rule ' +
+        'rooted at `fabricate-slider` now matches nothing while the source text still reads right'
+    );
+    assert.equal(
+      value.replace(/ ?svelte-[a-z0-9]+/g, ''),
+      ROOT_CLASSES,
+      'the rendered root must carry exactly the class string the component writes'
+    );
+    // THE POSITION, by equality rather than by `classList.contains`, which cannot see a root that
+    // arrived second. A namespace root is only a root while it leads.
+    assert.equal(value.split(/\s+/)[0], 'fabricate-slider');
+  });
+
+  it('renders the descendants every re-rooted rule is a chain beneath', async () => {
+    // The family's other twenty-two selectors are DESCENDANT chains under that root, so the root
+    // alone is not the whole contract: a tree that stopped rendering one of these children would
+    // leave its rules matching nothing with the root still correctly emitted.
+    const root = await harness.mount({ value: 40, min: 0, max: 100, step: 1 });
+    for (const selector of [
+      '.fabricate-slider .manager-drop-rate-percent',
+      '.fabricate-slider .manager-drop-rate-percent input[type="number"]',
+      '.fabricate-slider .manager-drop-rate-control',
+      '.fabricate-slider .manager-drop-rate-track',
+      '.fabricate-slider .manager-drop-rate-fill',
+      '.fabricate-slider .manager-drop-rate-control input[type="range"]',
+    ]) {
+      assert.ok(
+        Boolean(root.querySelector(selector)),
+        `the rendered tree must match \`${selector}\`, which is a shipped rule of this family`
+      );
+    }
+  });
+});
 
 describe('ChanceSlider keyboard stepping (issue 1050, R1)', () => {
   for (const testCase of KEYBOARD_CASES) {

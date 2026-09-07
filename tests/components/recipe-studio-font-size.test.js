@@ -142,7 +142,7 @@ const FIXTURE = `
         anything the recipes VIEW scopes applies as it does in the shipped tree.
       -->
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="recipes">
-        <section class="manager-toolbar manager-recipe-toolbar">
+        <section class="fabricate-filter-bar manager-toolbar manager-recipe-toolbar">
           <!-- The multi-select row is the LAST row of this toolbar, immediately above the
                list. The host row class is a PROP of the shared toolbar primitive, so this
                studio names its own ("manager-recipe-filter-row") and its own data hook.

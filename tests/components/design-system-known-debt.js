@@ -124,11 +124,19 @@ export function knownDebt(gate) {
  * 29 of them are the six Foundry-core reset blocks the gate allow-lists by shape, leaving these.
  * Issue 1501 collapses the `.fabricate-app`/`.fabricate-manager` pair, and issue 1520 deletes the
  * three interactables copies; both will move the allow-list rather than this table.
+ *
+ * RE-MEASURED at 24 → 23 by issue 1508's third phase, which paid one row down by ROOTING it:
+ * `.fabricate-manager .manager-status-toggle:focus` became
+ * `.fabricate-toggle.manager-status-toggle:focus`, the strip half of the pair `StatusToggle`
+ * already declared, and a recognised member of `PRIMITIVE_FOCUS_STRIPS` rather than debt. The
+ * three OTHER strips that phase adds — the toggle's checkbox-host input, and `ChanceSlider`'s —
+ * are new and exempt, so they add no row; a strip is required chrome and booking one here would
+ * file a requirement as a defect.
  */
 export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
 
 /** @see KNOWN_BARE_FOCUS_SELECTORS */
-export const KNOWN_BARE_FOCUS_TOTAL = 24;
+export const KNOWN_BARE_FOCUS_TOTAL = 23;
 
 /**
  * An `@media` query that is not a user preference, keyed `file | query`.
@@ -327,10 +335,14 @@ export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 308;
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
  *
- * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`. 24 of the 140 distinct
- * `--fab-*` names have every one of their declaration sites inside a `.fabricate-manager`
- * compound, and 19 of those 24 carry no `--fab-manager-` prefix — which is why that gate now
- * computes its population instead of matching the prefix, and why these rows appeared at all.
+ * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`, and RE-MEASURED after issue
+ * 1508's re-root. 17 of the 141 distinct `--fab-*` names have every one of their declaration
+ * sites inside a `.fabricate-manager` compound — the predicate `areaScopedProperties` applies is
+ * that EVERY compound of EVERY rule declaring the name matches `.fabricate-manager` with a
+ * right-hand boundary — and 12 of those 17 carry no `--fab-manager-`
+ * prefix, which is why that gate computes its population instead of matching the prefix, and why
+ * these rows appeared at all. The pair was 24 and 19 before the re-root; see
+ * {@link KNOWN_AREA_SCOPED_STRING_USES} for the seven names that left.
  *
  * All six read ONE property, `--fab-recipe-control-font`, for their control type. Every one of
  * the three components does render inside the manager today and not one of them can prove it: a
@@ -347,22 +359,33 @@ export const KNOWN_AREA_SCOPED_STYLE_READ_TOTAL = 6;
  * An area-scoped `--fab-*` property spelled into a template or module string, keyed
  * `file | property`.
  *
- * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read. Five sites, and
- * they are two different mistakes. `WorldToolEntryPage` and `ToolBreakageTab` READ
- * `--fab-tool-breakage-chance-track-gradient` through a component prop. `ChanceSlider` DECLARES
- * three area-scoped names into an inline `style` attribute — and that one is invisible to every
- * CSS clause in this repository, because the mask that isolates a `<style>` block blanks exactly
- * the markup those declarations live in. It is also the widest version of the defect: a component
- * under `components/` renders wherever a caller puts it.
+ * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read, and RE-MEASURED
+ * after issue 1508's re-root. TWO sites remain, and they are one mistake: `WorldToolEntryPage` and
+ * `ToolBreakageTab` READ `--fab-tool-breakage-chance-track-gradient` through a component prop.
+ * That shape is the `var(` one, which is also the pair the issue behind this baseline predicted.
  *
- * The issue predicted TWO rows here, because its audit looked only for the `var(` shape. The three
- * `ChanceSlider` declarations are found by the shape that matches a name followed by a colon, and
- * they are real.
+ * THREE `ChanceSlider` ROWS RETIRED WITH ISSUE 1508'S RE-ROOT, and they are not a repair of the
+ * debt — they are the re-root's intended effect. The component DECLARES
+ * `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color` and `--fab-drop-rate-value` into
+ * an inline `style` attribute exactly as before; what changed is where the sheet declares them.
+ * Issue 1508 re-rooted the slider family's rules from `.fabricate-manager .manager-drop-rate-*`
+ * onto `.fabricate-slider …`, so those three names no longer have every declaration site inside
+ * the area, no longer measure as area-scoped, and are rightly no longer flagged. A family-rooted
+ * property travels with the component: it is declared wherever the component's own root class is
+ * emitted, which is the guarantee the area-scoped shape could not give, and it is why the debt
+ * ended rather than moved.
+ *
+ * SEVEN names left the area-scoped set in that re-root, 24 → 17. Three had rows here and so read
+ * as VANISHED: `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color`,
+ * `--fab-drop-rate-value`. Four left silently, having none: `--fab-toggle-track`,
+ * `--fab-toggle-track-border`, `--fab-toggle-knob` (re-rooted onto `.fabricate-toggle`) and
+ * `--fab-chance-slider-thumb-radius` (onto `.fabricate-slider`). The exact-set pin that would
+ * make a silent departure loud is a follow-up; this note is the published record until it lands.
  */
 export const KNOWN_AREA_SCOPED_STRING_USES = knownDebt('areaScopedStringUses');
 
 /** @see KNOWN_AREA_SCOPED_STRING_USES */
-export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 5;
+export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 2;
 
 /**
  * A name-bearing prop defaulting to untranslated English, keyed `file | prop | default`.
@@ -475,9 +498,21 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * `{...triggerAttributes}`, which this source-level scanner cannot see, so nothing is being
  * quietly banked that the scanner did not measure.
  *
+ * 274 → 272 with issue 1508's third phase, across two rows that leave entirely:
+ * `StatusToggle.svelte` 1 → 0 and `ModifierPillSelect.svelte` 1 → 0. Each declares
+ * `data-keyboard-focus="true"` on the one formless `<button>` it writes — the toggle's `button`
+ * host, and the pill row's remove button.
+ *
+ * ITS SIZE IS THE POINT, exactly as issue 1502's one-row entry above records. This scanner counts
+ * SOURCE elements, never component call sites, so `StatusToggle`'s single `<button>` leaves while
+ * the 42 render sites across 28 importing files that now answer `hasFocus` true are invisible to
+ * it. `ModifierPillSelect`'s MENU button is `SearchablePopover`'s trigger and was never on this
+ * row. The two hand-rolled `manager-status-toggle` buttons in `CraftingSystemManagerRoot.svelte`
+ * are `<span>`s and a `<button>` inside the root's own rows, and their file's row is unmoved.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 272;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

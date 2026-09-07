@@ -6,8 +6,28 @@
   Before this component the manager's card was a CSS CONVENTION and nothing else:
   write `class="manager-inspector-card"` on a `<section>` and the sheet gives you the
   padding, the hairline border, the 8px radius, the surface fill and the stacked
-  `gap` (`fabricate.css:12685` for the stack, `:13429` for the box). 80 sites across
+  `gap` (`fabricate.css:13033` for the stack, `:13779` for the box). 80 sites across
   20 components wrote that out by hand.
+
+  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
+  Those two rules and the Checks Studio's `.manager-checks-card` override (`:2501`)
+  are written `.fabricate-card.manager-inspector-card…` rather than `.fabricate-manager
+  .manager-inspector-card…`, so the shell paints wherever it is rendered instead of only
+  inside the manager. `fabricate-card` is the FIRST literal of the class array below,
+  and that position is a constraint rather than a style note:
+  `tests/components/searchable-popover-area-scope.test.js` reads the composed region up
+  to the first `]`, so a root moved off the head of the array is a root that gate
+  reports as unemitted while every re-rooted rule keeps matching. The four remaining
+  family rules name a caller's own container — the Checks rail's two and the essence and
+  tool inspectors' per-view overrides — and stay application-rooted under the exemption
+  `openspec/specs/design-system/spec.md` already grants for caller chrome.
+
+  This family declares NO font floor and NO focus pair, and that is a positive decision
+  rather than an omission. The card owns no control of its own — it renders its caller's
+  children and nothing else — and the pair requirement forbids a primitive displacing an
+  area's chrome for a control it does not own.
+  `tests/components/re-rooted-controls-host-independence.test.js` carries the negative
+  control that asserts neither half exists.
 
   It is the lowest-drama member of this programme and that is precisely the argument
   for it. There is no accessible name to forget and no `type="button"` to remember,
@@ -30,9 +50,9 @@
   ── WHAT THIS COMPONENT DOES NOT OWN ──────────────────────────────────────────────
   No variant prop, and that is a deliberate scope line. The card has three painted
   treatments in the sheet and they are not one vocabulary: the base box;
-  `.manager-checks-card` (radius 11, padding 0, `--fab-bg-2`; `fabricate.css:2500`),
-  keyed on the card's own modifier class; and the Checks rail's box (`:3308`) and its
-  `.is-rail-list` compaction (`:3447`), the first of which is keyed on an ANCESTOR
+  `.manager-checks-card` (radius 11, padding 0, `--fab-bg-2`; `fabricate.css:2501`),
+  keyed on the card's own modifier class; and the Checks rail's box (`:3309`) and its
+  `.is-rail-list` compaction (`:3448`), the first of which is keyed on an ANCESTOR
   (`.manager-checks-rail`) and reaches cards carrying no modifier at all. A fourth,
   `.is-sticky`, had no call site anywhere under `src/` — measured, not assumed — and
   was deleted from the sheet in issue 1498. A closed `variant` set spanning two
@@ -60,12 +80,11 @@
   rendered by 19 components and reached from most of the manager's mounted trees.
 
   ── CLASS ORDER IS DELIBERATE ─────────────────────────────────────────────────────
-  `manager-inspector-card`, then the caller's extra. That is the order all 80
-  hand-rolled sites already wrote (`manager-inspector-card manager-checks-card`,
-  `manager-inspector-card is-rail-list`), so every converted site emits a
-  byte-identical `class` attribute and the conversion is a no-op in the DOM as well as
-  on screen. Class order changes no cascade; reproducing it is what makes a 48-site
-  diff reviewable.
+  The family ROOT, then `manager-inspector-card`, then the caller's extra. The last two
+  are the order all 80 hand-rolled sites already wrote (`manager-inspector-card
+  manager-checks-card`, `manager-inspector-card is-rail-list`), so a converted site
+  emits what it emitted before with the root PREPENDED. Class order changes no cascade;
+  reproducing it is what makes a 48-site diff reviewable.
 
   Props:
    - children: the card's contents. A snippet, because a card is a container and its
@@ -117,7 +136,9 @@
     ...rest
   } = $props();
 
-  const classes = $derived(['manager-inspector-card', extraClass].filter(Boolean).join(' '));
+  const classes = $derived(
+    ['fabricate-card', 'manager-inspector-card', extraClass].filter(Boolean).join(' ')
+  );
 </script>
 
 <section class={classes} {...rest}>{@render children?.()}</section>

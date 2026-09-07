@@ -124,7 +124,7 @@ const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
-      <section class="manager-inspector-card" data-world-modifiers style="width: 720px">
+      <section class="fabricate-card manager-inspector-card" data-world-modifiers style="width: 720px">
         <ul class="manager-character-modifier-list">
           ${modifierRow('Survival', '@skills.sur.mod')}
           ${modifierRow('Modifier', '')}
@@ -205,11 +205,11 @@ const FIELD_FIXTURE = `
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
       <div class="manager-modifier-body" style="width: 520px">
-        <label class="manager-field" data-case="label">
+        <label class="fabricate-field manager-field" data-case="label">
           <span>Label</span>
           <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
-        <label class="manager-field" data-case="plain">
+        <label class="fabricate-field manager-field" data-case="plain">
           <span>Expression</span>
           <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
         </label>

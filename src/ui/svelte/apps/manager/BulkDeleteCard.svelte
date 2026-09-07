@@ -335,7 +335,7 @@
 
      `display: flex; flex-direction: column; gap: var(--fab-space-2)` is deliberately NOT
      restated. Both retired per-studio blocks declared it, and it is a verbatim duplicate of
-     `.fabricate-manager .manager-inspector-card` in `styles/fabricate.css`, which this card
+     `.fabricate-card.manager-inspector-card` in `styles/fabricate.css`, which this card
      still carries. */
 
   /* The card is the first thing under `BulkEditPanelShell`'s sticky Apply dock, and the dock's

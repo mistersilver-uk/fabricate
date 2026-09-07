@@ -177,7 +177,7 @@ async function readRenderedToolGeometry(width, view) {
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
               <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
               <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
                 <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><input type="radio" name="tool-breakage-mode" value="limitedUses" checked><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-hourglass-half"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span></label>
@@ -432,7 +432,7 @@ test('Fabricate app shell suppresses the host outline on the selected-tab state 
 });
 
 test('manager character modifier search suggestions keep icons in row flow', () => {
-  const searchIconBlock = blockFor('.fabricate-manager .manager-search > i');
+  const searchIconBlock = blockFor('.fabricate-search.manager-search > i');
   const characterModifierSuggestionBlock = blockFor(
     '.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion'
   );
@@ -445,7 +445,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
     'search field leading icon should remain positioned inside the input chrome'
   );
   assert.equal(
-    css.includes('.fabricate-manager .manager-search i {\n  position: absolute;'),
+    css.includes('.fabricate-search.manager-search i {\n  position: absolute;'),
     false,
     'search icon positioning must not catch suggestion icons inside search popovers'
   );
@@ -519,7 +519,7 @@ test('manager character modifier search suggestions render with availability-sty
               </section>
 
               <section>
-                <label class="manager-search is-compact manager-character-modifier-add-search">
+                <label class="fabricate-search manager-search is-compact manager-character-modifier-add-search">
                   <i class="fa-solid fa-search" aria-hidden="true"></i>
                   <input type="search" value="wis" aria-label="Search character modifiers">
                   <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers">
@@ -709,16 +709,16 @@ test('manager systems text and action cells are constrained at normal widths', (
 });
 
 test('manager systems status cells use stable interactive on-off toggles', () => {
-  const toggleBlock = blockFor('.fabricate-manager .manager-status-toggle');
-  const onBlock = blockFor('.fabricate-manager .manager-status-toggle.is-on');
-  const offBlock = blockFor('.fabricate-manager .manager-status-toggle.is-off');
-  const trackBlock = blockFor('.fabricate-manager .manager-status-toggle-track');
-  const knobBlock = blockFor('.fabricate-manager .manager-status-toggle-knob');
+  const toggleBlock = blockFor('.fabricate-toggle.manager-status-toggle');
+  const onBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-on');
+  const offBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-off');
+  const trackBlock = blockFor('.fabricate-toggle .manager-status-toggle-track');
+  const knobBlock = blockFor('.fabricate-toggle .manager-status-toggle-knob');
   const onKnobBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle.is-on .manager-status-toggle-knob'
+    '.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob'
   );
-  const focusBlock = blockFor('.fabricate-manager .manager-status-toggle:focus');
-  const focusVisibleBlock = blockFor('.fabricate-manager .manager-status-toggle:focus-visible');
+  const focusBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus');
+  const focusVisibleBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus-visible');
 
   assert.ok(
     toggleBlock.includes('appearance: none;'),
@@ -780,7 +780,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // the button is inert. The hover affordance has to live on the TRACK, which is the
   // part with an edge — otherwise every switch in the manager has no hover state at all.
   const toggleHoverBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
+    '.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
@@ -2658,58 +2658,58 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-component-button .manager-system-name'
   );
   const dropRateBlock = blockFor('.fabricate-manager .manager-drop-rate-cell');
-  const dropRateValueBlock = blockFor('.fabricate-manager .manager-drop-rate-value');
-  const dropRatePercentBlock = blockFor('.fabricate-manager .manager-drop-rate-percent');
+  const dropRateValueBlock = blockFor('.fabricate-slider.manager-drop-rate-value');
+  const dropRatePercentBlock = blockFor('.fabricate-slider .manager-drop-rate-percent');
   const dropRatePercentInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-percent input:is([type="text"], [type="number"])'
+    '.fabricate-slider .manager-drop-rate-percent input:is([type="text"], [type="number"])'
   );
   const dropRatePercentInputOverrideBlock = blockFor(
     '.fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"])'
   );
   const dropRatePercentSuffixBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"]'
+    '.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"]'
   );
-  const dropRateControlBlock = blockFor('.fabricate-manager .manager-drop-rate-control');
+  const dropRateControlBlock = blockFor('.fabricate-slider .manager-drop-rate-control');
   const guaranteedDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-guaranteed'
+    '.fabricate-slider .manager-drop-rate-control.is-guaranteed'
   );
   const commonDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-common'
+    '.fabricate-slider .manager-drop-rate-control.is-common'
   );
   const uncommonDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-uncommon'
+    '.fabricate-slider .manager-drop-rate-control.is-uncommon'
   );
   const rareDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-rare'
+    '.fabricate-slider .manager-drop-rate-control.is-rare'
   );
   const veryRareDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-very-rare'
+    '.fabricate-slider .manager-drop-rate-control.is-very-rare'
   );
   const legendaryDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-legendary'
+    '.fabricate-slider .manager-drop-rate-control.is-legendary'
   );
   const noneDropRateControlBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.is-none'
+    '.fabricate-slider .manager-drop-rate-control.is-none'
   );
-  const dropRateTrackBlock = blockFor('.fabricate-manager .manager-drop-rate-track');
-  const dropRateFillBlock = blockFor('.fabricate-manager .manager-drop-rate-fill');
+  const dropRateTrackBlock = blockFor('.fabricate-slider .manager-drop-rate-track');
+  const dropRateFillBlock = blockFor('.fabricate-slider .manager-drop-rate-fill');
   const continuousGradientFillBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill'
+    '.fabricate-slider .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill'
   );
   const dropRateRangeBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]'
   );
   const dropRateWebkitTrackBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track'
   );
   const dropRateWebkitThumbBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb'
   );
   const dropRateMozProgressBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-progress'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-progress'
   );
   const dropRateMozThumbBlock = blockFor(
-    '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb'
+    '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-thumb'
   );
   const toolBreakageChanceControlBlock = blockFor(
     '.fabricate-manager .manager-tool-breakage-chance-control'
@@ -3130,7 +3130,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;'
+      '.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;'
     ) && css.includes('pointer-events: none;'),
     'drop chance row percent suffix should keep its existing placement'
   );
@@ -3175,7 +3175,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-track'
+      '.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-track'
     ).includes('border: 0;'),
     'the Firefox native track should stay invisible behind the inset shared rail'
   );
@@ -3484,6 +3484,21 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
 });
 
+// EACH CONTROL IS WRAPPED IN A BARE `<span class="fabricate-slider">` (issue 1508), and the shape
+// of the repair is load-bearing rather than cosmetic. `ChanceSlider` writes
+// `manager-drop-rate-control` on a CHILD of its root span, so every rule this fixture depends on
+// re-roots to a DESCENDANT chain — `.fabricate-slider .manager-drop-rate-control`,
+// `.fabricate-slider .manager-drop-rate-track`, `.fabricate-slider .manager-drop-rate-fill` and the
+// six `input[type="range"]` rules beneath them. A token added to the control ELEMENT matches none
+// of those, so it would satisfy `searchable-popover-area-scope.test.js`'s ancestry clause — which
+// reads an element's own classes as part of its ancestry — while leaving this test measuring an
+// unstyled span, and the `leftInset` assertion below is the only thing in the repository that can
+// tell the two repairs apart.
+//
+// The wrapper moves nothing it is measuring: no rule matches `.fabricate-slider` alone (every
+// family rule is either a compound with a `manager-*` class or a descendant chain), each control
+// keeps its own inline `width: 240px`, and every assertion below is relative to the control's own
+// rect.
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
   const context = await sharedBrowser.newContext({
     viewport: { width: 640, height: 240 },
@@ -3495,6 +3510,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
     await page.setContent(`
       <style>${css}</style><style>${partiesTabScoped.css}</style>
       <main class="fabricate-manager" style="padding: 24px;">
+        <span class="fabricate-slider">
         <span
           class="manager-drop-rate-control has-continuous-gradient"
           data-slider="tool"
@@ -3503,6 +3519,8 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
           <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
           <input type="range" min="0" max="100" value="62">
         </span>
+        </span>
+        <span class="fabricate-slider">
         <span
           class="manager-drop-rate-control is-uncommon"
           data-slider="gathering"
@@ -3510,6 +3528,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
         >
           <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
           <input type="range" min="0" max="100" value="40">
+        </span>
         </span>
       </main>
     `);
@@ -3569,8 +3588,10 @@ test('manager components browser defines drop target and compact responsive list
   const listBlock = blockFor('.fabricate-manager .manager-components-list');
   const rowBlock = blockFor('.fabricate-manager .manager-component-row');
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
+  // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508): the bar's own rules are
+  // `.fabricate-filter-bar.manager-toolbar`, not `.fabricate-manager .manager-toolbar`.
   const toolbarBlock = Array.from(
-    css.matchAll(/\.fabricate-manager \.manager-toolbar\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-filter-bar\.manager-toolbar\s*\{[\s\S]*?\}/g)
   )
     .map((match) => match[0])
     .join('\n');
@@ -4221,7 +4242,7 @@ test('manager environment inspector evidence table wraps compact pills without h
         </head>
         <body>
           <main class="fabricate-manager">
-            <section class="manager-inspector-card harness">
+            <section class="fabricate-card manager-inspector-card harness">
               <h3 class="manager-card-title">Matching evidence</h3>
               <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label="Matching evidence">
                 <tbody>
@@ -4673,8 +4694,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // retired selector kept inside a live selector list is dead CSS the block-granular
   // dead-class gate cannot see, and a test anchor naming it kept it alive by hand.
   const fieldInputBlock = blockFor(
-    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
-      '.fabricate-manager .manager-field select'
+    ".fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
+      '.fabricate-field.manager-field select'
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
@@ -5032,7 +5053,7 @@ function shortWindowRailMarkup(navItems) {
           <nav class="manager-nav">${items}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
-        <aside class="manager-inspector"><section class="manager-inspector-card">Inspector</section></aside>
+        <aside class="manager-inspector"><section class="fabricate-card manager-inspector-card">Inspector</section></aside>
       </div>
     </div>`;
 }
@@ -5843,7 +5864,7 @@ async function readRenderedKnowledgeGeometry(width) {
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="fabricate-search manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -7161,7 +7182,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
             `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"><div class="${view}">` +
             '<div class="manager-gathering-task-drop-row" role="row" style="width:640px">' +
             '<span role="cell" class="manager-drop-cell manager-drop-rate-cell">' +
-            '<span class="manager-chance-slider manager-drop-rate-value">' +
+            '<span class="fabricate-slider manager-chance-slider manager-drop-rate-value">' +
             '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
             'style="--fab-drop-rate-value:90%; --fab-drop-rate-color:#5EC3B0;">' +
             '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
@@ -7212,16 +7233,16 @@ test('the gathering inspector rail cards render as one card, not three treatment
       `<style>${css}</style>` +
         '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
         '<aside class="manager-inspector" style="width:320px">' +
-        '<section class="manager-inspector-card" data-card="details">' +
+        '<section class="fabricate-card manager-inspector-card" data-card="details">' +
         '<h3 class="manager-card-title">Gathering task details</h3><p>Three facts</p>' +
         '</section>' +
-        '<section class="manager-inspector-card" data-task-drops-summary data-card="drops">' +
+        '<section class="fabricate-card manager-inspector-card" data-task-drops-summary data-card="drops">' +
         '<h3 class="manager-card-title">Drops summary</h3>' +
         '<div class="manager-task-drops-summary-list"><span class="manager-task-drop-summary-chip">' +
         '<span class="manager-task-drop-summary-label">Nightshade</span>' +
         '<strong class="manager-task-drop-summary-percent">80%</strong></span></div>' +
         '</section>' +
-        '<section class="manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
+        '<section class="fabricate-card manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
         '<h3 class="manager-card-title">Used in environments</h3><p>Not used yet.</p>' +
         '</section>' +
         '</aside></div>'
@@ -7284,7 +7305,7 @@ test('the gathering inspector rail cards render as one card, not three treatment
 // because the conversion moved those fields from `[type="text"]` to `[type="number"]`, so a
 // stylesheet still keyed on the old type would leave them unstyled and this would catch it.
 const CHANCE_SLIDER_FIXTURE =
-  '<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
+  '<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
   '<span class="manager-chance-slider-number manager-drop-rate-percent">' +
   '<input type="number" min="0" max="100" step="1" value="80" aria-label="Chance"/>' +
   '<span aria-hidden="true">%</span></span>' +
@@ -7323,9 +7344,9 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       percentHeight: 28,
       markup:
         '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
-        '<section class="manager-inspector-card manager-drop-editor-card">' +
+        '<section class="fabricate-card manager-inspector-card manager-drop-editor-card">' +
         '<div class="manager-drop-editor-values">' +
-        '<label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
+        '<label class="fabricate-field manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
         `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></aside>',
     },
@@ -7341,7 +7362,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
         '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
         '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +
         '<div class="manager-task-availability-row">' +
-        '<label class="manager-field manager-drop-rate-editor">' +
+        '<label class="fabricate-field manager-field manager-drop-rate-editor">' +
         `<span>Drop rate (%)</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></main>',
     },
@@ -7924,12 +7945,12 @@ test('the Checks Studio really renders into the classes those measurements measu
 // browser behind it is this file's shared one or a fresh one.
 async function checksRollEdges(page, tiersWrapperClass) {
   const difficultyCard = `
-    <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+    <section class="fabricate-card manager-inspector-card manager-checks-card" data-check-difficulty-card>
       <div class="manager-checks-card-head">
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>
       <div class="manager-checks-card-body">
-        <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">DC source</legend>
           <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
             <label class="manager-resolution-option is-active" data-dc-mode-option="static">
@@ -8013,7 +8034,10 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   try {
     const page = await context.newPage();
 
-    const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
+    const edges = await checksRollEdges(
+      page,
+      'fabricate-card manager-inspector-card manager-checks-card'
+    );
     assert.equal(
       edges.rowLeft,
       edges.radioLeft,
@@ -8038,7 +8062,14 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
     // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
     // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
     // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
-    const broken = await checksRollEdges(page, 'manager-inspector-card');
+    //
+    // THE CONTROL ARM CARRIES THE FAMILY ROOT TOO (issue 1508). What this arm removes is the
+    // CALLER's `manager-checks-card`, not the primitive's root: since the card family is rooted
+    // at `fabricate-card`, an arm written without it matches no card rule at all, so both arms
+    // would render unstyled and the `notEqual`s below would pass on two identical defaults —
+    // a mutation proof turned into a vacuous one. Both arms are rooted; only the caller class
+    // differs between them, which is the difference the assertions are about.
+    const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
     assert.notEqual(
       broken.rowLeft,
       broken.radioLeft,
@@ -8052,6 +8083,59 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   } finally {
     await context.close();
   }
+});
+
+test('both interpolated card fixtures are rooted at the class the primitive emits', () => {
+  // THE ONE CARRIER NO SCANNER SEES, GUARDED (issue 1508). The two card fixtures above build
+  // their `class` attribute by INTERPOLATION — `<section class="${tiersWrapperClass}">` and
+  // `<section class="${cardWrapperClass}">` — so `searchable-popover-area-scope.test.js`'s
+  // fixture clauses, which walk `class="…"` in `tests/**`, cannot read either one. That blind
+  // spot is the defect that cost issue 1502 a whole extra phase, when twelve `triggerClass="…"`
+  // sites went unrepaired because the census probe only matched `class="manager-button`.
+  //
+  // AND THE MUTATION-CONTROL ARMS ARE THE HALF THAT FAILS SILENTLY. Each pair's control arm is a
+  // one-sided `notEqual`, so an arm that lost the family root would go on satisfying it — the
+  // bare CARD SHELL and an UNSTYLED `<section>` both differ from the studio card, and the suite
+  // cannot tell which one it measured. Measured on this tree: unrooting only the two control
+  // arms leaves all 128 tests in this file green. So the root is asserted on all four call
+  // sites here, read out of `InspectorCard.svelte` rather than restated, which is what makes
+  // that mutation red.
+  const card = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/InspectorCard.svelte'),
+    'utf8'
+  );
+  const array = card.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
+  assert.ok(array, 'InspectorCard must declare its emitted classes as one array literal');
+  const root = (array[1].match(/'([a-z][\w-]*)'/) ?? [])[1];
+  assert.equal(
+    root,
+    'fabricate-card',
+    'InspectorCard must emit its family root as the FIRST literal of its class array; the ' +
+      'fixtures below are rooted at whatever it emits, so a rename here is a rename there'
+  );
+
+  const suite = readFileSync(resolve(__dirname, 'manager-layout.test.js'), 'utf8');
+  const wrapperArguments = [
+    ...suite.matchAll(
+      /(?:checksRollEdges|modifiersCombinationRuleMetrics)\(\s*page,\s*'([^']*)'\s*\)/g
+    ),
+  ].map(([, value]) => value);
+  assert.equal(
+    wrapperArguments.length,
+    4,
+    `expected four interpolated card-fixture call sites and read ${wrapperArguments.length}. ` +
+      'Either a call site moved to a form this reader cannot see — in which case retarget the ' +
+      'reader rather than deleting the assertion — or one was added or removed.'
+  );
+  // TWO fixed arms and TWO controls, so the pair below is a discriminator rather than one value
+  // four times: the controls drop the CALLER's `manager-checks-card` and keep the root.
+  assert.deepEqual(
+    [...new Set(wrapperArguments)].sort(),
+    [`${root} manager-inspector-card`, `${root} manager-inspector-card manager-checks-card`],
+    'every interpolated card fixture must carry the family root; the control arms remove the ' +
+      'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +
+      'from the one those tests are proofs of'
+  );
 });
 
 test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
@@ -8089,7 +8173,7 @@ async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
       <h3 class="manager-card-title">Named modifiers</h3>
-      <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+      <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
         <legend class="manager-resolution-mode-legend">How they combine</legend>
         <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
           <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
@@ -8135,7 +8219,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
 
     const fixed = await modifiersCombinationRuleMetrics(
       page,
-      'manager-inspector-card manager-checks-card'
+      'fabricate-card manager-inspector-card manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
     assert.equal(
@@ -8155,7 +8239,14 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     // must desynchronise both the card's own look AND the combination-rule scale, because the
     // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
     // and fires only then. If this cannot fail, the assertions above prove nothing.
-    const broken = await modifiersCombinationRuleMetrics(page, 'manager-inspector-card');
+    //
+    // BOTH ARMS CARRY `fabricate-card` (issue 1508), for the reason the tier-row control above
+    // records: the arm removes the CALLER's class, never the family's root, and an unrooted
+    // control arm would compare two unstyled defaults instead of two card treatments.
+    const broken = await modifiersCombinationRuleMetrics(
+      page,
+      'fabricate-card manager-inspector-card'
+    );
     assert.notEqual(
       broken.cardRadius,
       fixed.cardRadius,
@@ -8614,10 +8705,10 @@ test('the locked activation indicator offers no hover affordance', async () => {
   try {
     await page.setContent(
       `<style>${css}</style><div class="fabricate-manager">` +
-        `<button type="button" class="manager-status-toggle is-on" id="live">` +
+        `<button type="button" class="fabricate-toggle manager-status-toggle is-on" id="live">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></button>` +
-        `<span class="manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="fabricate-toggle manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></span>` +
         `</div>`
@@ -8799,7 +8890,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
-        '<section class="manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<section class="fabricate-card manager-inspector-card manager-checks-card" data-outcome-bands>' +
         '<div class="manager-checks-card-body is-roomy">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +
@@ -9708,7 +9799,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="manager-toolbar">${toggles}${bare}${unconverted}</div>
+            <div class="fabricate-filter-bar manager-toolbar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -9828,23 +9919,23 @@ test('the Checks rail states its own control type scale instead of inheriting on
                   <div class="manager-environment-workspace">
                     <div class="manager-environment-tab-panel"></div>
                     <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
-                      <section class="manager-inspector-card" data-checks-preview-as>
+                      <section class="fabricate-card manager-inspector-card" data-checks-preview-as>
                         <div class="fabricate-picker manager-travel-picker manager-checks-preview-actor">
                           <button type="button" data-probe="preview-actor" data-checks-preview-actor
                             class="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
                           </button>
                         </div>
-                        <label class="manager-field">
+                        <label class="fabricate-field manager-field">
                           <span class="visually-hidden">Preview against record</span>
                           <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
                         </label>
-                        <label class="manager-field">
+                        <label class="fabricate-field manager-field">
                           <span>Result difficulties</span>
                           <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
                         </label>
                       </section>
-                      <section class="manager-inspector-card" data-checks-simulator>
+                      <section class="fabricate-card manager-inspector-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
                             class="fabricate-button manager-button fab-manager-button is-primary manager-checks-simulator-roll">
@@ -9863,7 +9954,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
               <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
                    rule, is what the two pickers measured before it existed. -->
               <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
-                <label class="manager-field">
+                <label class="fabricate-field manager-field">
                   <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
                 </label>
               </div>
@@ -9985,7 +10076,7 @@ test('the modifier row gives every field room for its longest content at every m
     const stepper = (bound) =>
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
-      `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+      `<div class="fabricate-field manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
     // The icon field's picker root element, which this copy omitted until issue 1470. The
     // trigger's geometry rules are rooted at it now, so without it the field measures a bare
     // button rather than the 38px combo the row is being asserted to have room for. Since issue
@@ -9997,8 +10088,8 @@ test('the modifier row gives every field room for its longest content at every m
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
-          <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="fabricate-field manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
+          <label class="fabricate-field manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
           </div>
@@ -12368,7 +12459,7 @@ const SOURCE_TRIGGER_SITES = [
          </div>
        </form>
      </main>`,
-    '<section class="manager-inspector-card">Inspector</section>'
+    '<section class="fabricate-card manager-inspector-card">Inspector</section>'
   ),
   // THE PICKER'S OWN RULE, outside any drop zone: the 140px square the component ships with
   // wherever a caller does not override it. Both sites above DO override it, so without this
@@ -12785,8 +12876,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
                    direction toggle are unaffected by the narrowing and are measured in the same
                    row. -->
               <div data-scoped-page="world-vocabulary">
-                <div class="manager-toolbar manager-scoped-list-toolbar">
-                  <div class="manager-search"><input type="text" data-probe="shipped-search"></div>
+                <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
+                  <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
                   <select data-probe="shipped-select"><option>Name</option></select>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
                     ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
@@ -13634,8 +13725,8 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
                     class="fas fa-chevron-down" aria-hidden="true"></i></button>
                 </div>
               </div>
-              <div class="manager-toolbar manager-scoped-list-toolbar">
-                <div class="manager-search"><input type="text" data-scoped-list-search></div>
+              <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
+                <div class="fabricate-search manager-search"><input type="text" data-scoped-list-search></div>
                 <div class="fabricate-picker manager-travel-picker fabricate-select">
                   <button
                     type="button"

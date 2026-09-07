@@ -123,6 +123,12 @@ A rule whose ancestor chain names a CALLER's own container is exempt and stays w
 An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .manager-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
 The boundary matters as much as the rule.
 An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
+One further case belongs in this paragraph, and recording it does not widen the exemption.
+A caller's own container is sometimes selected by an ATTRIBUTE that sits on THAT CONTAINER rather than on the application root, as in `.fabricate-manager [data-manager-tools-search] .manager-search`.
+The prose above already covers such a rule — it can only ever match inside that caller's app — but the family compound then stands THIRD, so neither re-rooting form is available: a root at position one matches nothing, because the root sits on the family element, which is a descendant of the attributed one; and dropping the application root leaves the first compound with no namespace class at all.
+The resolution is to name the caller's container by a class the caller writes ON THAT SAME ELEMENT, at the same rank and the same position, leaving the rule app-rooted and exempt.
+That is not the "second ancestor picked for reach" this requirement forbids above: it is the SAME ancestor named a different way, and the change that does it MUST publish the measured match set of both forms.
+Where the caller writes no such class, the rule is a named residue recorded with the change that retires the family.
 
 How many namespace roots a primitive needs is a property of its PORTAL SHAPE rather than a count to copy.
 A component that portals a panel out of its own root needs one class on each, because those two nodes end up in different subtrees; a component that portals nothing, or whose root element IS the panel it portals, needs one.
@@ -154,8 +160,17 @@ It is never deepened by putting the primitive's root in front of the caller's cl
 A PRIMITIVE-owned rule may DOUBLE the primitive's own root for the same purpose, because that root is its own.
 The three most-imported controls satisfy it too: `ManagerButton` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
 None of the three portals anything, so each needs one root, and each writes it on the element that already carries the family class — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
+Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `ManagerSearchField` emits `fabricate-search`, `ManagerToolbar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
+None of the six portals anything either, so each needs exactly one root.
+All six are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
+`Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
+That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
+Issue 1518 and issue 1520 are the changes that turn all six from claims into facts.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a composed class list as well as a written one, because a primitive that builds its classes in `<script>` writes no `class="…"` attribute at all and a markup-only extractor would report such a family clean while measuring nothing.
+It reads a declared class MAP as well.
+A family class a component chooses PER HOST lives in a frozen map in `<script>` rather than in the class array or in the markup, and a reader that stops at the array reports the family clean while rules naming that class stay application-rooted and unseen: `StatusToggle`'s `HOST_CLASSES` is what puts `manager-tool-setting-toggle` into the DOM, and two shipped rules name it.
+The composed reader takes the array's FIRST literal, so a primitive's root belongs at the head of that array — a root written below the first interpolated member is a root the gate reports as unemitted while every re-rooted rule in the sheet goes on matching.
 
 A re-rooted family is a CAPABILITY until a caller outside the original application uses it, and a capability nothing exercises is a claim rather than a fact.
 `SearchablePopover` has such a caller: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which makes the player window the second application the family paints in and this requirement satisfied by a shipped surface rather than by a fixture.
@@ -170,6 +185,10 @@ A capability that nothing exercises is still worth having, and is not debt: it i
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
 `RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
+The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
+A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
+`manager-availability-*` is written by `ModifierPillSelect` and by six manager views at 37 further sites, one of which renders the family's pill row outside any `ModifierPillSelect` at all, so rooting those rules at a class only the primitive emits would un-style every one of them.
+Such a family stays app-rooted, recorded with the change that converts the callers, until that change lands — which for this one is issue 1515.
 
 The rule governs SELECTOR ROOTING and does not reach a bare-element baseline an area declares for itself.
 A shared primitive nonetheless MUST NOT depend on one, for the same reason it must not read an area-scoped property: `.fabricate-manager input:not([type])` themes every free-text control in the manager, and a primitive relying on it renders Foundry's default chrome everywhere else.
@@ -179,7 +198,21 @@ The two re-rooted button families do exactly that. `.fabricate-manager button, .
 WHERE that rule is ROOTED is part of the requirement rather than a formatting choice, because a bare-element baseline is a FLOOR and not an override.
 It is declared at the FAMILY ROOT ALONE — high enough to beat the user agent's own button font in a host that declares nothing, and deliberately too low to beat a caller's per-site rule on a class the primitive merely passes through.
 Written at the family's own compound specificity it instead TIES every such rule and wins on source order against each one declared earlier in the sheet: that is how issue 1502's first attempt silently deleted the recipe row's `manager-recipe-lock` and `manager-recipe-edit` 0.68rem and rendered both glyphs 28.7% larger.
+The FAMILY ROOT ALONE is the button families' form of a rule that generalises on RANK: a floor is written at the LOWEST specificity that reaches the control the family owns.
+Where the family root IS the control, that is the root alone, (0,1,0) — `ManagerButton`, `IconButton` and `StatusToggle`.
+Where the root is NOT the control, it is the family root PLUS the bare element the family owns, (0,1,1) — `Field`, `ManagerSearchField` and `ChanceSlider`, each of which roots a wrapper around an `input`, a `select` or a `textarea` that is the control it owns.
+Both forms sit below a caller's per-site class rule at (0,2,0), which is the property the recipe-browser regression established, so the requirement is the SPECIFICITY BOUND and not the literal selector shape.
+CONTENT follows from rank.
+A floor at (0,1,1) TIES the area's own bare-element baseline rather than losing to it, so it declares ONLY declarations that baseline also declares — `font: inherit`, and nothing else.
+Any declaration it carried that the baseline does not is a real move inside the area it ties, which is the opposite of a floor.
+Chrome an area declares over an element-TYPED predicate is a SEPARATE rule that restates that predicate leg for leg at its own rank, and never a widened floor.
+Written over `:is(input, select, textarea)`, `appearance` and `min-height` reach the radios, ranges, steppers and selects the area's own predicate deliberately excludes, and neither can be undone by a higher-specificity `height` or `appearance` rule further down.
+POSITION is the third axis, and at (0,1,1) it is load-bearing in a way it is not at (0,1,0).
+A floor that TIES every LATER same-rank rule in its area also beats each of them on source order, and `font` is a shorthand that resets `line-height` with the rest.
+So the floor is declared at the first position from which no rule it did not previously beat now loses to it, which on this sheet is immediately below the area baseline: `.fabricate-manager textarea { line-height: 1.4 }` and the `@supports (appearance: base-select)` form of `.fabricate-manager select { line-height: 1 }` each restate a `font` longhand at that same rank, further down.
 The `line-height` is not left to the shorthand either. `font` is a shorthand, so it resets line-height along with the rest — to the inherited value in the `inherit` form, to `normal` otherwise — and the block that declares `line-height: 1` is the MORE SPECIFIC of the two, so that block is what resolves in any engine and the ordering of the two is corroboration rather than the mechanism.
+That is the (0,1,0) case, where the two ranks differ and specificity settles it.
+Where the ranks TIE, position carries the same duty on its own, and the floor must be declared where no same-rank restatement of a `font` longhand is left below it.
 `box-sizing` needed nothing, because that same block already declared it.
 
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
@@ -191,6 +224,17 @@ The module pair is (0,2,1) and a family pair is (0,2,0), so wherever a Fabricate
 The strip half is declared ABOVE the repaint, because the two tie on specificity and a keyboard-focused control matches both.
 Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
+A family that ALREADY declares its own pair re-roots that pair IN PLACE, at unchanged specificity and unchanged declarations, rather than adding a second one at the family root.
+`StatusToggle`'s pair is at (0,3,0) and its repaint carries a `box-shadow: none` the module repaint does not; both survive the re-root unchanged, and a second pair at the root would have been a new rule rather than the same rule moved.
+`Field` is the second instance of the scoping rule the pager's `select` states above.
+Its pair covers `input` and `textarea` and excludes `select`, because at (0,2,1) a `select` leg would tie `.fabricate-app select:focus-visible` and win on source order, deleting the inset ring that exists precisely because an outset outline on a select is clipped.
+The STRIP half is declared on the element that can TAKE focus, which is not always the element the repaint paints.
+A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
+
+A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
+`ManagerToolbar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
+A family rule that nonetheless REACHES a caller's control travels with the family: the toolbar's `select.is-size-38` rung re-roots with the rest of its family and paints a caller's select in a bare host with no floor beneath it.
+That is a recorded residue, and not a licence to declare a floor for a control the family does not own.
 
 #### Scenario: A primitive is adopted by a second application
 

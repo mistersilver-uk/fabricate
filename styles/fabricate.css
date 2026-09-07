@@ -1439,6 +1439,41 @@
   font: inherit;
 }
 
+/* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issue 1508).
+
+   `Field`, `ManagerSearchField` and `ChanceSlider` are rooted at the class each of them emits, so
+   all three now render in hosts carrying no `.fabricate-manager` — and the control each owns is a
+   bare `<input>`, `<select>` or `<textarea>` that would otherwise take Foundry's own font there.
+   Where a family root IS the control the floor is written at that root alone, (0,1,0), as the two
+   button families' and `StatusToggle`'s are; where the root is NOT the control it is written at
+   the family root plus the bare element it owns, (0,1,1) — the SAME rank as the baseline above,
+   which it therefore TIES and beats on source order with that baseline's own declaration.
+
+   The slider's member covers BOTH inputs it owns — the `type="number"` half and the `type="range"`
+   track — because `input` names the element rather than a type, and both are the primitive's own.
+
+   `font: inherit` AND NOTHING ELSE, because a tie is not a loss: any declaration this rule
+   carries that the baseline does not is a real move inside the manager. `appearance` and
+   `min-height` are the two the family would like and cannot have — neither can be undone by a
+   higher-specificity `height` or `appearance` rule, and the block below refuses both in prose.
+   Field's own element-typed chrome is a SECOND rule, in Field's own block, restating that
+   block's element predicate leg for leg.
+
+   POSITION IS LOAD-BEARING, and this group sits here rather than in either family's own block
+   for a measured reason. `font` is a SHORTHAND and resets `line-height` with the rest, and at
+   (0,1,1) this rule ties every LATER same-rank rule in the area as well. Two of those restate a
+   `font` longhand for controls these floors reach: `.fabricate-manager textarea
+   { line-height: 1.4 }` at `styles/fabricate.css:1541-1545`, in the free-text baseline block just
+   below, and `.fabricate-manager select { line-height: 1 }` at `:1667-1674`, inside `@supports
+   (appearance: base-select)`. Declared in a family block thousands of lines further down, this
+   group would win both and silently re-type every manager textarea and select. Immediately below
+   the baseline is the first position from which the interval walk comes back empty. */
+.fabricate-field :is(input, select, textarea),
+.fabricate-search input,
+.fabricate-slider input {
+  font: inherit;
+}
+
 /*
   PERMANENT baseline for free-text controls in the manager (issue 643).
 
@@ -1516,7 +1551,7 @@
   did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
   Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
   against these surfaces rather than as a missing border. Selects were themed
-  per-container instead — `.fabricate-manager .manager-field select` (further down this
+  per-container instead — `.fabricate-field.manager-field select` (further down this
   file) — so a select that leaves a `.manager-field` and carries only `.manager-input`
   reverted, exactly as the note on that rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
   found it: both sit in a revealed input strip rather than a field wrapper, and both painted
@@ -1545,7 +1580,7 @@
   Specificity is (0,1,1) — one step below the (0,2,1) of the group above, and below every
   per-control select rule in this file — so this only ever paints a select that nothing else
   claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
-  to `.fabricate-manager .manager-field select:disabled` (0,2,2).
+  to `.fabricate-field.manager-field select:disabled` (0,2,2).
 */
 
 /* skin census (issue 1523): not an adopter — an element-level baseline with no class; its
@@ -2463,7 +2498,7 @@
    order. The prototype's card carries NO padding of its own: its head and body each own
    theirs, which is what lets the head sit flush at the top and the tier list run to the
    card's own edge. */
-.fabricate-manager .manager-inspector-card.manager-checks-card {
+.fabricate-card.manager-inspector-card.manager-checks-card {
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -3373,7 +3408,7 @@
 
 /* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same
    drawing — and adds only that there is nothing to press. */
-.fabricate-manager .manager-status-toggle.is-locked {
+.fabricate-toggle.manager-status-toggle.is-locked {
   cursor: default;
 }
 
@@ -5480,7 +5515,7 @@
 }
 
 .fabricate-manager .manager-section-header,
-.fabricate-manager .manager-toolbar {
+.fabricate-filter-bar.manager-toolbar {
   min-width: 0;
   padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
@@ -5493,7 +5528,7 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-toolbar {
+.fabricate-filter-bar.manager-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -5501,7 +5536,7 @@
   background: var(--fab-overlay-light-03);
 }
 
-.fabricate-manager .manager-toolbar:not(:has(.manager-toolbar-primary)) {
+.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -5528,7 +5563,7 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-search {
+.fabricate-search.manager-search {
   position: relative;
   flex: 1 1 260px;
   min-width: 180px;
@@ -5544,7 +5579,7 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-search input {
+.fabricate-search.manager-search input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -5553,6 +5588,27 @@
   border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
+}
+
+/* THE SEARCH FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-button:focus`: core's `input:focus` paints an orange outline and a 4px glow that
+   the module reset removes inside every Fabricate window, and this family now renders in hosts
+   that have no Fabricate root at all. The declarations are the module strip's verbatim, so
+   nothing moves where that reset already reaches. Written ABOVE the repaint because the two
+   halves tie at (0,2,1) and a keyboard-focused input matches both, so source order decides. */
+.fabricate-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE SEARCH FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the
+   module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so
+   this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host,
+   where a primitive leaning on the module ring would render none. ONE member, over the `<input>`
+   this family owns — the ring-root recogniser reads `<root> <element>:focus-visible`. */
+.fabricate-search input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-filter select {
@@ -5659,7 +5715,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-manager .manager-search > i {
+.fabricate-search.manager-search > i {
   position: absolute;
   top: 50%;
   left: 11px;
@@ -7549,6 +7605,26 @@
   cursor: default;
 }
 
+/* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, at the family root ALONE (issue 1508). The switch's
+   root IS its control — a `<button>`, a `<label>` or a `<span role="img">` — so the floor is
+   written at (0,1,0), the same rank and the same shape the two button families' floor takes.
+   That is enough to beat the UA button font in a host that declares nothing, and deliberately
+   NOT enough to beat a caller's own per-site rule at (0,2,0) or the family's own
+   `.manager-status-toggle-label` type at (0,2,0) below.
+
+   Inside the manager it restates the area's own bare-element baseline
+   (`.fabricate-manager button, … textarea { font: inherit }`, near the top of this file, (0,1,1))
+   and is a no-op, because that baseline out-ranks it and declares the identical value. Its
+   position is therefore free, and it sits with the family it belongs to rather than in the
+   (0,1,1) floor group above — that group's position is load-bearing precisely because those
+   members TIE the area baseline, and this one does not.
+
+   `font: inherit` AND NOTHING ELSE, for the reason the group above states: any declaration the
+   area baseline does not also carry would be a real move inside the manager. */
+.fabricate-toggle {
+  font: inherit;
+}
+
 /* Switch (issue 643). The state colour now lives on the TRACK, and the button
    itself is a bare flex row rather than a tinted pill — so the control reads as a
    switch rather than a badge, and the row it sits in stays calm. The `is-on` /
@@ -7558,7 +7634,7 @@
    Off is NEUTRAL (bg-3 / border-strong), not amber: a disabled recipe, component
    or environment is an ordinary state, not a warning. `is-danger` keeps its tint,
    because a delete-on-depletion toggle genuinely is one. */
-.fabricate-manager .manager-status-toggle {
+.fabricate-toggle.manager-status-toggle {
   --fab-toggle-track: var(--fab-bg-3);
   --fab-toggle-track-border: var(--fab-border-strong);
   --fab-toggle-knob: var(--fab-text-secondary);
@@ -7603,13 +7679,13 @@
    position a raised neutral track with a SUBTLE knob: one hue, and the lit state is the loud
    one. `is-danger` below keeps its own family, because a delete-on-depletion toggle genuinely
    is a hazard. */
-.fabricate-manager .manager-status-toggle.is-on {
+.fabricate-toggle.manager-status-toggle.is-on {
   --fab-toggle-track: var(--fab-accent);
   --fab-toggle-track-border: var(--fab-accent-border);
   --fab-toggle-knob: var(--fab-on-accent);
 }
 
-.fabricate-manager .manager-status-toggle.is-off {
+.fabricate-toggle.manager-status-toggle.is-off {
   --fab-toggle-track: var(--fab-surface-raised);
   --fab-toggle-track-border: var(--fab-border);
   --fab-toggle-knob: var(--fab-text-subtle);
@@ -7620,7 +7696,7 @@
 /* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
    alongside `is-on` so the irreversible-delete signal lands on the toggle itself
    (the adjacent `manager-chip is-danger` alert reinforces it). */
-.fabricate-manager .manager-status-toggle.is-danger {
+.fabricate-toggle.manager-status-toggle.is-danger {
   --fab-toggle-track: var(--fab-danger);
   --fab-toggle-track-border: var(--fab-danger-border);
   --fab-toggle-knob: var(--fab-on-accent);
@@ -7642,17 +7718,17 @@
    could throw. `:disabled` cannot match a span and `.is-disabled` would be the wrong claim
    about it (nothing is disabled; there is nothing to press), so the state is excluded by
    name. */
-.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
+.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
   border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
   background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }
 
-.fabricate-manager .manager-status-toggle:focus {
+.fabricate-toggle.manager-status-toggle:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-status-toggle:focus-visible {
+.fabricate-toggle.manager-status-toggle:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
   box-shadow: none;
@@ -7661,7 +7737,7 @@
 /* 34x20 track, 14x14 knob inset 2px — the knob travels 34 - 2 - 14 - 2 = 16px,
    i.e. left:2px -> left:16px. Animated with `transform`, not `left`: it is the
    same visual travel without laying out on every frame. */
-.fabricate-manager .manager-status-toggle-track {
+.fabricate-toggle .manager-status-toggle-track {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -7675,7 +7751,7 @@
   transition: background-color 150ms ease, border-color 150ms ease;
 }
 
-.fabricate-manager .manager-status-toggle-knob {
+.fabricate-toggle .manager-status-toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -7686,11 +7762,11 @@
   transition: transform 150ms ease, background-color 150ms ease;
 }
 
-.fabricate-manager .manager-status-toggle.is-on .manager-status-toggle-knob {
+.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob {
   transform: translateX(14px);
 }
 
-.fabricate-manager .manager-status-toggle-label {
+.fabricate-toggle .manager-status-toggle-label {
   min-width: 0;
   overflow: hidden;
   color: inherit;
@@ -9780,7 +9856,23 @@
    clause in that suite is a WRAP guard the direction button's own `min-height: 34px` keeps
    green whatever happens here, so it could never have been the proof. The CI-armed half is a
    sheet-text clause in `manager-layout.test.js`, because that suite skips itself whole without
-   a harvested Foundry chrome. */
+   a harvested Foundry chrome.
+
+   AND IT IS THE ONE FILTER-BAR RULE ISSUE 1508 LEFT APPLICATION-ROOTED — the family's named
+   residue, recorded here rather than in a ledger nobody reads beside the rule. The other five
+   `.manager-toolbar` rules are rooted at `.fabricate-filter-bar`, the class `ManagerToolbar`
+   emits; this one cannot be, because the family compound stands THIRD, behind an ATTRIBUTE
+   ancestor that is not the application root. The root at position one would match nothing (it
+   sits on the bar, a DESCENDANT of the attributed element), and dropping `.fabricate-manager`
+   would leave the first compound with no namespace class at all. The rewrite the three
+   Tools-browser search rules took — name the caller's container by a class the caller writes on
+   that same element — is not available either: `[data-scoped-page='world-vocabulary']` is written
+   by the manager ROUTE, not by a caller container carrying a class of its own. The rule trips no
+   assertion in either state, because `manager-scoped-list-toolbar` is not a class the primitive
+   writes, so `isPrimitiveOwned` classes the selector CALLER-owned and neither the gated nor the
+   rootless clause of `tests/components/searchable-popover-area-scope.test.js` sees it. Its rank
+   is (0,4,1) here and would be (0,4,1) re-rooted, so nothing about specificity is at stake. It
+   retires with the rest of the `manager-*` names in issue 1507. */
 .fabricate-manager
   [data-scoped-page='world-vocabulary']
   .manager-toolbar.manager-scoped-list-toolbar
@@ -9944,7 +10036,7 @@
   min-height: 0;
 }
 
-.fabricate-manager .manager-field.span-2 {
+.fabricate-field.manager-field.span-2 {
   grid-column: 1 / -1;
 }
 
@@ -10028,7 +10120,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field {
+.fabricate-field.manager-field {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
@@ -10038,7 +10130,7 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-field.is-wide {
+.fabricate-field.manager-field.is-wide {
   grid-column: 1 / -1;
 }
 
@@ -10505,9 +10597,46 @@
    lists. A retired selector kept in a list nothing emits is dead CSS the block-granular
    dead-class gate cannot see, because the block's other selectors are live. */
 
+/* FIELD'S OWN ELEMENT-TYPED CHROME (issue 1508), and it is a SECOND rule rather than a widened
+   floor. The font floor near the top of this file declares `font: inherit` alone at (0,1,1);
+   these three declarations are NOT safe at that rank over `:is(input, select, textarea)`. Written
+   that way they take the resolution and tool-bonus radios inside a `<Field as="fieldset">` from
+   16px to 34, the gathering EVENT editor's Drop-rate range input from 28 to 34, that field's
+   number input likewise, and a `.fab-stepper-input` in any field from 22 to 34 — and, on a
+   `<select>`, `appearance: none` at (0,1,1) written later beats `@supports (appearance:
+   base-select)`'s `.fabricate-manager select` on source order and deletes the dropdown arrow this
+   file refuses to delete a few hundred lines above.
+
+   So it restates the area baseline's OWN element predicate LEG FOR LEG — six `input` legs at
+   (0,2,1) and `textarea` at (0,1,1), each leg the same rank as its donor leg in
+   `.fabricate-manager input[type="text"], … .fabricate-manager textarea` — and carries only that
+   block's `appearance`, `-webkit-appearance` and `min-height`. The exclusions cannot be spelled
+   with `:not()` on the floor instead: every `:not()` adds to the class column, so
+   `:is(input, textarea):not(.fab-stepper-input):not([type='radio']):not([type='range'])` is
+   (0,4,1) and would beat the per-site (0,2,0) rules the floor contract exists to stay under.
+
+   A `<select>` in a Field keeps the area's own `appearance` and therefore has Foundry's chrome in
+   a bare host — a stated residue on the same basis as its focus-ring residue (issue 1510).
+
+   Declared HERE, immediately above the family's own control chrome, because that is the first
+   position from which the interval walk comes back empty: the 36px `height` below and the 92px
+   textarea `min-height` further down both out-rank this rule at the elements they reach, and both
+   re-root with the family. */
+.fabricate-field input[type="text"],
+.fabricate-field input[type="url"],
+.fabricate-field input[type="email"],
+.fabricate-field input[type="tel"],
+.fabricate-field input[type="password"],
+.fabricate-field input:not([type]),
+.fabricate-field textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 34px;
+}
+
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
    (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
-   `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
+   `.fabricate-field.manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
    rows dodge this only by not living in a `.manager-field`. Excluding the stepper here
@@ -10536,9 +10665,9 @@
 
    Safe to exclude wholesale: `ChanceSlider.svelte` is the only source of a `type="range"`
    input in the codebase, and it always wants a transparent, unpadded control. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select,
-.fabricate-manager .manager-field textarea {
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field select,
+.fabricate-field.manager-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -10548,18 +10677,54 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood
-   36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
-.fabricate-manager .manager-field select {
+   36px tall with 8px of side padding instead of the 28px/0 the control asks for.
+
+   retired height: sweep — 36 is a RETIRED rung (the ladder is 26, 28, 30, 34, 38, 44). It is
+   re-rooted here at its measured value, byte-identical, rather than moved: issue 1523 owns the
+   sweep that puts this field on a live rung, and re-cutting it inside a re-rooting change would
+   move the pixels that change exists to hold still. */
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-field select:disabled {
+.fabricate-field.manager-field select:disabled {
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
   opacity: 0.62;
+}
+
+/* THE FIELD FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-button:focus`: core paints every focused control with an orange outline and a 4px
+   glow, the module reset removes it inside every Fabricate window, and a family rooted at the
+   class it emits also renders in hosts that carry no Fabricate root at all. Declarations are the
+   module strip's verbatim. Written ABOVE the repaint because the two halves tie at (0,2,1).
+
+   ONE `:is()` member, deliberately, and the repaint below is TWO comma-separated legs: the two
+   halves are read by different recognisers — the strip register is an exact list of single
+   compounds, the ring-root register matches `<root> <element>:focus-visible` per member — so
+   neither form may be "unified" into the other. Both are asserted. */
+.fabricate-field :is(input, textarea):focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE FIELD FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the module
+   ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches;
+   what this is FOR is the bare host.
+
+   `input` AND `textarea` ONLY, and the exclusion of `select` is load-bearing.
+   `.fabricate-field :is(input, select, textarea):focus-visible` would be (0,2,1), TIE
+   `.fabricate-app select:focus-visible` near the top of this file and win on source order —
+   deleting the inset `box-shadow` ring that exists precisely because an outset outline on a
+   select is clipped by an overflow-clipped container. A select in a Field keeps the area ring
+   (issues 1504 and 1510). */
+.fabricate-field input:focus-visible,
+.fabricate-field textarea:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-recipe-steps-list {
@@ -12767,13 +12932,13 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-field textarea {
+.fabricate-field.manager-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
-.fabricate-manager .manager-field small,
+.fabricate-field.manager-field small,
 .fabricate-manager .manager-feature-tile small {
   color: var(--fab-text-muted);
   font-size: 0.76rem;
@@ -12867,7 +13032,7 @@
 
 .fabricate-manager .manager-nav,
 .fabricate-manager .manager-rail-block,
-.fabricate-manager .manager-inspector-card {
+.fabricate-card.manager-inspector-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -13611,7 +13776,7 @@
   background: var(--fab-warning);
 }
 
-.fabricate-manager .manager-inspector-card {
+.fabricate-card.manager-inspector-card {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
@@ -14984,7 +15149,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-search.is-compact {
+.fabricate-search.manager-search.is-compact {
   width: min(220px, 30%);
   min-height: 32px;
 }
@@ -15524,21 +15689,21 @@
   display: block;
 }
 
-.fabricate-manager .manager-drop-rate-value {
+.fabricate-slider.manager-drop-rate-value {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-drop-rate-percent {
+.fabricate-slider .manager-drop-rate-percent {
   position: relative;
   display: block;
   color: var(--fab-text);
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
+.fabricate-slider .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   width: 100%;
   min-width: 0;
   height: 28px;
@@ -15579,8 +15744,8 @@
   positioned at `right: 6px` over the padding this reserves; the spinner used to draw
   underneath it.
 */
-.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
-.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
@@ -15593,7 +15758,7 @@
   box-shadow: none;
 }
 
-.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"] {
+.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
   right: 6px;
   top: 50%;
@@ -15601,7 +15766,7 @@
   transform: translateY(-50%);
 }
 
-.fabricate-manager .manager-drop-rate-control {
+.fabricate-slider .manager-drop-rate-control {
   --fab-drop-rate-value: 1%;
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
   --fab-chance-slider-track-gradient: var(--fab-drop-rate-color);
@@ -15613,35 +15778,35 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-drop-rate-control.is-guaranteed {
+.fabricate-slider .manager-drop-rate-control.is-guaranteed {
   --fab-drop-rate-color: var(--fab-drop-rate-guaranteed);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-common {
+.fabricate-slider .manager-drop-rate-control.is-common {
   --fab-drop-rate-color: var(--fab-drop-rate-common);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-uncommon {
+.fabricate-slider .manager-drop-rate-control.is-uncommon {
   --fab-drop-rate-color: var(--fab-drop-rate-uncommon);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-rare {
+.fabricate-slider .manager-drop-rate-control.is-rare {
   --fab-drop-rate-color: var(--fab-drop-rate-rare);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-very-rare {
+.fabricate-slider .manager-drop-rate-control.is-very-rare {
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-legendary {
+.fabricate-slider .manager-drop-rate-control.is-legendary {
   --fab-drop-rate-color: var(--fab-drop-rate-legendary);
 }
 
-.fabricate-manager .manager-drop-rate-control.is-none {
+.fabricate-slider .manager-drop-rate-control.is-none {
   --fab-drop-rate-color: var(--fab-drop-rate-none);
 }
 
-.fabricate-manager .manager-drop-rate-track {
+.fabricate-slider .manager-drop-rate-track {
   position: absolute;
   left: var(--fab-chance-slider-thumb-radius);
   right: var(--fab-chance-slider-thumb-radius);
@@ -15656,19 +15821,19 @@
   transform: translateY(-50%);
 }
 
-.fabricate-manager .manager-drop-rate-fill {
+.fabricate-slider .manager-drop-rate-fill {
   display: block;
   width: var(--fab-drop-rate-value);
   height: 100%;
   background: var(--fab-drop-rate-color);
 }
 
-.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
+.fabricate-slider .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
   width: 100%;
   background: var(--fab-chance-slider-track-gradient);
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"] {
+.fabricate-slider .manager-drop-rate-control input[type="range"] {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
@@ -15684,14 +15849,14 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: 14px;
@@ -15702,25 +15867,48 @@
   background: var(--fab-drop-rate-color);
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-track {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-progress {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-progress {
   height: 6px;
   border-radius: 999px;
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border: 2px solid var(--fab-bg-1);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
+}
+
+/* THE SLIDER FAMILY'S STRIP HALF (issue 1508), for the reason spelled out on
+   `.fabricate-search input:focus`: core's `input:focus` paints an orange outline and a 4px glow
+   that the module reset removes inside every Fabricate window, and this family now renders in
+   hosts that have no Fabricate root at all. The declarations are the module strip's verbatim, so
+   nothing moves where that reset already reaches. ONE member over the bare `input` this family
+   owns, which is both of them — the `type="number"` half and the `type="range"` track. Written
+   ABOVE the repaint because the two halves tie at (0,2,1) and a keyboard-focused input matches
+   both, so source order decides. */
+.fabricate-slider input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE SLIDER FAMILY'S OWN KEYBOARD RING (issue 1508). Declarations copied verbatim from the
+   module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so
+   this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host,
+   where a primitive leaning on the module ring would render none. ONE member, in the
+   `<root> <element>:focus-visible` shape the ring-root recogniser reads. */
+.fabricate-slider input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
@@ -16498,8 +16686,8 @@
   max-width: 160px;
 }
 
-.fabricate-manager .manager-status-toggle.is-disabled,
-.fabricate-manager .manager-status-toggle:disabled {
+.fabricate-toggle.manager-status-toggle.is-disabled,
+.fabricate-toggle.manager-status-toggle:disabled {
   cursor: not-allowed;
 }
 
@@ -16939,7 +17127,7 @@
   }
 
   .fabricate-manager .manager-toolbar-primary,
-  .fabricate-manager .manager-toolbar:not(:has(.manager-toolbar-primary)),
+  .fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)),
   .fabricate-manager .manager-header-actions,
   .fabricate-manager .manager-action-group {
     justify-content: flex-start;
@@ -16955,11 +17143,11 @@
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-search.is-compact {
+  .fabricate-search.manager-search.is-compact {
     width: 100%;
   }
 
-  .fabricate-manager .manager-search {
+  .fabricate-search.manager-search {
     flex-basis: 100%;
   }
 
@@ -18272,13 +18460,13 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-tool-setting-toggle {
+.fabricate-toggle.manager-tool-setting-toggle {
   position: relative;
   flex: 0 0 34px;
   width: 34px;
 }
 
-.fabricate-manager .manager-tool-setting-toggle-input {
+.fabricate-toggle .manager-tool-setting-toggle-input {
   position: absolute;
   z-index: 1;
   inset: 2px 0 auto;
@@ -18289,7 +18477,30 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible) {
+/* THE STRIP HALF OF THE CHECKBOX HOST'S PAIR (issue 1508), written on the element that can
+   actually TAKE focus. The repaint below is a `:has()` ring on the `<label>` host, and a label
+   never matches `:focus` at all, so the strip cannot be written on the same element the ring
+   paints: it goes on the transparent `<input type="checkbox">` the label wraps, which is what
+   the pointer and the keyboard both land on.
+
+   RECORDED WITH IT, because it changes how this pair should be read: that input is
+   `opacity: 0` (its own block above), so NEITHER Foundry core's focus treatment nor this strip
+   is visible on it. The pair is declared because the requirement is about the PAIR — a family
+   that repaints a focus ring declares the strip that removes what it is repainting over — and
+   because the ring on the host is real chrome that now travels to a bare host. Declared
+   immediately above the repaint: the two do not tie (the strip is (0,3,0) and the repaint
+   (0,4,0)), and the ordering is the family convention rather than a cascade requirement.
+
+   WHAT IT DOES MOVE, stated because the interval walk for it is not empty: at (0,3,0) this strip
+   beats the module's own `.fabricate input:focus-visible` ring (0,2,1) on this input, where that
+   ring wins today. On an `opacity: 0` element that is zero pixels, and the ring a keyboard user
+   sees is the host's `:has()` repaint below, which nothing here touches. */
+.fabricate-toggle .manager-tool-setting-toggle-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-toggle.manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible) {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
@@ -19307,7 +19518,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field.is-disabled {
+.fabricate-field.manager-field.is-disabled {
   opacity: 0.6;
 }
 
@@ -22378,7 +22589,7 @@
    sheet, so the column, its gap and the caption's kicker treatment are inherited rather than
    restated. Only the two trailing lines are this component's, and they are the specimen's
    `k-hint` and `k-err` exactly. Both are declared DIRECTLY on the span, which is why they beat
-   the 0.82rem/700 `.fabricate-manager .manager-field` hands its children by inheritance
+   the 0.82rem/700 `.fabricate-field.manager-field` hands its children by inheritance
    whatever the two selectors' specificities are. */
 .fabricate-select-note {
   color: var(--fab-text-subtle);
@@ -23249,7 +23460,32 @@
   padding-right: var(--fab-space-3);
 }
 
-.fabricate-manager [data-manager-tools-search] .manager-search {
+/* THE ANCESTOR IS NAMED BY ITS CLASS, NOT BY ITS ATTRIBUTE (issue 1508).
+
+   These three rules — this one, the input's own type below it, and the icon's — used to read
+   `.fabricate-manager [data-manager-tools-search] .manager-search…`. The search family is now
+   rooted at the class `ManagerSearchField` emits, and the leading-position mechanism expresses
+   none of the three: the root sits on the family element, a DESCENDANT of the attributed one,
+   so a root at position one matches nothing, and dropping the application root leaves the first
+   compound with no namespace class at all.
+
+   So the caller's own container is named by a class the caller writes ON THAT SAME ELEMENT.
+   The match set is identical, and that is measured rather than argued:
+   `data-manager-tools-search` occurs on exactly two elements repo-wide —
+   `ToolsBrowserView.svelte:492` and `tool-rules-list-parity.test.js:187` — and BOTH carry
+   `manager-tools-library-card`; the class's only other two carriers
+   (`ToolsBrowserView.svelte:575`, `tool-rules-list-parity.test.js:200`, both
+   `data-manager-tools-browser`) contain no `.manager-search`, because that file's single
+   `<ManagerSearchField>` is at `:493` inside this search card. Rank is unchanged for each —
+   this rule (0,3,0), the input and the icon (0,3,1) — the position is unchanged, and the
+   declarations are byte-identical. `tool-rules-list-parity.test.js` measures the input's 11.5px
+   /500 type, 30px height and 8px radius on its own fixture, so the rewrite is CI-armed.
+
+   These stay APPLICATION-ROOTED on purpose: this is the Tools browser's own override of a
+   search field inside its library card — caller chrome under the exemption
+   `openspec/specs/design-system/spec.md` already grants — expressed in the form the area-scope
+   detector reads. `ToolsBrowserView.svelte`'s own scoped block keeps the attribute. */
+.fabricate-manager .manager-tools-library-card .manager-search {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -23269,7 +23505,7 @@
    The FILL is the design's translucent surface token rather than the opaque `--fab-bg-1` the
    shared rule paints; the `<select>` beside it keeps the opaque one, and its own block says
    why. 32 takes the nearest surviving ladder rung — see the segment block above. */
-.fabricate-manager [data-manager-tools-search] .manager-search input {
+.fabricate-manager .manager-tools-library-card .manager-search input {
   height: 30px;
   border-radius: 8px;
   background: var(--fab-surface-soft);
@@ -23278,7 +23514,7 @@
 }
 
 /* `proto:2511`: `font-size: 10px; color: var(--subtle)`. */
-.fabricate-manager [data-manager-tools-search] .manager-search > i {
+.fabricate-manager .manager-tools-library-card .manager-search > i {
   color: var(--fab-text-subtle);
   font-size: 10px;
 }
@@ -26598,13 +26834,13 @@
    turn core's fixed `button { height: var(--button-size) }` into a floor, and a `height` here
    would put the fixed box straight back. (0,4,0) beats the trigger's own toolbar rung at (0,2,0)
    on specificity, so the rule's position in this file is not load-bearing. */
-.fabricate-manager .manager-search.is-size-38 input {
+.fabricate-search.manager-search.is-size-38 input {
   height: 38px;
   border-radius: 9px;
 }
 
 .fabricate-manager .manager-filter.is-size-38 select,
-.fabricate-manager .manager-toolbar select.is-size-38 {
+.fabricate-filter-bar.manager-toolbar select.is-size-38 {
   height: 38px;
   border-radius: 9px;
 }

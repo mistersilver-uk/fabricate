@@ -94,17 +94,25 @@ const RADIO_OPTIONS = Object.freeze([
 ]);
 
 /**
- * The exact class string the `<fieldset>` carried before the conversion, in source order.
+ * The exact class string the `<fieldset>` carries, in source order.
  *
- * `manager-field` first because that is where the hand-written attribute put it, and
- * `is-config-cards` last because it arrived through a `class:` directive, which Svelte appends
- * after the static attribute. The primitive PREPENDS `manager-field` to whatever the caller
- * passes, so the order survives — and this constant is what says so out loud.
+ * `is-config-cards` is last because it arrived through a `class:` directive, which Svelte appends
+ * after the static attribute. The primitive PREPENDS its family ROOT and then the hook class to
+ * whatever the caller passes — `fabricate-field manager-field …` since issue 1508 rooted the
+ * family at the class it emits — so the caller's own order survives behind them, and these two
+ * constants are what say so out loud.
+ *
+ * THEY ARE ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM. Every other reader of
+ * `fabricate-field` is SOURCE TEXT — the area-scope gate reads the `$derived` array, the
+ * host-independence fixtures write the class as a literal — so a `Field` that declared the array
+ * and stopped rendering `class={classes}` would pass all of them while every re-rooted rule
+ * matched nothing. The two `getAttribute('class')` equalities below mount the component and
+ * compare the WHOLE string, which is the one reader that catches it.
  */
 const RADIO_CLASS_CONFIG_CARDS =
-  'manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
+  'fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
 const RADIO_CLASS_PLAIN =
-  'manager-field is-wide manager-resolution-mode-card manager-radio-card-group';
+  'fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group';
 
 before(async () => {
   await vocabularyHarness.setup();

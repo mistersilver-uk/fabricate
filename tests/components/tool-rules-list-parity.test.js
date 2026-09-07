@@ -170,7 +170,7 @@ const LIST_SCREEN = `
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main" data-tool-library data-probe="pane">
       <div class="manager-tools-main-content" data-probe="toolbar-stack">
-        <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
+        <section class="fabricate-card manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
           <div class="manager-tools-authority-heading">
             <span><i class="fas fa-sliders"></i></span>
             <div class="manager-tools-authority-title">
@@ -185,7 +185,7 @@ const LIST_SCREEN = `
           </div>
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
-          <label class="manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+          <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
           <div class="manager-tools-membership-filter" role="radiogroup" data-tool-membership-filter="in">
             <label class="is-selected"><input type="radio" name="b" checked><span>In this system (3)</span></label>
             <label><input type="radio" name="b"><span>All world tools (11)</span></label>
@@ -212,7 +212,7 @@ const LIST_SCREEN = `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -369,7 +369,7 @@ function inspectorColumn(sections, footState) {
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
@@ -412,6 +412,58 @@ const READ_PINNED_BAND = () => {
     hits: [2, 8, 14].map((above) => topmostAt(above)),
   };
 };
+
+test('the Tools browser writes ONE search field, and it is inside the search card', () => {
+  // THE FIXTURE ABOVE IS A COPY, AND THIS IS THE DRIFT GUARD BESIDE IT. `LIST_SCREEN` writes
+  // two `.manager-tools-library-card` sections and one `.manager-search` by hand, so it goes on
+  // measuring the same three rules however the real view is edited. This clause reads the SOURCE.
+  //
+  // WHAT IT PROTECTS. Issue 1508 rewrote the Tools browser's three overrides from
+  // `[data-manager-tools-search] .manager-search…` to
+  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:23488`, `:23508`,
+  // `:23517`), on a measured premise: `data-manager-tools-search` and
+  // `.manager-tools-library-card` select the SAME `.manager-search` in this tree, because the
+  // view writes exactly one search field and writes it inside the search card. A SECOND search
+  // field anywhere under a `.manager-tools-library-card` — in the browser card, say — would take
+  // all three rules, where the retired attribute form would have reached none of them. That is a
+  // real geometry change (30px height, 8px corner, 11.5px/500 type) arriving silently, so the
+  // rewrite has to be RE-DECIDED rather than quietly widened.
+  const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+  const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');
+  const styleAt = source.indexOf('<style>');
+  const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
+
+  const fields = [...markup.matchAll(/<ManagerSearchField(?![\w-])/gu)];
+  assert.equal(
+    fields.length,
+    1,
+    `ToolsBrowserView renders ${fields.length} \`<ManagerSearchField>\`, not one. Every extra ` +
+      'one under a `.manager-tools-library-card` takes the three rewritten Tools-browser rules, ' +
+      'which the retired `[data-manager-tools-search]` form would not have reached. Re-decide ' +
+      'the rewrite — do not widen it by adding a field.'
+  );
+
+  const cards = [...markup.matchAll(/<section class="manager-tools-library-card"([^>]*)>/gu)];
+  assert.deepEqual(
+    cards.map((match) => match[1].trim()),
+    ['data-manager-tools-search', 'data-manager-tools-browser'],
+    'the class`s carriers in this view must be exactly the search card and the browser card, in ' +
+      'that order. A third carrier is a third container the rewritten rules now reach.'
+  );
+
+  const cardAt = cards[0].index;
+  const cardEnds = markup.indexOf('</section>', cardAt);
+  assert.ok(
+    cardEnds > cardAt,
+    'the search card`s `</section>` was not found, so the span below is not a span'
+  );
+  assert.ok(
+    fields[0].index > cardAt && fields[0].index < cardEnds,
+    'the one `<ManagerSearchField>` must sit INSIDE the `data-manager-tools-search` card. ' +
+      'Outside it the attribute form and the class form stop selecting the same field, which is ' +
+      'the premise the rewrite was measured on.'
+  );
+});
 
 test('the fixture layers the sheet the way Foundry does, or it proves nothing', async () => {
   // THE NON-VACUITY CHECK FOR THIS WHOLE FILE. Every measurement below rests on one claim:

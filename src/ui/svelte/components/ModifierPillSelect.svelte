@@ -10,6 +10,21 @@
 
   Controlled: it renders `options`/`selectedIds` and emits a single toggle via
   `onToggle(id, nextSelected)`; the parent owns the resulting set write.
+
+  `data-keyboard-focus="true"` is written on the pill REMOVE button, on the same side of
+  the element's attribute list as its `class` and before any spread (issues 1502 and 1508):
+  a spread that landed later would win, so a caller's `data-*` bag could unset the
+  attribute by accident. The remove button is a `<button>` outside a `<form>`, so while it
+  holds focus Foundry's `KeyboardManager#hasFocus` now answers true and Foundry's own
+  Space/arrow/Tab bindings stop firing — the intended behaviour change. The MENU button is
+  `SearchablePopover`'s trigger and already declares the attribute there, so it is not
+  restated here.
+
+  This component's own `manager-availability-*` family is deliberately NOT re-rooted by
+  issue 1508. Five manager views hand-write the same family at 37 further sites, one of
+  them outside any `ModifierPillSelect` at all, so rooting those rules at a class only this
+  primitive emits would un-style them; the re-root waits on the change that converts those
+  call sites (issue 1515).
 -->
 <script>
   import Field from './Field.svelte';
@@ -233,6 +248,7 @@
         <button
           type="button"
           class="manager-availability-remove"
+          data-keyboard-focus="true"
           {disabled}
           aria-label={`${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillRemove', 'Remove')} ${optionLabel(option)}`}
           data-modifier-pill-remove={option.id}

@@ -17,7 +17,6 @@
     "styles/fabricate.css | .fabricate-manager .manager-resolution-option input[type='radio']:checked:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-resolution-option input[type='radio']:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-scoped-list-identity:focus | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-status-toggle:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-system-identity:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-system-row:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-tool-bonus-row input[type='radio']:checked:focus | 1",
@@ -292,10 +291,7 @@
   ],
   "areaScopedStringUses": [
     "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | --fab-tool-breakage-chance-track-gradient | 1",
-    "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-chance-slider-track-gradient | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-color | 1",
-    "src/ui/svelte/components/ChanceSlider.svelte | --fab-drop-rate-value | 1"
+    "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1"
   ],
   "untranslatedNameDefaults": [
     "src/ui/svelte/apps/manager/EditorValidationSurface.svelte | viewLabel | View | 1",
@@ -422,10 +418,8 @@
     "src/ui/svelte/components/ImagePathPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPopover.svelte | 2",
-    "src/ui/svelte/components/ModifierPillSelect.svelte | 1",
     "src/ui/svelte/components/RowDisclosure.svelte | 1",
     "src/ui/svelte/components/SearchablePopover.svelte | 2",
-    "src/ui/svelte/components/StatusToggle.svelte | 1",
     "src/ui/svelte/components/Stepper.svelte | 2"
   ],
   "offLadderArtSizes": [
