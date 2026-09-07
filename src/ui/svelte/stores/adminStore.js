@@ -6022,7 +6022,7 @@ export function createAdminStore(services) {
   //
   // Issue 1371 r19-store2, the driver's ruling on the reviewer's round-5 finding 3. The RULE lives
   // in `systems/componentEssenceOverride.js`, not here, because this store is not its only caller:
-  // the standalone `SvelteComponentEditorApp` writes a component's essences too, and reaches
+  // `svelte/util/componentEditorSave.js` writes a component's essences too, and reaches
   // `CraftingSystemManager.updateItem` directly when it has no manager window to borrow this store
   // from. Two copies of "does this write override" is the drift the shared unit exists to prevent.
   // See that module for the rule, the per-pair refusal, the shadowing gate and the baseline the

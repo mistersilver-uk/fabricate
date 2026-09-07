@@ -653,7 +653,9 @@ The portal target and the coordinate origin MUST be the same element, because th
 A document-wide lookup for a root is worse rather than safer, since it finds that application wherever it is and portals the surface into a different window.
 The eligible roots are `.fabricate-manager` and `.fabricate-app`, and a root is eligible only while it is a POSITIONED element, because an absolutely positioned panel appended to a static one takes its containing block from somewhere else entirely.
 The list is TWO and stays two.
-Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the four windows joining the contract does not extend the eligible list.
+Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the windows joining the contract do not extend the eligible list.
+The component-editor half of that ruling is RETIRED rather than outstanding: the standalone component-editor window was orphaned — its only constructor call was a manager service nothing consumed, and three ratchets forbid restoring the call — so issue 1520 deleted the application instead of re-skinning it, and a deleted window adopts nothing.
+The interactables half stands and is the change's remaining obligation.
 A window that needs a root picks whichever of the two matches what it IS — a GM authoring surface or a play surface — rather than minting one for itself, because each new root is another ancestor a portal resolver must know about and another family a primitive can be accidentally scoped under.
 A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 

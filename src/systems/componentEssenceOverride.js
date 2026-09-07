@@ -15,19 +15,21 @@
  * FLAG first through `setSectionInherited`, the VALUES second, so a flag-only landing leaves the
  * system overriding rather than persisting a map the union masks.
  *
- * It lives here rather than inside `adminStore` because there are TWO entry points to a
- * system-scope component write and they must not be able to disagree: the manager's own store, and
- * the standalone `SvelteComponentEditorApp`, which reaches `CraftingSystemManager.updateItem`
- * directly when it has no manager window to borrow a store from. A second copy of this rule is
- * exactly the drift a shared unit exists to prevent.
+ * It lives here rather than inside `adminStore` because a system-scope component write has more
+ * than one entry point and they must not be able to disagree: the manager's own store applies this
+ * rule through `updateComponent`, and `componentEditorSave.js`'s `overrideAwareComponentWrite`
+ * applies the SAME rule over `CraftingSystemManager.updateItem` for a caller with no manager
+ * window to borrow a store from. A second copy of this rule is exactly the drift a shared unit exists to prevent.
  *
- * **THAT SECOND ENTRY POINT IS CURRENTLY UNREACHABLE FROM THE MANAGER** (reviewer round 6). Its
- * only constructor call is `SvelteCraftingSystemManagerApp.svelte.js`'s `services.onEditComponent`,
- * and nothing consumes that service — `CraftingSystemManagerRoot` binds its own in-page route to
- * every `onEditComponent` prop, and no `renderItemSheet` or header-control hook opens the app. It
- * is wired here because it is a live writer the moment anything opens it, not because a GM reaches
- * it today; earlier revisions of this docblock said "opened from an item sheet", which described a
- * path that does not exist.
+ * **THE STORELESS CALLER IS NOW ONLY `svelte/util/componentEditorSave.js`** (issue 1520). It used
+ * to be the standalone component-editor window, and reviewer round 6 recorded that that window was
+ * already UNREACHABLE: its only constructor call was
+ * `SvelteCraftingSystemManagerApp.svelte.js`'s `services.onEditComponent`, nothing consumed that
+ * service — `CraftingSystemManagerRoot` binds its own in-page route to every `onEditComponent`
+ * prop — and no `renderItemSheet` or header-control hook opened it. Issue 1520 deleted the
+ * application on that measurement. The rule stays shared rather than folded into the store because
+ * the storeless path is still the one a save reaches when no manager window is open, and folding
+ * it in is how the two answers drift apart again.
  *
  * ## THE FLIP ONLY FIRES WHERE THE WRITE WOULD IN FACT BE SHADOWED (round 6, finding 7)
  *

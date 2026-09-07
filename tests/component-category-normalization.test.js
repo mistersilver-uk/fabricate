@@ -156,12 +156,12 @@ test('enabled survives normalization when at least one result group exists', () 
 // ---------------------------------------------------------------------------
 
 test('a save payload that omits category preserves it (the REAL updateItem)', async () => {
-  // The standalone `SvelteComponentEditorApp` (ComponentEditorRoot.svelte) does not
-  // author `category` and is deliberately out of scope for issue 676. It stays safe
-  // ONLY because `updateItem` spreads `{...existing, ...updates}`, so an omitted key is
-  // preserved rather than dropped. The delta said "asserted, not assumed".
+  // The component-editor screen (`ComponentEditorRoot.svelte`) does not author `category`
+  // and is deliberately out of scope for issue 676. It stays safe ONLY because `updateItem`
+  // spreads `{...existing, ...updates}`, so an omitted key is preserved rather than dropped.
+  // The delta said "asserted, not assumed".
   //
-  // That app no longer reaches `updateItem` directly for its ESSENCE axis — see the
+  // Its save no longer reaches `updateItem` directly for the ESSENCE axis — see the
   // r19-store2 block at the foot of this file — but it still reaches it for everything
   // else, so this contract is unchanged and still load-bearing for it.
   //
@@ -237,23 +237,23 @@ test('updateSystem REPLACES the whole icon map (removal persists without -=)', a
 // (issue 1371 r19-store2)
 // ---------------------------------------------------------------------------
 //
-// `SvelteComponentEditorApp` used to call `manager.updateItem(...)` directly, so a GM editing a
+// The standalone editor window used to call `manager.updateItem(...)` directly, so a GM editing a
 // component's essences through it wrote a map the read union SHADOWS for every pair whose
 // `inherit.essences` switch is on — which, after the `1.32.0` election, is every component in a
 // one-system world. The manager's own store had been put on the flag-before-values order; this
 // second entry point had not, and two entry points that disagree about what a write means is the
 // defect this closes.
 //
-// THE APP IS NOT REACHED FROM AN ITEM SHEET, and earlier revisions of these comments said it was.
-// Its only constructor call is `SvelteCraftingSystemManagerApp`'s `services.onEditComponent`, which
-// nothing consumes — the manager root binds its own in-page route to every `onEditComponent` prop.
-// It is covered because it is a live writer the moment anything opens it.
+// THAT WINDOW WAS NEVER REACHED FROM AN ITEM SHEET, and earlier revisions of these comments said it
+// was. Its only constructor call was `SvelteCraftingSystemManagerApp`'s `services.onEditComponent`,
+// which nothing consumed — the manager root binds its own in-page route to every `onEditComponent`
+// prop — so issue 1520 deleted the application as orphaned.
 //
-// The app's save now delegates to `svelte/util/componentEditorSave.js`, which is what these tests
-// drive. The app module itself is not importable in a plain unit test — it builds a Foundry
-// `ApplicationV2` subclass at import time and statically imports a `.svelte` component, the same
-// reason `tests/import-folder-drop-wiring.test.js` gives for its sibling app — so the delegation
-// itself is pinned as SOURCE below, and the behaviour is driven for real through the seam.
+// WHAT THESE TESTS DRIVE OUTLIVED IT. The save decision was extracted to
+// `svelte/util/componentEditorSave.js` before the deletion, and `ComponentEditorRoot.svelte` — the
+// screen the window hosted — is still in the tree with its own coverage. So this block is a
+// contract on the SEAM, not on the window: any surface that saves a component-editor draft goes
+// through it, and none of them may restate the override rule.
 
 const { overrideAwareComponentWrite, saveComponentEditorDraft } = await import(
   '../src/ui/svelte/util/componentEditorSave.js'
@@ -483,7 +483,7 @@ test('1371 r19: an empty draft writes nothing and is not a failure', async () =>
 // dormant map. These drive the seam the app drives, seeded the way the app seeds it.
 
 /**
- * `SvelteComponentEditorApp`'s own seed, transcribed: the persisted record with its essence map
+ * The component-editor screen's own seed, transcribed: the persisted record with its essence map
  * overlaid from the read union, through `buildComponentEditorState`.
  *
  * @param {object} manager
@@ -640,50 +640,16 @@ test('1371 r20: a value write that THROWS puts the switch it flipped back', asyn
   );
 });
 
-// The app's own branch, pinned as source. The module cannot be imported (ApplicationV2 at import
-// time, plus a static `.svelte` import), so a mirror here would keep passing however the real
-// method is written — which is exactly how the direct `manager.updateItem` call survived.
-const EDITOR_APP_SOURCE = readFileSync(
-  new URL('../src/ui/SvelteComponentEditorApp.svelte.js', import.meta.url),
-  'utf8'
-);
+// The editor APP's own branch was pinned here as source until issue 1520. The application it read
+// — `src/ui/SvelteComponentEditorApp.svelte.js` — was orphaned (its only constructor call was a
+// manager service nothing consumed) and has been deleted, so the pin and its `readFileSync` went
+// with it: a top-level read of a deleted file throws at MODULE LOAD and fails this whole suite,
+// not one test. What that pin guarded is unchanged and still covered — the save decision itself
+// lives in `svelte/util/componentEditorSave.js` and is driven behaviourally above.
 
-test('1371 r19: the editor app delegates its save and never writes a component itself', () => {
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('saveComponentEditorDraft('),
-    'the save must delegate to the shared seam'
-  );
-  assert.ok(
-    !EDITOR_APP_SOURCE.includes('manager.updateItem('),
-    'and must not reach the manager write directly — that is the shadowed write this closed'
-  );
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('overrideAwareComponentWrite('),
-    'the no-store path applies the override rule'
-  );
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('store.updateComponent(componentId, updates, options)'),
-    'and the parent-store path routes through the override-aware store verb, options included'
-  );
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('resolvedComponentEssencesFor('),
-    'the steppers are seeded from what the system RESOLVES, not from its persisted row'
-  );
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('baseline: seed.baselineEssences'),
-    'and the save states the baseline it was seeded from rather than leaving the rule to assume it'
-  );
-  assert.ok(
-    EDITOR_APP_SOURCE.includes('carriedEssences: seed.carriedEssences'),
-    'and hands over the carried entries too — `saveComponentEditorDraft` falls back to this ' +
-      'argument, so unwiring it silently restores the foreign-id drop on the one path no ' +
-      'behavioural case here can see'
-  );
-});
-
-// The editor ROOT's own branch, pinned as source for `SvelteComponentEditorApp`'s reason: it is a
-// `.svelte` module, so the alternative is a hand-written mirror of `handleSave` that keeps passing
-// however the real one is written. The behavioural case below drives what this emits.
+// The editor ROOT's own branch, pinned as source because it is a `.svelte` module: the alternative
+// is a hand-written mirror of `handleSave` that keeps passing however the real one is written. The
+// behavioural case below drives what this emits.
 const EDITOR_ROOT_SOURCE = readFileSync(
   new URL('../src/ui/svelte/apps/ComponentEditorRoot.svelte', import.meta.url),
   'utf8'

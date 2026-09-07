@@ -1004,17 +1004,18 @@
    pair that stood here and the byte-identical `.fabricate-manager` pair that stood ~590 lines
    below.
 
-   THE WIDENING REACHES FOUR PLACES NEITHER DONOR DID, and they are worth naming because a
+   THE WIDENING REACHES THREE PLACES NEITHER DONOR DID, and they are worth naming because a
    reader checking this rule against the old pair will otherwise read the collapse as an
    equivalence. (1) `.fabricate-manager` is a <div> INSIDE the manager window rather than an
    application root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2
    frame's own header controls - the same accent ring those controls already carry in the
-   player app and the three interactables windows. (2) The standalone component-editor window
-   (`SvelteComponentEditorApp`) carried no pair at all and now takes both halves. (3) Nor did
-   the interaction-prompt toast, whose dimmed close control is why the `:focus-visible` opacity
-   rule far below exists. (4) `a` is newly named on BOTH halves in the player app, which listed
-   `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits no
-   <a>, so what this reaches is enriched content links and Foundry frame chrome.
+   player app and the three interactables windows. (2) The interaction-prompt toast carried no
+   pair at all and now takes both halves; its dimmed close control is why the `:focus-visible`
+   opacity rule far below exists. (3) `a` is newly named on BOTH halves in the player app, which
+   listed `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits
+   no <a>, so what this reaches is enriched content links and Foundry frame chrome. A FOURTH
+   place stood here until issue 1520 deleted the orphaned standalone component-editor window,
+   which had carried no pair either; the widening now reaches three.
 
    WRITTEN FLAT, and that is prescribed rather than stylistic. `.fabricate a:focus` is (0,2,1),
    the rank both donor blocks held, so per-component focus rings still win. The `:is()` form
