@@ -71,11 +71,18 @@ const ART_RESOLVER = 'resolveCraftingArt(';
  * two. Their contract did not lapse with the move — `avatar-source-contract.test.js` states the
  * same clause over the same two sites — and this file's domain is now the RECORD tile alone,
  * which is what its clauses were always about.
+ *
+ * 63 -> 65 (issue 1514, phase 2): the player gathering tab's drop row and required-tool card each
+ * moved a raw `<img>` onto this tile. BOTH are art-bearing and both pass `alt=""`, because each
+ * renders the record's name as adjacent text, so the second count moves by the same two. Both are
+ * the first render sites this component has in `apps/gathering/`, and the five gathering tiles
+ * that did NOT convert are the ones whose `.is-fallback` rule re-fits a default IMAGE with
+ * `object-fit: contain` and a padding — a state this tile's fixed `cover` cannot draw.
  */
-const MEDALLION_SITES = 63;
+const MEDALLION_SITES = 65;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 50;
+const ART_BEARING_SITES = 52;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

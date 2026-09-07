@@ -531,6 +531,13 @@ Two contradictions between that ladder and the radius rules below are settled he
 "A fully rounded radius is for a shape whose contents are text alone" would, read literally, forbid the ROUND portrait the library mandates for a person; the round portrait is a stated CARVE-OUT from that sentence, because the corner is what says the mark is a person.
 And the radius rule puts 26 to 32px at radius 7 while the specimen's 32px square portrait is radius 9: for art and portraits the ladder in this paragraph GOVERNS, and the control radius rule does not reach them.
 The shipped population is off the art size ladder at more distinct values than it is on — measured on the tree rather than asserted, and RE-MEASURED after any change that moves a tile — and `tests/components/design-system-known-debt.json`'s `offLadderArtSizes` pins every art-tile render site, with a non-literal `size` recorded as an explicit `dynamic` key, so the geometry sweep lowers a number rather than re-deriving a census.
+
+A CONVERSION PRESERVES THE RENDERED SIZE AND BANKS THE ROW; THE SWEEP SNAPS IT.
+Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and MUST bank the resulting `offLadderArtSizes` row, stating per tile the rung it rejected and why, or recording that the tile already sits at its kind's published rung and the row exists only because the census filters portraits against the art ladder.
+The row is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
+Resizing to the nearest rung in the same change would smuggle a layout move into a conversion, and the two must be separable so that a reviewer can approve one without the other.
+The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
+Discharging the accumulated rows is the geometry sweep's, which is issue 1519; that sweep also owns reconciling `design-system-debt-ratchets.test.js`'s single `ART_SIZE_LADDER` constant with the TWO ladders this requirement publishes, because filtering both primitives against the art ladder alone makes a portrait at the canon's own 32px rung bank a row while a 38px portrait banks none.
 The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not recordable on a `file | size` ratchet.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
@@ -554,9 +561,16 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 
 #### Scenario: A geometry falls between two rungs
 
-- **WHEN** a proposed control height, radius or spacing value is not on a published ladder
+- **WHEN** a NEW or RESIZED control height, radius or spacing value is not on a published ladder
 - **THEN** it snaps to the nearest rung
 - **AND** a value that genuinely cannot snap mints a scale member rather than shipping a literal
+
+#### Scenario: A hand-rolled tile becomes a primitive
+
+- **WHEN** an existing tile at an off-ladder size is converted to a shared art or portrait primitive
+- **THEN** the rendered size is preserved and its `offLadderArtSizes` row is banked
+- **AND** the banking entry states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
+- **AND** the resize is left to the geometry sweep that owns the ladder
 
 ### Requirement: Every interactive primitive declares its full state set
 

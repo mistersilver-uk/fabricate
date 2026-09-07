@@ -10,6 +10,19 @@
   sceneDocumentImage helper; navigation uses the shared viewScene() bridge
   (scene.view(), the player-safe call). canView is derived from the scene's
   player permission.
+
+  TWO FAILURES ARE SURFACED RATHER THAN SWALLOWED (issue 1514), and they are kept
+  APART from each other and from the ordinary refusal:
+
+   - the uuid does not resolve. The `.catch` used to leave the cleared placeholder
+     standing, which renders a nameless card with a map glyph — indistinguishable
+     from a scene that simply has no name yet, and silent about the fact that the
+     GM's link is broken.
+   - the PERMISSION CHECK ITSELF throws. `playerCanView` returned the same `false`
+     for "you may not view this scene" and for "asking the question failed", so a
+     broken `testUserPermission` was reported to the player as the GM not having
+     activated the scene. It returns a three-outcome result now, and the third
+     outcome has its own sentence and its own hook.
 -->
 <script>
   import { localize, viewScene } from '../../util/foundryBridge.js';
@@ -20,18 +33,32 @@
   let sceneName = $state('');
   let sceneThumb = $state('');
   let canView = $state(false);
+  // The scene uuid did not resolve at all.
+  let sceneUnresolved = $state(false);
+  // The scene resolved and the PERMISSION QUESTION failed, which is not the same thing as
+  // being told no.
+  let permissionUnknown = $state(false);
 
+  /**
+   * Whether this player may view the scene, as THREE outcomes rather than a boolean.
+   *
+   * `permitted: false, failed: false` is the ordinary refusal — the GM has not shared the
+   * scene. `failed: true` is the check itself throwing or being absent, which the caller
+   * reports differently, because telling a player to "wait for the GM" when the question was
+   * never actually answered sends them to the wrong person.
+   *
+   * @param {object|null} doc The resolved Scene document.
+   * @returns {{ permitted: boolean, failed: boolean }} The outcome.
+   */
   function playerCanView(doc) {
+    if (typeof doc?.testUserPermission !== 'function') return { permitted: false, failed: true };
     try {
-      if (typeof doc?.testUserPermission === 'function') {
-        const user = globalThis.game?.user ?? null;
-        const limited = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 'LIMITED';
-        return doc.testUserPermission(user, limited) === true;
-      }
+      const user = globalThis.game?.user ?? null;
+      const limited = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 'LIMITED';
+      return { permitted: doc.testUserPermission(user, limited) === true, failed: false };
     } catch (_err) {
-      return false;
+      return { permitted: false, failed: true };
     }
-    return false;
   }
 
   $effect(() => {
@@ -39,19 +66,28 @@
     sceneName = '';
     sceneThumb = '';
     canView = false;
+    sceneUnresolved = false;
+    permissionUnknown = false;
     if (!uuid || typeof globalThis.fromUuid !== 'function') return;
     let cancelled = false;
     Promise.resolve(globalThis.fromUuid(uuid))
       .then((doc) => {
         if (cancelled) return;
-        if (doc) {
-          sceneName = String(doc.name || '');
-          sceneThumb = sceneDocumentImage(doc) || '';
-          canView = playerCanView(doc);
+        if (!doc) {
+          // A uuid that resolves to NOTHING is the same broken link as a uuid that throws,
+          // and it used to fall through to the cleared placeholder just as quietly.
+          sceneUnresolved = true;
+          return;
         }
+        sceneName = String(doc.name || '');
+        sceneThumb = sceneDocumentImage(doc) || '';
+        const access = playerCanView(doc);
+        canView = access.permitted;
+        permissionUnknown = access.failed;
       })
       .catch(() => {
-        // An unresolvable uuid leaves the cleared placeholder state above in place.
+        if (cancelled) return;
+        sceneUnresolved = true;
       });
     return () => {
       cancelled = true;
@@ -85,7 +121,13 @@
       <i class="fas fa-location-dot" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.LinkedSceneHeading')}
     </span>
-    <span class="gathering-linked-scene-name" title={sceneName}>{sceneName}</span>
+    {#if sceneUnresolved}
+      <span class="gathering-linked-scene-name is-fault" data-gathering-scene-unresolved>
+        {localize('FABRICATE.App.Gathering.Detail.SceneUnresolved')}
+      </span>
+    {:else}
+      <span class="gathering-linked-scene-name" title={sceneName}>{sceneName}</span>
+    {/if}
   </span>
 
   {#if canView}
@@ -101,6 +143,10 @@
       <i class="fas fa-location-arrow" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.SceneVisit')}
     </button>
+  {:else if permissionUnknown}
+    <p class="gathering-linked-scene-wait is-fault" data-gathering-scene-permission-unknown>
+      {localize('FABRICATE.App.Gathering.Detail.ScenePermissionUnknown')}
+    </p>
   {:else}
     <p class="gathering-linked-scene-wait" data-gathering-scene-wait>
       {localize('FABRICATE.App.Gathering.Detail.SceneWait')}
@@ -168,6 +214,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 600;
+  }
+
+  /* The two surfaced faults (issue 1514) take the danger ink and nothing else: each replaces a
+     line that already exists in the row, so neither adds a box or moves the row's height. */
+  .gathering-linked-scene-name.is-fault,
+  .gathering-linked-scene-wait.is-fault {
+    color: var(--fab-danger-text);
   }
 
   .gathering-linked-scene-visit {

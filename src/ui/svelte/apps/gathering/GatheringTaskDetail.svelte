@@ -18,6 +18,7 @@
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import Notice from '../../components/Notice.svelte';
   import GatheringTaskRequirements from './GatheringTaskRequirements.svelte';
   import GatheringTaskDrops from './GatheringTaskDrops.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -101,6 +102,11 @@
   // cancelled flag drops any stale response when the selection changes.
   let breakdown = $state(null);
   let dropsLoading = $state(false);
+  // The THIRD outcome of the lazy fetch (issue 1514). Clearing the breakdown on failure
+  // renders exactly what "this task has no drops" renders, so a broken services call and an
+  // empty drop table were the same picture and the player was told nothing. This flag is what
+  // lets `GatheringTaskDrops` tell them apart.
+  let dropsError = $state(false);
 
   // Prefer the fully personalized success chance from the loaded breakdown (it
   // folds in weather/time/biome AND the actor's character-ability modifiers);
@@ -123,10 +129,12 @@
     if (!taskId || typeof services?.getGatheringDropBreakdown !== 'function') {
       breakdown = null;
       dropsLoading = false;
+      dropsError = false;
       return;
     }
     let cancelled = false;
     dropsLoading = true;
+    dropsError = false;
     breakdown = null;
     Promise.resolve(
       services.getGatheringDropBreakdown({ environmentId: envId, taskId, rememberedActorId })
@@ -135,11 +143,16 @@
         if (cancelled) return;
         breakdown = result ?? null;
         dropsLoading = false;
+        dropsError = false;
       })
       .catch(() => {
         if (cancelled) return;
         breakdown = null;
         dropsLoading = false;
+        // SURFACED rather than swallowed (issue 1514). What the player is owed here is the
+        // fact that the figures could not be worked out, which is a different sentence from
+        // "there is nothing to find" and was previously indistinguishable from it.
+        dropsError = true;
       });
     return () => {
       cancelled = true;
@@ -229,43 +242,47 @@
 
     {#if nodeDepleted}
       <!--
-        Player-facing depleted callout for a token-scoped node. Tone is carried by
-        the `is-depleted` class (not color alone) so the depleted state is legible
-        without relying on color, mirroring the row/economy depleted pattern.
+        Player-facing depleted banner for a token-scoped node.
+
+        `Notice` NON-BLOCKING rather than `Callout` (issue 1514), and the current role is what
+        decides: this element carried `role="status"`, `Callout` emits `role="note"` or nothing
+        (`Callout.svelte:131`) and cannot express a live status region, while `Notice` renders
+        `role="status"` with `aria-live="polite"` whenever `blocking` is unset. The tone is still
+        carried by more than colour — the glyph and the title ink move with it.
+
+        The respawn ETA is the `detail` line. It was a `<span>` inside the copy stacked by a
+        column flex, which is the shape `detail` already draws, so the second line survives the
+        conversion; what does not is its own `data-gathering-node-respawn-eta` hook, because
+        `Notice` exposes its two hook pairs on the ROOT alone. The two shipped readers of that
+        hook are NEGATIVE assertions (`gathering-detail-mounted.test.js`), and an assertion that
+        can never fail is worse than none, so they are retargeted onto the detail line's TEXT in
+        the same commit rather than left to pass vacuously.
       -->
-      <div
-        class="gathering-node-depleted-callout is-depleted"
-        role="status"
-        data-gathering-node-depleted
-      >
-        <i class="fas fa-mountain-sun" aria-hidden="true"></i>
-        <span class="gathering-node-depleted-text">
-          {#if nodeExhausted}
-            <!-- Permanently exhausted nonRegenerating pool: show the exhausted
-                 permanence copy. No count (already on the NodesAvailable line) and
-                 no respawn ETA — distinct from the regenerating "replenishes" copy. -->
-            {localize('FABRICATE.App.Gathering.Detail.NodeExhaustedPermanent')}
-          {:else}
-            {localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
-            {#if respawnEtaText !== ''}
-              <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta
-                >{respawnEtaText}</span
-              >
-            {/if}
-          {/if}
-        </span>
-      </div>
+      <Notice
+        tone="warning"
+        icon="fas fa-mountain-sun"
+        title={nodeExhausted
+          ? localize('FABRICATE.App.Gathering.Detail.NodeExhaustedPermanent')
+          : localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
+        detail={nodeExhausted ? '' : respawnEtaText}
+        dataAttr="data-gathering-node-depleted"
+        dataValue=""
+      />
     {:else if nodeNonRegenerating && nodeScarcePermanentText !== ''}
       <!--
-        Permanence callout for a nonRegenerating pool BEFORE exhaustion (current > 0).
+        Permanence banner for a nonRegenerating pool BEFORE exhaustion (current > 0).
         Distinct from the regenerating "replenishes over time" copy: this resource will
         never replenish. The remaining count is already shown on the NodesAvailable
-        line above, so this copy does not repeat it.
+        line above, so this copy does not repeat it. `info`, not `warning`, which is the
+        palette the rule it replaces painted.
       -->
-      <div class="gathering-node-scarce-callout" role="status" data-gathering-node-scarce>
-        <i class="fas fa-mountain-sun" aria-hidden="true"></i>
-        <span class="gathering-node-scarce-text">{nodeScarcePermanentText}</span>
-      </div>
+      <Notice
+        tone="info"
+        icon="fas fa-mountain-sun"
+        title={nodeScarcePermanentText}
+        dataAttr="data-gathering-node-scarce"
+        dataValue=""
+      />
     {/if}
 
     <div class="gathering-task-detail-action" class:has-chance={successChance != null}>
@@ -292,7 +309,7 @@
 
     <GatheringTaskRequirements {task} />
 
-    <GatheringTaskDrops {breakdown} loading={dropsLoading} />
+    <GatheringTaskDrops {breakdown} loading={dropsLoading} error={dropsError} />
   </section>
 {/if}
 
@@ -411,53 +428,6 @@
     font-weight: 600;
     background: var(--fab-warning-soft);
     border: 1px solid var(--fab-warning-border);
-  }
-
-  /* Token-scoped depleted callout: a tone-carrying banner (not color alone) with
-     the respawn ETA line. Reuses the warning palette like the depleted chip. */
-  .gathering-node-depleted-callout {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    background: var(--fab-warning-soft);
-    border: 1px solid var(--fab-warning-border);
-    color: var(--fab-warning-text);
-  }
-
-  .gathering-node-depleted-callout.is-depleted {
-    color: var(--fab-warning-text);
-  }
-
-  .gathering-node-depleted-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .gathering-node-respawn-eta {
-    font-weight: 600;
-  }
-
-  /* Count-bearing scarcity callout for a nonRegenerating pool before exhaustion.
-     Uses the info palette (not the warning palette) so it reads as informational
-     scarcity, visually distinct from the depleted/exhausted warning banner. */
-  .gathering-node-scarce-callout {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    background: var(--fab-info-soft);
-    border: 1px solid var(--fab-info-border);
-    color: var(--fab-info-text);
-  }
-
-  .gathering-node-scarce-text {
-    font-weight: 600;
   }
 
   /* Single column (full-width Attempt) by default; two equal columns with

@@ -311,6 +311,40 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Callout.svelte',
 ]);
 
+// THE SHARED PRIMITIVES THE PLAYER GATHERING TREE RENDERS, as ONE closure (issue 1514).
+//
+// Three suites mount that tree — `gathering-detail-mounted`, `gathering-environments-mounted`
+// and `gathering-view-actor-bar` — and all three are HAND-ROLLED rather than built on
+// `createMountedComponentHarness`, so a module the tree renders and the manifest omits is not
+// the named "add it to compiledModules" error the shared harness raises. It is
+// `ERR_MODULE_NOT_FOUND` in `before()`, and `node --test` reports the whole file as
+// `# cancelled`, never `# fail`.
+//
+// ONE ROSTER RATHER THAN THREE COPIES, and the reason is measured rather than stylistic. Issue
+// 1514's first phase added the same six-line comment and its two `writeCompiledSvelte` calls to
+// each of those three suites and to `fabricate-app-root-mounted`, and SonarCloud reported
+// `new_duplicated_lines_density` at 6.8% against a 3% threshold naming exactly those four files
+// — two of them at 100% of their new lines. Sonar counts a NEW line as duplicated when it falls
+// inside a duplicated block, and these harness manifests are near-identical across suites
+// already, so every line inserted into one lands inside such a block. The fix is therefore to
+// insert FEWER lines rather than to reword them: the prose lives here once and each call site
+// is a single loop.
+//
+// FLAT, and one quoted literal per entry, because the static guard in
+// `mounted-harness-primitive-allowlist.test.js` resolves an imported roster by matching
+// `export const NAME = Object.freeze([ … ])` up to the FIRST `]`. A spread of another roster
+// inside this body would resolve to nothing and the guard would read these suites as compiling
+// none of it — green, and blind. That is why `Kicker`, `Notice` and `Callout` are restated here
+// rather than spread from the roster above.
+export const GATHERING_PLAYER_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 // Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
 // test references one source of truth — a component referencing a `.svelte`/`.js`

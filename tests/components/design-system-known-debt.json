@@ -425,6 +425,8 @@
     "src/ui/svelte/apps/crafting/detail/IoTable.svelte | 32 | 1",
     "src/ui/svelte/apps/crafting/detail/RequirementTile.svelte | 44 | 2",
     "src/ui/svelte/apps/crafting/detail/RollResultBox.svelte | 24 | 1",
+    "src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte | 36 | 1",
+    "src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte | 40 | 1",
     "src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte | 24 | 1",
     "src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | 40 | 2",
     "src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | 40 | 6",

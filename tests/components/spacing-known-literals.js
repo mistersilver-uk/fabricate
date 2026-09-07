@@ -233,7 +233,14 @@ export function isExemptSpacingPixels(pixels) {
 // is left open under a new path. Five rows are DELETED rather than re-banked as one:
 // `assertRatchet` fails on a paid-down row as loudly as on a new one, so the rows and this total
 // move in the commit that deletes the blocks. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 884;
+// 884 -> 877 (issue 1514, phase 2): `GatheringTaskDetail`'s two node banners moved onto `Notice`,
+// which owns its own geometry, so the four rules those banners declared went with them. Three
+// rows VANISH — `gap 2` (the depleted banner's two-line copy stack), `gap 8` and `padding 8` (one
+// occupancy each per banner) — and `padding 10` SHRINKS 3 -> 1, because two of its three were the
+// same banners' `8px 10px`. Deleted rather than re-banked under `Notice`'s path: the primitive
+// declares `var(--fab-space-3)` throughout and owns no raw literal, so the seven occupancies are
+// paid rather than moved. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 877;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
