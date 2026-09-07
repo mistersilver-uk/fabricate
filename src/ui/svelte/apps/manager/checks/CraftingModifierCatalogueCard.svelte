@@ -94,7 +94,7 @@
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../../../components/Chip.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import {

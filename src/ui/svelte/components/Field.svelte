@@ -80,7 +80,7 @@
   the gate.
 
   ── THE `fieldset` MEMBER HAS ONE CALLER, AND IT IS NOT A `div` IN DISGUISE ───────
-  `apps/manager/RadioCardGroup.svelte` is the single `<fieldset>` site. It is a
+  `components/RadioCardGroup.svelte` is the single `<fieldset>` site. It is a
   genuine grouped-control case on three independent counts, each of which a `<div>`
   would silently drop: it renders a `<legend>`, which is only valid as a fieldset's
   first child and is what names the group; it holds a radio group — several `<input

@@ -24,7 +24,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import RadioCardGroup from './RadioCardGroup.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import IconButton from '../../components/IconButton.svelte';
 
   let { services = null, systemId = '' } = $props();

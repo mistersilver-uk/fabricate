@@ -285,7 +285,7 @@ function compileManagerRoot() {
   // inspector imports it statically, so it is in this root's static module graph; omitting it
   // HANGS every mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/InspectorActionButton.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
   // The seven world scoped-entity routes and the shared placeholder body they all call

@@ -872,7 +872,7 @@ const PRIMITIVES = Object.freeze([
     // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
     // fieldset, and by that suite's own mutation control.
     name: 'RadioCardGroup',
-    components: Object.freeze(['src/ui/svelte/apps/manager/RadioCardGroup.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/RadioCardGroup.svelte']),
     roots: Object.freeze(['fabricate-option-cards']),
     // ONE prefix and one exact name. `manager-radio-card-group` is the component's own hook class
     // and owns no rule in the sheet; it is in the pattern because the component writes it and a

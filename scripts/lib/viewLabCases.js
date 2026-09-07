@@ -674,7 +674,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // above it and heads it with nothing, so the legend is screen-reader-only again at both scopes
   // and no frame in the corpus draws a visible one. The pair is kept because the two SCOPES still
   // differ around the group, which is what a change to it would show up differently in.
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte': Object.freeze([
+  'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
   ]),

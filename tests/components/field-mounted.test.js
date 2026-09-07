@@ -75,9 +75,9 @@ const radioHarness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+  componentPath: 'src/ui/svelte/components/RadioCardGroup.svelte',
 });
 
 const VOCABULARY_PROPS = Object.freeze({

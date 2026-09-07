@@ -305,7 +305,7 @@ const VALIDATION_CLASSES = composedClasses(
  * literal reader cannot see; the pinning test below asserts the whole assembled string.
  */
 const OPTION_CARDS_OWN_CLASSES = (() => {
-  const source = read('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
+  const source = read('src/ui/svelte/components/RadioCardGroup.svelte');
   const match = source.match(/class=\{`([^`$]*)\$\{/u);
   assert.ok(
     match,

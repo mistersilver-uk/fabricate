@@ -83,7 +83,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373): the armed remove-from-system

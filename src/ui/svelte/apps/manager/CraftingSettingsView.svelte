@@ -22,7 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import RadioCardGroup from './RadioCardGroup.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import CraftingEffectPanel from './CraftingEffectPanel.svelte';
   import { resolutionModeOptions, salvageResolutionModeOptions } from './resolutionModeOptions.js';
 

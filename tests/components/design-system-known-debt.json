@@ -57,7 +57,7 @@
     "src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte | .salvage-outcome-threshold | 700 | 1",
     "src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte | .salvage-dc | 700 | 1",
     "src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte | .salvage-result-qty | 700 | 1",
-    "src/ui/svelte/apps/manager/RadioCardGroup.svelte | .manager-resolution-option-meta | 600 | 1",
+    "src/ui/svelte/components/RadioCardGroup.svelte | .manager-resolution-option-meta | 600 | 1",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | .manager-tools-row-recipes strong | 700 | 1",
     "src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | .downtime-board-row-value | 700 | 1",
     "src/ui/svelte/apps/manager/essences/EssenceRow.svelte | .manager-essence-usage-value | 700 | 1",

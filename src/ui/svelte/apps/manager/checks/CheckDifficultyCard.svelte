@@ -37,7 +37,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { interpolate } from './checksCopy.js';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

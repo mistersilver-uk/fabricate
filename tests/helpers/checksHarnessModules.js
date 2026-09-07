@@ -184,7 +184,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker. The rail's "Preview as" actor control renders
   // through it rather than through a native `<select>`, so every checks suite that mounts

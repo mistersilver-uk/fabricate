@@ -33,7 +33,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Callout from '../Callout.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {

@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -159,7 +159,6 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -226,6 +225,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // of its two callers is reachable — the alchemy brew banner is drawn by no case in the registry
   // and is held by its own mounted suite instead, which that entry records.
   'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -428,7 +428,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 237);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 222);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

@@ -75,8 +75,8 @@
   two-column config-card face.
 -->
 <script>
-  import Field from '../../components/Field.svelte';
-  import { localize } from '../../util/foundryBridge.js';
+  import Field from './Field.svelte';
+  import { localize } from '../util/foundryBridge.js';
 
   let {
     cardId = undefined,

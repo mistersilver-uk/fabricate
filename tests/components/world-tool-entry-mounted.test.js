@@ -100,7 +100,7 @@ const harness = createMountedComponentHarness({
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph

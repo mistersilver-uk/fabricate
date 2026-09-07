@@ -97,7 +97,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToolBehaviorPreview from '../tools/ToolBehaviorPreview.svelte';
   import ToolRepairRequirements from '../tools/ToolRepairRequirements.svelte';
   import ToolReplacementTarget from '../tools/ToolReplacementTarget.svelte';
