@@ -410,8 +410,24 @@ export function installFoundryShim(world) {
         String(document?.uuid ?? '').startsWith('Item.')
       )
     ),
+    // `current` is what the Manager's Travel → Map Region Links tab reads; `active` is what the
+    // three canvas windows fall back to (issue 1520). `InteractablesManagerApp._scene()` is
+    // `globalThis.canvas?.scene ?? globalThis.game?.scenes?.active ?? null`, and it is the only
+    // reader of `scenes.active` in the product — so this one key is the whole of what those
+    // windows need. Both name the same scene here, which is the ordinary Foundry state.
+    //
+    // NOT a synthetic `globalThis.canvas`, and the difference is not cosmetic. `canvas` appears
+    // nowhere in this shim today and `canvas?.` is read 33 times across 5 product files, so a
+    // partial canvas would flip every EXISTING lab frame from the absent branch to a
+    // present-but-incomplete one. THE CAVEAT THAT LEAVES: `_gridSize()` reads `canvas`
+    // exclusively and therefore takes its 100 fallback in every lab frame, so any grid-derived
+    // geometry in a captured frame is the fallback's rather than a scene's. Nothing rendered by
+    // the three windows is grid-derived today — the fallback reaches only the Drawing-marker
+    // create seam, which no case drives — but a case that ever photographs a created marker's
+    // size is photographing 100, not the lab scene's grid.
     scenes: Object.assign(createCollection(world.scenes ?? []), {
       current: world.scenes?.[0] ?? null,
+      active: world.scenes?.[0] ?? null,
     }),
     journal: createCollection([]),
     folders: createCollection([]),

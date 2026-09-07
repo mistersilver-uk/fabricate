@@ -265,6 +265,24 @@ export function resolveDialogChrome(config = {}) {
  * The Fabricate windows the lab can draw. Mirrors each application's `static DEFAULT_OPTIONS`;
  * `tests/view-lab-app-options-parity.test.js` parses the real classes and asserts equality, so
  * a window that is resized in `src/` cannot silently keep being captured at the old size.
+ *
+ * ── WHAT THE PARITY LOOP GUARDS, AND WHAT IT DOES NOT (issue 1520) ─────────────────────────────
+ *
+ * That loop is not field-by-field. It asserts SEVEN things — `id`, `tag`, `classes` (deepEqual),
+ * `window.title`, `window.icon`, `window.resizable`, and `position` as `{width, height}` — so
+ * `window.contentTag`, `window.contentClasses` and `window.controls` are transcribed here and
+ * checked by NOTHING. They are not decoration: `buildAppWindow` builds the content element from
+ * `contentTag` and stamps `contentClasses` onto it, so a wrong value there changes the DOM of
+ * every frame of that window and no test says so.
+ *
+ * All five windows below declare NONE of those three in their own `DEFAULT_OPTIONS`, so all five
+ * inherit ApplicationV2's — `contentTag: "section"` and `contentClasses: []`
+ * (`client/applications/api/application.mjs:82-83` in the harvested chrome). `controls: []` is the
+ * one modelling claim rather than a transcription: core's own default declares two entries
+ * (Attach/Detach), and this spec records that Fabricate registers no header controls so
+ * `_updateFrame` hides the ellipsis button. `tests/view-lab-chrome-drift.test.js` pins that pair
+ * together — it re-reads the harvested `_updateFrame` and requires every entry here to declare an
+ * empty `controls`.
  */
 export const APP_CHROME = Object.freeze({
   'fabricate-app': Object.freeze({
@@ -301,6 +319,68 @@ export const APP_CHROME = Object.freeze({
     minWidth: 0,
     minHeight: 0,
     optionsSource: 'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+  }),
+  // ── THE THREE CANVAS WINDOWS (issue 1520) ────────────────────────────────────────────────────
+  //
+  // Registered BEFORE the design-system adoption that re-skins them, not after, because until they
+  // were here a diff touching all three selected exactly one case — `fabricate-app-shell`, the
+  // PLAYER crafting window — through `mapChangedFilesToCases`'s fallback, and the evidence matcher
+  // computed its expectation from the same selector and reported the gate SATISFIED. A gate that
+  // cannot fail, on a photograph of the wrong window.
+  //
+  // Their `minWidth`/`minHeight` are 0/0 for the same reason the manager's are: neither the
+  // applications nor the sheet puts a floor on them today. The player window is the only one that
+  // carries one.
+  'fabricate-interactable-browser': Object.freeze({
+    id: 'fabricate-interactable-browser',
+    tag: 'div',
+    classes: Object.freeze(['fabricate', 'fabricate-interactable-browser-app']),
+    window: Object.freeze({
+      title: 'FABRICATE.Canvas.Browser.Title',
+      icon: 'fas fa-mortar-pestle',
+      resizable: true,
+      contentTag: 'section',
+      contentClasses: Object.freeze([]),
+      controls: Object.freeze([]),
+    }),
+    position: Object.freeze({ width: 420, height: 620 }),
+    minWidth: 0,
+    minHeight: 0,
+    optionsSource: 'src/ui/InteractableBrowserApp.svelte.js',
+  }),
+  'fabricate-interactable-config': Object.freeze({
+    id: 'fabricate-interactable-config',
+    tag: 'div',
+    classes: Object.freeze(['fabricate', 'fabricate-interactable-config-app']),
+    window: Object.freeze({
+      title: 'FABRICATE.Canvas.Interactable.Config.Title',
+      icon: 'fas fa-sliders',
+      resizable: true,
+      contentTag: 'section',
+      contentClasses: Object.freeze([]),
+      controls: Object.freeze([]),
+    }),
+    position: Object.freeze({ width: 480, height: 680 }),
+    minWidth: 0,
+    minHeight: 0,
+    optionsSource: 'src/ui/InteractableConfigApp.svelte.js',
+  }),
+  'fabricate-interactables-manager': Object.freeze({
+    id: 'fabricate-interactables-manager',
+    tag: 'div',
+    classes: Object.freeze(['fabricate', 'fabricate-interactables-manager']),
+    window: Object.freeze({
+      title: 'FABRICATE.Canvas.Manage.Title',
+      icon: 'fas fa-list-check',
+      resizable: true,
+      contentTag: 'section',
+      contentClasses: Object.freeze([]),
+      controls: Object.freeze([]),
+    }),
+    position: Object.freeze({ width: 560, height: 680 }),
+    minWidth: 0,
+    minHeight: 0,
+    optionsSource: 'src/ui/InteractablesManagerApp.svelte.js',
   }),
 });
 
