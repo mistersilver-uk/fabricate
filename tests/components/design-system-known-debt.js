@@ -732,4 +732,18 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // than three without one — which is this register working rather than a name slipping out of it.
 // Re-measured on the tree, not subtracted: 71 clear the two-caller bar, 26 are registered, 45
 // are not, and the docblock above is re-measured with it.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 45;
+// 45 -> 46 (issue 1514): `apps/PlayerViewState.svelte` ARRIVED, at five callers, and it is banked
+// rather than adjudicated in either direction because neither table can hold it. It is not a
+// primitive — `spec.md` says "a candidate that decomposes entirely into existing members is a
+// COMPOSITION and MUST NOT enter the set", and this decomposes into `EmptyState` and `Callout`
+// plus one line of chrome. It cannot take a `notAPrimitive` row either: the row-shape assertion
+// beside that table caps a recorded non-member at ONE caller, and all twelve shipped rows have
+// zero or one, so a five-caller row reds on its first run. So this register is its answer, which
+// is the register working rather than a gap in it: the five player views drew the same centred
+// loading/error/empty fill up to a class-name prefix, that chrome is one component now, and the
+// decision that it is a composition rather than a member is recorded HERE instead of nowhere.
+// The answer is PATH-CONDITIONAL and the condition is the row itself: it holds only while the
+// file sits outside `src/ui/svelte/components/` and inside `src/ui/svelte/`, which is what
+// `unregisteredSharedComponents()` filters on. The same file under `components/` would be inside
+// the primitive directory and would demand a manifest row instead.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 46;

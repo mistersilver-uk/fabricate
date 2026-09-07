@@ -960,6 +960,29 @@ const CRAFTING_MODE_FILES = Object.freeze({
   progressive: ['ProgressiveBody', 'ProgressiveStageList'],
 });
 
+/**
+ * The ONE not-yet-ready chrome all five player views draw (issue 1514).
+ *
+ * It sits directly under `apps/`, so it matches NEITHER leg of `BROAD_SIGNAL_PATTERN` and no
+ * directory pattern reaches it — without a claim of its own it selects `FALLBACK_CASE_ID` alone,
+ * which `view-lab-source-coverage.test.js` reds on by name. It is claimed by ONE representative
+ * frame per player app rather than by every player case: the component is in the render path of
+ * all of them (its `{:else}` branch renders the ready content), so five frames prove the populated
+ * tree is undisturbed across all five windows without publishing sixty for a one-line change.
+ *
+ * WHAT THOSE FIVE FRAMES CANNOT SHOW, stated rather than left to be discovered: no case in this
+ * registry seeds a player view's loading, error, no-actor or empty state — every player case
+ * renders a populated window — so the chrome this component draws in its OTHER branch is
+ * photographed nowhere. The lab has no query parameter that produces one either, so closing that
+ * gap is a lab-input change (`tests/view-lab/mount.js`) rather than a registry edit, and it is
+ * recorded here as the gap it is rather than papered over with a frame that cannot contain it.
+ *
+ * Hoisted outside every case region for the reason `RECIPE_BULK_EDIT_MATCHES` records: a change
+ * inside a case literal narrows the capture selection to that one frame, and a shared pattern
+ * belongs to all five.
+ */
+const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
+
 /** Everything under `crafting/` that is NOT one mode's own body. Applies to every crafting case. */
 const CRAFTING_SHARED = new RegExp(
   '^src/ui/svelte/apps/crafting/(?!detail/(' +
@@ -10524,7 +10547,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'gathering' },
     steps: [],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_VIEW_STATE],
   }),
   playerCase({
     id: 'fabricate-app-shell',
@@ -10545,6 +10568,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // would publish only the frame that opens its picker and never the frame that draws it
       // closed — which is where its own 18 scoped rules are visible.
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+      PLAYER_VIEW_STATE,
     ],
   }),
   // THE PRIMITIVE'S FIRST PLAYER-WINDOW FRAME (issue 1475). Every other player case draws the
@@ -10599,6 +10623,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      PLAYER_VIEW_STATE,
     ],
   }),
   playerCase({
@@ -11962,7 +11987,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'alchemy' },
     steps: [],
     kinds: ['player', 'alchemy'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//, PLAYER_VIEW_STATE],
   }),
   playerCase({
     id: 'player-alchemy-stacked',
@@ -11996,7 +12021,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'journal' },
     steps: [],
     kinds: ['player', 'journal'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/journal\//,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      PLAYER_VIEW_STATE,
+    ],
   }),
   playerCase({
     id: 'fabricate-journal-craft-detail',

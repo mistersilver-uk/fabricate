@@ -57,6 +57,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/journal/JournalTips.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    // The ONE not-yet-ready chrome the five player views draw (issue 1514), and the strip its
+    // error branch composes. `JournalView` below renders the composition; `EmptyState` is
+    // already above through the `SELECT_COMPILED_MODULES` spread, and `Callout` is named here
+    // rather than spread from the marks-and-notices roster because this tree reaches neither
+    // `Kicker` nor `Notice`. An omission CANCELS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/apps/PlayerViewState.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte'
   ],
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
@@ -116,6 +123,26 @@ describe('JournalView mounted behavior', () => {
     const { store } = makeJournal({ loading: true });
     const target = await harness.mount({ services: makeServices(store) });
     assert.ok(target.querySelector('[data-journal-state="loading"]'), 'loading state shown');
+  });
+
+  it('announces the loading root as busy, and does not once the view is ready', async () => {
+    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
+    // stops rendering it passes every source-text reader, and the negative half is what makes
+    // the attribute mean the loading state rather than the component.
+    const { store: loadingStore } = makeJournal({ loading: true });
+    const loading = await harness.mount({ services: makeServices(loadingStore) });
+    const loadingRoot = loading.querySelector('[data-journal-state="loading"]');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Journal.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    harness.remount();
+    const { store: readyStore } = makeJournal({});
+    const ready = await harness.mount({ services: makeServices(readyStore) });
+    assert.ok(ready.querySelector('[data-journal-state="populated"]'), 'the ready view is populated');
+    assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
   });
 
   it('renders the error state', async () => {

@@ -541,6 +541,14 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // The ONE not-yet-ready chrome the five player views draw (issue 1514), and the strip its
+  // error branch composes. `CraftingView` below renders the composition, so this roster is
+  // where the crafting suites acquire it — and `Callout` arrives WITH it rather than through
+  // `MARKS_AND_NOTICES_COMPILED_MODULES`, because this list already carries `Kicker` and
+  // `StatBox` flat and spreading that roster here would name `Notice`, which this tree does
+  // not reach. Omitting either does not fail a crafting suite: it CANCELS it.
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 

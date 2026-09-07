@@ -226,7 +226,14 @@ export function isExemptSpacingPixels(pixels) {
 // insetted a house-fallback image by. That treatment is dropped rather than restated, so the
 // slot is not left open anywhere; `CraftingEssenceThumb` went in the same commit and had no
 // spacing row at all. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 889;
+// 889 -> 884 (issue 1514): the five player views drew the same centred loading/error/empty fill
+// up to a class-name prefix, and each of those five blocks declared `gap: 12px` — the ONE raw
+// spacing literal in each of the five files. The blocks are one shared composition now, and the
+// composition writes `var(--fab-space-3)`, which is 12px, so nothing on screen moves and no slot
+// is left open under a new path. Five rows are DELETED rather than re-banked as one:
+// `assertRatchet` fails on a paid-down row as loudly as on a new one, so the rows and this total
+// move in the commit that deletes the blocks. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 884;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

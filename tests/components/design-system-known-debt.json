@@ -456,6 +456,7 @@
     "src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte | 150 | 1"
   ],
   "unregisteredSharedComponents": [
+    "src/ui/svelte/apps/PlayerViewState.svelte | 1",
     "src/ui/svelte/apps/alchemy/EssenceChips.svelte | 1",
     "src/ui/svelte/apps/crafting/CraftButton.svelte | 1",
     "src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte | 1",
