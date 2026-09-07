@@ -100,7 +100,7 @@
    - onArm(token) / onDisarm(token) / onConfirm(token).
 -->
 <script>
-  import ArmedDangerButton from './ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
 

@@ -59,7 +59,7 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',

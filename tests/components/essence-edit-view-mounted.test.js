@@ -79,7 +79,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/CopyRulesCard.svelte',
     'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',

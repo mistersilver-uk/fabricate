@@ -431,10 +431,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
   // puts this WHOLE subtree into the compiled root's STATIC module graph regardless
-  // of `{#if}`, so every child is enumerated by name: omitting one HANGS every
-  // mounted manager test as `# cancelled`, it does not fail one.
+  // of `{#if}`, so every child is enumerated by name — including the armed control
+  // below, which has lived under `components/` since issue 1509. Omitting one fails
+  // this suite BY NAME through the closure walk at the foot of the file; the
+  // `# cancelled` reading belongs to the suites that carry no such validator.
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/ArmedDangerButton.svelte');
   // The shared bulk-delete card (issue 1132). All three bulk-edit panels render it, and all
   // three are in the root's static graph, so the same rule applies: omitting it HANGS every
   // mounted manager test as `# cancelled`, it does not fail one.

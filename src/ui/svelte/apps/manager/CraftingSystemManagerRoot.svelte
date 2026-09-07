@@ -166,7 +166,7 @@
   // The shipped two-step destructive control, for the world Tool entry's header `Delete`
   // (issue 1373). It is the manager's one destructive idiom, so the header's Delete is guarded
   // exactly as the row and card ones already are.
-  import ArmedDangerButton from './ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
   import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';

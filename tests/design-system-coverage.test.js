@@ -644,7 +644,6 @@ const UNDOCUMENTED_ROWS = [
   // `components/` to `apps/`, which changes where it sorts and nothing about its adjudication.
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
@@ -670,6 +669,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',

@@ -492,7 +492,7 @@ Keep the control constraint as UX, and **test the requirement** (normalizer inpu
 - Manager confirmation prompts (discard unsaved, destructive actions) MUST go through `services.confirmDialog` → `foundry.applications.api.DialogV2.confirm`.
 Never use `globalThis.confirm()`, not even as a fallback.
 See [Manager confirm-discard guard](#manager-confirm-discard-guard).
-  - **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/apps/manager/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
+  - **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/components/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
 A modal per row is the wrong ergonomics at that frequency, and the arm still requires a deliberate second act.
 `confirmDialog` is RETAINED for the heavyweight cases: deleting a stacked (`quantity > 1`) document, and a reset action.
 The armed token MUST be keyed on the target document id, never a row index, because a projection can re-publish asynchronously between the two clicks.

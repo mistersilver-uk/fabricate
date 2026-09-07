@@ -48,7 +48,7 @@
 -->
 <script>
   import { localize, notifyError, notifyWarn } from '../../../util/foundryBridge.js';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';

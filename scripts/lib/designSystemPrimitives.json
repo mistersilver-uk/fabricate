@@ -1,7 +1,7 @@
 {
   "designSystemPrimitives": [
     {
-      "path": "src/ui/svelte/apps/manager/ArmedDangerButton.svelte",
+      "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
       "library": null,
       "status": "target",
       "evidence": "broad",

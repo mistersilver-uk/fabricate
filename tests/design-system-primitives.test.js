@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ManagerModal|SegmentedControl)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(Callout|EmptyState|ExplainerCard|IconFactRow|ManagerModal|SegmentedControl)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -355,13 +355,18 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * this list without giving it an override would have been an unphotographed primitive at a new
  * path. Its override names `manager-recipe-edit-normal`, whose walk lands on the recipe editor's
  * Overview tab, where two of these cards render.
+ * `ArmedDangerButton` moved in the same change and STAYED, with its path re-keyed and its sort
+ * position moved with it — which is the counter-case that makes the rule above legible. Nothing
+ * about it acquired a state: it was neither re-rooted nor re-authored, because its family is
+ * already `ManagerButton`'s and rooted, so the change is a file relocation and a file relocation
+ * draws nothing. A re-key is not an entry, and it does not earn an override.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
@@ -442,7 +447,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 198);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 180);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -1029,7 +1034,8 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
   assert.ok(
     domain.length >= 60,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 71 this tree holds. With none, the register below is empty and ` +
+      `caller bar, against the 64 this tree holds — 71 until issue 1509 moved six primitives out ` +
+      `of apps/ and Phase 3's shim deletion took the seventh. With none, the register is empty and ` +
       'this property is satisfied by a broken scan.'
   );
   assert.ok(

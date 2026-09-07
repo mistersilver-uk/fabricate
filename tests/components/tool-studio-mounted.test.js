@@ -90,7 +90,7 @@ const harness = createMountedComponentHarness({
     // control, the routed identity notice on Validation, the inherit/override card every
     // behaviour section is drawn as, the system-scope band that opens Breakage, and the shared
     // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',

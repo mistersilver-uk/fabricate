@@ -364,7 +364,7 @@
     "src/ui/svelte/apps/journal/ActionsPanel.svelte | 4",
     "src/ui/svelte/apps/journal/RecentResults.svelte | 1",
     "src/ui/svelte/apps/manager/AccessTabView.svelte | 1",
-    "src/ui/svelte/apps/manager/ArmedDangerButton.svelte | 1",
+    "src/ui/svelte/components/ArmedDangerButton.svelte | 1",
     "src/ui/svelte/apps/manager/BooksScrollsView.svelte | 1",
     "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | 1",
     "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte | 2",

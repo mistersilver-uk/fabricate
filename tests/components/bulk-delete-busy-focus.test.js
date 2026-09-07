@@ -49,7 +49,7 @@ const card = createMountedComponentHarness({
   // throws without it.
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: [
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     CARD_PATH,
   ],

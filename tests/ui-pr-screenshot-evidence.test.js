@@ -268,7 +268,7 @@ describe('UI PR screenshot evidence', () => {
     // owned-copies frame would win forever and the armed state would never ship.
     for (const file of [
       'src/ui/svelte/apps/manager/KnowledgeView.svelte',
-      'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      'src/ui/svelte/components/ArmedDangerButton.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',

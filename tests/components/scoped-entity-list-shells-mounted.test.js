@@ -97,7 +97,7 @@ const catalogueHarness = createMountedComponentHarness({
   compiledModules: [
     ...FRAME_MODULES,
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',

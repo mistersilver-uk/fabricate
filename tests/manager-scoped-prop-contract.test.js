@@ -146,6 +146,18 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../utils/vocabularyUsage.js',
   '../../../managerExtensions.js',
   '../../../navTabBadgeStore.js',
+  // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete`
+  // (issue 1373's parity round). The design draws `Back to tools · Delete · Save tool` on
+  // the title line, and `.manager-header` is a sibling of `.manager-main`, so the page
+  // structurally cannot render into that band - it reports an action descriptor and the shell
+  // draws the control. The verb, the reach and the write are all still the page's.
+  //
+  // MOVED BY ISSUE 1509, not added, and for the same reason recorded on the chip below: the
+  // control writes `fabricate-button manager-button is-danger`, a family another primitive
+  // already owns and roots, so it could go to `components/` at the cost of a specifier and
+  // nothing else. The dependency did not change; this list is spelled in specifiers, so the
+  // entry re-sorts as well as re-spells.
+  '../../components/ArmedDangerButton.svelte',
   '../../components/ChanceSlider.svelte',
   // MOVED BY ISSUE 1506, not added. The shell imports the same one chip it always did; the
   // primitive left `apps/manager/` for `components/` because two shipped components under
@@ -160,12 +172,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../util/dropUtils.js',
   '../../util/foundryBridge.js',
   './AccessTabView.svelte',
-  // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete`
-  // (issue 1373's parity round). The design draws `Back to tools · Delete · Save tool` on
-  // the title line, and `.manager-header` is a sibling of `.manager-main`, so the page
-  // structurally cannot render into that band - it reports an action descriptor and the shell
-  // draws the control. The verb, the reach and the write are all still the page's.
-  './ArmedDangerButton.svelte',
   './BooksScrollsView.svelte',
   './ComponentEditView.svelte',
   './ComponentsBrowserView.svelte',

@@ -24,7 +24,7 @@
   control" invariant still holds across this card and every other membership cluster.
 -->
 <script>
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';

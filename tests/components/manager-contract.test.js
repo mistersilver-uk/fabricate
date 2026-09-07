@@ -85,7 +85,7 @@ const gatheringTasksBrowserPath = resolve(
 const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
 const armedDangerButtonPath = resolve(
   repoRoot,
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte'
+  'src/ui/svelte/components/ArmedDangerButton.svelte'
 );
 const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');

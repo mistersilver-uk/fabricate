@@ -83,7 +83,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     // The manager's standing-statement strip. `ToolRequirementsTab` imports it STATICALLY for
     // the system editor's opening info strip (issue 1373, `proto:2855`), and this page renders
     // that tab. World scope passes no `intro`, so the strip never appears here — but a static

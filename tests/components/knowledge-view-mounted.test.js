@@ -53,7 +53,7 @@ const harness = createMountedComponentHarness({
     // `Avatar` is NOT on `SHARED_PRIMITIVES` at two callers, so omitting it HANGS this suite
     // (# cancelled) rather than failing it by name.
     'src/ui/svelte/components/Avatar.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/apps/manager/Callout.svelte',

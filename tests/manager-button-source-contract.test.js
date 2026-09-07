@@ -95,7 +95,7 @@ const LITERAL_EXCEPTIONS = Object.freeze({
       'emits its own classes through a `.join(" ")` rather than writing them in markup — so ' +
       'its evidence is PROSE, and a token-aware probe would read it as having stopped',
   }),
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte': Object.freeze({
+  'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze({
     evidence: 'markup',
     why:
       'a consumer of the same CSS contract, not of the primitive: its danger role is an ' +
