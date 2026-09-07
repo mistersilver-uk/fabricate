@@ -51,8 +51,28 @@ const PROMOTE_TO_PUBLIC = `${WORKFLOW_DIR}/promote-to-public.yml`;
  * Pinning the ref is what makes #1418's gate reachable from the line that needs it. This constant
  * exists so both call sites are asserted against ONE value rather than two string literals that can
  * drift apart — which is the same failure this whole source contract exists to catch.
+ *
+ * AND NOT `@main` either. A mutable ref means whoever can push to `main` changes what the release
+ * line executes under the ruleset-bypassing App token; SonarCloud rates that a HIGH security finding
+ * on new code and fails the gate (measured on PR #1620), which is why
+ * `aws-actions/configure-aws-credentials` is SHA-pinned here too. So the reference is an immutable
+ * commit, and the BUMP OBLIGATION that creates — a change to forward-port.yml must move this SHA, or
+ * the release line keeps running the older gate — is asserted by test 6c below.
  */
-const FORWARD_PORT_USES = 'mistersilver-uk/fabricate/.github/workflows/forward-port.yml@main';
+const FORWARD_PORT_USES =
+  'mistersilver-uk/fabricate/.github/workflows/forward-port.yml@2de9e4d00a5553dec4912cec93fae8b8099fd488';
+
+/**
+ * A job's `uses:` with any trailing YAML comment removed.
+ *
+ * A SHA pin is unreadable without a comment saying what it points at, so this repository writes them
+ * as `<ref>@<sha> # <what>` (see `aws-actions/configure-aws-credentials`). That is ordinary YAML and
+ * GitHub resolves it correctly, but `helpers/workflow-source.js` reads scalars literally and hands
+ * back the comment as part of the value. A `uses:` reference can never contain whitespace, so its
+ * first token IS the whole reference — no general comment-stripping (which would be wrong for
+ * scalars that may legitimately contain `#`) is needed or attempted here.
+ */
+const usesOf = (job) => String(job.uses ?? '').split(/\s+/)[0];
 
 /**
  * The content gate's shared shell (issue #1418).
@@ -418,7 +438,7 @@ test('every step after the skip notice is gated by `enabled`, proven by EVALUATI
 test('release.yml calls the reusable forward-port only after a VERIFIED publish, on the release line', () => {
   const job = jobOf(RELEASE, 'forward-port');
 
-  assert.equal(job.uses, FORWARD_PORT_USES);
+  assert.equal(usesOf(job), FORWARD_PORT_USES);
   assert.ok(needsOf(job).includes('verify-publish'), 'the job needs verify-publish');
 
   // `always()` disables the implicit `success()` wrapping entirely (it is required because
@@ -468,7 +488,7 @@ test('release.yml passes the tag it actually verified as expected_tag', () => {
 test('promote-to-public.yml job 2 delegates, never skips, and names a REACHABLE override remedy', () => {
   const job = jobOf(PROMOTE_TO_PUBLIC, 'forward-port');
 
-  assert.equal(job.uses, FORWARD_PORT_USES);
+  assert.equal(usesOf(job), FORWARD_PORT_USES);
 
   // NO job-level `if:`. A *skipped* job leaves `result == 'skipped'`, and job 4's strict `if:`
   // requires `needs.forward-port.result == 'success'` — so a job-level `if:` here would break every
@@ -542,13 +562,23 @@ test('NO workflow reaches the forward-port through a `./` reference (issue #1619
 
 // ── 6c ──────────────────────────────────────────────────────────────────────────────────────────
 
-test('the pinned forward-port reference names THIS repository and a ref that exists', () => {
+test('the forward-port reference is an immutable SHA naming THIS repository and a real callee', () => {
   // A pinned reference is only as good as its target. A typo in the owner/repo half does not fail
   // at parse time — it fails at dispatch, on the release line, with the callee unresolvable and the
   // prerelease line already jammed. Both halves are checked here instead.
   const [path, ref] = FORWARD_PORT_USES.split('@');
 
-  assert.equal(ref, 'main', 'the callee is pinned to the default branch, where the reviewed gate lives');
+  // IMMUTABLE, not a branch or tag. `@main` would track the reviewed gate automatically, but a
+  // mutable ref lets whoever can push to `main` change what the release line executes under the
+  // ruleset-bypassing App token — a HIGH security finding that fails the Sonar gate on new code.
+  // The cost is a bump obligation, which is exactly why this assertion is here to name it.
+  assert.match(
+    ref,
+    /^[0-9a-f]{40}$/,
+    `the callee must be pinned to a full-length commit SHA, not the mutable ref '${ref}' — a change ` +
+      'to forward-port.yml then requires bumping this pin in BOTH callers, or the release line ' +
+      'keeps running the older gate'
+  );
   assert.ok(
     path.endsWith(`/${FORWARD_PORT}`),
     `the pinned path must end in '${FORWARD_PORT}', got '${path}'`

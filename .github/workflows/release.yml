@@ -266,7 +266,19 @@ jobs:
     # Note the callee already checks out `ref: main`, so its SCRIPTS were main's all along — only the
     # workflow YAML, which decides whether those scripts are invoked at all, came from `release`.
     # Pinning the ref closes that last gap so the release line runs the reviewed gate on `main`.
-    uses: mistersilver-uk/fabricate/.github/workflows/forward-port.yml@main
+    #
+    # PINNED TO A SHA, NOT `@main`, and that is a security requirement rather than a preference: a
+    # mutable ref means whoever can push to `main` changes what this job executes under the ruleset-
+    # bypassing App token. SonarCloud rates it a HIGH security finding on new code and fails the gate
+    # (measured on PR #1620), which is the same reason
+    # `aws-actions/configure-aws-credentials` is SHA-pinned in this repository.
+    #
+    # ⚠ BUMP OBLIGATION. This pin does NOT track `main`. Any change to forward-port.yml must bump the
+    # SHA HERE and in promote-to-public.yml, or the release line keeps running the older gate — the
+    # same class of staleness this pin replaced, now visible in a diff instead of hidden in branch
+    # lag. tests/forward-port-workflow.test.js asserts the reference is an immutable 40-hex SHA and
+    # that both callers name the SAME one.
+    uses: mistersilver-uk/fabricate/.github/workflows/forward-port.yml@2de9e4d00a5553dec4912cec93fae8b8099fd488 # forward-port.yml as of #1443
     with:
       # Not a dry run: this is the entry point that actually keeps `main` numbered above the
       # released version.
