@@ -55,12 +55,12 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import { evaluatePrerequisites } from '../../../../../systems/characterPrerequisites.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import Pagination from '../../../components/Pagination.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import ScopedEntityPreview from '../scoped/ScopedEntityPreview.svelte';
   import {
@@ -385,11 +385,9 @@
     </div>
     <div class="manager-tool-player-copy">
       {#if playerPreview.pill}
-        <StatusPill
-          tone={playerPreview.pill.tone}
-          icon={playerPreview.pill.icon}
-          label={playerPreview.pill.label}
-        />
+        <Chip tone={statusChipTone(playerPreview.pill.tone)} icon={playerPreview.pill.icon}
+          >{playerPreview.pill.label}</Chip
+        >
       {/if}
       <div class="manager-tool-player-toggle">
         <span>{text('FABRICATE.Admin.Manager.Tools.Editor.ShowAsBroken', 'Show as broken')}</span>

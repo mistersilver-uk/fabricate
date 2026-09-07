@@ -18,7 +18,7 @@
 -->
 <script>
   import Field from '../../../components/Field.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';

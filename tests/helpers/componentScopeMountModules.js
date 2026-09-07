@@ -79,6 +79,11 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
 export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
   ...COMPONENT_SCOPE_LEAF_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
+  // The one tone map the converted status chips read (issue 1506). Every consumer of this tier
+  // renders one of the two screens that bind a tone through it — the catalogue's own source
+  // badge, or the shared list frame's presence badge — so it travels with the tier rather than
+  // being restated per suite.
+  'src/ui/svelte/util/statusChipTone.js',
   'src/utils/componentScopeValidation.js',
   'src/utils/componentCategories.js',
 ]);
@@ -154,7 +159,6 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   // `Select`, `Field` and `SearchablePopover` are already in this list via the
   // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
 ]);
 

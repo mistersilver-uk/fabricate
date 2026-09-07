@@ -269,10 +269,12 @@ export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
  * A `var()` token is RESOLVED through the corpus's own definitions and pinned as
  * `raw => resolved`, so moving a banned literal into a private token does not pay the debt down.
  * One token is live debt on this base: `--fab-books-control-radius` is 5px and is read three
- * times. Two others resolve to compliant values and are correctly absent —
- * `--fab-books-panel-radius` is 6px, which is on the ladder, and
- * `--crafting-essence-thumb-radius` is set from markup so the scan reaches only its 6px fallback.
- * The issue predicted the panel token would be debt; it measured compliant, so it has no row.
+ * times. One other resolves to a compliant value and is correctly absent —
+ * `--fab-books-panel-radius` is 6px, which is on the ladder. The issue predicted the panel token
+ * would be debt; it measured compliant, so it has no row. A second worked example stood here
+ * until issue 1506 — `--crafting-essence-thumb-radius`, set from markup so the scan reached only
+ * its 6px fallback — and the art-tile unification deleted the component that declared it, so
+ * the token and the note about it go together.
  */
 export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 
@@ -480,10 +482,11 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
  *
- * MEASURED at `6a2c3b46b` by `tests/design-system-primitives.test.js`: 49 files under
- * `src/ui/svelte/` but outside `components/` are imported by two or more independent callers —
- * the bar `openspec/specs/design-system/spec.md` sets for membership of the primitive set — and
- * carry no row in either manifest table. 75 clear the bar in that domain and 26 are registered.
+ * RE-MEASURED by `tests/design-system-primitives.test.js` after issue 1506's art-tile
+ * unification: 45 files under `src/ui/svelte/` but outside `components/` are imported by two or
+ * more independent callers — the bar `openspec/specs/design-system/spec.md` sets for membership
+ * of the primitive set — and carry no row in either manifest table. 71 clear the bar in that
+ * domain and 26 are registered.
  *
  * This register is the EXCLUSION MECHANISM rather than a list of offenders. A path leaves it only
  * by gaining a manifest row, in either table, and enters it only by being added here, so a name
@@ -503,6 +506,63 @@ export const KNOWN_FORMLESS_BUTTON_TOTAL = 274;
  * specimen and an `evidence` derivation, or a `notAPrimitive` row with the measurement behind it;
  * recording it here says only that it crossed the bar and that the decision is outstanding.
  */
+/**
+ * An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`.
+ *
+ * ── WHY THIS EXISTS, AND WHY IT IS A RECORD RATHER THAN A CORRECTION ────────────────────
+ * The published ladder for the icon chip is 22 / 26 / 30 / 38, default 26. Measured when issue
+ * 1506 unified the tree's art tiles into one primitive, the shipped population renders at
+ * nineteen distinct numeric sizes plus one `dynamic` size key, and only four of the nineteen are
+ * rungs. Restricting `size` would therefore
+ * move almost every art tile in the app, which is a geometry correction with its own frames and
+ * its own screen-by-screen judgement; the size-ladder sweep owns that, and this table is what
+ * lets that sweep LOWER a pin rather than re-derive a census from nothing.
+ *
+ * ── WHY IT IS MEASURED AFTER THE UNIFICATION AND NOT BEFORE ─────────────────────────────
+ * Before that change the same population was spread across four implementations — the manager's
+ * tile, two crafting tiles and three raw image elements — and every key would have named a file
+ * that no longer renders one. A pre-unification baseline is wholly VANISHED afterwards, which
+ * `assertRatchet` reports as loudly as a new row and for no useful reason.
+ *
+ * ── THE TWO `dynamic` KEYS ARE EXPLICIT, AND THAT IS THE POINT ──────────────────────────
+ * Two sites forward a `size` this scan cannot read: the player inventory detail header passes
+ * its own `{size}` prop through, and the scoped list inspector's row tile takes one from a
+ * caller-supplied descriptor. Each is recorded as an explicit `dynamic` key rather than dropped,
+ * because a silently dropped site is invisible to the `scanned` floor as well as to the table —
+ * a scan that had stopped reading expression attributes would look like a tidier tree.
+ *
+ * The ladder-COMPLIANT sites are deliberately absent: this is a debt table, and eight render
+ * sites currently sit on a rung. One of them is a REGRESSION rather than a survivor and is
+ * recorded here as such — the recipe-item contents row drew at 30px on radius 7 with no edge,
+ * the only art tile in the tree already compliant on both, and converting it to the shared
+ * primitive kept its size while moving its corner to a flat 9px and adding a hairline. Radius is
+ * not recordable on a `path | size` table, so it is stated in that change's pull request.
+ *
+ * ── TWO PRIMITIVES, ONE POPULATION, AND WHY THE SAME CHANGE MOVED NO KEY ────────────────
+ * The same issue then shipped `components/Avatar.svelte`, an ACTOR's portrait, and converted the
+ * GM Knowledge surface's roster row and detail header onto it. The population is unchanged at 65
+ * because a call site is a call site whichever tile it renders, and the two keys those sites hold
+ * — `KnowledgeRoster.svelte | 34` and `KnowledgeView.svelte | 50`, still the tree's only carriers
+ * of either value — did not move either, because THIS TABLE IS KEYED BY CALL SITE AND NOT BY
+ * PRIMITIVE. What that conversion had to move instead is the extractor's own list of tile names,
+ * and that is load-bearing rather than clerical: with the portrait missing from it those two
+ * sites leave the scan silently and `assertRatchet` reports them VANISHED, which is a scan that
+ * stopped seeing a tile wearing the costume of debt that had been paid. The two names default to
+ * different rungs — 40 for the icon chip and 32 for the portrait — so the list carries the
+ * default beside each name rather than one constant beside the scan.
+ */
+export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
+
+/**
+ * @see KNOWN_OFF_LADDER_ART_SIZES
+ *
+ * MEASURED after issue 1506's art-tile unification and re-measured after the portrait shipped:
+ * 57 off-ladder render sites across 40 `path | size` keys, out of 65 art-tile render sites in the
+ * tree — 63 icon chips and 2 portraits, with 8 of the 65 on a rung. Unchanged by the portrait
+ * conversion, for the reason the docblock above gives.
+ */
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 57;
+
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
 /** @see KNOWN_UNREGISTERED_SHARED_COMPONENTS */
@@ -531,4 +591,20 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // r16-list by dropping BELOW the bar, never by adjudication, so the decision it records is the same
 // one as then: a manifest row with a `library.html` specimen, or a `notAPrimitive` row with this
 // measurement behind it.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 50;
+// 50 -> 49 (issue 1506): the journal's `RunStatusPill` LEFT by being DELETED. Its four
+// callers render the shared `<Chip>` directly now, so the file this row named is gone and the
+// register's own rule — a name departing unrecorded is a failure — is satisfied by removing it in
+// the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
+// the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
+// already states.
+// 49 -> 48 (issue 1506): the crafting `CraftingStatusBadge` LEFT the same way, its two
+// callers rendering the shared chip. Re-measured: 74 clear the bar, 26 are registered, 48 are not.
+// 48 -> 47 (issue 1506): the crafting `QuantityTag` LEFT, the last of the three retired
+// look-alikes. Re-measured: 73 clear the two-caller bar, 26 are registered, 47 are not.
+// 47 -> 45 (issue 1506): the crafting `CraftingThumb` and `CraftingEssenceThumb` LEFT together,
+// by being DELETED. Their thirty-five render sites across twenty-one files draw the registered
+// `components/Medallion.svelte` now, so the art tile is one component with a manifest row rather
+// than three without one — which is this register working rather than a name slipping out of it.
+// Re-measured on the tree, not subtracted: 71 clear the two-caller bar, 26 are registered, 45
+// are not, and the docblock above is re-measured with it.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 45;

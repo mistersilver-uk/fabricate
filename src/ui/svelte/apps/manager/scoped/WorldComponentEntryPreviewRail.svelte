@@ -35,7 +35,7 @@
   and every selector naming it still resolve.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from '../components/EssenceChip.svelte';
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
 

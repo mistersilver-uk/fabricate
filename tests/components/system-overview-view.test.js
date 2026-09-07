@@ -14,7 +14,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     // THE manager's labelled push-button (issue 1118). Named AHEAD of the conversion that
     // puts it in this tree: `SystemOverviewView`'s deep-link control is one of the sweep's
     // forgotten-role repairs, and the moment it becomes a `<ManagerButton>` an omission here

@@ -31,22 +31,37 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const chipSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'),
   'utf8'
 );
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-chip-characterization-',
-  compiledModules: ['src/ui/svelte/apps/manager/Chip.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/Chip.svelte',
+  compiledModules: ['src/ui/svelte/components/Chip.svelte'],
+  componentPath: 'src/ui/svelte/components/Chip.svelte',
 });
 
 /**
- * The accepted tone vocabulary, DERIVED from the component's own `TONES` literal rather
- * than restated here (issue 1286).
+ * `chipSource`, or a slice of it, with its block and line comments removed.
  *
- * A hand-copied matrix is a mirror, and a mirror of a nine-entry list is exactly the kind
+ * Both scans below need this and neither may skip it: the literals and the class builder sit
+ * inside a heavily annotated file whose prose quotes tone names, density names and the very
+ * `density === '…'` shape one of those scans counts, so an unstripped read invents entries no
+ * `Set.has(…)` will ever match and counts branches that are not branches.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function withoutComments(text) {
+  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
+}
+
+/**
+ * The values one closed vocabulary `Set` declares, DERIVED from the component's own literal
+ * rather than restated here (issue 1286; generalized over both vocabularies at issue 1506).
+ *
+ * A hand-copied matrix is a mirror, and a mirror of a thirteen-entry list is exactly the kind
  * that rots quietly: a tone added to `Chip.svelte` and not to this file leaves the new tone
  * unpinned while every assertion here still passes, which reads as "the chip is
  * characterized" when the newest tone is the one nothing covers. `TONES` is a local `const`
@@ -54,23 +69,49 @@ const harness = createMountedComponentHarness({
  * `chipSource` for the `--fab-chip-color` scope assertion below, and this reads the same
  * text.
  *
+ * ONE SCAN FOR BOTH VOCABULARIES, not two. `EMPHASES` is declared in the same shape a few lines
+ * below `TONES`, and issue 1506 needed to read it for the exact-count contract at the foot of
+ * this file. A second copy of this body would be the mirror this function exists to close, said
+ * about itself: two scans that disagree about what a declaration IS do not fail — one of them
+ * reports clean over a literal the other polices.
+ *
  * Comments are stripped first. The literal is heavily annotated and those annotations quote
- * tone NAMES in prose, so a naive scan for quoted words inside the block would invent
+ * value NAMES in prose, so a naive scan for quoted words inside the block would invent
  * entries that no `TONES.has(...)` will ever match.
+ *
+ * @param {string} name The `const` the vocabulary is declared as, e.g. `TONES`.
+ * @returns {string[]}
  */
-function declaredTones() {
-  const start = chipSource.indexOf('const TONES = new Set([');
-  assert.notEqual(start, -1, 'Chip.svelte still declares its tone vocabulary as `TONES`');
+function declaredSetLiteral(name) {
+  const start = chipSource.indexOf(`const ${name} = new Set([`);
+  assert.notEqual(start, -1, `Chip.svelte still declares its \`${name}\` vocabulary as a Set literal`);
   const open = chipSource.indexOf('[', start);
   const close = chipSource.indexOf(']);', open);
-  assert.ok(close > open, 'the `TONES` literal is closed');
-  const body = chipSource
-    .slice(open + 1, close)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '');
-  const tones = [...body.matchAll(/'([\w-]+)'/g)].map(([, tone]) => tone);
-  assert.ok(tones.length > 0, 'at least one tone is declared');
-  return tones;
+  assert.ok(close > open, `the \`${name}\` literal is closed`);
+  const body = withoutComments(chipSource.slice(open + 1, close));
+  const values = [...body.matchAll(/'([\w-]+)'/g)].map(([, value]) => value);
+  assert.ok(values.length > 0, `at least one \`${name}\` value is declared`);
+  return values;
+}
+
+/**
+ * The accepted TONE vocabulary. See `declaredSetLiteral` above for why it is derived.
+ *
+ * @returns {string[]}
+ */
+function declaredTones() {
+  return declaredSetLiteral('TONES');
+}
+
+/**
+ * Every `density === '…'` branch the class builder routes through, in source order, comments
+ * stripped so a docblock that names a density in prose cannot answer for a branch.
+ *
+ * @returns {string[]}
+ */
+function densityBranches() {
+  const code = withoutComments(chipSource);
+  return [...code.matchAll(/density === '([a-z-]+)'/g)].map(([, value]) => value);
 }
 
 /** Tone → the single class it must add. The whole accepted vocabulary, in source order. */
@@ -596,5 +637,424 @@ describe('1371 Chip — the lit emphasis', () => {
     assert.ok(lit > 0, 'the lit emphasis has a rule');
     assert.ok(ruleIndex('is-tag') < lit, 'the tag tone is written first');
     assert.ok(ruleIndex('is-outlined') < lit, 'and so is the plate');
+  });
+});
+
+
+/**
+ * THE BARE EMPHASIS, NOW THAT A CALLER DRAWS IT (issue 1506).
+ *
+ * The face landed unused beside the `subtle` tone, and the world Component catalogue's row badge
+ * is the caller that turns it on: `tone={linked ? 'subtle' : 'warning'} emphasis="bare"
+ * density="list"`. The mounted coverage that used to watch this face lived in
+ * `recipe-studio-primitives.test.js`, against the pill that owned it before this change — so it
+ * moves here with the face rather than dying with the file, and it asks the same three questions
+ * of the surviving primitive.
+ *
+ * The two that matter most are the negatives. `border: 0` is the WHOLE of this emphasis: it must
+ * not touch the tone's fill or ink, because the catalogue draws the same badge in `subtle` when a
+ * row is linked and in `warning` when it is not, and a face that stated a colour would flatten
+ * the amber the tone is there to say. And the glyph rule must exclude `.fa-circle`: the status
+ * dot rule is written earlier at the same (0,3,1), so an unqualified selector would tie it, win
+ * on source order and inflate every dot the day someone composed the two.
+ */
+describe('1506 Chip — the bare emphasis', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /** The bare rule's body, comments already absent because the head is inside the block. */
+  function bareRule() {
+    const open = ruleIndex('is-bare');
+    assert.notEqual(open, -1, 'the bare emphasis has a rule of its own');
+    return styleBlock.slice(open, styleBlock.indexOf('}', open));
+  }
+
+  it('emits is-bare only when asked, and composes with a NON-subtle tone', async () => {
+    const shipped = await harness.mount({ tone: 'warning' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-warning'],
+      'a chip that does not ask for the bare face is exactly what shipped'
+    );
+    harness.remount();
+
+    // The catalogue's UNLINKED row is `warning` with this face, so the composition is the shipped
+    // case rather than a hypothetical: a bare chip keeps every colour its tone states.
+    const bare = await harness.mount({ tone: 'warning', emphasis: 'bare', density: 'list' });
+    assert.deepEqual(
+      [...chipNode(bare).classList]
+        .filter((name) => name.startsWith('is-'))
+        .toSorted((a, b) => a.localeCompare(b)),
+      ['is-bare', 'is-list', 'is-warning'],
+      'the row badge draws as tone + emphasis + scale, three axes and three classes'
+    );
+  });
+
+  it('states the edge as the `border` SHORTHAND, and touches no colour', () => {
+    const rule = bareRule();
+    // `border: 0` rather than `border-width: 0`: the shorthand resets `border-color` to
+    // `currentColor`, which is the reference's computed edge, where the longhand would leave the
+    // base rule's `--fab-border` sitting on a zero-width edge at a different computed colour.
+    assert.match(rule, /(?:^|\n)\s*border:\s*0;/, 'the whole of this face is the edge going away');
+    assert.ok(
+      !/(?:^|;|\n)\s*(?:color|background)\s*:/.test(rule),
+      `the bare face states a colour of its own, so the tone stops deciding it: ${rule}`
+    );
+  });
+
+  /**
+   * The stylesheet the mount INJECTED, comments stripped.
+   *
+   * `styleBlock` above reads what the file authors; this reads what the compiler emitted and
+   * `css: 'injected'` put in `document.head`, which is the artefact that ships and the only one
+   * that can answer a question about scoping. Comments must go first for the reason
+   * `withoutComments` exists: this rule's own docblock quotes the emitted selector in prose two
+   * lines above the declaration, so an unstripped scan matches the DOCUMENTATION of the rule and
+   * reports green with the rule deleted.
+   *
+   * @returns {string}
+   */
+  function injectedCss() {
+    return withoutComments(
+      [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
+    );
+  }
+
+  /**
+   * The computed `font-size`, in px, of the glyph a chip rendered from its `icon` prop.
+   *
+   * @param {Element} target the mounted container
+   * @returns {number}
+   */
+  function glyphFontSize(target) {
+    const glyph = chipNode(target).querySelector('i');
+    assert.ok(Boolean(glyph), 'the chip rendered a glyph from its `icon` prop');
+    return Number.parseFloat(getComputedStyle(glyph).fontSize);
+  }
+
+  it('emits the status dot rule, at the size that makes a dot a MARK', async () => {
+    // The one rule in this component with no `is-*` class of its own, so nothing above reaches
+    // it: reverting `0.36rem` to a glyph size, or renaming the selector, ships every status dot
+    // at full glyph size with every other assertion in this file still green. Read off the
+    // COMPILED text because the claim is about what Svelte emits — `:global(i.fa-circle)` or a
+    // hoist into the global sheet would keep the authored block looking right while moving marks
+    // on screens that never asked for one.
+    await harness.mount({ icon: 'fa-solid fa-circle' });
+    const [rule] = [...injectedCss().matchAll(/[^{}]*\bi\.fa-circle[^{}]*\{[^}]*\}/g)].map(
+      ([match]) => match
+    );
+    assert.ok(
+      Boolean(rule),
+      'the compiled sheet no longer states a rule for the status dot at all'
+    );
+    assert.match(
+      rule,
+      /font-size:\s*0\.36rem/,
+      `the dot must draw at 0.36rem, and the compiled rule says: ${rule}`
+    );
+    assert.match(
+      rule,
+      /\.manager-chip\.svelte-\w+ i\.fa-circle/,
+      `the rule must stay scoped to a chip's own glyph, but emitted: ${rule}`
+    );
+  });
+
+  it('draws the dot STRICTLY smaller than the same chip drawn with any other glyph', async () => {
+    // The compiled rule above proves the declaration; this proves it ARRIVES. Two mounts that
+    // differ in the icon class alone, so the only thing that can separate the two sizes is the
+    // dot rule matching one of them. A floor is asserted first because an unresolved size reads
+    // as `NaN` and every comparison against it is false — which fails, but for the wrong reason.
+    const dot = await harness.mount({ icon: 'fa-solid fa-circle' });
+    const dotSize = glyphFontSize(dot);
+    harness.remount();
+    const glyph = await harness.mount({ icon: 'fa-solid fa-lock' });
+    const glyphSize = glyphFontSize(glyph);
+    assert.ok(
+      dotSize > 0 && glyphSize > 0,
+      `both glyphs must resolve to a real size, but read ${dotSize}px and ${glyphSize}px`
+    );
+    assert.ok(
+      dotSize < glyphSize,
+      `the dot must be a mark rather than a glyph, but read ${dotSize}px beside ${glyphSize}px`
+    );
+  });
+
+  it('drops its glyph to the reference 7px WITHOUT touching the status dot', () => {
+    const glyphRule = styleBlock.search(/\.manager-chip\.is-bare i:not\(\.fa-circle\)/);
+    assert.notEqual(glyphRule, -1, 'the bare face states its own glyph size');
+    assert.match(
+      styleBlock.slice(glyphRule, styleBlock.indexOf('}', glyphRule)),
+      /font-size:\s*7px/,
+      'at `density="list"` the glyph inherits 9px and the reference draws 7px'
+    );
+    // The tie this `:not()` exists to lose: the dot rule is (0,2,1) and written EARLIER, so an
+    // unqualified `.manager-chip.is-bare i` would tie it, win on order, and inflate the dot.
+    const dot = styleBlock.search(/\.manager-chip i\.fa-circle/);
+    assert.ok(dot !== -1 && dot < glyphRule, 'and the dot rule is still written first');
+  });
+});
+
+/**
+ * THE CLOSED VOCABULARIES ARE PINNED BY EXACT COUNT (issue 1506).
+ *
+ * Two of this component's axes are closed vocabularies with no landed guard on their SIZE. The
+ * matrices above quantify over whatever each axis declares, so they characterize a sixth density
+ * or a fourth emphasis as readily as they characterize the shipped ones: adding a value makes the
+ * suite pin one more thing and report green, which is exactly the opposite of what a vocabulary
+ * that is meant to be closed needs from a test.
+ *
+ * THE PIN IS AN EXACT COUNT AND NEVER A CEILING, and the difference is not pedantry. Written as
+ * `<= 5`, the density gate is defeated by the most natural refactor available — `DENSITIES.has(density) ? \`is-${density}\` : ''`, the exact shape `TONES` and `EMPHASES` already use — which
+ * drops the branch count to zero and lets a seventh density in for free while every assertion
+ * above still passes. An exact count reds on that refactor as loudly as on a new branch, which
+ * puts the question in front of a reviewer instead of leaving it to a green run.
+ *
+ * WHY THE EMPHASIS HALF IS HERE RATHER THAN WHERE IT USED TO BE. The one guard that watched this
+ * axis was the cross-primitive pair in `recipe-studio-primitives.test.js`, which reads
+ * `StatusPill.svelte` from disk — and that component is retiring into this one. This is the
+ * LANDED replacement: it reads only the surviving primitive, and it survives the deletion that
+ * takes the other one.
+ *
+ * Both clauses read the source rather than the mounted DOM on purpose. A value declared without a
+ * rule renders as the default chip, so the DOM cannot tell the two apart, and a value declared
+ * with a rule but never passed by a caller has no DOM at all.
+ */
+describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
+  it('routes exactly FIVE densities through a `density === …` branch, and `default` is their absence', () => {
+    const branches = densityBranches();
+
+    assert.equal(
+      branches.length,
+      5,
+      'the chip routes a different number of densities than the five it ships. This is an EXACT ' +
+        'count rather than a ceiling: a SIXTH branch reds here, and so does a `DENSITIES.has(…)` ' +
+        'set refactor that drops the count to zero. A conversion routes to an EXISTING rung; ' +
+        'minting one to make a conversion pixel-neutral re-creates, on the primitive, the ' +
+        `per-surface geometry this component was extracted to retire. Found: ${branches}`
+    );
+
+    // The names as well as the count, so the failure says WHICH rung moved rather than that the
+    // number did. `default` is deliberately absent: it is the absence of every branch above.
+    assert.deepEqual(
+      branches,
+      ['row', 'list', 'action', 'tag-run', 'inspector'],
+      'the five shipped densities are these five, in this order, and `default` is their absence'
+    );
+  });
+
+  it('declares exactly THREE emphases, and they are the three the specimen publishes', () => {
+    const emphases = declaredSetLiteral('EMPHASES');
+
+    assert.equal(
+      emphases.length,
+      3,
+      'the chip declares a different number of emphases than the three it ships. An EXACT count ' +
+        'rather than a ceiling, for the density clause\'s reason: a FOURTH value reds here, and ' +
+        'so does an `EMPHASES.has(…)` refactor that drops the count below three. A face a pixel ' +
+        `from a shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
+    );
+
+    assert.deepEqual(
+      emphases,
+      ['outlined', 'lit', 'bare'],
+      'the three shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
+        'the ink) and `bare` (no edge at all), in this order'
+    );
+  });
+});
+
+/**
+ * THE ICON-ONLY CHIP, AND THE NAME IT HAS TO CARRY (issue 1506).
+ *
+ * `CraftingStatusBadge` shipped a `compact` variant — a 20x20 square with its label suppressed
+ * and `title` as its only accessible name — and the recipe browser's row rendered it. Retiring
+ * that component into this one had to answer two questions it left open.
+ *
+ * THE SQUARE IS A BOOLEAN, NOT A SEVENTH DENSITY. No density here can produce one: each states a
+ * BAND (a vertical inset and a type size) and a square needs a SIDE. So the prop composes with
+ * whichever density the caller also asks for and publishes a side for each — which makes it total
+ * over the axis it reads, and makes the failure "a density with no side" impossible rather than
+ * unlikely.
+ *
+ * THE NAME IS REQUIRED AND THE ROLE IS CONDITIONAL, which is the half the shipped badge had
+ * wrong. Its glyph is `aria-hidden`, so the only name it ever had was a `title` — a tooltip, not
+ * a name — and the badge was effectively unannounced. `aria-label` alone does not fix it on a
+ * bare `span`, because ARIA prohibits naming a generic role, so the chip states `role="img"`
+ * beside it. But only where it is NON-INTERACTIVE: on a `button` or an `a` the label is already
+ * the control's name and an `img` role would announce an operable control as a picture. The role
+ * is written BEFORE the rest spread, so a caller that passes its own is never overridden.
+ */
+describe('1506 Chip — the icon-only chip', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /**
+   * The six published sides, as `[selector suffix, side, where the figure comes from]`. Five are
+   * read from the density they belong to; `list` states `min-height: 0` and has none to read,
+   * which is why the six are published rather than computed.
+   */
+  const ICON_ONLY_SIDES = [
+    ['is-icon-only', 20, "the base rule's own min-height"],
+    ['is-icon-only.is-row', 22, "`is-row`'s min-height"],
+    [
+      'is-icon-only.is-list',
+      15,
+      'the 15px stadium `proto:4872` publishes, ~2px above the ~13px a labelled list chip renders',
+    ],
+    ['is-icon-only.is-action', 34, "`is-action`'s min-height, which is the button's own figure"],
+    ['is-icon-only.is-tag-run', 25, "the height `is-tag-run`'s note computes: 6 + 6 + 11 + 2"],
+    [
+      'is-icon-only.is-inspector',
+      20,
+      "the height `is-inspector`'s note computes: 3 + 12 + 3 plus the hairline",
+    ],
+  ];
+
+  it('emits is-icon-only only when asked, and composes with a density rather than replacing it', async () => {
+    const shipped = await harness.mount({ density: 'list' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-list'],
+      'a chip that does not ask for the square is exactly what shipped'
+    );
+    harness.remount();
+
+    // The one converted caller: the recipe browser row's status badge, at `list`.
+    const square = await harness.mount({
+      density: 'list',
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+    });
+    assert.deepEqual(
+      authoredClasses(chipNode(square)).toSorted((a, b) => a.localeCompare(b)),
+      ['is-icon-only', 'is-list', 'manager-chip'],
+      'the square is a class beside the scale, so the two axes compose'
+    );
+  });
+
+  it('publishes a square SIDE for every density, six of them, with equal insets', () => {
+    for (const [selector, side, provenance] of ICON_ONLY_SIDES) {
+      const rule = ruleFor(selector);
+      for (const property of ['width', 'height', 'min-height']) {
+        assert.match(
+          rule,
+          new RegExp(String.raw`(?:^|\n)\s*${property}:\s*${side}px;`),
+          `\`.manager-chip.${selector}\` states ${property}: ${side}px (${provenance}). ` +
+            'All three are stated together: `width` because the base rule sets `fit-content`, ' +
+            '`height` because nothing else would make it a square, and `min-height` because the ' +
+            "base rule's 20px floor would otherwise win at `list` and `is-list`'s own " +
+            '`min-height: 0` would let a column flex parent collapse the square at the rest'
+        );
+      }
+    }
+
+    // Equal insets, which at a fixed side is none at all: every density's padding is
+    // horizontal-only or horizontal-heavy, so carrying one in would push the glyph off centre.
+    assert.match(
+      ruleFor('is-icon-only'),
+      /(?:^|\n)\s*padding:\s*0;/,
+      'the square drops the chip padding and lets the base rule centre the glyph'
+    );
+  });
+
+  it('states each density side as a COMPOUND selector, so it does not depend on rule order', () => {
+    for (const [selector] of ICON_ONLY_SIDES.slice(1)) {
+      // (0,3,0) against the density's own (0,2,0) and the base rule's (0,1,0): the side wins on
+      // specificity, so moving these rules within the block cannot change a rendered square.
+      assert.equal(
+        selector.split('.').length,
+        2,
+        `${selector} names the density it overrides, rather than relying on being written later`
+      );
+      assert.notEqual(
+        ruleIndex(selector.replaceAll('.', String.raw`\.`)),
+        -1,
+        `${selector} has a rule`
+      );
+    }
+  });
+
+  it('names itself through role="img" only where the chip is NON-interactive', async () => {
+    const span = await harness.mount({
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+    });
+    assert.equal(
+      chipNode(span).getAttribute('role'),
+      'img',
+      'a bare span drops an aria-label without one'
+    );
+    assert.equal(chipNode(span).getAttribute('aria-label'), 'Locked', 'and the label is the name');
+    harness.remount();
+
+    for (const tag of ['button', 'a']) {
+      const control = await harness.mount({
+        tag,
+        iconOnly: true,
+        icon: 'fas fa-lock',
+        'aria-label': 'Locked',
+      });
+      assert.ok(
+        !chipNode(control).hasAttribute('role'),
+        `on a ${tag} the label is already the accessible name, and an img role would announce an ` +
+          'operable control as a picture'
+      );
+      harness.remount();
+    }
+
+    const plain = await harness.mount({ icon: 'fas fa-lock' });
+    assert.ok(!chipNode(plain).hasAttribute('role'), 'a labelled chip states no role at all');
+  });
+
+  it('never overrides a role the caller passed', async () => {
+    const passed = await harness.mount({
+      iconOnly: true,
+      icon: 'fas fa-lock',
+      'aria-label': 'Locked',
+      role: 'status',
+    });
+    assert.equal(
+      chipNode(passed).getAttribute('role'),
+      'status',
+      'the role is written BEFORE the rest spread, so a caller that means something else wins'
+    );
+  });
+});
+
+/**
+ * `density="list"` IS SINGLE-LINE (issue 1506, decision G).
+ *
+ * `is-row` and `is-action` both state `white-space: nowrap`; the base rule states none, because
+ * wrapping is the chip's default for the reason `is-truncated` documents. So `list` was the one
+ * density that inherited the wrap — and `proto:4872`, which that density quotes, describes a
+ * STADIUM, which is a single-line construction. It became load-bearing when twelve player row
+ * pills converged here from three retired look-alikes, every one of which was single-line: two by
+ * declaration and the journal's by a `flex: 0 0 auto` that held it at max-content. In a narrow
+ * player window a have/need pair would otherwise break across two lines.
+ */
+describe('1506 Chip — the list density is single-line', () => {
+  it('states `white-space: nowrap`, as the two densities beside it already do', () => {
+    assert.match(
+      ruleFor('is-list'),
+      /(?:^|\n)\s*white-space:\s*nowrap;/,
+      "the list density inherited the base rule's wrap, and the reference draws a stadium"
+    );
+  });
+
+  it('leaves the SHRINK to the caller, stating no flex of its own', () => {
+    // The retired journal pill held its width with `flex: 0 0 auto`; that is position, and
+    // position stays with the caller per this component's own `density` note.
+    assert.ok(
+      !/(?:^|\n)\s*flex(?:-shrink)?:/.test(ruleFor('is-list')),
+      'a density states how text lays out, never how much room the row gives the chip'
+    );
   });
 });

@@ -27,6 +27,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  STATUS_TONE_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -35,6 +36,8 @@ import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopePr
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
+  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+  ...STATUS_TONE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
@@ -84,7 +87,6 @@ const SHELL_MODULES = [
   // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
   // this shell rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives

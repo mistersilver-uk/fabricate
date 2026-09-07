@@ -629,7 +629,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     assert.ok(row.classList.contains('is-ghost'), 'and reads as the dimmed cohort');
     assert.ok(Boolean(row.querySelector('.fab-medallion')), 'the medallion stays');
     assert.equal(
-      row.querySelector('[data-status-pill]').textContent.trim(),
+      row.querySelector('.manager-component-name-line .manager-chip').textContent.trim(),
       'Not in this system',
       'the name line states the membership fact rather than a salvage state it cannot have'
     );

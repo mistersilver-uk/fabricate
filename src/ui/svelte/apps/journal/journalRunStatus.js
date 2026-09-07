@@ -1,7 +1,10 @@
 // Shared, pure tone+icon+label vocabulary for the player-facing Journal run
-// status pill. Mirrors the structure of `gatheringBlockedReasons.js`: a frozen
-// presentation map keyed by `RunModel.derivedStatus`, consumed by
-// `RunStatusPill.svelte` so the pill stays a dumb presenter.
+// status badge. Mirrors the structure of `gatheringBlockedReasons.js`: a frozen
+// presentation map keyed by `RunModel.derivedStatus`, consumed by the four journal
+// rows that draw that badge — `HistoryRow`, `RecentResults`, `RunCard` and
+// `RunDetail` — each of which renders the shared `Chip` at `density="list"` and
+// routes this tone through `util/statusChipTone.js`, so the reading stays a dumb
+// projection and the paint stays the primitive's (issue 1506).
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the
 // RuntimeStatePill vocabulary: waiting=warning+hourglass; ready=success+play;

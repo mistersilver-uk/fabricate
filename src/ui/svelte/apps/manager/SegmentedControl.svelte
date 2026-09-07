@@ -188,7 +188,7 @@
         stop — `badge` reuses the slot and changes only the face. A caller passes one or the
         other; passing both is a caller error and renders two numerals, which is visible.
 
-        The mono face ships 400 and 500 only (`design-system/spec.md:230-231`), so the
+        The mono face ships 400 and 500 only (`design-system/spec.md:232-233`), so the
         reference's `font:700 …var(--mono)` numeral lands on 500.
       -->
       {#if option.badge !== undefined && option.badge !== null && option.badge !== ''}
@@ -538,7 +538,7 @@
   }
 
   /* The MONO presentation. Weight 500 is the ceiling the mono face ships
-     (`design-system/spec.md:230-231`), so the reference's 700 lands here. */
+     (`design-system/spec.md:232-233`), so the reference's 700 lands here. */
   .manager-segment-count.is-badge {
     font-family: var(--fab-font-mono);
     font-weight: 500;

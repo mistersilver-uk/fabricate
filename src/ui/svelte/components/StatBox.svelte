@@ -3,13 +3,13 @@
   THE AT-A-GLANCE FIGURE (issue 1505).
 
   ── WHY IT EXISTS ─────────────────────────────────────────────────────────────────
-  `library.html:888-890` draws three of them in a row and captions the rule: "Never
+  `library.html:960-962` draws three of them in a row and captions the rule: "Never
   for a number the GM can edit — that is a stepper." Two screens had each hand-rolled
   the same box, in two directions at once — the player Shopping list at an 18px sans
   numeral over a sentence-case 10px label, the manager's item page at a 1.15rem sans
   numeral over a sentence-case 0.7rem label — and neither is the specimen. One
   component makes the figure ONE treatment and makes the label the shared `Kicker`,
-  which is what `library.html:889` draws: `<div class="k-stat"><span class="v">…</span>
+  which is what `library.html:961` draws: `<div class="k-stat"><span class="v">…</span>
   <span class="k-kicker">…</span></div>`.
 
   ── THE FIGURES ───────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@
   `[data-item-page-mid-label]` sit INSIDE the box, on the two elements this component
   itself renders, and nine assertions read their `textContent`. So the value and the
   label take a hook prop each, the label's being forwarded into the composed `Kicker`
-  because `library.html:889` draws the label AS the kicker and no wrapper element is
+  because `library.html:961` draws the label AS the kicker and no wrapper element is
   permitted to carry a hook instead.
 
   Every one of those four is written BARE on an element today, so each is rendered

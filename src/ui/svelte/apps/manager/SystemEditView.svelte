@@ -16,7 +16,7 @@
 -->
 <script>
   import Field from '../../components/Field.svelte';
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';

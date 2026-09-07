@@ -42,11 +42,11 @@
 -->
 <script>
   import { localize, notifyError } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from '../components/EssenceChip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
@@ -147,9 +147,10 @@
    * THE ROW'S LEADING TILE, as the reference draws it (`proto:600`, UX finding F12).
    *
    * `width:38px;height:38px;border-radius:9px;font-size:15px` with a slate fill and no border at
-   * all. `glyph-chip` is the two halves of that a caller cannot state — the absent edge, and the
-   * fact that a tinted glyph on this chip does not bring a tinted SURFACE with it — and 38 and 15
-   * are the primitive's own `size` and `glyph`, which is why they are written here beside it.
+   * all. `glyph-chip` is the half of that a caller cannot state — the absent edge — and 38 and 15
+   * are the primitive's own `size` and `glyph`, which is why they are written here beside it. The
+   * variant's other half, that a tinted glyph brings no tinted SURFACE with it, became true of
+   * every medallion in issue 1506 and is no longer this variant's to say.
    *
    * A MODULE CONSTANT rather than an inline object literal, because a fresh object every render
    * is a fresh prop value every render: the frame merges it into a `$derived`, and an inline
@@ -475,8 +476,9 @@
      under D-C and this prop deliberately does not reach them.
    - `rowMedallion` (UX F12): `proto:600` draws the row's leading tile as a borderless slate
      square at 38px carrying a 15px tinted glyph, against the shipped 40px bordered artwork tile.
-     The variant owns only the absent edge and the cancelled surface wash; the size and the glyph
-     are the primitive's own arguments, which is why the descriptor states all three together.
+     The variant owns only the absent edge since issue 1506 deleted the surface wash it also used
+     to cancel; the size and the glyph are the primitive's own arguments, which is why the
+     descriptor states all three together.
    - `rosterRecessed` / `rosterSearchWell` (reviewer 7): the reference's system-roster card is a
      recess with its search field LIFTED out of it. Both were restyled in place for all three
      catalogues before lane PRIM turned them into props; this screen is the one that wants them.
@@ -777,8 +779,9 @@
   pill in particular said something different — the frame's badge answers "does this record name
   an Item at all", where the reference's pill names WHICH KIND of address it is.
 
-  It renders INSIDE the identity `<button>`, so nothing here may be interactive: `StatusPill` is
-  a `<span>`, which is why it is the primitive used rather than a chip button.
+  It renders INSIDE the identity `<button>`, so nothing here may be interactive: the chip's `tag`
+  defaults to `span` and neither badge passes one, which is what keeps them readable marks rather
+  than nested controls.
 -->
 {#snippet componentRowNameTrailing(entry)}
   {@const linked = entry?.hasSourceLink === true}
@@ -793,18 +796,26 @@
       insets. Every one of them is declared inside the primitive's own scoped block, and a
       component's scoped block is UNLAYERED while `styles/fabricate.css` imports at
       `layer(modules)` — so no page- or sheet-authored rule could have won against it however
-      specific. `emphasis="bare"` is that face, on the primitive that owns it.
+      specific. `emphasis="bare"` is that face, and since issue 1506 the chip is the primitive
+      that owns it.
 
       IT KEEPS THE TONE, which is why it is `bare` and not `outlined`: the fill and the ink are
       the tone's, and only the edge and the type move. So a linked badge stays `subtle` and an
       unlinked one stays `warning` and keeps its amber.
+
+      AND IT TAKES `density="list"` (issue 1506). The bare face states no height floor of its own
+      and the chip's base declares `min-height: 20px` where the retired pill declared none, so at
+      the default density this badge would floor at 20px inside an 11px gap. `list` declares
+      `min-height: 0` at the same `600 9px` the reference draws, which is also the weight the
+      chip's own base would have thickened to 700. Measured, the badge moves 15.5px to 11px, of
+      which 4.5px is the leading the chip states as 1 rather than 1.5.
     -->
-    <StatusPill
-      tone={linked ? 'subtle' : 'warning'}
+    <Chip
+      tone={statusChipTone(linked ? 'subtle' : 'warning')}
       emphasis="bare"
-      icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}
-      label={componentSourceType(entry, text)}
-    />
+      density="list"
+      icon={linked ? 'fas fa-link' : 'fas fa-link-slash'}>{componentSourceType(entry, text)}</Chip
+    >
   </span>
   {#if broken}
     <!--
@@ -817,13 +828,17 @@
       They are two faces, not one: `proto:3893`'s `pill()` helper draws the exception flag at
       `2px 8px` with a REAL `1px solid` edge at 9.5px, and only `proto:601`'s source badge is
       edgeless. A flag that lost its edge would read as the badge beside it.
+
+      IT TAKES `density="list"` FOR THE PAIR (issue 1506). `proto:601` draws the two badges as one
+      line's pair and they render as `flex: 0 0 auto` siblings in this one snippet, so they move
+      together: at `list` the flag keeps the real edge the chip's base states and the `warning`
+      tone repaints, and measures 13px against the source badge's 11px — where the default density
+      would floor it at 20px, nine pixels above its sibling rather than two.
     -->
     <span class="manager-world-component-row-flag" data-world-component-row-flag={entry.id}>
-      <StatusPill
-        tone="warning"
-        icon="fas fa-link-slash"
-        label={text('FABRICATE.Admin.Manager.Scoped.Component.FlagBrokenLink', 'Broken link')}
-      />
+      <Chip tone="warning" density="list" icon="fas fa-link-slash"
+        >{text('FABRICATE.Admin.Manager.Scoped.Component.FlagBrokenLink', 'Broken link')}</Chip
+      >
     </span>
   {/if}
 {/snippet}
@@ -925,7 +940,7 @@
   .manager-world-component-row-stat-value {
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
-    /* 500, WHICH IS THE ONLY WEIGHT THE FACE SHIPS. `design-system/spec.md:230-231` publishes
+    /* 500, WHICH IS THE ONLY WEIGHT THE FACE SHIPS. `design-system/spec.md:232-233` publishes
        the mono family at 400 and 500 only, so the reference's `font:700 12px var(--mono)` snaps
        here exactly as the control-height ladder snaps 32 and 36 to 34. */
     font-weight: 500;
@@ -973,7 +988,7 @@
   }
 
   /* THE INSPECTOR'S TWO INSETS (issue 1371, round 4). Each is a `--fab-bg-1` well lifted out of
-     the `--fab-bg-2` pane, hairline, radius 9 — `design-system/spec.md:218` puts a well on 9,
+     the `--fab-bg-2` pane, hairline, radius 9 — `design-system/spec.md:220` puts a well on 9,
      which is the reference's own value.
 
      ITS PADDING SNAPS. The reference draws 10px block / 11px inline and the published spacing
@@ -1002,7 +1017,7 @@
     margin: 0;
   }
 
-  /* THE ADDRESS, in the mono face at the weight the face ships (`spec.md:230-231`). It breaks
+  /* THE ADDRESS, in the mono face at the weight the face ships (`spec.md:232-233`). It breaks
      inside a word because a uuid has no spaces and a 300px column has no room for one. */
   .manager-world-component-inspector-uuid {
     margin: 0;

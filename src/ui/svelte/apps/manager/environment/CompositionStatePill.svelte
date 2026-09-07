@@ -10,7 +10,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { resolveCompositionStateMeta } from './compositionStateMeta.js';
 
   let { state = 'candidate' } = $props();

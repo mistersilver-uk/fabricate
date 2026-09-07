@@ -103,7 +103,7 @@ const harness = createMountedComponentHarness({
     // `ManagerButton` among them since issue 1371 gave the popover a `triggerButton` trigger
     // form. A `.svelte` the mounted tree reaches but the harness omits does not fail — the
     // closure validator throws in `before()` and `node --test` reports `# cancelled`.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',

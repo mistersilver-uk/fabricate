@@ -7,7 +7,7 @@
   includedRealmIds; each list is searchable and paginated independently.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';

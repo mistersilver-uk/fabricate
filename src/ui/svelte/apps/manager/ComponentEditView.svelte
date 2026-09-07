@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Field from '../../components/Field.svelte';
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import Callout from './Callout.svelte';
   import EditorTabs from './EditorTabs.svelte';
   import EditorValidationSurface from './EditorValidationSurface.svelte';

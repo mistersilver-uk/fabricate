@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,102 `(at-context, selector)` keys, of which 2,983 appear exactly
+ * Unfiltered, the sheet holds 3,101 `(at-context, selector)` keys, of which 2,982 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -43,6 +43,33 @@
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
  * printed from. The sheet holds 2,600 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES A THIRD TIME, by adding one rule:
+ * `.fabricate-manager .manager-recipe-name-row .manager-chip` gives the row's status pills
+ * `flex: 0 0 auto`, so `truncate`'s `overflow: hidden` cannot zero their automatic minimum
+ * size and squeeze them for room the name should give up first. The selector is a new
+ * singleton in both keyings, so the rule, key and singleton counts each rise by one and the
+ * repeated table is untouched.
+ *
+ * ISSUE 1506 MOVED TWO OF THE THREE CONTEXTUAL FIGURES A SECOND TIME, AND NOT THE RULE COUNT, by
+ * deleting one SELECTOR out of a five-selector group: `.fabricate-manager .manager-recipe-thumb`,
+ * whose two raw `<img>` call sites became the shared art tile. The rule and its four other
+ * selectors — all owned by other geometry sweeps — stay, so the RULE count is unchanged at 2,599
+ * while the key count and the singleton count each fall by one. That is the shape a selector
+ * leaving a group takes, as against a whole block leaving, and the two are recorded separately
+ * because only one of them moves the rule count. The gate cannot see this one on its own:
+ * `deadRuleBlocks` treats a block as dead only when EVERY selector in the group is dead, so the
+ * check with teeth is `git grep -n 'manager-recipe-thumb'` returning nothing across `styles/` and
+ * `src/`, which the pull request quotes.
+ *
+ * ISSUE 1506 ALSO MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting one
+ * rule block: the Tool player preview's `[data-tool-player-preview] .fab-status-pill.is-subtle`,
+ * which selected the status pill this change retires into the shared chip. It was a singleton
+ * key, so the rule count falls by one and the key and singleton counts fall with it, and the
+ * repeated table is untouched — the same shape as the deletion issue 1505 recorded above. The
+ * rule had never rendered, for the reason its own comment recorded: the sheet is imported at
+ * `layer(modules)` and the primitive's scoped block is unlayered, so it lost at every
+ * specificity.
  *
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's

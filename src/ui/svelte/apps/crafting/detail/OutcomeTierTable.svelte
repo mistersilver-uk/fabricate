@@ -6,8 +6,9 @@
   same result are collapsed into one row, so `tier.names` may list several tiers.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
   let { tiers = [] } = $props();
@@ -44,7 +45,7 @@
             <ul class="crafting-tier-awards">
               {#each tier.awardedResults as item, awardIndex (item.name + awardIndex)}
                 <li class="crafting-tier-award">
-                  <CraftingThumb src={item.img} alt="" size={26} />
+                  <Medallion {...resolveCraftingArt(item.img)} alt="" size={26} />
                   <span class="crafting-tier-award-name">{item.name}</span>
                   <span class="crafting-tier-award-qty">×{item.qty}</span>
                 </li>
@@ -134,7 +135,7 @@
   }
 
   /* Rectangular pill with rounded corners, matching the rounded-square item image
-     (CraftingThumb) it wraps. */
+     (the shared `Medallion` tile) it wraps. */
   .crafting-tier-award {
     display: inline-flex;
     align-items: center;

@@ -41,7 +41,7 @@ const harness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
     previewPath,
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',

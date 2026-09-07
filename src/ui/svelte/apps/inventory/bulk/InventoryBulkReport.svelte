@@ -35,7 +35,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import Chip from '../../../components/Chip.svelte';
   import Notice from '../../../components/Notice.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
@@ -283,7 +284,9 @@
                 <span class="bulk-roll-value">{item.rollValue}</span>
               </span>
             {/if}
-            <StatusPill tone={visual.tone} icon={visual.icon} label={localize(visual.labelKey)} />
+            <Chip tone={statusChipTone(visual.tone)} icon={visual.icon}
+              >{localize(visual.labelKey)}</Chip
+            >
           {/snippet}
         </InventoryBulkRow>
       {/each}

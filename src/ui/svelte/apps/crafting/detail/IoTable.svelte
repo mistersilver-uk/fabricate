@@ -19,6 +19,8 @@
   (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
@@ -26,8 +28,9 @@
     buildConsumptionPlan,
     buildRequirementSlots,
   } from '../../../util/requirementSlots.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
-  import QuantityTag from '../QuantityTag.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import { countText } from '../../../util/craftingQuantityReading.js';
+  import Chip from '../../../components/Chip.svelte';
   import IngredientOptionSelector from './IngredientOptionSelector.svelte';
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
@@ -135,16 +138,18 @@
               <span class="crafting-io-name">{essenceLabel(state)}</span>
             </span>
             <span class="crafting-io-tags">
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Have')}
-                value={state.have ?? 0}
-                tone={state.satisfied ? 'success' : 'neutral'}
-              />
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Need')}
-                value={state.need ?? 0}
-                tone="neutral"
-              />
+              <!-- The reading is a WORD and a COUNT, two children rather than one string, so the
+                   chip's own gap still separates them the way the retired tag's did. -->
+              <Chip density="list" tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
+                ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span
+                  >{countText(state.have)}</span
+                ></Chip
+              >
+              <Chip density="list" tone={statusChipTone('neutral')}
+                ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span
+                  >{countText(state.need)}</span
+                ></Chip
+              >
             </span>
           </li>
         {/each}
@@ -159,17 +164,17 @@
         {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
           <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
             <span class="crafting-io-tool-label">
-              <CraftingThumb src={tool.img} alt="" size={28} />
+              <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
               <span class="crafting-io-name">{tool.name}</span>
             </span>
-            <QuantityTag
-              label={tool.available
+            <Chip
+              density="list"
+              tone={statusChipTone(tool.available ? 'success' : 'danger')}
+              icon={`fas ${tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}`}
+              >{tool.available
                 ? localize('FABRICATE.App.Crafting.Io.Available')
-                : localize('FABRICATE.App.Crafting.Io.Unavailable')}
-              value=""
-              tone={tool.available ? 'success' : 'danger'}
-              icon={tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}
-            />
+                : localize('FABRICATE.App.Crafting.Io.Unavailable')}</Chip
+            >
           </li>
         {/each}
       </ul>
@@ -182,7 +187,7 @@
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
           <li class="crafting-io-output" data-io-output>
-            <CraftingThumb src={item.img} alt="" size={32} />
+            <Medallion {...resolveCraftingArt(item.img)} alt="" size={32} />
             <span class="crafting-io-output-name">{item.name}</span>
             <span class="crafting-io-output-qty">×{item.qty}</span>
           </li>

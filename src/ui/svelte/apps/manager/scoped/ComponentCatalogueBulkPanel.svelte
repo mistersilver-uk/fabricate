@@ -44,7 +44,7 @@
   ── THE DOCK NAMES THE WRITE ─────────────────────────────────────────────────────────────────
   The membership group is N components by M systems, so a selection of twelve across three systems
   is thirty-six replicated writes. `Apply 2 changes` named neither the records nor the verb;
-  `componentBulkApplyLabel` names both, which `design-system/spec.md:415` requires of a bulk
+  `componentBulkApplyLabel` names both, which `design-system/spec.md:434` requires of a bulk
   commit action.
 
   ── THE CHROME IS THE SHIPPED PRIMITIVES ─────────────────────────────────────────────────────
@@ -101,7 +101,7 @@
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { paginateRows } from '../../../../../utils/browserPagination.js';

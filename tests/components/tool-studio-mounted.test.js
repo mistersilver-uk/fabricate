@@ -7,6 +7,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 
@@ -16,6 +17,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-editor-',
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     'src/config/flags.js',
     'src/models/Ingredient.js',
     // Ingredient filters its payload through the shared omitted-when-default machinery
@@ -89,7 +92,6 @@ const harness = createMountedComponentHarness({
     // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
@@ -502,7 +504,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(tile.dataset.toolPlayerImage, 'none', 'the slot is empty');
     assert.ok(!tile.querySelector('img'), 'no art is drawn for a copy that is gone');
     assert.ok(
-      !root.querySelector('[data-tool-player-preview] .fab-status-pill'),
+      !root.querySelector('[data-tool-player-preview] .manager-chip'),
       'and no chip names the outcome the empty box already states'
     );
   });

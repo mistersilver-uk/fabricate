@@ -64,7 +64,7 @@
   import-free `components/` leaf directory), which is why it lives here.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   let {
     icon = '',
     title = '',

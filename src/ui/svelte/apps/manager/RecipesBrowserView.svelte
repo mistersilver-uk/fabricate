@@ -17,19 +17,19 @@
   live in the pure `recipeBrowserModel.js`; this component only renders.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
-  import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import {
     describeRecipeSelection,
@@ -759,12 +759,22 @@
                       class="manager-recipe-identity"
                       onclick={() => onSelectRecipe(recipe.id)}
                     >
-                      <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
+                      <Medallion
+                        art={resolveRecipeImage(recipe)}
+                        alt=""
+                        icon="fas fa-scroll"
+                        size={40}
+                      />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
                           {#each statusPills(recipe) as pill (pill.id)}
-                            <StatusPill tone={pill.tone} icon={pill.icon} label={pill.label} />
+                            <Chip
+                              tone={statusChipTone(pill.tone)}
+                              icon={pill.icon}
+                              truncate
+                              title={pill.label}>{pill.label}</Chip
+                            >
                           {/each}
                         </span>
                         <span

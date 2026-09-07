@@ -110,7 +110,7 @@ const RAW_MODULES = [
 const RECIPE_COMPILED = [
   // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
   // harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
@@ -187,7 +187,7 @@ const stepsHarness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     // The card's two step fields render through the labelled-field primitive (issue 1428).
     'src/ui/svelte/components/Field.svelte',
     // The card's "Add a step" footer renders through the primitive (issue 1118).

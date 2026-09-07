@@ -22,9 +22,10 @@
   runless salvage, which records nothing — no tier is marked.
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
+  import Chip from '../../../../components/Chip.svelte';
 
   let { salvage = null, result = null } = $props();
 
@@ -70,11 +71,9 @@
             <span class="salvage-outcome-name">{outcome.name}</span>
             {#if rolled}
               <span class="salvage-outcome-rolled" data-inventory-outcome-your-roll>
-                <StatusPill
-                  tone="accent"
-                  icon="fas fa-circle"
-                  label={localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
-                />
+                <Chip tone="accent" icon="fas fa-circle"
+                  >{localize('FABRICATE.App.Inventory.Salvage.YourRoll')}</Chip
+                >
               </span>
             {/if}
             {#if routedType === 'fixed'}
@@ -104,9 +103,9 @@
                   class="salvage-outcome-result"
                   data-inventory-salvage-result={entry.componentId}
                 >
-                  <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
-                       rather than a broken-image glyph. -->
-                  <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
+                  <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: missing
+                       art gets the house fallback rather than a broken-image glyph. -->
+                  <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={14} />
                   <span class="salvage-outcome-result-name">{entry.name}</span>
                   <span class="salvage-outcome-result-qty">×{entry.quantity}</span>
                 </li>
@@ -187,7 +186,7 @@
     background: var(--fab-accent-soft);
   }
 
-  /* A positioning wrapper only — the shared StatusPill inside owns the ramp and type. */
+  /* A positioning wrapper only — the shared `Chip` inside owns the ramp and type. */
   .salvage-outcome-rolled {
     display: inline-flex;
     flex: 0 0 auto;

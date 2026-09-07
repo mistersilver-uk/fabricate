@@ -38,7 +38,7 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883), which is how the strip draws the ISSUE-SUMMARY
     // vehicle. A `.svelte` the tree renders but the harness omits HANGS the suite
     // (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EditorTabs.svelte',

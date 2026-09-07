@@ -94,7 +94,7 @@
   two copies: SonarCloud's copy-paste detector reads `.svelte`.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import RowDisclosure from '../../components/RowDisclosure.svelte';
   import IconButton from '../../components/IconButton.svelte';
 

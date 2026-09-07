@@ -9,6 +9,7 @@ import {
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -93,6 +94,17 @@ describe('RecipeBrowser mounted behavior', () => {
       null,
       'craftable row has no thumbnail pip'
     );
+
+    // Issue 1506: that meta badge is the shared chip's ICON-ONLY face. `AVAILABLE` returns
+    // `tone: 'success'`, which `Chip` does not paint, so the tone is routed through the map — and
+    // the label the retired badge carried only as a `title` is now the chip's accessible NAME.
+    const chip = craftable.querySelector('.crafting-recipe-row-meta [data-crafting-status]');
+    assert.ok(chip.classList.contains('is-icon-only'), 'the row badge is the square face');
+    assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');
+    assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
+    assert.equal(chip.getAttribute('role'), 'img', 'a bare span drops an aria-label without one');
+    assert.ok((chip.getAttribute('aria-label') ?? '') !== '', 'and it carries a name to announce');
+    assert.equal(chip.textContent.trim(), '', 'the label itself is suppressed, which is the face');
   });
 
   it('forwards search input to onSearch', async () => {

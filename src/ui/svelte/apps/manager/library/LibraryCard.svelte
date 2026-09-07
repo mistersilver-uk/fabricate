@@ -58,8 +58,7 @@
     // `facts` is the recessed well: [{ id, label, tone, title, attrs, class }]. `tone` is
     // one of 'muted' (the default), 'strong' for the leading stat that carries the emphasis
     // — the prototype's "2 in · 1 out" over its "2 steps" — or one of the semantic
-    // 'warning' / 'danger' / 'success', which resolve to the same tokens `Chip` and
-    // `StatusPill` use.
+    // 'warning' / 'danger' / 'success', which resolve to the same tokens `Chip` uses.
     facts = [],
     factsAttrs = {},
     // Snippets
@@ -241,9 +240,10 @@
      is the leading stat that carries the emphasis, because a well whose halves read
      identically is a box with no hierarchy.
 
-     The semantic three are the same `--fab-<tone>-text` tokens `Chip` and `StatusPill`
-     already answer to, so a studio marking a fact as a problem gets the colour the rest of
-     the app uses for a problem, rather than a colour invented at the call site. They exist
+     The semantic three are the same `--fab-<tone>-text` tokens `Chip` already answers to —
+     for every status face in both windows since issue 1506 — so a studio marking a fact as a
+     problem gets the colour the rest of the app uses for a problem, rather than a colour
+     invented at the call site. They exist
      so `tone` is a real enum rather than a boolean wearing a string's clothes: a studio can
      colour a stat by NAMING one, without editing this file. */
   .fab-library-card-fact.is-strong {

@@ -93,7 +93,7 @@ const harness = createMountedComponentHarness({
     'src/utils/recipeCategories.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',

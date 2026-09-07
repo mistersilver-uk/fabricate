@@ -1218,13 +1218,20 @@ describe('CraftingSystemManager source contract', () => {
       recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
       'RecipesBrowserView should use the localized Incomplete label'
     );
-    // The four row states are one component (StatusPill) rather than four ad-hoc
-    // chips. The tones stay distinguishable: warning = blocked but already enabled,
-    // danger = blocked AND off, i.e. enabling would be REFUSED (issue 643, repointed
-    // onto the shared activation predicate by issue 1010).
+    // The four row states are one component rather than four ad-hoc chips. The tones stay
+    // distinguishable: warning = blocked but already enabled, danger = blocked AND off, i.e.
+    // enabling would be REFUSED (issue 643, repointed onto the shared activation predicate by
+    // issue 1010, and onto the one shared chip by issue 1506).
     assert.ok(
-      recipesBrowserSource.includes("import StatusPill from '../../components/StatusPill.svelte'"),
-      'the row should render its states through the shared StatusPill'
+      recipesBrowserSource.includes("import Chip from '../../components/Chip.svelte'"),
+      'the row should render its states through the shared Chip'
+    );
+    // AND THROUGH THE TONE MAP, which is the half a source pin can see and a mounted test
+    // cannot: the projection emits the retired pill's vocabulary, `Chip` DROPS a tone it does
+    // not know, and an unmapped row therefore renders an untoned chip on a green suite.
+    assert.ok(
+      recipesBrowserSource.includes('tone={statusChipTone(pill.tone)}'),
+      'and the projected tone should be mapped rather than bound straight onto the chip'
     );
     assert.ok(
       /incomplete:\s*\['FABRICATE\.Admin\.Manager\.Recipe\.Incomplete'/.test(recipesBrowserSource),

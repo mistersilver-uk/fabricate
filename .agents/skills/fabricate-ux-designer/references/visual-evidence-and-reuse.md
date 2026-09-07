@@ -109,6 +109,6 @@ Evidence from another branch, SHA, checkout, or launch surface does not prove th
 - The already-migrated side wins only for the controls and states where the comparison assigns it authority.
 - A shipped sibling's CSS comments can be the durable record of prototype defects.
 - A style declaration that renders as a no-op is a failed visual change.
-- Hand-rolled copies of `Medallion`, `StatusPill`, `DropZone`, `RollResultBox`, `CraftButton`, or `CraftingThumb` are drift risks when the same behavior is required.
+- Hand-rolled copies of `Medallion`, `Chip`, `Avatar`, `DropZone`, `RollResultBox`, or `CraftButton` are drift risks when the same behavior is required.
 - Borrowing vocabulary and classes from the wrong neighboring feature can be internally consistent and still visually wrong.
 - Prototype fixtures are not authority for states they never represent.

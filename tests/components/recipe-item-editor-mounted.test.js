@@ -6,6 +6,7 @@ import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -15,6 +16,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-editor-',
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
@@ -29,10 +32,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     // The rail's "How players see it" preview builds a synthetic row (pure helper) and
-    // embeds the REAL player InventoryDetail, which pulls in CraftingThumb →
-    // craftingImageDefaults (issue 544).
+    // embeds the REAL player InventoryDetail, which pulls in the shared art tile and the
+    // resolution behind it (issue 544; retargeted by issue 1506).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
@@ -44,6 +48,7 @@ const harness = createMountedComponentHarness({
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
     // ONE chip (issue 883) and the shared no-state primitive (issue 785).
@@ -51,12 +56,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
-    // The salvage bodies render the house chip primitive. The preview never reaches them,
-    // but the compiled router imports them statically, so it is still in the graph.
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
     // the compiled router imports every child statically, so the whole `detail/` tree

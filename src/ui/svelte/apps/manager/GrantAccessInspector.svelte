@@ -14,7 +14,8 @@
    - onSaveAccess(recipeId, { characterIds, playerIds }): persists the full snapshot.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
@@ -210,7 +211,7 @@
     </p>
     <div class="manager-inspector-title-row">
       <span class="manager-inspector-icon" aria-hidden="true"
-        ><img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" /></span
+        ><Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={46} /></span
       >
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>

@@ -28,7 +28,7 @@
 <script>
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
 
   let {
     name = '',
@@ -48,7 +48,7 @@
     <div class="manager-scoped-shared-copy">
       <div class="manager-scoped-shared-title-row">
         <h3 class="manager-card-title manager-scoped-entity-title" title={name}>{name}</h3>
-        <StatusPill tone="info" icon="fas fa-globe" label={pillLabel} />
+        <Chip tone="info" icon="fas fa-globe">{pillLabel}</Chip>
       </div>
       <p class="manager-muted manager-scoped-shared-note" data-scoped-shared-definition-note>
         {note}

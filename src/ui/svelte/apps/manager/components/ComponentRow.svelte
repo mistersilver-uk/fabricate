@@ -44,11 +44,10 @@
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from './EssenceChip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
@@ -137,11 +136,13 @@
          wears a hairline. That single difference measured as three `compare` lines on this row —
          `borderTopWidth`, `borderTopStyle` and `borderTopColor` — and the variant was built for
          exactly these three sites and wired at only one of them. The size and the tint stay the
-         caller's: the variant owns only the absent edge, and the fact that a tinted glyph on this
-         chip does not bring a tinted SURFACE with it, which is also the reference's drawing —
-         every row's chip shares one slate fill and differs in the glyph's ink alone. -->
+         caller's: the variant owns only the absent edge. It used to own a second thing — that a
+         tinted glyph on this chip brings no tinted SURFACE with it — and issue 1506 made that
+         true of every medallion, on the same reference reading: every row's chip shares one slate
+         fill and differs in the glyph's ink alone. -->
     <Medallion
-      src={component?.img}
+      art={component?.img}
+      alt=""
       icon="fas fa-cube"
       size={40}
       tint={component?.color || ''}
@@ -151,12 +152,12 @@
       <span class="manager-component-name-line">
         <span class="manager-system-name" title={component?.name}>{component?.name}</span>
         {#if member && salvageLabel}
-          <StatusPill tone="info" icon="fas fa-recycle" label={salvageLabel} />
+          <Chip tone="info" icon="fas fa-recycle">{salvageLabel}</Chip>
         {/if}
         {#if !member && notInSystemLabel}
           <!-- `subtle` is the reference's own paint for this pill: the soft surface, the
                hairline and the disabled ink (`proto:4997`). -->
-          <StatusPill tone="subtle" label={notInSystemLabel} />
+          <Chip tone="subtle">{notInSystemLabel}</Chip>
         {/if}
         {#if member && difficultyBadge}
           <Chip

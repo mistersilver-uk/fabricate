@@ -883,7 +883,7 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
   // And it is held to what it claims: the panel's warning AND the row pill the warning is
   // counting, in the frame. Either alone publishes a lie.
   assert.match(body, /data-recipe-bulk-blocked-warning/);
-  assert.match(body, /Temper a Blade"\) \[data-status-pill="danger"\]/);
+  assert.match(body, /Temper a Blade"\) \.manager-chip\.is-danger/);
 
   // `selectRecipeRowsByName` fails loudly on a name that matches no row rather than
   // degrading to whatever happened to be first — the degradation IS the defect.

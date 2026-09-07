@@ -125,27 +125,32 @@ test('the library has the exact structure the parser assumes', () => {
   // file — at which point the edit should be accepted deliberately rather than absorbed.
   // 51 as of issue 1371 r17-b: the `<BulkStagingInset>` entry beside `<BulkEditPanel>`'s.
   // 52 as of issue 1371 r18-colour: the `<EssenceChip>` entry beside the icon chip's (M29).
-  assert.equal(library.blockCount, 52, 'spec-head block count');
+  // 53 as of issue 1506: the `<Chip>` entry, written when four status pills retired into that
+  // primitive and the register's highest-traffic row was still pointing at the icon chip's
+  // specimen. RE-MEASURED after the edit rather than incremented: the same change gave two
+  // existing blocks a per-name API section, which moves no count here, and gave section 14 four
+  // routing rows and section 16 three re-measured rows, which move none either.
+  assert.equal(library.blockCount, 53, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    52,
+    53,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 60, 'distinct primitive names');
+  assert.equal(library.names.length, 61, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    60,
+    61,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 32, 'naming blocks');
+  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 33, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan. If the parser were ever
   // widened to the whole file these two would collapse to 69 and 0, and every set comparison below
   // would quietly start counting the ruled-out register as part of the vocabulary.
-  assert.equal(library.fileWideNames.length, 71, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 72, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
@@ -244,7 +249,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 29 library entries with no shipped implementation.
+ * The 28 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -254,9 +259,15 @@ test('every manifest library name resolves to a library entry', () => {
  * `Kicker`, `Notice` and `StatBox` left it at issue 1505, which built all three. `InfoStrip` STAYS:
  * that change measured five candidate call sites for it and exactly one qualifies, which is below
  * the two-independent-importer membership bar, so it defers rather than shipping on one caller.
+ *
+ * `Avatar` left it at issue 1506, which built it: the GM Knowledge surface's roster row and its
+ * detail header are two independent callers, which is the bar, and both were rendering the icon
+ * chip with a person glyph until then. The count above is re-measured on the tree rather than
+ * subtracted, and `Rail`, `LogList` and `TierTrack` — the three names sharing its specimen block —
+ * all STAY, because building one name in a multi-name block builds one name.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
+  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard',
   'ChoiceGroup', 'DataTable', 'InfoStrip', 'ListRow',
   'LogList', 'Menu', 'Meter', 'NavSidebar', 'PageHeader',
   'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',
@@ -574,7 +585,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 34 shipped rows the library does not name.
+ * The 33 shipped rows the library does not name.
  *
  * RE-COUNTED at issue 1392 rather than incremented. The heading said 31 while the register
  * held 33, so it was already two out before this change added one — the list itself is pinned
@@ -603,6 +614,13 @@ test('a divergent entry names the issue that decided it', () => {
  * 1444 and are the same kind of growth: both were PROPOSED as unconverted call sites of
  * `EditorValidationSurface` and both measured as a different surface, so each is a recorded
  * adjudication rather than a primitive that shipped undocumented.
+ *
+ * `components/Medallion` LEFT at issue 1506, in the direction the failure message below calls the
+ * right one: a library entry was written for it. It had been here since this register existed, on
+ * a row whose own text ruled the correspondence out — and the ground it gave, that the tile
+ * "renders a record's linked image with a glyph fallback", is what the icon-chip entry specifies.
+ * That change also made the row true in a way it had not been: the tile absorbed both crafting
+ * thumbnails, so it is now the app's ONE art tile rather than one of three.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
@@ -663,9 +681,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
 ];
 
 test('the shipped rows the library does not name are exactly the known set', () => {
@@ -733,7 +749,7 @@ const CITED_WITHOUT_ENTRY = [
   {
     name: 'RoutingOverview',
     why:
-      'Cited at `library.html:1576` and `:1588` as the element two specimens render. NOT a loose ' +
+      'Cited at `library.html:1756` and `:1768` as the element two specimens render. NOT a loose ' +
       'citation: spec.md requirement "Sets and groups are the container layer above the row" ' +
       'already MANDATES the surface — "The routing is authored in TWO surfaces" and "A ROUTING ' +
       'OVERVIEW lists every source with the set it produces". This is a bound requirement whose ' +

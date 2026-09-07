@@ -43,7 +43,7 @@
   search field is three different things — `<label class="manager-filter"><select>`
   (16 sites), a bare `<select>` carrying its own accessible name (2), and a
   segmented control (2, at `EssenceBrowserView.svelte:289` and
-  `RecipesBrowserView.svelte:468`). `library.html:1233` sketches a `<FilterBar>` that
+  `RecipesBrowserView.svelte:468`). `library.html:1306` sketches a `<FilterBar>` that
   owns `toggles`, `selects`, `segments` and `sort` as DATA; the shipped corpus has
   three control vocabularies and no bar in a position to choose between them, so this
   primitive takes a slot. See the manifest row and `ui-integration/spec.md`.

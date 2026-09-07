@@ -228,7 +228,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 // Suites that mount a larger tree keep their own list: they need these plus a screen's worth of
 // components, and spreading a constant into a longer literal buys nothing.
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'
@@ -255,10 +255,36 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
 export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'
+]);
+
+// THE ONE TONE MAP the retired status pill's call sites read (issue 1506). Every screen that
+// bound a pill tone dynamically — the salvage yield rows, the bulk report's outcome table, the
+// recipe browser's row pills, the world Essence rollup, the Tool player preview and the world
+// Component catalogue's source badge — now routes that read through `statusChipTone.js`, so the
+// module is in the closure of any tree holding one of those components whether or not a test
+// exercises the tone.
+//
+// Hoisted rather than written per suite because it reaches more than two of them, which is the
+// threshold this file's other rosters record: a hand-copied manifest entry rots silently in one
+// copy and counts as duplicated new code in all of them. Flat, and one entry, so the static
+// guard in `mounted-harness-primitive-allowlist.test.js` can read the literal it quotes.
+//
+// A raw module missing from a manifest is INVISIBLE to that guard, which quantifies over
+// compiled COMPONENTS — the only symptom is the harness throwing its named "add it to
+// rawModules" error in `before()`, which cancels the suite's subtests rather than failing one.
+//
+// THE QUANTITY READINGS RIDE WITH IT (issue 1506). `QuantityTag` retired into the same chip, and
+// the readings it never owned — a count, a held-against-needed pair, a stack's `×N` — became a
+// second pure leaf beside the map. Every suite that mounts a converted crafting tree needs both,
+// and the same three-plus suites need both, so they are ONE closure rather than two rosters that
+// have to be remembered separately.
+export const STATUS_TONE_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/statusChipTone.js',
+  'src/ui/svelte/util/craftingQuantityReading.js'
 ]);
 
 // THE MARKS AND NOTICES the design-system pass of issue 1505 closed, as ONE closure. Every
@@ -295,6 +321,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // carries `foundryBridge.js`, so this list does not restate it.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
+  // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
+  // converted tile reads. It joins this roster IN PLACE rather than as a roster of its own:
+  // the eleven suites that spread this constant are exactly the suites whose trees reach it,
+  // and a raw module a tree imports but a manifest omits HANGS the suite (# cancelled) rather
+  // than failing one test in it. It imports `craftingImageDefaults.js` alone, which is the
+  // entry directly above, so the two together close it.
+  'src/ui/svelte/util/craftingArtResolution.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters
   // so a bar reads as the same essence as the pip that filled it; the panel is already in
@@ -304,6 +337,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
+  // THE ONE TONE MAP (issue 1506), spread from its own roster rather than copied. The recipe
+  // browser's row and the detail header draw their status through `<Chip>` now, and the browse
+  // status vocabulary above emits `success` and `neutral`, neither of which is a chip tone under
+  // that spelling — so the map is in this tree's closure wherever that vocabulary is read.
+  ...STATUS_TONE_RAW_MODULES,
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
   // is already in the compiled graph and imports it, so omitting this HANGS every
@@ -452,10 +490,13 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // literal cannot see through a second level of spread — and argued once at that roster.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/StatBox.svelte',
-  'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-  'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-  'src/ui/svelte/apps/crafting/QuantityTag.svelte',
-  'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
+  // The ONE art tile (issue 1506). It replaced `CraftingThumb` and `CraftingEssenceThumb`, which
+  // were entries here, and it joins IN PLACE for the reason they were here: the eleven suites
+  // that spread this constant render it, and ten of them never named a thumb path at all, so a
+  // roster of its own would have left ten suites HANGING (# cancelled) with nothing naming the
+  // omission. It is also a `SHARED_PRIMITIVES` member now, so an omission is the NAMED failure
+  // of `mounted-harness-primitive-allowlist.test.js` rather than a silent hang.
+  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/CraftButton.svelte',

@@ -19,7 +19,7 @@
    - onToggleQuickLimit(id, limited): flip Limited use / Limited learning.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';

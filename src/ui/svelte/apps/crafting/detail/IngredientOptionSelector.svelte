@@ -16,10 +16,13 @@
   message on that choice. Renders nothing when no group offers a choice.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
+  import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
-  import CraftingThumb from '../CraftingThumb.svelte';
-  import QuantityTag from '../QuantityTag.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import { haveOfNeedText, stackCountText } from '../../../util/craftingQuantityReading.js';
+  import Chip from '../../../components/Chip.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
   let { choices = [], onChoose = null } = $props();
@@ -105,24 +108,21 @@
                 )}
             >
               {#if option.isEssence}
-                <CraftingEssenceThumb icon={option.icon} size={40} />
+                <Medallion icon={normalizeEssenceIcon(option.icon)} size={40} glyph={17} />
               {:else}
-                <CraftingThumb src={option.img} alt="" size={40} />
+                <Medallion {...resolveCraftingArt(option.img)} alt="" size={40} />
               {/if}
               <span class="crafting-alt-name">{option.name}</span>
               {#if option.isCurrency}
-                <QuantityTag
-                  label=""
-                  value={option.costLabel}
-                  tone={option.affordable ? 'success' : 'danger'}
-                  icon="fa-coins"
-                />
+                <Chip
+                  density="list"
+                  tone={statusChipTone(option.affordable ? 'success' : 'danger')}
+                  icon="fas fa-coins">{option.costLabel}</Chip
+                >
               {:else}
-                <QuantityTag
-                  label=""
-                  value={`${option.have}/${option.need}`}
-                  tone={option.satisfied ? 'success' : 'danger'}
-                />
+                <Chip density="list" tone={statusChipTone(option.satisfied ? 'success' : 'danger')}
+                  >{haveOfNeedText(option.have, option.need)}</Chip
+                >
               {/if}
               {#if selected}
                 <i class="crafting-alt-tick fa-solid fa-circle-check" aria-hidden="true"></i>
@@ -162,9 +162,11 @@
                   choice.selectedHeldItemId
                 )}
             >
-              <CraftingThumb src={stack.img} alt="" size={40} />
+              <Medallion {...resolveCraftingArt(stack.img)} alt="" size={40} />
               <span class="crafting-alt-name">{stack.name}</span>
-              <QuantityTag label="" value={`×${stack.have}`} tone="neutral" />
+              <Chip density="list" tone={statusChipTone('neutral')}
+                >{stackCountText(stack.have)}</Chip
+              >
               {#if selected}
                 <i class="crafting-alt-tick fa-solid fa-circle-check" aria-hidden="true"></i>
               {/if}

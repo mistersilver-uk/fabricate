@@ -7,8 +7,9 @@
   the products that option produces. Renders nothing for a single-set recipe.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import { ingredientOptionStatus } from '../../../util/ingredientOptionStatus.js';
   import Kicker from '../../../components/Kicker.svelte';
 
@@ -79,7 +80,7 @@
               <ul class="crafting-option-product-grid">
                 {#each products as product, index (product.name + index)}
                   <li class="crafting-option-product" title={product.name}>
-                    <CraftingThumb src={product.img} alt="" size={40} />
+                    <Medallion {...resolveCraftingArt(product.img)} alt="" size={40} />
                     <span class="crafting-option-product-pip">×{product.qty}</span>
                   </li>
                 {/each}

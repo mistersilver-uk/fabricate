@@ -26,8 +26,11 @@
  * anchor on the path separator conflates `components/DropZone.svelte` with
  * `apps/manager/ItemDropZone.svelte` and reports seven callers for a component nothing imports.
  * A basename is not an identity here — nothing stops two directories holding the same name, and
- * `Chip`/`StatusPill`, `ManagerColorPicker`/`ManagerColorPopover` are the near misses that already
- * ship.
+ * `Chip`/`EssenceChip`, `ManagerColorPicker`/`ManagerColorPopover` are the near misses that
+ * already ship. The first pair is the sharper one and it is why suffix matching is structurally
+ * unavailable below: `components/Chip.svelte` and `apps/manager/components/EssenceChip.svelte`
+ * are two different primitives, each with its own manifest row, and a suffix search for the
+ * first would claim the second's four callers as well.
  *
  * So no basename is compared at any point. Each relative specifier is resolved against the
  * DIRECTORY OF THE FILE THAT WROTE IT and the result is compared as a whole repository-relative

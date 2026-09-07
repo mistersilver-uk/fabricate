@@ -2,7 +2,13 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness
+} from '../helpers/svelte-component-harness.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,17 +16,24 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alt-selector-',
   rawModules: [
+    // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
+    // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    // Issue 1506: the tone map and the quantity readings the retired tag's six sites now use.
+    ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-    'src/ui/svelte/apps/crafting/QuantityTag.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
+    // Issue 1506: the have/need tag retired into the shared chip, which this list reaches
+    // through the `<Select>` closure rather than by a hand-written literal of its own.
+    ...SELECT_COMPILED_MODULES,
     // The shared eyebrow (issue 1505). The Alternatives title is a `<Kicker>`, so
     // omitting it HANGS this suite (# cancelled), never fails it.
     'src/ui/svelte/components/Kicker.svelte',
@@ -79,11 +92,13 @@ describe('IngredientOptionSelector mounted behavior', () => {
     };
     const target = await harness.mount({ choices: [choice], onChoose: null });
     const radio = target.querySelectorAll('[role="radio"]')[1];
-    const thumb = radio.querySelector('.crafting-essence-thumb');
-    assert.ok(thumb, 'essence alternative uses a glyph thumb');
+    // Issue 1506 retired the crafting essence tile into the ONE shared tile, so the glyph
+    // face is now a `[data-medallion="glyph"]` rather than a class of its own.
+    const thumb = radio.querySelector('[data-medallion="glyph"]');
+    assert.ok(thumb, 'essence alternative uses a glyph tile');
     assert.match(thumb.getAttribute('style'), /40px/, 'alternative glyph keeps 40px geometry');
     assert.ok(thumb.querySelector('i').classList.contains('fa-heart'));
-    assert.equal(radio.querySelector('img'), null);
+    assert.ok(!radio.querySelector('img'), 'and draws no artwork beside it');
     assert.equal(radio.getAttribute('aria-checked'), 'false');
     assert.match(radio.getAttribute('aria-label'), /Restorative essence/);
     assert.match(radio.textContent, /0\/1/, 'have/need remains visible');
@@ -151,5 +166,48 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.equal(radios.length, 2);
     radios[1].click();
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'copper' }], 'commits the chosen stack');
+  });
+
+  // Issue 1506: the have/need tag retired into the shared chip. Three of this picker's readings
+  // pass `success` for a satisfied or affordable option, and `Chip` paints no tone by that name —
+  // it drops one it does not know, so the satisfied option would have lost its green silently.
+  it('draws each option reading as a chip, in the tone the map routes it to', async () => {
+    const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
+    const radios = target.querySelectorAll('[role="radio"]');
+
+    const satisfied = radios[0].querySelector('.manager-chip');
+    assert.equal(chipToneOf(satisfied), 'positive', 'a satisfied option still reads as green');
+    assert.equal(satisfied.textContent.trim(), '2/1', 'held against needed, from the one reading');
+
+    const short = radios[1].querySelector('.manager-chip');
+    assert.equal(chipToneOf(short), 'danger', 'an insufficient option is still flagged red');
+    assert.equal(short.textContent.trim(), '0/1');
+  });
+
+  it('draws an affordable currency option as a green coin chip', async () => {
+    const choice = optionChoice();
+    choice.options[0] = { ...choice.options[0], isCurrency: true, costLabel: '12 gp' };
+    const target = await harness.mount({ choices: [choice], onChoose: null });
+
+    const chip = target.querySelector('[role="radio"] .manager-chip');
+    assert.equal(chipToneOf(chip), 'positive', 'an affordable cost reads as green');
+    assert.ok(chip.querySelector('i.fa-coins'), 'and keeps its coin glyph');
+    assert.equal(chip.textContent.trim(), '12 gp', 'the cost label is the chip');
+  });
+
+  it('draws a held stack count behind the multiplication sign', async () => {
+    const stackChoice = {
+      kind: 'stack',
+      groupId: 'g1',
+      groupName: 'metal',
+      optionIndex: 0,
+      selectedHeldItemId: 'iron',
+      stacks: [{ itemId: 'iron', name: 'Iron', img: null, have: 3 }],
+    };
+    const target = await harness.mount({ choices: [stackChoice], onChoose: null });
+
+    const chip = target.querySelector('[data-alt-kind="stack"] .manager-chip');
+    assert.equal(chipToneOf(chip), 'neutral', 'a held count is a fact that is merely present');
+    assert.equal(chip.textContent.trim(), '×3');
   });
 });

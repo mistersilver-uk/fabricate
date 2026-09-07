@@ -211,7 +211,22 @@ export function isExemptSpacingPixels(pixels) {
  * no other occurrence of either. The padding is `var(--fab-space-3)` inside the primitive now,
  * so neither slot is left open.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 897;
+// 897 -> 895 (issue 1506): the journal's `RunStatusPill` was DELETED, and its two
+// occupancies — a 5px gap and an 8px padding — vanished with it. `assertRatchet` fails on a
+// VANISHED row as loudly as on a new one, so the rows and this total move in the commit that
+// deletes the file. Measured, not subtracted.
+// 895 -> 892 (issue 1506): the crafting `CraftingStatusBadge` went the same way, taking
+// three — a 5px gap, the 2px inset of its icon-only variant and an 8px padding. Its two callers
+// render the shared chip, whose own square face states `padding: 0`.
+// 892 -> 890 (issue 1506): the crafting `QuantityTag` was the third and last of the retired
+// look-alikes, taking a 5px gap and an 8px padding. Seven occupancies in all, one per rule those
+// three files declared; the chip they converged onto declares its own once.
+// 890 -> 889 (issue 1506): the crafting `CraftingThumb` was DELETED with the art-tile
+// unification, taking the ONE occupancy it declared — the 6px padding its `is-fallback` rule
+// insetted a house-fallback image by. That treatment is dropped rather than restated, so the
+// slot is not left open anywhere; `CraftingEssenceThumb` went in the same commit and had no
+// spacing row at all. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 889;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

@@ -54,7 +54,8 @@
    - children: the body, rendered inside the scrolling column.
 -->
 <script>
-  import CraftingThumb from '../../crafting/CraftingThumb.svelte';
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
 
   let {
@@ -100,7 +101,7 @@
         <i class={icon}></i>
       </span>
     {:else}
-      <CraftingThumb src={img} alt="" {size} />
+      <Medallion {...resolveCraftingArt(img)} alt="" {size} />
     {/if}
     <div class="inventory-detail-heading">
       <p class="inventory-detail-name">{name}</p>

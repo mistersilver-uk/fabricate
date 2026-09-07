@@ -18,8 +18,9 @@
   caller that needs a different join.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
@@ -66,7 +67,12 @@
     <ul class="consumption-plan-rows">
       {#each rows as row (row.key)}
         <li class="consumption-plan-row" data-consumption-row={row.key}>
-          <CraftingThumb src={row.img} alt="" size={30} glyph="fa-solid fa-cube" />
+          <Medallion
+            {...resolveCraftingArt(row.img, 'fa-solid fa-cube')}
+            alt=""
+            size={30}
+            glyph={13.5}
+          />
           <span class="consumption-plan-body">
             <span class="consumption-plan-name">{row.name}</span>
             {#if row.contributions.length > 0}
@@ -123,7 +129,7 @@
     background: var(--fab-surface-soft);
   }
 
-  /* The caller's own flex row, kept: `library.html:883` draws the kicker as a plain span
+  /* The caller's own flex row, kept: `library.html:955` draws the kicker as a plain span
      inside a caller-owned row, and this one carries the leading accent glyph. Everything the
      kicker now owns — size, weight, case, tracking and ink — is gone from here. */
   .consumption-plan-title {

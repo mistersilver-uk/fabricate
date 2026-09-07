@@ -30,7 +30,7 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { USES_CHIP_SPENT, USES_CHIP_UNLIMITED } from './knowledgeStudio.js';
 
   let {
@@ -161,7 +161,7 @@
     title={matchTierTitle(copy)}
   >
     <span class="manager-knowledge-copy-identity">
-      <Medallion src={copy.img} icon="fas fa-book" size={44} alt="" />
+      <Medallion art={copy.img} icon="fas fa-book" size={44} alt="" />
       <span class="manager-knowledge-copy-copy">
         <!-- Line 1 is the prototype's rhythm: name, type, quantity. Keeping the type
              pill here rather than in the chip row is what lets line 2 carry the whole

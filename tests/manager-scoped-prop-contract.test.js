@@ -147,6 +147,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../managerExtensions.js',
   '../../../navTabBadgeStore.js',
   '../../components/ChanceSlider.svelte',
+  // MOVED BY ISSUE 1506, not added. The shell imports the same one chip it always did; the
+  // primitive left `apps/manager/` for `components/` because two shipped components under
+  // that directory already render it, so a player window that mounts either draws it too.
+  // The specifier changed, the dependency did not, and this list is spelled in specifiers.
+  '../../components/Chip.svelte',
   '../../components/ManagerButton.svelte',
   '../../components/Medallion.svelte',
   '../../util/announceAfterFocus.js',
@@ -162,7 +167,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // draws the control. The verb, the reach and the write are all still the page's.
   './ArmedDangerButton.svelte',
   './BooksScrollsView.svelte',
-  './Chip.svelte',
   './ComponentEditView.svelte',
   './ComponentsBrowserView.svelte',
   './CraftingSettingsView.svelte',

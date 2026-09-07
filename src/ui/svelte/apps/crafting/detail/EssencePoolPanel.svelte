@@ -18,10 +18,11 @@
   step themselves into an infeasible allocation.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
@@ -151,7 +152,12 @@
       <ul class="essence-pool-carriers">
         {#each carriers as carrier (carrier.itemKey)}
           <li class="essence-pool-carrier" data-essence-carrier={carrier.itemKey}>
-            <CraftingThumb src={carrier.img} alt="" size={30} glyph="fa-solid fa-cube" />
+            <Medallion
+              {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
+              alt=""
+              size={30}
+              glyph={13.5}
+            />
             <span class="essence-pool-carrier-body">
               <span class="essence-pool-carrier-name">{carrier.name}</span>
               <span class="essence-pool-carrier-facts">
@@ -199,7 +205,12 @@
       <ul class="essence-pool-picked">
         {#each allocated as carrier (carrier.itemKey)}
           <li class="essence-pool-picked-row" data-essence-picked={carrier.itemKey}>
-            <CraftingThumb src={carrier.img} alt="" size={24} glyph="fa-solid fa-cube" />
+            <Medallion
+              {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
+              alt=""
+              size={24}
+              glyph={10.8}
+            />
             <span class="essence-pool-picked-name">{carrier.name}</span>
             <span class="essence-pool-picked-count">×{carrier.allocatedUnits}</span>
             <span class="essence-pool-picked-contributions">

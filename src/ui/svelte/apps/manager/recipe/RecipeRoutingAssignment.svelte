@@ -19,7 +19,7 @@
     onAdd(id) / onRemove(id)
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
 

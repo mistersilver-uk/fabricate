@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -164,6 +164,13 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
+  // Every other entry here was earned by an existing component acquiring a state its frames could
+  // not reach; this one exists because a new `components/` file is a broad signal the moment it
+  // is written, and the rule three components followed at issue 1505 is that a new broad-signal
+  // component ships with an override naming a frame that draws it. One frame, because one frame
+  // draws both of its call sites.
+  'src/ui/svelte/components/Avatar.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
@@ -187,6 +194,13 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
+  // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
+  // `manager-components-normal` draws the untinted variant — that row binds a colour nothing in
+  // `src/` produces — and `fabricate-app-shell` draws the plain artwork tile, so the tint, which
+  // is the axis this change moved from a surface wash onto the glyph, is absent from both. It
+  // leaves `PRIMITIVES_WITH_NO_FRAME` in the same change, which is the direction that list moves.
+  'src/ui/svelte/components/Medallion.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
@@ -243,7 +257,7 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`coverage-theme-light-player :: ^styles\/fabricate\.css$`,
   String.raw`manager-checks-crafting-dynamic-dc :: ^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$`,
   String.raw`manager-component-complications-empty :: ^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$`,
-  String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$`,
+  String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Chip\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Medallion\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^styles\/fabricate\.css$`,
   String.raw`manager-world-downtime-test-companion-installed :: ^styles\/fabricate\.css$`,
@@ -299,16 +313,21 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * Three components shipped under `components/` in that same change — `Kicker`, `Notice` and
  * `StatBox` — and NONE of them entered this list, because each arrived with its own override
  * naming a frame that draws it, which is the only way a new broad-signal component may ship.
+ * `Medallion` left it at issue 1506, the same way and for a reason that change created: absorbing
+ * both crafting thumbnails made it the app's ONE art tile, and moving its tint from a surface wash
+ * onto the glyph gave it a state neither representative frame draws. Its override names the one
+ * published frame that draws a TINTED tile. `Avatar`, which arrived in the same change, never
+ * entered this list either, and for the rule stated above rather than as an exception.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
   'src/ui/svelte/components/FillBar.svelte',
@@ -316,10 +335,8 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
@@ -357,6 +374,11 @@ test('the inputs every property below quantifies over are alive', () => {
   // component that had quietly crossed the bar, and the first time three arrived together. The
   // non-member set is unmoved at 12: this change promotes nothing out of it and demotes nothing
   // into it.
+  // 53 UNMOVED as of issue 1506, and the stillness is the fact rather than the absence of one:
+  // that change DELETED `components/StatusPill.svelte`'s row when the pill retired into the chip
+  // and ADDED `components/Avatar.svelte`'s when the actor portrait shipped, so the set is
+  // net-neutral across the branch and this pin is deliberately not edited. Between those two
+  // commits it is the one register red the change declares in advance.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 53, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
@@ -374,7 +396,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 266);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 261);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -537,7 +559,7 @@ test('(c) every manifest row names a file that exists', () => {
 const IMPORTERS = measureImporters(REPO_ROOT);
 
 /** A component this repository is known to import heavily. See the control clause below. */
-const POPULATED_CONTROL = 'src/ui/svelte/apps/manager/Chip.svelte';
+const POPULATED_CONTROL = 'src/ui/svelte/components/Chip.svelte';
 
 /** The number words a `why` may spell a caller count with, plus the digits. */
 const COUNT_WORDS = new Map([
@@ -918,7 +940,9 @@ const MEMBERSHIP_BAR = 2;
  * set is a closed, versioned vocabulary" requirement puts a candidate INTO the set at two or more
  * independent callers, and it does not say the candidate has to live in `components/` — but every
  * gate that read it did, so a component under `apps/` could acquire twenty callers without
- * anything asking whether it belonged in the vocabulary. `CraftingThumb` has twenty-one.
+ * anything asking whether it belonged in the vocabulary. The crafting art tile had twenty-one,
+ * and issue 1506 answered the question for it by retiring it into a registered primitive rather
+ * than by registering it where it stood.
  *
  * The register below is therefore the EXCLUSION MECHANISM rather than a list of offenders. A path
  * leaves it only by gaining a manifest row — in EITHER table, because recording a component as a
@@ -959,7 +983,7 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
   assert.ok(
     domain.length >= 60,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 75 this tree holds. With none, the register below is empty and ` +
+      `caller bar, against the 71 this tree holds. With none, the register below is empty and ` +
       'this property is satisfied by a broken scan.'
   );
   assert.ok(

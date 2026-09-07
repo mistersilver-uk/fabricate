@@ -2,7 +2,7 @@
 <!--
   RunDetail is the Journal's centre column: the full view of the selected run.
   With no run selected it shows the "Select a run" per-column empty state. With a
-  run selected it renders a header (thumb, name, status pill, structure + step
+  run selected it renders a header (thumb, name, status chip, structure + step
   labels, flavor) then branches on runType:
    - crafting / salvage: a StepTimeline + the current step's StepDetails;
    - gathering: a simple auto-resolve summary (full gathering detail is Phase 2).
@@ -12,7 +12,9 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import RunStatusPill from './RunStatusPill.svelte';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
+  import { runStatusPresentation } from './journalRunStatus.js';
   import StepTimeline from './StepTimeline.svelte';
   import StepDetails from './StepDetails.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
@@ -24,6 +26,7 @@
 
   const runType = $derived(String(run?.runType ?? ''));
   const status = $derived(String(run?.derivedStatus ?? ''));
+  const runStatus = $derived(runStatusPresentation(status));
   const isTerminal = $derived(TERMINAL.has(status));
   const isSucceeded = $derived(status === 'succeeded');
   const hasSteps = $derived(runType === 'crafting' || runType === 'salvage');
@@ -70,7 +73,13 @@
           {run.names?.title ?? ''}
         </h2>
         <div class="journal-detail-meta">
-          <RunStatusPill {status} />
+          <Chip
+            class="journal-run-status"
+            density="list"
+            tone={statusChipTone(runStatus.tone)}
+            icon={`fas ${runStatus.icon}`}
+            data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+          >
           {#if run.structureLabel}
             <span class="journal-detail-tag">{run.structureLabel}</span>
           {/if}
@@ -200,6 +209,14 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+  }
+
+  /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
+     `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
+     caller's and geometry is the primitive's — the rule its own `density` note states. So the one
+     property that was doing work here is restated here, where the row that squeezes it lives. */
+  .journal-detail-meta :global(.journal-run-status) {
+    flex: 0 0 auto;
   }
 
   .journal-detail-tag {

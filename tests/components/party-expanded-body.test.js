@@ -27,7 +27,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
