@@ -18,7 +18,10 @@ A measurement taken on a branch is dated to that branch commit, which a squash m
 
 ### Corpus and authority
 
-The design system's corpus is **this repository only** — the GM manager and the player app under `src/ui/`, and the Core prototypes that feed them.
+The design system's corpus is **this repository only** — every Fabricate-authored surface under `src/ui/`, and the Core prototypes that feed them.
+Measured at the commit that states this: the GM manager, the player app, the three canvas interactables windows (the interactable browser, the interactable config sheet and the interactables manager), the roll-prompt dialog and the interaction-prompt toast.
+The corpus is DERIVED rather than listed, and that distinction is what the earlier two-window sentence obscured: `collectStyleCorpus()` walks `['src','styles']` and no gate carries a directory list, so a window enters the corpus by existing.
+Its debt is therefore pinned from its first commit, and “not yet in the design system” is never true of a file under `src/` — a new surface is either compliant or on a ratchet, never outside.
 The Economy module and the premium Downtime companion are separate products and are explicitly OUT of corpus, because a signature count weighted by a codebase this repository does not govern cannot justify a primitive in it.
 A prototype whose implementation brief names a module other than Core is out of corpus, and a count derived from it MUST be re-derived before it is cited.
 
@@ -163,6 +166,10 @@ None of the three portals anything, so each needs one root, and each writes it o
 Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `ManagerSearchField` emits `fabricate-search`, `ManagerToolbar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
 None of the six portals anything either, so each needs exactly one root.
 All six are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
+That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
+The tree contradicts such a prohibition in both directions: `apps/inventory/detail/InventorySalvagePanel.svelte` and `apps/inventory/salvage/SalvageProgressiveBody.svelte` both import `apps/manager/Callout.svelte` and are reachable from the player application's root, and `components/SearchablePopover.svelte` imports `apps/manager/EmptyState.svelte`.
+So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
+The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
 Issue 1518 and issue 1520 are the changes that turn all six from claims into facts.
@@ -462,7 +469,11 @@ An interactive primitive MUST declare rest, hover, focus-visible and disabled, a
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
-Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for five roots — three interactables windows, the roll-prompt dialog, and `.fabricate` itself, the shared module root every Fabricate window emits, which carries the collapsed reset for the player app and the manager — and it is recognised by the SHAPE of those blocks — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
+Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for ONE root — `.fabricate` itself, the shared module root every Fabricate window emits — and it is recognised by the SHAPE of that block — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
+It named five roots until the three interactables windows and the roll-prompt dialog had their copies deleted, and the rule that reduction establishes is general: a per-area copy of a suppression the module root already writes reaches the same elements at the same rank, so which one paints is decided by source order rather than by anything a reader of either block can see, and the copy is deleted by the change that proves the module rule reaches it.
+The licence extends to COPIES and not to VARIANTS.
+Where an area rule declares a DIFFERENT treatment it is not a copy and it survives: the roll-prompt dialog keeps a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash.
+So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 
 A loading control MUST set `aria-busy` and change its label or text.
@@ -571,7 +582,19 @@ The eligible roots are `.fabricate-manager` and `.fabricate-app`, and a root is 
 The list is TWO and stays two.
 Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the windows joining the contract do not extend the eligible list.
 The component-editor half of that ruling is RETIRED rather than outstanding: the standalone component-editor window was orphaned — its only constructor call was a manager service nothing consumed, and three ratchets forbid restoring the call — so issue 1520 deleted the application instead of re-skinning it, and a deleted window adopts nothing.
-The interactables half stands and is the change's remaining obligation.
+The interactables half LANDED: `InteractableBrowserApp`, `InteractableConfigApp` and `InteractablesManagerApp` each declare `fabricate-app` in `DEFAULT_OPTIONS.classes`, so the eligible list is still two CLASSES while the windows those two classes cover went from two to four — which is what makes the adoption a prerequisite for converting any control that portals, rather than a skin change that could follow one.
+Two facts the ruling did not state are recorded with it, because both are ways of honouring its letter while breaking what it is for.
+
+First, THE LEVEL.
+An area class adopted by a window that already has a positioned frame goes in that window's `DEFAULT_OPTIONS.classes` array.
+Putting `.fabricate-app` on a static Svelte root instead would satisfy every source reader while making the resolver return a non-positioned host — the exact defect this requirement forbids, arriving through the adoption meant to honour it.
+The frame is also the only ancestor OUTSIDE `.window-content`, which the area class sets to `overflow: hidden`, so a panel portalled to the frame escapes that clip and one portalled inside it would not.
+
+Second, A SHARED AREA CLASS MUST NOT CARRY A PER-WINDOW SIZE FLOOR.
+`.fabricate.fabricate-app` declared `min-width: 1024px; min-height: 640px` for the 1280px player window, and a CSS floor beats the inline `width` ApplicationV2 writes onto the frame, so adopting that class on windows declared at 420, 480 and 560 wide would have rendered all three at 1024px with every existing parity assertion still green — because those assertions read `position`, and `position` does not change.
+The floor moved to a player-only `.fabricate.fabricate-app-window`.
+The general rule: an area class carries typography, colour and scheme, a size floor belongs to the window that declares the size, and the test pinning the floor is retargeted onto the narrower class so re-merging them reds.
+That retarget alone is insufficient and MUST be paired with a negative assertion that the shared rule declares neither dimension, because a retarget catches a MOVE and misses an ADD — and an add is the likelier way back, since a reader who opens the shared rule and finds no floor is being invited to restore one.
 A window that needs a root picks whichever of the two matches what it IS — a GM authoring surface or a play surface — rather than minting one for itself, because each new root is another ancestor a portal resolver must know about and another family a primitive can be accidentally scoped under.
 A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 
@@ -1146,6 +1169,32 @@ The player window carries NO premium signal in any state, and a player-side choo
 - **WHEN** a new surface lists records a GM can filter and open
 - **THEN** it follows the browse recipe's element order
 - **AND** its row state renders as a status button rather than a toggle
+
+### Requirement: A window is registered in the View Lab before a change re-skins it
+
+Screenshot evidence for a change to a window OUTSIDE the case registry is not merely absent; it is FALSELY POSITIVE, and that is why registration is a requirement rather than a courtesy.
+`mapChangedFilesToCases` returns its fallback case id when nothing matched, the evidence matcher computes its expectation from the same selector, finds that id in it, and reports SATISFIED — so a conversion touching four windows can go green on a frame of a window it does not touch, automatically, with no human involved.
+The smoke path fails differently and no better: its theme-or-global-ui fallback arms only when NOTHING matched, so a diff in which some windows have recipes and others do not leaves the others with zero frames while the gate reports a match.
+
+A change that re-skins an unregistered window therefore REGISTERS it as a phase of that same change, BEFORE the phases that alter what it looks like.
+Registration is four artifacts: a chrome entry restating the window's real `DEFAULT_OPTIONS`, a mount path, the fixture state its screens read, and cases whose `reaches` and `smokeLabels` are ANSWERED per case rather than blanket-declared.
+`screenshots-exempt` is not the answer here and is refused by name: an exemption on a change that deletes whole skin families is an exemption on exactly the case the gate exists for.
+
+The requirement carries ONE exception, stated rather than left implicit.
+A deletion whose no-op is proved by an ELEMENT-AND-RANK argument — the deleted rule and the surviving rule select the same elements at the same or lower rank, so no pixel can differ — needs no frame, and a change taking the exception invokes it BY NAME for the window concerned and publishes that argument.
+The exception covers deletions proved redundant, never re-skins, and never a VARIANT mistaken for a copy; any deletion that cannot carry the argument registers its window like the rest.
+
+#### Scenario: A change re-skins a window outside the View Lab's case registry
+
+- **WHEN** a change alters the visual presentation of a window with no chrome entry or case
+- **THEN** the change registers that window — chrome entry, mount path, fixture state, and cases with `reaches` and `smokeLabels` answered — as a phase before the phases that alter its appearance
+- **AND** `screenshots-exempt` is refused for that change
+
+#### Scenario: A change deletes a rule proved redundant in an unregistered window
+
+- **WHEN** a deleted rule and a surviving rule select the same elements at the same or lower rank
+- **THEN** the change may invoke the exception by naming the window and publishing the element-and-rank argument
+- **AND** a rule declaring a DIFFERENT treatment is a variant rather than a copy and is not covered
 
 ### Requirement: The set is extended by an explicit, recorded decision
 

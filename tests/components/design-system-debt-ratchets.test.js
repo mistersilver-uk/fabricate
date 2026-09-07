@@ -364,19 +364,24 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
 
   assert.deepEqual(
     [...new Set(exempt.map((entry) => entry.reset))].sort(byCodePoint),
-    [
-      '.fabricate',
-      '.fabricate-interactable-browser-app',
-      '.fabricate-interactable-config-app',
-      '.fabricate-interactables-manager',
-      '.fabricate-roll-prompt-dialog',
-    ],
-    'the set of roots suppressing core focus has changed. Issue 1501 has collapsed the ' +
-      'app/manager pair onto the module root `.fabricate` and issue 1520 deletes the three ' +
-      'interactables copies, so this list is expected to shrink again — but each of those is a ' +
-      'deliberate edit here, not a silent one.'
+    ['.fabricate'],
+    'the set of roots suppressing core focus has changed. It is ONE root now: issue 1501 ' +
+      'collapsed the app/manager pair onto the module root `.fabricate`, and issue 1520 deleted ' +
+      'the four per-area copies that outlived it — the interactable browser, the interactable ' +
+      'config sheet, the interactables manager and the roll-prompt dialog. Each of those emits ' +
+      '`fabricate` itself, so the module reset already reached every element the copy named, at ' +
+      'the same (0,2,1) rank and with a wider element list. A root arriving here is a per-area ' +
+      'copy of a suppression the module root already writes, and it needs a reason no reader of ' +
+      'either block could otherwise see.'
   );
-  assert.equal(exempt.length, 24, 'the five blocks name 24 selectors between them');
+  assert.equal(
+    exempt.length,
+    6,
+    'the one surviving block names 6 selectors. It was 24 across five blocks before issue 1520: ' +
+      'the module reset names six, the config, browser and manager copies named five each, and ' +
+      'the roll-prompt copy named three — 6 + 5 + 5 + 5 + 3 — of which 18 went with the four ' +
+      'deleted blocks.'
+  );
 
   // A rule that merely CONTAINS a reset compound is not a reset. This is the cheapest way to
   // launder a finding: append the offending selector to the block that is already exempt.
@@ -1235,26 +1240,26 @@ const MODULE_FOCUS_PAIR = Object.freeze([
     half: 'the Foundry-core focus reset',
     compound: RESET_COMPOUND,
     declarations: { outline: 'none', 'box-shadow': 'none' },
-    areaRoots: [
-      '.fabricate-interactable-browser-app',
-      '.fabricate-interactable-config-app',
-      '.fabricate-interactables-manager',
-      '.fabricate-roll-prompt-dialog',
-    ],
+    // EMPTY SINCE ISSUE 1520, which is the state this pin was written to reach. Four area roots
+    // carried a byte-for-byte copy of this half; every one of them emits `fabricate`, so the
+    // module reset already reached the same elements at the same rank and source order alone
+    // decided which painted. An entry returning here is a regression, not a decision deferred.
+    areaRoots: [],
   },
   {
     half: 'its paired :focus-visible ring',
     compound: RING_COMPOUND,
     declarations: { outline: '2px solid var(--fab-accent)', 'outline-offset': '2px' },
-    // THREE, NOT FOUR, AND THE MISSING ONE IS NOT AN OVERSIGHT. The roll-prompt dialog writes its
-    // ring as `button, input` in one block and `select` alone in another — neither list is one of
-    // `RESET_SHAPES`, so this recogniser does not see either as a copy of the pair. Its RESET half
-    // is a published shape and is listed above. Issue 1520 owns all four blocks.
-    areaRoots: [
-      '.fabricate-interactable-browser-app',
-      '.fabricate-interactable-config-app',
-      '.fabricate-interactables-manager',
-    ],
+    // EMPTY SINCE ISSUE 1520. Three area roots wrote a copy of this half and all three are gone.
+    // The roll-prompt dialog was never in this list even while it carried a ring, and the reason
+    // survives the deletion and now matters more: it writes `button, input` in one block and
+    // `select` alone in another, and neither list is one of `RESET_SHAPES`, so this recogniser
+    // never saw either as a copy of the pair. Issue 1520 deleted the `button, input` block as a
+    // copy and KEPT the `select` one, which paints an INSET `box-shadow` where the module ring
+    // paints an OUTSET `outline` — a variant rather than a copy, because an outset ring on a
+    // `<select>` flush to that dialog's overflow-clipped edge is clipped. `RING_ROOTS` below
+    // still names the dialog for exactly that surviving rule.
+    areaRoots: [],
   },
 ]);
 
@@ -1285,11 +1290,18 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 12 roots over 14 blocks, every one of them
- * legitimate today, which is exactly why a thirteenth would not stand out to a reader. It was 9
- * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
- * each gained the ring half of its own pair, and 11 over 13 until its third phase did the same
- * for `ChanceSlider`. `Field`'s is TWO comma-separated legs — `.fabricate-field
+ * Derived from the sheet rather than asserted: 9 roots over 11 blocks, every one of them
+ * legitimate today, which is exactly why a tenth would not stand out to a reader. It was 9 over
+ * 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and each
+ * gained the ring half of its own pair, 11 over 13 until its third phase did the same for
+ * `ChanceSlider`, and 12 over 14 until issue 1520 deleted the interactable browser's, the
+ * interactable config sheet's and the interactables manager's per-area rings — three roots over
+ * three blocks, each a copy of the module ring reaching the same elements at the same rank.
+ * `.fabricate-roll-prompt-dialog` STAYS, and the asymmetry is the point of this population's own
+ * keying: its reset half went with the other copies, so it left the exemption list in the same
+ * commit, while its `select` ring paints an INSET `box-shadow` against the module's OUTSET
+ * `outline` and is a VARIANT the module cannot cover. Membership here is not a licence to
+ * delete — the population is keyed on ELEMENTS, and elements are the part a variant shares. `Field`'s is TWO comma-separated legs — `.fabricate-field
  * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
  * `:is(input, textarea)` member, and that is a requirement of this population rather than a
  * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`
@@ -1311,9 +1323,6 @@ const RING_ROOTS = Object.freeze(
     '.fabricate-button',
     '.fabricate-field',
     '.fabricate-icon-button',
-    '.fabricate-interactable-browser-app',
-    '.fabricate-interactable-config-app',
-    '.fabricate-interactables-manager',
     '.fabricate-pagination',
     '.fabricate-roll-prompt-dialog',
     '.fabricate-search',
@@ -1551,10 +1560,14 @@ test('no area root writes a copy of either half of the module focus pair', () =>
     assert.deepEqual(
       [...new Set(roots)].sort(byCodePoint),
       areaRoots,
-      `${half} must be written once at the module root. These area roots are issue 1520's and ` +
-        'issue 1501 left them in place; any other root is a per-area copy of a pair the module ' +
+      `${half} must be written once at the module root, and since issue 1520 no area root ` +
+        'writes a copy of either half — the list above is empty and is meant to stay empty. ' +
+        'Issue 1501 collapsed the pair onto `.fabricate` and left four per-area copies standing; ' +
+        'issue 1520 discharged them. Any root arriving here is a fresh copy of a pair the module ' +
         'already writes, reaching the same elements at the same rank, so which one paints is ' +
-        'decided by source order rather than by anything a reader of either block can see.'
+        'decided by source order rather than by anything a reader of either block can see. A ' +
+        'genuine VARIANT — a different treatment, not a different spelling of the same one — is ' +
+        'not this shape and is adjudicated at `RING_ROOTS` instead.'
     );
   }
 });
@@ -1772,8 +1785,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,120 `(at-context, selector)`
-  // keys under this very keying, of which 3,001 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,086 `(at-context, selector)`
+  // keys under this very keying, of which 2,967 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

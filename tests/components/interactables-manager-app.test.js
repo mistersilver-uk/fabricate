@@ -38,8 +38,15 @@ describe('InteractablesManagerApp singleton window', () => {
     );
     assert.ok(appSource.includes("id: 'fabricate-interactables-manager'"), 'stable window id');
     assert.ok(
-      appSource.includes("classes: ['fabricate', 'fabricate-interactables-manager']"),
-      'carries the namespaced app-root class for the CSS gate'
+      appSource.includes(
+        "classes: ['fabricate', 'fabricate-interactables-manager', 'fabricate-app']"
+      ),
+      'carries the namespaced app-root class for the CSS gate, plus the shared `fabricate-app` ' +
+        'area class issue 1520 adopted at the FRAME. The area class is what `resolveOverlayHost` ' +
+        'walks to, so a converted control that portals a panel lands inside this window instead ' +
+        'of on `<body>`; putting it on the Svelte root would satisfy a source reader while ' +
+        'resolving a non-positioned host. It carries no size floor — that is on ' +
+        '`fabricate-app-window`, which only the player window emits.'
     );
   });
 

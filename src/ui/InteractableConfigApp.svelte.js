@@ -72,7 +72,13 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-interactable-config',
-    classes: ['fabricate', 'fabricate-interactable-config-app'],
+    // `fabricate-app` is the shared PLAY-surface area class (issue 1520), adopted at the frame so
+    // this 480px-wide behaviour sheet takes the module's typography, colour and `color-scheme`.
+    // NOT on the Svelte root: `resolveOverlayHost` needs a POSITIONED ancestor, and the frame is
+    // the only one outside `.window-content`, which `.fabricate.fabricate-app .window-content`
+    // clips. The size floor is NOT part of this class — it lives on `fabricate-app-window`, which
+    // only the player window emits.
+    classes: ['fabricate', 'fabricate-interactable-config-app', 'fabricate-app'],
     tag: 'div',
     window: {
       title: 'FABRICATE.Canvas.Interactable.Config.Title',
