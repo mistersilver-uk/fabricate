@@ -35,6 +35,7 @@ import { applyManualCompositionForceFold } from './migrateManualCompositionForce
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
+import { applySubjectModifierMarks } from './migrateSubjectModifierMarks.js';
 import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 import { buildWorldTravelConfig, stripSystemTravelConfig } from './migrateTravelToWorldScope.js';
@@ -595,6 +596,32 @@ function seedFailureResultPolicy(migrated) {
 }
 
 /**
+ * Record the mark that keeps an imported bundle's existing subject modifier picks rolling
+ * (issue 1608), mirroring the world-side 1.33.0 migration so an imported system behaves exactly
+ * like a migrated one. An export bundle carries exactly one system, its recipes and its gathering
+ * slice, so the shared per-system transform is applied directly with no grouping.
+ *
+ * ORDERED AFTER `liftCharacterLibrariesToWorldScope`, which is load-bearing rather than
+ * cosmetic: the transform intersects the seed with the world modifier catalogue, and on a bundle
+ * predating 1308 that catalogue exists only as the system's own copy until that lift has run.
+ *
+ * BRANCH-INDEPENDENT for the same reason as its siblings above: `migrateExportPayload` returns
+ * early once `payload.schemaVersion` is already current, and every bundle written by the shipping
+ * build carries the current schema, so a derivation reachable only from the legacy branch would
+ * never run on a real bundle. Idempotent — a second pass finds the mark already seeded.
+ * @private
+ */
+function seedSubjectModifierMarks(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applySubjectModifierMarks(system, {
+    recipes: migrated.recipes,
+    tasks: migrated.gatheringConfig?.system?.tasks,
+    worldLibraries: migrated.characterLibraries,
+  });
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -618,6 +645,7 @@ export function migrateExportPayload(payload) {
     liftCurrencyToWorldScope(current);
     liftTravelToWorldScope(current);
     liftCharacterLibrariesToWorldScope(current);
+    seedSubjectModifierMarks(current);
     foldManualCompositionForces(current, { clearAutomaticForces: false });
     deriveWorldScopeEntitySlices(current);
     return current;
@@ -658,6 +686,7 @@ export function migrateExportPayload(payload) {
   liftCurrencyToWorldScope(migrated);
   liftTravelToWorldScope(migrated);
   liftCharacterLibrariesToWorldScope(migrated);
+  seedSubjectModifierMarks(migrated);
   foldManualCompositionForces(migrated, { clearAutomaticForces: true });
   deriveWorldScopeEntitySlices(migrated);
 

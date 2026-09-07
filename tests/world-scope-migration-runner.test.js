@@ -161,7 +161,7 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
       `${scopeKey} is a DESTINATION and must precede its source`
     );
   }
-  assert.equal(store.get('migrationVersion'), '1.32.0');
+  assert.equal(store.get('migrationVersion'), '1.33.0');
   // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it
   // carries one record per entity whose oldest contributing system authored a liftable section.
   // Seededness still keys on key PRESENCE, so the key must be written either way.
@@ -220,7 +220,7 @@ for (const leg of LEGS) {
     const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
     const rerunSummary = await rerun.runner.run();
     assert.equal(rerunSummary.aborted, false);
-    assert.equal(rerun.store.get('migrationVersion'), '1.32.0');
+    assert.equal(rerun.store.get('migrationVersion'), '1.33.0');
     assert.deepEqual(
       finalState(rerun.store),
       untornFinal,
@@ -273,7 +273,7 @@ test('the ready-pass interaction: a same-boot pass must NOT destroy the map of a
   // AT THE NEXT BOOT the map is STILL PRESENT and the re-run repairs `gatheringConfig`.
   const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
   await rerun.runner.run();
-  assert.equal(rerun.store.get('migrationVersion'), '1.32.0');
+  assert.equal(rerun.store.get('migrationVersion'), '1.33.0');
 
   // AND THE MAP IS EVENTUALLY CLEARED. Without this assertion the arm passes against a pass
   // that withholds the clear but advances its own version, which orphans the map permanently.
@@ -335,12 +335,13 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   initial.migrationVersion = '1.30.0';
   const { runner, writes } = makeRunner(initial);
   const summary = await runner.run();
-  // TWO entries are pending, and NEITHER is this one: issue 1373's `1.31.0` and issue 1371's
-  // `1.32.0` sit above `1.30.0` on the ladder. What this test measures is that the world-scope
-  // LIFT does not re-enter, and the empty write list is what proves it — the `1.31.0` pass finds
-  // no tool membership record here to backfill and the `1.32.0` pass no component membership
-  // record to mark, so neither changes anything and no leg is written.
-  assert.equal(summary.ran, 2, 'only the 1.31.0 and 1.32.0 passes above it are pending');
+  // THREE entries are pending, and NONE is this one: issue 1373's `1.31.0`, issue 1371's
+  // `1.32.0` and issue 1608's `1.33.0` sit above `1.30.0` on the ladder. What this test measures
+  // is that the world-scope LIFT does not re-enter, and the empty write list is what proves it —
+  // the `1.31.0` pass finds no tool membership record here to backfill, the `1.32.0` pass no
+  // component membership record to mark, and the `1.33.0` pass no `bySubject` check whose
+  // subjects have picked anything, so none changes anything and no leg is written.
+  assert.equal(summary.ran, 3, 'only the 1.31.0, 1.32.0 and 1.33.0 passes above it are pending');
   assert.deepEqual(
     writes,
     ['migrationVersion'],

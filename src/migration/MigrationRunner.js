@@ -41,6 +41,7 @@ import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgr
 import { migrateSeedFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateSubjectModifierMarks } from './migrateSubjectModifierMarks.js';
 import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { migrateToolRequirementSections } from './migrateToolRequirementSections.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
@@ -713,6 +714,35 @@ const MIGRATIONS = [
     // That is data loss in the registry's sense, and the label says so beside the button.
     downgradeLosesData: true,
     migrate: (data) => migrateComponentEssenceSections(data),
+  },
+  {
+    version: '1.33.0',
+    label:
+      'Keep every check modifier your recipes, components and gathering tasks already pick. ' +
+      'Under the "each subject picks its own" rule, the check now MARKS which modifiers a ' +
+      'subject may choose from — the Selectable switches on the Checks tab — and a pick the ' +
+      'check does not mark no longer rolls. A check where nothing was ever marked would ' +
+      'therefore have stopped applying every pick in your world at once, so each one is ' +
+      'marked with exactly the modifiers its own subjects already pick, and every record ' +
+      'that was inheriting that empty mark is given an explicit pick of no modifiers — ' +
+      'which is what it was already rolling, because an empty mark was all it had to ' +
+      'inherit. NO ROLL CHANGES: every record contributes exactly what it contributed ' +
+      'before, and the Checks tab now shows the modifiers your subjects actually use as ' +
+      'Selectable rather than showing none of them. The records that gained an explicit ' +
+      'pick read "No modifiers" where they read "Inherit system default" before; both add ' +
+      'nothing. Checks on the other three rules are untouched, and a check where you HAD ' +
+      'marked something is left exactly as you set it. DOWNGRADING IS LOSSLESS: 1.32.0 ' +
+      'reads a subject’s own picks whatever the check marks, and reads an explicit pick ' +
+      'of no modifiers exactly as this release does, so nothing changes in that direction ' +
+      'either',
+    downgradeTo: '1.32.0',
+    // Nothing is removed in either direction: the pass only ADDS ids to a mark and an empty
+    // pick to a record that had none. `1.32.0` reads the mark as a plain default rather than
+    // as a bound, so a subject with its own picks rolls those picks there exactly as it did
+    // before this pass, and one carrying the authored `[]` resolves to no eligible modifier —
+    // which is what it resolved to under the empty mark it used to inherit.
+    downgradeLosesData: false,
+    migrate: (data) => migrateSubjectModifierMarks(data),
   },
   // Future migrations added here in version order
 ];
