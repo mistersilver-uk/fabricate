@@ -1049,6 +1049,60 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(two.text.includes('2'), 'and the number reaches the sentence a GM reads');
   });
 
+  it('says the picks are HIDDEN rather than absent when the check marks NONE of them (issue 1608)', async () => {
+    // THE ZERO POINT of the suppression cohort, which every case above steps around: the
+    // check marks nothing, so EVERY stored pick is suppressed and the pill row draws no
+    // chip at all. The row then falls back to its empty-set copy — in the visible
+    // placeholder AND in the `aria-live` summary a screen reader hears on every change —
+    // and that copy was written for the OTHER zero, an authored pick of nothing. It says
+    // "nothing is added", two lines above a note that correctly says the picks are kept.
+    const target = await editHarness.mount(
+      markProps({
+        craftingModifierDefaultIds: [],
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+      })
+    );
+    const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
+    const placeholder = picker.querySelector('.manager-availability-any').textContent.trim();
+    const status = picker.querySelector('[data-modifier-pill-status]').textContent.trim();
+    assert.equal(
+      picker
+        .querySelector('[data-recipe-crafting-modifier-suppressed]')
+        ?.getAttribute('data-recipe-crafting-modifier-suppressed'),
+      '2',
+      'both picks are counted as kept-but-hidden, which is what the row must not contradict'
+    );
+    for (const [where, sentence] of [
+      ['placeholder', placeholder],
+      ['live status', status],
+    ]) {
+      assert.ok(
+        !/nothing is added/i.test(sentence),
+        `the ${where} must not tell a GM the recipe adds nothing while both picks are kept`
+      );
+      assert.match(sentence, /hidden/i, `the ${where} names the state the note explains`);
+    }
+    editHarness.remount();
+
+    // THE OTHER ZERO IS UNTOUCHED. An authored pick of nothing against a full mark really
+    // does add nothing, and must keep saying so — or this fix would have swapped one wrong
+    // sentence for another.
+    const authoredZero = await editHarness.mount(
+      markProps({ recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } } })
+    );
+    const zeroPicker = authoredZero.querySelector('[data-recipe-crafting-modifier-picker]');
+    assert.match(
+      zeroPicker.querySelector('.manager-availability-any').textContent,
+      /nothing is added/i,
+      'a real pick of zero still reads as a pick of zero'
+    );
+    assert.ok(
+      !zeroPicker.querySelector('[data-recipe-crafting-modifier-suppressed]'),
+      'and nothing is suppressed, which is what makes the two zeros different'
+    );
+    editHarness.remount();
+  });
+
   it('counts ELIGIBLE picks against the cap, so a suppressed one frees no slot it took (issue 1608)', async () => {
     // A cap of 2 with two marked picks and one suppressed. Counting the STORED list would
     // read three and deaden the Add menu, against a chip that is not on screen to remove.

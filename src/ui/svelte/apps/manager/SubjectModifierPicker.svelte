@@ -202,6 +202,24 @@
     if (translated && translated !== SUPPRESSED_KEY) return translated;
     return `${suppressedCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
   });
+  // WHICH ZERO THE PILL ROW IS SHOWING, the recipe picker's rule applied to the surface it
+  // shares. The row draws no chip both when the record authored a pick of nothing and when
+  // every pick it authored is currently suppressed, and its placeholder is also its
+  // `aria-live` summary — one sentence for two states. "Nothing is added" is true of the
+  // first and flatly contradicts the note beneath it in the second, which says those same
+  // picks are kept. The ALL-suppressed sentence reuses the RECIPE key for the reason the
+  // note above already reuses its pair: it names no subject.
+  const allPicksSuppressed = $derived(pickedEligible.length === 0 && suppressedCount > 0);
+  const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
+  const emptyRowText = $derived(
+    allPicksSuppressed
+      ? text(
+          ALL_SUPPRESSED_KEY,
+          'All chosen modifiers are currently hidden — the check no longer marks them selectable. They are kept and return if the check marks them again.'
+        )
+      : text(copy.emptySetKey, copy.emptySet)
+  );
+
   // `aria-describedby` takes a LIST: a reader told only the cap would never hear that some
   // of this record's own picks are missing from the row it is reading.
   const describedBy = $derived(
@@ -298,7 +316,7 @@
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
           'All modifiers selected.'
         )}
-        noneSelectedLabel={text(copy.emptySetKey, copy.emptySet)}
+        noneSelectedLabel={emptyRowText}
         onToggle={togglePick}
       />
       {#if capBounded}

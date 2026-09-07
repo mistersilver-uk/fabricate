@@ -397,6 +397,48 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
   });
 
+  it('says the picks are HIDDEN rather than absent when the activity marks NONE of them (issue 1608)', async () => {
+    // THE ZERO POINT of the suppression cohort: the activity marks nothing, so EVERY
+    // authored pick is suppressed and the pill row draws no chip. The row then falls back
+    // to its empty-set copy — the visible placeholder AND the `aria-live` summary — which
+    // was written for the OTHER zero, an authored pick of nothing, and says "nothing is
+    // added" directly above a note that says the picks are kept.
+    const { target } = await mount({ selectedIds: ['med', 'alch'], inheritedIds: [] });
+    const placeholder = target.querySelector('.manager-availability-any').textContent.trim();
+    const status = target.querySelector('[data-modifier-pill-status]').textContent.trim();
+    assert.equal(
+      target
+        .querySelector('[data-subject-modifier-suppressed]')
+        ?.getAttribute('data-subject-modifier-suppressed'),
+      '2',
+      'both picks are counted as kept-but-hidden, which is what the row must not contradict'
+    );
+    for (const [where, sentence] of [
+      ['placeholder', placeholder],
+      ['live status', status],
+    ]) {
+      assert.ok(
+        !/nothing is added/i.test(sentence),
+        `the ${where} must not tell a GM the record adds nothing while both picks are kept`
+      );
+      assert.match(sentence, /hidden/i, `the ${where} names the state the note explains`);
+    }
+    harness.remount();
+
+    // THE OTHER ZERO IS UNTOUCHED. An authored pick of nothing against a full mark really
+    // does add nothing, and must keep saying so.
+    const { target: authoredZero } = await mount({ selectedIds: [] });
+    assert.match(
+      authoredZero.querySelector('.manager-availability-any').textContent,
+      /nothing is added/i,
+      'a real pick of zero still reads as a pick of zero'
+    );
+    assert.ok(
+      !authoredZero.querySelector('[data-subject-modifier-suppressed]'),
+      'and nothing is suppressed, which is what makes the two zeros different'
+    );
+  });
+
   it('counts ELIGIBLE picks against the cap, so a suppressed one frees no slot it took (issue 1608)', async () => {
     // Counting the STORED list would read two and deaden the Add menu against a chip that
     // is not on screen to remove.

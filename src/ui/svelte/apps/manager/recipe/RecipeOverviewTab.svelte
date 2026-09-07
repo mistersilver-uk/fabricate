@@ -278,6 +278,27 @@
     return `${suppressedPickCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
   });
 
+  // WHICH ZERO THE PILL ROW IS SHOWING. The row draws no chip in two different states and
+  // its placeholder — which is also its `aria-live` summary, so a screen-reader user hears
+  // it on every change — can only carry one sentence. Before the mark bounded the offer
+  // there was one zero: the recipe had authored no pick, and "nothing is added" was true.
+  // Now the row also empties when every stored pick is suppressed, where that sentence is
+  // FALSE and contradicts the note directly beneath it, which says the same picks are
+  // kept. So the state decides the sentence rather than the emptiness alone.
+  const allPicksSuppressed = $derived(pickedEligibleIds.length === 0 && suppressedPickCount > 0);
+  const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
+  const emptyRowText = $derived(
+    allPicksSuppressed
+      ? text(
+          ALL_SUPPRESSED_KEY,
+          'All chosen modifiers are currently hidden — the check no longer marks them selectable. They are kept and return if the check marks them again.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
+          'No modifiers — nothing is added to this recipe’s check roll.'
+        )
+  );
+
   // Both notes describe the pill group, and `aria-describedby` takes a LIST — a screen
   // reader that heard only the cap would be told how many picks are allowed and never
   // that some of the recipe's own are missing from the row it is reading.
@@ -698,10 +719,7 @@
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
               'All modifiers selected.'
             )}
-            noneSelectedLabel={text(
-              'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
-              'No modifiers — nothing is added to this recipe’s check roll.'
-            )}
+            noneSelectedLabel={emptyRowText}
             onToggle={toggleModifierId}
           />
           {#if modifierCapBounded}
