@@ -81,8 +81,13 @@ function buildHost() {
   };
 
   if (hostKind === 'app') {
-    // `SvelteFabricateApp.svelte.js`: `classes: ['fabricate', 'fabricate-app']`, plus the
-    // `application` class ApplicationV2 puts on every framed window.
+    // `SvelteFabricateApp.svelte.js`: `classes: ['fabricate', 'fabricate-app',
+    // 'fabricate-app-window']`, plus the `application` class ApplicationV2 puts on every framed
+    // window. The third of those is DELIBERATELY omitted here: it carries only the player
+    // window's drag-resize size floor (issue 1520 split that off the shared `fabricate-app` area
+    // class), and this fixture sizes its frame inline, so the floor would be noise. What the
+    // fixture is testing is `fabricate-app` as a POSITIONED portal host, which is the part of
+    // the real class list that matters to `resolveOverlayHost`.
     const frame = element('div', 'application fabricate fabricate-app', frameStyles);
     const content = element('section', 'window-content');
     const shell = element('div', 'fabricate-app-shell');

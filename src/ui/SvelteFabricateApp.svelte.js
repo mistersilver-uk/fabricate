@@ -174,7 +174,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
-    classes: ['fabricate', 'fabricate-app'],
+    classes: ['fabricate', 'fabricate-app', 'fabricate-app-window'],
     tag: 'div',
     window: {
       title: 'FABRICATE.App.Title',
@@ -195,10 +195,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // narrow-width stacking breakpoint takes over. ApplicationV2 V13 does NOT
   // accept `minWidth`/`minHeight` inside the (non-extensible) `position` option
   // (assigning to it throws), so the floor is enforced two ways: a
-  // `min-width`/`min-height` on the app root (.fabricate-app, styles/fabricate.css)
-  // which is what visually stops the drag handle, and the `_updatePosition` clamp
-  // below which is the single ApplicationV2 position-transform hook applied by
-  // BOTH `setPosition()` and drag-resize.
+  // CSS floor on `.fabricate.fabricate-app-window` in styles/fabricate.css, which
+  // is what visually stops the drag handle, and the `_updatePosition` clamp below
+  // which is the single ApplicationV2 position-transform hook applied by BOTH
+  // `setPosition()` and drag-resize.
+  //
+  // THE FLOOR IS ON `fabricate-app-window`, NOT ON THE SHARED `fabricate-app` AREA
+  // CLASS, and that is deliberate (issue 1520). `fabricate-app` carries typography,
+  // colour and `color-scheme`, and the three canvas interactables windows adopted it
+  // at 420, 480 and 560 wide; a floor on the shared class would have matched their
+  // frames too and painted every one of them at this window's floor, because a CSS
+  // floor beats the inline `width` Foundry writes onto the frame. This window is the
+  // only one that emits the third class, so it is the only one the floor reaches.
   static MIN_WINDOW_WIDTH = 1024;
   static MIN_WINDOW_HEIGHT = 640;
 

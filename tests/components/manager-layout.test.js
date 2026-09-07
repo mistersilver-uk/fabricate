@@ -115,6 +115,21 @@ function withoutComments(source) {
 // optional at each `.manager-button`, and the enabled-state qualifier optional at the end of
 // each selector in the list. The list is split on a comma-NEWLINE, which is how both this
 // sheet and these callers write one; the comma inside `:is(select, input…)` is left alone.
+/**
+ * The class list a fixture host must carry to impersonate `SvelteFabricateApp`'s window FRAME.
+ *
+ * WHY THE THIRD CLASS IS LOAD-BEARING IN A LAYOUT HARNESS. `styles/fabricate.css` is injected
+ * below at `@layer modules`, exactly as the product ships it, so whatever floors the real player
+ * frame floors these hosts too. Issue 1520 split that floor off the shared `.fabricate-app` area
+ * class onto `.fabricate.fabricate-app-window`, because three canvas windows 420-560px wide now
+ * adopt `.fabricate-app` and a floor on it would have inflated all three. These hosts run at
+ * 900x700, 900x400 and 640x320 viewports and are meant to BE the player frame, so they take the
+ * window class as well; drop it and each host silently narrows to its viewport width — 124, 124
+ * and 384 pixels off the box the select-panel and popover-row probes measure inside, with no
+ * assertion naming the geometry that moved.
+ */
+const PLAYER_FRAME_CLASSES = 'fabricate fabricate-app fabricate-app-window';
+
 const CHAINED_MANAGER_BUTTON = String.raw`\.manager-button(?:\.fab-manager-button)?`;
 const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
 
@@ -12878,7 +12893,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
         </head>
         <body>
           ${stamp(`
-          <div class="fabricate fabricate-app" data-area="player">
+          <div class="${PLAYER_FRAME_CLASSES}" data-area="player">
             ${areaBody(
               'player',
               [
@@ -13157,7 +13172,7 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
           </style>
         </head>
         <body>
-          <div class="fabricate fabricate-app" data-area="player">
+          <div class="${PLAYER_FRAME_CLASSES}" data-area="player">
             <button type="button" data-probe="player-anchor">anchor</button>
             ${selectTriggerFixture('player', 'inline')}
           </div>
@@ -13291,7 +13306,7 @@ test('a hovered SELECTED option row keeps the shared Select`s own fill', async (
           </style>
         </head>
         <body>
-          <div class="fabricate fabricate-app">
+          <div class="${PLAYER_FRAME_CLASSES}">
             <div
               class="fabricate-picker-popover manager-travel-popover fabricate-select-popover fabricate-select-popover-inline fabricate-select-popover-ticked"
               role="dialog"

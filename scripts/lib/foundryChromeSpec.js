@@ -288,7 +288,7 @@ export const APP_CHROME = Object.freeze({
   'fabricate-app': Object.freeze({
     id: 'fabricate-app',
     tag: 'div',
-    classes: Object.freeze(['fabricate', 'fabricate-app']),
+    classes: Object.freeze(['fabricate', 'fabricate-app', 'fabricate-app-window']),
     window: Object.freeze({
       title: 'FABRICATE.App.Title',
       icon: 'fa-solid fa-flask',
@@ -328,13 +328,17 @@ export const APP_CHROME = Object.freeze({
   // computed its expectation from the same selector and reported the gate SATISFIED. A gate that
   // cannot fail, on a photograph of the wrong window.
   //
-  // Their `minWidth`/`minHeight` are 0/0 for the same reason the manager's are: neither the
-  // applications nor the sheet puts a floor on them today. The player window is the only one that
-  // carries one.
+  // Their `minWidth`/`minHeight` are 0/0, and after issue 1520 adopted the shared `fabricate-app`
+  // area class on all three that is a FACT ABOUT A CLASS rather than an accident. The sheet's
+  // drag-resize floor sits on `fabricate-app-window`, which only the player window emits;
+  // `fabricate-app` itself carries typography, colour and `color-scheme` and no size. Had the
+  // floor stayed on the shared class these three would each have painted at 1024x640 — a floor
+  // beats the inline `width` the frame builder writes — while the parity loop above stayed green,
+  // because it asserts `position` and `position` does not change.
   'fabricate-interactable-browser': Object.freeze({
     id: 'fabricate-interactable-browser',
     tag: 'div',
-    classes: Object.freeze(['fabricate', 'fabricate-interactable-browser-app']),
+    classes: Object.freeze(['fabricate', 'fabricate-interactable-browser-app', 'fabricate-app']),
     window: Object.freeze({
       title: 'FABRICATE.Canvas.Browser.Title',
       icon: 'fas fa-mortar-pestle',
@@ -351,7 +355,7 @@ export const APP_CHROME = Object.freeze({
   'fabricate-interactable-config': Object.freeze({
     id: 'fabricate-interactable-config',
     tag: 'div',
-    classes: Object.freeze(['fabricate', 'fabricate-interactable-config-app']),
+    classes: Object.freeze(['fabricate', 'fabricate-interactable-config-app', 'fabricate-app']),
     window: Object.freeze({
       title: 'FABRICATE.Canvas.Interactable.Config.Title',
       icon: 'fas fa-sliders',
@@ -368,7 +372,7 @@ export const APP_CHROME = Object.freeze({
   'fabricate-interactables-manager': Object.freeze({
     id: 'fabricate-interactables-manager',
     tag: 'div',
-    classes: Object.freeze(['fabricate', 'fabricate-interactables-manager']),
+    classes: Object.freeze(['fabricate', 'fabricate-interactables-manager', 'fabricate-app']),
     window: Object.freeze({
       title: 'FABRICATE.Canvas.Manage.Title',
       icon: 'fas fa-list-check',

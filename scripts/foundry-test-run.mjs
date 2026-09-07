@@ -12549,9 +12549,12 @@ async function main() {
         }
         // Drive the window below the gathering grid's stacking breakpoint. This
         // simulates the small-screen case from #330 where Foundry constrains the
-        // window to a viewport narrower than the CSS min-width floor: the inline
-        // `min-width: 0` overrides the floor (.fabricate-app min-width: 1024px)
-        // for this capture so the app can shrink past the 900px grid breakpoint,
+        // window to a viewport narrower than the CSS floor. That floor is on
+        // `.fabricate.fabricate-app-window`, which only the player window emits
+        // (issue 1520 split it off the shared `.fabricate-app` area class so the
+        // three canvas windows could adopt that class without being inflated to
+        // 1024px). The inline `min-width: 0` set below beats the floor whichever
+        // class carries it, so this capture can shrink past the 900px breakpoint,
         // at which point the grid's @container query collapses it to one column.
         const stackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
