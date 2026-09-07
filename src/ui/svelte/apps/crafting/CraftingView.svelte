@@ -57,6 +57,14 @@
   const canReorderStages = $derived(selectedRecipe?.allowPlayerResultReorder !== false);
   const stageAnnouncement = $derived(store?.orderAnnouncement ?? '');
 
+  // The step the engine would execute next, and the step the model's top-level
+  // projection (`ingredientSets`, and so `craftability` above) was built from. They
+  // coincide until a run is parked past the first step; read as one pair here because
+  // the detail needs BOTH — one decides which rail is interactive, the other decides
+  // which step block the recomputed craftability describes.
+  const activeStepId = $derived(selectedRecipe?.activeStepId ?? null);
+  const displayedStepId = $derived(selectedRecipe?.displayedStepId ?? null);
+
   // The requirement rail is INTERACTIVE only for the step the engine would execute
   // next, and only while that step's time gate is unarmed (issue 917). A later step's
   // rail would drive a craft it does not describe — and the engine drops any
@@ -65,8 +73,7 @@
   // are absent on a pre-917 listing, in which case they compare equal and the rail
   // stays interactive, exactly as today.
   const railReadOnly = $derived(
-    selectedRecipe?.activeStepTimeGateArmed === true ||
-      (selectedRecipe?.activeStepId ?? null) !== (selectedRecipe?.displayedStepId ?? null)
+    selectedRecipe?.activeStepTimeGateArmed === true || activeStepId !== displayedStepId
   );
 
   const rail = $derived({
@@ -251,7 +258,8 @@
           {onReorderStageSettled}
           steps={selectedRecipe?.steps ?? []}
           {rail}
-          activeStepId={selectedRecipe?.activeStepId ?? null}
+          {activeStepId}
+          {displayedStepId}
         />
       </section>
 

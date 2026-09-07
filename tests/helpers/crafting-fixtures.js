@@ -290,8 +290,13 @@ export function multiStepRecipe(overrides = {}) {
 
 /**
  * A two-step recipe whose FIRST step carries the shared essence block. Step 1 is the
- * step the engine would execute (so its rail is interactive); step 2 is a plain
- * component step and must render read-only preview whatever the store holds.
+ * step the engine would execute by default (so its rail is interactive); step 2 must
+ * render read-only preview whatever the store holds.
+ *
+ * The two steps are deliberately distinct in EVERY half a step block renders — slot
+ * count (two essence requirements vs one), the allocated carrier the consumption plan
+ * names, and the tool row — so a block fed another step's projection is visible rather
+ * than coincidentally identical. Fresh objects per call: these are mutated by tests.
  */
 export function steppedEssenceRecipe(overrides = {}) {
   const stepOne = {
@@ -299,7 +304,21 @@ export function steppedEssenceRecipe(overrides = {}) {
     label: 'Infuse',
     duration: null,
     ingredientSets: [
-      { id: 'set-ess-1', label: 'Option A', craftability: sharedEssenceCraftability(), products: [] }
+      {
+        id: 'set-ess-1',
+        label: 'Option A',
+        craftability: sharedEssenceCraftability({
+          toolStates: [
+            {
+              componentId: 'c-alembic',
+              name: "Alchemist's Supplies",
+              img: 'icons/tools/laboratory/mortar-pestle-yellow.webp',
+              available: true
+            }
+          ]
+        }),
+        products: []
+      }
     ],
     products: []
   };
@@ -308,7 +327,39 @@ export function steppedEssenceRecipe(overrides = {}) {
     label: 'Temper',
     duration: null,
     ingredientSets: [
-      { id: 'set-ess-2', label: 'Option A', craftability: essenceCraftability(), products: [] }
+      {
+        id: 'set-ess-2',
+        label: 'Option A',
+        craftability: essenceCraftability({
+          toolStates: [
+            {
+              componentId: 'c-loupe',
+              name: "Jeweler's Tools",
+              img: 'icons/tools/hand/chisel-steel-brown.webp',
+              available: false
+            }
+          ],
+          // A different allocated carrier, so the two steps' consumption plans share no
+          // row key (`carrier:<itemKey>`) when each renders its own projection.
+          essencePool: essencePool({
+            carriers: [
+              {
+                itemKey: 'Item.emberglass-1',
+                componentId: 'c-emberglass',
+                name: 'Emberglass Shard',
+                img: 'icons/commodities/gems/gem-fragments-red.webp',
+                ownedUnits: 4,
+                allocatedUnits: 2,
+                perUnit: { radiant: 1 }
+              }
+            ],
+            allocation: { 'Item.emberglass-1': 2 },
+            totals: { radiant: 2 },
+            suggested: { 'Item.emberglass-1': 4 }
+          })
+        }),
+        products: []
+      }
     ],
     products: []
   };

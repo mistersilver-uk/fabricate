@@ -11664,7 +11664,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-multistep'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' }],
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
+      // Scroll to the second step ("Fold the pattern") to show its corrected requirements,
+      // which is painted with its own coal-only cost, not step 1's Steel Ingot + Coal.
+      { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },
+    ],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
