@@ -316,6 +316,33 @@ const OPTION_CARDS_OWN_CLASSES = (() => {
 
 const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-config-cards`;
 
+/**
+ * The class list `ToggleCard` writes on its own root `<div>`, read out of its template.
+ *
+ * Its template interpolates the `variant` and the on/off state, so what is READ is the LEADING
+ * LITERAL RUN — the namespace root and the family's own card class — and the two state tokens are
+ * appended by the fixture. That split is the same one `RadioCardGroup`'s read makes below, and it
+ * is what `searchable-popover-area-scope.test.js` reads the family from.
+ */
+const TOGGLE_CARD_CLASSES = (() => {
+  const source = read('src/ui/svelte/apps/manager/ToggleCard.svelte');
+  const match = source.match(/class=\{`([^`$]*)\$\{/u);
+  assert.ok(
+    match,
+    'ToggleCard must write a `` class={`…`} `` template whose leading run is literal, with its ' +
+      'namespace root at the head of it'
+  );
+  return match[1].trim();
+})();
+
+/** The class list `ItemDropZone` writes on its own root `<div>`, a plain literal attribute. */
+const LINK_FIELD_CLASSES = (() => {
+  const source = read('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  const match = source.match(/class="(fabricate-link-field[^"]*)"/u);
+  assert.ok(match, 'ItemDropZone must write its family root inline on its root element');
+  return match[1];
+})();
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -326,7 +353,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the twelve class strings under measurement are the ones the primitives emit', () => {
+test('the fourteen class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -348,6 +375,17 @@ test('the twelve class strings under measurement are the ones the primitives emi
     'fabricate-field manager-field fabricate-option-cards is-wide ' +
       'manager-resolution-mode-card manager-radio-card-group is-config-cards',
     'the fieldset carries `Field`s pair, then this family`s root, then this family`s own classes'
+  );
+  assert.equal(
+    TOGGLE_CARD_CLASSES,
+    'fabricate-toggle-card manager-recipe-status-card',
+    'the status card emits its namespace root ahead of its own card class, and the variant and ' +
+      'the on/off state are interpolated after them'
+  );
+  assert.equal(
+    LINK_FIELD_CLASSES,
+    'fabricate-link-field manager-item-drop-zone',
+    'the link field emits its namespace root ahead of its own zone class'
   );
   assert.equal(
     OPTION_CARDS_OWN_CLASSES.split(/\s+/u)[0],
@@ -577,6 +615,87 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
   }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE STATUS CARD EITHER (issue 1509 phase 4). This family
+  // owns NO CONTROL: the switch inside it is `StatusToggle`'s, composed rather than written, and
+  // it is rendered here exactly as the card renders it — with its own namespace root on it — so
+  // the fixture is the card the product draws rather than a card-shaped approximation. It carries
+  // no probe of its own, because the `toggle` entry above already measures that primitive.
+  //
+  // THREE CARDS, because the family's ten rules are three variants and their shared base, and one
+  // card would leave five of them unrendered. `is-enabled.is-on` carries the copy probes and the
+  // success-toned glyph, `is-locked.is-on` the accent tone and `is-info.is-on` the info tone and
+  // ITS glyph — the one rule in the family that tones a child from a variant on the parent.
+  //
+  // THE SUB-LINE IS THE RESIDUE, and the fixture states it rather than hiding it: it carries
+  // `manager-muted` beside the family class exactly as the component writes it, and
+  // `.fabricate-manager .manager-muted` is a (0,2,0) rule declared LATER in the sheet that gives
+  // it a colour, a `font-size` and a margin this family does not restate. So inside the manager
+  // that line is 0.78rem muted and outside it takes its type from its ancestor, and what the
+  // FAMILY promises about it — `min-width: 0` and the 1.35 leading — travels and is compared.
+  // `manager-muted` is the manager's vocabulary, not this primitive's; issue 1507 owns it.
+  Object.freeze({
+    id: 'toggle-card',
+    classes: `${TOGGLE_CARD_CLASSES} is-enabled is-on`,
+    // OPTED OUT OF THE BOX COMPARISON, for the sub-line's reason above: a 0.78rem line inside the
+    // manager and an inherited-size line outside it give the copy column two heights, and the
+    // card is a `align-items: center` row solved from its tallest child. Every property the
+    // family declares on the card itself is compared in all three hosts.
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-toggle-card manager-recipe-status-card is-enabled is-on" data-probe="${host}-toggle-card"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-icon"><i class="fas fa-circle-check"></i></span><div class="manager-recipe-status-copy" data-probe="${host}-toggle-card-copy"><p class="manager-recipe-status-title" data-probe="${host}-toggle-card-title">Enabled</p><p class="manager-recipe-status-sub manager-muted" data-probe="${host}-toggle-card-sub">Craftable by players</p></div><button type="button" class="fabricate-toggle manager-status-toggle is-on" aria-pressed="true" data-keyboard-focus="true"><span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span></button></div>`,
+  }),
+  Object.freeze({
+    id: 'toggle-card-locked',
+    classes: `${TOGGLE_CARD_CLASSES} is-locked is-on`,
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-toggle-card manager-recipe-status-card is-locked is-on" data-probe="${host}-toggle-card-locked"><span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-lock"></i></span><div class="manager-recipe-status-copy"><p class="manager-recipe-status-title">Locked</p><p class="manager-recipe-status-sub manager-muted">Players cannot edit this</p></div></div>`,
+  }),
+  Object.freeze({
+    id: 'toggle-card-info',
+    classes: `${TOGGLE_CARD_CLASSES} is-info is-on`,
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-toggle-card manager-recipe-status-card is-info is-on" data-probe="${host}-toggle-card-info"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-info-icon"><i class="fas fa-circle-info"></i></span><div class="manager-recipe-status-copy"><p class="manager-recipe-status-title">Policy</p><p class="manager-recipe-status-sub manager-muted">Set by the world</p></div></div>`,
+  }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE LINK FIELD EITHER (issue 1509 phase 4), and this family
+  // owns no control either: its two actions are `IconButton`s, composed and rendered here with
+  // that primitive's own root on them.
+  //
+  // TWO FACES, because `compact` is not a density knob but a different claim about what the zone
+  // is FOR, and the two share only the root class. The default face is the three-column linked
+  // card — art, copy, actions — and the compact one is the centred glyph-over-title-over-note
+  // prompt. Between them they render thirteen of the fifteen rules this change re-roots; the two
+  // that are missing are `.is-drop-active` and `.is-disabled`, single-declaration state tones
+  // that no static fixture reaches, and they are covered by the CSSOM clause below instead.
+  //
+  // ONE EXCLUSION, NAMED RATHER THAN LEFT TO BE DISCOVERED, and it belongs to ONE CALLER rather
+  // than to the family. `styles/fabricate.css` declares `.fabricate-manager [data-tool-create-card]
+  // { flex: 0 0 auto; width: 100% }`, a STYLING hook the Tools catalogue's create prompt passes
+  // through this primitive's `hookAttrs` bag. That rule is application-rooted and its selector
+  // names no class of this family at all, so it is outside every census this change made and it
+  // does not travel: the create prompt keeps its `flex` and its full width only inside the
+  // manager. `fabricate-link-field` is therefore host-independent for eight of its nine callers
+  // and host-DEPENDENT for the ninth, the residue is issue 1507's, and no fixture here carries
+  // that attribute — a probe for it would be measuring the exclusion rather than the family.
+  //
+  // THE ADDRESS LINE IS PROBED FOR THE OPPOSITE REASON TO EVERYTHING ELSE HERE. Its type comes
+  // from the component's OWN scoped block, which this harness deliberately does not load, so the
+  // global sheet gives it nothing and all three hosts compute the same UA default. That agreement
+  // is the assertion: the moment anybody writes `.fabricate-manager .manager-item-drop-zone-uuid`
+  // the three stop agreeing and this probe reds, which is exactly the regression this file is for.
+  Object.freeze({
+    id: 'link-field',
+    classes: `${LINK_FIELD_CLASSES} is-linked`,
+    markup: (host) =>
+      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-icon"><img src="icons/svg/item-bag.svg" alt="" data-probe="${host}-link-field-art"></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button manager-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button manager-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
+  }),
+  Object.freeze({
+    id: 'link-field-compact',
+    classes: `${LINK_FIELD_CLASSES} is-compact`,
+    markup: (host) =>
+      `<div class="fabricate-link-field manager-item-drop-zone is-compact" data-manager-item-drop-zone="" data-probe="${host}-link-field-compact"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-compact-icon"><i class="fas fa-right-left"></i></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-compact-copy"><strong data-probe="${host}-link-field-compact-name">Drop an item to replace the source</strong><small data-probe="${host}-link-field-compact-hint">World item, compendium entry, or pack.</small></span></div>`,
+  }),
 ]);
 
 /**
@@ -626,6 +745,22 @@ const EXTRA_PROBES = Object.freeze([
   'option-cards-desc',
   'option-cards-radio',
   'option-cards-radio-checked',
+  'toggle-card-icon',
+  'toggle-card-copy',
+  'toggle-card-title',
+  'toggle-card-sub',
+  'toggle-card-info-icon',
+  'link-field-icon',
+  'link-field-art',
+  'link-field-copy',
+  'link-field-name',
+  'link-field-uuid',
+  'link-field-hint',
+  'link-field-actions',
+  'link-field-compact-icon',
+  'link-field-compact-copy',
+  'link-field-compact-name',
+  'link-field-compact-hint',
 ]);
 
 /**
@@ -688,6 +823,15 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'option-cards-body',
   'option-cards-name',
   'option-cards-desc',
+  // AND THE STATUS CARD'S COPY COLUMN AND ITS TWO LINES (issue 1509 phase 4), for the card's own
+  // `box-sizing` dependence rather than for a cause of theirs. The card declares no `box-sizing`,
+  // so inside the manager it takes `border-box` from `.fabricate-manager *` and its 1px border and
+  // 12px padding come out of its width; elsewhere in this core-less harness they are added to it,
+  // and the flexible copy column is 2px narrower. Every DECLARED value on all three is compared in
+  // all three hosts, and the card's own box-sizing exclusion is asserted with its reason below.
+  'toggle-card-copy',
+  'toggle-card-title',
+  'toggle-card-sub',
 ]);
 
 /**
@@ -707,7 +851,17 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
  * opt-out cannot outlive it. `manager-muted` is the manager's vocabulary, not
  * this primitive's; retiring it from this surface is issue 1507's.
  */
-const HOST_LEADING_PROBES = Object.freeze(['validation-copy', 'validation-sub']);
+const HOST_LEADING_PROBES = Object.freeze([
+  'validation-copy',
+  'validation-sub',
+  // AND THE STATUS CARD'S TWO, for the identical reason one family later (issue 1509 phase 4):
+  // its sub-line also carries `manager-muted`, so inside the manager that line is 0.78rem with a
+  // margin the family does not restate and outside it takes its size from its ancestor. The
+  // sub-line's own border box follows that leading and the copy column that stacks it under the
+  // title follows the sub-line's, so the two are opted out together rather than one of them being
+  // reported as a different kind of difference. What the FAMILY declares about both is compared.
+  'toggle-card-sub',
+]);
 
 /**
  * The one probe that is a Font Awesome GLYPH and nothing else (issue 1509).
@@ -719,7 +873,15 @@ const HOST_LEADING_PROBES = Object.freeze(['validation-copy', 'validation-sub'])
  * the row's own `is-block` gives it, which is the only place in this fixture where a row status
  * reaches a colour.
  */
-const GLYPH_ONLY_PROBES = Object.freeze(['validation-status']);
+const GLYPH_ONLY_PROBES = Object.freeze([
+  'validation-status',
+  // AND THE LINK FIELD'S COMPACT GLYPH TILE (issue 1509 phase 4). The compact face's whole point
+  // is that it does NOT show the art, so the family replaces the default face's 44x44 plate with
+  // `width: auto; height: auto` and lets the glyph size itself — and the glyph is a Font Awesome
+  // ligature this core-less harness does not load, so the tile lays out at 0x0 in every host. Its
+  // DECLARED values are compared instead, in all three, which is where the family's claim lives.
+  'link-field-compact-icon',
+]);
 
 /**
  * The family's shared base rule, as the browser serialises its prelude.
@@ -1412,6 +1574,204 @@ const OPTION_CARDS_RADIO_COMPARED = Object.freeze([
   'font-family',
 ]);
 
+
+/**
+ * ── THE TWO FAMILIES THAT OWN NO CONTROL AT ALL (issue 1509 phase 4) ────────────────────
+ *
+ * `ToggleCard` and `ItemDropZone` are the first two entries here whose root is neither a control
+ * nor the parent of one they wrote: the card's switch is `StatusToggle`'s and the link field's two
+ * actions are `IconButton`'s, both COMPOSED. So neither declares a font floor and neither declares
+ * a focus pair, and both refusals are asserted below over the sheet rather than left implicit.
+ *
+ * What is compared here is therefore the four things each family DRAWS.
+ */
+
+/**
+ * The status card's own box: a centred row of glyph, copy and switch on a toned surface.
+ *
+ * `box-sizing` is EXCLUDED, and it is the pager's exclusion rather than a new one: this card
+ * declares none, so inside the manager it takes `border-box` from `.fabricate-manager *` and
+ * elsewhere it takes whatever the host gives. The dependence is inert while no rule gives the card
+ * an explicit `width` or `height` — none does — and in Foundry core's own `@layer reset` supplies
+ * the keyword to every host anyway. The card's DECLARED box is compared in full instead.
+ */
+const TOGGLE_CARD_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'min-width',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'background-color',
+]);
+
+/** The two other variants: their whole claim is a border tone and a fill. */
+const TOGGLE_CARD_VARIANT_COMPARED = Object.freeze([
+  'border-top-color',
+  'background-color',
+  'display',
+  'align-items',
+]);
+
+/** The glyph column, and its `color` is the state tone the `is-enabled.is-on` rule gives it. */
+const TOGGLE_CARD_ICON_COMPARED = Object.freeze([
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'display',
+  'align-items',
+  'justify-content',
+  'width',
+  'color',
+]);
+
+/**
+ * The INFO variant's glyph, which is the one rule in this family that tones a CHILD from a variant
+ * class on the parent — `.is-info.is-on .manager-recipe-status-icon` at (0,5,0). One property,
+ * because that is the whole of what the rule declares.
+ */
+const TOGGLE_CARD_INFO_ICON_COMPARED = Object.freeze(['color']);
+
+/** The copy column: the flexible middle of the row. */
+const TOGGLE_CARD_COPY_COMPARED = Object.freeze([
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'min-width',
+]);
+
+/** The title line. */
+const TOGGLE_CARD_TITLE_COMPARED = Object.freeze(['margin-top', 'margin-bottom', 'font-weight']);
+
+/**
+ * The sub-line, scoped to what this family owns.
+ *
+ * The element carries `manager-muted` beside the family class, exactly as the component writes it,
+ * and `.fabricate-manager .manager-muted` is a (0,2,0) rule declared LATER in the sheet that gives
+ * it a `margin`, a `color` and a `font-size: 0.78rem`. Those three are the MANAGER's vocabulary
+ * rather than this primitive's, they are EXCLUDED BY NAME, and issue 1507 owns retiring the class.
+ * `line-height` is excluded for a SECOND-ORDER form of the same fact, and the distinction matters:
+ * the family declares `line-height: 1.35` and that RATIO is identical in every host, but a
+ * unitless line-height computes against the element's own `font-size` — which is 0.78rem inside
+ * the manager and the inherited size outside it — so the computed pixel value differs while the
+ * declaration does not. Comparing it would report `manager-muted`'s font size a second time.
+ *
+ * What is left is `min-width: 0`, the one thing this family says about this line that survives the
+ * residue. The card's own rules are compared in full on the three card probes above.
+ */
+const TOGGLE_CARD_SUB_COMPARED = Object.freeze(['min-width']);
+
+/** The link field's default face: the three-column linked card on a dashed edge. */
+const LINK_FIELD_COMPARED = Object.freeze([
+  'display',
+  'grid-template-columns',
+  'align-items',
+  'gap',
+  'width',
+  'min-height',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'box-sizing',
+  'background-color',
+]);
+
+/** The compact face: a centred glyph over a title over a note, on a narrower well. */
+const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'align-items',
+  'justify-content',
+  'gap',
+  'width',
+  'min-height',
+  'padding-top',
+  'padding-left',
+  'border-radius',
+  'text-align',
+]);
+
+/** The 44px art tile. */
+const LINK_FIELD_ICON_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'justify-content',
+  'width',
+  'height',
+  'border-radius',
+  'overflow-x',
+  'background-color',
+  'color',
+]);
+
+/** And the art inside it, which the family sizes and crops. */
+const LINK_FIELD_ART_COMPARED = Object.freeze(['width', 'height', 'object-fit']);
+
+/** The compact face's glyph, which the family re-sizes and re-tones rather than re-boxes. */
+const LINK_FIELD_COMPACT_ICON_COMPARED = Object.freeze(['width', 'height', 'font-size', 'color']);
+
+/** The copy column. */
+const LINK_FIELD_COPY_COMPARED = Object.freeze(['display', 'row-gap', 'min-width']);
+
+/** And the compact face's, which is a centred flex column rather than a grid. */
+const LINK_FIELD_COMPACT_COPY_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'align-items',
+  'row-gap',
+  'text-align',
+]);
+
+/** The name line: the family's whole claim on it is that it truncates. */
+const LINK_FIELD_NAME_COMPARED = Object.freeze(['overflow-x', 'text-overflow']);
+
+/** The compact face's name line, which the family also types down. */
+const LINK_FIELD_COMPACT_NAME_COMPARED = Object.freeze([
+  'font-size',
+  'font-weight',
+  'line-height',
+  'color',
+]);
+
+/** The hint line. */
+const LINK_FIELD_HINT_COMPARED = Object.freeze([
+  'color',
+  'font-size',
+  'line-height',
+  'overflow-x',
+  'text-overflow',
+]);
+
+/** The compact face's note. */
+const LINK_FIELD_COMPACT_HINT_COMPARED = Object.freeze(['font-size', 'line-height', 'color']);
+
+/**
+ * The ADDRESS LINE, probed for the opposite reason to every other entry in this table.
+ *
+ * Its type comes from the component's OWN scoped `<style>` block, which this harness deliberately
+ * does not load, so the global sheet gives it nothing and all three hosts compute the same UA
+ * default. That agreement IS the assertion here: the moment anybody writes
+ * `.fabricate-manager .manager-item-drop-zone-uuid` into the sheet, the three stop agreeing and
+ * this probe reds — which is the regression this whole file exists to report.
+ *
+ * `color` is excluded and the exclusion is the harness's rather than the family's: nothing styles
+ * this element, so its colour is INHERITED, and the two app hosts declare a text colour on their
+ * own root while the bare `<div>` declares none. That difference is host chrome — the same chrome
+ * `.fabricate-app` and `.fabricate-manager` give every uncoloured descendant — and reporting it
+ * here would be reporting the fixture. Everything a rule could set on this element is compared.
+ */
+const LINK_FIELD_UUID_COMPARED = Object.freeze(['display', 'font-family', 'font-size']);
+
+/** The action cluster, which is a gap and nothing else — the buttons are `IconButton`'s. */
+const LINK_FIELD_ACTIONS_COMPARED = Object.freeze(['display', 'gap']);
+
 const COMPARED_BY_CONTROL = Object.freeze({
   pagination: COMPARED_PAGINATION,
   field: FIELD_COMPARED,
@@ -1461,6 +1821,27 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'option-cards-desc': OPTION_CARDS_DESC_COMPARED,
   'option-cards-radio': OPTION_CARDS_RADIO_COMPARED,
   'option-cards-radio-checked': OPTION_CARDS_RADIO_COMPARED,
+  'toggle-card': TOGGLE_CARD_COMPARED,
+  'toggle-card-locked': TOGGLE_CARD_VARIANT_COMPARED,
+  'toggle-card-info': TOGGLE_CARD_VARIANT_COMPARED,
+  'toggle-card-icon': TOGGLE_CARD_ICON_COMPARED,
+  'toggle-card-info-icon': TOGGLE_CARD_INFO_ICON_COMPARED,
+  'toggle-card-copy': TOGGLE_CARD_COPY_COMPARED,
+  'toggle-card-title': TOGGLE_CARD_TITLE_COMPARED,
+  'toggle-card-sub': TOGGLE_CARD_SUB_COMPARED,
+  'link-field': LINK_FIELD_COMPARED,
+  'link-field-compact': LINK_FIELD_COMPACT_COMPARED,
+  'link-field-icon': LINK_FIELD_ICON_COMPARED,
+  'link-field-art': LINK_FIELD_ART_COMPARED,
+  'link-field-compact-icon': LINK_FIELD_COMPACT_ICON_COMPARED,
+  'link-field-copy': LINK_FIELD_COPY_COMPARED,
+  'link-field-compact-copy': LINK_FIELD_COMPACT_COPY_COMPARED,
+  'link-field-name': LINK_FIELD_NAME_COMPARED,
+  'link-field-compact-name': LINK_FIELD_COMPACT_NAME_COMPARED,
+  'link-field-uuid': LINK_FIELD_UUID_COMPARED,
+  'link-field-hint': LINK_FIELD_HINT_COMPARED,
+  'link-field-compact-hint': LINK_FIELD_COMPACT_HINT_COMPARED,
+  'link-field-actions': LINK_FIELD_ACTIONS_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
@@ -3076,6 +3457,204 @@ test('the option-card radio takes its type from the field floor it shares a root
     'the manager host lost the radio`s type when `Field`s floor member went, which would mean ' +
       'the area baseline no longer reaches it and this control is measuring two things at once'
   );
+});
+
+/*
+ * ── THE TWO FAMILIES THAT OWN NO CONTROL AT ALL (issue 1509 phase 4) ─────────────────
+ *
+ * `ToggleCard`'s switch is `StatusToggle`'s and `ItemDropZone`'s two actions are `IconButton`'s.
+ * Both are COMPOSED, so both families declare no font floor and no focus pair — and the refusals
+ * are asserted over the sheet, with the rank each would have taken published beside the rule it
+ * would have met, because "there was nothing to floor" and "a floor here would have been wrong"
+ * are two different claims and only the second is true.
+ *
+ * WHAT A FLOOR IS, STATED PRECISELY, because both these families DO type bare elements and none of
+ * those rules is a floor. A floor is `<root> <bare element>` and nothing else — two compounds, the
+ * first the namespace root alone, the second carrying no class, attribute or id — which is the
+ * (0,1,1) shape every shipped member of the `fabricate.css` floor group takes. The link field's
+ * `.fabricate-link-field .manager-item-drop-zone-copy small` is NOT that: it is (0,2,1), it types
+ * a `<small>` inside a class the component itself writes, and it reaches no control anybody else
+ * could put there. The predicate below is written to that shape and is proved to FIRE on the
+ * shipped floor group, so its zero for these two families is a measurement rather than a filter
+ * that stopped matching.
+ */
+
+/**
+ * Every rule in `rules` rooted at `root`, with the family's non-vacuity floor asserted.
+ *
+ * @param {Array<{selectorText: string, cssText: string, properties: string[]}>} rules
+ * @param {string} root The namespace class, without its leading dot.
+ * @param {number} floor The smallest family size that makes the absences below meaningful.
+ * @returns {Array<{selectorText: string, cssText: string, properties: string[]}>}
+ */
+function familyRootedAt(rules, root, floor) {
+  const named = new RegExp(`\\.${root}(?![\\w-])`, 'u');
+  const family = rules.filter((rule) => named.test(rule.selectorText));
+  assert.ok(
+    family.length >= floor,
+    `only ${family.length} rules are rooted at \`.${root}\`, so the absences below hold over ` +
+      'nothing. The family has been renamed or the re-root has been undone.'
+  );
+  return family;
+}
+
+/**
+ * The rules in `family` that are a FLOOR: the namespace root, then a bare element, and no more.
+ *
+ * @param {Array<{selectorText: string}>} family
+ * @param {string} root The namespace class, without its leading dot.
+ * @returns {Array<{selectorText: string}>}
+ */
+function floorShaped(family, root) {
+  return family.filter((rule) => {
+    const compounds = rule.selectorText.split(/\s*(?:>|\+|~|\s)\s*/u).filter(Boolean);
+    if (compounds.length !== 2) return false;
+    return compounds[0] === `.${root}` && !/[.#[]/u.test(compounds[1]);
+  });
+}
+
+test('the status card family declares no font floor and no focus pair', async () => {
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    const family = familyRootedAt(rules, 'fabricate-toggle-card', 9);
+
+    // THE FLOOR PREDICATE FIRES, proved on the shipped group before it is used to report a zero.
+    // `.fabricate-tabs button` is a real member of `fabricate.css`'s floor group and is exactly
+    // the shape this predicate exists to recognise.
+    assert.ok(
+      floorShaped(
+        [{ selectorText: '.fabricate-tabs button' }, { selectorText: '.fabricate-tabs .x button' }],
+        'fabricate-tabs'
+      ).length === 1,
+      'the floor predicate no longer recognises `.fabricate-tabs button`, the shipped (0,1,1) ' +
+        'shape it exists to find, so the zeroes it reports below mean nothing'
+    );
+
+    assert.deepEqual(
+      floorShaped(family, 'fabricate-toggle-card').map((rule) => rule.selectorText),
+      [],
+      '`.fabricate-toggle-card` declares a font floor. This family renders no control of its own ' +
+        '— the switch inside the card is `StatusToggle`s, composed — so a floor here would type a ' +
+        'bare element for a primitive that already floors its own, and would reach any element a ' +
+        'CALLER put inside the card as well.'
+    );
+
+    // AND NO FOCUS PAIR, AND THE RANK IS PUBLISHED RATHER THAN ASSERTED. A pair would be
+    // `.fabricate-toggle-card button:focus-visible` at (0,2,1). The switch's own repaint is
+    // `.fabricate-toggle.manager-status-toggle:focus-visible` at (0,3,0) — measured below — so on
+    // THIS family the hypothetical pair would LOSE rather than replace, which is the opposite of
+    // what happens one clause down at the link field. That difference is why the refusal is a rule
+    // about OWNERSHIP and not a rank argument: `StatusToggle` happens to write its pair at three
+    // classes today, and a pair here would silently become a displacement the day it wrote it at
+    // two. The one control this card contains belongs to another primitive either way.
+    const focused = family.filter((rule) => /:focus/u.test(rule.selectorText));
+    assert.deepEqual(
+      focused.map((rule) => rule.selectorText),
+      [],
+      '`.fabricate-toggle-card` declares a focus rule. The only focusable thing inside this card ' +
+        'is the switch, which is `StatusToggle`s and paints its own ring; a rule here is a claim ' +
+        'on another primitive`s chrome, and it becomes a displacement the moment that primitive ' +
+        'writes its pair at two classes rather than three.'
+    );
+
+    const switchRepaint = rules.find(
+      (rule) => rule.selectorText === '.fabricate-toggle.manager-status-toggle:focus-visible'
+    );
+    assert.ok(
+      Boolean(switchRepaint),
+      'the switch`s own focus repaint is no longer in the sheet, so the rank comparison this ' +
+        'refusal is published with cannot be measured'
+    );
+    assert.equal(
+      specificity(switchRepaint.selectorText),
+      '0,3,0',
+      'the switch`s repaint has moved off (0,3,0). A pair at `.fabricate-toggle-card ' +
+        'button:focus-visible` is (0,2,1), so it loses to (0,3,0) and WINS against (0,2,0) — ' +
+        'this number is the whole reason the refusal here is stated as ownership rather than rank.'
+    );
+    assert.equal(specificity('.fabricate-toggle-card button:focus-visible'), '0,2,1');
+  } finally {
+    await tab.close();
+  }
+});
+
+test('the link field family declares no font floor and no focus pair', async () => {
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    const family = familyRootedAt(rules, 'fabricate-link-field', 13);
+
+    assert.deepEqual(
+      floorShaped(family, 'fabricate-link-field').map((rule) => rule.selectorText),
+      [],
+      '`.fabricate-link-field` declares a font floor. This family renders no control of its own — ' +
+        'its copy and unlink actions are `IconButton`s, composed — so a floor here would type ' +
+        'every bare element under the zone, including two buttons another primitive already ' +
+        'floors at its own root.'
+    );
+
+    // The family DOES type bare elements, five of them, and none is a floor. Asserted so the zero
+    // above cannot be mistaken for "this family types nothing" — the predicate is shape, not
+    // absence, and a reader reconciling the two needs the second number.
+    const typedBareElement = family.filter(
+      (rule) =>
+        /(?:^|[\s>+~])[a-z][\w-]*$/u.test(rule.selectorText) &&
+        rule.properties.some(
+          (property) => property.startsWith('font') || property === 'line-height'
+        )
+    );
+    assert.equal(
+      typedBareElement.length,
+      3,
+      'expected exactly the three name-and-note rules to type a bare element under this root — ' +
+        'the default face`s `small`, and the compact face`s `strong` and `small` — found ' +
+        `${typedBareElement.length}: ` +
+        typedBareElement.map((rule) => rule.selectorText).join(', ')
+    );
+
+    // AND NO FOCUS PAIR, AND HERE THE RANK ARGUMENT IS THE WHOLE OF IT. A pair would be
+    // `.fabricate-link-field button:focus-visible` at (0,2,1), and `IconButton`'s own repaint is
+    // `.fabricate-icon-button:focus-visible` at (0,2,0) — so the pair would OUT-RANK it and
+    // REPLACE the ring on both of this zone's action buttons. Its strip half would displace
+    // `.fabricate-icon-button:focus` the same way. Both displaced rules are named and their ranks
+    // measured, so the refusal is published rather than argued.
+    const focused = family.filter((rule) => /:focus/u.test(rule.selectorText));
+    assert.deepEqual(
+      focused.map((rule) => rule.selectorText),
+      [],
+      '`.fabricate-link-field` declares a focus rule. This family owns no control, so a strip or ' +
+        'a repaint here paints chrome for a control `IconButton` owns — and it WINS: `<root> ' +
+        '<element>:focus-visible` is (0,2,1) and out-ranks that primitive`s own ' +
+        '`.fabricate-icon-button:focus-visible` at (0,2,0), so both of the zone`s actions would ' +
+        'lose their family ring to this one.'
+    );
+
+    for (const displaced of ['.fabricate-icon-button:focus', '.fabricate-icon-button:focus-visible']) {
+      const rule = rules.find((candidate) => candidate.selectorText === displaced);
+      assert.ok(
+        Boolean(rule),
+        `${displaced} is no longer in the sheet, so the displacement this refusal publishes ` +
+          'cannot be measured'
+      );
+      assert.equal(
+        specificity(displaced),
+        '0,2,0',
+        `${displaced} has moved off (0,2,0), which is the rank a link-field pair at (0,2,1) ` +
+          'would have beaten. Re-derive the refusal before trusting it.'
+      );
+    }
+    assert.equal(specificity('.fabricate-link-field button:focus-visible'), '0,2,1');
+    assert.equal(specificity('.fabricate-link-field button:focus'), '0,2,1');
+  } finally {
+    await tab.close();
+  }
 });
 
 test('the chrome these families declare reaches the control they own and nothing else', async () => {

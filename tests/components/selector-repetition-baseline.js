@@ -44,6 +44,17 @@
  * printed from. The sheet holds 2,619 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
  *
+ * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
+ * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
+ * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of
+ * those twenty-five exactly one is a repeated key: `.manager-item-drop-zone-copy small`, which the
+ * sheet writes once as a list member beside its `strong` sibling and once as a sole selector to
+ * give it a colour, a size and a leading. Both appearances re-root together, in the same commit,
+ * so the row keeps its count of 2 and `pinnedTotal` stays 243 across 119 rows. Nothing is added,
+ * split or deleted: the rule count stands at 2,619, the keyed and singleton figures at 3,123 and
+ * 3,004, and the phase writes no new rule at all — both families declare NO focus pair and NO font
+ * floor, and both refusals are asserted rather than merely absent.
+ *
  * ISSUE 1509 PHASE 3 RE-KEYED NO ROW AND MOVED ONE CONTEXTUAL FIGURE, WHICH IS A SHAPE NEITHER
  * EARLIER PHASE TOOK. Rooting `RadioCardGroup` rewrites the leading compound of 32 selectors, and
  * not one of them is a repeated key — measured — so the repeated table is untouched and

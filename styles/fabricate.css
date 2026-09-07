@@ -6460,7 +6460,25 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-recipe-status-card {
+/* ROOTED AT `fabricate-toggle-card` (issue 1509), the class `ToggleCard` writes at the head of
+   its own root template. One class for one class, at the same sheet position, declarations
+   byte-identical: the card's class sits on the ROOT element, so its rules take the COMPOUND form
+   and its children's take the descendant chain, and every rank is what it was.
+
+   THE FAMILY IS THE FIVE `manager-recipe-status-{card,icon,copy,title,sub}` SUFFIXES AND NOTHING
+   ELSE. Bare `manager-recipe-status` — the recipe row's status slot, below in this file — is a
+   different thing that shares the prefix, and `.manager-recipe-*` occurs 461 times in this sheet
+   across 55 prefixes, so a loose family pattern here would have swallowed several hundred
+   unrelated selectors. It also stays OFF every `manager-status-toggle*` rule: the switch inside
+   this card is `StatusToggle`'s and is rooted at `fabricate-toggle`, and a
+   `.fabricate-toggle-card .manager-status-toggle-track` would be an APPLICATION root by name to
+   that primitive's own area-scope entry.
+
+   WHAT DID NOT TRAVEL: the twelve rules under `.manager-checks-flag-list`,
+   `.manager-checks-trigger-body` and `.manager-tool-system-enabled` are three CALLERS restating
+   this card's metrics inside containers of their own, so they stay application-rooted and
+   caller-owned. Issue 1507 retires the `manager-*` names. */
+.fabricate-toggle-card.manager-recipe-status-card {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
@@ -6472,12 +6490,12 @@
 }
 
 /* The card's border + fill reflect its state. */
-.fabricate-manager .manager-recipe-status-card.is-enabled.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-locked.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-locked.is-on {
   border-color: var(--fab-accent-border);
   background: var(--fab-accent-soft);
 }
@@ -6489,16 +6507,16 @@
    semantics-inventing: `.is-enabled.is-on` is already exactly that, since
    `Recipe.enabled` also defaults true. The switch position and title carry the state;
    the tint is atmosphere. */
-.fabricate-manager .manager-recipe-status-card.is-info.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-info.is-on {
   border-color: var(--fab-info-border);
   background: var(--fab-info-soft);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon {
+.fabricate-toggle-card.manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon {
   color: var(--fab-info-text);
 }
 
-.fabricate-manager .manager-recipe-status-icon {
+.fabricate-toggle-card .manager-recipe-status-icon {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -6507,21 +6525,21 @@
   color: var(--fab-text-muted);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon {
+.fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon {
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-recipe-status-copy {
+.fabricate-toggle-card .manager-recipe-status-copy {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-status-title {
+.fabricate-toggle-card .manager-recipe-status-title {
   margin: 0;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-recipe-status-sub {
+.fabricate-toggle-card .manager-recipe-status-sub {
   margin: 2px 0 0;
   min-width: 0;
   line-height: 1.35;
@@ -18213,7 +18231,21 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-item-drop-zone {
+/* ROOTED AT `fabricate-link-field` (issue 1509), the class `ItemDropZone` writes at the head of
+   its root element's class attribute. One class for one class, at the same sheet position,
+   declarations byte-identical: the family class sits on the ROOT, so the zone's own rules take
+   the COMPOUND form and its children's take the descendant chain, and every rank is unchanged.
+
+   NO FONT FLOOR AND NO FOCUS PAIR, and both are REFUSALS rather than absences. This family owns
+   no control of its own: the two action buttons are `IconButton`s. A pair here would be actively
+   WRONG rather than merely redundant — `.fabricate-link-field button:focus-visible` is (0,2,1)
+   and OUT-RANKS `IconButton`'s own `.fabricate-icon-button:focus-visible` ring at (0,2,0) further
+   up this file, so it would REPLACE that ring on both actions.
+
+   ONE RESIDUE, NAMED: `.fabricate-manager [data-tool-create-card]` further down is a STYLING hook
+   rather than a test hook, it is application-rooted and it is outside this family — so the Tools
+   catalogue's create prompt keeps its `flex`/`width` only inside the manager. Issue 1507's. */
+.fabricate-link-field.manager-item-drop-zone {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) max-content;
   align-items: center;
@@ -18233,7 +18265,7 @@
    44px art column and `max-content` action column are exactly what must not be here — see the
    component's own note for why this is a different claim rather than a density knob.
    Radius 9 rather than the default 10: `design-system/spec.md:218` puts a well on 9. */
-.fabricate-manager .manager-item-drop-zone.is-compact {
+.fabricate-link-field.manager-item-drop-zone.is-compact {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18246,14 +18278,14 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
   width: auto;
   height: auto;
   font-size: 0.82rem;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18261,26 +18293,26 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
   font-size: 0.63rem;
   font-weight: 500;
   line-height: 1.4;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
   font-size: 0.59rem;
   line-height: 1.45;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-drop-active {
+.fabricate-link-field.manager-item-drop-zone.is-drop-active {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
   box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-disabled {
+.fabricate-link-field.manager-item-drop-zone.is-disabled {
   opacity: 0.55;
 }
 
@@ -18294,7 +18326,7 @@
    var(--border)` beside the fill, and both now draw it. This one does not: `proto:1981` states
    `background: var(--surface-soft)` and no border at all, because the tile is already inside a
    dashed edge of its own and a second edge 12px in would draw the empty zone twice. */
-.fabricate-manager .manager-item-drop-zone-icon {
+.fabricate-link-field .manager-item-drop-zone-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18306,31 +18338,31 @@
   color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-item-drop-zone-icon img {
+.fabricate-link-field .manager-item-drop-zone-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy {
+.fabricate-link-field .manager-item-drop-zone-copy {
   display: grid;
   gap: var(--fab-space-1);
   min-width: 0;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy strong,
-.fabricate-manager .manager-item-drop-zone-copy small {
+.fabricate-link-field .manager-item-drop-zone-copy strong,
+.fabricate-link-field .manager-item-drop-zone-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy small {
+.fabricate-link-field .manager-item-drop-zone-copy small {
   color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-item-drop-zone-actions {
+.fabricate-link-field .manager-item-drop-zone-actions {
   display: flex;
   gap: var(--fab-space-1);
 }

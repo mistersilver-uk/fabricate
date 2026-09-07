@@ -39,6 +39,20 @@
   }
 
   const hasLink = $derived(Boolean(linkedItem?.uuid));
+  /**
+   * This site's drop-zone hooks, and the ONE bag in the repository that is not caller-constant.
+   *
+   * `data-recipe-item-link` and `data-recipe-item-dropzone` are two faces of ONE state — the
+   * filled chip and the empty prompt — and were conditioned on the zone's `item` rather than on
+   * its `kind` while they lived inside the primitive. A STATIC object here would render both or
+   * neither, which is exactly the state `recipe-item-overview-tab-mounted.test.js` asserts
+   * against in both directions.
+   */
+  const linkHooks = $derived({
+    root: hasLink ? { 'data-recipe-item-link': true } : { 'data-recipe-item-dropzone': true },
+    copy: { 'data-recipe-item-copy-uuid': true },
+    unlink: { 'data-recipe-item-unlink': true },
+  });
   const uuid = $derived(String(linkedItem?.uuid || recipeItem?.originItemUuid || ''));
   const itemName = $derived(String(linkedItem?.name || ''));
   const itemImg = $derived(String(linkedItem?.img || recipeItem?.img || ''));
@@ -81,6 +95,7 @@
             'The Item sets this recipe item’s name and description.'
           )}
       kind="recipe-item"
+      hookAttrs={linkHooks}
       copyLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.CopyUuid', 'Copy UUID')}
       unlinkLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Unlink', 'Unlink item')}
       onDrop={handleItemDrop}

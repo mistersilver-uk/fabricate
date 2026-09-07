@@ -2387,8 +2387,13 @@ test('long-labelled switches escape the status cell geometry', () => {
 
   // (2) The Overview Enabled/Locked status cards are left-aligned rows (icon + copy
   // + switch), not the media column's centred, 14ch-clamped stack (issue 643).
-  const statusCardBlock = blockFor('.fabricate-manager .manager-recipe-status-card');
-  const statusSubBlock = blockFor('.fabricate-manager .manager-recipe-status-sub');
+  // RE-KEYED AT ISSUE 1509 PHASE 4, not relaxed: the family is rooted at
+  // `fabricate-toggle-card`, the class `ToggleCard` writes at the head of its own root template,
+  // so the card's rule is a COMPOUND and its sub-line's is a descendant chain. Same position,
+  // same declarations, same ranks — (0,2,0) both, before and after — so every assertion below
+  // reads the same block it always did.
+  const statusCardBlock = blockFor('.fabricate-toggle-card.manager-recipe-status-card');
+  const statusSubBlock = blockFor('.fabricate-toggle-card .manager-recipe-status-sub');
   assert.ok(
     statusCardBlock.includes('display: flex;') && statusCardBlock.includes('align-items: center;'),
     'a status card is an icon + copy + switch row, not a centred stack'

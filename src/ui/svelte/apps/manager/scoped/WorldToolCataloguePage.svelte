@@ -619,8 +619,17 @@
   navigates.
 -->
 {#snippet toolCreateZone()}
+  <!-- `data-tool-create-card` IS A STYLING HOOK, not a test hook (issue 1509).
+       `styles/fabricate.css` declares `.fabricate-manager [data-tool-create-card] { flex: 0 0
+       auto; width: 100% }`, so dropping it narrows this prompt from the list's full width. That
+       rule is application-rooted and outside the `manager-item-drop-zone*` family, which is what
+       leaves `fabricate-link-field` host-dependent for THIS caller alone — a named residue for
+       issue 1507. `data-tool-create-drop-prompt` is the mounted absence assertion's selector. -->
   <ItemDropZone
     kind="tool-create"
+    hookAttrs={{
+      root: { 'data-tool-create-card': true, 'data-tool-create-drop-prompt': true },
+    }}
     title={text(
       'FABRICATE.Admin.Manager.Tools.CreateDropTitle',
       'Drag an Item here to make it a Tool'
