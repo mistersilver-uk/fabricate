@@ -659,7 +659,7 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>stacked</b> for three or more · <b>row</b> for two — a two-up stacked pair leaves the descriptions swimming</li><li><b>chosen</b> surface-soft + 1px accent-border</li><li><b>icon</b> 30&times;30 chip, accent-soft when chosen</li><li><b>desc</b> one sentence, always present</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>value</b> <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span></li><li><b>options</b> {value, title, icon, desc}[]</li><li><b>layout</b> stacked | row · <b>columns</b></li><li><b>groupName · legend</b> <span class="req">required</span></li><li><b>disabled</b> whole group · <b>disabledOptions</b> {value, reason}[]</li></ul></div>
     </div>
-    <div class="delta"><b>A disabled option states why.</b> Opacity alone is not a reason, so a disabled option routes through <code>&lt;Locked&gt;</code> and carries its required <code>reason</code> — the shipped resolution-mode card proves the domain needs it, showing a visible “Coming soon” badge rather than a dimmed card.<span class="cite"><b>ResolutionModeCard.svelte:11-14</b></span></div>
+    <div class="delta"><b>A disabled option states why.</b> Opacity alone is not a reason, so a disabled option routes through <code>&lt;Locked&gt;</code> and carries its required <code>reason</code> — the shipped resolution-mode card proves the domain needs it, showing a visible “Coming soon” badge rather than a dimmed card.<span class="cite"><b>RadioCardGroup.svelte:161-165</b></span></div>
   </div>
 
   <div class="spec" data-status="target" data-status-Field="shipped" data-status-Select="shipped" data-status-Search="target">

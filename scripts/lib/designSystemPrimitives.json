@@ -148,13 +148,6 @@
       "why": "`library.html:626` — \"A radio group with room to explain itself.\" 9 callers."
     },
     {
-      "path": "src/ui/svelte/apps/manager/ResolutionModeCard.svelte",
-      "library": null,
-      "status": "target",
-      "evidence": "targeted",
-      "why": "The resolution-mode chooser card (2 callers, `CraftingSettingsView.svelte` and `GatheringEconomyView.svelte`). `library.html:1686` defers the modes themselves to the resolution-modes capability and specifies no card for choosing one. Targeted: `manager-system-edit-normal` claims it."
-    },
-    {
       "path": "src/ui/svelte/components/SearchablePopover.svelte",
       "library": "<SearchPopover>",
       "status": "target",

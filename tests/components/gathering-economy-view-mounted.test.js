@@ -122,7 +122,6 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
     // The manager's ONE labelled push-button (issue 1118): the actor list's bulk Save renders
     // it. Already covered by the `SELECT_COMPILED_MODULES` loop above.
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');

@@ -2,7 +2,8 @@
 // SystemEditView so the Crafting Settings page and any other surface reuse one
 // canonical list rather than duplicating it (avoids Sonar new-code duplication).
 // Each option is { value, labelKey, fallback, descKey, descFallback } for the
-// shared ResolutionModeCard.
+// shared RadioCardGroup, which issue 1509 made these sites' direct renderer when the
+// `ResolutionModeCard` shim was folded away.
 
 export const resolutionModeOptions = [
   {

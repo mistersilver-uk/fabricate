@@ -392,7 +392,18 @@ test('the inputs every property below quantifies over are alive', () => {
   // and ADDED `components/Avatar.svelte`'s when the actor portrait shipped, so the set is
   // net-neutral across the branch and this pin is deliberately not edited. Between those two
   // commits it is the one register red the change declares in advance.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 53, 'the shipped primitive set changed size');
+  // 52 as of issue 1509 phase 3, and it is the register's first NET REMOVAL: nothing was demoted
+  // and nothing promoted. `apps/manager/ResolutionModeCard.svelte` was a 65-line shim over
+  // `RadioCardGroup` that renamed three props, and rooting the radio-card family at the class the
+  // primitive emits made the indirection cost more than it bought — so the four call sites render
+  // `RadioCardGroup` directly and the shim's file, and therefore its row, are gone. The
+  // non-member set is unmoved at 12: a deleted component is not adjudicated OUT of the
+  // vocabulary, it stops existing, and `notAPrimitive` records decisions about files that do.
+  // NOT TO BE CONFUSED with the other 53 this file's siblings pin: `design-system-coverage.
+  // test.js:133` and `:136` pin `library.blockCount` and `library.headingCount`, which count
+  // `library.html`'s spec-head BLOCKS rather than manifest rows. That figure is unrelated to this
+  // one, is unchanged by this change, and the two agreeing at 53 today was a coincidence.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

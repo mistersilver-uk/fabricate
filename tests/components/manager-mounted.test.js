@@ -612,7 +612,6 @@ function compileManagerRoot() {
       readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
     );
   }
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
   // Plain module imported by CraftingSettingsView — copied raw (NOT compiled), the
   // same way recipe/recipeReadiness.js is, so the mounted import resolves.
   {
@@ -3590,7 +3589,7 @@ async function mountSystemOverviewPage(systemValidation) {
   return { calls };
 }
 
-// Shared assertion for a ResolutionModeCard's option list: the rows render in the
+// Shared assertion for a resolution-mode RadioCardGroup's option list: the rows render in the
 // expected order, each wraps a real radio in the named group, and each has a
 // non-empty description. Hoisted so the recipe/salvage tests stay DRY (Sonar gate).
 function assertResolutionCard(card, { optionAttr, groupName, expectedValues }) {

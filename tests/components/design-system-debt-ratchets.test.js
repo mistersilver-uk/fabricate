@@ -285,6 +285,14 @@ function focusResetRoot(selector) {
  * repaint is two comma-separated legs — the two forms differ because two different recognisers
  * govern them, and neither may be "unified" into the other.
  *
+ * `RadioCardGroup` joined at issue 1509 phase 3 and is the SECOND family to bring a pair it
+ * already declared, after `StatusToggle` — but it is the first whose strip had to be SPLIT out of
+ * a selector list before this recogniser could see it. The rule paired the option row's radio with
+ * the Tool Requirements bonus row's, and a list is not this shape: `primitiveFocusStrip` accepts
+ * exactly ONE compound. So the split is the precondition rather than a tidy-up, and the bonus
+ * row's leg stays a booked bare-`:focus` row rooted at the manager, which is what
+ * `design-system-known-debt.json` records.
+ *
  * `EditorTabs` joined at issue 1509 with a NEW pair rather than a re-rooted one: the tab strip had
  * no focus chrome of its own at all, because inside a Fabricate window the module pair reached its
  * buttons and nothing else was needed. Rooted at the class it emits, the strip renders in hosts
@@ -296,6 +304,7 @@ const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-button:focus',
   '.fabricate-field :is(input, textarea):focus',
   '.fabricate-icon-button:focus',
+  ".fabricate-option-cards .manager-resolution-option input[type='radio']:focus",
   '.fabricate-pagination button:focus',
   '.fabricate-search input:focus',
   '.fabricate-slider input:focus',
@@ -436,6 +445,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '.fabricate-button:focus',
       '.fabricate-field :is(input, textarea):focus',
       '.fabricate-icon-button:focus',
+      ".fabricate-option-cards .manager-resolution-option input[type='radio']:focus",
       '.fabricate-pagination button:focus',
       '.fabricate-search input:focus',
       '.fabricate-slider input:focus',
@@ -452,21 +462,30 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '`Field`s member is ONE `:is()` compound because this recogniser accepts ' +
       'exactly one list member, while its RING half is two comma-separated legs because ' +
       '`bareElementRingRoot` reads one element per member. Both forms are asserted, here and in ' +
-      'the ring-root clause below, so neither can be "unified" into the other. `StatusToggle` is ' +
+      'the ring-root clause below, so neither can be "unified" into the other. `RadioCardGroup` ' +
+      'joined at issue 1509 phase 3 by SPLITTING the list its strip shared with the Tool ' +
+      'Requirements bonus row — the rule and its two declarations are unchanged; what changed is ' +
+      'that the option row`s member is now its own rule and therefore its own compound. ' +
+      '`StatusToggle` is ' +
       'the one family with TWO members: its checkbox host is a `<label>`, which never matches ' +
       '`:focus`, so that host`s strip is written on the `<input>` the label wraps while its ' +
       'repaint stays a `:has()` ring on the label itself.'
   );
   assert.equal(
     strips.length,
-    9,
-    'one strip per family and per host that takes focus separately — EIGHT families and NINE ' +
+    10,
+    'one strip per family and per host that takes focus separately — NINE families and TEN ' +
       'compounds. The two numbers differ by one, and always for the same reason: `StatusToggle` ' +
       'declares two, because its checkbox host is a `<label>` that never matches `:focus` and ' +
       'that host`s strip is therefore written on the `<input>` the label wraps. Every other ' +
       'family declares exactly one. `EditorTabs` is the eighth family (issue 1509) and its strip ' +
       'is `.fabricate-tabs button:focus`, the shape `.fabricate-pagination button:focus` already ' +
-      'ships: a root whose own control is a bare `<button>` it renders itself.'
+      'ships: a root whose own control is a bare `<button>` it renders itself. `RadioCardGroup` ' +
+      'is the ninth (issue 1509 phase 3) and its strip is the one that arrived by SPLITTING ' +
+      'rather than by writing: the rule already existed and already carried exactly ' +
+      '`outline: none; box-shadow: none`, but it shared a selector list with the Tool ' +
+      'Requirements bonus row and this recogniser accepts one compound, so the split is what ' +
+      'made an existing strip recognisable.'
   );
 
   // `declarationsIn` stamps the file onto each declaration and `primitiveFocusStrip` never reads

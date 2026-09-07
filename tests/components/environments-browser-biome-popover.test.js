@@ -63,7 +63,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
-    'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',

@@ -177,7 +177,7 @@ async function readRenderedToolGeometry(width, view) {
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
               <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
               <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
                 <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><input type="radio" name="tool-breakage-mode" value="limitedUses" checked><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-hourglass-half"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span></label>
@@ -7973,7 +7973,7 @@ async function checksRollEdges(page, tiersWrapperClass) {
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>
       <div class="manager-checks-card-body">
-        <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">DC source</legend>
           <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
             <label class="manager-resolution-option is-active" data-dc-mode-option="static">
@@ -8196,7 +8196,7 @@ async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
       <h3 class="manager-card-title">Named modifiers</h3>
-      <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+      <fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
         <legend class="manager-resolution-mode-legend">How they combine</legend>
         <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
           <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">

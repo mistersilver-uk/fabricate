@@ -42,6 +42,37 @@
   change to a shared surface with its own reviewers, and it does not belong inside the diff that
   orphaned it; it is recorded here so the next reader finds a decision rather than dead code, and
   it is owed a follow-up that removes the prop, its markup branch and its rule together.
+
+  ── THE FAMILY IS ROOTED AT `fabricate-option-cards` (issue 1509) ──────────────────
+  Every `manager-resolution-*` rule this component needs used to begin `.fabricate-manager`, so
+  the group drew unstyled anywhere outside the manager window. The root leads the `class` template
+  below, which `Field` appends to its own `fabricate-field manager-field` — so the rendered
+  fieldset carries TWO namespace roots, `Field`'s and this one's, on one element.
+
+  That co-rooting is why this family declares NO font floor of its own. `Field`'s
+  `.fabricate-field :is(input, select, textarea)` at (0,1,1) already reaches every radio inside
+  this group in every host, so a second floor would restate the same property at the same rank
+  rather than establish one. The two families are measurably DISJOINT — no selector in
+  `styles/fabricate.css` names a `manager-field`/`fabricate-field` class together with a
+  `manager-resolution-*` one — which is what keeps each root from reading as an application root
+  to the other's area-scope entry. Both facts are asserted in
+  `tests/components/searchable-popover-area-scope.test.js`.
+
+  The `class` template is read by the area-scope gate's markup extractor, and the root is a
+  LITERAL at its head for that reason. The entry deliberately declares no `classProps`: a
+  `classProps: ['class']` entry's reader matches EVERY class attribute in this markup — twelve of
+  them — against a floor of one. What that would have bought is bought instead by the mounted
+  root-emission assertion in `tests/components/field-mounted.test.js`, which reads the RENDERED
+  `className` off the fieldset.
+
+  ── AND THE `ResolutionModeCard` SHIM IS GONE (issue 1509) ────────────────────────
+  Its four call sites render this component directly. It mapped three names — `legendFallback`,
+  `hintFallback` and `variant === 'config-card'` — and NO alias prop is kept for any of them,
+  because a permanent duplicate prop name on a shared primitive costs more than four call-site
+  edits. `configCards` is stated EXPLICITLY at every one of those sites, in both directions: the
+  shim derived it from `variant` and defaulted to FALSE, while this component defaults to TRUE, so
+  a site that merely dropped `variant` would flip from the compact single-column face to the
+  two-column config-card face.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -87,7 +118,7 @@
 <Field
   as="fieldset"
   id={cardId}
-  class={`is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}`}
+  class={`fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}`}
   {disabled}
   data-radio-card-group={dataGroup || undefined}
   {...{ [dataAttr]: dataAttr ? true : undefined }}

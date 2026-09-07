@@ -41,8 +41,20 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,613 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,619 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1509 PHASE 3 RE-KEYED NO ROW AND MOVED ONE CONTEXTUAL FIGURE, WHICH IS A SHAPE NEITHER
+ * EARLIER PHASE TOOK. Rooting `RadioCardGroup` rewrites the leading compound of 32 selectors, and
+ * not one of them is a repeated key — measured — so the repeated table is untouched and
+ * `pinnedTotal` stays 243 across 119 rows. What moves is the RULE COUNT alone, by six: six
+ * selector LISTS were SPLIT, each of them pairing a `manager-resolution-option` radio member that
+ * re-roots with a `manager-tool-bonus-row` one that must not. A split adds a rule without adding
+ * a key, because both members were already their own keys and each keeps exactly one appearance
+ * — so unlike phases 1 and 2 the key and singleton counts do not move at all, and 3,123 / 3,004
+ * stand. Phase 1 recorded that shape once as one third of its own change; here it is the whole of
+ * it, six times over, and the phase adds no rule of its own: the family's focus pair already
+ * existed and is re-rooted in place rather than written.
  *
  * ISSUE 1509 PHASE 1 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, which is issue 1508
  * phase 3's shape again. Rooting `EditorTabs` rewrites the leading compound of eight selectors, and

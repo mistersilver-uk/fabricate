@@ -17,7 +17,6 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/CraftingEffectPanel.svelte',
     'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
   ],

@@ -391,8 +391,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // side by side, and it is where four of this conversion's six `:global()` cascade repairs
   // landed, so a repair that reaches the element but loses the cascade shows up there.
   // `manager-system-edit-normal` is the frame that renders the corpus's ONE `<fieldset>` field:
-  // `RadioCardGroup` through `ResolutionModeCard`, which that component's own manifest row
-  // already names as its claiming frame.
+  // `RadioCardGroup`, which issue 1509 made a direct render when the `ResolutionModeCard` shim
+  // that used to stand between them was deleted.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
@@ -1454,7 +1454,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
+      // `ResolutionModeCard` LEFT this alternation at issue 1509, which deleted the file: the
+      // shim's four call sites render `RadioCardGroup` directly now. A dead branch of an
+      // alternation is exactly the failure `every knowledge render file the predicate probes
+      // is a real source file` records — the other branches keep resolving, so `every
+      // sourceMatches pattern resolves to at least one source file` stays green over a name
+      // that matches nothing. `RadioCardGroup` does NOT take its place: it is a broad-signal
+      // file routed by its own `BROAD_SIGNAL_CASE_OVERRIDES` entry, and `selectRenderFileCases`
+      // skips a broad-signal file before it reads any case's `sourceMatches` at all.
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
     ],
   }),
   managerCase({

@@ -1,7 +1,34 @@
 /*
  * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issues 1502, 1508 and 1509).
  *
- * ── WHAT ISSUE 1509 ADDED ─────────────────────────────────────────────────
+ * ── WHAT ISSUE 1509 PHASE 3 ADDED ─────────────────────────────────────────────
+ * `RadioCardGroup`, and it is the first family here whose ROOT ELEMENT BELONGS TO ANOTHER
+ * PRIMITIVE. The component renders `<Field as="fieldset">` unconditionally, so its fieldset
+ * carries `fabricate-field` and `fabricate-option-cards` together and the two families are
+ * co-rooted on ONE element rather than nested.
+ *
+ * That is why this family declares NO FONT FLOOR, and the refusal is measured rather than
+ * asserted: `Field`'s own `.fabricate-field :is(input, select, textarea)` at (0,1,1) already
+ * reaches every radio inside this group in every host, so a floor here would restate the same
+ * property at the same rank rather than establish one. The negative control below DELETES
+ * `Field`'s member from the floor group and shows the bare host's radio losing its type, which
+ * is what says the resolution really comes from there.
+ *
+ * Its focus PAIR is neither new nor refused: the family already declared one, and this change
+ * re-rooted it IN PLACE after SPLITTING the six selector lists it shared with the Tool
+ * Requirements bonus row. That split is what makes the strip half a single-compound rule and
+ * therefore a recognisable `PRIMITIVE_FOCUS_STRIPS` member at all.
+ *
+ * EVERY PROBE UNDER THIS CARD OPTS OUT OF THE BOX COMPARISON, and they all opt out for ONE
+ * cause rather than seven: the icon tile declares a 40x40 size over a 1px border, so its border
+ * box is 42x42 wherever `box-sizing` falls to `content-box` and 40x40 where the host supplies
+ * `border-box` — and it is the tallest thing in the row, so the row, the grid and the fieldset
+ * inherit the 2px from it. That is this core-less harness rather than Foundry, where core's
+ * `@layer reset` gives every host `border-box`, and the tile's DECLARED 40x40 is compared in all
+ * three hosts instead. The two RADIO probes keep their box comparison, because the radio
+ * declares `box-sizing: border-box` itself and lays out 16x16 everywhere.
+ *
+ * ── WHAT ISSUE 1509 PHASES 1 AND 2 ADDED ───────────────────────────────────────
  * `EditorTabs`, the manager's editor tab strip, and it is the first family here whose root is not
  * a control and whose control is a `<button>` rather than an `<input>`. Its root is a
  * `<div role="tablist">` and the control it owns is the `<button role="tab">` inside it, so its
@@ -265,6 +292,30 @@ const VALIDATION_CLASSES = composedClasses(
   'EditorValidationSurface'
 ).join(' ');
 
+/**
+ * The class list `RadioCardGroup` hands `Field`, read out of the component's own template.
+ *
+ * The template's LEADING LITERAL is the family root, and the position is a constraint rather than
+ * a style note: `searchable-popover-area-scope.test.js` reads this component's family out of its
+ * markup, and `Field` prepends its own two classes to whatever arrives — so what the fieldset
+ * renders is `Field`'s pair, then this family's root, then this family's own classes. That is the
+ * one place in this file where TWO namespace roots land on ONE element.
+ *
+ * `is-config-cards` is appended rather than read, because it arrives through an interpolation the
+ * literal reader cannot see; the pinning test below asserts the whole assembled string.
+ */
+const OPTION_CARDS_OWN_CLASSES = (() => {
+  const source = read('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
+  const match = source.match(/class=\{`([^`$]*)\$\{/u);
+  assert.ok(
+    match,
+    'RadioCardGroup must hand `Field` a `` class={`…`} `` template whose leading run is literal'
+  );
+  return match[1].trim();
+})();
+
+const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-config-cards`;
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -275,7 +326,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the eleven class strings under measurement are the ones the primitives emit', () => {
+test('the twelve class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -291,6 +342,18 @@ test('the eleven class strings under measurement are the ones the primitives emi
     'fabricate-validation manager-recipe-tab manager-recipe-validation ' +
       'manager-editor-validation-surface',
     'the surface emits its namespace root and its three `manager-*` classes, in that order'
+  );
+  assert.equal(
+    OPTION_CARDS_CLASSES,
+    'fabricate-field manager-field fabricate-option-cards is-wide ' +
+      'manager-resolution-mode-card manager-radio-card-group is-config-cards',
+    'the fieldset carries `Field`s pair, then this family`s root, then this family`s own classes'
+  );
+  assert.equal(
+    OPTION_CARDS_OWN_CLASSES.split(/\s+/u)[0],
+    'fabricate-option-cards',
+    'RadioCardGroup must declare its namespace root as the FIRST token of the class template it ' +
+      'hands `Field`, which is where the area-scope gate`s markup reader takes it from'
   );
   assert.equal(
     TABS_BUTTON_CLASS,
@@ -492,6 +555,28 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<section class="fabricate-validation manager-recipe-tab manager-recipe-validation manager-editor-validation-surface" data-probe="${host}-validation"><section class="manager-recipe-validation-summary-row" data-probe="${host}-validation-summary-row"><div class="manager-recipe-rail-summary is-block" data-probe="${host}-validation-summary"><span class="manager-recipe-rail-summary-medallion" data-probe="${host}-validation-medallion"><i class="fas fa-circle-xmark"></i></span><span class="manager-recipe-rail-summary-copy" data-probe="${host}-validation-copy"><span class="manager-recipe-rail-summary-title" data-probe="${host}-validation-title">Cannot be enabled</span><span class="manager-recipe-rail-summary-sub manager-muted" data-probe="${host}-validation-sub">Clear every blocking issue first.</span></span></div><ul class="manager-recipe-rail-counts" data-probe="${host}-validation-counts"><li class="manager-recipe-rail-count is-passing" data-probe="${host}-validation-count"><i class="fas fa-circle-check"></i><span class="manager-recipe-rail-count-label" data-probe="${host}-validation-count-label">Passing</span><span class="manager-recipe-rail-count-value" data-probe="${host}-validation-count-value">7</span></li></ul></section><div class="manager-recipe-val-group" data-probe="${host}-validation-group"><p class="manager-recipe-val-group-label" data-probe="${host}-validation-group-label">Requirements</p><ul class="manager-recipe-val-rows" data-probe="${host}-validation-rows"><li class="manager-recipe-val-row is-block" data-probe="${host}-validation-row"><i class="manager-recipe-val-status fas fa-circle-xmark" data-probe="${host}-validation-status"></i><div class="manager-recipe-val-copy" data-probe="${host}-validation-row-copy"><span class="manager-recipe-val-title" data-probe="${host}-validation-row-title">A game-world Item is linked</span></div></li></ul></div></section>`,
   }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE OPTION CARDS EITHER (issue 1509 phase 3), for a reason
+  // no other entry here has: the root element is `Field`'s `<fieldset>`, so it carries TWO
+  // namespace roots and what this family declares about it is only part of what paints it. The
+  // control the family owns is its own `<input type="radio">`, and it is probed in BOTH states,
+  // because the checked ring is an inset `box-shadow` written by a rule of its own and a single
+  // resting probe would compare the hollow ring and call the family proved.
+  //
+  // ELEVEN PROBES, and the icon tile is the one this fixture exists to draw: the two-column
+  // `is-config-cards` face is the only presentation that renders it, and the 40x40 plate over a
+  // hairline is what the card is recognisable by.
+  Object.freeze({
+    id: 'option-cards',
+    classes: OPTION_CARDS_CLASSES,
+    // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header: the tile
+    // declares 40x40 over a 1px border, so it is 42 high wherever `box-sizing` falls to
+    // `content-box`, and it is the tallest thing in the row — so the row, the grid and this
+    // fieldset are all 2px taller in the two hosts this core-less harness leaves without a
+    // universal box-sizing rule. The tile's DECLARED size is compared instead, in all three hosts.
+    comparesBox: false,
+    markup: (host) =>
+      `<fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
+  }),
 ]);
 
 /**
@@ -531,6 +616,16 @@ const EXTRA_PROBES = Object.freeze([
   'validation-status',
   'validation-row-copy',
   'validation-row-title',
+  'option-cards-legend',
+  'option-cards-options',
+  'option-cards-row',
+  'option-cards-row-active',
+  'option-cards-icon',
+  'option-cards-body',
+  'option-cards-name',
+  'option-cards-desc',
+  'option-cards-radio',
+  'option-cards-radio-checked',
 ]);
 
 /**
@@ -577,6 +672,22 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   // compared instead, in all three hosts, which is the claim that matters.
   'tabs-active',
   'tabs-button',
+  // AND SEVEN OF THE OPTION CARD'S PROBES (issue 1509 phase 3), for ONE cause rather than seven.
+  // `.fabricate-option-cards… .manager-resolution-option-icon` declares a 40x40 tile over a 1px
+  // border, so its border box is 42x42 wherever `box-sizing` falls to `content-box` and 40x40
+  // where the host supplies `border-box`. The tile is the tallest thing in an option row, so the
+  // row's box follows it, the grid's follows the row's and the fieldset's follows the grid's; the
+  // body, the name and the desc follow the row's CONTENT width for the same reason. Their
+  // DECLARED values are compared instead, in all three hosts, and the tile's 40x40 is among them.
+  // The two RADIO probes are deliberately NOT here: the radio declares `box-sizing: border-box`
+  // in its own rule, so it lays out 16x16 in every host and its box is compared.
+  'option-cards-options',
+  'option-cards-row',
+  'option-cards-row-active',
+  'option-cards-icon',
+  'option-cards-body',
+  'option-cards-name',
+  'option-cards-desc',
 ]);
 
 /**
@@ -1181,6 +1292,126 @@ const VALIDATION_ROW_TITLE_COMPARED = Object.freeze(['font-weight']);
  * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
  * above these constants and a forward reference would be a temporal-dead-zone error at import.
  */
+/**
+ * What this acceptance compares on the radio-card group, probe by probe (issue 1509 phase 3).
+ *
+ * `box-sizing` is absent from every one of these lists but the radio's, and the exclusion is the
+ * pager's own: nothing under this card declares a keyword except the radio, so the rest take
+ * `border-box` from `.fabricate-manager *` inside the manager and whatever this core-less harness
+ * leaves elsewhere. The radio DOES declare one, so it is compared there and reds if it goes.
+ *
+ * `color` is absent from the two radio lists for a different reason and a measured one: a radio
+ * inherits `color` from the `.fabricate` module root, which the bare host does not carry, so it
+ * is black there and `--fab-text` in both apps. That is the module's vocabulary rather than this
+ * family's, and the family declares no `color` on its radios at all.
+ */
+const OPTION_CARDS_ROOT_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'gap',
+  'min-width',
+  'padding-top',
+  'border-top-width',
+  'border-radius',
+]);
+
+/** The legend the config-cards face hides, which is the group's accessible name. */
+const OPTION_CARDS_LEGEND_COMPARED = Object.freeze([
+  'position',
+  'width',
+  'height',
+  'overflow',
+  'white-space',
+  'margin-top',
+  'padding-top',
+]);
+
+/** The two-column grid the face is named for. */
+const OPTION_CARDS_OPTIONS_COMPARED = Object.freeze([
+  'display',
+  'grid-template-columns',
+  'gap',
+  'min-width',
+]);
+
+/** The card ROW, resting and active, whose border and fill are what a selection reads as. */
+const OPTION_CARDS_ROW_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'background-color',
+  'cursor',
+]);
+
+/** The 40x40 glyph plate, compared as the size and edge it DECLARES. */
+const OPTION_CARDS_ICON_COMPARED = Object.freeze([
+  'order',
+  'display',
+  'align-items',
+  'justify-content',
+  'width',
+  'height',
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'background-color',
+  'color',
+  'font-size',
+]);
+
+/** The copy column the tile leads, and the two lines inside it. */
+const OPTION_CARDS_BODY_COMPARED = Object.freeze([
+  'order',
+  'display',
+  'flex-direction',
+  'gap',
+  'flex-grow',
+  'min-width',
+]);
+const OPTION_CARDS_NAME_COMPARED = Object.freeze(['font-size', 'font-weight', 'color']);
+const OPTION_CARDS_DESC_COMPARED = Object.freeze([
+  'font-size',
+  'font-weight',
+  'color',
+  'line-height',
+]);
+
+/**
+ * The control the family OWNS, in both states.
+ *
+ * `font-family` is here and it is the point: this family declares NO floor of its own, so the
+ * only thing typing this radio in a bare host is `Field`'s (0,1,1) floor reaching it through the
+ * root they SHARE. The clause that deletes that floor and watches this value move is below.
+ */
+const OPTION_CARDS_RADIO_COMPARED = Object.freeze([
+  'appearance',
+  '-webkit-appearance',
+  'width',
+  'height',
+  'box-sizing',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'background-color',
+  'box-shadow',
+  'cursor',
+  'align-self',
+  'margin-top',
+  'flex-shrink',
+  'font-family',
+]);
+
 const COMPARED_BY_CONTROL = Object.freeze({
   pagination: COMPARED_PAGINATION,
   field: FIELD_COMPARED,
@@ -1219,6 +1450,17 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'validation-status': VALIDATION_STATUS_COMPARED,
   'validation-row-copy': VALIDATION_ROW_COPY_COMPARED,
   'validation-row-title': VALIDATION_ROW_TITLE_COMPARED,
+  'option-cards': OPTION_CARDS_ROOT_COMPARED,
+  'option-cards-legend': OPTION_CARDS_LEGEND_COMPARED,
+  'option-cards-options': OPTION_CARDS_OPTIONS_COMPARED,
+  'option-cards-row': OPTION_CARDS_ROW_COMPARED,
+  'option-cards-row-active': OPTION_CARDS_ROW_COMPARED,
+  'option-cards-icon': OPTION_CARDS_ICON_COMPARED,
+  'option-cards-body': OPTION_CARDS_BODY_COMPARED,
+  'option-cards-name': OPTION_CARDS_NAME_COMPARED,
+  'option-cards-desc': OPTION_CARDS_DESC_COMPARED,
+  'option-cards-radio': OPTION_CARDS_RADIO_COMPARED,
+  'option-cards-radio-checked': OPTION_CARDS_RADIO_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
@@ -2488,9 +2730,17 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
  * third phase, and a fixture element carrying a family class with no root above it is exactly the
  * offender `searchable-popover-area-scope.test.js`'s ancestry clause reports. Writing the wrapper
  * now means this file does not become that phase's repair work.
+ *
+ * AND THE FIELDSET CARRIES `fabricate-option-cards` AS OF ISSUE 1509 PHASE 3, for a reason that
+ * is not bookkeeping: the resolution radio's own (0,3,1) chrome rule re-rooted onto that class in
+ * that phase, so without it this control's radio would stop matching the rule it has always been
+ * measured under and every value below would move for a reason that has nothing to do with a
+ * floor. The root restores the match exactly, at the same rank, which is what keeps this a
+ * NEGATIVE control rather than a changed subject. It is also what the ancestry clause asks for,
+ * and the two repairs are the same edit.
  */
 const NEGATIVE_CONTROLS =
-  '<fieldset class="fabricate-field manager-field" data-probe="neg-root">' +
+  '<fieldset class="fabricate-field manager-field fabricate-option-cards" data-probe="neg-root">' +
   '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
   '<label><input type="checkbox" data-probe="neg-checkbox"></label>' +
   '<span class="fabricate-slider manager-chance-slider"><span class="manager-drop-rate-control"><input type="range" data-probe="neg-range"></span></span>' +
@@ -2699,6 +2949,133 @@ test('the validation surface declares no font floor and no focus pair', async ()
   } finally {
     await tab.close();
   }
+});
+
+/*
+ * ── THE FAMILY WHOSE ROOT ELEMENT IS ANOTHER FAMILY'S (issue 1509 phase 3) ────────────
+ *
+ * `RadioCardGroup` owns a control — its `<input type="radio">` — and still declares no font floor,
+ * which no other entry in this file does. The reason is CO-ROOTING rather than composition: the
+ * component renders `<Field as="fieldset">`, so `fabricate-field` and `fabricate-option-cards` are
+ * on the SAME element and `Field`'s (0,1,1) floor already reaches every input inside the group in
+ * every host. A floor of this family's own would restate the same property at the same rank.
+ *
+ * The two clauses below are the two halves of that: the refusal is asserted over the sheet, and
+ * the thing it rests on is proved by DELETING `Field`'s member of the floor group and watching the
+ * bare host's radio lose its type.
+ */
+
+test('the option-card family declares no font floor of its own', async () => {
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    const named = /\.fabricate-option-cards(?![\w-])/u;
+    const family = rules.filter((rule) => named.test(rule.selectorText));
+    assert.ok(
+      family.length >= 27,
+      `only ${family.length} rules are rooted at \`.fabricate-option-cards\`, so the absence below ` +
+        'holds over nothing. The family has been renamed or the re-root has been undone.'
+    );
+
+    // THE DOMAIN IS REAL. This family DOES name bare elements under its root — the six radio rules
+    // the split produced, plus the note glyph — so a predicate that found none would be reporting
+    // a broken reader rather than a clean sheet, and the count says which it is.
+    const bareElement = family.filter((rule) =>
+      rule.selectorText
+        .split(/\s*(?:>|\+|~|\s)\s*/u)
+        .slice(1)
+        .some((compound) => compound !== '' && !compound.includes('.'))
+    );
+    assert.ok(
+      bareElement.length >= 7,
+      `only ${bareElement.length} rules name a bare element under this root, so the type check ` +
+        'below examines almost nothing: ' +
+        bareElement.map((rule) => rule.selectorText).join(', ')
+    );
+    const typedBareElement = bareElement.filter((rule) =>
+      rule.properties.some((property) => property.startsWith('font') || property === 'line-height')
+    );
+    assert.deepEqual(
+      typedBareElement.map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
+      [],
+      '`.fabricate-option-cards` types a bare element, which is a font FLOOR. This family must ' +
+        'not declare one: its root element is `Field`s fieldset and carries `fabricate-field` ' +
+        'too, so `.fabricate-field :is(input, select, textarea)` already floors every input in ' +
+        'the group at the same (0,1,1) rank. A second floor restates a property rather than ' +
+        'establishing one, and whichever of the two came later would win on source order alone.'
+    );
+
+    // AND IT IS NOT A MEMBER OF THE SHARED FLOOR GROUP EITHER, which is the other shape a floor
+    // could take here — `EditorTabs` joined that group rather than writing a block of its own.
+    // The group is found by its PRELUDE rather than by its declaration, because Chromium expands
+    // the `font` shorthand in `cssText` and a text search for it finds nothing.
+    const floorGroup = rules.filter((rule) => rule.selectorText === FAMILY_FONT_FLOOR_SELECTOR);
+    assert.equal(
+      floorGroup.length,
+      1,
+      `expected exactly one shared font-floor group, found ${floorGroup.length}. Its members are`+
+        ' pinned in `FAMILY_FONT_FLOOR_MEMBERS`, so a change to the group reds there first; this'+
+        ' clause reads nothing if the prelude has moved.'
+    );
+    assert.ok(
+      !named.test(floorGroup[0].selectorText),
+      '`.fabricate-option-cards` has joined the shared font-floor group. It must not: the same '+
+        'group already carries `.fabricate-field :is(input, select, textarea)`, which reaches '+
+        'this family`s radios through the root the two families share.'
+    );
+  } finally {
+    await tab.close();
+  }
+});
+
+test('the option-card radio takes its type from the field floor it shares a root with', async () => {
+  // THE NEGATIVE CONTROL FOR THE REFUSAL ABOVE, and it is a perturbation rather than an argument:
+  // "this family needs no floor because another one already reaches its control" is a claim about
+  // the cascade, and the only honest way to state it is to remove the other one and show the
+  // control lose its type in the host that has nothing else.
+  const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, select, textarea),\n';
+  assert.equal(
+    sheet.split(FIELD_FLOOR_MEMBER).length - 1,
+    1,
+    '`Field`s member of the font-floor group is not spelled as this control expects, so removing ' +
+      'it would perturb nothing and the comparison below would pass vacuously'
+  );
+  const base = sheet.replace(FIELD_FLOOR_MEMBER, '');
+  assert.notEqual(base, sheet, 'the perturbed sheet must actually differ from the shipped one');
+
+  const shipped = await measure(sheet);
+  const atBase = await measure(base);
+
+  const shippedFont = shipped['option-cards-radio'].bare['font-family'];
+  const baseFont = atBase['option-cards-radio'].bare['font-family'];
+  assert.ok(shippedFont !== '', 'the shipped radio computed no `font-family` at all');
+  assert.equal(
+    shippedFont,
+    shipped.field.bare['font-family'],
+    'in a BARE host the option-card radio must resolve the same `font-family` as `Field`s own ' +
+      'control, because the rule typing both of them is `Field`s floor'
+  );
+  assert.notEqual(
+    baseFont,
+    shippedFont,
+    'deleting `Field`s member of the font-floor group left the option-card radio typed anyway, ' +
+      'so something ELSE is flooring it and the refusal above rests on the wrong reason. Find ' +
+      'what, and say so here — do not add a floor to this family until it is the answer.'
+  );
+
+  // AND NOTHING ELSE MOVED IN THE MANAGER, which is the other half of "the floor is not this
+  // family's": inside `.fabricate-manager` the area's own bare-element baseline types the radio,
+  // so removing `Field`s member changes nothing there and the difference above is exactly the
+  // bare host's.
+  assert.equal(
+    atBase['option-cards-radio'].manager['font-family'],
+    shipped['option-cards-radio'].manager['font-family'],
+    'the manager host lost the radio`s type when `Field`s floor member went, which would mean ' +
+      'the area baseline no longer reaches it and this control is measuring two things at once'
+  );
 });
 
 test('the chrome these families declare reaches the control they own and nothing else', async () => {
