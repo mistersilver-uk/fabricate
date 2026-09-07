@@ -25,13 +25,13 @@
   `Delete component`) scrolled inline with the body and gave four commands equal weight where
   the design pins one. `Edit system rules` is the pinned primary; the other three move onto the
   shared `ActionMenu`, which is the primitive that owns "two or more commands behind one
-  trigger" (`design-system/spec.md:466-495`). Nothing is lost and nothing is a text link.
+  trigger" (`design-system/spec.md:485-514`). Nothing is lost and nothing is a text link.
 
   Strings are localized here; the CALLER resolves nothing but the actions and the world facts
   this screen's own row set cannot answer.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EssenceChip from './EssenceChip.svelte';
   import ActionMenu from '../../../components/ActionMenu.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
@@ -198,7 +198,8 @@
 
       <div class="manager-component-inspector-identity">
         <Medallion
-          src={selectedComponent.img}
+          art={selectedComponent.img}
+          alt=""
           icon="fas fa-cube"
           size={40}
           tint={selectedComponent.color || ''}

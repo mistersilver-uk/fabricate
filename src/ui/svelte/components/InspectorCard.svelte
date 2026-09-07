@@ -14,7 +14,7 @@
   so nothing here renders WRONG when the convention is missed — a card written as a
   bare `<section>` simply stops being a card, which is visible. What a hand-rolled
   convention costs instead is that no reader can enumerate the shell's callers, and
-  a change to the shell has to be argued site by site. `library.html:941` specifies
+  a change to the shell has to be argued site by site. `library.html:1014` specifies
   ONE card primitive (`<Card>`) and one container level below it; 80 hand-written
   sites is what "one card" looked like without a component to be one.
 

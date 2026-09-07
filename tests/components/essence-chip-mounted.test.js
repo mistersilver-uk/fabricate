@@ -35,7 +35,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-const CHIP_PATH = 'src/ui/svelte/apps/manager/Chip.svelte';
+const CHIP_PATH = 'src/ui/svelte/components/Chip.svelte';
 const ESSENCE_CHIP_PATH = 'src/ui/svelte/apps/manager/components/EssenceChip.svelte';
 const MEDALLION_PATH = 'src/ui/svelte/components/Medallion.svelte';
 
@@ -84,7 +84,6 @@ const row = createMountedComponentHarness({
     ESSENCE_CHIP_PATH,
     MEDALLION_PATH,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     ROW_PATH,
   ],

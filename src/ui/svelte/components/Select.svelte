@@ -135,7 +135,7 @@
                  {@link restTarget} for why the bare form has no home for it yet.
 -->
 <script>
-  import Chip from '../apps/manager/Chip.svelte';
+  import Chip from './Chip.svelte';
   import Field from './Field.svelte';
   import SearchablePopover from './SearchablePopover.svelte';
 

@@ -55,9 +55,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import {
     essenceColourCaption,
     essenceEffectSourceReferent,
@@ -421,7 +422,7 @@
   </span>
   {@const rollup = rollupState(entry)}
   <span class="manager-scoped-essence-rollup" data-scoped-essence-rollup={entry.id}>
-    <StatusPill tone={rollup.tone} icon={rollup.icon} label={rollup.label} />
+    <Chip tone={statusChipTone(rollup.tone)} icon={rollup.icon}>{rollup.label}</Chip>
   </span>
 {/snippet}
 

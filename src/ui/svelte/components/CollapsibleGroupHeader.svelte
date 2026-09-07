@@ -95,7 +95,7 @@
   }
 
   /* The non-collapsible band. It is not a control, so it takes neither the pointer cursor nor
-     the hover repaint, and the radius snaps 8 to the 7 rung (`design-system/spec.md:218`) on a
+     the hover repaint, and the radius snaps 8 to the 7 rung (`design-system/spec.md:220`) on a
      32px band.
 
      PADDING IS THE SCALE, NOT THE REFERENCE'S OWN `7px 11px` (`proto:1071`). Padding, margin and
@@ -104,7 +104,7 @@
      drawn value, which is inside this band's slack — nothing is pinned to its height.
 
      TYPE IS THE REFERENCE'S, in px, because font sizes are NOT scale members and are written as
-     literals (`design-system/spec.md:216-220`). The collapsible form's 0.72rem/0.66rem resolve
+     literals (`design-system/spec.md:218-222`). The collapsible form's 0.72rem/0.66rem resolve
      to 11.52px and 10.56px against the 16px root, and the reference draws 11px and 10.5px; both
      are stated on `.is-static` alone so the RecipesBrowserView's collapsible header is
      untouched. */

@@ -19,7 +19,7 @@
   vocabulary as the mapping step's per-folder rows.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerModal from './ManagerModal.svelte';

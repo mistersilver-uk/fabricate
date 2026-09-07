@@ -67,7 +67,8 @@
 -->
 <script>
   import { localize, formatList } from '../../../util/foundryBridge.js';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import Chip from '../../../components/Chip.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
@@ -359,11 +360,9 @@
               attrs={{ 'data-inventory-bulk-run-row': entry.key }}
             >
               {#snippet trailing()}
-                <StatusPill
-                  tone={runState.tone}
-                  icon={runState.icon}
-                  label={localize(runState.labelKey)}
-                />
+                <Chip tone={statusChipTone(runState.tone)} icon={runState.icon}
+                  >{localize(runState.labelKey)}</Chip
+                >
               {/snippet}
             </InventoryBulkRow>
           {/each}
@@ -412,26 +411,20 @@
             >
               {#snippet trailing()}
                 {#if isGuaranteed(entry)}
-                  <StatusPill
-                    tone="success"
-                    icon="fas fa-circle-check"
-                    label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-                  />
+                  <Chip tone="positive" icon="fas fa-circle-check"
+                    >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+                  >
                 {:else}
-                  <StatusPill
-                    tone="accent"
-                    icon="fas fa-dice-d20"
-                    label={localize('FABRICATE.App.Inventory.Bulk.Possible')}
-                  />
+                  <Chip tone="accent" icon="fas fa-dice-d20"
+                    >{localize('FABRICATE.App.Inventory.Bulk.Possible')}</Chip
+                  >
                 {/if}
                 {#if entry.broken}
                   <!-- Beside the certainty chip, never instead of the queue: brokenness
                        is about usability, and it does NOT gate salvageability. -->
-                  <StatusPill
-                    tone="danger"
-                    icon="fas fa-heart-crack"
-                    label={localize('FABRICATE.App.Inventory.Card.Broken')}
-                  />
+                  <Chip tone="danger" icon="fas fa-heart-crack"
+                    >{localize('FABRICATE.App.Inventory.Card.Broken')}</Chip
+                  >
                 {/if}
                 {@render removeControl(entry)}
               {/snippet}
@@ -462,17 +455,13 @@
                     </span>
                   {/if}
                   {#if shape.guaranteed}
-                    <StatusPill
-                      tone="success"
-                      icon="fas fa-circle-check"
-                      label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-                    />
+                    <Chip tone="positive" icon="fas fa-circle-check"
+                      >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+                    >
                   {:else}
-                    <StatusPill
-                      tone="accent"
-                      icon="fas fa-dice-d20"
-                      label={localize('FABRICATE.App.Inventory.Bulk.Possible')}
-                    />
+                    <Chip tone="accent" icon="fas fa-dice-d20"
+                      >{localize('FABRICATE.App.Inventory.Bulk.Possible')}</Chip
+                    >
                   {/if}
                 {/snippet}
               </InventoryBulkRow>

@@ -80,7 +80,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -99,7 +99,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     // THE shared picker both of the two above now render (issue 1503). `IconPicker` and
     // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC
     // import of this tree; omitting it throws in `before()` and reports `# cancelled`.

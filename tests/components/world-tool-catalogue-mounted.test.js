@@ -99,7 +99,6 @@ const harness = createMountedComponentHarness({
     // twice compiles the same file twice, harmlessly.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
   ],
 });
 

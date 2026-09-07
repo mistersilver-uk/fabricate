@@ -71,7 +71,7 @@
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -436,8 +436,10 @@
     onChange={(value) => onDraftChange(setBulkEssenceStatus(draft, value))}
   />
 
+  <!-- NEUTRAL (issue 1505): which fields stay per-essence is true of every selection, so it
+       is documentation rather than a note about the live one. -->
   <Callout
-    tone="info"
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Essence.BulkEdit.PerEssenceNote',
       'Names, descriptions, linked sources and property macros stay per-essence — edit those individually.'

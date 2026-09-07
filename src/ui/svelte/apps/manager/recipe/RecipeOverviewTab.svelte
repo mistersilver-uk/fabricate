@@ -13,7 +13,7 @@
 -->
 <script>
   import { untrack } from 'svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import RecipeModeBanner from './RecipeModeBanner.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
   import { resolveMaxModifierPicks } from '../../../../../systems/checkModifierResolver.js';

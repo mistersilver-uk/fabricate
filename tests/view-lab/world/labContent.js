@@ -1457,7 +1457,7 @@ const SMITHING_RECIPES = [
       description: 'Either burn the coal or spend the fire you are already carrying.',
       categories: ['Weaponsmithing'],
       // ONE group offering a COMPONENT or an ESSENCE, which is the only arrangement that draws an
-      // alternatives radiogroup carrying a `CraftingEssenceThumb`: `IngredientOptionSelector`
+      // alternatives radiogroup carrying an essence tile: `IngredientOptionSelector`
       // branches on the OPTION's `isEssence`, so an essence requirement in its own group renders a
       // rail tile instead and never reaches the chooser. Both options are affordable, so the
       // radiogroup shows two selectable rows rather than one flagged as short.

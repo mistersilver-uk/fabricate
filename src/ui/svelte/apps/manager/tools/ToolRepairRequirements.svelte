@@ -39,7 +39,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import RecipeIngredientSetCard from '../recipe/RecipeIngredientSetCard.svelte';
   import { repairSummarySentence } from './toolRepairSummary.js';
 

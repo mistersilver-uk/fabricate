@@ -10,11 +10,13 @@
 
   Props only: every string arrives already localized and every number already
   derived, so the tile owns presentation and nothing else. Both artwork paths are
-  the SHARED thumbs — CraftingThumb for component/tag artwork (plus the item-bag
-  sentinel rule) and CraftingEssenceThumb for an essence glyph — so one screen can
-  never draw the same essence through two components. The authored tint travels to
-  the shared glyph as the inherited `--fab-chip-color` custom property set on the
-  tile below, which is why the thumb needs no colour prop.
+  now the ONE shared `Medallion` (issue 1506): the component/tag branch resolves its
+  art through `resolveCraftingArt`, which carries the item-bag sentinel rule the
+  retired thumb owned, and the essence branch draws a glyph. One screen can still
+  never draw the same essence through two components, because there is only one tile
+  component left. The authored tint reaches the glyph as the primitive's own `tint`
+  prop rather than as an inherited custom property on the tile below, which is what
+  retired that vehicle here.
 
   ARIA — disclosure, not tablist. A selectable slot is a real `<button>` spanning
   the WHOLE column with `aria-expanded`/`aria-controls`; a fixed slot is a
@@ -24,8 +26,9 @@
   "focused" and "open" indistinguishable to a keyboard user.
 -->
 <script>
-  import CraftingThumb from '../CraftingThumb.svelte';
-  import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
+  import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
 
   let {
     // Slot projection from `util/requirementSlots.js`.
@@ -59,21 +62,29 @@
   const selectable = $derived(slot?.interactive === true && !readOnly);
   const have = $derived(Number(slot?.have ?? 0));
   const need = $derived(Number(slot?.need ?? 0));
-  // The GM-authored `--fab-tag-*` key tints the glyph only; label text keeps the
-  // standard body/muted colours so an authored colour can never cut contrast.
-  const tint = $derived(
-    slot?.colorToken ? `--fab-chip-color: var(--fab-tag-${slot.colorToken})` : ''
-  );
+  // The GM-authored `--fab-tag-*` key tints the essence glyph only; label text keeps the
+  // standard body/muted colours so an authored colour can never cut contrast. It reaches the
+  // glyph as the tile primitive's own `tint` prop since issue 1506; it used to travel as an
+  // inherited `--fab-chip-color` set on the wrapper below, which existed because the retired
+  // essence thumb took no colour argument.
 </script>
 
 {#snippet body()}
-  <span class="requirement-slot-tile" style={tint}>
+  <span class="requirement-slot-tile">
     {#if isEssence}
-      <!-- `requirement-slot-glyph` is a selector hook, not a style hook: the Foundry
-           smoke harness waits on it to know a first-class essence slot has rendered. -->
-      <CraftingEssenceThumb icon={iconClass} size={44} radius={8} class="requirement-slot-glyph" />
+      <!-- The Foundry smoke harness waits on `[data-slot-kind="essence"] [data-medallion]` to
+           know a first-class essence slot has rendered. That used to be a caller-owned
+           `requirement-slot-glyph` class, which the shared tile has no prop to carry and did
+           not need: the primitive's own data hook says the same thing inside a slot the
+           harness already selects by kind. -->
+      <Medallion
+        icon={normalizeEssenceIcon(iconClass)}
+        tint={slot?.colorToken || ''}
+        size={44}
+        glyph={18}
+      />
     {:else}
-      <CraftingThumb src={slot?.img} alt="" size={44} glyph={fallbackGlyph} />
+      <Medallion {...resolveCraftingArt(slot?.img, fallbackGlyph)} alt="" size={44} glyph={19.8} />
     {/if}
     {#if !isCurrency}
       <span class={`requirement-slot-pip is-${state}`} aria-hidden="true">{have}/{need}</span>
@@ -164,13 +175,11 @@
     background: var(--fab-accent-soft);
   }
 
-  /* The tint vehicle. The inline `style` above overrides this declaration when the GM
-     authored a colour; without one the shared glyph inherits the theme accent here,
-     which is what the essence pool's own badge paints and what shipped before
-     per-essence colours existed. */
+  /* The tint vehicle was here — a `--fab-chip-color` the essence glyph inherited, defaulting
+     to the theme accent. Issue 1506 retired it: the shared tile takes the authored key as a
+     `tint` PROP and falls back to the same theme accent itself, so an authored colour and an
+     unauthored one both render exactly what they did, from one declaration instead of two. */
   .requirement-slot-tile {
-    --fab-chip-color: var(--fab-accent);
-
     position: relative;
     box-sizing: border-box;
     flex: 0 0 auto;

@@ -9,10 +9,11 @@
   `data-tool-*` hooks and every one of its classes.
 
   `EssenceBehaviorPreview` is DEFERRED, and the reason is stated rather than left implicit:
-  it composes `InventoryItemCard` + `StatusPill` + `buildEssencePreviewRow` into a genuinely
+  it composes `InventoryItemCard` + `Chip` + `buildEssencePreviewRow` into a genuinely
   different shape — a real inventory tile with a per-essence row builder, not an identity
   block with fact rows — so folding it in would mean widening this shell until it is a union
-  of two layouts rather than one pattern.
+  of two layouts rather than one pattern. (It composed the retired status pill until issue
+  1506 drew that badge as a chip; the shape it names is the same one.)
 
   ── THE CLASS STEM IS A PROP ────────────────────────────────────────────────────────────
   `classPrefix` derives the five class names (`<prefix>`, `<prefix>-identity`,
@@ -64,7 +65,7 @@
   rather than a new one. Absent by default, so every existing caller renders identically.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import IconFactRow from '../IconFactRow.svelte';
 

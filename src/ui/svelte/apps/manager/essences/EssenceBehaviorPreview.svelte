@@ -41,7 +41,7 @@
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import InventoryItemCard from '../../inventory/InventoryItemCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { buildEssencePreviewRow } from '../../../util/essencePreviewRow.js';
@@ -123,11 +123,9 @@
       {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How players see it')}
     </p>
     {#if disabled}
-      <StatusPill
-        tone="subtle"
-        icon="fas fa-circle-pause"
-        label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-      />
+      <Chip tone="subtle" icon="fas fa-circle-pause"
+        >{text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}</Chip
+      >
     {/if}
   </div>
 

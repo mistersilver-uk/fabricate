@@ -5,9 +5,9 @@
   LOCATION IS DELIBERATE (issue 651). This lives under `apps/manager/`, NOT under
   `components/`, because it is NOT theme-agnostic: it wears `manager-recipe-status-card`
   classes that are styled only under `.fabricate-manager`. Dropped into `.fabricate-app`
-  it renders as an unstyled div. Its siblings in `components/` (Stepper, StatusPill) carry
-  no such coupling; both of this card's call sites are manager surfaces, so the coupling is
-  accepted and the file is located where it cannot mislead.
+  it renders as an unstyled div. Its siblings in `components/` (Stepper, Chip) carry no such
+  coupling; both of this card's call sites are manager surfaces, so the coupling is accepted
+  and the file is located where it cannot mislead.
 
   The markup is a BYTE-FAITHFUL extraction of `RecipeOverviewTab`'s Enabled/Locked status
   cards (same element tree, same class names, same aria shape) so that retrofitting those

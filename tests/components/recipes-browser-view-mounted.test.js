@@ -16,6 +16,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
@@ -26,10 +27,14 @@ import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCas
 // on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
 // harness's own mount target, which is why every lookup is rooted there.
 import { chooseSelectOption } from '../helpers/select-control.js';
+// Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
+import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const RECIPE_RAW_MODULES = [
+  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+  ...STATUS_TONE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
@@ -60,7 +65,6 @@ const RECIPE_PRIMITIVES = [
   // hoisting is required: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
   // reads the WHOLE file, so naming a primitive in only one of two harnesses reads as covered.
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -548,10 +552,8 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
 describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
   const pills = (root, id) =>
     [
-      ...root.querySelectorAll(
-        `[data-recipe-id="${id}"] .manager-recipe-name-row [data-status-pill]`
-      )
-    ].map((pill) => [pill.dataset.statusPill, pill.textContent.trim()]);
+      ...root.querySelectorAll(`[data-recipe-id="${id}"] .manager-recipe-name-row .manager-chip`)
+    ].map((pill) => [chipToneOf(pill), pill.textContent.trim()]);
 
   it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
     // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
@@ -1072,7 +1074,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.equal(on.querySelectorAll('.manager-chip-row > *').length, 2, 'category + status, one line');
-    const status = on.querySelector('[data-status-pill="success"]');
+    const status = on.querySelector('.manager-chip.is-positive');
     assert.equal(status.textContent.trim(), 'On', 'the same state has the same name as the row switch');
     assert.ok(status.querySelector('i.fa-circle'), 'the status pill leads with a dot');
     assert.equal(on.textContent.includes('Unlocked'), false, 'unlocked is not a state to chip');
@@ -1084,8 +1086,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1,
       showRecipeCategories: true
     });
-    assert.equal(off.querySelector('[data-status-pill="subtle"]').textContent.trim(), 'Off');
-    assert.ok(off.querySelector('[data-status-pill="accent"]'), 'Locked IS a state and keeps its pill');
+    assert.equal(off.querySelector('.manager-chip.is-subtle').textContent.trim(), 'Off');
+    assert.ok(
+      off.querySelector('.manager-chip.is-accent'),
+      'Locked IS a state and keeps its pill'
+    );
   });
 
   // The panel is the one surface with the room for the recipe's flavour text; it used to
@@ -1262,11 +1267,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1
     });
 
-    assert.ok(root.querySelector('[data-status-pill="accent"]'), 'the locked state shows');
-    assert.equal(
-      root.querySelector('[data-status-pill="danger"]').textContent.trim(),
-      "Can't enable"
-    );
+    assert.ok(root.querySelector('.manager-chip.is-accent'), 'the locked state shows');
+    assert.equal(root.querySelector('.manager-chip.is-danger').textContent.trim(), "Can't enable");
   });
 
   it('routes an empty, component-less system to Components rather than to a dead form', async () => {

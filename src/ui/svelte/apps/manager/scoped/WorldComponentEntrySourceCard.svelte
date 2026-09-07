@@ -21,7 +21,7 @@
 -->
 <script>
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
@@ -234,10 +234,14 @@
   </div>
 
   {#if duplicateCount > 0}
-    <!-- THE BAND IS A `Callout` AND THE ACTION IS ITS SIBLING, not its child: `Callout` renders a
-         `<p>` with no snippet slot, and a control nested inside a paragraph is invalid markup a
-         primitive extension would have to introduce for one call site with no route to offer. -->
+    <!-- THE BAND IS A `Callout` AND THE ACTION IS ITS SIBLING. Issue 1505 gave the primitive an
+         `actions` snippet and a `<div role="note">` root when one is present, so nesting is legal
+         now; the control stays a sibling here because folding it in would move this screen's
+         frame, which is this screen's own child's work rather than a rebase's. -->
     <div class="manager-component-entry-duplicate">
+      <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: `duplicateCount`
+           is live state on this record that an import would act on, which is the conditional
+           hazard warning names rather than a standing note. -->
       <Callout
         tone="warning"
         icon="fas fa-clone"

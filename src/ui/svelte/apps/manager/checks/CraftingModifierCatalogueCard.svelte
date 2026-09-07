@@ -92,7 +92,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

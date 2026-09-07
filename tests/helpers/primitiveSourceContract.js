@@ -42,8 +42,26 @@
  * matters for a duller reason: a newly added, still-untracked primitive is invisible to
  * `git ls-files`.
  *
+ * THE CLOSED-TOKEN FORM
+ * ---------------------
+ * `defineClosedTokenContract` below is the same spine for the shape issue 1505's primitives are
+ * in: a contract class that is a NEW token, written by nothing in the tree but the primitive, so
+ * the exemption table is ONE row and has no deferral in it; and a component that exposes no
+ * `class`, no `style` and no rest spread, so those two are the pass-throughs a call site must not
+ * restate. Both facts produced a byte-parallel preamble in `kicker-source-contract.test.js` and
+ * `stat-box-source-contract.test.js` when each stated them itself, which is the block SonarCloud's
+ * new-code duplication gate counts — and, again, the thing that drifts: an exemption table and a
+ * probe list that are the SAME contract said twice can disagree about what the contract is.
+ *
+ * WHAT A CALLER'S HEADER SAYS
+ * ---------------------------
+ * This paragraph, once. A caller's docblock argues what is true of ITS primitive — why the file
+ * earns its place, what its own clause is, and why its token was chosen — and points here for the
+ * shared clauses rather than restating them. Four files carried a paraphrase of this section
+ * before that rule; the two written for issue 1505 carry a two-sentence pointer instead.
+ *
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
- * glob, so nothing here is collected as a suite. Its clauses run under the two callers' names.
+ * glob, so nothing here is collected as a suite. Its clauses run under its callers' names.
  */
 
 import assert from 'node:assert/strict';
@@ -246,5 +264,149 @@ export function definePrimitiveSourceContract(spec) {
     assert.deepEqual(offenders, [], `${bareDataRemedy}:\n  ${offenders.join('\n  ')}`);
   });
 
-  return { components, callSiteFiles, callSiteTags, assertCallSitesAlive };
+  return {
+    components,
+    callSiteFiles,
+    callSiteTags,
+    assertCallSitesAlive,
+
+    /**
+     * The primitive's own markup, once the corpus has been proved alive.
+     *
+     * Every clause a caller adds is stated over this, and both halves of the preamble are
+     * load-bearing: a clause read off an EMPTY string passes as readily as one read off the
+     * component, and a corpus that lost its call sites makes the floor above the only thing that
+     * would have said so.
+     *
+     * @returns {string}
+     */
+    primitiveMarkup() {
+      assertCallSitesAlive();
+      const source = components[primitive] ?? '';
+      assert.ok(source.length > 0, `${primitive} is not in the corpus`);
+      return source;
+    },
+
+    /**
+     * A list the primitive declares about ITSELF — a host union, a prop set — read out of its
+     * source.
+     *
+     * The `absent` half is what makes it a clause rather than a guess: a declaration whose SHAPE
+     * moved (a union that stopped being a literal `Set`, a prop list that stopped being one
+     * destructuring) would otherwise yield an EMPTY list, and a caller comparing that against
+     * its expected one reports a broken component when what actually broke is this scan.
+     *
+     * @param {{ declaration: RegExp, member: RegExp, absent: string }} shape
+     * @returns {string[]}
+     */
+    declaredList({ declaration, member, absent }) {
+      const declared = declaration.exec(this.primitiveMarkup());
+      assert.ok(declared, absent);
+      return [...declared[1].matchAll(member)].map(([, name]) => name);
+    },
+
+    /**
+     * Assert the primitive emits nothing a GM can act on.
+     *
+     * `design-system/spec.md` routes anything actionable to a control primitive, so an
+     * interactive element or a handler inside a label or a figure is a ROUTING error rather than
+     * a feature — and it is invisible, because the component photographs identically either way.
+     * All three routes it could arrive by are covered, since an element, a handler and a role are
+     * each enough on their own.
+     *
+     * @param {string} why What a failure means for this primitive.
+     */
+    assertNothingInteractive(why) {
+      const source = this.primitiveMarkup();
+      const routes = [/<button\b/, /<a\s/, /<input\b/, /<select\b/, /<textarea\b/, /\son[a-z]+=/];
+      const found = routes.filter((pattern) => pattern.test(source)).map(String);
+      assert.deepEqual(found, [], `${why}: ${found.join(', ')}`);
+    },
+  };
+}
+
+/**
+ * The three probes a primitive with no pass-through props is policing.
+ *
+ * `class` and `style` on a COMPONENT tag are props nothing reads, so Svelte drops them SILENTLY:
+ * the site renders, the rule the caller was reaching for never lands, and no gate but this one
+ * would notice. The third is the contract class itself, hand-written where the tag should have
+ * carried it.
+ *
+ * @param {string} contractClass
+ * @returns {ReadonlyArray<RestatementProbe>}
+ */
+export function noPassThroughRestatements(contractClass) {
+  return Object.freeze([
+    Object.freeze({ name: 'class', present: (tag) => /\bclass=/.test(tag) }),
+    Object.freeze({ name: 'style', present: (tag) => /\bstyle=/.test(tag) }),
+    Object.freeze({ name: contractClass, present: (tag) => tag.includes(contractClass) }),
+  ]);
+}
+
+/** What the restatement clause says before a caller's own advice about where layout goes. */
+const NO_PASS_THROUGH_REMEDY =
+  'this primitive exposes no `class`, no `style` and no rest spread, so an attribute the tag ' +
+  'does not name is a prop nothing reads and Svelte drops it without a word.';
+
+/** What the bare-`data-*` clause says before a caller's own advice about its hook props. */
+const BARE_DATA_REMEDY =
+  'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on an ' +
+  'element, so it renders `="true"` where the hand-rolled element rendered `=""`. Presence ' +
+  'selectors resolve either way, which is exactly why this would not be caught by the suites ' +
+  'that read them.';
+
+/** What the positive control says when the primitive stops emitting something it owns. */
+const LOST_EMISSION =
+  'the primitive no longer emits something it is the single source of, so a clause here is ' +
+  'policing a token that reaches nothing';
+
+/**
+ * @typedef {object} ClosedTokenContractSpec
+ * @property {string} label Names the clauses, e.g. `kicker`.
+ * @property {string} tag The component's tag name, e.g. `Kicker`.
+ * @property {string} contractClass The NEW token only the primitive may write.
+ * @property {string} primitive Repo-relative POSIX path to the primitive itself.
+ * @property {number} callSiteFloor The non-vacuity floor, in call-site FILES.
+ * @property {string | readonly string[]} emits What the primitive must still be seen to contain.
+ * @property {{ count: number, why: string }} primitiveWrites How many times the primitive itself
+ *   writes the class, and why that number rather than another — the ONE exemption a new token
+ *   leaves, counted rather than merely listed.
+ * @property {string} classOnlyRemedy Prose for the class-only clause's failure.
+ * @property {string} keepInstead What a call site keeps instead of the attribute it restated.
+ * @property {string} hookAdvice How a call site passes a test hook rather than a bare `data-*`.
+ */
+
+/**
+ * Register the four shared clauses for a primitive whose contract class is a NEW token and whose
+ * props are closed.
+ *
+ * The caller states the FACTS only: its class, its path, its floor, what it emits, the one count
+ * its own file writes the class at, and the three pieces of advice its failures should give. The
+ * exemption table, the probe list and the two remedy preambles are the same contract for every
+ * such primitive, so they are built here rather than restated per file.
+ *
+ * @param {ClosedTokenContractSpec} spec
+ * @returns {ReturnType<typeof definePrimitiveSourceContract>}
+ */
+export function defineClosedTokenContract(spec) {
+  return definePrimitiveSourceContract({
+    label: spec.label,
+    tag: spec.tag,
+    contractClass: spec.contractClass,
+    primitive: spec.primitive,
+    callSiteFloor: spec.callSiteFloor,
+    exemptions: Object.freeze([
+      Object.freeze({
+        file: spec.primitive,
+        count: spec.primitiveWrites.count,
+        why: spec.primitiveWrites.why,
+      }),
+    ]),
+    primitiveEmits: { source: spec.emits, otherwise: LOST_EMISSION },
+    restatements: noPassThroughRestatements(spec.contractClass),
+    classOnlyRemedy: spec.classOnlyRemedy,
+    restatementRemedy: `${NO_PASS_THROUGH_REMEDY} ${spec.keepInstead}`,
+    bareDataRemedy: `${BARE_DATA_REMEDY} ${spec.hookAdvice}`,
+  });
 }

@@ -26,7 +26,7 @@
   `src/utils/browserPagination.js`, and filter/sort/memoisation is
   `src/utils/scopedEntityListModel.js`. The chrome is the shipped primitives:
   `BulkSelectionToolbar`, `Pagination`, `EmptyState`, `SelectionCheckbox`, `Medallion`,
-  `StatusPill`, `Callout`.
+  `Chip`, `Callout`.
 
   THE CLAMP IS A DEFECT SURFACE, NOT FREE SAFETY. `paginateRows` clamps the index IT RETURNS;
   `Pagination` computes its displayed range from the index its OWNER hands it. A frame that
@@ -153,8 +153,9 @@
   import Pagination from '../../../components/Pagination.svelte';
   import Select from '../../../components/Select.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
@@ -1003,6 +1004,9 @@
       {/if}
       {#if !available}
         <div class="manager-scoped-list-unavailable">
+          <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: the corpus
+               could not be read, so this reports a live failure the GM can act on by reloading
+               — not documentation, and not a settled outcome. -->
           <Callout
             tone="warning"
             text={text(
@@ -1283,7 +1287,8 @@
                     onclick={() => inspect(entry.id)}
                   >
                     <Medallion
-                      src={thumbnail.src}
+                      art={thumbnail.src}
+                      alt=""
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
                       variant={rowMedallionSpec.variant}
@@ -1342,14 +1347,12 @@
                               class="manager-scoped-list-source"
                               data-scoped-list-source="unlinked"
                             >
-                              <StatusPill
-                                tone="warning"
-                                icon="fas fa-link-slash"
-                                label={text(
+                              <Chip tone="warning" icon="fas fa-link-slash"
+                                >{text(
                                   'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
                                   'No source item'
-                                )}
-                              />
+                                )}</Chip
+                              >
                             </span>
                           {/if}
                           {@render rowMeta(entry, rowContext(entry))}
@@ -1373,16 +1376,16 @@
                         class="manager-scoped-list-source"
                         data-scoped-list-source={sourceLinkedRow(entry) ? 'linked' : 'unlinked'}
                       >
-                        <StatusPill
-                          tone={sourceLinkedRow(entry) ? 'subtle' : 'warning'}
+                        <Chip
+                          tone={statusChipTone(sourceLinkedRow(entry) ? 'subtle' : 'warning')}
                           icon={sourceLinkedRow(entry) ? 'fas fa-link' : 'fas fa-link-slash'}
-                          label={sourceLinkedRow(entry)
+                          >{sourceLinkedRow(entry)
                             ? text('FABRICATE.Admin.Manager.Scoped.List.SourceLinked', 'Linked')
                             : text(
                                 'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
                                 'No source item'
-                              )}
-                        />
+                              )}</Chip
+                        >
                       </span>
                     {/if}
                     {#if rowSecondLine === 'description' && rowMeta}
@@ -1515,7 +1518,8 @@
             <div class="manager-inspector-title-row">
               <span class="manager-inspector-icon">
                 <Medallion
-                  src={thumbnail.src}
+                  art={thumbnail.src}
+                  alt=""
                   icon={thumbnail.icon}
                   tint={thumbnail.tint}
                   size={42}

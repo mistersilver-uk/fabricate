@@ -16,6 +16,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ToggleCard from '../ToggleCard.svelte';
+  import Callout from '../Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
 
@@ -135,15 +136,15 @@
   </div>
 
   {#if collapsed}
-    <div class="manager-recipe-info-strip" data-recipe-collapsed-results-note>
-      <i class="fas fa-layer-group" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
-          'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
-        )}</span
-      >
-    </div>
+    <Callout
+      tone="info"
+      icon="fas fa-layer-group"
+      text={text(
+        'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
+        'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
+      )}
+      dataAttr="data-recipe-collapsed-results-note"
+    />
   {/if}
 
   {#if progressive}
@@ -157,16 +158,24 @@
          The strip's copy is NOT folded into the card's sub-line: the strip states an
          INVARIANT (the award mechanic is true of every progressive recipe regardless of
          this toggle) while the card states a CONDITIONAL. When the toggle is off the
-         budget explanation must still be true, so a merged sub-line would caveat itself. -->
-    <div class="manager-recipe-info-strip" data-recipe-info-strip>
-      <i class="fas fa-dice-d20" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
-          'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
-        )}</span
-      >
-    </div>
+         budget explanation must still be true, so a merged sub-line would caveat itself.
+
+         NEUTRAL, not info (issue 1505), on the same reading: the specimen reserves the info
+         tint for a note about LIVE state, and the sentence above says in terms that this
+         strip states an invariant. It also sits directly above an info-tinted ToggleCard, so
+         tinting it spent the colour twice and made the standing rule read as the lesser of
+         the two boxes. The salvage editor's twin follows THIS one on the tone, which is the
+         reverse of the placement debt above: salvage led on where the pair sits, the recipe
+         side led on how loud the upper box is. -->
+    <Callout
+      tone="neutral"
+      icon="fas fa-dice-d20"
+      text={text(
+        'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
+        'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
+      )}
+      dataAttr="data-recipe-info-strip"
+    />
 
     <ToggleCard
       variant="is-info"

@@ -69,7 +69,7 @@ const harness = createMountedComponentHarness({
   // (issue 1503). Omitting any of the three does not FAIL this suite — the closure validator
   // throws in `before()` and `node --test` reports every test here as `# cancelled`.
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     // Rendered by `SearchablePopover`'s `triggerButton` form (issue 1371), so it is in this
     // tree's closure even though no picker asks for that form.

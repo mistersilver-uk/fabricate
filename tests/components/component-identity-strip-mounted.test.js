@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness omits
     // HANGS the suite rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
@@ -163,9 +163,10 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
     // 131, and it is why this pill shipped toneless for a round.
     //
     // `emphasis="outlined"` is the axis that closes it. `Chip`'s outlined emphasis states ONLY
-    // the fill, so `tone` keeps the edge and the ink — which is the MIRROR of `StatusPill`'s
-    // emphasis of the same name, and the reason the two classes are asserted together here
-    // rather than one standing in for the other.
+    // the fill, so `tone` keeps the edge and the ink — which is the MIRROR of the emphasis of
+    // the same name on the status pill issue 1506 retired, and the reason the two classes are
+    // asserted together here rather than one standing in for the other. That inversion is now
+    // history rather than a live comparison, so what this case pins is THIS chip's two classes.
     const { props } = track();
     const target = await harness.mount(props);
     const pill = target.querySelector('[data-component-world-pill]');

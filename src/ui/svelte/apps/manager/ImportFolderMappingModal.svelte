@@ -21,7 +21,7 @@
 -->
 <script>
   import Field from '../../components/Field.svelte';
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';

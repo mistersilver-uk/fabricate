@@ -6,9 +6,11 @@
   identity + a discovery hint — never any ingredient/result detail.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingThumb from './CraftingThumb.svelte';
-  import CraftingStatusBadge from './CraftingStatusBadge.svelte';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
@@ -56,7 +58,7 @@
   <div class="crafting-detail-header-top">
     <span class="crafting-detail-thumb" class:is-uncraftable={uncraftable}>
       <span class="crafting-detail-thumb-media">
-        <CraftingThumb src={recipe?.img} alt="" size={56} />
+        <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={56} />
       </span>
       {#if uncraftable}
         <span class="crafting-detail-thumb-scrim" aria-hidden="true"></span>
@@ -100,7 +102,13 @@
              badge is dropped here to avoid a duplicate icon; the blocking-reasons
              callout below still spells out the reason. -->
         {#if !uncraftable}
-          <CraftingStatusBadge {status} />
+          <Chip
+            density="list"
+            tone={statusChipTone(descriptor.tone)}
+            icon={descriptor.icon}
+            data-crafting-status={status}
+            title={statusLabel}>{statusLabel}</Chip
+          >
         {/if}
       </div>
     </div>
@@ -166,11 +174,12 @@
     opacity: 0.4;
   }
 
-  /* Flat error wash over the dimmed thumbnail (matches CraftingThumb's radius). */
+  /* Flat error wash over the dimmed thumbnail (matches the shared tile's radius, which
+     issue 1506 moved from the retired thumb's 6px to the medallion's 9px). */
   .crafting-detail-thumb-scrim {
     position: absolute;
     inset: 0;
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-danger-soft);
     pointer-events: none;
   }

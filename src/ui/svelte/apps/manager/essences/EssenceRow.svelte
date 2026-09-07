@@ -58,11 +58,10 @@
   would leave the next tall identity button to rediscover the same crop.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
@@ -218,8 +217,8 @@
   });
 </script>
 
-<!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and
-     washes the surface; unset resolves to the accent, which is the shipped render. -->
+<!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and, since
+     issue 1506, nothing else; unset resolves to the accent, which is the shipped render. -->
 {#snippet medallionTile()}
   <Medallion
     icon={essence.icon || 'fas fa-mortar-pestle'}
@@ -235,17 +234,13 @@
   <span class="manager-essence-name-row">
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
     {#if absent}
-      <StatusPill
-        tone="subtle"
-        icon="fas fa-circle-minus"
-        label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
-      />
+      <Chip tone="subtle" icon="fas fa-circle-minus"
+        >{text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}</Chip
+      >
     {:else if disabled}
-      <StatusPill
-        tone="subtle"
-        icon="fas fa-circle-pause"
-        label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-      />
+      <Chip tone="subtle" icon="fas fa-circle-pause"
+        >{text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}</Chip
+      >
     {/if}
   </span>
 {/snippet}
@@ -438,17 +433,13 @@
     {#snippet media()}{@render medallionTile()}{/snippet}
     {#snippet badges()}
       {#if absent}
-        <StatusPill
-          tone="subtle"
-          icon="fas fa-circle-minus"
-          label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
-        />
+        <Chip tone="subtle" icon="fas fa-circle-minus"
+          >{text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}</Chip
+        >
       {:else if disabled}
-        <StatusPill
-          tone="subtle"
-          icon="fas fa-circle-pause"
-          label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-        />
+        <Chip tone="subtle" icon="fas fa-circle-pause"
+          >{text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}</Chip
+        >
       {/if}
       {@render capabilityPills('is-card-badges')}
     {/snippet}

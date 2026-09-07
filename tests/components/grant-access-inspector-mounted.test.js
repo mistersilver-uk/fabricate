@@ -19,9 +19,10 @@ const harness = createMountedComponentHarness({
     'src/utils/managerBrowserViewState.js'
   ],
   compiledModules: [
+    'src/ui/svelte/components/Medallion.svelte',
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
@@ -198,6 +199,9 @@ describe('GrantAccessInspector (mounted)', () => {
       characters: makeCharacters(1),
       players: makePlayers(1)
     }),
-    selectImg: (root) => root.querySelector('.manager-inspector-icon img.manager-recipe-thumb').getAttribute('src')
+    // Issue 1506 converted this header's raw `<img>` into the shared tile, so the query is
+    // the primitive's own image rather than the retired sheet class it used to carry.
+    selectImg: (root) =>
+      root.querySelector('.manager-inspector-icon [data-medallion] img').getAttribute('src')
   });
 });

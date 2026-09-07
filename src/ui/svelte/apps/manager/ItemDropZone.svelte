@@ -53,7 +53,7 @@
   caller keeps `item` for the drop guard and for `state`, and says what the zone is FOR in
   `title` / `hint` rather than having the primitive restate what it is already looking at.
 
-  Two callers, which is the extend-before-add bar in `design-system/spec.md:25-67`.
+  Two callers, which is the extend-before-add bar in `design-system/spec.md:25-69`.
 -->
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';

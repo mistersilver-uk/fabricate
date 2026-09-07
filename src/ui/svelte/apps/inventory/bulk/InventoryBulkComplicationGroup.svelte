@@ -72,8 +72,9 @@
    - attrs: extra attributes for the `<li>` (the card's `data-` hook).
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../../crafting/CraftingThumb.svelte';
   // The ONE complication summary row, in its `player` variant — the same component and
   // the same variant the per-stage band renders. They are one meaning on two screens,
   // and the shared scaffold is what makes the second call site cost props rather than a
@@ -143,7 +144,7 @@
        is the shell's shared leaf, so the name reads exactly like the queue row's own name
        directly below the block. -->
   <div class="bulk-complication-head">
-    <CraftingThumb src={img} alt="" size={24} />
+    <Medallion {...resolveCraftingArt(img)} alt="" size={24} />
     <span class="bulk-complication-head-text">
       <span class="inventory-detail-row-name">{name}</span>
       {#if orderNoteKey}

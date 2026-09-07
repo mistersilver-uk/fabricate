@@ -17,6 +17,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { createEssenceBrowserState } from '../../src/utils/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
@@ -77,7 +78,6 @@ const harness = createMountedComponentHarness({
     // state's Clear filters both render it.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
     'src/ui/svelte/apps/manager/library/LibraryShelf.svelte',
@@ -339,21 +339,24 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
 
   it('states an enabled row and a disabled row through the same pill treatment', async () => {
     // ── ONE STATE, ONE SHAPE (issue 1372, maintainer parity round 8) ─────────────────────────
-    // The row's Disabled badge is a `StatusPill`, and it passed `tone="neutral"` — a tone that
-    // is not in the pill's ramp at all, so `is-neutral` matched no rule and the badge rendered
-    // with the base `border: 1px solid transparent` and no fill: a bare dot and some small text
-    // beside a bordered, filled pill on the world catalogue one click away. `data-status-pill`
-    // reports the RESOLVED tone, which is what makes the fallback measurable rather than
-    // invisible.
+    // The row's Disabled badge passed `tone="neutral"` — a tone that was not in the retired
+    // pill's ramp at all, so `is-neutral` matched no rule and the badge rendered with the base
+    // `border: 1px solid transparent` and no fill: a bare dot and some small text beside a
+    // bordered, filled pill on the world catalogue one click away.
+    //
+    // The badge is a `Chip` since issue 1506, and the same claim is read off the class the chip
+    // paints its tone with: `chipToneOf` answers `null` for a chip wearing a tone the component
+    // drops, which is what keeps "the tone it resolves to is one the chip paints" measurable
+    // rather than invisible.
     const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
     const pill = root.querySelector(
-      '.manager-essence-row[data-essence-id="aether"] [data-status-pill]'
+      '.manager-essence-row[data-essence-id="aether"] .manager-chip'
     );
     assert.ok(Boolean(pill), 'the disabled row states its state as a pill');
     assert.equal(
-      pill.dataset.statusPill,
+      chipToneOf(pill),
       'subtle',
-      'and the tone it resolves to is one the pill actually paints'
+      'and the tone it resolves to is one the chip actually paints'
     );
     harness.remount();
   });

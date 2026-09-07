@@ -67,6 +67,13 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../../../utils/componentBulkEditModel.js',
         '../../../../utils/componentCategories.js',
         '../../components/ChanceSlider.svelte',
+        // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new
+        // dependency. `Chip` was always imported here; it moved from `apps/manager/Chip.svelte`
+        // to `components/Chip.svelte`, and this clause selects on the specifier TEXT matching
+        // /component/i, so a directory rename is enough to enter the set. The gateway imports
+        // exactly the same module it did before, mints no route with it, and the primitive is
+        // a badge rather than a surface.
+        '../../components/Chip.svelte',
         '../../components/ManagerButton.svelte',
         '../../components/Medallion.svelte',
         '../../util/componentEditor.js',

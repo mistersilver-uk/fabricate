@@ -174,14 +174,14 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // any part of this tree reaches it.
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
   // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
   // not fail a suite, it HANGS it and reports `# cancelled`.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',

@@ -24,10 +24,27 @@ function createRecipeBrowserHarness({ rawModules = CRAFTING_APP_RAW_MODULES, com
   });
 }
 
+/**
+ * BOTH FIXTURES ARE A MODULE THE CHAIN REALLY REACHES, and issue 1506 had to move both.
+ *
+ * They were `CraftingThumb.svelte` and, one rung below it, `craftingImageDefaults.js`. That
+ * change retired the crafting tiles into the shared `Medallion`, so the thumb is not on disk and
+ * neither `.filter()` would remove anything — leaving `assert.rejects` waiting on a setup that
+ * SUCCEEDS, which fails these two cases rather than silently passing them. That is the good
+ * outcome and it is why they are re-pointed here rather than deleted: this diagnostic is what
+ * turns every other mounted suite's missing-module HANG into a named error, so it is the last
+ * guard in the repository that should be allowed to go vacuous.
+ *
+ * The RAW chain is re-pointed one rung shorter, at `RecipeListRow`'s own direct import of the
+ * recipe-status vocabulary, because the retired tile's own `.js` import is the thing that no
+ * longer exists: `Medallion` is an import-free leaf by contract, so there is no two-rung raw
+ * chain through the new tile to point at, and inventing one would fight a stated goal of that
+ * change. The COMPILED case keeps its two-rung shape at the tile that replaced the thumb.
+ */
 describe('createMountedComponentHarness dependency validation', () => {
   it('reports the full importer chain for an omitted indirect raw import before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      rawModules: CRAFTING_APP_RAW_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/util/craftingImageDefaults.js')
+      rawModules: CRAFTING_APP_RAW_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/util/craftingRecipeStatus.js')
     });
 
     await assert.rejects(
@@ -35,7 +52,7 @@ describe('createMountedComponentHarness dependency validation', () => {
       (error) => {
         assert.match(
           error.message,
-          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte -> src\/ui\/svelte\/util\/craftingImageDefaults\.js/
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/util\/craftingRecipeStatus\.js/
         );
         assert.match(error.message, /rawModules/);
         return true;
@@ -47,7 +64,7 @@ describe('createMountedComponentHarness dependency validation', () => {
 
   it('reports the full importer chain for an omitted indirect compiled component before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/apps/crafting/CraftingThumb.svelte')
+      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/components/Medallion.svelte')
     });
 
     await assert.rejects(
@@ -55,7 +72,7 @@ describe('createMountedComponentHarness dependency validation', () => {
       (error) => {
         assert.match(
           error.message,
-          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte/
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/components\/Medallion\.svelte/
         );
         assert.match(error.message, /compiledModules/);
         return true;
@@ -63,6 +80,23 @@ describe('createMountedComponentHarness dependency validation', () => {
     );
 
     harness.teardown();
+  });
+
+  it('omits a REAL entry in both halves, so neither case asserts over a complete closure', () => {
+    // THE VACUITY CONTROL. Both cases above are `assert.rejects` over a list with ONE entry
+    // removed BY VALUE. A fixture path that stopped matching — because the module moved, was
+    // renamed, or was deleted by a later change — removes nothing, and the two cases then assert
+    // that a COMPLETE closure rejects. That reads as a broken diagnostic rather than a silent
+    // pass, but it says so in the language of a timeout rather than of the mistake, and it is
+    // exactly what issue 1506 walked into when it retired the tile both fixtures named.
+    assert.ok(
+      CRAFTING_APP_RAW_MODULES.includes('src/ui/svelte/util/craftingRecipeStatus.js'),
+      'the raw fixture must be a member of the roster the case filters, or it removes nothing'
+    );
+    assert.ok(
+      CRAFTING_APP_COMPILED_MODULES.includes('src/ui/svelte/components/Medallion.svelte'),
+      'and so must the compiled one'
+    );
   });
 });
 

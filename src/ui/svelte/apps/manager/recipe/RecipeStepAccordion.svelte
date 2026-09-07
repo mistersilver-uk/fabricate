@@ -20,7 +20,7 @@
   `step.timeRequirement`; otherwise (the requirement tabs) it stays a read-only chip.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { formatTimeRequirement } from '../../../util/recipeDuration.js';
   import RecipeDurationEditor from './RecipeDurationEditor.svelte';

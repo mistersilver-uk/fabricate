@@ -431,7 +431,7 @@
 <script>
   import { tick } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
-  import Chip from '../apps/manager/Chip.svelte';
+  import Chip from './Chip.svelte';
   import EmptyState from '../apps/manager/EmptyState.svelte';
   import ManagerButton from './ManagerButton.svelte';
   import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';

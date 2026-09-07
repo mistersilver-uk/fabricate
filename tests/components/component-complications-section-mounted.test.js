@@ -86,7 +86,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/stepperLabels.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',

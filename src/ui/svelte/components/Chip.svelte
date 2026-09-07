@@ -1,8 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE chip: a short, fully-rounded badge carrying a count, a state, a
+  The app's ONE chip: a short, fully-rounded badge carrying a count, a state, a
   category or a tag. Every chip on every GM manager screen renders through this
-  component (issue 883).
+  component (issue 883) — and not the manager's alone: `components/SearchablePopover.svelte`
+  and `components/Select.svelte` render it too, so a player window that mounts either of
+  those controls draws this chip as well. That is why it ships under `components/` rather
+  than under `apps/manager/` (issue 1506). The `manager-chip` class hook does NOT move with
+  it, for the reason the class-hook paragraph below states.
 
   It exists because the chip had drifted into two scales. The base `.manager-chip` rule
   in `styles/fabricate.css` was 24px tall at `0.75rem`/700, and the Tool Studio and
@@ -27,13 +31,33 @@
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
      `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
-     `secondary`, `tag`, or '' for the default neutral fill. Tone is colour only and never
-     changes the size; a tone that resized would reintroduce the drift this component removes.
-   - emphasis: '' (the shipped chip), 'outlined' or 'lit'. It is a SECOND AXIS and not an
+     `secondary`, `subtle`, `tag`, or '' for the default neutral fill. Tone is colour only and
+     never changes the size; a tone that resized would reintroduce the drift this component
+     removes.
+
+     FOUR OF THE THIRTEEN ARE ONE RECESSIVE LADDER, AND IT IS AN ORDER RATHER THAN A SET OF
+     PERCENTAGES. `secondary`, `neutral`, `subtle` and `muted` run from loudest to quietest in
+     that order, each measurably weaker than the last in every theme this app ships. The
+     quantity that orders them is the CONTRAST of each ink composited over that theme's own
+     ground — never an alpha and never a channel, because the themes do not agree on a model:
+     five state the ladder as one opaque hue at three descending percentages of itself, one
+     mixes two percentages with a different base triple beneath them, and one states the first
+     three as three DIFFERENT opaque hues plus one alpha, where an alpha comparison ties three of
+     the four. The ORDER survives all three shapes; a percentage would not.
+
+     A CALLER ROUTES BY MEANING, NEVER BY MATCHING A TONE NAME TO A TOKEN NAME. `secondary` names
+     the rule the GM is reading, on a surface of its own; `neutral` is a fact that is merely
+     present; `subtle` is a quiet, non-actionable state; `muted` is unavailable. The names do NOT
+     track the tokens and that is worth stating rather than discovering: `muted` inks with
+     `--fab-text-disabled` and `neutral` inks with `--fab-text-muted`, so only `subtle` and
+     `secondary` are spelled the same as the token they use.
+   - emphasis: '' (the shipped chip), 'outlined', 'lit' or 'bare'. It is a SECOND AXIS and not an
      eleventh tone: `tone` says which family the chip belongs to, `emphasis` says HOW that
      family arrives. Anything else resolves to '', exactly as an unrecognised `tone` does, so a
-     chip that does not ask for one is byte-identical to what shipped. Both rules are the last
-     in the style block and carry the full notes.
+     chip that does not ask for one is byte-identical to what shipped. The three are
+     ALTERNATIVES rather than a composition — a plate, a wash and no edge are three answers to
+     one question — and all their rules are the last in the style block and carry the full
+     notes.
      · 'outlined' — the chip as a FLAT PLATE rather than a tinted wash, for a badge that has to
        stand ON a panel of its own colour family (`proto:1313`).
      · 'lit' — the family's colour on the INK too, over a 16% wash of it and nothing else
@@ -43,6 +67,14 @@
        chips that declare a colour of their own — `tone="tag"` and any `swatch` — because those
        are the ones with a colour to be lit in; on any other chip the rule does not match and
        nothing moves.
+     · 'bare' — NO EDGE (issue 1506), for a badge the reference draws edgeless inside a dense
+       list row. `border: 0` is the whole of it, and it is on this axis because neither a tone
+       nor a density can REMOVE an edge: a tone paints `border-color` and a density paints the
+       band. It pairs with `density="list"`, which owns the stadium and the 9px/600 type; a bare
+       chip's own glyph draws at 7px through the one rule this face carries. IT IS THE ONE
+       EMPHASIS THAT DOES NOT COMPOSE WITH `struck`, because its `border` shorthand resets the
+       dashed `border-style` that prop states — the opposite of what 'outlined' promises, so it
+       is written here rather than left to be found.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - struck: the MUTED VARIANT the design reference draws for a value that is switched off in
@@ -143,6 +175,29 @@
      `density` prop is, for the identical reason: a layout context may still size a
      chip's POSITION (a caller sets `flex-shrink` etc. from outside), but never its own
      geometry.
+   - iconOnly: the chip is its GLYPH — a square with equal insets and no label, which is the
+     face a dense browser row draws when the status has already been said in words beside it
+     (issue 1506). It is a boolean rather than a density because it is not a scale: it composes
+     with whichever `density` the caller also asks for, and the side it takes is that density's.
+
+     SIX SIDES ARE PUBLISHED, one per density, because the prop must be total over the axis it
+     reads: 20px at the default (the base rule's own floor), 22px at `row`, 15px at `list`, 34px
+     at `action`, 25px at `tag-run` and 20px at `inspector`. Five of the six are read from the
+     density they belong to — its `min-height`, or the height its own note computes. `list` has
+     none to read, because it is the one density that states `min-height: 0`, so its side is the
+     15px stadium `proto:4872` publishes and the density's own note above quotes. That makes an
+     icon-only list chip about two pixels TALLER than the labelled list chips beside it, which is
+     deliberate: the alternative is a side derived from a height that density declines to have.
+
+     THE ACCESSIBLE NAME IS REQUIRED, AND THE ROLE IS CONDITIONAL. The glyph is `aria-hidden`, so
+     an icon-only chip with no `aria-label` is announced as nothing at all; a `title` is a tooltip
+     and not a name. `role="img"` is emitted BESIDE the label, because `aria-label` on a bare
+     `span` is dropped under ARIA's prohibition on naming a generic role — but only where the chip
+     is NON-INTERACTIVE. On `tag="button"` or `tag="a"` the label is already the control's
+     accessible name and an `img` role would announce an operable control as a picture, so the
+     role is withheld there; and it is written BEFORE the rest spread, so a `role` a caller passes
+     is never overridden. A source contract holds the `aria-label` half at every tag, because a
+     primitive cannot make a caller pass one.
 
   Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`,
   `type`, `disabled` — is forwarded through the rest spread, so a call site is not
@@ -161,6 +216,7 @@
     class: extraClass = '',
     truncate = false,
     density = 'default',
+    iconOnly = false,
     element = $bindable(null),
     children,
     ...rest
@@ -236,6 +292,15 @@
     // pill is a step louder than that — it names the rule the GM is reading, on a surface of
     // its own — and a step quieter than every semantic family.
     'secondary',
+    // SUBTLE (issue 1506): a quiet, non-actionable STATE, the third rank of the recessive ink
+    // ladder and the one tone the retired status pill had that this one did not. It is a
+    // REPRODUCTION rather than a new statement — `--fab-text-subtle` over
+    // `--fab-surface-raised` behind no visible edge is byte-for-byte the pill's own default
+    // face — so the sites that converge onto it keep their paint. It is genuinely distinct from
+    // `secondary` above, which is one rank louder, carries a real `--fab-border` hairline and
+    // grounds on `--fab-surface-soft`; routing this cohort there would move all three
+    // properties where a reproduction is available.
+    'subtle',
   ]);
 
   /**
@@ -247,7 +312,19 @@
    *
    * @type {ReadonlySet<string>}
    */
-  const EMPHASES = new Set(['outlined', 'lit']);
+  const EMPHASES = new Set(['outlined', 'lit', 'bare']);
+
+  /**
+   * The elements a chip can be rendered as that carry an operable role of their own. An
+   * `iconOnly` chip states `role="img"` so its `aria-label` is not dropped on a generic `span`,
+   * and stating it on one of these would REPLACE the role that makes the chip operable — a
+   * button announced as a picture. The label is the accessible name at every tag either way.
+   *
+   * @type {ReadonlySet<string>}
+   */
+  const INTERACTIVE_TAGS = new Set(['button', 'a']);
+
+  const iconOnlyRole = $derived(iconOnly && !INTERACTIVE_TAGS.has(tag) ? 'img' : undefined);
 
   const classes = $derived(
     [
@@ -267,6 +344,7 @@
       // either reaching the other's rules.
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
+      iconOnly ? 'is-icon-only' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -283,6 +361,7 @@
   class={classes}
   style={swatchStyle}
   data-chip-tint={safeTint || undefined}
+  role={iconOnlyRole}
   {...rest}
   >{#if safeSwatch}<span
       class="manager-chip-swatch"
@@ -380,7 +459,9 @@
      them. `truncate` is for chips whose ROW HEIGHT must not move (a toolbar beside 34px
      buttons), and a caller that sets it should pass `title` so the full text stays
      reachable. The pill returns here: a truncated chip is single-line by construction,
-     so the stadium is always correct (issue 883). */
+     so the stadium is always correct (issue 883). `overflow: hidden` also makes the chip
+     a flex scroll container, so its automatic minimum size becomes 0 — in a shrinkable
+     row the caller must give it `flex-shrink: 0` unless clipping is what it wants. */
   .manager-chip.is-truncated {
     flex-wrap: nowrap;
     white-space: nowrap;
@@ -391,6 +472,27 @@
   /* The glyph must not be squeezed by a long label; the label owns the clipping. */
   .manager-chip.is-truncated > i {
     flex: 0 0 auto;
+  }
+
+  /* THE STATUS DOT (issue 1506): `fa-circle` is not a glyph, it is a MARK, and its whole meaning
+     is that it is small. Transcribed verbatim from the status pill this chip retired, which
+     drew it at 0.36rem from its first day; without this rule a dot inherits 0.62rem and
+     inflates by 72% on a mark that is meant to read as a bullet.
+
+     A RULE, NOT A PROP AND NOT A PER-SITE STYLE, in the shape `is-truncated > i` above already
+     uses: a caller cannot be asked to remember to shrink a dot it did not choose to be a dot.
+
+     IT REACHES THIS COMPONENT'S OWN GLYPH AND NOTHING ELSE, and that boundary is the compiler's
+     rather than this file's. Svelte emits this as
+     `.manager-chip.svelte-<hash> i.fa-circle:where(.svelte-<hash>)`, so the `<i>` must carry
+     THIS component's scope hash — which is true of the glyph rendered from the `icon` prop below
+     and false of any `<i>` a caller writes into the children snippet, since that one carries the
+     caller's hash. Widening it to `:global(i.fa-circle)`, or hoisting it into
+     `styles/fabricate.css`, would erase exactly that asymmetry and move marks on screens that
+     never asked. Measured across every importer at the time it landed, the rule reaches two
+     `icon`-prop sites and five live `fa-circle` elements outside any chip stay where they are. */
+  .manager-chip i.fa-circle {
+    font-size: 0.36rem;
   }
 
   /* A chip rendered as a `button` must beat Foundry's host button geometry, which sets a
@@ -480,8 +582,8 @@
      step quieter than every semantic family. `proto:5721` draws the rules editor's salvage
      mode pill through the prototype's shared pill helper with exactly these three: the subtle
      surface, a plain `--fab-border` hairline and the SECONDARY ink. `--fab-text-secondary` IS
-     that reference's own secondary ink token, the same equivalence `StatusPill`'s outlined
-     emphasis rests on, so this states a token rather than approximating a colour.
+     that reference's own secondary ink token, the same equivalence the retired pill's outlined
+     emphasis rested on, so this states a token rather than approximating a colour.
 
      THREE DECLARATIONS AND NO GEOMETRY, like every tone here. The mode pill's SCALE is
      `density="list"` — see the micro-pill note in the props block above, which settles both of
@@ -491,6 +593,29 @@
     border-color: var(--fab-border);
     color: var(--fab-text-secondary);
     background: var(--fab-surface-soft);
+  }
+
+  /* SUBTLE (issue 1506): a quiet, non-actionable state — the third rank of the recessive ink
+     ladder, one step below `neutral` and one above `muted`. It is transcribed from the retired
+     status pill's own default face, which declared `color` and `background` and took a
+     transparent edge from that component's base rule.
+
+     THREE DECLARATIONS, NOT TWO, and the third is the whole reason this tone can be a
+     reproduction rather than a move. That pill's base stated `border: 1px solid transparent`;
+     THIS component's base states `1px solid var(--fab-border)` a few rules above, so restating
+     only the pill's two would put a visible hairline on every subtle chip and the tone would
+     read one rank louder than it is. `border-color` rather than the `border` shorthand, for the
+     reason `is-struck` gives: the shorthand would reset `border-style` too.
+
+     ONE DIVERGENCE IS RECORDED RATHER THAN ABSORBED. `--fab-surface-raised` is documented as the
+     HOVER ground, not a resting one. Re-pointing this fill to `--fab-surface-soft` would move
+     every site that converges here, so the reproduction is kept and the follow-up is stated
+     precisely instead: re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle`
+     and `secondary` differ in ink and edge alone. */
+  .manager-chip.is-subtle {
+    border-color: transparent;
+    color: var(--fab-text-subtle);
+    background: var(--fab-surface-raised);
   }
 
   /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
@@ -592,6 +717,17 @@
     border-radius: 999px;
     font-size: 9px;
     font-weight: 600;
+    /* SINGLE-LINE, and it is the one density that had to say so (issue 1506). `is-row` and
+       `is-action` both state it; the base rule states none, because wrapping is the chip's
+       default for the reason `is-truncated` gives above. So a list chip inherited the wrap —
+       and `proto:4872`, quoted at the head of this rule, describes a STADIUM, which is a
+       single-line construction. It matters at the twelve player rows that converged here from
+       the three retired look-alikes: every one of them was `nowrap` (two by declaration, the
+       journal's by a `flex: 0 0 auto` that held it at max-content), and a narrow player window
+       would otherwise break a have/need pair across two lines. SHRINK PROTECTION STAYS WITH THE
+       CALLER, per the `density` note above: this states how the text lays out, never how much
+       room the row gives the chip. */
+    white-space: nowrap;
   }
 
   /* ACTION density: a chip standing in the page header's action cluster.
@@ -693,6 +829,69 @@
     font-weight: 600;
   }
 
+  /* THE ICON-ONLY CHIP (issue 1506): the chip that IS its glyph. The retired
+     crafting status badge drew it as a 20x20 square with its label suppressed, for a browser row
+     that has already said the status in words; no tone and no density can produce a square,
+     because every density here states a BAND — a vertical inset and a type size — and a square
+     needs a side.
+
+     A SIDE PER DENSITY, SIX OF THEM, PUBLISHED RATHER THAN COMPUTED. Five are read from the
+     density they belong to: 20px is the base rule's own `min-height`, 22px is `is-row`'s, 34px is
+     `is-action`'s, 25px is the height `is-tag-run`'s note computes (6 + 6 + 11 + 2) and 20px is
+     the height `is-inspector`'s note computes (3 + 12 + 3 plus the hairline). `is-list` is the
+     exception and the reason these are published: it states `min-height: 0`, so it has no height
+     to read, and its side is the 15px stadium `proto:4872` states and its own note quotes. A
+     labelled list chip renders about 13px, so an icon-only one is deliberately about two pixels
+     taller — the published figure, rather than one derived from a height that density declines
+     to have.
+
+     EQUAL INSETS, WHICH IS `padding: 0`. Every density's padding is horizontal-only or
+     horizontal-heavy, so carrying one into a fixed square would push the glyph off centre; the
+     base rule's `justify-content: center` and `align-items: center` already place it. The
+     `box-sizing: border-box` the base rule declares is what keeps the side the OUTER side, edge
+     included, so the square measures what it says at every density.
+
+     `min-height` IS RESTATED BESIDE `height` on purpose: the base rule's 20px floor would win at
+     `list` (15px) otherwise, and `is-list`'s own `min-height: 0` would let a column flex parent
+     collapse the square at the others. Each compound selector is (0,3,0) and beats both the
+     density it names and the base rule below, so these five do not depend on their order. */
+  .manager-chip.is-icon-only {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+    padding: 0;
+  }
+
+  .manager-chip.is-icon-only.is-row {
+    width: 22px;
+    height: 22px;
+    min-height: 22px;
+  }
+
+  .manager-chip.is-icon-only.is-list {
+    width: 15px;
+    height: 15px;
+    min-height: 15px;
+  }
+
+  .manager-chip.is-icon-only.is-action {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+  }
+
+  .manager-chip.is-icon-only.is-tag-run {
+    width: 25px;
+    height: 25px;
+    min-height: 25px;
+  }
+
+  .manager-chip.is-icon-only.is-inspector {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+  }
+
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
      `--fab-chip-color` the root sets inline. Named `manager-chip-swatch` rather than
      anything matching `manager-chip` on its own, because `manager-layout.test.js`'s
@@ -769,13 +968,13 @@
      `--fab-border` and `--fab-text`. Eleven tones times one rule, rather than eleven more rules
      — and a tone added later is outlined for free.
 
-     IT IS THE MIRROR OF `StatusPill`'s EMPHASIS OF THE SAME NAME, and the axis it supersedes is
-     the OPPOSITE one. Stating that plainly because the shared prop name invites the assumption
-     that the two are the same declarations: that pill's outlined emphasis neutralises the EDGE
-     and the INK and keeps the tone's fill, because its reference draws one neutral attribution
-     badge whatever state it annotates (`proto:834`); this one neutralises the FILL and keeps
-     the tone's edge and ink, because its reference draws a coloured badge that must not melt
-     into a coloured panel. What the two genuinely share is the meaning of the word — a
+     IT IS THE MIRROR OF THE RETIRED PILL'S EMPHASIS OF THE SAME NAME, and the axis that one
+     superseded was the OPPOSITE one. Stated plainly because the shared prop name invited the
+     assumption that the two were the same declarations: its outlined emphasis neutralised the
+     EDGE and the INK and kept the tone's fill, because its reference draws one neutral
+     attribution badge whatever state it annotates (`proto:834`); this one neutralises the FILL
+     and keeps the tone's edge and ink, because its reference draws a coloured badge that must
+     not melt into a coloured panel. What the two genuinely share is the meaning of the word — a
      hairline-edged plate rather than a tinted wash — which is why this is that prop's second
      value and not a differently named prop.
 
@@ -827,5 +1026,51 @@
   .manager-chip.has-tint.is-lit {
     color: var(--fab-chip-color);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
+  }
+
+  /* THE BARE EMPHASIS (issue 1506): the chip with NO EDGE AT ALL, and `border: 0` is the whole
+     of it.
+
+     WHY IT EARNS A VALUE ON THIS AXIS RATHER THAN A THIRTEENTH TONE. A tone paints
+     `border-color` and a density paints the band; NEITHER CAN REMOVE THE EDGE, because this
+     component's base rule states `1px solid var(--fab-border)` and a colour cannot subtract a
+     width. That gap is the entire justification, and it is the same gap `Medallion`'s
+     `glyph-chip` variant fills with `border: 0` one component over. The reference draws an
+     edgeless attribution badge inside a dense list row and there is no combination of the
+     thirteen tones that says it.
+
+     `border` RATHER THAN `border-width: 0`, and the difference is measurable rather than
+     stylistic: the shorthand resets `border-color` to `currentColor`, which is what the
+     reference's own computed edge is, where the longhand would leave a zero-width edge at a
+     different computed colour for anything that later read it.
+
+     THE BAND AND THE TYPE SIZE ARE `density="list"`'s, NOT THIS EMPHASIS'S. Paint and scale stay
+     on separate axes here, exactly as the `tag-run` note above states, so a bare chip takes its
+     stadium and its 9px/600 from the density its caller also asks for. Minting a fourth emphasis
+     value that stated a scale would be the `micro`-density trap the props block already refuses,
+     one axis over.
+
+     THE ONE EMPHASIS THAT DOES NOT COMPOSE WITH `struck`, stated here rather than discovered.
+     `is-struck` above deliberately uses the `border-style` LONGHAND so the tone's own
+     `border-color` survives; this rule is written later and its SHORTHAND resets `border-style`
+     to `none`, so a struck bare chip loses the dashed edge that says "switched off". That is the
+     opposite of the composition `is-outlined` promises a line below, and it is the honest
+     consequence of the one declaration this face is. No caller pairs the two. */
+  .manager-chip.is-bare {
+    border: 0;
+  }
+
+  /* The bare face's glyph, and `:not(.fa-circle)` is LOAD-BEARING rather than defensive. At
+     `density="list"` a glyph inherits 9px and the reference draws 7px, so this rule is real work
+     and not a restatement. But the status-dot rule near the top of this block is
+     `.manager-chip i.fa-circle` at (0,2,1), and an unqualified `.manager-chip.is-bare i` is
+     ALSO (0,2,1) — a tie, decided by order, and this rule is later, so a bare chip's dot would
+     inflate from 5.76px to 7px. Excluding the dot by selector is the only form that cannot lose
+     that race, and it is the form the retired status pill reached for the identical reason.
+
+     WRITTEN AFTER EVERY TONE RULE, after `has-tint` and after `is-outlined` and the lit pair,
+     for the equal-specificity ordering argument each of those already carries. */
+  .manager-chip.is-bare i:not(.fa-circle) {
+    font-size: 7px;
   }
 </style>

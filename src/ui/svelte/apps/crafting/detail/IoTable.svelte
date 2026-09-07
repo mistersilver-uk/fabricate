@@ -19,6 +19,8 @@
   (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
@@ -26,12 +28,14 @@
     buildConsumptionPlan,
     buildRequirementSlots,
   } from '../../../util/requirementSlots.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
-  import QuantityTag from '../QuantityTag.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import { countText } from '../../../util/craftingQuantityReading.js';
+  import Chip from '../../../components/Chip.svelte';
   import IngredientOptionSelector from './IngredientOptionSelector.svelte';
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     craftability = null,
@@ -125,7 +129,7 @@
 
   {#if essences.length > 0}
     <div class="crafting-io-group" data-io-group="essences">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Essences')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Essences')}</Kicker>
       <ul class="crafting-io-list">
         {#each essences as state, index (state.type ?? state.essenceType ?? index)}
           <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
@@ -134,16 +138,18 @@
               <span class="crafting-io-name">{essenceLabel(state)}</span>
             </span>
             <span class="crafting-io-tags">
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Have')}
-                value={state.have ?? 0}
-                tone={state.satisfied ? 'success' : 'neutral'}
-              />
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Need')}
-                value={state.need ?? 0}
-                tone="neutral"
-              />
+              <!-- The reading is a WORD and a COUNT, two children rather than one string, so the
+                   chip's own gap still separates them the way the retired tag's did. -->
+              <Chip density="list" tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
+                ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span
+                  >{countText(state.have)}</span
+                ></Chip
+              >
+              <Chip density="list" tone={statusChipTone('neutral')}
+                ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span
+                  >{countText(state.need)}</span
+                ></Chip
+              >
             </span>
           </li>
         {/each}
@@ -153,22 +159,22 @@
 
   {#if tools.length > 0}
     <div class="crafting-io-group" data-io-group="tools">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Tools')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Tools')}</Kicker>
       <ul class="crafting-io-list">
         {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
           <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
             <span class="crafting-io-tool-label">
-              <CraftingThumb src={tool.img} alt="" size={28} />
+              <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
               <span class="crafting-io-name">{tool.name}</span>
             </span>
-            <QuantityTag
-              label={tool.available
+            <Chip
+              density="list"
+              tone={statusChipTone(tool.available ? 'success' : 'danger')}
+              icon={`fas ${tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}`}
+              >{tool.available
                 ? localize('FABRICATE.App.Crafting.Io.Available')
-                : localize('FABRICATE.App.Crafting.Io.Unavailable')}
-              value=""
-              tone={tool.available ? 'success' : 'danger'}
-              icon={tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}
-            />
+                : localize('FABRICATE.App.Crafting.Io.Unavailable')}</Chip
+            >
           </li>
         {/each}
       </ul>
@@ -177,11 +183,11 @@
 
   {#if outputs.length > 0}
     <div class="crafting-io-group" data-io-group="outputs">
-      <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Output')}</p>
+      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
           <li class="crafting-io-output" data-io-output>
-            <CraftingThumb src={item.img} alt="" size={32} />
+            <Medallion {...resolveCraftingArt(item.img)} alt="" size={32} />
             <span class="crafting-io-output-name">{item.name}</span>
             <span class="crafting-io-output-qty">×{item.qty}</span>
           </li>
@@ -290,15 +296,6 @@
   .crafting-io-output-qty {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--fab-text-muted);
   }
 </style>

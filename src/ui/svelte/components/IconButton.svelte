@@ -14,7 +14,7 @@
   markup. An icon button that loses its `aria-label` announces itself as "button" and
   nothing else — it is unusable by a screen reader and IDENTICAL on screen, so no
   frame, no computed-style probe and no mounted assertion that resolves it by its
-  `data-*` hook can see the defect. `design-system/spec.md:171-175` states the rule
+  `data-*` hook can see the defect. `design-system/spec.md:173-177` states the rule
   this component enforces structurally: WHEN a primitive renders a control whose only
   visible content is a glyph, THEN its accessible name is a required prop.
 
@@ -93,7 +93,7 @@
 
   Props:
    - ariaLabel: the pre-localized accessible name. REQUIRED by
-     `design-system/spec.md:171-175` for an icon-only control, and emitted as
+     `design-system/spec.md:173-177` for an icon-only control, and emitted as
      `aria-label`. Dropped when empty rather than emitted blank, because
      `aria-label=""` is worse than none: it suppresses the fallback naming a screen
      reader would otherwise derive. Two shipped sites pass `label || undefined`

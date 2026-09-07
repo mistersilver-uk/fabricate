@@ -18,12 +18,14 @@
   step themselves into an infeasible allocation.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
@@ -101,7 +103,7 @@
     aria-labelledby={labelledBy ?? undefined}
     data-recipe-section="essence-pool"
   >
-    <p class="crafting-detail-section-title">{title}</p>
+    <Kicker as="p">{title}</Kicker>
 
     <div class="essence-pool-meters">
       {#each requirements as requirement (requirement.groupId ?? requirement.essenceId)}
@@ -141,14 +143,21 @@
       {/each}
     </div>
 
-    <p class="essence-pool-subtitle">{localize('FABRICATE.App.Crafting.Pool.AddComponents')}</p>
+    <p class="essence-pool-subtitle">
+      <Kicker as="span">{localize('FABRICATE.App.Crafting.Pool.AddComponents')}</Kicker>
+    </p>
     {#if carriers.length === 0}
       <p class="essence-pool-empty">{localize('FABRICATE.App.Crafting.Pool.NoCarriers')}</p>
     {:else}
       <ul class="essence-pool-carriers">
         {#each carriers as carrier (carrier.itemKey)}
           <li class="essence-pool-carrier" data-essence-carrier={carrier.itemKey}>
-            <CraftingThumb src={carrier.img} alt="" size={30} glyph="fa-solid fa-cube" />
+            <Medallion
+              {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
+              alt=""
+              size={30}
+              glyph={13.5}
+            />
             <span class="essence-pool-carrier-body">
               <span class="essence-pool-carrier-name">{carrier.name}</span>
               <span class="essence-pool-carrier-facts">
@@ -190,11 +199,18 @@
     {/if}
 
     {#if allocated.length > 0}
-      <p class="essence-pool-subtitle">{localize('FABRICATE.App.Crafting.Pool.YourSelection')}</p>
+      <p class="essence-pool-subtitle">
+        <Kicker as="span">{localize('FABRICATE.App.Crafting.Pool.YourSelection')}</Kicker>
+      </p>
       <ul class="essence-pool-picked">
         {#each allocated as carrier (carrier.itemKey)}
           <li class="essence-pool-picked-row" data-essence-picked={carrier.itemKey}>
-            <CraftingThumb src={carrier.img} alt="" size={24} glyph="fa-solid fa-cube" />
+            <Medallion
+              {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
+              alt=""
+              size={24}
+              glyph={10.8}
+            />
             <span class="essence-pool-picked-name">{carrier.name}</span>
             <span class="essence-pool-picked-count">×{carrier.allocatedUnits}</span>
             <span class="essence-pool-picked-contributions">
@@ -356,13 +372,12 @@
     }
   }
 
+  /* LAYOUT ONLY. This sub-label kept its own 10px rung when the section title above it
+     converted, which inverted the pair: the title that names the section rendered SMALLER
+     than the label nested under it. The type is the kicker's now; the wrapper survives for
+     the one margin that separates it from the meters above, which the kicker zeroes. */
   .essence-pool-subtitle {
     margin: var(--fab-space-1) 0 0;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--fab-text-subtle);
   }
 
   .essence-pool-empty {
@@ -450,16 +465,5 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--fab-space-2);
-  }
-
-  /* Matches the sibling IO section headers (the IngredientOptionSelector precedent:
-     Svelte scopes CSS per component, so the rule is redefined rather than shared). */
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>

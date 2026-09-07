@@ -3,7 +3,7 @@
   THE manager's search field (issue 1039).
 
   ── WHY IT IS A SECOND COMPONENT AND NOT PART OF THE BAR ──────────────────────────
-  `library.html:1233` sketches ONE `<FilterBar>` owning `query` and `onQueryChange`, so
+  `library.html:1306` sketches ONE `<FilterBar>` owning `query` and `onQueryChange`, so
   the obvious extraction is a bar that renders its own field. The corpus says
   otherwise, and the number is the argument: of the 23 sites writing
   `class="manager-search"`, THIRTEEN are inside no `.manager-toolbar` at all — the

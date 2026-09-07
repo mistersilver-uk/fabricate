@@ -39,7 +39,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     LEARNED_SOURCE_AUTO_LEARN,
@@ -161,7 +161,7 @@
 {#if learned}
   <li class="manager-knowledge-learned-row" data-knowledge-learned={learned.recipeId}>
     <span class="manager-knowledge-copy-identity">
-      <Medallion src={learned.img} icon="fas fa-scroll" size={38} alt="" />
+      <Medallion art={learned.img} icon="fas fa-scroll" size={38} alt="" />
       <span class="manager-knowledge-copy-copy">
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={learned.name}>{learned.name}</strong>

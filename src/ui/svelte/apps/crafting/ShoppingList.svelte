@@ -8,9 +8,11 @@
   repair. Fully-owned components never appear.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
+  import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingEssenceThumb from './CraftingEssenceThumb.svelte';
-  import CraftingThumb from './CraftingThumb.svelte';
+  import StatBox from '../../components/StatBox.svelte';
 
   let {
     aggregate = null,
@@ -202,41 +204,29 @@
   </header>
 
   <div class="crafting-shopping-summary" data-shopping-summary>
-    <div class="crafting-shopping-summary-card" data-summary="recipes">
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-scroll" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{plannedRecipes}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}</span
-      >
-    </div>
-    <div
-      class="crafting-shopping-summary-card"
-      class:is-alert={missingComponentsCount > 0}
-      data-summary="components"
-    >
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-cubes" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{missingComponentsCount}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}</span
-      >
-    </div>
-    <div
-      class="crafting-shopping-summary-card"
-      class:is-alert={unavailableToolsCount > 0}
-      data-summary="tools"
-    >
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{unavailableToolsCount}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}</span
-      >
-    </div>
+    <StatBox
+      value={plannedRecipes}
+      label={localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}
+      icon="fas fa-scroll"
+      dataAttr="data-summary"
+      dataValue="recipes"
+    />
+    <StatBox
+      value={missingComponentsCount}
+      label={localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}
+      icon="fas fa-cubes"
+      tone={missingComponentsCount > 0 ? 'danger' : 'default'}
+      dataAttr="data-summary"
+      dataValue="components"
+    />
+    <StatBox
+      value={unavailableToolsCount}
+      label={localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}
+      icon="fas fa-screwdriver-wrench"
+      tone={unavailableToolsCount > 0 ? 'danger' : 'default'}
+      dataAttr="data-summary"
+      dataValue="tools"
+    />
   </div>
 
   {#if isEmpty}
@@ -275,7 +265,7 @@
                 title={entry.name}
                 onclick={() => onIncrement?.(entry.recipeId)}
               >
-                <CraftingThumb src={entry.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={28} />
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
@@ -302,9 +292,9 @@
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <CraftingEssenceThumb icon={row.icon} size={28} />
+                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={28} glyph={12} />
                 {:else}
-                  <CraftingThumb src={row.img} alt="" size={28} />
+                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
                 <span
@@ -328,7 +318,7 @@
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
-                <CraftingThumb src={tool.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
                 <span class="crafting-shopping-acquire-name" title={tool.name}>{tool.name}</span>
                 <span
                   class={`crafting-shopping-chip ${tool.needsRepair ? 'tone-warning' : 'tone-danger'}`}
@@ -394,57 +384,13 @@
     color: var(--fab-text);
   }
 
-  /* Three always-visible summary cards. */
+  /* The grid the three always-visible summary cards sit in. Each card is a `<StatBox>`
+     and owns its own box, figure and label; this rule owns only the grid. */
   .crafting-shopping-summary {
     flex: 0 0 auto;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--fab-space-2);
-  }
-
-  .crafting-shopping-summary-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    text-align: center;
-  }
-
-  .crafting-shopping-summary-card.is-alert {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-  }
-
-  /* Icon + count share a line; the label sits beneath. */
-  .crafting-shopping-summary-value {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .crafting-shopping-summary-card i {
-    font-size: 14px;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-shopping-summary-card.is-alert i {
-    color: var(--fab-danger-text);
-  }
-
-  .crafting-shopping-summary-count {
-    font-size: 18px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .crafting-shopping-summary-label {
-    font-size: 10px;
-    line-height: 1.2;
-    color: var(--fab-text-muted);
   }
 
   .crafting-shopping-empty {

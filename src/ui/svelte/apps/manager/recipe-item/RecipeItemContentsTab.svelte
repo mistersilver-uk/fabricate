@@ -19,6 +19,7 @@
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import IconButton from '../../../components/IconButton.svelte';
+  import Medallion from '../../../components/Medallion.svelte';
 
   let {
     linkedRecipes = [],
@@ -139,9 +140,13 @@
     <ul class="manager-recipe-item-recipe-list" data-recipe-item-contents-list>
       {#each linkedRecipes as recipe (recipe.id)}
         <li class="manager-recipe-item-recipe-row" data-recipe-item-recipe={recipe.id}>
-          <span class="manager-recipe-item-recipe-icon" aria-hidden="true">
-            <img src={resolveRecipeImage(recipe)} alt="" />
-          </span>
+          <!-- The shared tile (issue 1506). This row was the ONE art tile in the tree already
+               drawing at a published ladder rung — 30px at radius 7 on `--fab-bg-3`, with no edge
+               — so converting it is a KNOWN regression on two geometry axes: the corner moves to
+               the medallion's flat 9px and the tile gains a hairline. Both are geometry, both
+               belong to the size-ladder sweep, and one tile primitive is worth more than one
+               compliant tile: its size is recorded on the `offLadderArtSizes` ledger for it. -->
+          <Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={30} />
           <div class="manager-recipe-item-recipe-copy">
             <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
             <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
@@ -227,25 +232,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-2);
-  }
-
-  .manager-recipe-item-recipe-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    border-radius: 7px;
-    background: var(--fab-bg-3);
-    color: var(--fab-accent);
-    overflow: hidden;
-  }
-
-  .manager-recipe-item-recipe-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .manager-recipe-item-recipe-copy {

@@ -22,7 +22,7 @@
 <script>
   import Field from '../../../components/Field.svelte';
   import { tick } from 'svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
