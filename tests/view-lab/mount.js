@@ -19,6 +19,7 @@ import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
 } from './labInjectedLayoutGuard.js';
+import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -188,6 +189,23 @@ function readParams() {
     // display text rendered verbatim, so the stress belongs on the provider rather than on the
     // localizer Core's own five tab labels read.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // view-lab-region:end
+    // view-lab-region:canvas-mount-params
+    // The two params only the three CANVAS windows read (issue 1520).
+    //
+    // `interactable` names WHICH seeded behaviour the config panel opens against, by the key
+    // `LAB_INTERACTABLE_REFS` declares rather than by a three-part ref: the panel is opened
+    // AGAINST a behaviour, so its ref is instance state and there is no `mountManagerApp`
+    // analogue for it. `noInteractables` builds a world whose scene carries none, which is the
+    // Manage panel's empty state and the one state no seeded behaviour count can produce.
+    //
+    // Their own attributed REGION, and the readership is structural rather than assumed: neither
+    // param is read anywhere but `mountCanvasApp` and the world build it drives, and no player or
+    // manager frame mounts a canvas window at all. `scripts/lib/viewLabCases.js` keys
+    // `ATTRIBUTED_LAB_INPUTS` on that fact, so a hunk confined to this block selects the canvas
+    // frames rather than the whole corpus.
+    interactable: params.get('interactable') ?? null,
+    noInteractables: params.get('noInteractables') === '1',
     // view-lab-region:end
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
@@ -604,6 +622,88 @@ function labDowntimeProvider() {
   };
 }
 
+// view-lab-region:mount-canvas-app
+/**
+ * The three GM canvas windows, each keyed by its own {@link APP_CHROME} id.
+ *
+ * A TABLE plus one mount function rather than three near-identical mount functions. All three
+ * applications expose the SAME seam `mountManagerApp` uses — `_prepareSvelteProps()` returning
+ * `{ services }` off a lazily-built `_services` — so three copies would differ only in two import
+ * specifiers each, which is a duplicated block wearing three names (and one the new-code
+ * duplication gate would fail).
+ *
+ * `load` is a pair of literal dynamic imports rather than an interpolated path because Vite
+ * resolves the lab's module graph statically: a computed specifier yields a runtime 404 in the
+ * browser, not a build error here.
+ *
+ * `ref` is the one thing this table has that `mountManagerApp` has no analogue for. The config
+ * panel is opened AGAINST a behaviour — production constructs it with `{ ref }` and stores
+ * `this._ref` — so the lab must supply that instance field or `_resolveBehavior` answers null and
+ * the window renders its own "no behaviour" body as if it were the screen.
+ */
+const CANVAS_APP_MOUNTS = Object.freeze({
+  'fabricate-interactable-browser': Object.freeze({
+    exportName: 'InteractableBrowserApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractableBrowserApp.svelte.js'),
+        import('../../src/ui/svelte/apps/InteractableBrowserRoot.svelte'),
+      ]),
+  }),
+  'fabricate-interactable-config': Object.freeze({
+    exportName: 'InteractableConfigApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractableConfigApp.svelte.js'),
+        import('../../src/ui/svelte/apps/InteractableConfigRoot.svelte'),
+      ]),
+    ref: (params) => {
+      const key = params.interactable ?? 'configured';
+      const ref = LAB_INTERACTABLE_REFS[key];
+      // Loudly, and by name. A missing ref renders a panel with no behaviour in it, which looks
+      // like a screen rather than like a fault and would publish as evidence of one.
+      if (!ref) {
+        throw new Error(
+          `view lab: unknown interactable "${key}"; ` +
+            `labInteractables.js declares ${Object.keys(LAB_INTERACTABLE_REFS).join(', ')}`
+        );
+      }
+      return ref;
+    },
+  }),
+  'fabricate-interactables-manager': Object.freeze({
+    exportName: 'InteractablesManagerApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractablesManagerApp.svelte.js'),
+        import('../../src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte'),
+      ]),
+  }),
+});
+
+/**
+ * Mount one of the three canvas windows into the built frame.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<{instance: object, services: object, props: object}>} The mounted window.
+ */
+async function mountCanvasApp(content, params) {
+  const spec = CANVAS_APP_MOUNTS[params.appId];
+  const [appModule, rootModule] = await spec.load();
+
+  const app = borrowInstance(appModule[spec.exportName], {
+    _services: null,
+    ...(spec.ref ? { _ref: spec.ref(params) } : {}),
+    // The lab never re-renders through ApplicationV2; an action in a captured frame is a no-op.
+    render: () => {},
+  });
+  const props = app._prepareSvelteProps();
+  const instance = mount(rootModule.default, { target: content, props });
+  return { instance, services: props.services, props };
+}
+// view-lab-region:end
+
 async function mountManagerApp(content, params) {
   const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] =
     await Promise.all([
@@ -627,6 +727,26 @@ async function mountManagerApp(content, params) {
   if (params.clearSystem) await props.store.selectSystem('');
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
+}
+
+/**
+ * The mount path for the window a case names.
+ *
+ * A three-way choice rather than the player/manager ternary it replaced (issue 1520): the lab now
+ * draws five windows, and a binary would have sent every canvas case down the Manager's mount.
+ * That failure is silent in the worst way — `borrowInstance` would build a Manager stand-in and
+ * `mount` would render the Manager root into a 420px frame — so the fall-through THROWS rather
+ * than defaulting.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<object>} The mounted window.
+ */
+async function mountAppFor(content, params) {
+  if (params.appId === 'fabricate-app') return mountPlayerApp(content, params);
+  if (params.appId === 'fabricate-crafting-system-manager') return mountManagerApp(content, params);
+  if (CANVAS_APP_MOUNTS[params.appId]) return mountCanvasApp(content, params);
+  throw new Error(`view lab: no mount path for app "${params.appId}"`);
 }
 
 /**
@@ -879,6 +999,7 @@ async function boot() {
         noTools: params.noTools,
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
+        noInteractables: params.noInteractables,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
@@ -905,10 +1026,7 @@ async function boot() {
     world.shim.setViewer(params.viewer ?? defaultViewer);
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
-    mounted =
-      params.appId === 'fabricate-app'
-        ? await mountPlayerApp(built.content, params)
-        : await mountManagerApp(built.content, params);
+    mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.

@@ -25,10 +25,25 @@ import { BROAD_SIGNAL_PATTERN, VIEW_LAB_CASES, normalizePath } from '../scripts/
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The two windows the lab mounts. Everything reachable from these is photographable. */
+/**
+ * The windows the lab mounts. Everything reachable from these is photographable.
+ *
+ * FIVE since issue 1520 registered the three GM canvas windows. They have to be here, and the
+ * second test below is why: it fails a `sourceMatches` pattern that claims a component NO mounted
+ * window renders, so the moment a case claimed `InteractableConfigRoot.svelte` while this list
+ * held two roots, the registry would have looked as though it were claiming a phantom. The two
+ * halves are a pair — a root registered in the case registry and not here reports its own real
+ * claims as phantoms, and a root here with no case reports its whole subtree as unclaimed.
+ *
+ * Measured when the three were added: the closure grows by exactly three. None of them imports a
+ * `.svelte` component at all, so they bring no unclaimed subtree with them.
+ */
 const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/FabricateAppRoot.svelte',
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  'src/ui/svelte/apps/InteractableBrowserRoot.svelte',
+  'src/ui/svelte/apps/InteractableConfigRoot.svelte',
+  'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte',
 ];
 
 /**
