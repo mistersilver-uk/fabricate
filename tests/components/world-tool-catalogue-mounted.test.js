@@ -68,7 +68,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',

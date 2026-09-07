@@ -658,7 +658,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   //     linked Item has been deleted out from under the record. It is reachable only from a
   //     world entity whose `registeredItemUuid` resolves to nothing, which the lab corpus had
   //     none of until `lab-tool-warped-crucible` — see `labContent.js`.
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte': Object.freeze([
+  'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
     'world-tool-entry-unlinked',
@@ -12098,8 +12098,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
+      // `ItemDropZone` is deliberately NOT claimed here (issue 1509), and the deletion changes no
+      // routing: the pattern that used to sit on this line was on the removal-only
+      // `BROAD_SHADOWED_SOURCE_MATCHES` register precisely because the file was already a broad
+      // signal, so `selectRenderFileCases` never read it. The move to `components/` keeps it
+      // broad, and the primitive's evidence comes from its own override.
+      //
+      // Whether this case should JOIN that override was adjudicated NO. The override's four
+      // frames already draw the primitive's closed `state` set — the create prompt, the linked
+      // tile, the unlinked prompt and the missing face — and the dynamic-DC card renders the
+      // unlinked prompt among them. A fifth frame of a face already photographed is cost without
+      // evidence.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
       /^src\/utils\/macroReference\.js$/,
     ],
   }),

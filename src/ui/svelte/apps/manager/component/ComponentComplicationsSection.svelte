@@ -44,7 +44,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';

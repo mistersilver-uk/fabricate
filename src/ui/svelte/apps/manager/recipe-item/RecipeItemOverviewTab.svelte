@@ -20,7 +20,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 

@@ -337,7 +337,7 @@ const TOGGLE_CARD_CLASSES = (() => {
 
 /** The class list `ItemDropZone` writes on its own root `<div>`, a plain literal attribute. */
 const LINK_FIELD_CLASSES = (() => {
-  const source = read('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  const source = read('src/ui/svelte/components/ItemDropZone.svelte');
   const match = source.match(/class="(fabricate-link-field[^"]*)"/u);
   assert.ok(match, 'ItemDropZone must write its family root inline on its root element');
   return match[1];

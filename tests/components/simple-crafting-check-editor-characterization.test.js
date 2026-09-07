@@ -63,7 +63,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     // The shared numeric stepper the DC, tier-DC and trigger fields are built on

@@ -31,7 +31,7 @@ import { parse } from 'svelte/compiler';
 import { SOURCES, walkTemplate } from '../helpers/primitiveAdoptionContract.js';
 
 /** The primitive whose bag this file pins. */
-const ZONE_PATH = 'src/ui/svelte/apps/manager/ItemDropZone.svelte';
+const ZONE_PATH = 'src/ui/svelte/components/ItemDropZone.svelte';
 
 const TAG = 'ItemDropZone';
 

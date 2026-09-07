@@ -283,7 +283,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/components/EditorValidationSurface.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/ItemDropZone.svelte');
   // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
   // inspector imports it statically, so it is in this root's static module graph; omitting it
   // HANGS every mounted manager test as `# cancelled`, it does not fail one.

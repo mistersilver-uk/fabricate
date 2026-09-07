@@ -79,8 +79,8 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * The roots a diff can name that `BROAD_SIGNAL_PATTERN` can match. `styles/` is included because
  * `styles/fabricate.css` is a broad signal and is the most commonly touched UI file in the
- * repository: 13 of property (b)'s 21 baseline entries are patterns claiming it, so a walk that
- * missed this root would compute 8 where the baseline says 21.
+ * repository: 13 of property (b)'s 20 baseline entries are patterns claiming it, so a walk that
+ * missed this root would compute 7 where the baseline says 20.
  *
  * That fails the `deepEqual` loudly rather than silently — the reason to walk every root the
  * pattern can match is that the baseline only MEANS what it says if it was measured over the whole
@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|SegmentedControl)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ManagerModal|SegmentedControl)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -158,7 +158,6 @@ const EXPECTED_OVERRIDE_KEYS = [
   // other. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change.
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -202,6 +201,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites. Two frames, one
   // per window, because the conversion is a different act in each — a section title joining the
   // ladder in the crafting detail, and three field labels changing size, weight and tracking in
@@ -258,21 +258,28 @@ const EXPECTED_OVERRIDE_KEYS = [
  * These can never be consulted. `selectRenderFileCases` `continue`s on a broad-signal file BEFORE
  * it reaches any case's `sourceMatches`, so each of these is a case declaring an interest the
  * router will not act on. Reporting them is the point of this baseline; it is NOT a clean-tree
- * assertion, because deleting 21 patterns across 17 case literals is unscoped work and each one
+ * assertion, because deleting 20 patterns across 16 case literals is unscoped work and each one
  * needs its own adjudication — several of these cases plainly DO want their `styles/fabricate.css`
  * claim honoured, and answering that is a routing decision, not a tidy-up.
  *
- * Thirteen of the 21 are `styles/fabricate.css` claimants, which is a historical accident of which
+ * Thirteen of the 20 are `styles/fabricate.css` claimants, which is a historical accident of which
  * cases pasted the pattern rather than an attribution anyone made.
  *
  * The only accepted edit to this list is a REMOVAL, with the reason in the commit that makes it.
+ *
+ * ONE REMOVAL SO FAR, and it is 21 → 20. `manager-checks-crafting-dynamic-dc` claimed
+ * `apps/manager/ItemDropZone.svelte`, and issue 1509 moved that file into `components/`. The move
+ * breaks the row either way — re-point it and it is still shadowed, leave it and it names a path
+ * that no longer exists — and this register accepts only a removal, so the pattern was DELETED at
+ * the case rather than re-pointed. The adjudication that had to accompany it is recorded beside
+ * the case: the primitive's four override frames already draw its closed `state` set, this frame
+ * draws one of them again, so it does not join the override.
  */
 const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`coverage-theme-light-manager :: ^src\/ui\/theme\.js$`,
   String.raw`coverage-theme-light-manager :: ^styles\/fabricate\.css$`,
   String.raw`coverage-theme-light-player :: ^src\/ui\/theme\.js$`,
   String.raw`coverage-theme-light-player :: ^styles\/fabricate\.css$`,
-  String.raw`manager-checks-crafting-dynamic-dc :: ^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$`,
   String.raw`manager-component-complications-empty :: ^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Chip\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Medallion\.svelte$`,
@@ -435,7 +442,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 211);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 198);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -631,7 +638,7 @@ const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
  * Whether `token` names `file`, anchored on the path separator.
  *
  * The anchor is the whole point and the register records why on its own `DropZone` row: a suffix
- * test without it accepts `DropZone.svelte` for `apps/manager/ItemDropZone.svelte` and credits a
+ * test without it accepts `DropZone.svelte` for `components/ItemDropZone.svelte` and credits a
  * dead component with seven importers. This is only ever asked against ONE row's own caller list,
  * so the ambiguity a bare basename would carry across the tree is not reintroduced.
  *

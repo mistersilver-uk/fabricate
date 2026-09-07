@@ -145,7 +145,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',

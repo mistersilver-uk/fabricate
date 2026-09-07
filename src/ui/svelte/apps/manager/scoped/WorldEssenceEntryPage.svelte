@@ -58,7 +58,7 @@
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';

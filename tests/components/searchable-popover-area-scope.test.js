@@ -966,7 +966,7 @@ const PRIMITIVES = Object.freeze([
     // ── ITEMDROPZONE (issue 1509). The manager's ONE document drop target — a dashed prompt that
     // becomes a linked card — rooted at the class it emits on its own root `<div>`.
     name: 'ItemDropZone',
-    components: Object.freeze(['src/ui/svelte/apps/manager/ItemDropZone.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/ItemDropZone.svelte']),
     roots: Object.freeze(['fabricate-link-field']),
     // ONE prefix, token-terminated. Nothing else in the sheet or in `src/` shares it.
     family: 'manager-item-drop-zone[\\w-]*',

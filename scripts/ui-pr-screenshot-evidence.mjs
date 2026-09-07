@@ -524,7 +524,7 @@ export const VIEW_RECIPES = Object.freeze([
       // Naming them here is what makes a change to either republish the frame that DOES
       // exist, rather than publishing nothing at all for this screen.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+      /^src\/ui\/svelte\/components\/ItemDropZone\.svelte$/,
     ],
   },
   {

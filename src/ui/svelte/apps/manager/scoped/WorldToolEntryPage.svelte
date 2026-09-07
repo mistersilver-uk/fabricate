@@ -96,7 +96,7 @@
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../../../components/Chip.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToolBehaviorPreview from '../tools/ToolBehaviorPreview.svelte';
   import ToolRepairRequirements from '../tools/ToolRepairRequirements.svelte';

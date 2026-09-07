@@ -24,7 +24,7 @@
  *
  * The register itself records the trap, on the `DropZone` row: a basename search that does not
  * anchor on the path separator conflates `components/DropZone.svelte` with
- * `apps/manager/ItemDropZone.svelte` and reports seven callers for a component nothing imports.
+ * `components/ItemDropZone.svelte` and reports seven callers for a component nothing imports.
  * A basename is not an identity here — nothing stops two directories holding the same name, and
  * `Chip`/`EssenceChip`, `ManagerColorPicker`/`ManagerColorPopover` are the near misses that
  * already ship. The first pair is the sharper one and it is why suffix matching is structurally

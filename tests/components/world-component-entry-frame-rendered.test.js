@@ -89,7 +89,7 @@ const compiledExtras = [
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
 ];

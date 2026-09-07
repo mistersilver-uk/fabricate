@@ -60,7 +60,7 @@
   import EmptyState from '../EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 

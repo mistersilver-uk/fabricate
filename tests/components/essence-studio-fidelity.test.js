@@ -457,7 +457,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // `ItemDropZone` itself must not have been bent to do it — it has other consumers.
     assert.equal(
       readFileSync(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/ItemDropZone.svelte'),
+        resolve(repoRoot, 'src/ui/svelte/components/ItemDropZone.svelte'),
         'utf8'
       ).includes('essence-source'),
       false,

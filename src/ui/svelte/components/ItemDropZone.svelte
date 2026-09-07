@@ -87,9 +87,9 @@
   Two callers, which is the extend-before-add bar in `design-system/spec.md:25-69`.
 -->
 <script>
-  import { dragDrop } from '../../actions/dragDrop.js';
-  import { resolveDropUuid } from '../../util/dropUtils.js';
-  import IconButton from '../../components/IconButton.svelte';
+  import { dragDrop } from '../actions/dragDrop.js';
+  import { resolveDropUuid } from '../util/dropUtils.js';
+  import IconButton from './IconButton.svelte';
 
   let {
     item = null,

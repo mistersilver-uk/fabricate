@@ -31,7 +31,7 @@
   // The shared macro-name resolver (issue 1036), which owns the `globalThis.fromUuid`
   // indirection and the stale-resolution latch.
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let { macroUuid = null, onChange = () => {} } = $props();
