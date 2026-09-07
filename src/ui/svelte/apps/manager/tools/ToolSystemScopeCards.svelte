@@ -35,7 +35,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import { toolDisplayName } from './toolStudio.js';
 

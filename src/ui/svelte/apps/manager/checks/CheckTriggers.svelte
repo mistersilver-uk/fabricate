@@ -42,7 +42,7 @@
   import { summariseCondition, summariseEffect, summariseHeadline } from './checkTriggerSummary.js';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import IconButton from '../../../components/IconButton.svelte';

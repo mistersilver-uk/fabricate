@@ -925,7 +925,7 @@ const PRIMITIVES = Object.freeze([
     // `${on ? …}` spans survive whitespace-splitting as tokens that match no class in the sheet
     // and the literals around them are credited.
     name: 'ToggleCard',
-    components: Object.freeze(['src/ui/svelte/apps/manager/ToggleCard.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/ToggleCard.svelte']),
     roots: Object.freeze(['fabricate-toggle-card']),
     // FIVE SUFFIXES, ENUMERATED, WITH BARE `manager-recipe-status` EXCLUDED BY SHAPE. This is the
     // most crowded namespace in the sheet: `.manager-recipe-*` occurs 457 times in selector

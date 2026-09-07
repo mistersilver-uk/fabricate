@@ -169,7 +169,7 @@
       "why": "The subject-and-modifier picker (2 callers, `ComponentEditView.svelte` and `GatheringTaskEditView.svelte`). `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", so this picker is specified as part of that editor rather than as an entry of its own. Targeted: one modifier-pick frame per caller claims it."
     },
     {
-      "path": "src/ui/svelte/apps/manager/ToggleCard.svelte",
+      "path": "src/ui/svelte/components/ToggleCard.svelte",
       "library": null,
       "status": "target",
       "evidence": "broad",

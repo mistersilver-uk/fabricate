@@ -125,7 +125,7 @@ const RECIPE_COMPILED = [
   // The Results tab's progressive reorder-permission card (issue 651). A component the
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
   // rather than failing it.
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   // The switch that card composes (issue 1040). Omitting it HANGS the suite.
   'src/ui/svelte/components/StatusToggle.svelte',
   // The resolution-mode banner heads every editor tab (issue 643 §5).

@@ -142,9 +142,12 @@ function withHydrateSpy(card, requests) {
 
 function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651).
-  // Omitting it here HANGS every mounted manager test rather than failing one.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
+  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651); under
+  // `components/` since issue 1509. Omitting it here does not hang this suite: the closure walk
+  // at the foot of this file THROWS for a `.svelte` the root renders and this list omits, and
+  // names the missing path. The `# cancelled` reading belongs to the mounted suites that carry
+  // no such validator.
+  writeCompiledSvelte('src/ui/svelte/components/ToggleCard.svelte');
   // The SHARED subject check-modifier picker (issue 1095), rendered by BOTH the salvage
   // block in ComponentEditView and the gathering task editor.
   writeCompiledSvelte('src/ui/svelte/apps/manager/SubjectModifierPicker.svelte');
@@ -463,7 +466,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
   // THE manager's on/off switch (issue 1040). The root reaches it from 25 components — every
   // browser, every studio overview tab, the Checks rail, the scoped-entity rows and
-  // `ToggleCard` — so omitting it HANGS every mounted manager test as `# cancelled`.
+  // `ToggleCard` — so omitting it fails this suite by name, through the closure walk, rather
+  // than cancelling it.
   writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
   // THE manager's filter bar and its search field (issue 1039). The root reaches the pair
   // through every browse screen it routes to, and the field through four editors and two

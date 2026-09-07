@@ -97,7 +97,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
   ],

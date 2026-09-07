@@ -678,6 +678,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
   ]),
+  // THE titled status card (issue 1509), and it GAINS an override in the same commit that MOVES
+  // it. It was a broad signal through the manager-name alternation and is one through the
+  // `components/` directory leg now, so its routing does not change — but a broad-signal
+  // `.svelte` with no override is a member of `PRIMITIVES_WITH_NO_FRAME`, and it LEAVES that
+  // list in this commit rather than a later one. The two registers are read by one `deepEqual`,
+  // so a commit that did either alone would be red.
+  //
+  // ONE frame, and it is chosen by the WALK rather than by a `sourceMatches` claim.
+  // `manager-recipe-edit-normal` opens the recipe editor and lands on `#recipe-tab-overview`,
+  // and `recipe/RecipeOverviewTab.svelte` renders TWO of these cards on that tab, so the frame
+  // draws the control rather than merely naming the file that renders one.
+  //
+  // `manager-tool-stress-long-name` is recorded as REFUSED. It claims `ToolSystemScopeCards`,
+  // which renders this card, but that case's own comment says its editor lands on the Breakage
+  // tab — so the card is not in the photograph, and a claim is not a drawing.
+  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze(['manager-recipe-edit-normal']),
   //
   // A THIRD entry as of issue 1458, and it is a third MODE rather than a third instance. Both
   // parties pickers above render the search row; the three converted add menus render none, which

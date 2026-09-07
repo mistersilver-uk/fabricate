@@ -660,7 +660,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
   // `library.html` specimen names. Its row adjudicates `<SetPicker>`, the nearest entry, and
   // records why the correspondence is not made — a vocabulary editor is not one record's
@@ -681,6 +680,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
 ];
 
 test('the shipped rows the library does not name are exactly the known set', () => {

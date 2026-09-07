@@ -325,7 +325,7 @@ const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-co
  * is what `searchable-popover-area-scope.test.js` reads the family from.
  */
 const TOGGLE_CARD_CLASSES = (() => {
-  const source = read('src/ui/svelte/apps/manager/ToggleCard.svelte');
+  const source = read('src/ui/svelte/components/ToggleCard.svelte');
   const match = source.match(/class=\{`([^`$]*)\$\{/u);
   assert.ok(
     match,

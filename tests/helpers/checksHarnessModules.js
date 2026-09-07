@@ -192,7 +192,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
   // `portal.js`) is already declared here for other reasons.
   'src/ui/svelte/components/SearchablePopover.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',

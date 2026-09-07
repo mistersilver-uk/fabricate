@@ -10,9 +10,9 @@
   gate owns for the five `manager-recipe-status-{card,icon,copy,title,sub}` classes are now
   rooted at `fabricate-toggle-card`, the class the root element below writes ahead of them,
   so the card paints the same in a bare `<div>` as it does in the manager. A recorded
-  decision to stay here rested on a coupling that no longer exists, so the file MOVES to
-  `components/` in this change's phase 5 rather than keeping a location whose stated reason
-  has gone.
+  decision to stay here rested on a coupling that no longer exists, so the file MOVED to
+  `components/` — where you are reading it — rather than keeping a location whose stated
+  reason has gone.
 
   WHAT DID NOT TRAVEL, so the claim is a measurement rather than a slogan: the twelve rules
   under `.manager-checks-flag-list`, `.manager-checks-trigger-body` and
@@ -43,7 +43,7 @@
   i18n keys and their fallbacks, which keeps this component a presentational leaf.
 -->
 <script>
-  import StatusToggle from '../../components/StatusToggle.svelte';
+  import StatusToggle from './StatusToggle.svelte';
 
   let {
     // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.

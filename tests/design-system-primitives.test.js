@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|SegmentedControl)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -248,6 +248,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
 ];
 
 /**
@@ -340,6 +341,13 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * frames that cannot contain one. Its override names `world-tool-entry`, chosen because that
  * case's tool fixture declares the `breakageChance` mode its walk then opens — the frame DRAWS
  * a slider, rather than claiming the file that renders one.
+ * `ToggleCard` left it at issue 1509, and it is the first to leave because a component MOVED: its
+ * routing did not change — broad through the manager-name alternation before, broad through the
+ * `components/` directory leg after — but the move commit is the one that had to state which
+ * frame draws it, since the two registers are read by one `deepEqual` and re-keying a path in
+ * this list without giving it an override would have been an unphotographed primitive at a new
+ * path. Its override names `manager-recipe-edit-normal`, whose walk lands on the recipe editor's
+ * Overview tab, where two of these cards render.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -347,7 +355,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
@@ -428,7 +435,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 222);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 211);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

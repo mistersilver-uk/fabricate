@@ -53,9 +53,9 @@ const cardHarness = createMountedComponentHarness({
     // `ToggleCard` composes the shared switch (issue 1040), so this second harness needs it
     // too — omitting it HANGS this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  componentPath: 'src/ui/svelte/components/ToggleCard.svelte',
 });
 
 const COMPONENT_OPTIONS = [

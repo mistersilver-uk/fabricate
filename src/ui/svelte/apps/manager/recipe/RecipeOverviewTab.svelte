@@ -25,7 +25,7 @@
     normalizeRecipeCategory,
   } from '../../../../../utils/recipeCategories.js';
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';

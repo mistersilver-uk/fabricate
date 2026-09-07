@@ -85,7 +85,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
     // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373): the armed remove-from-system
     // control, the routed identity notice on Validation, the inherit/override card every
     // behaviour section is drawn as, the system-scope band that opens Breakage, and the shared

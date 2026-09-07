@@ -43,7 +43,7 @@
   import EmptyState from '../EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import CheckFailurePolicy from './CheckFailurePolicy.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';

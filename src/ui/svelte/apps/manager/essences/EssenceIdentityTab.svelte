@@ -25,7 +25,7 @@
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import IconButton from '../../../components/IconButton.svelte';
