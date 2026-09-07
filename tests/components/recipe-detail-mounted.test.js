@@ -669,7 +669,9 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('feeds the active step rail the re-evaluated craftability, not the baked step projection', async () => {
+  // With no run in flight the active step IS the displayed step, so this case reads the
+  // recomputed value; the case below covers the two coming apart.
+  it('feeds the displayed step rail the re-evaluated craftability, not the baked step projection', async () => {
     const fixture = steppedEssenceRecipe();
     const recomputed = essenceCraftability();
     const target = await harness.mount({
@@ -678,6 +680,7 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: recomputed,
       steps: fixture.steps,
       activeStepId: fixture.activeStepId,
+      displayedStepId: fixture.displayedStepId,
       rail: {}
     });
     const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
@@ -686,6 +689,62 @@ describe('RecipeDetail mounted behavior', () => {
     // that do not match the plan the craft consumes.
     assert.equal(steps[0].querySelectorAll('[data-requirement-slot]').length, 1);
     assert.equal(steps[1].querySelectorAll('[data-requirement-slot]').length, 1);
+  });
+
+  // The re-evaluated craftability the store hands down is projected from the recipe's
+  // FIRST step, which stops being the active step the moment a run is parked past it.
+  // Substituting it into the ACTIVE step then paints that step with the first step's
+  // requirements, consumption plan and tools, so both blocks read identically and a
+  // player is told to gather the wrong materials for the step they are actually on.
+  it('renders each step from its own projection while a run is parked on a later step', async () => {
+    const fixture = steppedEssenceRecipe({ activeStepIndex: 1, activeStepId: 'step-ess-2' });
+    // `displayedStepId` stays 'step-ess-1' — the step the top-level projection describes.
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps,
+      activeStepId: fixture.activeStepId,
+      displayedStepId: fixture.displayedStepId,
+      rail: { readOnly: true }
+    });
+
+    const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
+    assert.equal(steps.length, 2, 'both step blocks rendered');
+
+    // Requirements: step 1 authors two essence requirements, step 2 exactly one.
+    assert.equal(
+      steps[0].querySelectorAll('[data-requirement-slot]').length,
+      2,
+      'the displayed step shows its own two requirements'
+    );
+    assert.equal(
+      steps[1].querySelectorAll('[data-requirement-slot]').length,
+      1,
+      "the parked-on step shows its own single requirement, not the displayed step's two"
+    );
+
+    // Consumption plan: each block spends its own step's allocated carrier.
+    const consumptionKeys = (step) =>
+      [...step.querySelectorAll('[data-consumption-row]')].map((row) =>
+        row.getAttribute('data-consumption-row')
+      );
+    const displayedSpend = consumptionKeys(steps[0]);
+    const activeSpend = consumptionKeys(steps[1]);
+    assert.ok(displayedSpend.length > 0, 'the displayed step states what it will spend');
+    assert.ok(activeSpend.length > 0, 'the parked-on step states what it will spend');
+    assert.ok(
+      activeSpend.every((key) => !displayedSpend.includes(key)),
+      'the two consumption plans name disjoint carriers'
+    );
+
+    // Tools follow the same craftability, so a shared projection repeats one step's tools.
+    const toolNames = (step) =>
+      [...step.querySelectorAll('[data-io-group="tools"] .crafting-io-name')].map((name) =>
+        name.textContent.trim()
+      );
+    assert.deepEqual(toolNames(steps[0]), ["Alchemist's Supplies"]);
+    assert.deepEqual(toolNames(steps[1]), ["Jeweler's Tools"]);
   });
 
   it('falls back to a single IoTable when steps is empty (single-step parity)', async () => {
