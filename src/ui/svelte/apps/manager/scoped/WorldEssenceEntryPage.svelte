@@ -60,13 +60,14 @@
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import MembershipActions from './MembershipActions.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { reportRefusedScopedEntrySave, scopedSectionLabel } from './scopedStudio.js';
@@ -1012,16 +1013,16 @@
                         <i class={ui?.glyph ?? PAGE_ICON}></i>
                       </span>
                       <h4 class="manager-scoped-entry-default-title">{heading}</h4>
-                      <StatusPill
-                        tone={value ? 'success' : 'subtle'}
+                      <Chip
+                        tone={statusChipTone(value ? 'success' : 'subtle')}
                         icon={value ? 'fas fa-circle-check' : 'fas fa-circle-minus'}
-                        label={value
+                        >{value
                           ? text(ui?.setKey ?? '', ui?.set ?? label)
                           : text(
                               'FABRICATE.Admin.Manager.Scoped.Essence.DefaultNone',
                               'No default'
-                            )}
-                      />
+                            )}</Chip
+                      >
                     </header>
 
                     <p class="manager-scoped-entry-default-blurb">

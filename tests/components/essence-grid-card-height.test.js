@@ -58,9 +58,8 @@ const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-m
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 const SCOPED_COMPONENTS = [
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   // The card's own CSS lives in the shared primitive now; without it this fixture measures
   // an unstyled stack and every gate below passes vacuously.
@@ -106,8 +105,13 @@ function card(essence) {
   const pills = (essence.pills || [])
     .map((pill) => chip(pill.label, { tone: pill.tone, icon: pill.icon }))
     .join('');
+  // The row's Disabled badge is the same shared chip as the capability badges beside it
+  // (issue 1506); before that it was a second pill component, and this fixture stamped its
+  // markup by hand. It is built through `chip()` for the reason the badges are: a fixture that
+  // spells a component's markup itself keeps measuring the old anatomy after the app stops
+  // rendering it.
   const disabledPill = essence.off
-    ? '<span class="fab-status-pill is-neutral"><i class="fas fa-circle-pause"></i><span class="fab-status-pill-label">Disabled</span></span>'
+    ? chip('Disabled', { tone: 'subtle', icon: 'fas fa-circle-pause' })
     : '';
   // The card is the shared `LibraryCard` anatomy: a header pairing the medallion with the
   // name to its right, a badges row, the fixed 2-line description box, the recessed facts
@@ -122,7 +126,7 @@ function card(essence) {
 <li class="fab-library-card manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
   <button type="button" class="fab-library-card-body manager-essence-identity">
     <span class="fab-library-card-header">
-      <span class="fab-medallion has-tint" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
+      <span class="fab-medallion" data-medallion-tint="sage" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
       <span class="fab-library-card-heading">
         <span class="fab-library-card-name manager-system-name" title="${essence.name}">${essence.name}</span>
       </span>

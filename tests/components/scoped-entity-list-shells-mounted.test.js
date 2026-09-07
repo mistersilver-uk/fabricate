@@ -33,6 +33,7 @@ import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js'
 import { chooseSelectOption, openSelectPanel } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  STATUS_TONE_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -41,6 +42,8 @@ import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopePr
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
+  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+  ...STATUS_TONE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
@@ -80,7 +83,6 @@ const FRAME_MODULES = [
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
   // (`...FRAME_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',

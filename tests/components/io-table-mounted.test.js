@@ -17,6 +17,7 @@ import {
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { craftability, sharedEssenceCraftability } from '../helpers/crafting-fixtures.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -243,5 +244,39 @@ describe('IoTable mounted behavior', () => {
       target.querySelector('[data-io-group="outputs"] .crafting-io-output-qty').textContent.trim(),
       '×2'
     );
+  });
+
+  // Issue 1506: the have/need tag retired into the shared chip. Its six sites passed `success`
+  // for a satisfied reading, and `Chip` does not paint a tone under that name — it drops it, with
+  // no class and no error — so a satisfied essence row would have read as an untoned default chip.
+  it('draws the have/need readings as chips, in the tones the map routes them to', async () => {
+    const target = await harness.mount({
+      craftability: craftability({
+        essenceStates: [
+          { type: 'aether', name: 'Aether', icon: 'fa-regular fa-star', need: 1, have: 2, satisfied: true },
+        ],
+      }),
+    });
+
+    const [have, need] = [...target.querySelectorAll('[data-io-group="essences"] .manager-chip')];
+    assert.equal(chipToneOf(have), 'positive', 'a satisfied holding still reads as green');
+    assert.equal(chipToneOf(need), 'neutral', 'and the requirement beside it is a plain fact');
+    assert.ok(have.classList.contains('is-list'), 'both take the browser row scale');
+    // The word and the count stay two children, so the chip's own gap separates them the way the
+    // retired tag's did rather than collapsing to a space.
+    assert.equal(have.querySelectorAll('span').length, 2, 'the reading is a word and a count');
+    assert.match(have.textContent.replaceAll(/\s+/g, ' ').trim(), /2$/, 'the count is the holding');
+  });
+
+  it('draws an unavailable tool as a danger chip with its own glyph', async () => {
+    const target = await harness.mount({
+      craftability: craftability({
+        toolStates: [{ name: 'Mortar', img: 'icons/mortar.webp', available: false }],
+      }),
+    });
+
+    const chip = target.querySelector('[data-io-group="tools"] .manager-chip');
+    assert.equal(chipToneOf(chip), 'danger', 'a missing tool is red');
+    assert.ok(chip.querySelector('i.fa-triangle-exclamation'), 'and keeps its warning glyph');
   });
 });

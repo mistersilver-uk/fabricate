@@ -18,7 +18,7 @@
     onChange(next)  — called with the normalized requirement or null
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { anchoredPopover, hostRelativePopoverLayout } from '../../../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';

@@ -5,10 +5,13 @@
   at attempt time, as a notification — so the player could spend the irreversible roll on
   an attempt the engine would reject for a missing tool.
 
-  Each row is a thumb + the tool's display name + a StatusPill availability treatment
-  (the salvage tree's own availability primitive — NOT the crafting `QuantityTag`):
-  success/`fa-screwdriver-wrench`/"Available" or danger/`fa-triangle-exclamation`/
-  "Unavailable". Two signals — icon + label — never colour alone.
+  Each row is a thumb + the tool's display name + a `Chip` availability treatment,
+  on the chip's DEFAULT density: `tone="positive"`/`fa-screwdriver-wrench`/"Available"
+  or `tone="danger"`/`fa-triangle-exclamation`/"Unavailable". Two signals — icon +
+  label — never colour alone. The scale is stated because the crafting have/need
+  readings beside it take `density="list"`, and this row is not one of those: the
+  quantity tag those readings used to be retired into the same chip at issue 1506,
+  so the two are now one component distinguished by a prop rather than by a file.
 
   Availability is decided builder-side (`InventoryListingBuilder._salvageToolStates`),
   scoped to the TARGET salvage actor's items only, so what this shows is exactly what the
@@ -17,9 +20,10 @@
   datum lives in the view-model but drives no rendering here).
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
+  import Chip from '../../../../components/Chip.svelte';
 
   let { toolStates = [] } = $props();
 
@@ -39,20 +43,16 @@
         data-inventory-salvage-tool={tool.componentId ?? tool.name ?? ''}
         data-io-satisfied={tool.available ? 'true' : 'false'}
       >
-        <CraftingThumb src={tool.img ?? ''} alt="" size={24} />
+        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={24} />
         <span class="salvage-tools-name">{tool.name}</span>
         {#if tool.available}
-          <StatusPill
-            tone="success"
-            icon="fas fa-screwdriver-wrench"
-            label={localize('FABRICATE.App.Inventory.Salvage.RequiredToolsAvailable')}
-          />
+          <Chip tone="positive" icon="fas fa-screwdriver-wrench"
+            >{localize('FABRICATE.App.Inventory.Salvage.RequiredToolsAvailable')}</Chip
+          >
         {:else}
-          <StatusPill
-            tone="danger"
-            icon="fas fa-triangle-exclamation"
-            label={localize('FABRICATE.App.Inventory.Salvage.RequiredToolsUnavailable')}
-          />
+          <Chip tone="danger" icon="fas fa-triangle-exclamation"
+            >{localize('FABRICATE.App.Inventory.Salvage.RequiredToolsUnavailable')}</Chip
+          >
         {/if}
       </li>
     {/each}

@@ -43,10 +43,11 @@
   import IconFactRow from '../IconFactRow.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import SystemRulesRoster from '../scoped/SystemRulesRoster.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import { essenceColourName, essenceShortValueName } from '../scoped/essenceScoped.js';
   import { projectEssenceOnCraftCards } from './essenceStudio.js';
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
@@ -196,13 +197,13 @@
            control on the rail states, and the reference draws it in exactly this slot. -->
       <p class="manager-essence-inspector-meta" data-essence-inspector-meta>{identityMeta}</p>
       <div class="manager-chip-row">
-        <StatusPill
-          tone={disabled ? 'subtle' : 'success'}
+        <Chip
+          tone={statusChipTone(disabled ? 'subtle' : 'success')}
           icon={disabled ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
-          label={disabled
+          >{disabled
             ? text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')
-            : text('FABRICATE.Admin.Manager.Essence.Status.Enabled', 'Enabled')}
-        />
+            : text('FABRICATE.Admin.Manager.Essence.Status.Enabled', 'Enabled')}</Chip
+        >
       </div>
     </div>
   </div>

@@ -357,8 +357,13 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
  * markup attribute — `style="padding: 7px"` — and a JS `element.style.gap = '7px'` are both raw
  * spacing the gate is blind to.
  *
- * The live shape of that gap is a custom property SET IN MARKUP from a JS prop and read by a
- * scanned declaration; `apps/crafting/CraftingThumb.svelte` does exactly this for a SIZE, and the
+ * The live shape of that gap has TWO forms, and the worked example is re-pointed at a surviving
+ * one: `apps/inventory/detail/InventoryDetailHeader.svelte` sets `--inventory-detail-thumb-size`
+ * in markup from a JS prop and reads it back in a scanned declaration, and `components/Medallion`
+ * writes `width`/`height` straight into a `style` attribute from its own `size` prop. Both are
+ * SIZES rather than spacing, so neither is this ratchet's debt; they are named because the shape
+ * is what this note is about, and the file it used to name — a crafting thumbnail doing the same
+ * thing — was deleted at issue 1506 when both crafting tiles retired into that one tile. The
  * control-height ladder records the same blind spot for the same reason. Closing it would mean
  * resolving a token through Svelte markup and a JS prop default, which is a different scanner
  * from this one. So "no new raw spacing literal has been introduced" is a claim about what the

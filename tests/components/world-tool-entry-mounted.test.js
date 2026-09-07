@@ -136,7 +136,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied —
     // also covers the component/essence/tag search popover the replacement card above uses.

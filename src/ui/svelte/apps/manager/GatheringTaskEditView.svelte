@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Field from '../../components/Field.svelte';
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';

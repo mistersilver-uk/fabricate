@@ -33,7 +33,7 @@
   Every other attribute is forwarded through the rest spread.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
 
   const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 

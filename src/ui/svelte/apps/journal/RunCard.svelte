@@ -13,8 +13,10 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
+  import { runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
-  import RunStatusPill from './RunStatusPill.svelte';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 
@@ -25,6 +27,7 @@
   const subtitle = $derived(String(run?.names?.subtitle ?? ''));
   const img = $derived(String(run?.img ?? '') || DEFAULT_RUN_IMAGE);
   const status = $derived(String(run?.derivedStatus ?? 'inProgress'));
+  const runStatus = $derived(runStatusPresentation(status));
   const stepLabel = $derived(String(run?.stepLabel ?? ''));
   // On the final step the run finishes rather than continuing, so the matured
   // countdown mirrors the detail button's "finish" wording.
@@ -82,7 +85,13 @@
         <span class="journal-run-card-subtitle">{subtitle}</span>
       {/if}
       <div class="journal-run-card-meta">
-        <RunStatusPill {status} />
+        <Chip
+          class="journal-run-status"
+          density="list"
+          tone={statusChipTone(runStatus.tone)}
+          icon={`fas ${runStatus.icon}`}
+          data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+        >
         {#if blindSecretPreview}
           <span
             class="journal-run-card-secret"
@@ -201,6 +210,14 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+  }
+
+  /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
+     `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
+     caller's and geometry is the primitive's — the rule its own `density` note states. So the one
+     property that was doing work here is restated here, where the row that squeezes it lives. */
+  .journal-run-card-meta :global(.journal-run-status) {
+    flex: 0 0 auto;
   }
 
   .journal-run-card-step {

@@ -27,13 +27,13 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     buildRecipeProduceRows,
@@ -401,7 +401,7 @@
     </p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion src={resolveRecipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
+      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={52} />
       <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!--
@@ -419,19 +419,17 @@
               {getRecipeCategoryLabel(selectedRecipe.category, localize)}
             </Chip>
           {/if}
-          <StatusPill
-            tone={selectedRecipe.enabled === false ? 'subtle' : 'success'}
+          <Chip
+            tone={statusChipTone(selectedRecipe.enabled === false ? 'subtle' : 'success')}
             icon="fas fa-circle"
-            label={selectedRecipe.enabled === false
+            >{selectedRecipe.enabled === false
               ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-          />
+              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</Chip
+          >
           {#if selectedRecipe.locked}
-            <StatusPill
-              tone="accent"
-              icon="fas fa-lock"
-              label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}
-            />
+            <Chip tone="accent" icon="fas fa-lock"
+              >{text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}</Chip
+            >
           {/if}
           <!--
             ONE predicate, three surfaces (issue 1010). This pill reads `enableBlocked` —
@@ -444,15 +442,18 @@
             activation gate fires only on a transition into the enabled state.
           -->
           {#if selectedRecipe.enableBlocked}
-            <StatusPill
-              tone={selectedRecipe.enabled === false ? 'danger' : 'warning'}
+            {@const blockedLabel =
+              selectedRecipe.enabled === false
+                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
+                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
+            <Chip
+              tone={statusChipTone(selectedRecipe.enabled === false ? 'danger' : 'warning')}
               icon={selectedRecipe.enabled === false
                 ? 'fas fa-circle-exclamation'
                 : 'fas fa-pen-ruler'}
-              label={selectedRecipe.enabled === false
-                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
-                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
-            />
+              truncate
+              title={blockedLabel}>{blockedLabel}</Chip
+            >
           {/if}
         </div>
       </div>

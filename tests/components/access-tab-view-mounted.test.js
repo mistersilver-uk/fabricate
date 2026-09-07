@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
     'src/utils/recipeCategories.js'
   ],
   compiledModules: [
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
     // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
@@ -192,10 +193,15 @@ describe('AccessTabView (mounted)', () => {
   });
 
   // Issue 884 — the row thumbnail is the recipe's own icon, resolved through the
-  // shared helper. It used to prefer the first containing book's artwork.
+  // shared helper. It used to prefer the first containing book's artwork. Issue 1506
+  // converted this row's raw `<img>` into the shared tile, so the query is the
+  // primitive's own image rather than the retired sheet class it used to carry.
   itResolvesTheRecipesOwnImage({
     harness,
     mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'alloy', ...imageOverrides })] }),
-    selectImg: (root) => root.querySelector('[data-access-row="alloy"] img.manager-recipe-thumb').getAttribute('src')
+    selectImg: (root) =>
+      root
+        .querySelector('[data-access-row="alloy"] [data-medallion] img')
+        .getAttribute('src')
   });
 });

@@ -12,8 +12,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
@@ -35,6 +37,8 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/config/flags.js',
@@ -85,6 +89,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/selectionDefault.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/craftingRecipeStatus.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/essenceTint.js',
@@ -120,6 +125,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceUuid.js',
   ],
   compiledModules: [
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
@@ -129,11 +135,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/alchemy/Workbench.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
     'src/ui/svelte/apps/crafting/CraftButton.svelte',
-    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-    'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/crafting/CraftingView.svelte',
-    'src/ui/svelte/apps/crafting/QuantityTag.svelte',
     'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
@@ -219,7 +221,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RecentResults.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/RunStatusPill.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
@@ -228,7 +229,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',
   ],

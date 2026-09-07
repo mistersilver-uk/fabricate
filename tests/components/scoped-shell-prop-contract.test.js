@@ -982,7 +982,7 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
     const shared = [
       ...source.matchAll(
         /:global\(\.manager-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
-      )
+      ),
     ].map(([, body]) => body);
     assert.ok(shared.length >= 2, 'NON-VACUITY: the shared class still has rules of its own');
     for (const body of shared) {
@@ -1031,7 +1031,11 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     assert.match(source, /\n\s*autoSelectFirst = false,/, 'declared, and OFF by default');
     assert.match(source, /\{autoSelectFirst\}/, 'and forwarded to the frame');
     const frame = sourceOf(FRAME);
-    assert.match(frame, /\n\s*autoSelectFirst = false,/, 'the frame declares it OFF by default too');
+    assert.match(
+      frame,
+      /\n\s*autoSelectFirst = false,/,
+      'the frame declares it OFF by default too'
+    );
     // The effect is guarded on the prop FIRST, so an unset shell never reaches the selection
     // write — which is the whole content of "byte-identical when off".
     assert.match(
@@ -1594,9 +1598,19 @@ describe('the world Component entry header wires the borderless medallion', () =
   it('passes `variant="glyph-chip"` on the entry heading, keeping its own size and glyph', () => {
     const call = medallionUnder(sourceOf(ROOT), 'data-world-component-entry-heading');
     assert.match(call, /variant="glyph-chip"/, `the header chip asks for the borderless face`);
-    assert.match(call, /size=\{42\}/, 'and keeps `proto:5375`’s 42px, which the variant does not own');
+    assert.match(
+      call,
+      /size=\{42\}/,
+      'and keeps `proto:5375`’s 42px, which the variant does not own'
+    );
     assert.match(call, /glyph=\{22\}/);
-    assert.match(call, /src=\{worldComponentEntryImage\}/, 'and still draws the linked art');
+    assert.match(
+      call,
+      /art=\{worldComponentEntryImage\}/,
+      'and still draws the linked art, through the prop the design system publishes — issue 1506 ' +
+        'renamed `src` to `art` at all 27 render sites and left `src` a deprecated alias, and a ' +
+        'pin left on the alias would have gone on passing for the one release it survives'
+    );
   });
 
   it('and the three SIBLING headings do not, so the opt-in is a real per-site decision', () => {
@@ -1734,12 +1748,14 @@ describe('the entry’s inventory tile mirrors the player inventory card’s art
   }
 
   const sheet = () => sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
-  const card = () =>
-    sheetRulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
+  const card = () => sheetRulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
 
   it('fills the tile with the art exactly as `.inventory-card-art img` does', () => {
     const authority = declarationsOf(card(), '.inventory-card-art img');
-    const mirror = declarationsOf(sheet(), '.fabricate-manager .manager-component-entry-preview-tile > img');
+    const mirror = declarationsOf(
+      sheet(),
+      '.fabricate-manager .manager-component-entry-preview-tile > img'
+    );
     for (const property of ['display', 'width', 'height', 'object-fit']) {
       assert.equal(
         mirror[property],
@@ -1752,7 +1768,10 @@ describe('the entry’s inventory tile mirrors the player inventory card’s art
 
   it('and the box is a square like `.inventory-card-thumb`, not a fixed 110px band', () => {
     const authority = declarationsOf(card(), '.inventory-card-thumb');
-    const mirror = declarationsOf(sheet(), '.fabricate-manager .manager-component-entry-preview-tile');
+    const mirror = declarationsOf(
+      sheet(),
+      '.fabricate-manager .manager-component-entry-preview-tile'
+    );
     assert.equal(mirror['aspect-ratio'], authority['aspect-ratio']);
     assert.equal(mirror.height, undefined, 'a fixed height would fight the square the art fills');
     assert.equal(mirror.overflow, 'hidden', 'and the corners clip the art, as the thumb’s do');

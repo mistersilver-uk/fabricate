@@ -29,6 +29,7 @@ import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
   rewriteClientImports,
 } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
@@ -78,7 +79,11 @@ const sharedComponentNames = [
   // MUST still be compiled into this tree: a `.svelte` the mounted root renders but
   // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
   'Medallion',
-  'StatusPill',
+  // The actor portrait (issue 1506), reached through the Knowledge roster and detail header,
+  // both of which are in this root's static graph. It is deliberately NOT on
+  // `SHARED_PRIMITIVES` at two callers, so omitting it HANGS every mounted manager test as
+  // `# cancelled` rather than failing one by name.
+  'Avatar',
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
@@ -322,8 +327,10 @@ function compileManagerRoot() {
   // theirs in parallel with no ordering between them, so each adds all three idempotently. A
   // duplicate is a one-minute textual conflict; an omission is a silent hang somebody bisects.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte');
-  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-  for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, and
+  // issue 1506's tone map, which the converted status pills on the essence, recipe, tool and
+  // world Component routes read at every dynamic site.
+  for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, ...STATUS_TONE_RAW_MODULES]) {
     const rawDestination = join(tempRoot, rawModule);
     mkdirSync(dirname(rawDestination), { recursive: true });
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -459,6 +466,14 @@ function compileManagerRoot() {
   // rosters besides.
   writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');
   writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
+  // THE uppercase micro-label (issue 1505). The root reaches it through the recipe-item
+  // Overview tab's three field labels, and again through every `StatBox` label, which makes it
+  // a leaf TWO rungs down as well — reached without anything here naming a kicker. Omitting it
+  // HANGS every mounted manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/components/Kicker.svelte');
+  // THE at-a-glance figure (issue 1505), reached through `ItemPageInspector`'s three stat
+  // tiles. Same failure mode.
+  writeCompiledSvelte('src/ui/svelte/components/StatBox.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -488,7 +503,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
   // The RecipeItemEditor's "How players see it" rail embeds the REAL player
-  // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
+  // InventoryDetail (which pulls in the shared art tile → craftingArtResolution) fed a
   // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
   // or mounting the manager tree that renders the editor HANGS (# cancelled).
   // InventoryDetail is a thin router (issue 675); its `{#if}` branches do NOT keep the
@@ -517,7 +532,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [
     'RecipeItemEditorTabs',
     'RecipeItemOverviewTab',
@@ -712,6 +726,10 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    // The art decision the retired crafting tile owned (issue 1506). The embedded player
+    // preview's whole `detail/` tree resolves its tiles through it, and this suite has NO
+    // dependency validator, so omitting it HANGS the suite as `# cancelled`.
+    'craftingArtResolution.js',
     // The essence colour fold (issue 1036), shared by the player card's tile and pips and by
     // the inventory inspector's tile and essence chips. `InventoryItemCard` is compiled into
     // this tree for the editor's "How players see it" preview and imports it statically, so
@@ -7602,12 +7620,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Restricted (none selected)'));
     // r2 is incomplete AND off, so enabling it would be REFUSED — the row says that
     // rather than merely "incomplete" (issue 643 §2's four row states, rendered
-    // through the shared StatusPill).
-    const r2Blocked = target.querySelector('[data-recipe-id="r2"] [data-status-pill="danger"]');
+    // through the shared chip since issue 1506).
+    const r2Blocked = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-danger');
     assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
     assert.equal(r2Blocked.textContent.trim(), "Can't enable");
     assert.equal(
-      target.querySelector('[data-recipe-id="r1"] [data-status-pill="warning"]'),
+      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
       null,
       'a complete recipe row should not render an authoring-state pill'
     );
@@ -8920,7 +8938,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // The reference's system row carries ONE state pill — `Salvage` — because the source belongs
     // to the world catalogue and the category is the group band's job.
     assert.ok(
-      !target.querySelector('[data-component-id="c1"] [data-status-pill="accent"]'),
+      !target.querySelector('[data-component-id="c1"] .manager-chip.is-accent'),
       'no `Compendium` / `Items Directory` pill on a system rules row'
     );
     assert.ok(

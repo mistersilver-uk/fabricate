@@ -16,9 +16,10 @@
   salvage check's default — resolved builder-side, exactly as the engine resolves it.
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
+  import Chip from '../../../../components/Chip.svelte';
 
   let { salvage = null } = $props();
 
@@ -45,17 +46,16 @@
     <ul class="salvage-result-list" data-inventory-salvage-results>
       {#each results as entry, index (entry.id ?? entry.componentId ?? index)}
         <li class="salvage-result-row" data-inventory-salvage-result={entry.componentId}>
-          <!-- CraftingThumb, not a raw <img>: a result whose component has no authored
-               art renders the house fallback rather than a broken-image glyph. -->
-          <CraftingThumb src={entry.img ?? ''} alt="" size={24} />
+          <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: a result whose
+               component has no authored art renders the house fallback rather than a
+               broken-image glyph. -->
+          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={24} />
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}
-            <StatusPill
-              tone="success"
-              icon="fas fa-circle-check"
-              label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-            />
+            <Chip tone="positive" icon="fas fa-circle-check"
+              >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+            >
           {/if}
         </li>
       {/each}

@@ -35,7 +35,7 @@
   move. Everything below is `$derived` off the live props so a catalogue edit re-renders here.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -83,7 +83,13 @@
 >
   <!-- `proto:1310`: a 44px chip at radius 11. `Medallion` ships radius 9 and takes the size; the
        11 is the card rung and is stated on the card, not manufactured here. -->
-  <Medallion src={component?.img} icon="fas fa-cube" size={44} tint={component?.color || ''} />
+  <Medallion
+    art={component?.img}
+    alt=""
+    icon="fas fa-cube"
+    size={44}
+    tint={component?.color || ''}
+  />
 
   <div class="manager-component-identity-copy" data-component-edit-section="source">
     <div class="manager-component-identity-name-row">
@@ -113,9 +119,10 @@
              emphasis states ONLY the fill, so the tone keeps the edge and the ink, and the three
              colours land as `--fab-info-border` / `--fab-info-text` on `--fab-bg-1`.
 
-             Note that this is the MIRROR of `StatusPill`'s emphasis of the same name, which
-             supersedes the edge and the ink and keeps the fill. Each matches its own reference;
-             `Chip.svelte`'s emphasis rule carries the note, and a test pins the inversion.
+             Note that this is the MIRROR of the emphasis of the same name on the status pill
+             issue 1506 retired, which superseded the edge and the ink and kept the fill. Each
+             matched its own reference; `Chip.svelte`'s emphasis rule carries that history, and
+             this file's mounted suite pins the two classes this site depends on.
 
              None of it can be stated from `styles/fabricate.css`. A
              `manager-component-world-pill` rule there, written against the primitive's own root

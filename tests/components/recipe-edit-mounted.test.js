@@ -110,7 +110,7 @@ const RAW_MODULES = [
 const RECIPE_COMPILED = [
   // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
   // harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
@@ -152,6 +152,9 @@ const RECIPE_COMPILED = [
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
+  // The Results tab's two standing notes became the shared strip (issue 1505). A `.svelte`
+  // the tree renders but the harness omits does not fail this suite, it CANCELS it.
+  'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   // The two mode-conditional tabs (issue 676), rehomed from the deleted context rail.
@@ -184,7 +187,7 @@ const stepsHarness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     // The card's two step fields render through the labelled-field primitive (issue 1428).
     'src/ui/svelte/components/Field.svelte',
     // The card's "Add a step" footer renders through the primitive (issue 1118).

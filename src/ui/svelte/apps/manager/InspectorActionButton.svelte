@@ -43,8 +43,10 @@
   on two of ITS OWN classes plus the hash, but the global rule would win the tone), so
   reusing that class and those modifier names would put the primitive's own tones behind the
   global sheet's. The `fab-` namespace is the repo's convention for an area-agnostic shared
-  primitive (`fab-medallion`, `fab-status-pill`, `fab-selection-check`) and it collides with
-  nothing in the global sheet.
+  primitive (`fab-medallion`, `fab-avatar`, `fab-selection-check`) and it collides with
+  nothing in the global sheet. The third example here was `fab-status-pill` until issue 1506
+  retired that component into the chip; it is repointed at a class that still exists, because
+  a namespace convention illustrated by a class nothing emits illustrates nothing.
 
   Because it is not `.manager-button`, it must carry the Foundry `<button>` reset itself —
   Foundry pins a fixed `height` and its own `font-family` on every button. Those declarations

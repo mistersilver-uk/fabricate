@@ -5,7 +5,7 @@
   show-NPCs toggle; an NPC's knowledge state stays reachable through the
   `game.fabricate.resetActorKnowledge` API.
 
-  Each row is a REAL button carrying the actor's portrait (`Medallion`, 34px,
+  Each row is a REAL button carrying the actor's portrait (`Avatar`, 34px, round,
   decorative `alt=""` because the name is adjacent text), the name, and an
   "N item(s) · M learned" meta line. A character with nothing tracked renders a
   dimmed "Nothing tracked" meta instead.
@@ -19,7 +19,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../EmptyState.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
+  import Avatar from '../../../components/Avatar.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
 
   let {
@@ -104,7 +104,7 @@
             data-knowledge-actor={character.id}
             onclick={() => onSelect(character.id)}
           >
-            <Medallion src={character.img} icon="fas fa-user" size={34} alt="" />
+            <Avatar art={character.img} name={character.name} size={34} alt="" />
             <span class="manager-knowledge-roster-copy">
               <strong class="manager-knowledge-roster-name" title={character.name}
                 >{character.name}</strong

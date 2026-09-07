@@ -64,7 +64,7 @@ const SHARED_PRIMITIVES = [
   // The manager's ONE chip (issue 883). This is the sharpest case yet: chips are on
   // essentially every manager screen, so as the conversion proceeds this component enters
   // the static graph of almost every mounted tree, and each omission costs a HUNG suite.
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   // The manager's ONE multi-select toolbar and ONE bulk-edit chrome (issue 1010), extracted
   // so the Component Studio and the Recipe Studio render the same controls. They live
   // directly under `apps/manager/` rather than `components/` because every module importing
@@ -203,7 +203,67 @@ const SHARED_PRIMITIVES = [
   // of a dependency. That is exactly how this conversion first reported: `# cancelled 7`, no
   // failures, on a suite whose tests never ran.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // THE THREE THAT SHIPPED TOGETHER (issue 1505), and between them they carry every shape this
+  // list exists for.
+  //
+  // `Kicker` is the sharpest entry on the list. It is a LEAF TWO RUNGS DOWN on two separate
+  // routes: nine crafting components in one directory render it directly, and `StatBox` COMPOSES
+  // it — so a suite that mounts the Shopping list or the Books & Scrolls inspector pulls a kicker
+  // in without naming one anywhere, verbatim the `ActionMenu` shape recorded above, which first
+  // reported as `# cancelled 7` with no failures on a suite whose tests never ran.
+  //
+  // `StatBox` sits in two mounted trees already — the player crafting app and the manager's
+  // Books & Scrolls aside — which is the membership bar itself, so neither is optional.
+  //
+  // `Notice` is the entry that forced the root SET below to widen again: its only two callers are
+  // the alchemy workbench and the inventory bulk report, and neither is under the manager root or
+  // the gathering view.
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/StatBox.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  // THE ONE ART TILE (issue 1506), and the widest case this list has been offered. It was the
+  // manager's tile; that change retired the player Crafting tab's two tiles into it, so it is now
+  // rendered from forty-two files across the manager and crafting trees — a third tree many
+  // times over, which is this list's own bar. It is also the entry with the most to gain from
+  // membership: measured before that change, ZERO of the eleven mounted suites that named a
+  // crafting-thumb path carried a Medallion entry, so every one of them would have taken the
+  // silent `# cancelled` rather than the named "mounts a tree that renders it but never compiles
+  // it" failure. Its sibling `Avatar` deliberately does NOT join at two callers, which is this
+  // list's rule read the other way; the two rulings were taken as one question and the second is
+  // recorded below rather than by silence.
+  'src/ui/svelte/components/Medallion.svelte',
 ];
+
+/**
+ * The one component adjudicated AGAINST membership, and why a non-entry is worth recording.
+ *
+ * `components/Avatar.svelte` shipped at issue 1506 with exactly two callers — the GM Knowledge
+ * surface's roster row and its detail header — and both sit under ONE mounted tree, the manager
+ * root. The list above goes on at a THIRD tree, so the portrait does not qualify, and the two
+ * suites that mount it name it in their own `compiledModules` instead. That is a real cost and it
+ * is taken deliberately: until a third tree renders one, an omitted portrait entry is a silent
+ * `# cancelled` rather than the named failure the entries above buy. It joins the moment a third
+ * caller in a third tree arrives, which is what makes this a criterion rather than a preference.
+ *
+ * Recorded here rather than left unsaid because its sibling `Medallion` JOINED in the same
+ * change, and one ruling stated beside its opposite is a decision; one stated alone is an
+ * omission that reads like an oversight.
+ */
+const ADJUDICATED_NON_MEMBERS = Object.freeze(['src/ui/svelte/components/Avatar.svelte']);
+
+test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
+  // Two ways this record rots, and both leave it looking like configuration. A path that no
+  // longer exists is a ruling about nothing; a path that has since been ADDED above is a ruling
+  // the tree has already overturned, and the comment would go on claiming the opposite.
+  for (const file of ADJUDICATED_NON_MEMBERS) {
+    assert.ok(existsSync(resolve(repoRoot, file)), `${file} is adjudicated and is not on disk`);
+    assert.ok(
+      !SHARED_PRIMITIVES.includes(file),
+      `${file} is recorded as adjudicated OUT of the shared set and is also in it. One of the ` +
+        'two is stale, and the list is the one every suite is checked against.'
+    );
+  }
+});
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
 const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
@@ -442,9 +502,18 @@ test('every inspected suite resolves at least one real component, so none passes
 // and nothing in the manager renders it. Widening to a declared root SET is the fix that
 // spec names, and it is a widening rather than a weakening — a primitive must still be
 // reachable from a real application root, just not from that one.
+//
+// A THIRD ROOT joins at issue 1505, on the same widening rule and for the same reason `FillBar`
+// forced the second. `Notice`'s two callers are `apps/alchemy/Workbench.svelte` (through
+// `AlchemyView`) and `apps/inventory/bulk/InventoryBulkReport.svelte` (through
+// `InventoryBulkPanel` and `InventoryView`), and neither is under the manager root or the
+// gathering view — so the guard below could not see a primitive that plainly clears the bar.
+// `FabricateAppRoot.svelte` imports every player view, which is the honest root of that window
+// and admits the alchemy, inventory and Journal surfaces the rule already names.
 const APPLICATION_ROOTS = [
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
   'src/ui/svelte/apps/gathering/GatheringView.svelte',
+  'src/ui/svelte/apps/FabricateAppRoot.svelte',
 ];
 
 test('the shared primitives are reachable from a declared application root, so the guard has teeth', () => {

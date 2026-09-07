@@ -68,7 +68,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { scopedInheritRows } from './scopedStudio.js';
 

@@ -99,10 +99,9 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   // The manager's ONE chip (issue 883).
-  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   // The manager's ONE icon-only push-button (issue 1422). `ComponentEditView` renders three
   // of them for the salvage editor's removes, and `ItemDropZone` and `ComplicationSummaryRow`
   // each render more, so every tree built on this list reaches it by several routes.

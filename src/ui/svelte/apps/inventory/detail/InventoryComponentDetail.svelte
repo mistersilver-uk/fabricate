@@ -18,9 +18,10 @@
   Prop-driven; navigation routes back through the store seams.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
-  import CraftingThumb from '../../crafting/CraftingThumb.svelte';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
   import InventorySalvagePanel from './InventorySalvagePanel.svelte';
@@ -416,7 +417,7 @@
                   class="inventory-detail-row"
                   data-inventory-contributor={contributor.componentId}
                 >
-                  <CraftingThumb src={contributor.img ?? ''} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(contributor.img ?? '')} alt="" size={40} />
                   <span class="inventory-detail-row-name">{contributor.name}</span>
                   <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
                 </li>
@@ -455,7 +456,7 @@
                     data-inventory-used-by={use.recipeId}
                     onclick={() => openRecipe(use.recipeId)}
                   >
-                    <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
+                    <Medallion {...resolveCraftingArt(use.recipeImg ?? '')} alt="" size={40} />
                     <span class="inventory-detail-row-name">{use.recipeName}</span>
                     <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
                   </button>
@@ -493,13 +494,13 @@
                       data-inventory-required-for={req.recipeId}
                       onclick={() => openRecipe(req.recipeId)}
                     >
-                      <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
                       <span class="inventory-detail-row-name">{req.name}</span>
                       <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
                     </button>
                   {:else}
                     <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
-                      <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
                       <span class="inventory-detail-row-name">{req.name}</span>
                       <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
                     </div>
@@ -539,7 +540,7 @@
                       data-inventory-produced-by={producer.recipeId}
                       onclick={() => openRecipe(producer.recipeId)}
                     >
-                      <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
                       <span class="inventory-detail-row-name">{producer.name}</span>
                       <span class="inventory-chip inventory-chip-role"
                         >{kindLabel(producer.kind)}</span
@@ -550,7 +551,7 @@
                       class="inventory-detail-row"
                       data-inventory-produced-by-kind={producer.kind}
                     >
-                      <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
                       <span class="inventory-detail-row-name">{producer.name}</span>
                       <span class="inventory-chip inventory-chip-role"
                         >{kindLabel(producer.kind)}</span

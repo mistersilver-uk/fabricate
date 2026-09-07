@@ -6,7 +6,12 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness
+} from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -15,15 +20,23 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-run-detail-',
   rawModules: [
+    // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
+    // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/systems/foundryCalendar.js',
-    'src/ui/svelte/apps/journal/journalRunStatus.js'
+    'src/ui/svelte/apps/journal/journalRunStatus.js',
+    // Issue 1506: the run's status is a `<Chip>` now, and the chip tone it wears comes from
+    // the ONE map the retired status vocabularies were routed through.
+    ...STATUS_TONE_RAW_MODULES
   ],
   compiledModules: [
-    'src/ui/svelte/apps/journal/RunStatusPill.svelte',
+    // Issue 1506: the journal's status pill retired into the shared chip, which this list
+    // reaches through the `<Select>` closure rather than by a fourth hand-written literal.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',

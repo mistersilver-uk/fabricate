@@ -11,7 +11,7 @@
  * forgotten `aria-label` on an ICON-ONLY control renders IDENTICALLY: the button is a glyph
  * either way, every `data-*` selector still resolves, every geometry probe still passes, and
  * the only difference is that a screen reader now announces "button" and nothing else. No
- * frame can photograph that. `design-system/spec.md:171-175` makes it normative — WHEN a
+ * frame can photograph that. `design-system/spec.md:173-177` makes it normative — WHEN a
  * primitive renders a control whose only visible content is a glyph, THEN its accessible name
  * is a required prop — and `IconButton.svelte` makes it structural by taking `ariaLabel` as a
  * named prop rather than letting it ride the rest spread.
@@ -255,7 +255,7 @@ test('every icon button is given an accessible name', () => {
     [],
     'an icon-only control whose accessible name is missing announces itself as "button" and ' +
       'nothing else. It is invisible on screen, so no frame and no geometry probe can catch ' +
-      'it — `design-system/spec.md:171-175` requires the name to be a REQUIRED prop:\n  ' +
+      'it — `design-system/spec.md:173-177` requires the name to be a REQUIRED prop:\n  ' +
       offenders.join('\n  ')
   );
 });

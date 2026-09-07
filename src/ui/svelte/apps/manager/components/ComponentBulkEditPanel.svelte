@@ -95,7 +95,7 @@
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../../util/announceAfterFocus.js';
@@ -590,7 +590,19 @@
   dockFoot={componentBulkRemove}
 >
   <!-- The standing explanation, directly under the hero (`proto:1110`): it says what CANNOT be
-       bulk-edited, so it belongs before the groups a GM is about to read. -->
+       bulk-edited, so it belongs before the groups a GM is about to read.
+
+       INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). Re-read against the widened
+       tone union, whose rule is that the tint is opt-in and reached only for a note about LIVE
+       STATE: this is a standing explanation, which that reading would put at neutral.
+       `proto:1110` asks for the tint here and `proto:618` asks for it on the world twin at
+       `scoped/ComponentCatalogueBulkPanel.svelte` — those two are the PROTOTYPE-ANCHORED copies
+       of this note. The other two panels that carry it, `essences/EssenceBulkEditPanel.svelte`
+       and `scoped/ToolCatalogueBulkPanel.svelte`, have no such anchor and this change already
+       quieted both. The recipe bulk panel carries no standing note of this kind at all; its one
+       `info` callout is the conditional check-tier message, which stands as live state. So the
+       open question is only whether a prototype anchor outranks the tone rule, and that is issue
+       1580's; this pair moves together under it or not at all. -->
   <Callout
     tone="info"
     text={text(
@@ -780,6 +792,9 @@
       {/snippet}
     </BulkEditSection>
     {#if essencesStaged && essenceWarningCount > 0}
+      <!-- WARNING STANDS (issue 1505). Re-read against the widened tone union: this is authored
+           data about to be overwritten on a counted number of the selected components, which is
+           the conditional hazard warning exists for rather than a standing note. -->
       <Callout
         tone="warning"
         text={format(

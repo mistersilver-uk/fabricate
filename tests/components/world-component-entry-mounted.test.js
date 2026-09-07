@@ -1806,22 +1806,32 @@ describe('world Component entry editor (issue 1371)', () => {
      * see, which is why the three assertions below are on the resolved variant rather than on a
      * measured pixel this suite has no way to read.
      */
-    it('the linked lock pill is the OUTLINED emphasis over the subtle tone', async () => {
+    it('the linked lock pill is the SECONDARY tone at the list scale', async () => {
       // `proto:834` draws it at 9px secondary ink on a `--fab-border` hairline over a 2px/8px
-      // band; the shipped `subtle` face is 9.92px on no border at 1px/4px. `tone` still says
-      // WHAT it is, so both props are asserted — an emphasis that had displaced the tone would
-      // repaint the pill's surface as well as its band.
+      // band. On the shared chip that face is a SHIPPED PAIR rather than an emphasis (issue
+      // 1506): `secondary` states the hairline and the secondary ink, `list` states the 999px
+      // stadium at `600 9px`. Both are asserted, because either alone draws a different badge —
+      // `secondary` at the default density floors at 20px and thickens to 700, and `list` on the
+      // default tone loses the hairline and the ink this reference is named for.
+      //
+      // AND IT MUST PASS NO EMPHASIS. `outlined` is RECOGNISED on this chip and means the
+      // opposite thing — it supersedes the FILL and draws a flat `--fab-bg-1` plate — so a
+      // verbatim carry-forward of the retired pill's prop would have drawn the wrong face here
+      // silently rather than falling back to the shipped one.
       const { target } = await open('ingot');
-      const pill = target.querySelector('[data-scoped-entry-linked-pill] .fab-status-pill');
+      const pill = target.querySelector('[data-scoped-entry-linked-pill] .manager-chip');
       assert.ok(Boolean(pill), 'a linked record draws the pill');
-      assert.equal(
-        pill.getAttribute('data-status-pill-emphasis'),
-        'outlined',
-        'the primitive reports the RESOLVED emphasis, so a dropped prop reads as an absent one'
+      assert.ok(
+        pill.classList.contains('is-secondary'),
+        `the tone states the hairline and the secondary ink, but read "${pill.className}"`
       );
       assert.ok(
-        pill.classList.contains('is-subtle'),
-        `and the tone survives beside it, but read "${pill.className}"`
+        pill.classList.contains('is-list'),
+        `and the density states the stadium at 9px/600, but read "${pill.className}"`
+      );
+      assert.ok(
+        !pill.classList.contains('is-outlined'),
+        'and it wears no emphasis, which on this chip would have plated it instead'
       );
     });
 

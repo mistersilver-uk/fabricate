@@ -2683,8 +2683,10 @@
    INFO family, and the only place on this screen that paints one — a mode explanation is
    a permanent statement about how the surface behaves, which is what `info` is for.
 
-   Not `.manager-callout`: that primitive is one glyph plus one sentence, and widening it
-   to carry a title, a paragraph and a fact list would make one component two shapes. */
+   Not `.manager-callout`, and the reason has narrowed rather than gone (issue 1505): that
+   primitive now carries a title and an actions slot, so what still separates the two is the
+   FACT ROW. A run of label/value facts is an `InfoStrip`, deferred to issue 1521, and a
+   paragraph plus a fact list under one title is still two shapes. */
 
 /* skin census (issue 1523): the 11px CARD tuple rather than the 9px field one — with
    `.manager-component-identity-strip` this block is one of the TWO carriers of
@@ -3929,29 +3931,6 @@
 
 .fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
   font-size: 11px;
-}
-
-/* The note the On failure screen ends on, at this studio's metrics. `Callout` is the manager's
-   shared standing-statement strip and its default is the INFO tint; the prototype draws this one
-   quietly — the surface fill and the ordinary border, with the glyph carrying the only colour —
-   because it is a pointer to two other screens rather than a hazard. Same primitive, this
-   studio's metrics, exactly as the flag list above restates `ToggleCard`. */
-.fabricate-manager .manager-callout[data-failure-salvage-note] {
-  gap: 11px;
-  align-items: flex-start;
-  padding: 13px 14px;
-  border-color: var(--fab-border);
-  border-radius: 10px;
-  color: var(--fab-text-muted);
-  background: var(--fab-surface-soft);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.55;
-}
-
-.fabricate-manager .manager-callout[data-failure-salvage-note] > i {
-  color: var(--fab-info);
-  font-size: 12px;
 }
 
 /* ── The Validation screen ────────────────────────────────────────────────────────────
@@ -6139,6 +6118,15 @@
   white-space: nowrap;
 }
 
+/* The pills are what must survive, and `truncate` made them shrinkable: `overflow: hidden`
+   makes a flex item a scroll container, and a scroll container's automatic minimum size is
+   0 rather than min-content. Without this the flex algorithm takes room from the pills as
+   well as the name and they render squeezed onto their own text, ink on the border. The
+   row's own `overflow: hidden` above remains the backstop. */
+.fabricate-manager .manager-recipe-name-row .manager-chip {
+  flex: 0 0 auto;
+}
+
 .fabricate-manager .manager-recipe-description {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6430,8 +6418,8 @@
   background: var(--fab-accent-soft);
 }
 
-/* Informational policy card (issue 651), reusing the `--fab-info-*` tokens the
-   `.manager-recipe-info-strip` wears. Toned on `.is-on` only — `.is-off` needs no
+/* Informational policy card (issue 651), reusing the `--fab-info-*` tokens the shared
+   `Callout`'s info tone wears — the strip this used to name became one (issue 1505). Toned on `.is-on` only — `.is-off` needs no
    variant because the base rule above already covers it. A default-on card is then
    permanently tinted in its resting state, which is precedent-following rather than
    semantics-inventing: `.is-enabled.is-on` is already exactly that, since
@@ -8278,7 +8266,6 @@
   font-size: 1.4rem;
 }
 
-.fabricate-manager .manager-recipe-thumb,
 .fabricate-manager .manager-recipe-preview,
 .fabricate-manager .manager-gathering-task-thumb,
 .fabricate-manager .manager-environment-thumb,
@@ -11302,19 +11289,6 @@
   margin: 0 0 var(--fab-space-2);
   padding: 0;
   list-style: none;
-}
-
-/* Roll-budget info strip (progressive, §C4). */
-.fabricate-manager .manager-recipe-info-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-info-border);
-  border-radius: 9px;
-  background: var(--fab-info-soft);
-  color: var(--fab-info-text);
-  font-size: 0.78rem;
 }
 
 /* The full-width dashed add-set / add-stage row (§C6) is no longer expressed by a
@@ -24593,18 +24567,6 @@
   background: var(--fab-bg-1);
 }
 
-/* ── THE PLAYER PREVIEW'S USES PILL (issue 1373) ─────────────────────────────────────────────
-   `StatusPill`'s `subtle` tone is a FILLED grey chip with a transparent edge. The reference
-   draws this one outlined, on the ordinary soft surface, with the secondary ink — the same
-   treatment the rules list's own stat chips wear, which is what makes the pill over the tile
-   read as the same fact the row and the rail state. Scoped here rather than re-toned on the
-   primitive: `subtle` also serves the Off pills on three other screens. */
-.fabricate-manager [data-tool-player-preview] .fab-status-pill.is-subtle {
-  border-color: var(--fab-border);
-  background: var(--fab-surface-soft);
-  color: var(--fab-text-secondary);
-}
-
 /* ── THE TOOL LIST SETTLES ON A ROW BOUNDARY (issue 1373) ────────────────────────────────────
    The list is paginated AND internally scrolled, and at a 720px window a page of eight rows
    does not fit — so the scroll box came to rest through the middle of a card, cutting a Tool's
@@ -26508,17 +26470,23 @@
    (which reverses layer order) moved it to 11px while the non-important `font-weight` beside it
    stayed at 700.
 
-   So all three are said by an OPT-IN PROP on the primitive instead, and the entry passes them:
-   `StatusPill emphasis="outlined"`, `Chip density="tag-run"` and `SegmentedControl shape="pill"
-   tone="accent-soft"`. `!important` would also have worked and was not taken: it wins the same
-   argument for every other caller of that primitive too, which is the opposite of what a
-   per-site variant is for. There is deliberately NO rule in this block for any of the three —
-   a rule that cannot change a measured value is dead, so none was written.
+   So all three are said by PROPS on the primitive instead, and the entry passes them:
+   `Chip tone="secondary" density="list"` for the lock pill (issue 1506 — the shipped pair that
+   renders `proto:834`'s hairline and secondary ink, where the pill it replaced said the same
+   face through an `emphasis` prop), `Chip density="tag-run"` for the run, and
+   `SegmentedControl shape="pill" tone="accent-soft"` for the filter. `!important` would also
+   have worked and was not taken: it wins the same argument for every other caller of that
+   primitive too, which is the opposite of what a per-site variant is for. There is deliberately
+   NO rule in this block for any of the three — a rule that cannot change a measured value is
+   dead, so none was written.
 
-   The same cascade fact means the shipped
-   `.fabricate-manager [data-tool-player-preview] .fab-status-pill.is-subtle` rule above (issue
-   1373) is inert. Reported rather than deleted from a lane that does not own that screen; its
-   fix is the `emphasis` prop this screen now uses. */
+   The same cascade fact made the Tool player preview's own Uses-pill rule inert for its whole
+   life, and issue 1506 deleted it with the pill it selected. What that rule ASKED for — an
+   outlined face on the soft surface in the secondary ink — is not what the screen has ever
+   rendered, so the badge converted to the PIXELS it actually drew: the `subtle` tone, reproduced
+   on the chip. Saying the rule's intent instead would have been a silent restyle of a surface
+   this change is not about, and it remains available as `tone="secondary"` the day that screen
+   asks for it. */
 
 /* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ───────────
    Copy and Unlink share one geometry and one surface, and the reference separates them by INK

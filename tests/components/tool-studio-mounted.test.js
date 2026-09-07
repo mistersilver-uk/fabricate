@@ -7,6 +7,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 
@@ -16,6 +17,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-editor-',
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
     'src/config/flags.js',
     'src/models/Ingredient.js',
     // Ingredient filters its payload through the shared omitted-when-default machinery
@@ -89,7 +92,6 @@ const harness = createMountedComponentHarness({
     // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
@@ -502,7 +504,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(tile.dataset.toolPlayerImage, 'none', 'the slot is empty');
     assert.ok(!tile.querySelector('img'), 'no art is drawn for a copy that is gone');
     assert.ok(
-      !root.querySelector('[data-tool-player-preview] .fab-status-pill'),
+      !root.querySelector('[data-tool-player-preview] .manager-chip'),
       'and no chip names the outcome the empty box already states'
     );
   });
@@ -1422,8 +1424,12 @@ describe('Tool Studio editor (mounted)', () => {
       props({ activeTab: 'requirements', systemName: 'The Herbalist' })
     );
     const strip = root.querySelector('[data-tool-requirements-intro]');
-    assert.ok(Boolean(strip), 'the system Requirements card opens with the info strip');
-    assert.equal(strip.dataset.calloutTone, 'info');
+    assert.ok(Boolean(strip), 'the system Requirements card opens with the scope strip');
+    // NEUTRAL since issue 1505, and the tone is the assertion rather than an incidental. The
+    // design system reserves the info tint for a note about LIVE state, and this sentence
+    // describes how system scope works — it is true of this card before the GM touches
+    // anything. It reads as the specimen's quiet standing statement, not as a signal.
+    assert.equal(strip.dataset.calloutTone, 'neutral');
     // The design's own sentence describes a model with no inheritance; ours inherits for real,
     // so the strip names the system it belongs to and says what following the world Tool means.
     assert.match(strip.textContent, /The Herbalist/);
@@ -2288,6 +2294,33 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-editor-save]').getAttribute('title'),
       'Resolve validation issues before saving.'
     );
+  });
+
+  it('routes out of the identity notice to the world Tool, from inside the callout body', async () => {
+    // ACTS, rather than seeing (issue 1505). This control is the ONLY route out of "it cannot be
+    // saved until that link is restored", and the conversion re-parented it from a sibling
+    // `<div>` into a snippet the shared `Callout` renders — which is exactly when a handler
+    // binding is lost silently. The header's `[data-tool-editor-world-tool]` route above is a
+    // DIFFERENT button, so nothing else in the tree presses this one.
+    const routed = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'validation',
+        validation: {
+          valid: false,
+          errors: ['a tool requires either a componentId or its own source references'],
+        },
+        scope: { entries: [{ id: 'hammer' }] },
+        onEditWorldTool: (id) => {
+          routed.push(id);
+        },
+      })
+    );
+
+    const route = root.querySelector('[data-tool-identity-route]');
+    assert.ok(route, 'the identity notice offers the route out of the blocked save');
+    route.click();
+    assert.deepEqual(routed, ['hammer'], 'and it forwards the Tool id, from inside the callout body');
   });
 
   it('accepts every complete repair match kind and rejects an incomplete option', async () => {

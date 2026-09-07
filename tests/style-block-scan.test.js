@@ -96,10 +96,16 @@ test('a comment is blanked, and its offsets are kept', () => {
   // shipped unproven while its sibling `maskNonStyleRegions(source)`, on the line above it, was
   // proved by `the ManagerButton prose trap stays shut`. This goes through `styleTextFor`.
   //
-  // The mechanism is live in the corpus rather than hypothetical: with stripping disabled the
-  // scan picks up commented-out declarations, `apps/manager/Chip.svelte:187` among them, whose
-  // interior `{` gives DECLARATION a real boundary to anchor on. None of them carries a RETIRED
-  // value today, so a corpus-level guard would be vacuous and this has to be a composition
+  // The mechanism is live in the corpus rather than hypothetical, and the worked example is
+  // RE-MEASURED here rather than re-pointed: it named `apps/manager/Chip.svelte:187`, a path that
+  // moved at issue 1506 and a line that was already stale before it — 187 was a JSDoc block, not
+  // the commented-out declaration the sentence describes. Measured on this tree, disabling the
+  // stripping adds 155 declarations across 26 files, and the shape is exactly the one described:
+  // `src/ui/svelte/components/Chip.svelte:399` writes
+  // `.manager-header-actions .manager-chip { min-height: 34px }` inside a prose comment arguing
+  // that a layered global rule cannot beat this block, and its interior `{` gives DECLARATION a
+  // real boundary to anchor on. NONE of those 155 carries a retired control height — re-measured,
+  // not carried — so a corpus-level guard would still be vacuous and this has to be a composition
   // assertion.
   const superseded = '/* superseded: .old-toolbar { min-height: 40px; } */\n.a { height: 28px; }';
   assert.deepEqual(

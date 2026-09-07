@@ -267,33 +267,37 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
 /**
  * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name: it reads CSS
  * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. There are
- * three ways out of that, and only the first two are absent from `src/`.
+ * three ways out of that, and WHICH of them is live in `src/` moved at issue 1506, so the whole
+ * paragraph below is RE-MEASURED rather than re-pointed at a surviving file.
  *
- * A literal markup attribute — `style="height: 36px"` — and a JS `element.style.height = '36px'`
- * are both retired control heights the gate is blind to, and neither is written anywhere in
- * `src/` today.
+ * THE LITERAL MARKUP ATTRIBUTE IS NOW THE LIVE ONE, and it is the one carrying retired values.
+ * `components/Medallion.svelte` interpolates `width:${n}px;height:${n}px` into a `style` attribute
+ * from its `size` prop, and `components/Avatar.svelte` does the same for a portrait. Measured on
+ * this tree, those two draw 65 art tiles between them — 63 records and 2 actors — and NINETEEN of
+ * the 65 render at a RETIRED control height: one at 32, one at 36, seventeen at 40, across eleven
+ * files. None of the nineteen contributes an occurrence to the baseline below. A JS
+ * `element.style.height = '36px'` is the one route still absent from `src/` entirely.
  *
- * THE THIRD IS LIVE, and it is the one carrying retired values: a custom property SET IN MARKUP
- * from a JS prop, and read by a scanned declaration. `apps/crafting/CraftingThumb.svelte:37`
- * writes `--crafting-thumb-size` onto a `style` attribute from its `size` prop, and its own
- * block at line 53 reads `height: var(--crafting-thumb-size, 48px)`. `CraftingEssenceThumb`
- * and `detail/InventoryDetailHeader` have the same shape. Fourteen call sites render the two
- * crafting thumbs at a retired size — one at 32, one at 36, twelve at 40 — and none of those
- * fourteen contributes an occurrence to the baseline below.
+ * THE CONFIDENT WRONG ANSWER IS GONE, and it went with the component that produced it. The third
+ * route — a custom property set in markup from a JS prop and read back by a scanned declaration —
+ * used to be spelled `height: var(--crafting-thumb-size, 48px)` on a crafting tile whose `size`
+ * lived in a JS prop, so resolution fell back to the declared `48px` and tallied a size no call
+ * site passed. Retiring both crafting tiles into the one art tile deleted that token. What is left
+ * of that route is the BENIGN case it always had beside it: `detail/InventoryDetailHeader.svelte`
+ * sets `--inventory-detail-thumb-size` in markup and reads `var(--inventory-detail-thumb-size,
+ * 64px)`, no caller overrides its `size`, so the `64px` fallback is what renders and the scanner
+ * happens to be right. Re-verified here: no comment-only or fallback-only declaration in the whole
+ * corpus resolves to a retired height today.
  *
- * The scanner does not merely miss them: for those two it reports a CONFIDENT WRONG ANSWER. The
- * size lives in a JS prop, so there is no CSS definition of the token to find, resolution falls
- * back to the declared fallback of `48px`, and 48 is tallied — a size no call site passes.
- * A reader who trusts that 48 is reading a default that never renders. (The inventory header is
- * the benign case of the same shape: nothing overrides its `size`, so its `64px` fallback is
- * what renders and the scanner happens to be right.)
- *
- * ACCEPTED, on the requirement's own terms rather than for convenience: all three components
- * size a THUMBNAIL, and the geometry requirement exempts art and portraits from the control
- * ladder — the same clause that lets `BooksScrollsView.svelte:706` stay in the baseline at 40px.
- * Closing it would also mean resolving a token through Svelte markup and a JS prop default, which
- * is a different scanner from this one. So "no new retired control height has been introduced" is
- * a claim about what the two stylesheet corpora DECLARE, not about what the product renders.
+ * ACCEPTED, on the requirement's own terms rather than for convenience, and the adjudication is
+ * RESTATED because its subject changed: every one of those declarations sizes a THUMBNAIL — a
+ * record's art tile, an actor's portrait, or the inventory header's shell around one — and the
+ * geometry requirement exempts art and portraits from the control ladder outright, now naming
+ * their own published size ladder rather than promising one. That is the same clause that lets
+ * `BooksScrollsView.svelte:706` stay in the baseline at 40px. Closing the gap would also mean
+ * reading a `style` attribute built by an interpolation, which is a different scanner from this
+ * one. So "no new retired control height has been introduced" is a claim about what the two
+ * stylesheet corpora DECLARE, not about what the product renders.
  */
 test('no new retired control height has been introduced', () => {
   const { retired } = scan();

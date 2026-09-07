@@ -44,7 +44,7 @@
   ── THE DOCK NAMES THE WRITE ─────────────────────────────────────────────────────────────────
   The membership group is N components by M systems, so a selection of twelve across three systems
   is thirty-six replicated writes. `Apply 2 changes` named neither the records nor the verb;
-  `componentBulkApplyLabel` names both, which `design-system/spec.md:415` requires of a bulk
+  `componentBulkApplyLabel` names both, which `design-system/spec.md:434` requires of a bulk
   commit action.
 
   ── THE CHROME IS THE SHIPPED PRIMITIVES ─────────────────────────────────────────────────────
@@ -101,7 +101,7 @@
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
   import Callout from '../Callout.svelte';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { paginateRows } from '../../../../../utils/browserPagination.js';
@@ -726,6 +726,18 @@
     `proto:618` puts it there and the panel put it last, immediately above the Apply dock — which
     inverts what it is for: it says what CANNOT be bulk-edited, so it belongs before the groups a
     GM is about to read rather than after the decision they have already made.
+
+    INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). Re-read against the widened
+    tone union, whose rule is that the tint is opt-in and reached only for a note about LIVE
+    STATE: this is the standing explanation of what bulk cannot change, which that reading
+    would put at neutral. `proto:618` asks for the tint here and `proto:1110` asks for it on the
+    per-system twin at `components/ComponentBulkEditPanel.svelte` — those two are the
+    PROTOTYPE-ANCHORED copies of this note. The other two panels that carry it,
+    `essences/EssenceBulkEditPanel.svelte` and `scoped/ToolCatalogueBulkPanel.svelte`, have no
+    such anchor and this change already quieted both. The recipe bulk panel carries no standing
+    note of this kind at all; its one `info` callout is the conditional check-tier message, which
+    stands as live state. So the open question is only whether a prototype anchor outranks the
+    tone rule, and that is issue 1580's; this pair moves together under it or not at all.
   -->
   <Callout
     tone="info"

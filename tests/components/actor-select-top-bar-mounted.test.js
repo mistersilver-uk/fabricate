@@ -41,7 +41,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` and the two leaves it renders (issue 1475). The Crafting tab renders
     // `ComponentSourcesBar` in the bar's right slot, so that is in the static graph too — on
     // every tab, not just Crafting.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
