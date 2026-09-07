@@ -11203,20 +11203,25 @@
    drift unmeasured. The `manager-recipe-rail-*` class names are kept verbatim so nothing
    already reading this surface has to learn a new name.
 
+   ROOTED AT `fabricate-validation` SINCE ISSUE 1509, so this family paints wherever the surface
+   is mounted rather than only inside the manager window. `manager-recipe-tab` is NOT in it —
+   six other recipe tabs write that class, and its rules, with `-tab-intro` and `-tab-title`
+   under them, stay rooted at `.fabricate-manager` (residue, issue 1507).
+
    The rail's VALUES are carried over unchanged; only the LAYOUT changes, because the
    surface did: the rail stacked medallion-over-copy-over-counts in a 300px column, and a
    tab panel is ~1060px. Here the summary and the counts sit side by side, and the
    summary's own medallion+copy runs as a row rather than a centred stack — a centred
    52px medallion with centred copy under it, stretched across a full-width tab, reads as
    a hero banner rather than a status line. */
-.fabricate-manager .manager-recipe-validation-summary-row {
+.fabricate-validation .manager-recipe-validation-summary-row {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-recipe-rail-summary {
+.fabricate-validation .manager-recipe-rail-summary {
   display: flex;
   flex: 1 1 320px;
   align-items: center;
@@ -11227,7 +11232,7 @@
   border-radius: 12px;
 }
 
-.fabricate-manager .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary-medallion {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -11238,7 +11243,7 @@
   font-size: 1.35rem;
 }
 
-.fabricate-manager .manager-recipe-rail-summary-copy {
+.fabricate-validation .manager-recipe-rail-summary-copy {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
@@ -11254,34 +11259,34 @@
    three; `SUMMARY_STATUS_ALIASES` in that component records the whole reconciliation, and
    `tests/components/manager-layout.test.js` pins the two sets against each other in both
    directions so neither half can move alone. */
-.fabricate-manager .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
   color: var(--fab-success);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
   color: var(--fab-warning);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
   color: var(--fab-danger);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-pass {
+.fabricate-validation .manager-recipe-rail-summary.is-pass {
   border-color: var(--fab-success-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warn {
+.fabricate-validation .manager-recipe-rail-summary.is-warn {
   border-color: var(--fab-warning-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-block {
+.fabricate-validation .manager-recipe-rail-summary.is-block {
   border-color: var(--fab-danger-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary-title {
+.fabricate-validation .manager-recipe-rail-summary-title {
   font-family: var(--fab-font-serif);
   font-size: 1rem;
   font-weight: 600;
@@ -11292,12 +11297,12 @@
    The rail out-specified that for free via Svelte's scoping hash; in the global sheet a
    (0,2,0) rule silently LOSES and the sub-line renders 10.24px instead of the rail's
    committed 11.52px. `recipe-studio-font-size.test.js` catches exactly this. */
-.fabricate-manager .manager-recipe-rail-summary .manager-recipe-rail-summary-sub {
+.fabricate-validation .manager-recipe-rail-summary .manager-recipe-rail-summary-sub {
   font-size: 0.72rem;
 }
 
 /* The Passing / Warnings / Blocking count table (three mono counts). */
-.fabricate-manager .manager-recipe-rail-counts {
+.fabricate-validation .manager-recipe-rail-counts {
   display: flex;
   flex: 0 1 260px;
   flex-direction: column;
@@ -11307,7 +11312,7 @@
   list-style: none;
 }
 
-.fabricate-manager .manager-recipe-rail-count {
+.fabricate-validation .manager-recipe-rail-count {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
@@ -11317,43 +11322,43 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-recipe-rail-count-label {
+.fabricate-validation .manager-recipe-rail-count-label {
   flex: 1 1 auto;
 }
 
-.fabricate-manager .manager-recipe-rail-count-value {
+.fabricate-validation .manager-recipe-rail-count-value {
   flex: 0 0 auto;
   font-family: var(--fab-font-mono);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-passing > i {
+.fabricate-validation .manager-recipe-rail-count.is-passing > i {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-warning > i {
+.fabricate-validation .manager-recipe-rail-count.is-warning > i {
   color: var(--fab-warning);
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-blocking > i {
+.fabricate-validation .manager-recipe-rail-count.is-blocking > i {
   color: var(--fab-danger);
 }
 
 /* ── Rebuilt Validation tab (issue 643 §E): grouped, bordered, tagged row stack ─ */
-.fabricate-manager .manager-recipe-validation {
+.fabricate-validation.manager-recipe-validation {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-4);
 }
 
-.fabricate-manager .manager-recipe-val-group {
+.fabricate-validation .manager-recipe-val-group {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-recipe-val-group-label {
+.fabricate-validation .manager-recipe-val-group-label {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
@@ -11365,7 +11370,7 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-recipe-val-rows {
+.fabricate-validation .manager-recipe-val-rows {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -11376,7 +11381,7 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-recipe-val-row {
+.fabricate-validation .manager-recipe-val-row {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
@@ -11384,27 +11389,27 @@
   border-top: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-recipe-val-row:first-child {
+.fabricate-validation .manager-recipe-val-row:first-child {
   border-top: 0;
 }
 
-.fabricate-manager .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-status {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-row.is-pass .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-pass .manager-recipe-val-status {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-val-row.is-warn .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-warn .manager-recipe-val-status {
   color: var(--fab-warning);
 }
 
-.fabricate-manager .manager-recipe-val-row.is-block .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-block .manager-recipe-val-status {
   color: var(--fab-danger);
 }
 
-.fabricate-manager .manager-recipe-val-copy {
+.fabricate-validation .manager-recipe-val-copy {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
@@ -11412,36 +11417,36 @@
   gap: 1px;
 }
 
-.fabricate-manager .manager-recipe-val-title {
+.fabricate-validation .manager-recipe-val-title {
   font-weight: 600;
 }
 
-.fabricate-manager .manager-recipe-val-detail {
+.fabricate-validation .manager-recipe-val-detail {
   font-size: 0.74rem;
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-recipe-val-view {
+.fabricate-validation .manager-recipe-val-view {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-pill {
+.fabricate-validation .manager-recipe-val-pill {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-pass {
+.fabricate-validation .manager-recipe-val-pill.is-pass {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-warn {
+.fabricate-validation .manager-recipe-val-pill.is-warn {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-block {
+.fabricate-validation .manager-recipe-val-pill.is-block {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -24823,13 +24828,22 @@
    and essence editors each have reference frames of their own, and this is the one that was
    read against its own.
 
+   NAMED BY THE CALLER'S OWN CONTAINER CLASS, not by its hook attribute (issue 1509). These four
+   rules put the family compound THIRD, behind an ancestor that is not the application root, so
+   neither re-rooting form exists for them: the surface's own root sits on the family element
+   itself. `ToolValidationTab` passes `stackClass="manager-scoped-tab-stack manager-tool-tab-stack"`
+   and `hookAttribute="data-tool-validation-tab"` to the SAME `<div>`, so `.manager-tool-tab-stack`
+   names that element by class rather than by hook. Rank is unchanged in all four, and so is the
+   descendant match set: the only other carrier of that class, `ToolBreakageTab`, renders no
+   `.manager-recipe-rail-*` anywhere in its subtree.
+
    ONE ICON TREATMENT IN THE REGION. The summary card led with a 52px medallion filled in the
    success family — a filled disc — over a column of count rows whose marks are bare glyphs and
    a stack of check rows whose marks are bare glyphs too, so one region drew the same idea three
    sizes and two ways. The reference draws a 34px SQUARE tile one rung under the card, in the
    tone's ink, and leaves every other mark bare. The card's own tinted fill and edge are the
    reference's and stay. */
-.fabricate-manager [data-tool-validation-tab] .manager-recipe-rail-summary-medallion {
+.fabricate-manager .manager-tool-tab-stack .manager-recipe-rail-summary-medallion {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -24842,15 +24856,15 @@
    matched nothing on this tab — which is the same defect the global block carried, arriving
    here as a tile that kept whichever fill the rule above gave it. */
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-pass
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-warn
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-block
   .manager-recipe-rail-summary-medallion {
   background: var(--fab-bg-1);

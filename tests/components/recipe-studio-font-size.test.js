@@ -112,22 +112,32 @@ const FIXTURE = `
              not read off the rehomed markup: a gate authored from the implementation
              enshrines the implementation. Only the rail's LAYOUT changed here (a 300px
              column became a ~1060px tab), never its type. -->
-        <section class="manager-recipe-validation-summary-row">
-          <div class="manager-recipe-rail-summary is-block">
-            <span class="manager-recipe-rail-summary-medallion" data-m="summary-medallion"><i class="fas fa-circle-xmark"></i></span>
-            <span class="manager-recipe-rail-summary-copy">
-              <span class="manager-recipe-rail-summary-title" data-m="summary-title">Cannot be enabled</span>
-              <span class="manager-recipe-rail-summary-sub manager-muted" data-m="summary-sub">Clear every blocking issue first.</span>
-            </span>
-          </div>
-          <ul class="manager-recipe-rail-counts">
-            <li class="manager-recipe-rail-count is-passing">
-              <i class="fas fa-circle-check"></i>
-              <span class="manager-recipe-rail-count-label" data-m="count-label">Passing</span>
-              <span class="manager-recipe-rail-count-value" data-m="count-value">7</span>
-            </li>
-          </ul>
-        </section>
+        <!-- THE SURFACE'S OWN ROOT ELEMENT, and the five pins below need it (issue 1509). The
+             family is anchored on fabricate-validation rather than on .fabricate-manager, and
+             in production that class sits on the section element EditorValidationSurface
+             writes, with the summary row as a DESCENDANT. So this copy reproduces the root
+             ELEMENT rather than stamping the root class onto the row: stamped on the row,
+             the ancestry gate would be satisfied while the row itself matched no rule in
+             the sheet and every number below measured an unstyled default. Its three
+             manager-* classes are the ones the surface writes beside the root, verbatim. -->
+        <div class="fabricate-validation manager-recipe-tab manager-recipe-validation manager-editor-validation-surface">
+          <section class="manager-recipe-validation-summary-row">
+            <div class="manager-recipe-rail-summary is-block">
+              <span class="manager-recipe-rail-summary-medallion" data-m="summary-medallion"><i class="fas fa-circle-xmark"></i></span>
+              <span class="manager-recipe-rail-summary-copy">
+                <span class="manager-recipe-rail-summary-title" data-m="summary-title">Cannot be enabled</span>
+                <span class="manager-recipe-rail-summary-sub manager-muted" data-m="summary-sub">Clear every blocking issue first.</span>
+              </span>
+            </div>
+            <ul class="manager-recipe-rail-counts">
+              <li class="manager-recipe-rail-count is-passing">
+                <i class="fas fa-circle-check"></i>
+                <span class="manager-recipe-rail-count-label" data-m="count-label">Passing</span>
+                <span class="manager-recipe-rail-count-value" data-m="count-value">7</span>
+              </li>
+            </ul>
+          </section>
+        </div>
         <input type="text" data-m="bleed-baseline" value="bare">
       </div>
 

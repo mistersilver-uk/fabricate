@@ -250,6 +250,21 @@ const TABS_BUTTON_CLASS = (() => {
 })();
 const TABS_CLASSES = `${TABS_ROOT} ${TABS_CONTAINER_CLASS}`;
 
+/**
+ * `EditorValidationSurface` composes FOUR unconditional literals and the root is the first
+ * (issue 1509), which is what `composedClassRegion` in the area-scope gate reads.
+ *
+ * The whole array is what a caller passing no `class` of its own emits, so it is the literal the
+ * fixture below writes. The three `manager-*` names travel with it deliberately:
+ * `manager-recipe-tab` is the RECIPE EDITOR's tab vocabulary and stays application-rooted, and
+ * its presence on the fixture root is what makes the residue this file records MEASURABLE rather
+ * than argued.
+ */
+const VALIDATION_CLASSES = composedClasses(
+  read('src/ui/svelte/apps/manager/EditorValidationSurface.svelte'),
+  'EditorValidationSurface'
+).join(' ');
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -260,7 +275,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the ten class strings under measurement are the ones the primitives emit', () => {
+test('the eleven class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -271,6 +286,12 @@ test('the ten class strings under measurement are the ones the primitives emit',
   assert.equal(TOGGLE_CLASSES, 'fabricate-toggle manager-status-toggle');
   assert.equal(SLIDER_CLASSES, 'fabricate-slider manager-chance-slider manager-drop-rate-value');
   assert.equal(TABS_CLASSES, 'fabricate-tabs manager-editor-tabs');
+  assert.equal(
+    VALIDATION_CLASSES,
+    'fabricate-validation manager-recipe-tab manager-recipe-validation ' +
+      'manager-editor-validation-surface',
+    'the surface emits its namespace root and its three `manager-*` classes, in that order'
+  );
   assert.equal(
     TABS_BUTTON_CLASS,
     'manager-editor-tab-button',
@@ -288,6 +309,11 @@ test('the ten class strings under measurement are the ones the primitives emit',
     ['src/ui/svelte/components/ManagerToolbar.svelte', 'ManagerToolbar', 'fabricate-filter-bar'],
     ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
     ['src/ui/svelte/components/StatusToggle.svelte', 'StatusToggle', 'fabricate-toggle'],
+    [
+      'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+      'EditorValidationSurface',
+      'fabricate-validation',
+    ],
   ]) {
     assert.equal(
       composedClasses(read(file), label)[0],
@@ -441,6 +467,31 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="${host}-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="${host}-tabs-active" aria-selected="true" data-keyboard-focus="true"><span>Overview</span></button><button type="button" role="tab" class="manager-editor-tab-button" data-probe="${host}-tabs-button" aria-selected="false" data-keyboard-focus="true"><span>Results</span></button></div>`,
   }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE VALIDATION SURFACE EITHER (issue 1509). This family
+  // owns no CONTROL at all — its root is a `<section>` and everything under it is sections,
+  // lists and spans — so what is measured is the four things the surface draws: the summary card
+  // with its medallion, the count rail, and the grouped row stack. Eighteen probes, because
+  // every one of them is painted by a rule this change re-rooted and none of them may depend on
+  // the host.
+  //
+  // THE ROOT ITSELF IS THE RESIDUE, and the fixture states it rather than hiding it. The section
+  // carries `manager-recipe-tab` beside the namespace root, and
+  // `.fabricate-manager .manager-recipe-tab` is (0,2,0) declared LATER in the sheet than the
+  // surface's own (0,2,0) root rule — so inside the manager the root's `gap` is `--fab-space-3`
+  // and its `min-width` is 0, and outside it the surface's own `--fab-space-4` stands with no
+  // `min-width` at all. That is the one thing about this family that is NOT host-independent, it
+  // is owned by issue 1507, and `VALIDATION_COMPARED` below is scoped to the two declarations
+  // both rules agree on so the exclusion is a named set rather than a silent gap.
+  Object.freeze({
+    id: 'validation',
+    classes: VALIDATION_CLASSES,
+    // OPTED OUT OF THE BOX COMPARISON for the residue above: two different `gap`s in two hosts
+    // put the row stack at two different offsets and give the section two different heights.
+    // Every element INSIDE it is compared as normal, which is where this family's claim lives.
+    comparesBox: false,
+    markup: (host) =>
+      `<section class="fabricate-validation manager-recipe-tab manager-recipe-validation manager-editor-validation-surface" data-probe="${host}-validation"><section class="manager-recipe-validation-summary-row" data-probe="${host}-validation-summary-row"><div class="manager-recipe-rail-summary is-block" data-probe="${host}-validation-summary"><span class="manager-recipe-rail-summary-medallion" data-probe="${host}-validation-medallion"><i class="fas fa-circle-xmark"></i></span><span class="manager-recipe-rail-summary-copy" data-probe="${host}-validation-copy"><span class="manager-recipe-rail-summary-title" data-probe="${host}-validation-title">Cannot be enabled</span><span class="manager-recipe-rail-summary-sub manager-muted" data-probe="${host}-validation-sub">Clear every blocking issue first.</span></span></div><ul class="manager-recipe-rail-counts" data-probe="${host}-validation-counts"><li class="manager-recipe-rail-count is-passing" data-probe="${host}-validation-count"><i class="fas fa-circle-check"></i><span class="manager-recipe-rail-count-label" data-probe="${host}-validation-count-label">Passing</span><span class="manager-recipe-rail-count-value" data-probe="${host}-validation-count-value">7</span></li></ul></section><div class="manager-recipe-val-group" data-probe="${host}-validation-group"><p class="manager-recipe-val-group-label" data-probe="${host}-validation-group-label">Requirements</p><ul class="manager-recipe-val-rows" data-probe="${host}-validation-rows"><li class="manager-recipe-val-row is-block" data-probe="${host}-validation-row"><i class="manager-recipe-val-status fas fa-circle-xmark" data-probe="${host}-validation-status"></i><div class="manager-recipe-val-copy" data-probe="${host}-validation-row-copy"><span class="manager-recipe-val-title" data-probe="${host}-validation-row-title">A game-world Item is linked</span></div></li></ul></div></section>`,
+  }),
 ]);
 
 /**
@@ -463,6 +514,23 @@ const EXTRA_PROBES = Object.freeze([
   'slider-fill',
   'tabs-active',
   'tabs-button',
+  'validation-summary-row',
+  'validation-summary',
+  'validation-medallion',
+  'validation-copy',
+  'validation-title',
+  'validation-sub',
+  'validation-counts',
+  'validation-count',
+  'validation-count-label',
+  'validation-count-value',
+  'validation-group',
+  'validation-group-label',
+  'validation-rows',
+  'validation-row',
+  'validation-status',
+  'validation-row-copy',
+  'validation-row-title',
 ]);
 
 /**
@@ -510,6 +578,37 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'tabs-active',
   'tabs-button',
 ]);
+
+/**
+ * The two validation-surface probes whose laid-out BOX follows a MANAGER class rather than a
+ * family one (issue 1509).
+ *
+ * The summary card's sub-line carries `manager-muted` beside the family class, and
+ * `.fabricate-manager .manager-muted` declares `line-height: 1.35` and a top margin that this
+ * family does not and must not restate. So the sub's LINE BOX is 12 high in a bare host and 16
+ * in the manager, and the copy column that stacks it under the title is 35 against 41. What the
+ * family promises about that line — its 0.72rem, at (0,3,0) over the muted class's 0.78rem — DOES
+ * travel and is compared on the `validation-sub` probe.
+ *
+ * The sub-line is a FLEX ITEM of that column, so it is blockified and its own border box follows
+ * the same leading; both are opted out together rather than one of them being reported as a
+ * different kind of difference. Both halves of the reason are asserted by the clause below so the
+ * opt-out cannot outlive it. `manager-muted` is the manager's vocabulary, not
+ * this primitive's; retiring it from this surface is issue 1507's.
+ */
+const HOST_LEADING_PROBES = Object.freeze(['validation-copy', 'validation-sub']);
+
+/**
+ * The one probe that is a Font Awesome GLYPH and nothing else (issue 1509).
+ *
+ * `.manager-recipe-val-status` is an empty `<i>` whose whole rendered content is a ligature from
+ * a webfont this core-less harness does not load, so it lays out at 0x0 in every host and a box
+ * comparison over it would be three zeroes agreeing. It is probed anyway because what the family
+ * declares about it DOES travel and is worth asserting: `flex: 0 0 auto`, and the per-status tone
+ * the row's own `is-block` gives it, which is the only place in this fixture where a row status
+ * reaches a colour.
+ */
+const GLYPH_ONLY_PROBES = Object.freeze(['validation-status']);
 
 /**
  * The family's shared base rule, as the browser serialises its prelude.
@@ -921,6 +1020,162 @@ const TABS_BUTTON_COMPARED = Object.freeze([
 ]);
 
 /**
+ * What acceptance 2 compares on the validation surface's own root `<section>`, and why it is TWO
+ * properties rather than the three its rule declares (issue 1509).
+ *
+ * `.fabricate-validation.manager-recipe-validation` declares `display`, `flex-direction` and
+ * `gap`; the RECIPE EDITOR's `.fabricate-manager .manager-recipe-tab` declares the first two
+ * identically, a DIFFERENT `gap` and a `min-width: 0`, at the same (0,2,0) and later in the
+ * sheet. That class is on this root because six other recipe tabs write it too, so this change
+ * deliberately left it and its two head-block rules application-rooted rather than un-styling six
+ * tabs — and the consequence is that the surface's own outer gap is the manager's inside the
+ * manager and the surface's outside it.
+ *
+ * So `gap` and `min-width` are EXCLUDED BY NAME and recorded as the residue issue 1507 owns, and
+ * what stays compared is the pair both rules agree on: the surface is a vertical stack wherever
+ * it is mounted. Everything the family actually paints — the card, the medallion, the rail and
+ * the row stack — is compared in full on the probes below.
+ */
+const VALIDATION_COMPARED = Object.freeze(['display', 'flex-direction']);
+
+/** The two-column header row: a flex row that wraps, at the surface's own gap. */
+const VALIDATION_SUMMARY_ROW_COMPARED = Object.freeze([
+  'display',
+  'flex-wrap',
+  'align-items',
+  'gap',
+]);
+
+/**
+ * The summary CARD, which is the thing a GM reads first.
+ *
+ * Its border colour is the status face's — `is-block` here, so `--fab-danger-border` — and is
+ * compared because a status face that stopped travelling would leave every non-manager host
+ * drawing a neutral card for a blocking verdict.
+ */
+const VALIDATION_SUMMARY_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'min-width',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'flex-basis',
+]);
+
+/** The 52px medallion tile, its shape and the tone its status face gives it. */
+const VALIDATION_MEDALLION_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'justify-content',
+  'width',
+  'height',
+  'border-radius',
+  'font-size',
+  'color',
+  'background-color',
+]);
+
+/** The card's copy column, and the two lines in it. */
+const VALIDATION_COPY_COMPARED = Object.freeze(['display', 'flex-direction', 'gap', 'min-width']);
+const VALIDATION_TITLE_COMPARED = Object.freeze(['font-family', 'font-size', 'font-weight']);
+/**
+ * The sub-line, and ONLY its size.
+ *
+ * It also carries `manager-muted`, whose colour is the manager's and not this family's, so
+ * comparing `color` here would report the residue of a class this change does not own. The
+ * 0.72rem is the whole of what the surface promises about this line, and it is the number
+ * `recipe-studio-font-size.test.js` pins in Chromium.
+ */
+const VALIDATION_SUB_COMPARED = Object.freeze(['font-size']);
+
+/** The count RAIL and one count row, including the tone the row's own status gives its glyph. */
+const VALIDATION_COUNTS_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'gap',
+  'margin-top',
+  'padding-left',
+  'list-style-type',
+  'flex-basis',
+]);
+const VALIDATION_COUNT_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'font-size',
+]);
+const VALIDATION_COUNT_LABEL_COMPARED = Object.freeze(['flex-grow', 'flex-shrink', 'flex-basis']);
+const VALIDATION_COUNT_VALUE_COMPARED = Object.freeze([
+  'flex-grow',
+  'flex-basis',
+  'font-family',
+  'font-weight',
+  'font-variant-numeric',
+]);
+
+/** The GROUPED ROW STACK: the group, its label, the bordered list and one row inside it. */
+const VALIDATION_GROUP_COMPARED = Object.freeze(['display', 'flex-direction', 'gap']);
+const VALIDATION_GROUP_LABEL_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'margin-top',
+  'color',
+  'font-size',
+  'font-weight',
+  'letter-spacing',
+  'text-transform',
+]);
+const VALIDATION_ROWS_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'margin-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'list-style-type',
+  'overflow-x',
+]);
+const VALIDATION_ROW_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'padding-top',
+  'padding-left',
+  // THE FIRST ROW'S border is reset to 0 by `:first-child`, which is the rule that keeps the
+  // stack's own rounded border from doubling on the top row. Comparing it is what proves that
+  // reset travels too.
+  'border-top-width',
+]);
+const VALIDATION_STATUS_COMPARED = Object.freeze([
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'color',
+]);
+const VALIDATION_ROW_COPY_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'gap',
+  'min-width',
+  'flex-grow',
+]);
+const VALIDATION_ROW_TITLE_COMPARED = Object.freeze(['font-weight']);
+
+/**
  * The compared set per control, for the entries that do not take the button families' default.
  *
  * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
@@ -946,6 +1201,24 @@ const COMPARED_BY_CONTROL = Object.freeze({
   tabs: TABS_COMPARED,
   'tabs-active': TABS_BUTTON_COMPARED,
   'tabs-button': TABS_BUTTON_COMPARED,
+  validation: VALIDATION_COMPARED,
+  'validation-summary-row': VALIDATION_SUMMARY_ROW_COMPARED,
+  'validation-summary': VALIDATION_SUMMARY_COMPARED,
+  'validation-medallion': VALIDATION_MEDALLION_COMPARED,
+  'validation-copy': VALIDATION_COPY_COMPARED,
+  'validation-title': VALIDATION_TITLE_COMPARED,
+  'validation-sub': VALIDATION_SUB_COMPARED,
+  'validation-counts': VALIDATION_COUNTS_COMPARED,
+  'validation-count': VALIDATION_COUNT_COMPARED,
+  'validation-count-label': VALIDATION_COUNT_LABEL_COMPARED,
+  'validation-count-value': VALIDATION_COUNT_VALUE_COMPARED,
+  'validation-group': VALIDATION_GROUP_COMPARED,
+  'validation-group-label': VALIDATION_GROUP_LABEL_COMPARED,
+  'validation-rows': VALIDATION_ROWS_COMPARED,
+  'validation-row': VALIDATION_ROW_COMPARED,
+  'validation-status': VALIDATION_STATUS_COMPARED,
+  'validation-row-copy': VALIDATION_ROW_COPY_COMPARED,
+  'validation-row-title': VALIDATION_ROW_TITLE_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
@@ -1069,7 +1342,13 @@ const MEASURED_PROBES = Object.freeze([
   // else here either declares its own `box-sizing` (the slider's number input does, in its own
   // rule) or declares no border over a declared size, and lays out identically in all three hosts.
   ...FAMILY_EXTRA_PROBES.map((id) =>
-    Object.freeze({ id, comparesBox: !HOST_BOX_DEPENDENT_PROBES.includes(id) })
+    Object.freeze({
+      id,
+      comparesBox:
+        !HOST_BOX_DEPENDENT_PROBES.includes(id) &&
+        !HOST_LEADING_PROBES.includes(id) &&
+        !GLYPH_ONLY_PROBES.includes(id),
+    })
   ),
 ]);
 
@@ -2301,6 +2580,126 @@ const ADDED_BLOCKS = Object.freeze([
     '.fabricate-field textarea {\n  appearance: none;\n  -webkit-appearance: none;\n' +
     '  min-height: 34px;\n}',
 ]);
+
+test('the validation surface`s sub-line takes its LEADING from a manager class, not this family', async () => {
+  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT, exactly as the two
+  // bordered rails' is. `manager-recipe-rail-summary-sub` is written beside `manager-muted`, and
+  // `.fabricate-manager .manager-muted` declares a `line-height` and a top margin the family does
+  // not — so the line box, and the column that stacks it under the title, differ by host while
+  // everything the family itself declares does not.
+  //
+  // BOTH HALVES, so the exclusion cannot be read as a gap nobody measured: the SIZE the family
+  // declares travels, and the LEADING the manager declares does not.
+  const measured = await measure(sheet);
+
+  assert.equal(
+    measured['validation-sub'].bare['line-height'],
+    'normal',
+    'the family declares no leading for the sub-line, so a bare host must resolve `normal`; a ' +
+      'value here means this family has started declaring one and `HOST_LEADING_PROBES` should ' +
+      'go with it'
+  );
+  assert.notEqual(
+    measured['validation-sub'].manager['line-height'],
+    'normal',
+    'the manager must still be what supplies that line its leading, or the opt-out above is ' +
+      'hiding a difference this family did make'
+  );
+  for (const host of HOSTS) {
+    assert.equal(
+      measured['validation-sub'][host.id]['font-size'],
+      '11.52px',
+      'the 0.72rem the family declares at (0,3,0) must beat `manager-muted`s 0.78rem in the ' +
+        'manager AND stand alone everywhere else: the SIZE is the family`s and travels, which ' +
+        'is the half of this line that is not a residue'
+    );
+  }
+
+  assert.match(
+    sheet,
+    /\.fabricate-manager \.manager-muted \{[^}]*line-height: 1\.35;/u,
+    'the leading must still come from `.fabricate-manager .manager-muted`, which is the manager`s ' +
+      'own vocabulary rather than this family`s — the residue issue 1507 owns'
+  );
+  assert.ok(
+    !/\.fabricate-validation [^{]*summary-sub[^{]*\{[^}]*line-height/u.test(sheet),
+    'and this family must NOT restate that leading at its own root: doing so would make the ' +
+      'sub-line travel by DISPLACING a manager rule for an element the manager also styles, ' +
+      'which is the displacement the design-system requirement refuses'
+  );
+});
+
+/*
+ * ── THE FAMILY THAT OWNS NO CONTROL AT ALL (issue 1509) ───────────────────────────────
+ *
+ * `EditorValidationSurface` goes further than the bar and the card above: its root is a
+ * `<section>`, everything under it is sections, lists and spans, and the only two INTERACTIVE
+ * things it renders — the row's View action and its status pill — are a composed `ManagerButton`
+ * and a composed `Chip`, which carry their own families' chrome. So it declares neither a font
+ * floor nor a focus pair, and the clause below is the negative control for that decision.
+ */
+
+test('the validation surface declares no font floor and no focus pair', async () => {
+  const tab = await browser.newPage();
+  try {
+    await tab.setContent(document_(sheet));
+    const rules = await readRules(tab);
+    assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
+
+    const named = /\.fabricate-validation(?![\w-])/u;
+    const family = rules.filter((rule) => named.test(rule.selectorText));
+    assert.ok(
+      family.length >= 30,
+      `only ${family.length} rules are rooted at \`.fabricate-validation\`, so the absences below ` +
+        'hold over nothing. The family has been renamed or the re-root has been undone.'
+    );
+
+    const focused = family.filter((rule) => /:focus/u.test(rule.selectorText));
+    assert.deepEqual(
+      focused.map((rule) => rule.selectorText),
+      [],
+      '`.fabricate-validation` declares a focus rule. This family owns no control of its own, so ' +
+        'a strip or a repaint here would paint chrome for a control ANOTHER primitive owns — and ' +
+        'it would WIN: `<root> <element>:focus-visible` is (0,2,1) and out-ranks the composed ' +
+        '`ManagerButton`s own `.fabricate-button:focus-visible` ring at (0,2,0), so the row`s ' +
+        'View action would lose its family ring to this one. That displacement is what the ' +
+        'design-system requirement refuses, and it is why the pair is REFUSED here rather than ' +
+        'merely absent.'
+    );
+
+    // AND NO FLOOR. A floor is a rule that types a BARE ELEMENT under the family root, which is
+    // what reaches a control the family does not write. This family has three bare-element rules
+    // — the three `> i` count glyphs — and every one of them declares `color` alone, so the
+    // predicate has a real domain and is not vacuously true of an empty set.
+    const bareElement = family.filter((rule) =>
+      rule.selectorText
+        .split(/\s*(?:>|\+|~|\s)\s*/u)
+        .slice(1)
+        .some((compound) => compound !== '' && !compound.includes('.'))
+    );
+    assert.equal(
+      bareElement.length,
+      3,
+      'expected exactly the three `> i` count glyph rules to name a bare element under this ' +
+        `root, found ${bareElement.length}: ` +
+        bareElement.map((rule) => rule.selectorText).join(', ')
+    );
+    const typedBareElement = bareElement.filter((rule) =>
+      rule.properties.some(
+        (property) => property.startsWith('font') || property === 'line-height'
+      )
+    );
+    assert.deepEqual(
+      typedBareElement.map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
+      [],
+      '`.fabricate-validation` types a bare element, which is a font floor for a control this ' +
+        'family does not own. The four families that DO own a control declare one; this one must ' +
+        'not, and its own type sits on its own classes instead.'
+    );
+  } finally {
+    await tab.close();
+  }
+});
 
 test('the chrome these families declare reaches the control they own and nothing else', async () => {
   // THE CONTROL IS A COMPARISON AGAINST BASE, not a list of remembered numbers, because that is

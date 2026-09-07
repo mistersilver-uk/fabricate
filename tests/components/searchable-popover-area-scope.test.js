@@ -109,19 +109,22 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Sixteen shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Seventeen shared primitives, each with the namespace roots it writes and the class family it owns.
  *
  * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
  * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
  * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field`,
  * `ManagerSearchField`, `ManagerToolbar`, `InspectorCard`, `StatusToggle` and `ChanceSlider`
  * (issue 1508). NONE of the issue-1508 families portals anything, so one
- * root each is the whole requirement, and neither does `EditorTabs` (issue 1509).
+ * root each is the whole requirement, and neither do `EditorTabs` or `EditorValidationSurface`
+ * (issue 1509).
  * A `composesClasses: true` entry
  * opts into reading the `const classes = $derived([…])` array literal (`composedClassRegion`)
  * ALONGSIDE the ordinary markup region, because `class={classes}` is an identifier rather than a
  * `class="…"` string or a `` class={`…`} `` template, so the ordinary markup-only extractors find
- * nothing for either button primitive on their own. A `classMaps` entry opts into a THIRD reader
+ * nothing for either button primitive on their own — nor for `EditorValidationSurface`, whose
+ * root `<section>` is written the same way and whose local was RENAMED to `classes` so this
+ * reader can find it at all. A `classMaps` entry opts into a THIRD reader
  * (`classMapRegion`) for a family class the component chooses per host out of a frozen map in
  * `<script>`, which neither of the other two regions covers. TWO entries declare one, and for two
  * different reasons: `StatusToggle` picks its host's class out of `HOST_CLASSES` at render time,
@@ -768,6 +771,80 @@ const PRIMITIVES = Object.freeze([
     // clause by stamping a root onto an element no rule in the sheet roots at.
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-editor-tabs', root: 'fabricate-tabs' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── EDITORVALIDATIONSURFACE (issue 1509). The aggregate validation header over a grouped,
+    // bordered, tagged row stack, rooted at the class it emits.
+    //
+    // COMPOSES its family, and the local had to be RENAMED for that to be readable.
+    // `composedClassRegion` locates its region by the exact opener `const classes = $derived(`, so
+    // the component's own `rootClass` was invisible to it and `composesClasses: true` would have
+    // red with the reader's own named error rather than reading the array. The root is the array's
+    // FIRST literal because that is the position the composed reader takes as the namespace class.
+    name: 'EditorValidationSurface',
+    components: Object.freeze(['src/ui/svelte/apps/manager/EditorValidationSurface.svelte']),
+    roots: Object.freeze(['fabricate-validation']),
+    // TWO prefixes and one exact name, and the EXCLUSIONS are the load-bearing part. This
+    // namespace is crowded: measured on this sheet, `.manager-recipe-*` occurs 457 times across
+    // 55 distinct `manager-recipe-<word>` prefixes, and `manager-recipe[\w-]*` matches 427
+    // selectors against this pattern's 46 — so a loose pattern would have swallowed
+    // `ToggleCard`'s own family and some three hundred and eighty unrelated selectors.
+    //
+    // `manager-recipe-tab` is EXCLUDED BY NAME even though this surface writes it on its own
+    // root: six other recipe tabs write it too (`recipe/RecipeAccessTab`,
+    // `RecipeBooksScrollsTab`, `RecipeIngredientsTab`, `RecipeOverviewTab`, `RecipeResultsTab`,
+    // `RecipeToolsTab`), so re-rooting the five `manager-recipe-tab(?!le)*` selectors would have
+    // un-styled six tabs. `manager-editor-validation-surface` is excluded for the plainer reason
+    // that no rule in the sheet names it.
+    family: 'manager-recipe-(val|rail)[\\w-]*',
+    anchors: Object.freeze([
+      'manager-recipe-validation',
+      'manager-recipe-validation-summary-row',
+      'manager-recipe-rail-summary',
+      'manager-recipe-rail-summary-medallion',
+      'manager-recipe-rail-summary-copy',
+      'manager-recipe-rail-summary-title',
+      'manager-recipe-rail-summary-sub',
+      'manager-recipe-rail-counts',
+      'manager-recipe-rail-count',
+      'manager-recipe-rail-count-label',
+      'manager-recipe-rail-count-value',
+      'manager-recipe-val-group',
+      'manager-recipe-val-group-label',
+      'manager-recipe-val-rows',
+      'manager-recipe-val-row',
+      'manager-recipe-val-status',
+      'manager-recipe-val-copy',
+      'manager-recipe-val-title',
+      'manager-recipe-val-detail',
+      'manager-recipe-val-view',
+      'manager-recipe-val-pill',
+    ]),
+    composesClasses: true,
+    // Measured at this commit: 21 written, 46 family selectors, 37 owned — 9 exempt and 0
+    // caller-CLASS compounds, so 37 re-rooted and the two counts agree for the first family in
+    // this table. The 9 are the Checks Studio route's five `.manager-checks-validation-route`
+    // chains and the Tool rules editor's four medallion overrides, which are exempt for two
+    // DIFFERENT reasons: the first five name a caller's own container and always did, while the
+    // four put the family compound THIRD behind an ancestor that is not the application root, so
+    // neither re-rooting form exists for them. Those four were rewritten to name that ancestor by
+    // the class its caller writes on the same element (`.manager-tool-tab-stack`) rather than by
+    // its hook attribute, at unchanged rank, position and declarations — which is what moved them
+    // out of `owned` and into the exempt set.
+    writtenFloor: 18,
+    familyFloor: 41,
+    ownedFloor: 33,
+    // The ROOT-ELEMENT anchor, and it matches ZERO fixture attributes today — measured, and
+    // recorded rather than swapped for a populated descendant. `manager-recipe-rail-summary` has
+    // one attribute in one file and is REFUSED: it is the medallion ROW, a descendant of the
+    // root, so a fixture carrying it satisfies the attribute clause by stamping a root onto an
+    // element no rule in the sheet roots at — which is why that file's ten offenders are repaired
+    // by WRAPPING the row in the root element instead. `manager-recipe-tab` is refused for the
+    // family's own reason: six other components write it, so it would report their fixtures as
+    // this family's offenders.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-recipe-validation', root: 'fabricate-validation' }),
     ]),
   }),
 ]);
@@ -1948,13 +2025,19 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 168,
+    attributes >= 170,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 168. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1509: 187 today, against the 181 before ' +
-      '`EditorTabs` joined the array. SIX arrived: four are the shipped fixtures that copy the ' +
-      'tab strip’s own root element, in three files, and two are the strip and the negative ' +
-      'control this change adds to `re-rooted-controls-host-independence.test.js`. Before that: ' +
+      'of 170. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1509 phase 2: 189 today, against the 187 before ' +
+      '`EditorValidationSurface` joined the array. Exactly TWO arrived, and that thinness is the ' +
+      'entry’s own measurement rather than an oversight: the surface’s root anchor matched ZERO ' +
+      'fixture attributes before this change. The two are both root ELEMENTS — the one ' +
+      '`recipe-studio-font-size.test.js` gained so its five rail measurements keep reaching the ' +
+      'sheet, and the one this change’s host-independence fixture writes. ' +
+      'Before that: 187 against the 181 before ' +
+      '`EditorTabs` joined the array. SIX arrived there: four are the shipped fixtures that copy ' +
+      'the tab strip’s own root element, in three files, and two are the strip and the negative ' +
+      'control that change added to `re-rooted-controls-host-independence.test.js`. Before that: ' +
       '181 against 169 before ' +
       '`StatusToggle` and `ChanceSlider` joined the array, 143 before `ManagerToolbar` and ' +
       '`InspectorCard` did and 113 before `Field` and ' +
@@ -2071,12 +2154,21 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 305,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 305. A ` +
+    elements >= 331,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 331. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing. RE-MEASURED at issue 1509: 339 today, against the 321 before ' +
+      'below holds over nothing. RE-MEASURED at issue 1509 phase 2: 368 today, against the 339 ' +
+      'before `EditorValidationSurface` joined the array. TWENTY-NINE arrived against the ' +
+      'attribute clause’s TWO, and that 29-to-2 is the widest gap either clause has recorded: a ' +
+      'validation fixture brings a whole surface with it and only its ROOT is an anchor. Eleven ' +
+      'are `recipe-studio-font-size.test.js`’s — the summary row, its card, its medallion, its ' +
+      'copy, its two lines, its count list, its one count and that count’s two spans, under the ' +
+      'root element that file gained to put them beneath a rule — and eighteen are the ' +
+      'three-host fixture in `re-rooted-controls-host-independence.test.js`, which adds a row ' +
+      'stack and a group label to that set. Before that: 339 ' +
+      'against the 321 before ' +
       '`EditorTabs` joined the array. THIRTEEN of the eighteen are the shipped fixtures’ own, ' +
-      'over three files, and five are this change’s two new host-independence fixtures. That ' +
+      'over three files, and five are that change’s two new host-independence fixtures. That ' +
       'thirteen against the attribute clause’s four is the gap the two clauses exist to keep ' +
       'apart: a strip fixture brings its buttons, its counts and its badges with it. Before ' +
       'that: 321 against 270 ' +
@@ -2217,7 +2309,7 @@ test('each primitive’s own scoped styles name no application root either', () 
 
   assert.ok(
     blocks >= 3,
-    `only ${blocks} of the seventeen component files hold a REAL scoped \`<style>\` block — one ` +
+    `only ${blocks} of the eighteen component files hold a REAL scoped \`<style>\` block — one ` +
       'opened after `</script>`. THREE do today: `SearchablePopover`, `ManagerColorPopover` and ' +
       '— since issue 1509 put an entry on it — `EditorTabs`, whose block is the two ' +
       '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation tab. ' +

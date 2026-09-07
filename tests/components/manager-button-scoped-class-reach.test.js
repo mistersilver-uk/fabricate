@@ -259,10 +259,17 @@ const PRIMITIVES = Object.freeze([
   // `manager-recipe-val-*`, `manager-recipe-rail-*` — is exactly the kind a site is tempted to
   // refine locally.
   //
-  // All three contract classes are listed because the primitive writes all three on its root
+  // All three `manager-*` classes are listed because the primitive writes all three on its root
   // unconditionally. `manager-recipe-tab` is shared with the recipe editor's other tabs, which
   // is harmless here: the contract half only runs for a file that RENDERS the primitive, and no
   // such file states a scoped rule against it.
+  //
+  // Its NAMESPACE root, `fabricate-validation`, is deliberately not among them (issue 1509),
+  // by the convention every entry above already follows: `ManagerButton` lists `manager-button`
+  // and `fab-manager-button` but not `fabricate-button`, and `Field` lists `manager-field` but
+  // not `fabricate-field`. A namespace root's own reach is the area-scope gate's question, and
+  // listing one here would make this guard report that gate's population a second time under a
+  // different name.
   Object.freeze({
     tag: 'EditorValidationSurface',
     contractClasses: [
