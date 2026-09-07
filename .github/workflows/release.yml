@@ -252,7 +252,33 @@ jobs:
     if: ${{ always() && github.ref_name == 'release' && needs.verify-publish.result == 'success' }}
     permissions:
       contents: read
-    uses: ./.github/workflows/forward-port.yml
+    # PINNED TO `main`, NOT `./` (issue #1619). A `./` reference resolves the callee at the CALLER's
+    # commit, and this job runs on `release` — a line that structurally LAGS `main` between
+    # promotions. So `./` runs whatever forward-port.yml `release` happened to carry, which is by
+    # construction an older one than `main`'s.
+    #
+    # That is not hypothetical: the v1.9.6 forward-port (run 34100631738) failed because `release`
+    # still carried the pre-#1418 gate, which REFUSES any content outright. #1418 had already
+    # replaced it on `main` with the provenance verifier written for exactly this case, and a manual
+    # dispatch off `main` then passed the same merge with no override. The gate that was supposed to
+    # run had shipped; the release line just could not reach it.
+    #
+    # Note the callee already checks out `ref: main`, so its SCRIPTS were main's all along — only the
+    # workflow YAML, which decides whether those scripts are invoked at all, came from `release`.
+    # Pinning the ref closes that last gap so the release line runs the reviewed gate on `main`.
+    #
+    # PINNED TO A SHA, NOT `@main`, and that is a security requirement rather than a preference: a
+    # mutable ref means whoever can push to `main` changes what this job executes under the ruleset-
+    # bypassing App token. SonarCloud rates it a HIGH security finding on new code and fails the gate
+    # (measured on PR #1620), which is the same reason
+    # `aws-actions/configure-aws-credentials` is SHA-pinned in this repository.
+    #
+    # ⚠ BUMP OBLIGATION. This pin does NOT track `main`. Any change to forward-port.yml must bump the
+    # SHA HERE and in promote-to-public.yml, or the release line keeps running the older gate — the
+    # same class of staleness this pin replaced, now visible in a diff instead of hidden in branch
+    # lag. tests/forward-port-workflow.test.js asserts the reference is an immutable 40-hex SHA and
+    # that both callers name the SAME one.
+    uses: mistersilver-uk/fabricate/.github/workflows/forward-port.yml@2de9e4d00a5553dec4912cec93fae8b8099fd488 # forward-port.yml as of #1443
     with:
       # Not a dry run: this is the entry point that actually keeps `main` numbered above the
       # released version.

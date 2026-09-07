@@ -289,7 +289,16 @@ jobs:
     needs: guard
     permissions:
       contents: read
-    uses: ./.github/workflows/forward-port.yml
+    # Pinned to `main` for the same reason release.yml is (issue #1619): a `./` reference resolves
+    # the callee at the CALLER's commit. This workflow is dispatch-only and is normally dispatched
+    # from `main`, where the two forms agree — but it accepts `--ref release` and `--ref N.N.x`, and
+    # on those lagging lines `./` would silently run an older gate than the reviewed one on `main`.
+    # Pinning makes the two entry points reach the SAME callee from every ref, which is the property
+    # the source contract below actually wants.
+    #
+    # ⚠ Keep this SHA equal to release.yml's — the source contract asserts both callers name the same
+    # immutable commit, and a change to forward-port.yml must bump BOTH. See the fuller note there.
+    uses: mistersilver-uk/fabricate/.github/workflows/forward-port.yml@2de9e4d00a5553dec4912cec93fae8b8099fd488 # forward-port.yml as of #1443
     with:
       enabled: ${{ inputs.source_channel == 'early-access' }}
       skip_reason: "forward-port is a no-op for a hotfix line — a hotfix leaves its line by cherry-pick, never a release-into-main merge."
