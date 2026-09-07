@@ -26,6 +26,7 @@
   import AboutThisRun from './AboutThisRun.svelte';
   import WhatToExpect from './WhatToExpect.svelte';
   import JournalTips from './JournalTips.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let { services = null } = $props();
 
@@ -46,6 +47,37 @@
   const selectedRun = $derived(journal?.selectedRun ?? null);
   const selectedRunId = $derived(String(journal?.selectedRunId ?? ''));
   const expectRunType = $derived(String(selectedRun?.runType ?? 'crafting'));
+
+  // The three branches this view can reach, in priority order, handed to the shared composition
+  // as data. The third is a NO-ACTOR state spelled `empty`, which is the hook the smoke locators
+  // and `journal-view-mounted` already read — the value is data, not a description, so it is
+  // forwarded exactly as written rather than renamed to match the condition.
+  const viewStates = $derived([
+    {
+      when: loading,
+      kind: 'loading',
+      hook: 'data-journal-state',
+      value: 'loading',
+      icon: 'fas fa-spinner fa-spin',
+      message: localize('FABRICATE.App.Journal.Loading'),
+    },
+    {
+      when: error,
+      kind: 'error',
+      hook: 'data-journal-state',
+      value: 'error',
+      icon: 'fas fa-triangle-exclamation',
+      message: localize('FABRICATE.App.Journal.Error'),
+    },
+    {
+      when: !hasActor,
+      kind: 'empty',
+      hook: 'data-journal-state',
+      value: 'empty',
+      icon: 'fas fa-book-open',
+      message: localize('FABRICATE.App.Journal.Empty.NoActor'),
+    },
+  ]);
 
   function selectRun(id) {
     journal?.select?.(id);
@@ -77,22 +109,7 @@
   );
 </script>
 
-{#if loading}
-  <div class="journal-view-state" data-journal-state="loading">
-    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Journal.Loading')}</p>
-  </div>
-{:else if error}
-  <div class="journal-view-state" data-journal-state="error">
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Journal.Error')}</p>
-  </div>
-{:else if !hasActor}
-  <div class="journal-view-state" data-journal-state="empty">
-    <i class="fas fa-book-open" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Journal.Empty.NoActor')}</p>
-  </div>
-{:else}
+<PlayerViewState branches={viewStates}>
   <div class="journal-view-container">
     <div class="journal-view-grid" data-journal-state="populated">
       <div class="journal-view-column journal-view-column-left">
@@ -132,7 +149,7 @@
       </div>
     </div>
   </div>
-{/if}
+</PlayerViewState>
 
 <style>
   /* Container-query layout cloned from GatheringView: the wrapper is the size
@@ -208,25 +225,5 @@
     border-radius: 8px;
     background: var(--fab-surface-soft);
     overflow: hidden;
-  }
-
-  .journal-view-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface);
-  }
-
-  .journal-view-state i {
-    font-size: 32px;
-  }
-
-  .journal-view-state p {
-    margin: 0;
-    font-size: 14px;
   }
 </style>

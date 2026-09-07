@@ -98,6 +98,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
+    // The ONE not-yet-ready chrome the five player views draw (issue 1514). `InventoryView`
+    // below renders it, and it composes `EmptyState` (already above through the
+    // `SELECT_COMPILED_MODULES` spread) and `Callout` (through the marks-and-notices spread).
+    // An omission HANGS this suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/PlayerViewState.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a

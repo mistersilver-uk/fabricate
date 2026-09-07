@@ -172,6 +172,14 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
+    // The ONE not-yet-ready chrome the five player views draw (issue 1514), and the strip its
+    // error branch composes. `GatheringView` below renders the composition and `EmptyState` is
+    // already compiled through the `SELECT_COMPILED_MODULES` loop above. This harness is
+    // HAND-ROLLED, so a missing entry is not the named "add it to compiledModules" error the
+    // shared harness raises — it is `ERR_MODULE_NOT_FOUND` in `before()` and a whole file
+    // reported as `# cancelled`.
+    writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/PlayerViewState.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(

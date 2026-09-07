@@ -95,6 +95,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
+    // The ONE not-yet-ready chrome the five player views draw (issue 1514). `InventoryView`
+    // below renders it, and it composes `EmptyState` (already above through the
+    // `SELECT_COMPILED_MODULES` spread) and `Callout` (through the marks-and-notices spread).
+    // An omission HANGS this suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/PlayerViewState.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
@@ -504,6 +509,37 @@ describe('InventoryView (mounted)', () => {
       null,
       'essence has no produced-by'
     );
+  });
+
+  it('renders the loading state, announces it busy, and drops the claim once ready', async () => {
+    // THE LOADING BRANCH HAD NO ASSERTION HERE AT ALL before issue 1514, which is why the
+    // `aria-busy` criterion for this view was unmeetable rather than merely unmet. Asserted on
+    // the RENDERED DOM: a composition that declares the attribute and stops rendering it passes
+    // every source-text reader.
+    const { services: loadingServices, store: loadingStore } = makeServices(makeItem());
+    loadingStore.loading = true;
+    loadingStore.loadedOnce = false;
+    const loading = await harness.mount({ services: loadingServices });
+    await settle();
+
+    const loadingRoot = loading.querySelector('[data-inventory-state="loading"]');
+    assert.ok(Boolean(loadingRoot), 'renders the loading state');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Inventory.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    harness.remount();
+    const { services: readyServices } = makeServices(makeItem());
+    const ready = await harness.mount({ services: readyServices });
+    await settle();
+
+    assert.ok(
+      ready.querySelector('[data-inventory-state="populated"]'),
+      'the ready view is populated'
+    );
+    assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
   });
 
   it('shows the empty state when the actor owns nothing', async () => {

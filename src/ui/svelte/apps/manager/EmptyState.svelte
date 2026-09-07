@@ -36,10 +36,10 @@
      with a leading mark rather than as a centred hero block. It is NOT a smaller
      `compact`: `compact` keeps the tile (at 32px) and keeps the column, and a "nothing
      goes wrong with this component yet" line sitting directly above an Add button cannot
-     afford either. The Component Studio's complications section is its first consumer;
-     the PLAYER app's own empties (`salvage-empty`, `alchemy-*-empty`,
-     `inventory-detail-empty-note`) are still a different area shell and are NOT this
-     variant's remit, as the note at the foot of this block says of the primitive at large.
+     afford either. The Component Studio's complications section is its first consumer.
+     (This clause used to go on to refuse the PLAYER app's own empties as "a different area
+     shell". That refusal is retired with the one at the foot of this block, and for the same
+     reason — see there.)
    - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
      corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
      the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
@@ -60,9 +60,28 @@
      panel rather than beside it.
 
   A component wearing `.manager-*` classes belongs under `apps/manager/` (not the
-  import-free `components/` leaf directory), which is why it lives here. The player app's
-  own empties (`salvage-empty`, `alchemy-*-empty`, `inventory-detail-empty-note`) are a
-  different area shell with their own scoped styles and are NOT this primitive's remit.
+  import-free `components/` leaf directory), which is why it lives here.
+
+  THIS BLOCK USED TO REFUSE THE PLAYER APP, TWICE, AND BOTH REFUSALS ARE RETIRED (issue 1514).
+  It said the player window's own empties were "a different area shell with their own scoped
+  styles" and so "NOT this primitive's remit". The player window renders this component now:
+  `apps/PlayerViewState.svelte` composes it for the no-actor and empty branches of all five
+  player views, which is the second application to draw it.
+
+  The claim was never about a directory, and that is why it could be overturned by a caller
+  rather than by a move. Everything this component looks like lives in the scoped `<style>`
+  below, and every token it reads is declared on `:root` — so it SELF-PAINTS, and a surface
+  outside `.fabricate-manager` gets the same panel the manager gets. The `.manager-*` class
+  names are a naming convention retained for the locators above, not an area binding. What a
+  docblock refusing a caller states is a fact about the tree at the time it was written; the
+  change that adds the caller restates it, in the commit that falsifies it.
+
+  One thing the refusal was right about survives, and is stated as the rule it actually is: a
+  caller that needs this panel to FILL a region owns that fill itself. `contextClass` puts the
+  rule in the global sheet, which is the wrong answer for a player screen — `PlayerViewState`
+  declares the `height: 100%` centred fill in its own scoped block and nests this panel inside
+  it, and the empties still hand-rolled in `salvage-empty`, `alchemy-*-empty` and
+  `inventory-detail-empty-note` convert on the same terms as they are reached.
 -->
 <script>
   let {

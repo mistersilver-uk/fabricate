@@ -1145,6 +1145,26 @@ The player window carries NO premium signal in any state, and a player-side choo
 - **THEN** it follows the browse recipe's element order
 - **AND** its row state renders as a status button rather than a toggle
 
+### Requirement: A view's loading, error and empty states are one composition, and a loading view says so
+
+A screen-level view MUST render its not-yet-ready states through one shared composition rather than a per-view copy, and MUST set `aria-busy` on the view root while loading together with a VISIBLE label, because a spinner with no accessible name and no busy state is invisible to a screen reader and indistinguishable from an empty screen to everyone else.
+The branch SET is the view's own — a view with no actor has a no-actor branch and a view that cannot have one does not — so the composition takes the set as data; a composition that hard-codes a branch count forces every view onto the widest one's vocabulary.
+The composition MUST forward each branch's existing test and screenshot hook by NAME and VALUE verbatim, because the name differs per view and at least one view spells a no-actor branch `empty`; normalising either is a silent break of readers that HANG rather than fail.
+It MUST declare its own fill in its own scoped block rather than through a global-sheet context class, so that adopting it does not put the module stylesheet on the change's path.
+
+#### Scenario: Five views draw the same three rules
+
+- **WHEN** two or more views render the same loading, error or empty chrome up to a class-name prefix
+- **THEN** that chrome is one composition with the branch set as a prop
+- **AND** each view names only the branches it can reach
+- **AND** each branch's hook name and value are unchanged
+
+#### Scenario: A view is loading
+
+- **WHEN** a view root is in its loading state
+- **THEN** it carries `aria-busy`
+- **AND** a visible label states what is loading
+
 ### Requirement: The set is extended by an explicit, recorded decision
 
 A new shared primitive enters the set only through a change that records its ENTRY, and an entry is two artifacts rather than one: a SPECIMEN in `openspec/specs/design-system/library.html` and, once the primitive ships, a ROW in `scripts/lib/designSystemPrimitives.json`.

@@ -41,6 +41,26 @@ describe('CraftingView mounted behavior', () => {
     assert.equal(target.querySelector('[data-crafting-state="populated"]'), null);
   });
 
+  it('announces the loading root as busy, and does not once the view is ready', async () => {
+    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
+    // stops rendering it passes every source-text reader. The negative half matters as much —
+    // an attribute that is always there says nothing about the state it describes.
+    const loading = await harness.mount({
+      services: services(fakeCraftingStore({ loading: true, loadedOnce: false, recipes: [] })),
+    });
+    const loadingRoot = loading.querySelector('[data-crafting-state="loading"]');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Crafting.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    harness.remount();
+    const ready = await harness.mount({ services: services(fakeCraftingStore({ recipes: [recipe()] })) });
+    assert.ok(ready.querySelector('[data-crafting-state="populated"]'), 'the ready view is populated');
+    assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
+  });
+
   it('renders the error state when the store reports an error', async () => {
     const store = fakeCraftingStore({ error: 'boom', recipes: [] });
     const target = await harness.mount({ services: services(store) });
