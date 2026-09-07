@@ -288,7 +288,7 @@ const TABS_CLASSES = `${TABS_ROOT} ${TABS_CONTAINER_CLASS}`;
  * than argued.
  */
 const VALIDATION_CLASSES = composedClasses(
-  read('src/ui/svelte/apps/manager/EditorValidationSurface.svelte'),
+  read('src/ui/svelte/components/EditorValidationSurface.svelte'),
   'EditorValidationSurface'
 ).join(' ');
 
@@ -411,7 +411,7 @@ test('the fourteen class strings under measurement are the ones the primitives e
     ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
     ['src/ui/svelte/components/StatusToggle.svelte', 'StatusToggle', 'fabricate-toggle'],
     [
-      'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+      'src/ui/svelte/components/EditorValidationSurface.svelte',
       'EditorValidationSurface',
       'fabricate-validation',
     ],

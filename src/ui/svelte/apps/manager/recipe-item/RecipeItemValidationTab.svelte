@@ -33,7 +33,7 @@
      `checks` win over the local computation (labels still come from this tab's copy).
 -->
 <script>
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
+  import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {

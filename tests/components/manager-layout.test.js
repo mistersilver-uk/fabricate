@@ -8668,7 +8668,7 @@ test('the Tool rule card eyebrow carries the reference type, not the shared kick
 // the vocabulary widens the gate and neither half can be greened by editing this file.
 test('the validation summary paints every status class it can emit, and only those', () => {
   const surface = readFileSync(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/EditorValidationSurface.svelte'),
+    resolve(__dirname, '../../src/ui/svelte/components/EditorValidationSurface.svelte'),
     'utf8'
   );
 

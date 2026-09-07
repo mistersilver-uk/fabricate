@@ -156,7 +156,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',

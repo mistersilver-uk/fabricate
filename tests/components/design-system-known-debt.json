@@ -295,7 +295,7 @@
     "src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte | --fab-tool-breakage-chance-track-gradient | 1"
   ],
   "untranslatedNameDefaults": [
-    "src/ui/svelte/apps/manager/EditorValidationSurface.svelte | viewLabel | View | 1",
+    "src/ui/svelte/components/EditorValidationSurface.svelte | viewLabel | View | 1",
     "src/ui/svelte/apps/manager/ManagerModal.svelte | closeLabel | Close | 1",
     "src/ui/svelte/components/ChanceSlider.svelte | numberLabel | Percentage | 1",
     "src/ui/svelte/components/ChanceSlider.svelte | rangeLabel | Percentage | 1",

@@ -60,8 +60,8 @@
   intro and the outer tab box's own layout unstyled. Retiring the `manager-*` names is issue 1507's.
 -->
 <script>
-  import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Chip from './Chip.svelte';
+  import ManagerButton from './ManagerButton.svelte';
 
   let {
     title = 'Validation',

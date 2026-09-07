@@ -81,7 +81,7 @@ const harness = createMountedComponentHarness({
     // The world modifier library's row, which the prerequisite list and the bonus list both
     // draw since issue 1373's round 5. Static in this tree, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',

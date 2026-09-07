@@ -23,7 +23,7 @@
   omitted upstream.
 -->
 <script>
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
+  import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { checkIssueCopy, checkTickCopy, interpolate } from './checksCopy.js';
   import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';

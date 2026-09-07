@@ -19,7 +19,7 @@
   `recipe-validation-tab` — has to learn a new name.
 -->
 <script>
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
+  import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';

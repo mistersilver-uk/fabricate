@@ -4,7 +4,7 @@
   import Chip from '../../components/Chip.svelte';
   import Callout from './Callout.svelte';
   import EditorTabs from '../../components/EditorTabs.svelte';
-  import EditorValidationSurface from './EditorValidationSurface.svelte';
+  import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
   import InheritRow from './scoped/InheritRow.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';

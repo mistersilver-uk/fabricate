@@ -162,7 +162,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
   // THE validation surface (issue 1444). The Validation tab hands it the readiness and
   // renders none of the markup itself, so omitting it CANCELS this suite.
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',

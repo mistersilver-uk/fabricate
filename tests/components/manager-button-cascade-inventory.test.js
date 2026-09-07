@@ -200,7 +200,7 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte', sites: 1 }),
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+        file: 'src/ui/svelte/components/EditorValidationSurface.svelte',
         sites: 1,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),

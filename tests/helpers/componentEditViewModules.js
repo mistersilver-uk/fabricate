@@ -156,7 +156,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // import of `ComponentEditView`, so an omission here HANGS every suite built on this list and
   // is reported as `# cancelled` rather than `# fail`.
   'src/ui/svelte/components/EditorTabs.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   // `ExplainerCard`'s own card shell, two rungs down from this tree's root.

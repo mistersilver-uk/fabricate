@@ -1044,7 +1044,7 @@ Each issue offers an action that moves focus to the offending control.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 
-The arrangement has ONE implementation, `src/ui/svelte/apps/manager/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
+The arrangement has ONE implementation, `src/ui/svelte/components/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
 That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
 A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.

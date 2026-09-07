@@ -180,7 +180,7 @@ const SHARED_PRIMITIVES = [
   // editors. It sits in more mounted trees than its four direct callers suggest, because the
   // scoped shell in between puts it in every tree that mounts an essence or a tool — and the
   // conversion that closed it dropped it into two more, each of which had to name it or hang.
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   // THE manager's searchable picker (issue 1458), and the entry with the LONGEST tail: it
   // renders `Chip` and `EmptyState`, both already here, so an omission does not cancel one
   // suite's tests — it cancels them for the reason a reader will not look for, a missing

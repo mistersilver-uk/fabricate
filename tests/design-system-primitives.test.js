@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -157,7 +157,6 @@ const EXPECTED_OVERRIDE_KEYS = [
   // widening moved the neutral default in one window and the tinted title-bearing form in the
   // other. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change.
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
@@ -187,6 +186,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // them here, which preserves the routing rather than inventing one — and is why this entry does
   // not appear in `PRIMITIVES_WITH_NO_FRAME` even for a commit: it never spent one there.
   'src/ui/svelte/components/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
@@ -428,7 +428,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 261);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 237);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

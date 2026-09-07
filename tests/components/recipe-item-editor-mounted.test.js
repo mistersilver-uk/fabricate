@@ -99,7 +99,7 @@ const harness = createMountedComponentHarness({
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
     // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
     // listed above via the `SELECT_COMPILED_MODULES` spread.
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],

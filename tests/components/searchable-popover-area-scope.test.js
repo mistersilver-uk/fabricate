@@ -789,7 +789,7 @@ const PRIMITIVES = Object.freeze([
     // red with the reader's own named error rather than reading the array. The root is the array's
     // FIRST literal because that is the position the composed reader takes as the namespace class.
     name: 'EditorValidationSurface',
-    components: Object.freeze(['src/ui/svelte/apps/manager/EditorValidationSurface.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/EditorValidationSurface.svelte']),
     roots: Object.freeze(['fabricate-validation']),
     // TWO prefixes and one exact name, and the EXCLUSIONS are the load-bearing part. This
     // namespace is crowded: measured on this sheet, `.manager-recipe-*` occurs 457 times across

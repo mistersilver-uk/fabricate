@@ -612,7 +612,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // and the Checks route's ISSUE rows rather than in every frame. Whether the lab world's
   // fixtures put either surface into a state that has one was not established here, so a
   // change to that button's treatment may publish two frames that do not contain it.
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte': Object.freeze([
+  'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
   ]),
