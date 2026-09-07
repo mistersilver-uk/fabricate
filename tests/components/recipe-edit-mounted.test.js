@@ -1065,13 +1065,24 @@ describe('RecipeEditView (mounted)', () => {
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
     const placeholder = picker.querySelector('.manager-availability-any').textContent.trim();
     const status = picker.querySelector('[data-modifier-pill-status]').textContent.trim();
-    assert.equal(
-      picker
-        .querySelector('[data-recipe-crafting-modifier-suppressed]')
-        ?.getAttribute('data-recipe-crafting-modifier-suppressed'),
-      '2',
-      'both picks are counted as kept-but-hidden, which is what the row must not contradict'
+    // ONE explanation, not two. The placeholder above already carries the whole sentence the
+    // separate note carries — verbatim from "the check no longer marks them selectable" on —
+    // and this is the one state in which both are guaranteed to render together, so the note
+    // stands down here. It still renders whenever SOME pick survives; that case is pinned by
+    // the counting test above.
+    assert.ok(
+      !picker.querySelector('[data-recipe-crafting-modifier-suppressed]'),
+      'the note does not repeat, word for word, what the placeholder above it just said'
     );
+    // And nothing describes the group by an element that is no longer on the page.
+    const describedBy =
+      picker.querySelector('[data-modifier-pill-select]')?.getAttribute('aria-describedby') ?? '';
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      assert.ok(
+        Boolean(target.querySelector(`#${id}`)),
+        `aria-describedby names ${id}, which is not rendered`
+      );
+    }
     for (const [where, sentence] of [
       ['placeholder', placeholder],
       ['live status', status],

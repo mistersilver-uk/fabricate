@@ -299,13 +299,21 @@
         )
   );
 
+  // WHEN THE NOTE IS WORTH SAYING SEPARATELY. It explains a suppression the GM can see
+  // PART of — some chips drawn, some missing. Once every pick is suppressed the placeholder
+  // above IS that explanation, word for word from "the check no longer marks them
+  // selectable" on, so rendering both reads the same sentence twice in the one state where
+  // both are guaranteed to co-occur.
+  const showSuppressedNote = $derived(suppressedPickCount > 0 && !allPicksSuppressed);
+
   // Both notes describe the pill group, and `aria-describedby` takes a LIST — a screen
   // reader that heard only the cap would be told how many picks are allowed and never
-  // that some of the recipe's own are missing from the row it is reading.
+  // that some of the recipe's own are missing from the row it is reading. It tracks the
+  // note's own condition, so the group is never described by an unrendered element.
   const modifierDescribedBy = $derived(
     [
       modifierCapBounded ? MODIFIER_CAP_HINT_ID : '',
-      suppressedPickCount > 0 ? MODIFIER_SUPPRESSED_ID : '',
+      showSuppressedNote ? MODIFIER_SUPPRESSED_ID : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -735,11 +743,12 @@
               {capText}{atModifierPickCap ? ` ${capReachedText}` : ''}
             </p>
           {/if}
-          {#if suppressedPickCount > 0}
-            <!-- Rendered ONLY when a stored pick is currently un-marked, so the ordinary
-                 recipe carries no standing warning. The count is on the attribute as well
-                 as in the sentence: the sentence is localized and a frame or a test
-                 reading it would be asserting the translation. -->
+          {#if showSuppressedNote}
+            <!-- Rendered ONLY when a stored pick is currently un-marked AND at least one
+                 survives, so the ordinary recipe carries no standing warning and the
+                 all-suppressed row is not told the same thing twice. The count is on the
+                 attribute as well as in the sentence: the sentence is localized and a frame
+                 or a test reading it would be asserting the translation. -->
             <p
               class="manager-muted manager-recipe-modifier-suppressed"
               id={MODIFIER_SUPPRESSED_ID}

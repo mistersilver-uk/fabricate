@@ -406,13 +406,22 @@ describe('SubjectModifierPicker (mounted)', () => {
     const { target } = await mount({ selectedIds: ['med', 'alch'], inheritedIds: [] });
     const placeholder = target.querySelector('.manager-availability-any').textContent.trim();
     const status = target.querySelector('[data-modifier-pill-status]').textContent.trim();
-    assert.equal(
-      target
-        .querySelector('[data-subject-modifier-suppressed]')
-        ?.getAttribute('data-subject-modifier-suppressed'),
-      '2',
-      'both picks are counted as kept-but-hidden, which is what the row must not contradict'
+    // ONE explanation, not two. The placeholder above already carries the whole sentence the
+    // separate note carries, and this is the one state in which both are guaranteed to render
+    // together, so the note stands down here. It still renders whenever SOME pick survives;
+    // that case is pinned by the counting test above.
+    assert.ok(
+      !target.querySelector('[data-subject-modifier-suppressed]'),
+      'the note does not repeat, word for word, what the placeholder above it just said'
     );
+    const describedBy =
+      target.querySelector('[data-modifier-pill-select]')?.getAttribute('aria-describedby') ?? '';
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      assert.ok(
+        Boolean(target.querySelector(`#${id}`)),
+        `aria-describedby names ${id}, which is not rendered`
+      );
+    }
     for (const [where, sentence] of [
       ['placeholder', placeholder],
       ['live status', status],

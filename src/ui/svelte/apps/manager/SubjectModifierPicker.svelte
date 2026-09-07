@@ -220,10 +220,18 @@
       : text(copy.emptySetKey, copy.emptySet)
   );
 
+  // WHEN THE NOTE IS WORTH SAYING SEPARATELY. It explains the suppression a GM can see
+  // PART of — some chips drawn, some missing. Once every pick is suppressed the placeholder
+  // above IS that explanation, word for word from "the check no longer marks them
+  // selectable" on, so rendering both reads the same sentence to a GM twice in the one
+  // state where both are guaranteed to co-occur.
+  const showSuppressedNote = $derived(suppressedCount > 0 && !allPicksSuppressed);
+
   // `aria-describedby` takes a LIST: a reader told only the cap would never hear that some
-  // of this record's own picks are missing from the row it is reading.
+  // of this record's own picks are missing from the row it is reading. It tracks the note's
+  // own condition, so the group is never described by an element that is not rendered.
   const describedBy = $derived(
-    [capBounded ? CAP_HINT_ID : '', suppressedCount > 0 ? SUPPRESSED_ID : '']
+    [capBounded ? CAP_HINT_ID : '', showSuppressedNote ? SUPPRESSED_ID : '']
       .filter(Boolean)
       .join(' ')
   );
@@ -329,10 +337,12 @@
           {capText}{atCap ? ` ${capReachedText}` : ''}
         </p>
       {/if}
-      {#if suppressedCount > 0}
-        <!-- Only when a stored pick is currently un-marked, so an ordinary record carries
-             no standing warning. The count rides the attribute as well as the sentence:
-             the sentence is localized, and a test reading it would assert a translation. -->
+      {#if showSuppressedNote}
+        <!-- Only when a stored pick is currently un-marked AND at least one survives, so an
+             ordinary record carries no standing warning and the all-suppressed row is not
+             told the same thing twice. The count rides the attribute as well as the
+             sentence: the sentence is localized, and a test reading it would assert a
+             translation. -->
         <p
           class="manager-muted"
           id={SUPPRESSED_ID}
