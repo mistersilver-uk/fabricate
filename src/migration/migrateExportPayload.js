@@ -605,10 +605,24 @@ function seedFailureResultPolicy(migrated) {
  * cosmetic: the transform intersects the seed with the world modifier catalogue, and on a bundle
  * predating 1308 that catalogue exists only as the system's own copy until that lift has run.
  *
- * BRANCH-INDEPENDENT for the same reason as its siblings above: `migrateExportPayload` returns
- * early once `payload.schemaVersion` is already current, and every bundle written by the shipping
- * build carries the current schema, so a derivation reachable only from the legacy branch would
- * never run on a real bundle. Idempotent — a second pass finds the mark already seeded.
+ * LEGACY-BRANCH ONLY, which is where this diverges from every sibling above, and the divergence
+ * is the point rather than an oversight. Its guard is a DATA SHAPE — the `bySubject` rule with an
+ * authored empty mark — not an envelope version, and since issue 1608 that shape is also a
+ * legitimate GM ANSWER: an empty mark now means "nothing is selectable", so a GM who un-marks the
+ * last row authors precisely the state this transform keys on. The current-schema branch runs on
+ * EVERY payload forever, so seeding there would re-seed that deliberately emptied mark, and pin
+ * every sibling subject of the activity to an authored `[]`, on every export/import round trip —
+ * permanently reverting the very state issue 1608 asks the check to express, and breaking the
+ * selection triple's round-trip MUST in `import-export/spec.md` § Round-trip integrity. This is
+ * the same rule, for the same reason, as the automatic force-list clear two calls below.
+ *
+ * The legacy branch MUST still seed: a bundle carrying no schema marker predates the upgrade by
+ * construction, so its empty mark is the un-asked question the world-side pass repairs. The
+ * residual case is a bundle stamped at the current schema but exported BEFORE the upgrade — it is
+ * not seeded, so its subjects arrive bound by an empty mark and the destination GM re-marks them.
+ * That is accepted as the lesser cost: it affects only worlds exporting across the upgrade
+ * boundary, whereas seeding on the current branch would break the rule for every world forever.
+ * Idempotent — a second pass finds the mark already seeded.
  * @private
  */
 function seedSubjectModifierMarks(migrated) {
@@ -645,7 +659,6 @@ export function migrateExportPayload(payload) {
     liftCurrencyToWorldScope(current);
     liftTravelToWorldScope(current);
     liftCharacterLibrariesToWorldScope(current);
-    seedSubjectModifierMarks(current);
     foldManualCompositionForces(current, { clearAutomaticForces: false });
     deriveWorldScopeEntitySlices(current);
     return current;

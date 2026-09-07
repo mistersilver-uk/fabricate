@@ -25,6 +25,7 @@ const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { resolveEligibleModifierIds } = await import('../src/systems/checkModifierResolver.js');
+const { projectComponentSummary } = await import('../src/systems/summaryProjection.js');
 
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },
@@ -182,6 +183,42 @@ test('1.33.0 seeds and pins the SALVAGE mark from the components’ own picks', 
     migrated.components[2].salvage.checkModifierIds,
     [],
     'and one that already authored a pick of zero is left exactly as it was'
+  );
+});
+
+test('1.33.0 pins a component carrying NO salvage block without making it salvageable', () => {
+  // The pin writes `salvage.checkModifierIds` and creates the block when a component has none.
+  // It MUST NOT be guarded on the block's presence: a genuinely salvageable component that
+  // simply never opened its picker has no `checkModifierIds` sub-key either, and skipping it
+  // would hand it the whole seeded union. What makes the CREATED block inert is that every
+  // reader keys on `salvage.enabled === true`, which the pin never writes — measured here
+  // through a shipped reader rather than by inspecting the shape.
+  const systems = [
+    system({
+      components: [
+        component('c-1', ['alch']),
+        { id: 'c-bare' },
+        { id: 'c-open', salvage: { enabled: true } },
+      ],
+    }),
+  ];
+  const [, bare, open] = migrate({ systems }).systems[0].components;
+
+  assert.deepEqual(bare.salvage.checkModifierIds, [], 'the block-less component is pinned');
+  assert.deepEqual(
+    open.salvage.checkModifierIds,
+    [],
+    'and so is the salvageable one that never authored a pick'
+  );
+  assert.equal(
+    projectComponentSummary({ component: bare }).salvageEnabled,
+    false,
+    'the block the pin created carries no `enabled`, so no reader takes it for salvageable'
+  );
+  assert.equal(
+    projectComponentSummary({ component: open }).salvageEnabled,
+    true,
+    'and a component that really is salvageable is not switched off by being pinned'
   );
 });
 
@@ -427,9 +464,8 @@ test('the runner does not re-run 1.33.0 once the world is at that version', asyn
 // The IMPORT-side mirror — a bundle exported before the upgrade
 // ---------------------------------------------------------------------------
 
-test('the export upcast seeds an imported bundle’s mark from its own recipes and tasks', () => {
+test('the export upcast seeds a LEGACY bundle’s mark from its own recipes and tasks', () => {
   const upcast = migrateExportPayload({
-    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: system({ components: [component('c-1', ['alch']), component('c-2')] }),
     recipes: [recipe('r-1', ['med']), recipe('r-2')],
     gatheringConfig: { system: { tasks: [task('t-1', ['herb']), task('t-2')] }, shared: {} },
@@ -448,14 +484,58 @@ test('the export upcast seeds an imported bundle’s mark from its own recipes a
   assert.deepEqual(upcast.gatheringConfig.system.tasks[1].checkModifierIds, []);
 });
 
-test('the export upcast reads a bundle whose modifier library has not been lifted yet', () => {
+test('the export upcast reads a LEGACY bundle whose modifier library has not been lifted yet', () => {
   // A bundle predating the 1308 lift carries its library on the SYSTEM. The seed runs after the
   // upcast's own lift, so the catalogue is known by the time the intersection is taken.
   const upcast = migrateExportPayload({
-    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: system({ modifiers: CATALOGUE }),
     recipes: [recipe('r-1', ['med'])],
     gatheringConfig: { system: {}, shared: {} },
   });
   assert.deepEqual(upcast.system.craftingCheck.defaultModifierIds, ['med']);
+});
+
+test('the export upcast leaves a CURRENT-schema bundle alone — there an empty mark is an ANSWER', () => {
+  // Since issue 1608 an empty mark under `bySubject` MEANS “nothing is selectable”, so a GM who
+  // un-marks the last row authors exactly the shape this seed keys on. The current-schema branch
+  // runs on EVERY payload forever, so seeding there would revert that answer — and pin every
+  // sibling subject of the activity — on every export/import round trip, which is the selection
+  // triple round-trip `import-export/spec.md` § Round-trip integrity requires.
+  const payload = {
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
+    system: system({ components: [component('c-1', ['alch']), component('c-2')] }),
+    recipes: [recipe('r-1', ['med']), recipe('r-2')],
+    gatheringConfig: { system: { tasks: [task('t-1', ['herb']), task('t-2')] }, shared: {} },
+    characterLibraries: LIBRARIES,
+  };
+  const before = structuredClone(payload);
+
+  const upcast = migrateExportPayload(payload);
+
+  // The selection triple, which `import-export/spec.md` § Round-trip integrity names by field.
+  // `failureResultPolicy` is a separate, legitimate branch-independent derivation and is not
+  // part of the triple, so the comparison is per key rather than over the whole check.
+  const triple = (check) => ({
+    defaultModifierPolicy: check.defaultModifierPolicy,
+    defaultModifierIds: check.defaultModifierIds,
+    maxModifierPicks: check.maxModifierPicks,
+  });
+  for (const key of ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck']) {
+    assert.deepEqual(
+      triple(upcast.system[key]),
+      triple(before.system[key]),
+      `${key}'s selection triple must round-trip: the GM emptied this mark on purpose`
+    );
+  }
+  assert.deepEqual(upcast.recipes, before.recipes, 'no recipe pick is rewritten or pinned');
+  assert.deepEqual(
+    upcast.system.components,
+    before.system.components,
+    'no component salvage pick is rewritten or pinned'
+  );
+  assert.deepEqual(
+    upcast.gatheringConfig.system.tasks,
+    before.gatheringConfig.system.tasks,
+    'no gathering task pick is rewritten or pinned'
+  );
 });
