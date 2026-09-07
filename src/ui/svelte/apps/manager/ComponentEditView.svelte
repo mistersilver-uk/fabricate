@@ -2333,8 +2333,9 @@
 
                           {#if result.componentId}
                             <!-- Opens the referenced YIELD component's editor — the IN-MANAGER
-                         component-edit view, not the standalone SvelteComponentEditorApp
-                         window. Component -> component navigation is guarded
+                         component-edit view. The standalone editor window this once had to be
+                         told apart from was deleted at issue 1520 as orphaned, and the in-manager
+                         route is now the only one. Component -> component navigation is guarded
                          (confirmComponentRouteExit deliberately has no component-edit
                          bypass), so a dirty draft prompts rather than being discarded. -->
                             <button

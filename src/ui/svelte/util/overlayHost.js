@@ -33,14 +33,19 @@
  * resolve through `resolveOverlayHost` against the same node, so they cannot.
  *
  * ── THE ROOT SET, AND WHY IT IS EXACTLY THESE TWO ───────────────────────────────────────────
- * Fabricate ships six Svelte applications. Their roots are:
+ * Fabricate ships five Svelte applications. Their roots are:
  *
  *   SvelteCraftingSystemManagerApp  window `.crafting-system-manager`  root `.fabricate-manager`
  *   SvelteFabricateApp              window `.fabricate-app`            root `.fabricate-app-shell`
- *   SvelteComponentEditorApp        window `.component-editor-app`     root `.fabricate-component-editor`
  *   InteractablesManagerApp         window `.fabricate-interactables-manager`
  *   InteractableBrowserApp          window `.fabricate-interactable-browser-app`
  *   InteractableConfigApp           window `.fabricate-interactable-config-app`
+ *
+ * A SIXTH stood here until issue 1520: the standalone component-editor application, window
+ * `.component-editor-app` over root `.fabricate-component-editor`. It was orphaned — its only
+ * constructor call was a manager service nothing consumed — and issue 1520 deleted it.
+ * `ComponentEditorRoot.svelte` survives it and is not mounted by any application, so its root
+ * class is no longer an application root and is deliberately absent from the list above.
  *
  * Only two of those can host an overlay, and the reason is POSITIONING rather than taxonomy: a
  * host is only usable as a coordinate origin if it is also the containing block of the
@@ -57,7 +62,7 @@
  * `tests/components/portal-host-app-root.test.js` pins both halves: that no component
  * hard-codes a root of its own, and that every class named here is genuinely positioned.
  *
- * The other four applications reach none of the overlay components today (measured by walking
+ * The other three applications reach none of the overlay components today (measured by walking
  * the import graph from each app root), so adding them would be adding untested capability.
  * When one of them grows an overlay, add its root here AND to the positioning proof.
  *

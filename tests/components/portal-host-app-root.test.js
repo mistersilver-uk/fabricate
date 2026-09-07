@@ -323,8 +323,10 @@ test('the application-root vocabulary is derived from the applications themselve
 
   assert.ok(
     roots.size >= 10,
-    `only ${roots.size} application-root classes were derived. Seven applications contribute ` +
-      'thirteen; a collapse to a handful means the reader is finding one layer and not the other.'
+    `only ${roots.size} application-root classes were derived. Six applications contribute ` +
+      'eleven — measured after issue 1520 deleted the orphaned component-editor window, which ' +
+      'took its window and Svelte-root classes with it; a collapse to a handful means the ' +
+      'reader is finding one layer and not the other.'
   );
 });
 
