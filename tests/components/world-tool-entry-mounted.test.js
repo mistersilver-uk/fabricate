@@ -93,7 +93,7 @@ const harness = createMountedComponentHarness({
     // The world modifier library's row. Since issue 1373's round 5 the prerequisite list
     // and the bonus list are both this one component, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components

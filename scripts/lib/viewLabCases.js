@@ -560,6 +560,28 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // Foundry assigns default artwork on creation, so no lab character is art-less. It is held by
   // `tests/components/avatar-mounted.test.js` instead.
   'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
+  // THE editor tab strip (issue 1509), and the FIRST key this table gains because a component
+  // MOVED rather than because one acquired a state its frames could not reach. The strip was an
+  // `evidence: 'targeted'` row under `apps/manager/`, so the six cases that render it claimed it
+  // through their own `sourceMatches`; moving it into `components/` puts it behind the DIRECTORY
+  // leg of `BROAD_SIGNAL_PATTERN`, and `selectRenderFileCases` `continue`s on a broad-signal file
+  // BEFORE it reads any case's `sourceMatches`. Left where they were, those six claims would be
+  // silently unreachable and a change to the strip would publish the representative pair alone.
+  // So the six patterns were DELETED in the same commit and re-expressed here: this entry
+  // PRESERVES the routing that shipped rather than inventing one.
+  //
+  // Six, because between them they draw every vocabulary of the strip — the system editor's
+  // strip, the recipe-item editor's overview and validation tabs, the one Checks section tab
+  // wearing a count and a dot at once, the environment editor's Events tab, and the Knowledge
+  // editor's learned/lost counts in their active and inactive treatments together.
+  'src/ui/svelte/components/EditorTabs.svelte': Object.freeze([
+    'manager-system-edit-normal',
+    'manager-recipe-item-overview',
+    'manager-recipe-item-validation',
+    'manager-checks-section-badged-and-dotted',
+    'manager-environment-edit-events',
+    'manager-knowledge-learned-lost-copy',
+  ]),
   // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
   // representative frame can contain one, and that is established from the static import
   // closure rather than from looking at a frame: walking every transitive `.svelte` import,
@@ -1447,12 +1469,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'system-edit',
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       // `ResolutionModeCard` LEFT this alternation at issue 1509, which deleted the file: the
       // shim's four call sites render `RadioCardGroup` directly now. A dead branch of an
@@ -4892,7 +4908,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-recipe-item-tab="overview"]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
@@ -4915,12 +4930,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'recipe-item-edit',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
@@ -6654,11 +6663,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The editor tab strip draws BOTH of this frame's markers since issue 1429, so a
-      // change to it must be photographed here. This is the only case in the registry that
-      // renders a tab wearing a count and a dot at once, which makes it the one frame where
-      // a regression in either drawing — or in how they share the slot — is visible.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
     kinds: ['manager', 'checks'],
   }),
@@ -7955,12 +7959,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
@@ -10157,11 +10155,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
-      // The editor tab strip draws this surface's two tab counts since issue 1429, which
-      // moved them off the chip and onto the Rail Marker Family's record-count vehicle. This
-      // frame is the one that opens on the OTHER tab, so it is the case where the count's
-      // active and inactive treatments appear together.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
   }),
   managerCase({

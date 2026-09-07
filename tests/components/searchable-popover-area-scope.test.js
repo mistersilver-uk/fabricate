@@ -742,7 +742,7 @@ const PRIMITIVES = Object.freeze([
     // `` class={`fabricate-tabs ${containerClass}`} ``, a literal the markup reader already sees,
     // which is what keeps the emission clause reading an element the component actually writes.
     name: 'EditorTabs',
-    components: Object.freeze(['src/ui/svelte/apps/manager/EditorTabs.svelte']),
+    components: Object.freeze(['src/ui/svelte/components/EditorTabs.svelte']),
     roots: Object.freeze(['fabricate-tabs']),
     // ONE prefix, token-terminated, with a lookahead that refuses `manager-editor-table*`. The
     // sheet holds no such class today; the guard is written anyway because the FIXTURE census this

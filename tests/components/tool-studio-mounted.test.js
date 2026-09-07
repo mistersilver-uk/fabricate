@@ -118,7 +118,7 @@ const harness = createMountedComponentHarness({
     // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in
     // this tree's static graph. `ToolOverviewTab` is NOT: issue 1373 retired the Overview tab
     // from the SYSTEM rules editor, because a crafting system authors no identity.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     // The shared `REPLACEMENT COMPONENT` card (issue 1373, maintainer round 2). The system
     // editor's own bespoke block became a caller of it, so it is in this tree's static graph

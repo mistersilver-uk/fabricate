@@ -155,7 +155,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // `How players see it` rail — and the rail brings two leaves of its own. Every one is a STATIC
   // import of `ComponentEditView`, so an omission here HANGS every suite built on this list and
   // is reported as `# cancelled` rather than `# fail`.
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',

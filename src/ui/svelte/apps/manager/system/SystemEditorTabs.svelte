@@ -11,7 +11,7 @@
   `manager-environment-tab-button` / `-badge` classes, so no shipped rule stops matching.
 -->
 <script>
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
 
   let { activeTab = 'settings', badges = {}, onSelect = () => {} } = $props();
 

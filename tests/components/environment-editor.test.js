@@ -41,7 +41,7 @@ const tabsSource = read('EnvironmentEditorTabs.svelte');
 // component that RENDERS them. Left pointed at the caller they would have gone green over an
 // empty file: `EnvironmentEditorTabs.svelte` no longer contains a single one of those tokens.
 const editorTabsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/EditorTabs.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/EditorTabs.svelte'),
   'utf8'
 );
 const evidenceSource = read('MatchingEvidenceChips.svelte');

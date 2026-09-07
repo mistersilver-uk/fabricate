@@ -179,6 +179,14 @@ const EXPECTED_OVERRIDE_KEYS = [
   // mode rather than through a `sourceMatches` claim, and it leaves `PRIMITIVES_WITH_NO_FRAME`
   // in the same change.
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above
+  // — the component did not acquire a state and it did not arrive. It MOVED. It was an
+  // `evidence: 'targeted'` row under `apps/manager/` with six cases claiming it by `sourceMatches`,
+  // and `components/` is a broad signal by DIRECTORY, so `selectRenderFileCases` stopped reading
+  // those six claims the moment the file landed. The move commit deleted them and re-expressed
+  // them here, which preserves the routing rather than inventing one — and is why this entry does
+  // not appear in `PRIMITIVES_WITH_NO_FRAME` even for a commit: it never spent one there.
+  'src/ui/svelte/components/EditorTabs.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither

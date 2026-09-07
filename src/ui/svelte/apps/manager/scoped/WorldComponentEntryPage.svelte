@@ -50,7 +50,7 @@
   import { localize, notifyError, notifyWarn } from '../../../util/foundryBridge.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

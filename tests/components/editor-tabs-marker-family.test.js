@@ -39,9 +39,9 @@ const harness = createMountedComponentHarness({
     // vehicle. A `.svelte` the tree renders but the harness omits HANGS the suite
     // (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  componentPath: 'src/ui/svelte/components/EditorTabs.svelte',
 });
 
 before(() => harness.setup());

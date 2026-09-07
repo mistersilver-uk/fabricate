@@ -133,7 +133,7 @@ const SHARED_PRIMITIVES = [
   // tree. That is what makes it sharp: every further strip that stops hand-rolling its
   // markers drops it into another mounted tree, and each omission costs a HUNG suite rather
   // than a failing one.
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
   // THE manager's on/off switch (issue 1040). Sharper again than `ManagerButton`: the switch
   // shipped as a hand-rolled element TREE at 37 sites in 26 components, and converting them
   // dropped this leaf into 25 mounted trees in one change — the browsers, every studio's

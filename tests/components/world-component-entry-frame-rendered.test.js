@@ -85,7 +85,7 @@ const compiledExtras = [
   'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',

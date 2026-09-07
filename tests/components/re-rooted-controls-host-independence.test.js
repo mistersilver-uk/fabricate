@@ -258,19 +258,19 @@ const SLIDER_CLASSES = (() => {
  * became the only site that renders.
  */
 const TABS_ROOT = (() => {
-  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const source = read('src/ui/svelte/components/EditorTabs.svelte');
   const match = source.match(/class=\{`(fabricate-tabs) \$\{containerClass\}`\}/);
   assert.ok(match, 'EditorTabs must write its family root ahead of the container class it takes');
   return match[1];
 })();
 const TABS_CONTAINER_CLASS = (() => {
-  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const source = read('src/ui/svelte/components/EditorTabs.svelte');
   const match = source.match(/container: '([\w-]+)'/);
   assert.ok(match, 'EditorTabs must declare its container class in `DEFAULT_CLASSES`');
   return match[1];
 })();
 const TABS_BUTTON_CLASS = (() => {
-  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const source = read('src/ui/svelte/components/EditorTabs.svelte');
   const match = source.match(/button: '([\w-]+)'/);
   assert.ok(match, 'EditorTabs must declare its button class in `DEFAULT_CLASSES`');
   return match[1];

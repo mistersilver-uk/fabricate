@@ -8,7 +8,7 @@
   the conversion.
 -->
 <script>
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
 

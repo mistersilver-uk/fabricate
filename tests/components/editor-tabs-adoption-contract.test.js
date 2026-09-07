@@ -57,7 +57,7 @@ import {
 import { byCodePoint } from '../helpers/ratchetBaseline.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const PRIMITIVE = 'src/ui/svelte/apps/manager/EditorTabs.svelte';
+const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 
 /**
@@ -124,7 +124,7 @@ definePrimitiveAdoptionContract({
   booleanProps: Object.freeze(['activePanelOnly', 'danger']),
   rawRemedy:
     'these components hand-roll the tab button that ' +
-    'src/ui/svelte/apps/manager/EditorTabs.svelte owns. Render `<EditorTabs>` instead — the ' +
+    'src/ui/svelte/components/EditorTabs.svelte owns. Render `<EditorTabs>` instead — the ' +
     'button and panel id stems, the per-button `data-*` hook, the container and button classes ' +
     'and the strip`s accessible name are all props, so no converted site changes a rendered id, ' +
     '`aria-controls`, attribute name or class. A mark the caller cannot express is a MISSING ' +
@@ -137,18 +137,25 @@ definePrimitiveAdoptionContract({
 });
 
 /**
- * Every raw element under `apps/manager/` carrying `role="tablist"`, with its file.
+ * Every raw element under `apps/manager/` — plus the primitive itself — carrying `role="tablist"`.
  *
  * Parsed rather than grepped, on the same rule the factory records: `role="tablist"` appears in
  * DOCBLOCK PROSE in four components in this corpus and inside a test-facing comment in more, and
  * a text scan reports every one of those as a hand-rolled strip.
+ *
+ * THE PRIMITIVE IS NAMED EXPLICITLY BECAUSE IT LEFT THE DIRECTORY (issue 1509). The strip moved to
+ * `src/ui/svelte/components/`, so a walk bounded by `apps/manager/` alone stops seeing the one
+ * tablist the corpus is guaranteed to hold — and the vacuity guard below, which exists precisely
+ * to prove the walk found something, would have been the assertion that reported it. Widening the
+ * domain by the primitive's own path keeps both the guard and the pinned set meaning what they
+ * meant: everything in the manager, and the file that is supposed to write this.
  *
  * @returns {string[]} repo-relative paths, one entry per raw tablist element
  */
 function rawManagerTablists() {
   const found = [];
   for (const [file, source] of Object.entries(SOURCES)) {
-    if (!file.startsWith(MANAGER_DIRECTORY)) continue;
+    if (!file.startsWith(MANAGER_DIRECTORY) && file !== PRIMITIVE) continue;
     walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
       if (node.type === 'Component') return;
       const role = (node.attributes ?? []).find(
@@ -173,10 +180,11 @@ function rawManagerTablists() {
  * converts and a new hand-rolled one appears and the count never moves.
  */
 const TABLIST_HOSTS = Object.freeze([
-  // In CODE-POINT order, matching the walk's own comparator: `E` sorts before `d`.
+  // In CODE-POINT order, matching the walk's own comparator. The order INVERTED at issue 1509:
+  // while the primitive sat beside its callers, `E` sorted before `d` and it came first; now that
+  // it lives under `components/`, `apps/` sorts before `components/` and it comes last. Nothing
+  // about the membership changed — only where the two files live.
   //
-  // THE primitive. It is the one file that is supposed to write this.
-  `${MANAGER_DIRECTORY}EditorTabs.svelte`,
   // CONVERSION PENDING, not a justified divergence. `scripts/lib/designSystemPrimitives.json`
   // carries the re-adjudication: issue 1038 ruled it out led by the 177 lines of scoped `<style>`
   // it owns, and issue 1429 re-read that under the maintainer's ruling and found the load-bearing
@@ -186,6 +194,8 @@ const TABLIST_HOSTS = Object.freeze([
   // ruling says the primitive ABSORBS AS CAPABILITIES. Deleting this entry is the goal; widening
   // this list is not.
   `${MANAGER_DIRECTORY}downtime/WorldDowntimeTabs.svelte`,
+  // THE primitive. It is the one file that is supposed to write this.
+  PRIMITIVE,
 ]);
 
 test('the manager tablist walk is alive, so the clause below is not vacuous', () => {
@@ -199,7 +209,7 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
   // strips — the exact vacuity the class detector's synthetic fixture exists to rule out, stated
   // here against the one positive case the corpus is guaranteed to keep.
   assert.ok(
-    rawManagerTablists().includes(`${MANAGER_DIRECTORY}EditorTabs.svelte`),
+    rawManagerTablists().includes(PRIMITIVE),
     'the walk cannot see `EditorTabs` own `<div role="tablist">`, so it sees no tablist at all'
   );
 });

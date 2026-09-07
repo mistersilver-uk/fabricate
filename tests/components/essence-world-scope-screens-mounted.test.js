@@ -153,7 +153,7 @@ const entryHarness = createMountedComponentHarness({
   compiledModules: [
     ...SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',

@@ -131,8 +131,8 @@
   own overrides, which name the caller's container, are untouched.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
-  import Chip from '../../components/Chip.svelte';
+  import { localize } from '../util/foundryBridge.js';
+  import Chip from './Chip.svelte';
 
   /*
     THE FAMILY THIS COMPONENT WRITES, HOISTED OUT OF THE PROP DEFAULTS (issue 1509).

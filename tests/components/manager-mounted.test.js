@@ -449,10 +449,14 @@ function compileManagerRoot() {
   // The shared chip (issue 883, already compiled above via `SELECT_COMPILED_MODULES`). The
   // root reaches it through the Tool Studio and Knowledge trees today, and through every
   // other manager screen as the conversion proceeds.
-  // THE manager's editor tab strip (issue 1362). The environment, system and recipe-item
-  // strips are callers of it now, and all three are in this root's static graph, so omitting
-  // it HANGS every mounted manager test as `# cancelled` rather than failing one.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  // THE manager's editor tab strip (issue 1362, moved to `components/` at issue 1509). The
+  // environment, system and recipe-item strips are callers of it now, and all three are in this
+  // root's static graph. The hang model this comment carried is wrong for THIS suite and is
+  // corrected rather than copied on: `assertCompiledSvelteClosure` below walks the root's static
+  // `.svelte` graph and THROWS by name for a module the tree renders and this list omits, so an
+  // omission here fails with the missing path rather than cancelling the file. The `# cancelled`
+  // reading still holds for the mounted suites that have no such validator.
+  writeCompiledSvelte('src/ui/svelte/components/EditorTabs.svelte');
   // THE manager's labelled push-button (issue 1096, already compiled above via
   // `SELECT_COMPILED_MODULES`). The root reaches it through the Tool Studio header and the
   // System Overview Modifiers card, and through every other screen as the conversion proceeds.
@@ -629,8 +633,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
   // The vocabulary tab strip, extracted out of TagsCategoriesView in issue 1429 and now a thin
-  // caller of `EditorTabs` (compiled above). Omitting a rendered `.svelte` HANGS every mounted
-  // manager test as `# cancelled` rather than failing one.
+  // caller of `EditorTabs` (compiled above, from `components/` since issue 1509). Omitting a
+  // rendered `.svelte` is caught BY NAME here rather than by a cancelled run, for the reason
+  // recorded beside that compile line.
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyTabs.svelte');
   // The one vocabulary section TagsCategoriesView renders three times (recipe
   // categories, component categories, item tags — issue 676).
