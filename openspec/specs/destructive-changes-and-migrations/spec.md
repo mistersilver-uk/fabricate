@@ -850,6 +850,37 @@ It mutates no input, throws no `FatalMigrationError`, and skips a malformed envi
     The `enabled*Ids` entries themselves survive the downgrade; what is lost is their COMPOSITION, silently, because the old engine drops a picked record that no longer matches rather than reporting it.
 11. **The `label` string is the one string a GM ever reads about this migration**, so it states the new rule in both modes, says the fold is what stops a manual environment composing nothing after the upgrade, says the clear is what keeps the manual-to-automatic guarantee, and names the downgrade cost.
 
+### Subject Modifier Mark Seed (`1.33.0`, `downgradeTo: '1.32.0'`, pure, clone-first, idempotent)
+
+Records the mark that keeps every existing subject check-modifier pick rolling, now that under `bySubject` an activity check's `defaultModifierIds` BOUNDS the subject's pick rather than merely defaulting it (`resolution-modes/spec.md`, issue 1608).
+
+1. **WHY IT EXISTS.**
+   `CraftingSystemManager._normalizeCheckModifierSelection` emits `defaultModifierIds` unconditionally, so a check whose GM never toggled a single catalogue row "Selectable" is persisted as an EMPTY ARRAY rather than as an absent key — and an empty mark bounds every pick away.
+   The resolver's absent-mark branch is therefore unreachable for persisted data, and without this pass the upgrade would silently stop applying every pick those worlds authored, on the one rule whose whole purpose is to let a record pick its own.
+2. **THE MARK IS SEEDED FROM THE SUBJECTS, PER ACTIVITY.**
+   For each of the three activity checks under `bySubject` whose mark is an AUTHORED EMPTY array, the mark becomes the union of what that activity's OWN subjects already pick — recipes for `craftingCheck`, component salvage for `salvageCraftingCheck`, gathering tasks for `gatheringCraftingCheck` — in first-seen authored order, de-duplicated, and INTERSECTED with the world modifier catalogue (the union of the world library and any surviving in-system copy, exactly as the resolver reads it).
+   The intersection DECLINES to write an unknown id and never prunes one: `resolveEligibleModifierIds` drops an id the catalogue does not know, so such an id contributed nothing before the pass and must contribute nothing after it.
+3. **EVERY INHERITING SUBJECT OF THAT ACTIVITY IS PINNED TO AN AUTHORED PICK OF NOTHING, AND THIS HALF IS NOT OPTIONAL.**
+   Under `bySubject` a subject with no authored pick resolves the MARK itself, so a record that never opened the picker rolled nothing while the mark was empty and would start rolling the whole seeded union the moment the seed landed — a larger behaviour change than the one this pass prevents, and one landing on the majority of records.
+   An authored `[]` is a real pick of zero (`src/utils/checkModifierPicks.js`), which is exactly what those records were already rolling.
+   This is the same trade the `1.29.0` force-list fold makes: explicit state is written so a semantic flip changes no outcome.
+   It is NOT the seeding that `### Canonical-Write and Legacy-Read Policy` forbids, because the written `[]` and the absence it replaces do NOT mean the same thing once the mark is non-empty — that is precisely why it must be written.
+4. **BOTH HALVES FIRE TOGETHER OR NOT AT ALL.**
+   When the union is empty there is no mark to seed, no subject is pinned, and the world is left byte-identical — so a world that never used the rule, and one whose subjects picked only ids the catalogue no longer knows, are both untouched.
+5. **NOTHING ELSE IS TOUCHED.**
+   An authored NON-EMPTY mark is the GM's own answer and is never widened, because a pick the check refuses is exactly the state issue 1608 reports.
+   A NON-ARRAY mark is the unknown-basis sentinel and bounds nothing already.
+   The other three rules read the mark as the SOURCE rather than as a bound, so an empty one already means "nothing rolls" there and seeding it would ADD modifiers to every roll.
+6. **IDEMPOTENT**, guarded by the seeded mark itself: a second pass finds a non-empty mark and returns at the same test that made it non-empty.
+7. **THE EXPORT-PAYLOAD UPCAST RUNS THE SAME PER-SYSTEM TRANSFORM ON ITS LEGACY BRANCH ONLY**, over the bundle's one system with its own recipes and gathering slice, ordered AFTER the `1.28.0` character-libraries lift so the catalogue the intersection needs is known.
+   It is the one field-level derivation there that is NOT branch-independent, because its guard is the DATA SHAPE this change turned into an answer: on the current-schema branch — which runs on every payload forever — seeding would restore a mark the GM deliberately emptied and pin every sibling subject on every export/import round trip, breaking the selection triple's round-trip requirement (`import-export/spec.md` § Round-trip integrity).
+   A bundle carrying no schema marker predates the upgrade by construction, so only there is the empty mark the un-asked question this pass repairs; a bundle stamped at the current schema but exported before the upgrade is the accepted residual, on the same terms as the `1.29.0` automatic force-list clear.
+8. **THE DOWNGRADE IS LOSSLESS**, in data and in behaviour, and is declared `downgradeLosesData: false`.
+   Nothing is removed: the pass only adds ids to a mark and an empty pick to a record that had none.
+   `1.32.0` reads the mark as a plain default rather than as a bound, so a subject with its own picks rolls exactly those picks there, and one carrying the authored `[]` resolves to no eligible modifier — which is what it resolved to under the empty mark it used to inherit.
+
+Mutated setting keys: `craftingSystems`, `recipes` and `gatheringConfig`.
+
 ### Component Essence Sections (`1.32.0`, `downgradeTo: '1.31.0'`, pure, idempotent)
 
 Elects each world component's `essences` map and marks every existing component membership record's `inherit.essences` switch, now that `essences` is a component world-default section (`## Scoped Entity Definitions` `### Component scope` requirement 2a, issue 1371 r18-store, maintainer ruling M31).

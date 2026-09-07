@@ -449,11 +449,13 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
   // `1.30.0` lifts components, essences and tools to world scope (issue 1363), and `1.31.0`
   // backfills each system's own tool prerequisites and check bonus as its own override
   // (issue 1373).
-  // The count is asserted rather than loosened so a TWELFTH migration landing here is noticed
-  // rather than absorbed — which is exactly how the fourth through eleventh were.
-  assert.equal(result.ran, 12);
+  // `1.32.0` elects each component's world essence map (issue 1371) and `1.33.0` records the
+  // mark that keeps every existing subject modifier pick rolling (issue 1608).
+  // The count is asserted rather than loosened so a FOURTEENTH migration landing here is
+  // noticed rather than absorbed — which is exactly how the fourth through thirteenth were.
+  assert.equal(result.ran, 13);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.32.0');
+  assert.equal(store.get('migrationVersion'), '1.33.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

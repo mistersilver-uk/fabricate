@@ -255,9 +255,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
   // issue 1308's 1.28.0 lifts both character libraries, and issue 1315's 1.29.0 folds manual
   // force lists into their picked lists, issue 1363's 1.30.0 lifts components, essences and
   // tools to world scope, and issue 1373's 1.31.0 backfills each system's own tool prerequisites
-  // and check bonus as its own override; the runner counts every entry it applies.
-  assert.equal(summary.ran, 10);
-  assert.equal(store.get('migrationVersion'), '1.32.0');
+  // and check bonus as its own override, issue 1371's 1.32.0 elects each component's world
+  // essence map, and issue 1608's 1.33.0 records the mark that keeps every existing subject
+  // modifier pick rolling; the runner counts every entry it applies.
+  assert.equal(summary.ran, 11);
+  assert.equal(store.get('migrationVersion'), '1.33.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

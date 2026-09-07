@@ -80,7 +80,11 @@ function mount(props = {}) {
     .mount({
       options: CATALOGUE,
       selectedIds: null,
-      inheritedIds: [],
+      // The activity MARKS the whole catalogue by default, because the mark now bounds
+      // what the picker offers (issue 1608): an unmarked catalogue offers nothing, so a
+      // fixture that left this empty would be testing the suppressed path everywhere.
+      // The inheritance cases below override it with their own mark.
+      inheritedIds: CATALOGUE.map((entry) => entry.id),
       maxPicks: null,
       subject: 'component',
       testId: 'salvage-check-modifier',
@@ -299,6 +303,180 @@ describe('SubjectModifierPicker (mounted)', () => {
     assert.ok(
       !/check modifiers/i.test(hint),
       '"pick up to 1 check modifiers" is the reading this branch exists to prevent'
+    );
+  });
+
+  // ── the activity's MARK bounds what this record may pick (issue 1608) ───────
+  //
+  // `inheritedIds` is not merely the set the inherit note names: it is what the activity
+  // MARKS selectable, and the picker offers only that. Before this, all three `bySubject`
+  // hosts were handed the whole world library, so a component or a task could pick a
+  // modifier its own check refused.
+  //
+  // `MARKED_TWO` leaves `herb` catalogued-but-unmarked, which is the shape every case
+  // below turns on.
+  const MARKED_TWO = ['med', 'alch'];
+
+  /** The ids the add menu offers — where the narrowed OFFER shows. The panel is portaled. */
+  async function offeredIds(target) {
+    target.querySelector('[data-modifier-pill-menu-button]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return [...target.querySelectorAll('[data-modifier-pill-option]')].map((option) =>
+      option.getAttribute('data-modifier-pill-option')
+    );
+  }
+
+  it('offers ONLY the modifiers the activity marks selectable (issue 1608)', async () => {
+    const { target } = await mount({ selectedIds: [], inheritedIds: MARKED_TWO });
+    assert.deepEqual(
+      await offeredIds(target),
+      MARKED_TWO,
+      'the catalogued-but-unmarked herb is not offered, though it is in the world library'
+    );
+    harness.remount();
+
+    // THE NEGATIVE CONTROL: marking herb must put it back, or the assertion above would
+    // pass equally against a picker that offered nothing at all.
+    const { target: wide } = await mount({
+      selectedIds: [],
+      inheritedIds: ['med', 'alch', 'herb'],
+    });
+    assert.deepEqual(
+      await offeredIds(wide),
+      ['med', 'alch', 'herb'],
+      'marking herb offers it, so the filter is the MARK and not some other narrowing'
+    );
+  });
+
+  it('renders no chip for a pick the activity no longer marks, and keeps it in the record (issue 1608)', async () => {
+    const { target, emitted } = await mount({
+      // `herb` was picked while it was marked; the activity has since un-marked it.
+      selectedIds: ['med', 'herb'],
+      inheritedIds: MARKED_TWO,
+    });
+    assert.ok(target.querySelector('[data-modifier-pill="med"]'), 'the marked pick still shows');
+    assert.ok(
+      !target.querySelector('[data-modifier-pill="herb"]'),
+      'the un-marked pick draws no chip — the offer is the mark, so it finds no option'
+    );
+
+    // THE POINT OF THE DESIGN: an edit made beside the suppressed id must not destroy it.
+    target.querySelector('[data-modifier-pill-remove="med"]').click();
+    assert.deepEqual(
+      emitted.at(-1),
+      ['herb'],
+      'removing the VISIBLE pick leaves the invisible one, rather than emptying the record'
+    );
+  });
+
+  it('states how many picks the activity no longer marks, and says nothing when none (issue 1608)', async () => {
+    const { target: quiet } = await mount({ selectedIds: ['med'], inheritedIds: MARKED_TWO });
+    assert.ok(
+      !quiet.querySelector('[data-subject-modifier-suppressed]'),
+      'an ordinary record carries no standing warning'
+    );
+    harness.remount();
+
+    const { target: one } = await mount({
+      selectedIds: ['med', 'herb'],
+      inheritedIds: MARKED_TWO,
+    });
+    const note = one.querySelector('[data-subject-modifier-suppressed]');
+    assert.ok(Boolean(note), 'a suppressed pick is accounted for, never silently swallowed');
+    assert.equal(
+      note.getAttribute('data-subject-modifier-suppressed'),
+      '1',
+      'the COUNT rides the attribute, not only the localized sentence'
+    );
+    // The note DESCRIBES the pill group, alongside the cap: a reader told only the cap
+    // would never hear that some of this record's own picks are missing from the row.
+    assert.match(
+      one.querySelector('[data-modifier-pill-select]').getAttribute('aria-describedby'),
+      new RegExp(note.id),
+      'and it is wired into the group’s description rather than left visual-only'
+    );
+  });
+
+  it('says the picks are HIDDEN rather than absent when the activity marks NONE of them (issue 1608)', async () => {
+    // THE ZERO POINT of the suppression cohort: the activity marks nothing, so EVERY
+    // authored pick is suppressed and the pill row draws no chip. The row then falls back
+    // to its empty-set copy — the visible placeholder AND the `aria-live` summary — which
+    // was written for the OTHER zero, an authored pick of nothing, and says "nothing is
+    // added" directly above a note that says the picks are kept.
+    const { target } = await mount({ selectedIds: ['med', 'alch'], inheritedIds: [] });
+    const placeholder = target.querySelector('.manager-availability-any').textContent.trim();
+    const status = target.querySelector('[data-modifier-pill-status]').textContent.trim();
+    // ONE explanation, not two. The placeholder above already carries the whole sentence the
+    // separate note carries, and this is the one state in which both are guaranteed to render
+    // together, so the note stands down here. It still renders whenever SOME pick survives;
+    // that case is pinned by the counting test above.
+    assert.ok(
+      !target.querySelector('[data-subject-modifier-suppressed]'),
+      'the note does not repeat, word for word, what the placeholder above it just said'
+    );
+    const describedBy =
+      target.querySelector('[data-modifier-pill-select]')?.getAttribute('aria-describedby') ?? '';
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      assert.ok(
+        Boolean(target.querySelector(`#${id}`)),
+        `aria-describedby names ${id}, which is not rendered`
+      );
+    }
+    for (const [where, sentence] of [
+      ['placeholder', placeholder],
+      ['live status', status],
+    ]) {
+      assert.ok(
+        !/nothing is added/i.test(sentence),
+        `the ${where} must not tell a GM the record adds nothing while both picks are kept`
+      );
+      assert.match(sentence, /hidden/i, `the ${where} names the state the note explains`);
+    }
+    harness.remount();
+
+    // THE OTHER ZERO IS UNTOUCHED. An authored pick of nothing against a full mark really
+    // does add nothing, and must keep saying so.
+    const { target: authoredZero } = await mount({ selectedIds: [] });
+    assert.match(
+      authoredZero.querySelector('.manager-availability-any').textContent,
+      /nothing is added/i,
+      'a real pick of zero still reads as a pick of zero'
+    );
+    assert.ok(
+      !authoredZero.querySelector('[data-subject-modifier-suppressed]'),
+      'and nothing is suppressed, which is what makes the two zeros different'
+    );
+  });
+
+  it('counts ELIGIBLE picks against the cap, so a suppressed one frees no slot it took (issue 1608)', async () => {
+    // Counting the STORED list would read two and deaden the Add menu against a chip that
+    // is not on screen to remove.
+    const { target } = await mount({
+      selectedIds: ['med', 'herb'],
+      inheritedIds: MARKED_TWO,
+      maxPicks: 2,
+    });
+    assert.equal(
+      target.querySelector('[data-subject-modifier-cap]').dataset.subjectModifierCap,
+      'available',
+      'one VISIBLE pick of two is below the cap; the suppressed herb consumes no slot'
+    );
+    assert.ok(
+      !target.querySelector('[data-modifier-pill-menu-button]').getAttribute('aria-disabled'),
+      'so the Add menu is live and the second slot is reachable'
+    );
+    harness.remount();
+
+    // …and the bound still binds: two VISIBLE picks reach it.
+    const { target: full } = await mount({
+      selectedIds: ['med', 'alch', 'herb'],
+      inheritedIds: MARKED_TWO,
+      maxPicks: 2,
+    });
+    assert.equal(
+      full.querySelector('[data-subject-modifier-cap]').dataset.subjectModifierCap,
+      'reached',
+      'two visible picks of two is AT the cap — the suppressed one neither adds nor excuses'
     );
   });
 

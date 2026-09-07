@@ -71,10 +71,11 @@
     // auto-hides everywhere else.
     minSuccessTierOptions = [],
     // Per-recipe crafting-check modifier SELECTION (issue 770, reshaped by issue 1055).
-    // `craftingModifierOptions` is the system's unified `modifiers` library ({id,label});
+    // `craftingModifierOptions` is the world's unified `modifiers` library ({id,label});
     // an empty catalogue hides the whole surface. `craftingModifierDefaultIds` is the
-    // system's default eligible set, which the Inherit state NAMES rather than describes
-    // abstractly.
+    // crafting check's own MARK over that library — the ids its catalogue card calls
+    // "Selectable". It does two jobs: the Inherit state NAMES it rather than describing
+    // it abstractly, and under Custom set it BOUNDS what this recipe may pick.
     //
     // The control writes `recipe.craftingModifier` ({ modifierIds? } | null) and authors
     // ONE axis: WHICH modifiers apply. An absent `modifierIds` inherits the system set,
@@ -139,6 +140,7 @@
   // Per-recipe crafting-modifier selection state (issue 770, reshaped by issue 1055).
   const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
   const MODIFIER_CAP_HINT_ID = 'manager-recipe-crafting-modifier-cap';
+  const MODIFIER_SUPPRESSED_ID = 'manager-recipe-crafting-modifier-suppressed';
 
   // The banner copy for each inert cause. Same two causes the Checks card names, said
   // from this tab's point of view: what the GM loses here, not what to fix there. There
@@ -192,7 +194,43 @@
     resolveMaxModifierPicks({ maxModifierPicks: craftingModifierMaxPicks })
   );
   const modifierCapBounded = $derived(Number.isFinite(modifierPickCap));
-  const atModifierPickCap = $derived(overrideModifierIds.length >= modifierPickCap);
+
+  // WHAT THIS RECIPE MAY PICK FROM is the check's MARK, not the whole library. Under
+  // `bySubject` the Checks studio's per-row eligibility pill reads "Selectable" / "Not
+  // selectable" over `defaultModifierIds`, and its intro promises "Mark which of the
+  // system's modifiers the recipe may choose from" — so the offer is the intersection of
+  // the catalogue with that mark. Before this, the promise was unkept: the picker was
+  // handed the whole world library and a recipe could pick an entry its check refused.
+  //
+  // The mark BOUNDS the pick; it does not PRUNE it. An id the recipe stored while it was
+  // marked, and the check has since un-marked, stays on disk untouched — it draws no
+  // chip, does not consume the cap, and comes back the moment the check marks it again.
+  // Nothing on this tab writes a narrowed set, so a mark toggled by mistake costs the GM
+  // no authoring. `resolveEligibleModifierIds` applies the same intersection at roll
+  // time, so the offer and the roll agree.
+  //
+  // An EMPTY mark therefore means "nothing is selectable", the same reading the Inherit
+  // sentence already gives an empty default set ("no check modifier applies to this
+  // recipe"). A non-array is the UNKNOWN-BASIS sentinel `_normalizeCheckModifierSelection`
+  // uses for `validIds`: a host that cannot vouch for the mark filters nothing and the
+  // whole catalogue is offered, rather than an unknown basis silently emptying the menu.
+  const modifierMarkKnown = $derived(Array.isArray(craftingModifierDefaultIds));
+  const eligibleOptions = $derived(
+    modifierMarkKnown
+      ? craftingModifierOptions.filter((option) => craftingModifierDefaultIds.includes(option?.id))
+      : craftingModifierOptions
+  );
+  const eligibleModifierIds = $derived(new Set(eligibleOptions.map((option) => option?.id)));
+
+  // The cap counts what the GM can SEE. A suppressed pick that consumed a slot would
+  // disable the add button with fewer chips on screen than the cap allows and no way to
+  // free one, because the chip whose remove button would free it is not rendered.
+  const pickedEligibleIds = $derived(
+    overrideModifierIds.filter((id) => eligibleModifierIds.has(id))
+  );
+  const suppressedPickCount = $derived(overrideModifierIds.length - pickedEligibleIds.length);
+  const atModifierPickCap = $derived(pickedEligibleIds.length >= modifierPickCap);
+
   // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers", following
   // the `…Selected` / `…SelectedOne` pair the pill select already uses. The at-cap clause
   // needs no count of its own: it renders immediately after the standing sentence that
@@ -219,6 +257,68 @@
     )
   );
 
+  // Suppressed picks are ACCOUNTED FOR, never silently swallowed. A chip that vanished
+  // with no sentence would read as data loss on the one surface that did not lose it, so
+  // the note states the count, why they are gone, and that they come back — which is also
+  // what tells the GM the repair lives on the Checks tab rather than here.
+  //
+  // It borrows the check pill's own word for the state ("Not selectable") so the two
+  // screens name one fact one way. Singular gets its own sentence, the pair the cap hint
+  // above already uses, rather than "1 chosen modifiers".
+  const SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierSuppressed';
+  const suppressedText = $derived.by(() => {
+    if (suppressedPickCount === 1) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierSuppressedOne',
+        'One chosen modifier is hidden because the check no longer marks it selectable. It is kept and returns if the check marks it again.'
+      );
+    }
+    const translated = localize(SUPPRESSED_KEY, { count: suppressedPickCount });
+    if (translated && translated !== SUPPRESSED_KEY) return translated;
+    return `${suppressedPickCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
+  });
+
+  // WHICH ZERO THE PILL ROW IS SHOWING. The row draws no chip in two different states and
+  // its placeholder — which is also its `aria-live` summary, so a screen-reader user hears
+  // it on every change — can only carry one sentence. Before the mark bounded the offer
+  // there was one zero: the recipe had authored no pick, and "nothing is added" was true.
+  // Now the row also empties when every stored pick is suppressed, where that sentence is
+  // FALSE and contradicts the note directly beneath it, which says the same picks are
+  // kept. So the state decides the sentence rather than the emptiness alone.
+  const allPicksSuppressed = $derived(pickedEligibleIds.length === 0 && suppressedPickCount > 0);
+  const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
+  const emptyRowText = $derived(
+    allPicksSuppressed
+      ? text(
+          ALL_SUPPRESSED_KEY,
+          'All chosen modifiers are currently hidden — the check no longer marks them selectable. They are kept and return if the check marks them again.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
+          'No modifiers — nothing is added to this recipe’s check roll.'
+        )
+  );
+
+  // WHEN THE NOTE IS WORTH SAYING SEPARATELY. It explains a suppression the GM can see
+  // PART of — some chips drawn, some missing. Once every pick is suppressed the placeholder
+  // above IS that explanation, word for word from "the check no longer marks them
+  // selectable" on, so rendering both reads the same sentence twice in the one state where
+  // both are guaranteed to co-occur.
+  const showSuppressedNote = $derived(suppressedPickCount > 0 && !allPicksSuppressed);
+
+  // Both notes describe the pill group, and `aria-describedby` takes a LIST — a screen
+  // reader that heard only the cap would be told how many picks are allowed and never
+  // that some of the recipe's own are missing from the row it is reading. It tracks the
+  // note's own condition, so the group is never described by an unrendered element.
+  const modifierDescribedBy = $derived(
+    [
+      modifierCapBounded ? MODIFIER_CAP_HINT_ID : '',
+      showSuppressedNote ? MODIFIER_SUPPRESSED_ID : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+
   // The tri-state the eligible-set select reads back. An authored empty array is "no
   // modifiers", NOT "inherit" — that collapse is the pre-1055 defect this replaces — so
   // the discriminator is `Array.isArray`, exactly as it is in `Recipe` and the resolver.
@@ -230,10 +330,14 @@
   // …which leaves exactly ONE state the persisted shape cannot express: "Custom set,
   // nothing picked yet". It writes `modifierIds: []`, the same bytes as "No modifiers".
   // Read purely, that made Custom set unreachable on a system with a catalogue but an
-  // EMPTY `defaultModifierIds` — the ordinary "every recipe picks its own" setup that
-  // `bySubject` exists to serve. The seed came back empty, `setModeOf` mapped it to
+  // EMPTY `defaultModifierIds`. The seed came back empty, `setModeOf` mapped it to
   // `none`, and the control snapped to "No modifiers" as though it had rejected the GM's
   // choice; the same snap ran going No modifiers → Custom set.
+  //
+  // That setup no longer means "every recipe picks its own": the mark now BOUNDS the
+  // pick, so an empty `defaultModifierIds` offers nothing to pick and the pin only keeps
+  // the select from snapping while the GM goes to mark some. The pin is still load-bearing
+  // for the ordinary case, where the recipe empties a marked set down to nothing.
   //
   // So the select reads the persisted shape for everything EXCEPT that one collision,
   // where a local pin decides which of the two identical shapes was meant. Deliberately
@@ -328,9 +432,15 @@
   // invariant either: `resolveEligibleModifierIds` truncates on read, deliberately, so a
   // cap lowered below what a recipe already picked is honoured whatever is on disk. A UI
   // control's constraint is never an invariant.
+  //
+  // The cap counts ELIGIBLE picks only, while the write is over the WHOLE stored list: a
+  // pick the check has since un-marked neither consumes a slot nor survives an add or a
+  // remove any less than it would have. Counting the stored list instead would refuse an
+  // add the GM has room for, against chips that are not on screen to remove.
   function toggleModifierId(id, checked) {
     const current = recipe?.craftingModifier?.modifierIds || [];
-    if (checked && !current.includes(id) && current.length >= modifierPickCap) return;
+    const counted = current.filter((existing) => eligibleModifierIds.has(existing));
+    if (checked && !current.includes(id) && counted.length >= modifierPickCap) return;
     const modifierIds = checked
       ? [...new Set([...current, id])]
       : current.filter((existing) => existing !== id);
@@ -601,23 +711,23 @@
                 )}
           </p>
         {:else}
+          <!-- The OFFER is the check's mark, not the world library: `eligibleOptions`.
+               `selectedIds` stays the WHOLE stored list, so an un-marked pick simply
+               finds no option to draw a chip from and survives every edit below. -->
           <ModifierPillSelect
-            options={craftingModifierOptions}
+            options={eligibleOptions}
             selectedIds={overrideModifierIds}
             disabled={saving}
             addDisabled={atModifierPickCap}
             testId="recipe-crafting-modifier"
             labelledBy={MODIFIER_SET_LABEL_ID}
-            describedBy={modifierCapBounded ? MODIFIER_CAP_HINT_ID : ''}
+            describedBy={modifierDescribedBy}
             menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
             allSelectedLabel={text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
               'All modifiers selected.'
             )}
-            noneSelectedLabel={text(
-              'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
-              'No modifiers — nothing is added to this recipe’s check roll.'
-            )}
+            noneSelectedLabel={emptyRowText}
             onToggle={toggleModifierId}
           />
           {#if modifierCapBounded}
@@ -631,6 +741,20 @@
               data-recipe-crafting-modifier-cap={atModifierPickCap ? 'reached' : 'available'}
             >
               {capText}{atModifierPickCap ? ` ${capReachedText}` : ''}
+            </p>
+          {/if}
+          {#if showSuppressedNote}
+            <!-- Rendered ONLY when a stored pick is currently un-marked AND at least one
+                 survives, so the ordinary recipe carries no standing warning and the
+                 all-suppressed row is not told the same thing twice. The count is on the
+                 attribute as well as in the sentence: the sentence is localized and a frame
+                 or a test reading it would be asserting the translation. -->
+            <p
+              class="manager-muted manager-recipe-modifier-suppressed"
+              id={MODIFIER_SUPPRESSED_ID}
+              data-recipe-crafting-modifier-suppressed={suppressedPickCount}
+            >
+              {suppressedText}
             </p>
           {/if}
         {/if}
@@ -846,7 +970,8 @@
   /* The cap note trails the pill row it constrains, at the same 0.25rem rhythm as the
      inherited-set line above, so the cell keeps one vertical beat whichever of the two
      trailing lines is on screen. */
-  .manager-recipe-modifier-cap {
+  .manager-recipe-modifier-cap,
+  .manager-recipe-modifier-suppressed {
     margin-block: 0.25rem 0;
   }
 </style>

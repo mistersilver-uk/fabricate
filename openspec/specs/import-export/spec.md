@@ -148,6 +148,20 @@ It MUST NOT hand back a value that ALIASES the shared function's result, because
 For a one-system corpus the re-key map MUST be EMPTY for every ACCEPTED `(system, entityType)` pair among the re-keyable types — components and tools; essences are never re-keyed and carry no map — and a pair whose map is non-empty MUST be REFUSED, so no imported bundle is ever re-keyed.
 A REFUSED pair MUST yield an empty slice AND a REPORTED refusal, never a silently empty slice: an empty slice alone is indistinguishable from a system with no world members.
 
+A payload whose activity check sits on the `bySubject` rule with an AUTHORED EMPTY `defaultModifierIds` MUST have the world-side `1.33.0` transform applied to its one system, its recipes and its gathering slice, using the SAME function that migration applies (`applySubjectModifierMarks`), not a second implementation of it.
+Import is a second ingress for exactly the records that migration rescues: a bundle exported before the upgrade carries subject picks the destination's empty mark would bound away, and the world migration cannot reach it (issue 1608, see *destructive-changes-and-migrations/spec.md* § Subject Modifier Mark Seed).
+It MUST run AFTER the character-libraries lift above, because the seed is intersected with the world modifier catalogue and on a pre-`5` bundle that catalogue exists only as the system's own copy until that lift has run.
+
+**This seed MUST NOT run on the current-schema branch.**
+It is the one field-level derivation here that is NOT branch-independent, because it is the one whose guard is a DATA SHAPE that issue 1608 turned into a legitimate ANSWER: an empty mark under `bySubject` now MEANS "nothing is selectable", so a GM who un-marks the last row authors exactly the shape the seed keys on.
+That branch runs on every payload forever, so seeding there would restore that mark and PIN every sibling subject of the activity to an authored `[]` on every export/import round trip, permanently — reverting the GM's own answer and breaking the selection triple's round-trip requirement in § Round-trip integrity.
+The legacy branch MUST still seed, because a bundle carrying no schema marker predates the upgrade by construction and its empty mark is the un-asked question `1.33.0` repairs.
+The residual case is a bundle stamped at the current schema but exported before the upgrade: it is not seeded, so its subjects arrive bound by an empty mark and the destination GM must re-mark them.
+That is accepted as the lesser cost, on exactly the terms the automatic force-list clear above is: it affects only worlds exporting across the upgrade boundary, whereas seeding on the current branch would break the rule for every world forever.
+**Bumping `schemaVersion` to separate the two cohorts MUST NOT be used to remove that residual**, because the branch predicate is shared: every derivation here reads "legacy" as "not the current marker", so a bump reclassifies every bundle at the OUTGOING version as legacy and hands it the whole legacy branch — including the automatic force-list clear above, which would then destroy a legitimate force add in every bundle the shipping build has written since `1315`.
+Trading a residual that costs one re-mark for one that destroys authored data is the worse bargain, and it is why the residual is accepted rather than engineered away.
+It is idempotent, because a second pass finds the mark already non-empty and returns at the same test that made it so.
+
 ### Currency configuration merge on import
 
 Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.

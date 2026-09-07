@@ -43,6 +43,8 @@ const CATALOGUE = [
   { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask' },
 ];
 
+const MARKED_IDS = CATALOGUE.map((entry) => entry.id);
+
 const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
@@ -75,7 +77,10 @@ function salvageProps(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     salvageModifierPolicy: 'bySubject',
     salvageModifierMaxPicks: null,
-    salvageModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    salvageModifierDefaultIds: MARKED_IDS,
     ...rest,
   };
 }
@@ -187,6 +192,57 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     assert.ok(
       !/empty/i.test(note.textContent),
       'and the empty-set sentence is not what a non-empty default set renders'
+    );
+    salvageHarness.remount();
+  });
+
+  // THE SAME HOST→PICKER HOP, now carrying a SECOND job (issue 1608). `inheritedIds` was
+  // only ever read for the inherit note above, so a host that wired it correctly for that
+  // reading proved nothing about the new one — and the bound is the half a GM cannot see
+  // going wrong, because a picker offering too much looks exactly like a picker offering
+  // the right amount until you know what the check marked.
+  //
+  // Asserted through the REAL host rather than against the picker directly, because the
+  // narrowing is only as good as the id list the host hands down: `ComponentEditView`
+  // reading the CRAFTING check's mark for its salvage picker would be invisible on both
+  // screens (the two agree in the lab world) and is exactly what this suite exists for.
+  it('bounds the salvage pick by the SALVAGE mark, keeping an un-marked pick on the record (issue 1608)', async () => {
+    const { target } = await mountSalvage({
+      salvageModifierDefaultIds: ['med'],
+      // `alch` was picked while it was marked; the salvage check has since un-marked it.
+      component: { salvage: { enabled: true, checkModifierIds: ['med', 'alch'] } },
+    });
+    assert.ok(
+      target.querySelector(`${PICKER} [data-modifier-pill="med"]`),
+      'the marked pick reaches the row'
+    );
+    assert.ok(
+      !target.querySelector(`${PICKER} [data-modifier-pill="alch"]`),
+      'the un-marked one draws no chip — the mark reached the picker as a BOUND, not just ' +
+        'as the inherit note’s name list'
+    );
+    assert.equal(
+      target
+        .querySelector(`${PICKER} [data-subject-modifier-suppressed]`)
+        ?.getAttribute('data-subject-modifier-suppressed'),
+      '1',
+      'and the note counts it, so the chip that vanished is accounted for on screen'
+    );
+    salvageHarness.remount();
+
+    // THE NEGATIVE CONTROL: marking both must restore the second chip and silence the
+    // note, or the assertions above would pass against a picker that rendered no chips.
+    const { target: wide } = await mountSalvage({
+      salvageModifierDefaultIds: MARKED_IDS,
+      component: { salvage: { enabled: true, checkModifierIds: ['med', 'alch'] } },
+    });
+    assert.ok(
+      wide.querySelector(`${PICKER} [data-modifier-pill="alch"]`),
+      'marking alch puts its chip back'
+    );
+    assert.ok(
+      !wide.querySelector(`${PICKER} [data-subject-modifier-suppressed]`),
+      'and nothing is suppressed, so no note renders'
     );
     salvageHarness.remount();
   });
@@ -321,7 +377,10 @@ async function mountGathering(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',
     gatheringModifierMaxPicks: null,
-    gatheringModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    gatheringModifierDefaultIds: MARKED_IDS,
     onUpdateTask: (patch) => updates.push(patch),
     ...overrides,
   });
@@ -405,7 +464,14 @@ describe('CraftingSystemManagerRoot threads each host its OWN activity’s selec
     'utf8'
   );
 
-  it('hands both hosts the WORLD library', () => {
+  // STILL THE WHOLE LIBRARY, deliberately, and this test says so rather than leaving the
+  // next reader to "fix" it. Issue 1608 narrows what a subject may PICK to the ids its
+  // activity marks — but the narrowing is `SubjectModifierPicker`'s, computed from the
+  // `inheritedIds` the row below wires, not the root's. Pre-filtering here instead would
+  // hand the component a list it could not tell apart from the catalogue, and the
+  // suppressed-picks note — which exists precisely to count the difference — would have
+  // nothing to count and would silently never render.
+  it('hands both hosts the WORLD library, unnarrowed', () => {
     const wirings = [...source.matchAll(/checkModifierOptions=\{([^}]+)\}/g)].map((m) => m[1]);
     assert.equal(wirings.length, 2, 'one wiring per host — salvage and gathering');
     for (const wiring of wirings) {
@@ -415,6 +481,11 @@ describe('CraftingSystemManagerRoot threads each host its OWN activity’s selec
         'the library is ONE list since issue 1117 and WORLD scope since issue 1308, read off the ' +
           'view state rather than the selection; an empty literal here renders a picker with ' +
           'nothing in it'
+      );
+      assert.ok(
+        !/defaultModifierIds|ModifierDefaultIds/.test(wiring),
+        'and it is NOT intersected with the mark here — the picker owns that, and a ' +
+          'pre-narrowed list would leave the suppressed-picks note with nothing to count'
       );
     }
   });

@@ -4852,6 +4852,54 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // THE SUPPRESSED-PICK STATE (issue 1608): the same seeded custom set as the case above, after
+  // one of its three stored picks is un-marked on the Checks tab rather than removed on the
+  // recipe. `hb-r-stillroom` still authors `{ modifierIds: ['hb-mod-medicine', 'hb-mod-nature',
+  // 'hb-mod-tools'] }` — this walk clicks NOTHING on the recipe side — but the catalogue's
+  // eligibility button for `hb-mod-medicine` is toggled off first, so `RecipeOverviewTab`'s
+  // `eligibleOptions = craftingModifierOptions ∩ craftingModifierDefaultIds` intersection drops
+  // it and the frame renders the OTHER two picks' pills alone: the offer narrowed by exactly the
+  // one mark this walk removes.
+  //
+  // The stored id is not pruned. `pickedEligibleIds` filters it out of the visible row and
+  // `suppressedPickCount` counts the gap it leaves — one, here — which is what the note beside
+  // the cap hint states and what this case's `expectSelector` reads back directly, rather than
+  // merely asserting the note is present.
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-suppressed',
+    label: 'Manager — Recipe edit crafting modifier suppressed pick',
+    // BEYOND the smoke, same as its neighbours: the smoke's system authors no modifier picks at
+    // all under this rule, let alone an un-marked one.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Un-marks `hb-mod-medicine` selectable. A click on the catalogue's own eligibility toggle
+      // button (`CraftingModifierCatalogueCard.svelte:624`), not on a `RadioCardGroup` radio, so
+      // it needs no scoping exemption of its own.
+      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-medicine"]' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-stillroom"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // The COUNT, not merely the note's presence: a click that landed on the wrong row, or one
+    // that toggled nothing, would still leave all three picks eligible and render no note at all,
+    // and a selector asserting only `[data-recipe-crafting-modifier-suppressed]` would be
+    // satisfied by any nonzero count. "1" is what un-marking exactly one of the three stored
+    // picks produces.
+    expectSelector: '.fabricate-manager [data-recipe-crafting-modifier-suppressed="1"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
   // ── The pick cap, from the recipe's side (issue 1055) ────────────────────────────────────────
   //
   // Two frames, because the cap has two readings and they are different pictures: BELOW the bound

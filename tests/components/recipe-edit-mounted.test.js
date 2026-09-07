@@ -572,6 +572,9 @@ describe('RecipeEditView (mounted)', () => {
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
+        // The check MARKS both, which is what makes them offerable at all (issue 1608):
+        // `defaultModifierIds` bounds the pick, so an unmarked catalogue offers nothing.
+        craftingModifierDefaultIds: ['med', 'alch'],
         craftingModifierPolicy: 'bySubject',
       })
     );
@@ -591,9 +594,8 @@ describe('RecipeEditView (mounted)', () => {
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
     );
-    assert.equal(
-      picker.querySelector('[data-modifier-pill="alch"]'),
-      null,
+    assert.ok(
+      !picker.querySelector('[data-modifier-pill="alch"]'),
       'an unselected modifier is not a pill'
     );
     // Opening the menu and picking alch stages the combined set. The patch carries the
@@ -910,6 +912,250 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // ── the check's MARK bounds what the recipe may pick (issue 1608) ───────────
+  //
+  // `bySubject` hands the SELECTION to the recipe, and `craftingModifierDefaultIds` is the
+  // set the Checks studio marks selectable — its per-row pill reads "Selectable" / "Not
+  // selectable" over exactly that list, and its intro promises "Mark which of the system's
+  // modifiers the recipe may choose from". The picker was handed the whole world library
+  // instead, so a recipe could pick a modifier its own check refused.
+  //
+  // `ruleProps` marks `med` and `alch` and leaves `herb` catalogued-but-unmarked, which is
+  // the shape every case below turns on.
+  const markProps = (overrides = {}) =>
+    ruleProps({
+      craftingModifierOptions: [
+        { id: 'med', label: 'Medicine' },
+        { id: 'alch', label: 'Alchemy' },
+        { id: 'herb', label: 'Herbalism' },
+      ],
+      craftingModifierDefaultIds: ['med', 'alch'],
+      ...overrides,
+    });
+
+  /** The ids the add menu actually offers, which is where the narrowed OFFER shows. */
+  async function offeredIds(target) {
+    target.querySelector('[data-modifier-pill-menu-button]').click();
+    await flushRender();
+    // The panel is PORTALED to the application root (issue 1466), so it is not under the
+    // picker cell and must be queried from the mount target.
+    return [...target.querySelectorAll('[data-modifier-pill-option]')].map((option) =>
+      option.getAttribute('data-modifier-pill-option')
+    );
+  }
+
+  it('offers ONLY the modifiers the check marks selectable (issue 1608)', async () => {
+    const target = await editHarness.mount(
+      markProps({ recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } } })
+    );
+    assert.deepEqual(
+      await offeredIds(target),
+      ['med', 'alch'],
+      'the catalogued-but-unmarked herb is not offered, though it is in the world library'
+    );
+    editHarness.remount();
+
+    // THE NEGATIVE CONTROL. Marking herb too must put it back, or the assertion above
+    // would pass just as well against a picker that offered nothing at all.
+    const wide = await editHarness.mount(
+      markProps({
+        craftingModifierDefaultIds: ['med', 'alch', 'herb'],
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
+      })
+    );
+    assert.deepEqual(
+      await offeredIds(wide),
+      ['med', 'alch', 'herb'],
+      'marking herb offers it, so the filter is the MARK and not some other narrowing'
+    );
+    editHarness.remount();
+  });
+
+  it('renders no chip for a stored pick the check no longer marks, and keeps it on disk (issue 1608)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      markProps({
+        // `herb` was picked while it was marked; the check has since un-marked it.
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'herb'] } },
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
+    assert.ok(picker.querySelector('[data-modifier-pill="med"]'), 'the marked pick still shows');
+    assert.ok(
+      !picker.querySelector('[data-modifier-pill="herb"]'),
+      'the un-marked pick draws no chip — the offer is the mark, so it finds no option'
+    );
+
+    // THE POINT OF THE WHOLE DESIGN: the suppressed id is not pruned by an edit made
+    // beside it. Adding `alch` must carry `herb` through untouched, or a GM who edited one
+    // pick would silently destroy another they cannot see.
+    picker.querySelector('[data-modifier-pill-menu-button]').click();
+    await flushRender();
+    target.querySelector('[data-modifier-pill-option="alch"]').click();
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: ['med', 'herb', 'alch'] } },
+      'the add preserves the suppressed herb in place, in its authored position'
+    );
+
+    // …and so must a REMOVE. The control is controlled, so this acts on the original prop.
+    picker.querySelector('[data-modifier-pill-remove="med"]').click();
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: ['herb'] } },
+      'removing the visible pick leaves the invisible one, rather than emptying the set'
+    );
+    editHarness.remount();
+  });
+
+  it('states how many picks the check no longer marks, and says nothing when none (issue 1608)', async () => {
+    const noteOf = async (overrides) => {
+      const target = await editHarness.mount(markProps(overrides));
+      const note = target.querySelector('[data-recipe-crafting-modifier-suppressed]');
+      const result = {
+        count: note?.getAttribute('data-recipe-crafting-modifier-suppressed') ?? null,
+        text: note?.textContent?.trim() ?? '',
+      };
+      editHarness.remount();
+      return result;
+    };
+
+    const quiet = await noteOf({ recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } } });
+    assert.equal(quiet.count, null, 'an ordinary recipe carries no standing warning');
+
+    const one = await noteOf({
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'herb'] } },
+    });
+    assert.equal(one.count, '1', 'the COUNT rides the attribute, not only the localized sentence');
+    assert.ok(
+      !/\b1 chosen\b/i.test(one.text),
+      'the singular reading is its own sentence, never "1 chosen modifiers"'
+    );
+
+    // Two suppressed, which needs a catalogue with two unmarked entries.
+    const two = await noteOf({
+      craftingModifierOptions: [
+        { id: 'med', label: 'Medicine' },
+        { id: 'alch', label: 'Alchemy' },
+        { id: 'herb', label: 'Herbalism' },
+      ],
+      craftingModifierDefaultIds: ['med'],
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'herb', 'alch'] } },
+    });
+    assert.equal(two.count, '2', 'both un-marked picks are counted');
+    assert.ok(two.text.includes('2'), 'and the number reaches the sentence a GM reads');
+  });
+
+  it('says the picks are HIDDEN rather than absent when the check marks NONE of them (issue 1608)', async () => {
+    // THE ZERO POINT of the suppression cohort, which every case above steps around: the
+    // check marks nothing, so EVERY stored pick is suppressed and the pill row draws no
+    // chip at all. The row then falls back to its empty-set copy — in the visible
+    // placeholder AND in the `aria-live` summary a screen reader hears on every change —
+    // and that copy was written for the OTHER zero, an authored pick of nothing. It says
+    // "nothing is added", two lines above a note that correctly says the picks are kept.
+    const target = await editHarness.mount(
+      markProps({
+        craftingModifierDefaultIds: [],
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+      })
+    );
+    const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
+    const placeholder = picker.querySelector('.manager-availability-any').textContent.trim();
+    const status = picker.querySelector('[data-modifier-pill-status]').textContent.trim();
+    // ONE explanation, not two. The placeholder above already carries the whole sentence the
+    // separate note carries — verbatim from "the check no longer marks them selectable" on —
+    // and this is the one state in which both are guaranteed to render together, so the note
+    // stands down here. It still renders whenever SOME pick survives; that case is pinned by
+    // the counting test above.
+    assert.ok(
+      !picker.querySelector('[data-recipe-crafting-modifier-suppressed]'),
+      'the note does not repeat, word for word, what the placeholder above it just said'
+    );
+    // And nothing describes the group by an element that is no longer on the page.
+    const describedBy =
+      picker.querySelector('[data-modifier-pill-select]')?.getAttribute('aria-describedby') ?? '';
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      assert.ok(
+        Boolean(target.querySelector(`#${id}`)),
+        `aria-describedby names ${id}, which is not rendered`
+      );
+    }
+    for (const [where, sentence] of [
+      ['placeholder', placeholder],
+      ['live status', status],
+    ]) {
+      assert.ok(
+        !/nothing is added/i.test(sentence),
+        `the ${where} must not tell a GM the recipe adds nothing while both picks are kept`
+      );
+      assert.match(sentence, /hidden/i, `the ${where} names the state the note explains`);
+    }
+    editHarness.remount();
+
+    // THE OTHER ZERO IS UNTOUCHED. An authored pick of nothing against a full mark really
+    // does add nothing, and must keep saying so — or this fix would have swapped one wrong
+    // sentence for another.
+    const authoredZero = await editHarness.mount(
+      markProps({ recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } } })
+    );
+    const zeroPicker = authoredZero.querySelector('[data-recipe-crafting-modifier-picker]');
+    assert.match(
+      zeroPicker.querySelector('.manager-availability-any').textContent,
+      /nothing is added/i,
+      'a real pick of zero still reads as a pick of zero'
+    );
+    assert.ok(
+      !zeroPicker.querySelector('[data-recipe-crafting-modifier-suppressed]'),
+      'and nothing is suppressed, which is what makes the two zeros different'
+    );
+    editHarness.remount();
+  });
+
+  it('counts ELIGIBLE picks against the cap, so a suppressed one frees no slot it took (issue 1608)', async () => {
+    // A cap of 2 with two marked picks and one suppressed. Counting the STORED list would
+    // read three and deaden the Add menu, against a chip that is not on screen to remove.
+    const target = await editHarness.mount(
+      markProps({
+        craftingModifierDefaultIds: ['med', 'alch'],
+        craftingModifierMaxPicks: 2,
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'herb'] } },
+      })
+    );
+    assert.equal(
+      target
+        .querySelector('[data-recipe-crafting-modifier-cap]')
+        ?.getAttribute('data-recipe-crafting-modifier-cap'),
+      'available',
+      'one VISIBLE pick of two is below the cap; the suppressed herb consumes no slot'
+    );
+    assert.equal(
+      target.querySelector('[data-modifier-pill-menu-button]').getAttribute('aria-disabled'),
+      null,
+      'so the Add menu is live and the second slot is reachable'
+    );
+    editHarness.remount();
+
+    // …and the bound still binds: two VISIBLE picks reach it.
+    const full = await editHarness.mount(
+      markProps({
+        craftingModifierDefaultIds: ['med', 'alch'],
+        craftingModifierMaxPicks: 2,
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch', 'herb'] } },
+      })
+    );
+    assert.equal(
+      full
+        .querySelector('[data-recipe-crafting-modifier-cap]')
+        ?.getAttribute('data-recipe-crafting-modifier-cap'),
+      'reached',
+      'two visible picks of two is AT the cap — the suppressed one neither adds nor excuses'
+    );
+    editHarness.remount();
+  });
+
   it('hides the crafting-modifier picker when the system has no catalogue (issue 770)', async () => {
     const target = await editHarness.mount(
       identityProps({ craftingModifierPolicy: 'bySubject', craftingModifierOptions: [] })
@@ -935,7 +1181,15 @@ describe('RecipeEditView (mounted)', () => {
     ];
     const capOf = async (overrides) => {
       const target = await editHarness.mount(
-        ruleProps({ craftingModifierOptions: CAP_CATALOGUE, ...overrides })
+        ruleProps({
+          craftingModifierOptions: CAP_CATALOGUE,
+          // MARK all three. `ruleProps` marks only two, and the mark now bounds the offer
+          // (issue 1608), so leaving it would shrink the offer back to the two the picks
+          // fill — reinstating exactly the "everything is already selected" confound the
+          // three-entry catalogue above exists to remove.
+          craftingModifierDefaultIds: CAP_CATALOGUE.map((entry) => entry.id),
+          ...overrides,
+        })
       );
       const hint = target.querySelector('[data-recipe-crafting-modifier-cap]');
       const reading = hint?.getAttribute('data-recipe-crafting-modifier-cap') ?? null;
