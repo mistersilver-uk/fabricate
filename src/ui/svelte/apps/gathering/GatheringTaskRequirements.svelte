@@ -13,9 +13,15 @@
   the always-visible right-column section never renders empty.
 -->
 <script>
+  import EmptyState from '../manager/EmptyState.svelte';
+  import Kicker from '../../components/Kicker.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let { task = null } = $props();
+
+  /** The tool tile's stand-in when a tool record carries no artwork of its own. */
+  const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
 
   const blocked = $derived(task?.attemptable !== true);
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
@@ -69,12 +75,15 @@
 </script>
 
 <div class="gathering-task-details" data-gathering-details>
-  <p class="gathering-task-details-heading">{requirementsHeading}</p>
+  <Kicker as="p">{requirementsHeading}</Kicker>
 
   {#if isEmpty}
-    <p class="gathering-task-details-empty" data-gathering-no-requirements>
-      {localize('FABRICATE.App.Gathering.Detail.NoRequirements')}
-    </p>
+    <EmptyState
+      note
+      hint={localize('FABRICATE.App.Gathering.Detail.NoRequirements')}
+      dataAttr="data-gathering-no-requirements"
+      dataValue=""
+    />
   {:else}
     <div class="gathering-task-details-grid">
       {#if tools.length > 0}
@@ -90,11 +99,7 @@
                 data-gathering-tool
                 data-tool-state={tool.state}
               >
-                <img
-                  class="gathering-task-tool-thumb"
-                  src={tool.img || 'icons/svg/item-bag.svg'}
-                  alt=""
-                />
+                <Medallion art={tool.img || DEFAULT_TOOL_IMG} alt="" size={40} />
                 <span class="gathering-task-tool-copy">
                   <span class="gathering-task-tool-name" title={tool.name}>{tool.name}</span>
                   <span class="gathering-task-tool-state">{toolStateLabel(tool.state)}</span>
@@ -127,21 +132,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     background: var(--fab-surface);
-  }
-
-  .gathering-task-details-heading {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .gathering-task-details-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .gathering-task-details-grid {
@@ -177,15 +167,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-surface-soft);
-  }
-
-  .gathering-task-tool-thumb {
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .gathering-task-tool-copy {

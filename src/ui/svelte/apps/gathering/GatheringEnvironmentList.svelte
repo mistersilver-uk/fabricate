@@ -9,6 +9,7 @@
 <script>
   import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import EmptyState from '../manager/EmptyState.svelte';
   import EnvironmentCard from './EnvironmentCard.svelte';
   import Pagination from '../../components/Pagination.svelte';
 
@@ -130,23 +131,52 @@
     </div>
   </header>
 
+  <!--
+    THE COLUMN'S FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). Both branches
+    stand in for the whole scrolling list, so each must GROW to the column the cards would have
+    filled — measured at 322.84x569 in the View Lab. `EmptyState` is padding-driven and declares
+    no height, and its documented fill escape is `contextClass`, "whose rules live in the global
+    sheet" (`EmptyState.svelte:53-55`) — which would put `styles/fabricate.css` on this change's
+    path. So `.gathering-env-empty` survives as a caller-owned WRAPPER declaring the grow and the
+    centring and nothing else, which is the same answer `PlayerViewState` takes for the same
+    reason.
+  -->
   {#if filtered.length === 0}
-    <p class="gathering-env-empty" data-gathering-env-empty="no-matches">
-      {localize('FABRICATE.App.Gathering.Environments.NoMatches')}
-    </p>
+    <div class="gathering-env-empty">
+      <!--
+        `note`, not `filtered`, although a zero-result SEARCH is a filtered empty: `filtered`
+        keeps the dashed panel and this is one line. The distinction stays in the hook value,
+        which is the reader `gathering-environment-list-hide.test.js` matches on exactly.
+      -->
+      <EmptyState
+        note
+        hint={localize('FABRICATE.App.Gathering.Environments.NoMatches')}
+        dataAttr="data-gathering-env-empty"
+        dataValue="no-matches"
+      />
+    </div>
   {:else if visible.length === 0}
-    <div class="gathering-env-empty" data-gathering-env-empty="all-unavailable">
-      <p class="gathering-env-empty-message">
-        {localize('FABRICATE.App.Gathering.Environments.AllUnavailableHidden')}
-      </p>
-      <button
-        type="button"
-        class="gathering-env-show-unavailable"
-        data-gathering-env-show-unavailable
-        onclick={() => setHideUnavailable(false)}
+    <div class="gathering-env-empty">
+      <!--
+        `filtered` here, because this branch is a multi-element PANEL rather than a line: the
+        sentence plus the way out of it. The recovery button is the primitive's `children`,
+        which is where `EmptyState.svelte:58-60` puts "the way out of the dead end".
+      -->
+      <EmptyState
+        filtered
+        hint={localize('FABRICATE.App.Gathering.Environments.AllUnavailableHidden')}
+        dataAttr="data-gathering-env-empty"
+        dataValue="all-unavailable"
       >
-        {localize('FABRICATE.App.Gathering.Environments.ShowUnavailable')}
-      </button>
+        <button
+          type="button"
+          class="gathering-env-show-unavailable"
+          data-gathering-env-show-unavailable
+          onclick={() => setHideUnavailable(false)}
+        >
+          {localize('FABRICATE.App.Gathering.Environments.ShowUnavailable')}
+        </button>
+      </EmptyState>
     </div>
   {:else}
     <div class="gathering-env-list-scroll" role="list">
@@ -328,21 +358,14 @@
     scrollbar-gutter: stable;
   }
 
+  /* THE WRAPPER ONLY: the grow and the centring the column needs, and nothing about type or
+     ink — those belong to the panel nested inside it now. */
   .gathering-env-empty {
     flex: 1 1 auto;
-    margin: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--fab-space-2);
-    text-align: center;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
-  .gathering-env-empty-message {
-    margin: 0;
   }
 
   .gathering-env-show-unavailable {

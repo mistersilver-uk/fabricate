@@ -12,6 +12,7 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
 import {
+  GATHERING_PLAYER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
@@ -244,14 +245,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
-    // The ONE not-yet-ready chrome the five player views draw (issue 1514), and the strip its
-    // error branch composes. `GatheringView` below renders the composition and `EmptyState` is
-    // already compiled through the `SELECT_COMPILED_MODULES` loop above. This harness is
-    // HAND-ROLLED, so a missing entry is not the named "add it to compiledModules" error the
-    // shared harness raises — it is `ERR_MODULE_NOT_FOUND` in `before()` and a whole file
-    // reported as `# cancelled`.
-    writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/PlayerViewState.svelte');
+    for (const primitive of GATHERING_PLAYER_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -563,6 +557,139 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(toolRows[0].getAttribute('data-tool-state'), 'present');
     assert.equal(toolRows[1].getAttribute('data-tool-state'), 'missing');
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
+  });
+
+  it('draws the drop row on the shared art tile and the shared fill bar, at the size each rendered', async () => {
+    const { services } = makeServices(listing([environment()]), {
+      drops: [{ id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 }],
+      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+    });
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
+    const tile = row.querySelector('.fab-medallion');
+    assert.ok(Boolean(tile), 'the drop thumbnail is the shared art tile');
+    // The CONVERSION RULE the geometry requirement states: the rendered size is preserved and
+    // the off-ladder row is banked, rather than snapped to the nearest rung here.
+    assert.match(tile.getAttribute('style'), /width:\s*36px;\s*height:\s*36px/, 'at the 36px it already rendered');
+    assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
+
+    const bar = row.querySelector('.fab-fill-bar');
+    assert.ok(Boolean(bar), 'the chance track is the shared fill bar');
+    assert.ok(bar.classList.contains('is-sm'), 'at the `sm` rung, which is the height the hand-rolled track drew');
+    assert.match(bar.querySelector('.fab-fill-bar-fill').getAttribute('style'), /width: 50%/, 'and the fill carries the chance');
+  });
+
+  it('draws the required-tool tile on the shared art tile at the size it rendered', async () => {
+    const { services } = makeServices(listing([environment({
+      tasks: [taskModel({ id: 'task-tool', tools: [{ id: 't1', name: 'Pick', img: 'icons/svg/mystery-man.svg', state: 'missing' }] })]
+    })]));
+    await mountView(services);
+    target.querySelector('[data-task-id="task-tool"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const tile = target.querySelector('[data-gathering-task-detail] [data-gathering-tool] .fab-medallion');
+    assert.ok(Boolean(tile), 'the tool thumbnail is the shared art tile');
+    assert.match(tile.getAttribute('style'), /width:\s*40px;\s*height:\s*40px/, 'at the 40px it already rendered');
+  });
+
+  // ─── THE THREE ERRORS THAT USED TO BE SWALLOWED (issue 1514) ────────────────────────────
+  //
+  // All three are asserted on the RENDERED DOM rather than on source text, because each defect
+  // was precisely that the component rendered its ORDINARY state after a failure: a source-text
+  // reader cannot tell "no drops" from "the drop fetch threw", which is the confusion being
+  // fixed.
+
+  it('says so when the drop-breakdown fetch fails, instead of drawing an empty find list', async () => {
+    const { services } = makeServices(listing([environment()]));
+    services.getGatheringDropBreakdown = () => Promise.reject(new Error('boom'));
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.ok(Boolean(section), 'the find section still renders');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'error', 'and it reports the error state');
+    const notice = section.querySelector('[data-gathering-drops-error]');
+    assert.ok(Boolean(notice), 'a notice names the failure');
+    assert.ok(notice.textContent.includes('DropsError'), 'with the localized failure sentence');
+    assert.equal(notice.getAttribute('role'), 'status', 'announced politely rather than as an alert');
+    // The DISTINCTION that was missing: this is not the "nothing to find" picture.
+    assert.ok(!section.querySelector('[data-gathering-drop]'), 'no drop rows are drawn');
+  });
+
+  it('draws the ordinary ready state when the drop-breakdown fetch succeeds (control)', async () => {
+    const { services } = makeServices(listing([environment()]), {
+      drops: [{ id: 'd1', name: 'Moss', img: '', finalChance: 0.5, quantity: 1 }],
+      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+    });
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'ready', 'the ready state is reachable');
+    assert.ok(!section.querySelector('[data-gathering-drops-error]'), 'and carries no failure notice');
+  });
+
+  it('says the linked scene could not be loaded when its uuid does not resolve', async () => {
+    const previous = globalThis.fromUuid;
+    globalThis.fromUuid = () => Promise.reject(new Error('no such document'));
+    try {
+      const { services } = makeServices(listing([environment({
+        sceneUuid: 'Scene.missing',
+        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
+      })]));
+      await mountView(services);
+      await settle();
+
+      const scene = target.querySelector('[data-gathering-scene]');
+      assert.ok(Boolean(scene), 'the linked-scene panel renders');
+      const fault = scene.querySelector('[data-gathering-scene-unresolved]');
+      assert.ok(Boolean(fault), 'the broken link is named where the scene name would be');
+      assert.ok(fault.textContent.includes('SceneUnresolved'), 'with the localized sentence');
+    } finally {
+      globalThis.fromUuid = previous;
+    }
+  });
+
+  it('keeps a failed permission CHECK distinct from being refused permission', async () => {
+    const previous = globalThis.fromUuid;
+    const scenario = async (testUserPermission) => {
+      globalThis.fromUuid = () => Promise.resolve({ name: 'Old Mine', testUserPermission });
+      const { services } = makeServices(listing([environment({
+        sceneUuid: 'Scene.mine',
+        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
+      })]));
+      await mountView(services);
+      await settle();
+      return target.querySelector('[data-gathering-scene]');
+    };
+
+    try {
+      // REFUSED: the check answered, and the answer was no. The player waits for the GM.
+      const refused = await scenario(() => false);
+      assert.ok(Boolean(refused.querySelector('[data-gathering-scene-wait]')), 'a refusal shows the wait hint');
+      assert.ok(!refused.querySelector('[data-gathering-scene-permission-unknown]'), 'and does not claim the check failed');
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+
+      // FAILED: the check threw. Telling this player to wait for the GM sends them to the
+      // wrong person, which is the whole reason the two outcomes are separated.
+      const unknown = await scenario(() => { throw new Error('broken'); });
+      assert.ok(Boolean(unknown.querySelector('[data-gathering-scene-permission-unknown]')), 'a failed check says so');
+      assert.ok(!unknown.querySelector('[data-gathering-scene-wait]'), 'and is NOT reported as the GM not having shared it');
+    } finally {
+      globalThis.fromUuid = previous;
+    }
   });
 
   it('shows the linked-scene banner once above the task list when the environment is scene-gated', async () => {
@@ -941,7 +1068,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout, 'the depleted/exhausted callout renders');
     assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the permanent-exhaustion copy');
     assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+    // RETARGETED, not deleted (issue 1514). The ETA moved onto `Notice`'s `detail` line, whose
+    // hooks live on the banner ROOT alone, so `[data-gathering-node-respawn-eta]` no longer
+    // exists anywhere and this assertion would have gone on passing for the wrong reason.
+    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
   });
 
   it('detail still shows the replenishes-over-time copy for a regenerating depleted node (regression)', async () => {
@@ -956,6 +1086,26 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout, 'the depleted callout renders');
     assert.ok(callout.textContent.includes('NodeDepletedRespawns'), 'shows the replenishes-over-time copy');
     assert.ok(!callout.textContent.includes('NodeExhaustedPermanent'), 'does NOT show the permanent copy');
+  });
+
+  // The POSITIVE half of the two "no respawn ETA" assertions above (issue 1514). Without it
+  // they prove only that an element is absent, which is what they would prove if the ETA had
+  // stopped rendering everywhere — the exact failure the conversion of this banner to `Notice`
+  // could have caused, since the ETA is now the banner's `detail` line rather than a span of
+  // its own.
+  it('detail renders the respawn ETA as the depleted banner second line when one is known', async () => {
+    await renderDetail({
+      task: {
+        id: 't2b', name: 'Berries', attemptable: false,
+        blockedReasons: [{ code: 'NODE_DEPLETED' }],
+        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: false, current: 0, max: 5, respawnEta: { secondsUntil: 3600 } } }
+      }
+    });
+    const callout = target.querySelector('[data-gathering-node-depleted]');
+    assert.ok(callout, 'the depleted callout renders');
+    const detail = callout.querySelector('.fab-notice-detail');
+    assert.ok(Boolean(detail), 'the ETA renders as the banner detail line');
+    assert.ok(detail.textContent.includes('NodeRespawnEta'), 'and it is the ETA key');
   });
 
   // issue 301 (UI simplification): a nonRegenerating pool surfaces a plain permanence
@@ -990,7 +1140,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the exhausted permanence copy when exhausted');
     assert.ok(!callout.textContent.includes('"current"') && !callout.textContent.includes('"max"'), 'does not repeat the node count');
     assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
     assert.equal(target.querySelector('[data-gathering-node-scarce]'), null, 'the pre-exhaustion scarcity callout is not used at current <= 0');
   });
 });

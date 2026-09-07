@@ -16,6 +16,8 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Callout from '../manager/Callout.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -72,18 +74,34 @@
   });
 </script>
 
+<!--
+  Both restricted-tier statements are `Callout` (issue 1514). Each is DOCUMENTATION in the
+  routing rule's sense — always true of this environment's tier, and still true a moment before
+  and after the player acts — which is what separates a callout from a notice. Neither carried a
+  role, and `Callout` adds `role="note"` only when it is given a title or actions, so the
+  accessible tree is unchanged. Both were BARE 12px muted paragraphs with no box of their own,
+  so this conversion GAINS the strip's edge, fill and inset; that is a published frame move, not
+  a preserved one, and it is what makes the two statements read as the same kind of thing as the
+  standing statements every other player surface now draws.
+-->
 {#if eventVisibility === 'dangerLevelOnly'}
-  <p class="gathering-detail-event-hint" data-gathering-event-risk-note>
-    {localize('FABRICATE.App.Gathering.Detail.EventRiskNote')}
-  </p>
+  <Callout
+    tone="info"
+    text={localize('FABRICATE.App.Gathering.Detail.EventRiskNote')}
+    dataAttr="data-gathering-event-risk-note"
+    dataValue=""
+  />
 {:else if eventVisibility === 'encounterChance'}
   <div class="gathering-detail-event" data-gathering-event-summary>
     {#if hasEvent}
       <ChanceBar value={eventChance} scale="event" />
     {:else}
-      <p class="gathering-detail-event-hint" data-gathering-safe-hint>
-        {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
-      </p>
+      <Callout
+        tone="info"
+        text={localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
+        dataAttr="data-gathering-safe-hint"
+        dataValue=""
+      />
     {/if}
   </div>
 {/if}
@@ -144,13 +162,20 @@
     </header>
 
     {#if isBlind && activeTasks.length === 0}
-      <p class="gathering-detail-empty">
-        {localize('FABRICATE.App.Gathering.Detail.NothingDiscovered')}
-      </p>
+      <EmptyState note hint={localize('FABRICATE.App.Gathering.Detail.NothingDiscovered')} />
     {:else if filteredTasks.length === 0 && normalizedTaskSearch !== ''}
-      <p class="gathering-detail-empty" data-gathering-no-task-matches>
-        {localize('FABRICATE.App.Gathering.Detail.NoTaskMatches')}
-      </p>
+      <!--
+        `note`, not `filtered`, even though this IS the filtered branch: `filtered` keeps the
+        dashed panel and this is a one-line empty inside a pane, so the box is what the
+        frame-move rule forbids. The filtered/unfiltered distinction stays where it already
+        lives — in the hook value and in the sentence.
+      -->
+      <EmptyState
+        note
+        hint={localize('FABRICATE.App.Gathering.Detail.NoTaskMatches')}
+        dataAttr="data-gathering-no-task-matches"
+        dataValue=""
+      />
     {:else if filteredTasks.length > 0}
       <div class="gathering-detail-task-list" role="list">
         {#each paginatedTasks as gatheringTask (gatheringTask.id)}
@@ -192,12 +217,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-  }
-
-  .gathering-detail-event-hint {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   /* Blind call-to-action card: a flavour lead (icon + prompt) on the left, a
@@ -359,12 +378,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  .gathering-detail-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .gathering-detail-pagination {

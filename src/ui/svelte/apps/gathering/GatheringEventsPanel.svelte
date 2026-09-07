@@ -10,6 +10,9 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Callout from '../manager/Callout.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -71,24 +74,31 @@
 
 <div class="gathering-detail-event" data-gathering-event-section>
   <div class="gathering-detail-event-danger">
-    <span class="gathering-detail-event-caption"
-      >{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span
-    >
+    <Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</Kicker>
     <span class={`gathering-detail-event-level is-danger ${dangerRiskClass}`}>
       <i class="fas fa-skull" aria-hidden="true"></i>
       <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
     </span>
   </div>
 
+  <!--
+    CONVERTED WITH ITS TWIN IN `GatheringTasksPanel`, not separately (issue 1514). The delta
+    named only the tasks panel's pair, and converting one of the two would have left the SAME
+    sentence — `EventSafeHint`, in the same place under the same chance bar — drawn as a strip
+    at one event-visibility tier and as a bare line at another, which is worse than either
+    answer applied consistently. Both files declared the same `.gathering-detail-event-hint`
+    rule, and both rules are deleted here.
+  -->
   {#if hasEvent}
     <ChanceBar value={eventChance} scale="event" />
-    <p class="gathering-detail-event-hint">
-      {localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}
-    </p>
+    <Callout tone="info" text={localize('FABRICATE.App.Gathering.Detail.EventChanceHint')} />
   {:else}
-    <p class="gathering-detail-event-hint" data-gathering-safe-hint>
-      {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
-    </p>
+    <Callout
+      tone="info"
+      text={localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
+      dataAttr="data-gathering-safe-hint"
+      dataValue=""
+    />
   {/if}
 </div>
 
@@ -111,9 +121,12 @@
     </header>
 
     {#if filteredEvents.length === 0}
-      <p class="gathering-detail-empty" data-gathering-no-event-matches>
-        {localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
-      </p>
+      <EmptyState
+        note
+        hint={localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
+        dataAttr="data-gathering-no-event-matches"
+        dataValue=""
+      />
     {:else}
       <div class="gathering-detail-event-list" role="list">
         {#each paginatedEvents as event (event.id)}
@@ -143,9 +156,12 @@
     {/if}
   </section>
 {:else if eventsHidden}
-  <p class="gathering-detail-empty" data-gathering-events-hidden>
-    {localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
-  </p>
+  <EmptyState
+    note
+    hint={localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
+    dataAttr="data-gathering-events-hidden"
+    dataValue=""
+  />
 {/if}
 
 <style>
@@ -165,13 +181,6 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
-  }
-
-  .gathering-detail-event-caption {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fab-text-muted);
   }
 
   .gathering-detail-event-level {
@@ -207,12 +216,6 @@
   .gathering-detail-event-level.is-danger.risk-deadly i,
   .gathering-detail-event-level.is-danger.risk-extreme i {
     color: var(--fab-danger);
-  }
-
-  .gathering-detail-event-hint {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   /*
@@ -291,12 +294,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  .gathering-detail-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .gathering-detail-pagination {

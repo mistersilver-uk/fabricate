@@ -595,8 +595,26 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  * 57 off-ladder render sites across 40 `path | size` keys, out of 65 art-tile render sites in the
  * tree — 63 icon chips and 2 portraits, with 8 of the 65 on a rung. Unchanged by the portrait
  * conversion, for the reason the docblock above gives.
+ *
+ * 59 ACROSS 42 KEYS since issue 1514 moved the player gathering tab's two stateless raw thumbs
+ * onto the tile, and both new rows are the price the guidance above names by hand — a decision
+ * about one tile, stated with the rung it rejected:
+ *
+ *  - `GatheringTaskDrops.svelte | 36`. The drop row's tile renders at 36 and 38 is the nearest
+ *    rung. It was REJECTED because 38 is the only rung above it and the row is a 52px summary
+ *    whose height the tile already sets; snapping up would grow every drop row in the panel,
+ *    which is a layout move, and the conversion this row records preserves geometry by rule.
+ *  - `GatheringTaskRequirements.svelte | 40`. The tool card's tile renders at 40 — the icon
+ *    chip's own DEFAULT, and still off the published art ladder, which is the conflation
+ *    `ART_TILE_COMPONENTS` records above. 38 was rejected for the same reason and one more:
+ *    dropping 2px here would put the one tile in the tree at a rung its own primitive does not
+ *    default to, on a card whose 63.75px height it shares with a three-line copy stack.
+ *
+ * Both are pre-existing geometry becoming VISIBLE rather than new geometry: each tile was
+ * already that size as a raw `<img>`, and only the conversion puts it where this census can see
+ * it. Issue 1519's sweep owns lowering them.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 57;
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 59;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 

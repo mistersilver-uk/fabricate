@@ -35,6 +35,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],
+  // `EmptyState` arrives through the `SELECT_COMPILED_MODULES` spread above, which is what
+  // both converted empty branches render now (issue 1514).
+
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
   // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
   // portal host by walking up to the nearest Fabricate application root. `rootClass` IS that

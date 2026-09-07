@@ -1106,6 +1106,7 @@
           "EventRegions": "Regions",
           "WhatYouMightFind": "What you might find",
           "DropsLoading": "Calculating finds…",
+          "DropsError": "Fabricate couldn’t work out what you might find here. Try selecting the task again, and tell your GM if it keeps happening.",
           "FindChance": "Find chance: {x}%",
           "FindChanceLabel": "Find chance",
           "DropQuantity": "×{x}",
@@ -1144,6 +1145,8 @@
           "LinkedSceneHeading": "Visit linked scene",
           "SceneVisit": "View Scene",
           "SceneWait": "Wait until the GM activates the linked scene.",
+          "SceneUnresolved": "This linked scene couldn’t be loaded — tell your GM the link is broken.",
+          "ScenePermissionUnknown": "Fabricate couldn’t check whether you can view this scene.",
           "ToolState": {
             "present": "Available",
             "damaged": "Broken",

@@ -127,10 +127,6 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',
-    // The ONE not-yet-ready chrome all five player views draw (issue 1514). Every view listed
-    // below renders it, and this suite compiles all five, so an omission CANCELS the whole
-    // file rather than failing one test. It composes `EmptyState` (already here through the
-    // `SELECT_COMPILED_MODULES` spread) and `Callout` (through the marks-and-notices spread).
     'src/ui/svelte/apps/PlayerViewState.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyView.svelte',

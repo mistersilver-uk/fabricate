@@ -104,8 +104,16 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * and the control it became takes the shared select's `form` rung, which is the ladder's 38. So
  * this is the first kind of fall again — a control moved onto a rung — and the same conversion
  * takes the same file's 8px corner off the radius ledger in the same commit.
+ *
+ * It was 72 until issue 1514's second phase moved the player gathering tab's two stateless raw
+ * thumbs onto `Medallion`. Both rows go — `GatheringTaskDrops | height | 36` and
+ * `GatheringTaskRequirements | height | 40` — and NEITHER is a control reaching a rung: each was
+ * a THUMBNAIL, which is one of the three exceptions this file's own guidance names, and its
+ * declaration is gone because the primitive interpolates the box into a `style` attribute
+ * instead. The size itself did not change; it moved to a place this text scan cannot see and is
+ * banked instead on `offLadderArtSizes`, which is where a tile's geometry belongs.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 72;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 70;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -141,8 +149,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte | min-height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte | min-height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte | height | 32 | 1 | 32px => 32px',
-  'src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte | height | 36 | 1 | 36px => 36px',
-  'src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/inventory/InventoryFilters.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | min-height | 40 | 1 | 40px => 40px',

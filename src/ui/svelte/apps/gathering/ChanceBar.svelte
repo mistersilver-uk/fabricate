@@ -41,6 +41,7 @@
 -->
 <script>
   import FillBar from '../../components/FillBar.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent } from '../../util/gatheringFormat.js';
 
@@ -96,7 +97,7 @@
     {...meterAttrs}
   >
     {#if showCaption}
-      <span class="chance-bar-caption">{localize(captionKey)}</span>
+      <Kicker as="span">{localize(captionKey)}</Kicker>
     {/if}
     <span class="chance-bar-row">
       <FillBar value={pct} color={fillColour} dataAttr="data-chance-bar-track" />
@@ -123,13 +124,6 @@
     flex-direction: column;
     gap: 3px;
     min-width: 88px;
-  }
-
-  .chance-bar-caption {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fab-text-muted);
   }
 
   .chance-bar-row {
