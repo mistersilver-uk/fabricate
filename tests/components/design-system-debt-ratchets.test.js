@@ -284,6 +284,13 @@ function focusResetRoot(selector) {
  * not see an `:is()` at all. So Field's strip is one `:is(input, textarea):focus` member and its
  * repaint is two comma-separated legs — the two forms differ because two different recognisers
  * govern them, and neither may be "unified" into the other.
+ *
+ * `EditorTabs` joined at issue 1509 with a NEW pair rather than a re-rooted one: the tab strip had
+ * no focus chrome of its own at all, because inside a Fabricate window the module pair reached its
+ * buttons and nothing else was needed. Rooted at the class it emits, the strip renders in hosts
+ * carrying no `.fabricate` root, so it declares both halves — the module pair's declarations
+ * verbatim, at the module pair's own (0,2,1), which is what keeps the two identical wherever both
+ * reach. `.fabricate-pagination button:focus` is the precedent for the shape.
  */
 const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-button:focus',
@@ -292,6 +299,7 @@ const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-pagination button:focus',
   '.fabricate-search input:focus',
   '.fabricate-slider input:focus',
+  '.fabricate-tabs button:focus',
   '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
   '.fabricate-toggle.manager-status-toggle:focus',
 ]);
@@ -431,11 +439,12 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '.fabricate-pagination button:focus',
       '.fabricate-search input:focus',
       '.fabricate-slider input:focus',
+      '.fabricate-tabs button:focus',
       '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
       '.fabricate-toggle.manager-status-toggle:focus',
     ],
     'the set of primitive families declaring their own focus strip has changed. Each of the ' +
-      'eight is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
+      'nine is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
       'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
       'carrying neither application root — a deliberate edit here, never a silent one. `Field` ' +
       'and `ManagerSearchField` joined at issue 1508 phase 1 and `ChanceSlider` and ' +
@@ -450,9 +459,14 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
   );
   assert.equal(
     strips.length,
-    8,
-    'one strip per family and per host that takes focus separately — seven families, eight ' +
-      'compounds, the extra being StatusToggle`s checkbox host'
+    9,
+    'one strip per family and per host that takes focus separately — EIGHT families and NINE ' +
+      'compounds. The two numbers differ by one, and always for the same reason: `StatusToggle` ' +
+      'declares two, because its checkbox host is a `<label>` that never matches `:focus` and ' +
+      'that host`s strip is therefore written on the `<input>` the label wraps. Every other ' +
+      'family declares exactly one. `EditorTabs` is the eighth family (issue 1509) and its strip ' +
+      'is `.fabricate-tabs button:focus`, the shape `.fabricate-pagination button:focus` already ' +
+      'ships: a root whose own control is a bare `<button>` it renders itself.'
   );
 
   // `declarationsIn` stamps the file onto each declaration and `primitiveFocusStrip` never reads
@@ -1285,11 +1299,14 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 12 roots over 14 blocks, every one of them
- * legitimate today, which is exactly why a thirteenth would not stand out to a reader. It was 9
+ * Derived from the sheet rather than asserted: 13 roots over 15 blocks, every one of them
+ * legitimate today, which is exactly why a fourteenth would not stand out to a reader. It was 9
  * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
- * each gained the ring half of its own pair, and 11 over 13 until its third phase did the same
- * for `ChanceSlider`. `Field`'s is TWO comma-separated legs — `.fabricate-field
+ * each gained the ring half of its own pair, 11 over 13 until its third phase did the same
+ * for `ChanceSlider`, and 12 over 14 until issue 1509 rooted `EditorTabs` and its tab strip gained
+ * `.fabricate-tabs button:focus-visible` — a `<root> <element>:focus-visible` block over a bare
+ * `button`, which is exactly {@link RING_COMPOUND}'s shape and therefore exactly this
+ * population. `Field`'s is TWO comma-separated legs — `.fabricate-field
  * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
  * `:is(input, textarea)` member, and that is a requirement of this population rather than a
  * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`
@@ -1318,6 +1335,7 @@ const RING_ROOTS = Object.freeze(
     '.fabricate-roll-prompt-dialog',
     '.fabricate-search',
     '.fabricate-slider',
+    '.fabricate-tabs',
   ].sort(byCodePoint)
 );
 
@@ -1772,8 +1790,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,120 `(at-context, selector)`
-  // keys under this very keying, of which 3,001 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,123 `(at-context, selector)`
+  // keys under this very keying, of which 3,004 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

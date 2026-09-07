@@ -43,7 +43,7 @@ const FIXTURE = `
                states the same colours. -->
           <button class="fabricate-button manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
         </div>
-        <div class="manager-editor-tabs">
+        <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
             <span class="manager-chip is-neutral manager-editor-tab-badge" data-m="tab-badge">4</span>
           </button>

@@ -1,5 +1,22 @@
 /*
- * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issues 1502 and 1508).
+ * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issues 1502, 1508 and 1509).
+ *
+ * ── WHAT ISSUE 1509 ADDED ─────────────────────────────────────────────────
+ * `EditorTabs`, the manager's editor tab strip, and it is the first family here whose root is not
+ * a control and whose control is a `<button>` rather than an `<input>`. Its root is a
+ * `<div role="tablist">` and the control it owns is the `<button role="tab">` inside it, so its
+ * font floor takes the (0,1,1) shape — `.fabricate-tabs button` — and joins the same group as
+ * `Field`'s, `ManagerSearchField`'s and `ChanceSlider`'s rather than sitting at its own root the
+ * way the two button FAMILIES' floors do.
+ *
+ * TWO probes rather than one, because the strip's ACTIVE UNDERLINE is what it is recognisable by:
+ * the resting tab's bottom border is transparent and the selected tab's is the accent, and a
+ * single probe would compare one of those and call the strip proved.
+ *
+ * Its focus PAIR is new on both halves, which nothing before it here was. The strip carried no
+ * focus chrome of its own at all — inside a Fabricate window the module pair reached its buttons,
+ * and outside one there was no strip — so both halves are added, at the module pair's own (0,2,1)
+ * and with its declarations verbatim.
  *
  * ── WHAT ISSUE 1508 ADDED ───────────────────────────────────────────────────────────────────
  * Two more families, and they differ from the first three in the one way that matters to this
@@ -203,6 +220,36 @@ const SLIDER_CLASSES = (() => {
   return match[1];
 })();
 
+/**
+ * `EditorTabs` writes its root as a LITERAL at the head of an interpolated template and its
+ * container class as a frozen PROP DEFAULT, so its contract is read out of both (issue 1509).
+ *
+ * That split is the whole shape of this family and is why the two halves are read separately
+ * rather than as one string: the root is the primitive's and no caller can drop it, while the
+ * container class is a DEFAULT nine wrappers override with a vocabulary of their own. A reader
+ * that took the rendered pair as one literal would keep measuring the default after a caller
+ * became the only site that renders.
+ */
+const TABS_ROOT = (() => {
+  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const match = source.match(/class=\{`(fabricate-tabs) \$\{containerClass\}`\}/);
+  assert.ok(match, 'EditorTabs must write its family root ahead of the container class it takes');
+  return match[1];
+})();
+const TABS_CONTAINER_CLASS = (() => {
+  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const match = source.match(/container: '([\w-]+)'/);
+  assert.ok(match, 'EditorTabs must declare its container class in `DEFAULT_CLASSES`');
+  return match[1];
+})();
+const TABS_BUTTON_CLASS = (() => {
+  const source = read('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  const match = source.match(/button: '([\w-]+)'/);
+  assert.ok(match, 'EditorTabs must declare its button class in `DEFAULT_CLASSES`');
+  return match[1];
+})();
+const TABS_CLASSES = `${TABS_ROOT} ${TABS_CONTAINER_CLASS}`;
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -213,7 +260,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the nine class strings under measurement are the ones the primitives emit', () => {
+test('the ten class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -223,6 +270,13 @@ test('the nine class strings under measurement are the ones the primitives emit'
   assert.equal(CARD_CLASSES, 'fabricate-card manager-inspector-card');
   assert.equal(TOGGLE_CLASSES, 'fabricate-toggle manager-status-toggle');
   assert.equal(SLIDER_CLASSES, 'fabricate-slider manager-chance-slider manager-drop-rate-value');
+  assert.equal(TABS_CLASSES, 'fabricate-tabs manager-editor-tabs');
+  assert.equal(
+    TABS_BUTTON_CLASS,
+    'manager-editor-tab-button',
+    'the tab button class the fixture below writes is the primitive`s own default, read out of ' +
+      'its frozen map rather than restated here'
+  );
 
   // AND THE ROOT IS THE ARRAY'S FIRST LITERAL, for both. This is a CONSTRAINT rather than a
   // style note: `searchable-popover-area-scope.test.js` reads the composed region by taking the
@@ -369,6 +423,24 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-probe="${host}-slider-root" data-chance-slider><span class="manager-chance-slider-number manager-drop-rate-percent" data-probe="${host}-slider-percent"><input type="number" min="0" max="100" step="1" value="40" data-probe="${host}-slider-number"><span aria-hidden="true">%</span></span><span class="manager-chance-slider-control manager-drop-rate-control is-common" data-probe="${host}-slider" style="width: 240px; --fab-drop-rate-value: 40%;"><span class="manager-drop-rate-track" data-probe="${host}-slider-track"><span class="manager-drop-rate-fill" data-probe="${host}-slider-fill"></span></span><input type="range" min="0" max="100" step="1" value="40" data-probe="${host}-slider-range"></span></span>`,
   }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE TAB STRIP EITHER (issue 1509). Its root is a
+  // `<div role="tablist">`, and the control it owns is the `<button role="tab">` inside it — two
+  // of them here, because the RESTING and the ACTIVE tab are painted by two different rules and
+  // the active underline is the thing this strip is recognisable by. The root carries the class
+  // string the pinning test reads; the two buttons carry the probes.
+  Object.freeze({
+    id: 'tabs',
+    classes: TABS_CLASSES,
+    // OPTED OUT OF THE BOX COMPARISON, for its CHILDREN's reason rather than its own. The strip
+    // declares no height at all — it is solved from the tallest button — and each button declares
+    // a 38px `min-height` under a 2px bottom border, so a button lays out 2px taller wherever
+    // `box-sizing` falls to `content-box` and the strip grows with it. That is the bordered
+    // rails' case exactly, it is a property of this core-less harness rather than of Foundry, and
+    // the box-sizing clause below asserts both halves so the opt-out cannot outlive its reason.
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="${host}-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="${host}-tabs-active" aria-selected="true" data-keyboard-focus="true"><span>Overview</span></button><button type="button" role="tab" class="manager-editor-tab-button" data-probe="${host}-tabs-button" aria-selected="false" data-keyboard-focus="true"><span>Results</span></button></div>`,
+  }),
 ]);
 
 /**
@@ -389,6 +461,8 @@ const EXTRA_PROBES = Object.freeze([
   'slider-range',
   'slider-track',
   'slider-fill',
+  'tabs-active',
+  'tabs-button',
 ]);
 
 /**
@@ -426,7 +500,16 @@ const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
  * sheet. What the family actually promises about it is a RELATIONSHIP — the fill fills its rail —
  * and that is asserted directly by the box-sizing clause below, in every host.
  */
-const HOST_BOX_DEPENDENT_PROBES = Object.freeze([...BORDERED_TRACK_PROBES, 'slider-fill']);
+const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
+  ...BORDERED_TRACK_PROBES,
+  'slider-fill',
+  // THE TWO TAB BUTTONS, for the bordered rails' reason (issue 1509): each declares a 38px
+  // `min-height` under a 2px bottom border, so its border box is 40 high wherever `box-sizing`
+  // falls to `content-box` and 38 where the host supplies `border-box`. The DECLARED 38 is
+  // compared instead, in all three hosts, which is the claim that matters.
+  'tabs-active',
+  'tabs-button',
+]);
 
 /**
  * The family's shared base rule, as the browser serialises its prelude.
@@ -451,7 +534,7 @@ const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
  * The issue-1508 families' font floor, as the browser serialises its prelude.
  *
  * ONE rule with one member per family whose root is NOT its control, declared as a group
- * immediately below the area's own bare-element baseline. All three members are (0,1,1) and every
+ * immediately below the area's own bare-element baseline. All FOUR members are (0,1,1) and every
  * one of them TIES that baseline, which is what makes the group's position load-bearing and is
  * asserted as a CSSOM index below.
  *
@@ -464,6 +547,12 @@ const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
   '.fabricate-field :is(input, select, textarea)',
   '.fabricate-search input',
   '.fabricate-slider input',
+  // AND THE TAB STRIP'S (issue 1509). Its root is a `<div role="tablist">` and the control it
+  // owns is the `<button role="tab">` inside it, so it takes the (0,1,1) shape the other three
+  // members take rather than `StatusToggle`'s (0,1,0). It is this group's first `button` member;
+  // the two BUTTON FAMILIES floor at their own root instead, because there the root IS the
+  // control.
+  '.fabricate-tabs button',
 ]);
 const FAMILY_FONT_FLOOR_SELECTOR = FAMILY_FONT_FLOOR_MEMBERS.join(', ');
 
@@ -777,6 +866,61 @@ const SLIDER_ROOT_COMPARED = Object.freeze([
 ]);
 
 /**
+ * What acceptance 2 compares on the tab strip's own `<div role="tablist">`.
+ *
+ * Every one is a declaration the strip's own re-rooted rule makes: the stretched flex row, the
+ * wrap, the `--fab-space-1` gap, the `min-width: 0` that lets a long tab list shrink, and the
+ * hairline the strip draws under itself. `box-sizing` is excluded for the pager's reason and is
+ * asserted separately below; `font-*` are compared because they must be INHERITED — the strip's
+ * own rule types nothing, so a family rule that started typing this container would show up here.
+ */
+const TABS_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'flex-wrap',
+  'gap',
+  'min-width',
+  'border-bottom-width',
+  'border-bottom-style',
+  'border-bottom-color',
+  'font-family',
+  'font-size',
+]);
+
+/**
+ * And on each of the two `<button role="tab">`s, which are the controls the strip owns.
+ *
+ * `appearance` is here because the button rule declares `none` itself rather than borrowing the
+ * area's; `min-height` and the two paddings are the box; `border-bottom-*` is the ACTIVE
+ * UNDERLINE, which is transparent on the resting tab and the accent on the selected one and is
+ * what makes the two probes different measurements rather than a duplicate. `font-family`,
+ * `font-size`, `font-weight` and `line-height` are the type: the size and the weight come from
+ * the button's own (0,2,0) rule and the family name and the line-height come from the strip's
+ * (0,1,1) font floor, which is what a bare host has instead of the manager's bare-element
+ * baseline.
+ */
+const TABS_BUTTON_COMPARED = Object.freeze([
+  'appearance',
+  '-webkit-appearance',
+  'min-height',
+  'padding-left',
+  'padding-right',
+  'border-radius',
+  'border-bottom-width',
+  'border-bottom-style',
+  'border-bottom-color',
+  'background-color',
+  'color',
+  'display',
+  'align-items',
+  'gap',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+]);
+
+/**
  * The compared set per control, for the entries that do not take the button families' default.
  *
  * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
@@ -799,6 +943,9 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'slider-range': SLIDER_RANGE_COMPARED,
   'slider-track': SLIDER_TRACK_COMPARED,
   'slider-fill': SLIDER_FILL_COMPARED,
+  tabs: TABS_COMPARED,
+  'tabs-active': TABS_BUTTON_COMPARED,
+  'tabs-button': TABS_BUTTON_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */
@@ -1439,6 +1586,14 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       ],
       ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
       ['.fabricate-slider input:focus', '.fabricate-slider input:focus-visible'],
+      // THE TAB STRIP'S PAIR (issue 1509), and it is the first this file has seen that is NEW on
+      // BOTH halves rather than a re-rooted one. The strip had no focus chrome of its own at all:
+      // inside a Fabricate window the module pair reached its buttons and nothing more was
+      // needed, and outside one there was no strip. Rooted at the class it emits, the strip
+      // renders where no `.fabricate` root exists, so it declares both halves — at the module
+      // pair's own (0,2,1) and with the module pair's declarations verbatim, which is what keeps
+      // the two identical wherever both reach. `.fabricate-pagination button:focus` is the shape.
+      ['.fabricate-tabs button:focus', '.fabricate-tabs button:focus-visible'],
       // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added: it
       // existed at (0,3,0) before the re-root and was re-rooted in place, declarations and rank
       // unchanged. The second is the checkbox host's, and its two halves sit on two DIFFERENT
@@ -1519,6 +1674,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       'fabricate-search',
       'fabricate-slider',
       'fabricate-toggle',
+      'fabricate-tabs',
     ];
     const selectReach = rules
       .filter((rule) => roots.some((root) => rule.selectorText.includes(`.${root}`)))
@@ -1530,7 +1686,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     assert.deepEqual(
       selectReach.map((rule) => rule.selectorText),
       [],
-      'a rule rooted at one of the seven namespace classes reaches a focused `select`, which ' +
+      'a rule rooted at one of the eight namespace classes reaches a focused `select`, which ' +
         'is what would displace the inset ring above'
     );
   } finally {
@@ -2072,7 +2228,14 @@ const NEGATIVE_CONTROLS =
   // one rule in this change whose interval walk is not empty and the input it lands on is
   // `opacity: 0`, which is the fact that makes the move zero pixels.
   '<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="neg-toggle"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>' +
-  '<label class="fabricate-toggle manager-tool-setting-toggle" data-probe="neg-toggle-host"><input type="checkbox" class="manager-tool-setting-toggle-input" data-probe="neg-toggle-input"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></label>';
+  '<label class="fabricate-toggle manager-tool-setting-toggle" data-probe="neg-toggle-host"><input type="checkbox" class="manager-tool-setting-toggle-input" data-probe="neg-toggle-input"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></label>' +
+  // AND A TAB STRIP (issue 1509), for the toggle's reason and the floor group's. Its
+  // `.fabricate-tabs button` member is a (0,1,1) TIE with the area's own bare-element baseline,
+  // declared later and so winning on source order with the identical declaration — which means
+  // that inside the manager it must be a no-op, and this is the element that says so with a
+  // measurement rather than with an argument. The button's own (0,2,0) rule states the 0.78rem
+  // and the 700 weight, and the floor must not disturb either.
+  '<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="neg-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="neg-tab"><span>Overview</span></button></div>';
 
 /**
  * Those elements measured in the manager host under a given sheet text.
@@ -2117,16 +2280,20 @@ async function measureNegativeControls(css) {
 }
 
 /**
- * The two blocks issue 1508 ADDS that can move a resting measurement, spelled exactly as the sheet
- * spells them, so a "base" sheet can be built by removing them.
+ * The blocks issues 1508 and 1509 ADD that can move a resting measurement, spelled exactly as the
+ * sheet spells them, so a "base" sheet can be built by removing them.
  *
- * The two focus PAIRS are not on this list and do not need to be: they declare `:focus` and
+ * Issue 1509 adds no block of its own: its `.fabricate-tabs button` floor is a fifth MEMBER of the
+ * group below, so removing that group already removes it and the tab button in the fixture is
+ * measured against a sheet that has none.
+ *
+ * The focus PAIRS are not on this list and do not need to be: they declare `:focus` and
  * `:focus-visible` chrome only, which no resting measurement reads, and their own neutrality is
  * asserted by the ring clause below and by the select-reach check inside it.
  */
 const ADDED_BLOCKS = Object.freeze([
   '.fabricate-field :is(input, select, textarea),\n.fabricate-search input,\n' +
-    '.fabricate-slider input {\n  font: inherit;\n}',
+    '.fabricate-slider input,\n.fabricate-tabs button {\n  font: inherit;\n}',
   '.fabricate-toggle {\n  font: inherit;\n}',
   '.fabricate-field input[type="text"],\n.fabricate-field input[type="url"],\n' +
     '.fabricate-field input[type="email"],\n.fabricate-field input[type="tel"],\n' +

@@ -65,14 +65,14 @@
     "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte | .manager-recipe-item-stepper-value | 600 | 1",
     "src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte | .manager-scoped-roster-count | 600 | 1",
     "src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte | .manager-scoped-essence-stat-value | 700 | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-editor-tab-count | 600 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-environment-comp-order | 700 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-count | 600 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-issue-badge | 700 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-recipe-flow-qty, .fabricate-manager .manager-component-flow-qty | 600 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-recipe-rail-count-value | 700 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-salvage-result-difficulty, .fabricate-manager .manager-recipe-stage-dc | 700 | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-salvage-result-ordinal, .fabricate-manager .manager-recipe-stage-ordinal | 700 | 1"
+    "styles/fabricate.css | .fabricate-manager .manager-salvage-result-ordinal, .fabricate-manager .manager-recipe-stage-ordinal | 700 | 1",
+    "styles/fabricate.css | .fabricate-tabs .manager-editor-tab-count | 600 | 1"
   ],
   "offTokenShadows": [
     "src/ui/svelte/apps/alchemy/Workbench.svelte | 0%, 100% | 0 0 0 0 transparent | 1",

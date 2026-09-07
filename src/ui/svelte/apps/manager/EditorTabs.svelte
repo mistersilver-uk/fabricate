@@ -117,12 +117,44 @@
    - containerClass / buttonClass / badgeClass: the site's existing classes, kept so no
      shipped rule in `styles/fabricate.css` stops matching. The COUNT and DOT have no such
      prop: their classes are the drawing, and a drawing a caller can choose is the style
-     divergence this capability exists to remove.
+     divergence this capability exists to remove. Their DEFAULTS are the primitive's own
+     family and are declared as one frozen map below rather than three literals, so the
+     area-scope gate can read them; see that map's own note.
    - danger: whether a danger chip also tints its button.
+
+  ── AND THE STRIP IS ROOTED AT `fabricate-tabs` (issue 1509) ────────────────────
+
+  The tablist writes `fabricate-tabs` ahead of whatever `containerClass` carries, and every rule
+  the strip's own family owns is anchored on that class instead of on `.fabricate-manager`. So the
+  strip draws wherever it is mounted rather than only inside the manager window. The `manager-*`
+  classes stay on the elements — retiring them is a later change — and a caller's
+  own overrides, which name the caller's container, are untouched.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Chip from '../../components/Chip.svelte';
+
+  /*
+    THE FAMILY THIS COMPONENT WRITES, HOISTED OUT OF THE PROP DEFAULTS (issue 1509).
+
+    These three strings are the `manager-editor-tab*` family — the classes `styles/fabricate.css`
+    paints the strip, its buttons and its badges with — and until this change they lived as literal
+    `$props()` defaults. That is a real hiding place rather than a formatting preference: the
+    area-scope gate reads a component's family out of its MARKUP and out of a frozen class map, and
+    a default is in neither, so eleven of the family's thirteen selectors read CALLER-owned and the
+    gate reported the family clean while they stayed rooted at `.fabricate-manager`. Frozen and
+    named here, they reach the gate's class-map reader and the family is measured.
+
+    A value a CALLER passes stays the caller's. `manager-environment-tab-*` and
+    `manager-tool-editor-tabs` are per-site vocabularies handed in through these same props, so
+    they never enter this component's family and their rules stay application-rooted — which is the
+    boundary a later fold of the three strips would have to cross deliberately.
+  */
+  const DEFAULT_CLASSES = Object.freeze({
+    container: 'manager-editor-tabs',
+    button: 'manager-editor-tab-button',
+    badge: 'manager-editor-tab-badge',
+  });
 
   let {
     tabs = [],
@@ -140,9 +172,9 @@
     badgeAttribute = '',
     countAttribute = '',
     dotAttribute = '',
-    containerClass = 'manager-editor-tabs',
-    buttonClass = 'manager-editor-tab-button',
-    badgeClass = 'manager-editor-tab-badge',
+    containerClass = DEFAULT_CLASSES.container,
+    buttonClass = DEFAULT_CLASSES.button,
+    badgeClass = DEFAULT_CLASSES.badge,
     danger = false,
   } = $props();
 
@@ -279,7 +311,7 @@
 </script>
 
 <div
-  class={containerClass}
+  class={`fabricate-tabs ${containerClass}`}
   role="tablist"
   aria-label={text(ariaLabelKey, ariaLabel)}
   {...containerAttributes()}

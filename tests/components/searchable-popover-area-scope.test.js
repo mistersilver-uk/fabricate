@@ -109,20 +109,24 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Fifteen shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Sixteen shared primitives, each with the namespace roots it writes and the class family it owns.
  *
  * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
  * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
  * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field`,
  * `ManagerSearchField`, `ManagerToolbar`, `InspectorCard`, `StatusToggle` and `ChanceSlider`
  * (issue 1508). NONE of the issue-1508 families portals anything, so one
- * root each is the whole requirement. A `composesClasses: true` entry
+ * root each is the whole requirement, and neither does `EditorTabs` (issue 1509).
+ * A `composesClasses: true` entry
  * opts into reading the `const classes = $derived([…])` array literal (`composedClassRegion`)
  * ALONGSIDE the ordinary markup region, because `class={classes}` is an identifier rather than a
  * `class="…"` string or a `` class={`…`} `` template, so the ordinary markup-only extractors find
  * nothing for either button primitive on their own. A `classMaps` entry opts into a THIRD reader
  * (`classMapRegion`) for a family class the component chooses per host out of a frozen map in
- * `<script>`, which neither of the other two regions covers; only `StatusToggle` declares one.
+ * `<script>`, which neither of the other two regions covers. TWO entries declare one, and for two
+ * different reasons: `StatusToggle` picks its host's class out of `HOST_CLASSES` at render time,
+ * while `EditorTabs` DEFAULTS three class PROPS to its own family and a default lives in neither
+ * of the other regions — the markup writes only the binding.
  *
  * `family` is a PREFIX pattern rather than a class list because the list is derived from markup:
  * it decides which of the component's classes belong to the primitive's own family, so that
@@ -711,6 +715,59 @@ const PRIMITIVES = Object.freeze([
     // that class re-roots to a DESCENDANT chain that a token on the element itself never matches.
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-chance-slider', root: 'fabricate-slider' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── EDITORTABS (issue 1509). The manager's editor tab strip, rooted at the class it emits.
+    //
+    // ITS FAMILY LIVES IN PROP DEFAULTS, which is why this entry declares a class map. The
+    // component takes `containerClass`, `buttonClass` and `badgeClass` as props and DEFAULTS them
+    // to its own family; the markup writes `class={containerClass}` (a bare identifier the
+    // attribute reader cannot match at all) and `` class={`${buttonClass} …`} `` (all
+    // interpolated), so only the count and the dot survive as literals. Without the map `written`
+    // is 2 and eleven of the family's thirteen selectors read CALLER-owned — gate-inert, left
+    // application-rooted, with this gate reporting the family clean. The three defaults are frozen
+    // into `DEFAULT_CLASSES` so `classMapRegion` reads them, and `written` is 5.
+    //
+    // The ROOT does NOT ride the map, deliberately: the tablist writes
+    // `` class={`fabricate-tabs ${containerClass}`} ``, a literal the markup reader already sees,
+    // which is what keeps the emission clause reading an element the component actually writes.
+    name: 'EditorTabs',
+    components: Object.freeze(['src/ui/svelte/apps/manager/EditorTabs.svelte']),
+    roots: Object.freeze(['fabricate-tabs']),
+    // ONE prefix, token-terminated, with a lookahead that refuses `manager-editor-table*`. The
+    // sheet holds no such class today; the guard is written anyway because the FIXTURE census this
+    // pattern also feeds does hit `-table-head` spellings elsewhere in `tests/`.
+    family: 'manager-editor-tab(?!le)[\\w-]*',
+    anchors: Object.freeze([
+      'manager-editor-tabs',
+      'manager-editor-tab-button',
+      'manager-editor-tab-badge',
+      'manager-editor-tab-count',
+      'manager-editor-tab-dot',
+    ]),
+    classMaps: Object.freeze(['DEFAULT_CLASSES']),
+    // Measured at this commit: 5 written, 12 family selectors, 7 owned — 4 exempt (the
+    // environment stem's leg of the split active re-tone, the Tool Studio's badge override and the
+    // component-entry column's two strip overrides) and 1 caller-CLASS compound, the badge's own
+    // `.manager-chip` qualification. EIGHT are re-rooted: the 7 owned plus that compound, which is
+    // the strip's own chrome under a composed primitive's class and would be split from its family
+    // if it stayed behind.
+    //
+    // `.fabricate-manager .manager-editor-tab-panel` is NOT in these figures and is not exempt
+    // either: `manager-editor-tab-panel` is a CALLER class that happens to fall inside the family
+    // PREFIX, no name in `written` matches it, so the rule never enters `pickerSelectors`'
+    // population at all. Three callers write it on a SIBLING of the tablist, so re-rooting it
+    // would cost every editor panel its overflow, its scrollbar gutter and both `min-*: 0`.
+    writtenFloor: 4,
+    familyFloor: 10,
+    ownedFloor: 6,
+    // The ROOT-ELEMENT anchor. `manager-editor-tab-button` has the larger fixture population
+    // (7 elements over 3 files against this one's 4 attributes over 3) and is REFUSED all the
+    // same: it is the BUTTON, a descendant of the root, so a fixture carrying it satisfies this
+    // clause by stamping a root onto an element no rule in the sheet roots at.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-editor-tabs', root: 'fabricate-tabs' }),
     ]),
   }),
 ]);
@@ -1446,7 +1503,9 @@ test('the class-map reader is what puts the per-host class in the family, and it
   assert.deepEqual(
     toggle.classMaps,
     ['HOST_CLASSES'],
-    'StatusToggle is the one entry that declares a class map, and this clause is stated over it'
+    'StatusToggle declares exactly this one class map, and this clause is stated over it. It is ' +
+      'no longer the only entry that declares one — `EditorTabs` declares `DEFAULT_CLASSES` for a ' +
+      'different reason, and has its own controls below — so the two are proved separately.'
   );
 
   // POSITIVE CONTROL 1: the region really holds the string.
@@ -1506,6 +1565,77 @@ test('the class-map reader is what puts the per-host class in the family, and it
     2,
     'the class map must move exactly two selectors into the owned set — the checkbox host`s box ' +
       'and the `:has()` ring on it. Neither is re-rooted without it, and the sheet reports clean.'
+  );
+});
+
+test('the class-map reader is also what puts a PROP DEFAULT in the family, and it fires', () => {
+  // CLAUSE (d) A SECOND TIME, over the other shape a class map hides (issue 1509). `StatusToggle`
+  // chooses its host's class out of a map at render time; `EditorTabs` DEFAULTS three class PROPS
+  // to its own family, and a default is in neither of the other two regions — the markup writes
+  // `class={containerClass}`, a bare identifier `classAttributeValues` cannot match at all, and
+  // `` class={`${buttonClass} …`} ``, whose family tokens are all interpolated. So the two entries
+  // exercise the same reader against two different hiding places, and both are proved.
+  const tabs = PRIMITIVES.find((entry) => entry.name === 'EditorTabs');
+  assert.deepEqual(
+    tabs.classMaps,
+    ['DEFAULT_CLASSES'],
+    'EditorTabs declares exactly this one class map, and this clause is stated over it'
+  );
+
+  // POSITIVE CONTROL 1: the region really holds the strings.
+  const region = classMapRegion(tabs.components[0], 'DEFAULT_CLASSES');
+  assert.ok(
+    region.includes("'manager-editor-tab-button'"),
+    `${tabs.components[0]}'s DEFAULT_CLASSES no longer contains the button class this gate reads, ` +
+      'so a reader that stops finding the map would examine a family short by three classes ' +
+      'instead of reporting the regression'
+  );
+
+  // AND THE MARKUP REGION CANNOT SEE IT, which is the whole reason the reader is consulted here.
+  // The button class reaches the DOM through an interpolated binding, so the text
+  // `manager-editor-tab-button` appears nowhere after `</script>` except inside the scoped
+  // `<style>` block, which `markupRegion` excludes.
+  assert.ok(
+    !markupRegion(tabs.components[0]).includes('manager-editor-tab-button'),
+    'the button class has moved into the markup, so this reader is no longer the thing that ' +
+      'credits it and the control below proves nothing'
+  );
+
+  // POSITIVE CONTROL 2: dropping the field really costs the family five of its seven owned rules,
+  // stated as a measured DIFFERENCE over a copy of the entry with `classMaps` removed — the exact
+  // state this component was in before the defaults were frozen into a map. The figure is the one
+  // the GATE emits (`owned.length`), not the eight rules the change re-roots, because a control
+  // publishing a number the gate never produces cannot be checked against the gate.
+  const withoutMap = Object.freeze({ ...tabs, classMaps: undefined });
+  const withMap = classesWrittenBy(tabs);
+  const without = classesWrittenBy(withoutMap);
+  assert.equal(
+    withMap.size,
+    5,
+    'the map must credit all five family classes: the container, the button and the badge from ' +
+      'the defaults, the count and the dot from the markup'
+  );
+  assert.equal(
+    without.size,
+    2,
+    'without the map only the count and the dot are literals in the markup; a different number ' +
+      'means the family reaches this gate some other way and the control below measures nothing'
+  );
+
+  const ownedIn = (entry, written) =>
+    pickerSelectors(written, entry).filter((selector) => isPrimitiveOwned(selector, written, entry));
+  assert.equal(
+    ownedIn(tabs, withMap).length,
+    7,
+    'the strip owns seven of the twelve selectors that name a class it writes'
+  );
+  assert.equal(
+    ownedIn(withoutMap, without).length,
+    2,
+    'dropping the class map must take the gate-owned count from 7 to 2 — only the count rule and ' +
+      'the dot rule survive, and the strip`s own container, button, hover, active, active-count ' +
+      'and badge rules all read CALLER-owned, gate-inert, and would have been left rooted at ' +
+      '`.fabricate-manager` with this file reporting the family clean'
   );
 });
 
@@ -1672,6 +1802,19 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       '`file|primitive` because this one file holds a second family\'s detector too.',
   }),
   Object.freeze({
+    file: 'tests/components/editor-tabs-adoption-contract.test.js',
+    primitive: 'EditorTabs',
+    attributeCount: 1,
+    elementCount: 4,
+    why:
+      'the `DETECTOR_FIXTURE` and `detectorFixture.lowered` source strings, which exist to prove ' +
+      'the raw-site detector fires and to prove it counts a LOWERED corpus differently. Four of ' +
+      'their elements carry a family class on purpose — two raw tab buttons, the container the ' +
+      'token is deliberately NOT, and the lowered probe — and namespacing any of them would make ' +
+      'the fixture depict a CONVERTED site, at which point the contract counts 0 raw sites and ' +
+      'passes over a tree that could have any number.',
+  }),
+  Object.freeze({
     file: 'tests/components/manager-filter-bar-source-contract.test.js',
     primitive: 'ManagerToolbar',
     attributeCount: 1,
@@ -1805,10 +1948,14 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 163,
+    attributes >= 168,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 163. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1508 phase 3: 181 today, against 169 before ' +
+      'of 168. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1509: 187 today, against the 181 before ' +
+      '`EditorTabs` joined the array. SIX arrived: four are the shipped fixtures that copy the ' +
+      'tab strip’s own root element, in three files, and two are the strip and the negative ' +
+      'control this change adds to `re-rooted-controls-host-independence.test.js`. Before that: ' +
+      '181 against 169 before ' +
       '`StatusToggle` and `ChanceSlider` joined the array, 143 before `ManagerToolbar` and ' +
       '`InspectorCard` did and 113 before `Field` and ' +
       '`ManagerSearchField` did. The floor stood at 54 against a population that had already ' +
@@ -1924,10 +2071,15 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 289,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 289. A ` +
+    elements >= 305,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 305. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing. RE-MEASURED at issue 1508 phase 3: 321 today, against 270 ' +
+      'below holds over nothing. RE-MEASURED at issue 1509: 339 today, against the 321 before ' +
+      '`EditorTabs` joined the array. THIRTEEN of the eighteen are the shipped fixtures’ own, ' +
+      'over three files, and five are this change’s two new host-independence fixtures. That ' +
+      'thirteen against the attribute clause’s four is the gap the two clauses exist to keep ' +
+      'apart: a strip fixture brings its buttons, its counts and its badges with it. Before ' +
+      'that: 321 against 270 ' +
       'before `StatusToggle` and `ChanceSlider` joined the array, 244 before `ManagerToolbar` and ' +
       '`InspectorCard` did and 214 before `Field` and ' +
       '`ManagerSearchField` did — the same drifted margin the attribute floor above records, ' +
@@ -2064,12 +2216,16 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 2,
-    `only ${blocks} of the sixteen component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. Two do today, `SearchablePopover` and `ManagerColorPopover`; ' +
-      'the rest name a `<style>` only in DOCBLOCK PROSE, usually to say they deliberately have ' +
-      'none, and the `</script>` guard above is what keeps that prose out of this clause. A ' +
-      'lower number means the reader has stopped finding the real blocks and this clause ' +
-      'examined nothing.'
+    blocks >= 3,
+    `only ${blocks} of the seventeen component files hold a REAL scoped \`<style>\` block — one ` +
+      'opened after `</script>`. THREE do today: `SearchablePopover`, `ManagerColorPopover` and ' +
+      '— since issue 1509 put an entry on it — `EditorTabs`, whose block is the two ' +
+      '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation tab. ' +
+      'That block STAYS where it is: a scoped block is injected unlayered and this sheet is ' +
+      'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
+      'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, usually ' +
+      'to say they deliberately have none, and the `</script>` guard above is what keeps that ' +
+      'prose out of this clause. A lower number means the reader has stopped finding the real ' +
+      'blocks and this clause examined nothing.'
   );
 });

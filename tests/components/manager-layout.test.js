@@ -2467,9 +2467,16 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     // Read out of `Chip.svelte`'s scoped block, since the chip owns its own appearance
     // (issue 883); everything else in this list is still global-sheet.
     '.manager-chip.is-mono',
-    // Three classes deliberately, so it outranks the scoped chip block rather than tying
-    // with it and losing on source order (issue 883).
-    '.fabricate-manager .manager-chip.manager-editor-tab-badge',
+    // Three classes, and issue 1509 keeps all three WITHOUT the reason issue 883 gave. That
+    // reason was that three classes out-rank `Chip.svelte`'s own scoped `.manager-chip.svelte-
+    // <hash>` block; specificity never decides that contest, because the sheet is loaded into
+    // `layer(modules)` and a Svelte scoped block is injected unlayered, and an unlayered
+    // declaration beats a layered one at any specificity. What this row still measures is the
+    // one thing that IS true of it: the rule declares the mono face and tabular figures, which
+    // `Chip` does not, so those two properties are the badge's from here. The class count is
+    // preserved because changing it would be a change, and issue 1509 re-roots this family
+    // without moving a frame. The rendering defect the old reason implies is issue 1507's.
+    '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
     '.fabricate-manager .manager-environment-comp-order',
     '.fabricate-manager .manager-nav-count',
   ];
@@ -5758,19 +5765,35 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
     );
   }
 
-  // Any global rule that still needs to beat a chip declaration must be written at three
-  // classes or more. At two it TIES with the scoped `.manager-chip.svelte-<hash>` block and
-  // loses on source order, because `css: 'injected'` puts component CSS after the sheet —
-  // a silent regression no mounted test can see. The tab badge is the live case: it is
-  // deliberately SMALLER than a chip (18px/0.56rem) and would otherwise grow back.
+  // THE TAB BADGE IS WRITTEN AT THREE CLASSES, and issue 1509 corrects WHY while changing
+  // neither assertion's subject, the rule's declarations, nor any rendered value.
+  //
+  // Issue 883's reason was that three classes out-rank `Chip.svelte`'s own scoped
+  // `.manager-chip.svelte-<hash>` block, so the badge renders at its own deliberately smaller
+  // 18px/0.56rem rather than at the chip's scale. That is not how the contest resolves.
+  // Foundry loads `styles/fabricate.css` into `layer(modules)` and `svelte.config.js` injects a
+  // scoped block UNLAYERED, and an unlayered declaration beats a layered one at ANY specificity
+  // — so the chip's block wins every property it declares whatever this selector's class count
+  // is, and only the properties `Chip` does NOT declare (the margin, the min-width, the mono
+  // face and the tabular figures) actually land from here. The badge does not render at
+  // 18px/0.56rem in the product today; that defect, and the fact that
+  // `tests/helpers/scoped-component-css.js` models injection order and specificity but no
+  // layers at all and therefore cannot see it, are both filed to issue 1507.
+  //
+  // So the three-class form is preserved for a smaller and true reason: CHANGING THE CLASS
+  // COUNT IS A CHANGE, and issue 1509 re-roots this family at `fabricate-tabs` with the rank,
+  // the layer, the position and the declarations all unchanged. The first assertion below is
+  // the one the re-root moves, and it moves by exactly one compound.
   assert.ok(
-    css.includes('.fabricate-manager .manager-chip.manager-editor-tab-badge {'),
-    'the smaller tab badge must outrank the chip block on specificity, not source order'
+    css.includes('.fabricate-tabs .manager-chip.manager-editor-tab-badge {'),
+    'the tab badge rule must stay at three classes, rooted at the class `EditorTabs` emits ' +
+      'rather than at the manager window'
   );
   assert.equal(
     css.includes('.fabricate-manager .manager-editor-tab-badge {'),
     false,
-    'the two-class form would tie with the scoped chip block and lose'
+    'the two-class, manager-rooted form is the shape this rule must never be rewritten back ' +
+      'to: it is neither three classes nor rooted at the primitive'
   );
 });
 
@@ -5864,7 +5887,7 @@ async function readRenderedKnowledgeGeometry(width) {
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="fabricate-search manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="fabricate-search manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="fabricate-button manager-button fab-manager-button is-danger">Reset this system</button><button class="fabricate-button manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="fabricate-tabs manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -7082,7 +7105,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
     </div>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-editor-tab-count">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section><span class="manager-chip" data-default-chip-reference>Default</span></div></main></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="fabricate-tabs manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-editor-tab-count">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section><span class="manager-chip" data-default-chip-reference>Default</span></div></main></div></div>`
       )
     );
     const geometry = await page.evaluate(() => {

@@ -1441,9 +1441,14 @@
 
 /* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issue 1508).
 
-   `Field`, `ManagerSearchField` and `ChanceSlider` are rooted at the class each of them emits, so
-   all three now render in hosts carrying no `.fabricate-manager` — and the control each owns is a
-   bare `<input>`, `<select>` or `<textarea>` that would otherwise take Foundry's own font there.
+   `Field`, `ManagerSearchField`, `ChanceSlider` and — since issue 1509 — `EditorTabs` are rooted
+   at the class each of them emits, so all four now render in hosts carrying no
+   `.fabricate-manager`, and the control each owns is a bare `<input>`, `<select>`, `<textarea>` or
+   `<button>` that would otherwise take Foundry's own font there. A `button` is among the controls
+   this group floors as of issue 1509: the tab strip's root is its `<div role="tablist">` and the
+   control it owns is the `<button role="tab">` inside it, so its member takes the (0,1,1) shape
+   rather than the (0,1,0) one.
+
    Where a family root IS the control the floor is written at that root alone, (0,1,0), as the two
    button families' and `StatusToggle`'s are; where the root is NOT the control it is written at
    the family root plus the bare element it owns, (0,1,1) — the SAME rank as the baseline above,
@@ -1451,6 +1456,8 @@
 
    The slider's member covers BOTH inputs it owns — the `type="number"` half and the `type="range"`
    track — because `input` names the element rather than a type, and both are the primitive's own.
+   The strip's member reaches every `<button>` inside a tablist, which is every button the strip
+   renders and no other: the primitive draws its own tabs and their marks and takes no children.
 
    `font: inherit` AND NOTHING ELSE, because a tie is not a loss: any declaration this rule
    carries that the baseline does not is a real move inside the manager. `appearance` and
@@ -1463,14 +1470,15 @@
    for a measured reason. `font` is a SHORTHAND and resets `line-height` with the rest, and at
    (0,1,1) this rule ties every LATER same-rank rule in the area as well. Two of those restate a
    `font` longhand for controls these floors reach: `.fabricate-manager textarea
-   { line-height: 1.4 }` at `styles/fabricate.css:1541-1545`, in the free-text baseline block just
-   below, and `.fabricate-manager select { line-height: 1 }` at `:1667-1674`, inside `@supports
+   { line-height: 1.4 }` at `styles/fabricate.css:1547-1551`, in the free-text baseline block just
+   below, and `.fabricate-manager select { line-height: 1 }` at `:1673-1680`, inside `@supports
    (appearance: base-select)`. Declared in a family block thousands of lines further down, this
    group would win both and silently re-type every manager textarea and select. Immediately below
    the baseline is the first position from which the interval walk comes back empty. */
 .fabricate-field :is(input, select, textarea),
 .fabricate-search input,
-.fabricate-slider input {
+.fabricate-slider input,
+.fabricate-tabs button {
   font: inherit;
 }
 
@@ -13714,8 +13722,17 @@
   (`manager-environment-tab-button` on the Checks strip, `manager-editor-tab-button`
   elsewhere) and a re-tone that named one of them would make the mark's ACTIVE drawing
   depend on which strip it sits in, which is the same divergence one selector down.
+
+  THE ACTIVE RE-TONE IS TWO RULES RATHER THAN ONE TWO-MEMBER LIST (issue 1509). A selector
+  list's specificity is per member, and these two members are owned by different things: the
+  environment stem is a value a CALLER passes to `EditorTabs`, so its rule stays rooted at the
+  manager, while the editor stem is the primitive's own default and its rule roots at
+  `.fabricate-tabs`. Split into two adjacent rules at the original position with byte-identical
+  declarations, every member keeps its (0,4,0) rank and its source order, so nothing the strip
+  draws moves. The one thing the split does NOT change is what the comment above says: both
+  stems are still re-toned, by the same declaration, at the same rank.
 */
-.fabricate-manager .manager-editor-tab-count {
+.fabricate-tabs .manager-editor-tab-count {
   flex: 0 0 auto;
   color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
@@ -13724,8 +13741,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count,
-.fabricate-manager .manager-editor-tab-button.is-active .manager-editor-tab-count {
+.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count {
+  color: var(--fab-accent);
+}
+
+.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-count {
   color: var(--fab-accent);
 }
 
@@ -13767,7 +13787,7 @@
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-editor-tab-dot {
+.fabricate-tabs .manager-editor-tab-dot {
   flex: 0 0 auto;
   display: inline-block;
   width: 6px;
@@ -19307,7 +19327,7 @@
 /* Shared editor tab + validation primitives. Generic so the recipe editor reuses
    the same tab strip and readiness/issue layout the environment editor pioneered
    without duplicating the rules per editor. */
-.fabricate-manager .manager-editor-tabs {
+.fabricate-tabs.manager-editor-tabs {
   display: flex;
   align-items: stretch;
   gap: var(--fab-space-1);
@@ -19316,7 +19336,7 @@
   border-bottom: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-editor-tab-button {
+.fabricate-tabs .manager-editor-tab-button {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -19338,13 +19358,34 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-editor-tab-button:hover {
+.fabricate-tabs .manager-editor-tab-button:hover {
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-editor-tab-button.is-active {
+.fabricate-tabs .manager-editor-tab-button.is-active {
   color: var(--fab-text);
   border-bottom-color: var(--fab-accent);
+}
+
+/* THE STRIP'S STRIP HALF (issue 1509), on the precedent `.fabricate-pagination button:focus`
+   set and for its reason: Foundry core's `a.button:focus, button:focus` paints an orange
+   outline and a 4px glow, the module reset removes it only inside `.fabricate`, and this
+   family now renders in hosts carrying no Fabricate root at all — where the repaint below
+   would lay the accent ring OVER core's treatment instead of replacing it. Written above the
+   repaint because the two tie at (0,2,1), and BUTTONS ONLY because the tablist renders its own
+   `<button role="tab">`s and nothing else focusable. */
+.fabricate-tabs button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* AND THE STRIP'S OWN KEYBOARD RING, the module ring's declarations verbatim (`.fabricate
+   <element>:focus-visible`, issue 1501) so nothing moves where that ring already reaches. It
+   ties the module pair at (0,2,1) and sits later, so inside a Fabricate window the two resolve
+   to the same two declarations; outside one it is the whole of the tab's focus chrome. */
+.fabricate-tabs button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 /* Editor tab badges are counts — issue counts, item counts — so they take the mono
@@ -19353,12 +19394,24 @@
    (against the inherited chip min-height) keeps a single digit reading as a small
    pill with centred text rather than a circle. */
 
-/* Written at THREE classes on purpose (issue 883). The chip's own rules now live in
-   `Chip.svelte`'s scoped block as `.manager-chip.svelte-<hash>` — two classes — injected
-   after the global sheet, so the old two-class form of this selector would have tied and
-   lost on source order, silently restoring the chip scale over this deliberately smaller
-   tab badge. Every tab badge is a chip, so qualifying on `.manager-chip` costs nothing. */
-.fabricate-manager .manager-chip.manager-editor-tab-badge {
+/* Written at THREE classes, and issue 1509 keeps all three rather than restating the reason
+   issue 883 gave for them, because that reason is FALSE and the correction belongs beside the
+   rule it was written on.
+
+   The claim was that three classes out-rank `Chip.svelte`'s own scoped `.manager-chip.svelte-
+   <hash>` block, so this deliberately smaller badge survives the chip's scale. Specificity
+   never decides that contest. Foundry loads this sheet into `layer(modules)` and a Svelte
+   scoped block is injected UNLAYERED, and an unlayered declaration beats a layered one at ANY
+   specificity — so the chip's block wins every property it declares, at two classes or at ten,
+   and only the properties `Chip` does NOT declare land from here. The rendering consequence is
+   real and is filed to issue 1507; this rule is not the place it is fixed.
+
+   So the three classes stay for a different and smaller reason: CHANGING THE CLASS COUNT IS A
+   CHANGE, and issue 1509 re-roots this family without moving a frame. Every property resolves
+   here exactly as it did before, because the rank, the layer, the position and the declarations
+   are all unchanged and only the leading compound was rewritten. Every tab badge is a chip, so
+   qualifying on `.manager-chip` still costs nothing. */
+.fabricate-tabs .manager-chip.manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
   min-width: 1.4rem;
   min-height: 18px;
