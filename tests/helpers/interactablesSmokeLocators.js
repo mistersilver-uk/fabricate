@@ -54,27 +54,36 @@ export function readRootSource(relativePath) {
 }
 
 /**
- * Every distinct `data-*` attribute name in a source that starts with `prefix`.
+ * Order two lowercase hook / class tokens, explicitly.
  *
- * @param {string} source The text to scan.
- * @param {string} prefix e.g. `data-interactable-manager-`.
- * @returns {string[]} Sorted, de-duplicated attribute names.
+ * A bare `.sort()` compares UTF-16 code units, which is right for these tokens only by
+ * accident of their being ASCII - and the accident is one non-ASCII hook away from ending.
+ * The locale is PINNED so a CI runner's own locale cannot reorder a list a suite compares
+ * against; an unpinned `localeCompare` is reproducible on one machine and not across two.
+ *
+ * @param {string} first
+ * @param {string} second
+ * @returns {number}
  */
-export function dataHooksMatching(source, prefix) {
-  const pattern = new RegExp(`${prefix}[a-z-]*[a-z]`, 'g');
-  return [...new Set(source.match(pattern) ?? [])].sort();
+export function byTokenName(first, second) {
+  return first.localeCompare(second, 'en');
 }
 
 /**
- * Every distinct class token in a source that starts with `prefix`.
+ * Every distinct lowercase token in a source that starts with `prefix`.
+ *
+ * A `data-*` attribute name and a class token are the SAME lexical shape - lowercase letters
+ * and hyphens, terminated by a letter - so one scan answers for both, and the prefix the
+ * caller passes is what says which is being read. It is a regex FRAGMENT, not a literal, so a
+ * caller can scope one family away from a sibling that shares its stem.
  *
  * @param {string} source The text to scan.
- * @param {string} prefix e.g. `fab-im-`.
- * @returns {string[]} Sorted, de-duplicated class tokens.
+ * @param {string} prefix e.g. `data-interactable-manager-`, `fab-im-`.
+ * @returns {string[]} Sorted, de-duplicated tokens.
  */
-export function classTokensMatching(source, prefix) {
+export function prefixedTokensIn(source, prefix) {
   const pattern = new RegExp(`${prefix}[a-z-]*[a-z]`, 'g');
-  return [...new Set(source.match(pattern) ?? [])].sort();
+  return [...new Set(source.match(pattern) ?? [])].sort(byTokenName);
 }
 
 /**

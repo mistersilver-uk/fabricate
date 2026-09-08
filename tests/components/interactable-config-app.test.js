@@ -22,8 +22,12 @@ import { planSetEnabled, planSetLocked } from '../../src/canvas/regions/interact
 import {
   SMOKE_SOURCE,
   assertLocatorsEmitted,
-  dataHooksMatching,
+  prefixedTokensIn,
 } from '../helpers/interactablesSmokeLocators.js';
+import {
+  CONFIG_PANEL_CONTRACT,
+  assertWindowContract,
+} from '../helpers/interactablesWindowContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -53,74 +57,6 @@ const statusToggleSource = readFileSync(
   'utf8'
 );
 const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
-
-/**
- * The Foundry smoke harness, read as the OTHER END of a hand-maintained mirror (issue 1520).
- *
- * Nothing statically tied a locator string in `scripts/foundry-test-run.mjs` to an attribute
- * this root emits, and the smoke cannot run in CI - so a conversion that moved one of these
- * hooks off the DOM would have been invisible to `npm test` and would have surfaced, weeks
- * later, as a click timeout in a capture run. Converting nine controls to shared primitives is
- * exactly the change that moves them: every one of these attributes now reaches the DOM through
- * a primitive's rest spread, its `triggerData` map or its `dataAttr` prop rather than
- * being written on the element beside it.
- */
-const smokeSource = readFileSync(resolve(__dirname, '../../scripts/foundry-test-run.mjs'), 'utf8');
-
-/**
- * Every control family this root imports from the shared library.
- *
- * `Stepper` is deliberately absent: it converted earlier, and its own contract - including
- * the `<label>`-around-a-Stepper trap - lives in `tests/helpers/stepperSourceContract.js`.
- */
-const ADOPTED_PRIMITIVES = Object.freeze([
-  'Chip',
-  'Field',
-  'ManagerButton',
-  'Notice',
-  'Select',
-  'StatusToggle',
-]);
-
-/**
- * The `.fab-ic-*` names that survive the conversion, EXACTLY.
- *
- * Every one is this window's own LAYOUT or one of its status readings - the scroll column, the
- * section rhythm, the facts grid, the node-state colours - which is the half a shared
- * primitive cannot own. No control family is on this list, and that is the assertion: a
- * hand-rolled button, field, chip or banner re-appearing adds a name, and a name deleted
- * without its markup drops one.
- *
- * `fab-ic-toggle` is on it and is NOT an unconverted control: it is the `<label>` around
- * the native "Hidden from players" checkbox, which carries no `aria-pressed` and is not a
- * switch. `fab-ic-node-count-field` is on it because the stepper's width cap is layout the
- * `<Field>` it now travels to does not own.
- */
-const SURVIVING_LAYOUT_CLASSES = Object.freeze([
-  'fab-ic-actions',
-  'fab-ic-actions-inline',
-  'fab-ic-empty',
-  'fab-ic-fact',
-  'fab-ic-fact-id',
-  'fab-ic-fact-list',
-  'fab-ic-fact-muted',
-  'fab-ic-fact-name',
-  'fab-ic-facts',
-  'fab-ic-header',
-  'fab-ic-identity',
-  'fab-ic-identity-body',
-  'fab-ic-identity-head',
-  'fab-ic-node-count-field',
-  'fab-ic-node-depleted',
-  'fab-ic-node-exhausted',
-  'fab-ic-node-hint',
-  'fab-ic-node-state',
-  'fab-ic-section',
-  'fab-ic-section-title',
-  'fab-ic-title',
-  'fab-ic-toggle',
-  'fab-ic-visual-status',
-]);
 
 describe('InteractableConfigApp shell', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
@@ -364,7 +300,7 @@ describe('InteractableConfigRoot body', () => {
   // harness, and an unscoped `data-interactable-*` scan would assert THIS root writes them.
   it('still emits every data-interactable-* locator the Foundry smoke drives', () => {
     assertLocatorsEmitted({
-      locators: dataHooksMatching(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)'),
+      locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)'),
       rootSource,
       floor: 9,
       what: 'config-panel hooks',
@@ -372,7 +308,7 @@ describe('InteractableConfigRoot body', () => {
     });
     // The window's own root container, which the smoke waits on three times and which the
     // conversion deliberately KEEPS: it is the scroll box, not a control family.
-    assert.ok(smokeSource.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');
+    assert.ok(SMOKE_SOURCE.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');
     assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'and the root container is still emitted');
   });
 
@@ -385,29 +321,13 @@ describe('InteractableConfigRoot body', () => {
   // painted, so it is inverted instead: every CONTROL family is a shared primitive imported
   // from `src/ui/svelte/components/`, and the `.fab-ic-*` names that survive are an
   // EXACT allow-list of this window's own layout.
+  //
+  // THE STATEMENT AND ITS DATA BOTH LIVE IN `tests/helpers/interactablesWindowContract.js`,
+  // which the browser's and the manager's own copies of this clause read as well: one shape
+  // over three allow-lists, so an exactness that is right for one window cannot be loosened
+  // for another - and so three near-identical bodies do not become new duplicated lines.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'root element carries the namespaced class');
-
-    for (const primitive of ADOPTED_PRIMITIVES) {
-      // The IMPORT PATH is asserted, not merely the identifier: an adoption that reached for a
-      // local copy, or for the manager's own directory, is not this window joining the library.
-      assert.ok(
-        rootSource.includes(`import ${primitive} from '../components/${primitive}.svelte'`),
-        `${primitive} is imported from src/ui/svelte/components/`
-      );
-      // ...and it is RENDERED, because an unused import adopts nothing.
-      assert.ok(
-        new RegExp(`<${primitive}[\\s/>]`).test(rootSource),
-        `${primitive} is rendered by the panel`
-      );
-    }
-
-    const residue = [...new Set(rootSource.match(/fab-ic-[a-z-]+/g) ?? [])].sort();
-    assert.deepEqual(
-      residue,
-      [...SURVIVING_LAYOUT_CLASSES],
-      "the surviving fab-ic-* names are exactly this window's own layout and status readings"
-    );
+    assertWindowContract({ rootSource, contract: CONFIG_PANEL_CONTRACT });
   });
 
   // THE LIVE STATE IS A SWITCH NOW, AND THE CHAIN IS ASSERTED END TO END (issue 1520).

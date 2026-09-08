@@ -15,6 +15,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  BROWSER_WINDOW_CONTRACT,
+  assertWindowContract,
+} from '../helpers/interactablesWindowContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/InteractableBrowserApp.svelte.js'),
@@ -42,56 +47,6 @@ const searchFieldSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/ManagerSearchField.svelte'),
   'utf8'
 );
-
-/**
- * Every control family this root imports from the shared library.
- *
- * Each is asserted by IMPORT PATH as well as by render site: an adoption that reached for a
- * local copy, or for the manager's own directory, is not this window joining the library.
- */
-const ADOPTED_PRIMITIVES = Object.freeze([
-  'IconButton',
-  'ManagerSearchField',
-  'ManagerToolbar',
-  'Select',
-]);
-
-/**
- * The `fab-ib-*` names that survive the conversion, EXACTLY.
- *
- * Every one is this window's own LAYOUT - the scroll column, the header rhythm, the list and its
- * rows - or the two-tab strip, which this phase deliberately does not convert because it is a
- * tablist KEYBOARD CONTRACT (roving tabindex, arrow/Home/End, aria-controls onto two panels)
- * rather than a radio group. No control family is on this list, and that is the assertion: a
- * hand-rolled button, field or search box re-appearing adds a name, and a name deleted without
- * its markup drops one.
- *
- * The four `fab-ib-tab-*` / `fab-ib-panel-*` entries are ID values rather than classes; they are
- * on the list because the scan reads the prefix wherever it is written, and pinning them is what
- * keeps the `aria-controls` / `aria-labelledby` pairing from being renamed on one side only.
- */
-const SURVIVING_LAYOUT_CLASSES = Object.freeze([
-  'fab-ib-controls',
-  'fab-ib-empty',
-  'fab-ib-header',
-  'fab-ib-hint',
-  'fab-ib-hint-modifier',
-  'fab-ib-hint-region',
-  'fab-ib-list',
-  'fab-ib-panel-tasks',
-  'fab-ib-panel-tools',
-  'fab-ib-row',
-  'fab-ib-row-actions',
-  'fab-ib-row-icon',
-  'fab-ib-row-label',
-  'fab-ib-row-thumb',
-  'fab-ib-section',
-  'fab-ib-tab',
-  'fab-ib-tab-tasks',
-  'fab-ib-tab-tools',
-  'fab-ib-tabs',
-  'fab-ib-title',
-]);
 
 describe('InteractableBrowserApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
@@ -344,31 +299,11 @@ describe('InteractableBrowserRoot body', () => {
   //
   // Every CONTROL family is a shared primitive imported from `src/ui/svelte/components/`, and
   // the `fab-ib-*` names that survive are an EXACT allow-list of this window's own layout plus
-  // the one residue this phase declines to convert.
+  // the one residue this phase declines to convert. The statement and this window's own
+  // allow-list both live in `tests/helpers/interactablesWindowContract.js`, shared with the
+  // config panel's and the manage panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assert.ok(
-      rootSource.includes('class="fabricate-interactable-browser"'),
-      'root element carries the namespaced class'
-    );
-
-    for (const primitive of ADOPTED_PRIMITIVES) {
-      assert.ok(
-        rootSource.includes(`import ${primitive} from '../components/${primitive}.svelte'`),
-        `${primitive} is imported from src/ui/svelte/components/`
-      );
-      // ...and it is RENDERED, because an unused import adopts nothing.
-      assert.ok(
-        new RegExp(`<${primitive}[\\s/>]`).test(rootSource),
-        `${primitive} is rendered by the browser`
-      );
-    }
-
-    const residue = [...new Set(rootSource.match(/fab-ib-[a-z-]+/g) ?? [])].sort();
-    assert.deepEqual(
-      residue,
-      [...SURVIVING_LAYOUT_CLASSES],
-      "the surviving fab-ib-* names are exactly this window's own layout and its tablist residue"
-    );
+    assertWindowContract({ rootSource, contract: BROWSER_WINDOW_CONTRACT });
   });
 
   // THE TWO SCROLL CONTAINERS DECLARE THEIR KEYBOARD FOCUS (issue 1520).
