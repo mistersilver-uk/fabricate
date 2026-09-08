@@ -21,8 +21,9 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
+import { seedLabInteractables } from './labInteractables.js';
+import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
@@ -321,6 +322,12 @@ function stripAuthoredWorldComponents(content) {
  *   lab's own. This does NOT empty the world component catalogue by itself — the migration still
  *   lifts one record per crafting system component — so a case wanting an empty catalogue pairs
  *   it with `clearSystem`. See {@link stripAuthoredWorldComponents}.
+ * @param {boolean} [options.noInteractables] Attach NO `fabricate.interactable` behaviours to the
+ *   scene's region, for the Manage Interactables panel's empty state. A FLAG rather than a second
+ *   fixture shape, because it is the one state no behaviour COUNT can produce: the panel scans
+ *   whatever the active scene carries, so "nothing on this scene" is a property of the world
+ *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
+ *   states are seeded behaviours instead.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -332,6 +339,7 @@ export async function buildLabWorld({
   noParties = false,
   noTools = false,
   noAuthoredWorldComponents = false,
+  noInteractables = false,
 } = {}) {
   const content = buildLabContent();
   if (noTools) stripTools(content);
@@ -376,6 +384,12 @@ export async function buildLabWorld({
     i18n: toI18nStub(localize),
     localize,
   };
+
+  // BEFORE the shim, because `installFoundryShim` wraps `world.scenes` in the collection
+  // `game.scenes` exposes and captures `current` / `active` off it. The seeder also replaces the
+  // scene's plain `regions` array with a collection, which is what the two canvas windows'
+  // `_resolveBehavior` walks (`scene.regions.get(id).behaviors.get(id)`).
+  if (!noInteractables) seedLabInteractables(world);
 
   const shim = installFoundryShim(world);
   world.shim = shim;

@@ -33,33 +33,61 @@
  * resolve through `resolveOverlayHost` against the same node, so they cannot.
  *
  * ── THE ROOT SET, AND WHY IT IS EXACTLY THESE TWO ───────────────────────────────────────────
- * Fabricate ships six Svelte applications. Their roots are:
+ * Fabricate ships five Svelte applications. Their roots are:
  *
  *   SvelteCraftingSystemManagerApp  window `.crafting-system-manager`  root `.fabricate-manager`
- *   SvelteFabricateApp              window `.fabricate-app`            root `.fabricate-app-shell`
- *   SvelteComponentEditorApp        window `.component-editor-app`     root `.fabricate-component-editor`
- *   InteractablesManagerApp         window `.fabricate-interactables-manager`
- *   InteractableBrowserApp          window `.fabricate-interactable-browser-app`
- *   InteractableConfigApp           window `.fabricate-interactable-config-app`
+ *   SvelteFabricateApp              window `.fabricate-app.fabricate-app-window`
+ *                                                                     root `.fabricate-app-shell`
+ *   InteractablesManagerApp         window `.fabricate-interactables-manager.fabricate-app`
+ *   InteractableBrowserApp          window `.fabricate-interactable-browser-app.fabricate-app`
+ *   InteractableConfigApp           window `.fabricate-interactable-config-app.fabricate-app`
  *
- * Only two of those can host an overlay, and the reason is POSITIONING rather than taxonomy: a
- * host is only usable as a coordinate origin if it is also the containing block of the
- * `position: absolute` panel appended to it, i.e. if it is itself positioned.
+ * Each also emits `.fabricate`, the module root. `fabricate-app` is the shared PLAY-surface area
+ * skin — typography, colour, `color-scheme` — and issue 1520 put it on the last three;
+ * `fabricate-app-window` is the player window's drag-resize size floor, split off that skin in
+ * the same change so adopting it could not inflate a 420px window to 1024px.
+ *
+ * A SIXTH stood here until issue 1520: the standalone component-editor application, window
+ * `.component-editor-app` over root `.fabricate-component-editor`. It was orphaned — its only
+ * constructor call was a manager service nothing consumed — and issue 1520 deleted it.
+ * `ComponentEditorRoot.svelte` survives it and is not mounted by any application, so its root
+ * class is no longer an application root and is deliberately absent from the list above.
+ *
+ * TWO CLASSES ARE ELIGIBLE, AND SINCE ISSUE 1520 THEY COVER FOUR OF THE FIVE WINDOWS. The list
+ * below is a list of CLASSES, not of applications, and those two counts moved independently: the
+ * eligible list stayed at two while `fabricate-app` went from being emitted by one window to
+ * being emitted by four. Eligibility is POSITIONING rather than taxonomy — a host is usable as a
+ * coordinate origin only if it is also the containing block of the `position: absolute` panel
+ * appended to it, i.e. only if it is itself positioned.
  *
  *   - `.fabricate-manager` declares `position: relative; isolation: isolate` in
  *     `styles/fabricate.css`. It is the manager's own Svelte root, inside the window content.
- *   - `.fabricate-app` is the player window's ApplicationV2 FRAME element, which Foundry
- *     positions absolutely and writes `left`/`top` onto. `.fabricate-app-shell`, the Svelte
- *     root one level in, is a static flex container and would NOT serve — which is exactly the
- *     kind of near-miss that makes "the nearest `.fabricate-*` thing" the wrong rule and an
- *     explicit, measured list the right one.
+ *   - `.fabricate-app` is an ApplicationV2 FRAME class, which Foundry positions absolutely and
+ *     writes `left`/`top` onto. `SvelteFabricateApp` emitted it alone until issue 1520 adopted
+ *     it on `InteractableBrowserApp`, `InteractableConfigApp` and `InteractablesManagerApp`, all
+ *     three in their `DEFAULT_OPTIONS.classes` array — at the FRAME, deliberately. The frame is
+ *     also the only ancestor OUTSIDE `.window-content`, which
+ *     `.fabricate.fabricate-app .window-content` sets to `overflow: hidden`, so a panel portalled
+ *     to it escapes that clip and one portalled inside it would not.
+ *     `.fabricate-app-shell`, the player window's Svelte root one level in, is a static flex
+ *     container and would NOT serve — which is exactly the kind of near-miss that makes "the
+ *     nearest `.fabricate-*` thing" the wrong rule and an explicit, measured list the right one.
+ *     The same near-miss is why the three windows above take the class at the frame rather than
+ *     on their own Svelte roots, which are static too.
  *
  * `tests/components/portal-host-app-root.test.js` pins both halves: that no component
  * hard-codes a root of its own, and that every class named here is genuinely positioned.
  *
- * The other four applications reach none of the overlay components today (measured by walking
- * the import graph from each app root), so adding them would be adding untested capability.
- * When one of them grows an overlay, add its root here AND to the positioning proof.
+ * WHICH WINDOWS REACH AN OVERLAY COMPONENT IS A SEPARATE, NARROWER QUESTION, and the answer is
+ * ALL FIVE — measured by walking the import graph from each app root. It was "the manager and the
+ * player app" for one phase of issue 1520 and is no longer: the three canvas windows adopted the
+ * class BEFORE reaching an overlay, on purpose, and the later phase that spent the prerequisite
+ * landed in the same change. Twelve native `<select>` elements across those three windows are the
+ * shared `Select` now, which is a thin composition over `SearchablePopover`, so each one opens a
+ * panel appended to its own window's frame. Without the frame class each of those panels would
+ * portal to `<body>`, lose window stacking, and emit the console error below on every scroll tick
+ * — the exact defect this module exists to prevent, arriving through the conversion meant to
+ * modernise the control.
  *
  * ── WHY THE FALLBACK IS LOUD RATHER THAN SILENT ─────────────────────────────────────────────
  * `resolveOverlayHost` never returns null while a document exists. Landing on `document.body`

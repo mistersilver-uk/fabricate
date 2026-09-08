@@ -1,16 +1,22 @@
 /**
- * Saving ONE component-editor draft, extracted from `SvelteComponentEditorApp` so the decision it
- * makes can be driven by a test (issue 1371 r19-store2; the baseline half added at r20-store3).
+ * Saving ONE component-editor draft, extracted from the standalone component-editor window so the
+ * decision it makes can be driven by a test (issue 1371 r19-store2; the baseline half added at
+ * r20-store3).
  *
  * ## WHY THIS IS A MODULE AND NOT A METHOD
  *
- * `SvelteComponentEditorApp.svelte.js` builds a Foundry `ApplicationV2` subclass at import time and
- * statically imports a `.svelte` component, so it is not importable in a plain unit test — a fact
- * `tests/import-folder-drop-wiring.test.js` already records for its sibling app. Every behaviour
- * that file used to own was therefore reachable only through a hand-written MIRROR of it, which
- * keeps passing however the real branch is written. The save is now the one decision worth
- * pinning, because it is where a system-scope essence write either overrides or is silently
- * shadowed, so it lives here and the app method is a thin delegator over it.
+ * The window it was extracted from built a Foundry `ApplicationV2` subclass at import time and
+ * statically imported a `.svelte` component, so it was not importable in a plain unit test — a
+ * fact `tests/import-folder-drop-wiring.test.js` still records for a sibling app. Every behaviour
+ * it owned was therefore reachable only through a hand-written MIRROR of it, which keeps passing
+ * however the real branch is written. The save is the one decision worth pinning, because it is
+ * where a system-scope essence write either overrides or is silently shadowed, so it lives here.
+ *
+ * ISSUE 1520 DELETED THAT WINDOW as orphaned, and this module OUTLIVED it deliberately: the
+ * extraction is what made the decision testable, and the decision belongs to any surface that
+ * saves a component-editor draft rather than to one window's method. This module and
+ * `svelte/apps/ComponentEditorRoot.svelte` are both retained, both covered, and neither is mounted
+ * in production today.
  *
  * ## THE TWO WRITERS, AND WHY THEY CANNOT DISAGREE
  *
@@ -21,9 +27,9 @@
  * Neither path restates the rule.
  *
  * (Earlier revisions described the second writer as "the editor opened from an item sheet". There
- * is no such path: `SvelteComponentEditorApp`'s only constructor call is a manager service nothing
- * consumes. It is wired because it is a live writer the moment anything opens it — see that
- * module's header.)
+ * was no such path: the deleted window's only constructor call was a manager service nothing
+ * consumed, which is the measurement issue 1520 acted on. The storeless branch is retained because
+ * it is the branch a save takes with no manager window to borrow a store from.)
  *
  * ## AND THE SAVE STATES ITS BASELINE
  *

@@ -29,6 +29,26 @@ const PLAYER = 'fabricate-app';
 const MANAGER = 'fabricate-crafting-system-manager';
 
 /**
+ * The three GM canvas windows (issue 1520).
+ *
+ * Registered BEFORE the design-system adoption that re-skins them, because until they were here a
+ * diff touching all three selected exactly ONE case — {@link FALLBACK_CASE_ID}, the player
+ * crafting window — and the evidence matcher computed its expectation from this same selector,
+ * found that id in it, and reported the gate SATISFIED. A gate that cannot fail, on a photograph
+ * of the wrong window.
+ *
+ * Unlike the Manager and the player app, each of these IS a single screen: no routes, and the
+ * browser's two `role="tab"` panels are sub-tabs of the kind {@link labSurfaceKey} already folds
+ * into their screen. So the window is the surface — see that function.
+ */
+const CANVAS_BROWSER = 'fabricate-interactable-browser';
+const CANVAS_CONFIG = 'fabricate-interactable-config';
+const CANVAS_MANAGER = 'fabricate-interactables-manager';
+
+/** The three, as a set, for the surface key and the readership predicate. */
+const CANVAS_APPS = Object.freeze([CANVAS_BROWSER, CANVAS_CONFIG, CANVAS_MANAGER]);
+
+/**
  * Files that can change what a window looks like. Mirrors the rule in `AGENTS.md`: a `lang/` change
  * needs evidence only when the same PR also touches a render file, which callers enforce by testing
  * `hasUiChanges` over the whole changed set.
@@ -55,6 +75,9 @@ const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 
 /** The page that mounts every frame, as a diff names it. Attributed by marked region — see below. */
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
+
+/** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
+const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
 /**
  * ── How this machinery says "part of this reached beyond what I can attribute" ──────────────────
@@ -1039,6 +1062,18 @@ export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 const DEFAULT_POSITION = Object.freeze({
   [MANAGER]: Object.freeze({ width: 1280, height: 820 }),
   [PLAYER]: Object.freeze({ width: 1280, height: 860 }),
+  // The three canvas windows are captured at their DECLARED size, unlike the two above — the
+  // Manager's smoke counterpart is photographed at 1280x820 rather than its declared 1280x940,
+  // and the player app's frames are 860 rather than its own default. These three have no such
+  // divergence to honour, so the numbers are their `DEFAULT_OPTIONS.position` verbatim
+  // (`InteractableBrowserApp.svelte.js:55-58`, `InteractableConfigApp.svelte.js:82-85`,
+  // `InteractablesManagerApp.svelte.js:77-80`). `tests/view-lab-app-options-parity.test.js`
+  // pins the chrome spec's copy of those numbers to `src/`; this pins the capture to the same
+  // size, which is what makes "the window renders at 420 wide" a measurement rather than a claim
+  // — `assertWindowGeometry` fails the frame when the rendered box is not the declared one.
+  [CANVAS_BROWSER]: Object.freeze({ width: 420, height: 620 }),
+  [CANVAS_CONFIG]: Object.freeze({ width: 480, height: 680 }),
+  [CANVAS_MANAGER]: Object.freeze({ width: 560, height: 680 }),
 });
 
 /**
@@ -1118,16 +1153,49 @@ function previewAsActor(actorId) {
  * A sentinel option carrying the empty string is stamped `__unchanged__` instead, because an
  * attribute cannot carry an empty value (`Select.svelte`); no case chooses one today.
  *
+ * `host` MAKES THE ROW STEP A PORTAL ASSERTION as well as a click (issue 1520 review). The
+ * design-system capability requires a change that adds a portalled control to a window to carry
+ * a case proving the panel is a DIRECT CHILD of that window's frame, because the fallback still
+ * draws the panel where its trigger is and loses only the window's stacking and its clip — so
+ * the two outcomes are nearly indistinguishable in a rendered frame, and the unscoped form above
+ * matches a `<body>`-hosted panel exactly as happily. A step that cannot match fails the capture
+ * WHOLE, which is the same gating force an `expectSelector` has, so passing the frame class here
+ * discharges that requirement for a window without spending a second frame on it. Left off where
+ * the case is not the one making that claim: every manager and player call site inherits the
+ * unscoped form, and their windows' portal is asserted by their own cases.
+ *
  * @param {string} trigger Selector for the control's trigger button.
  * @param {string} value The option's own value, as `data-popover-option` carries it.
+ * @param {string} [host] The window frame class the panel must be a direct child of.
  * @returns {object[]} The ordered steps.
  */
-function chooseSelectOption(trigger, value) {
-  return [
-    { selector: trigger },
-    { selector: `.fabricate-select-popover [data-popover-option="${value}"]` },
-  ];
+function chooseSelectOption(trigger, value, host = '') {
+  const panel = host ? `${host} > .fabricate-select-popover` : '.fabricate-select-popover';
+  return [{ selector: trigger }, { selector: `${panel} [data-popover-option="${value}"]` }];
 }
+
+/**
+ * The three canvas-window factories.
+ *
+ * One per window rather than one taking an app id, for the reason `managerCase` and `playerCase`
+ * are two functions rather than one: at the call site `browserCase({...})` says which window the
+ * frame is of, and `canvasCase(CANVAS_BROWSER, {...})` says it twice — once in a parameter a
+ * reader has to resolve. They are generated from the app id because the bodies are otherwise
+ * identical, which keeps the trio from being three copied blocks.
+ *
+ * Each defaults `position` to the window's declared size and `publish` to true, exactly as the
+ * two shipped factories do.
+ *
+ * @param {string} app An {@link APP_CHROME} id.
+ * @returns {(entry: object) => object} The factory.
+ */
+function canvasCaseFactory(app) {
+  return (entry) => ({ app, position: DEFAULT_POSITION[app], publish: true, ...entry });
+}
+
+const browserCase = canvasCaseFactory(CANVAS_BROWSER);
+const configCase = canvasCaseFactory(CANVAS_CONFIG);
+const interactablesManagerCase = canvasCaseFactory(CANVAS_MANAGER);
 
 /**
  * @param {object} entry Case fields.
@@ -1257,7 +1325,7 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * frame, which draws no popover at all — and a regression in the pass that places every floating
  * surface in the product would have published one frame that could not contain it.
  *
- * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is THIRTEEN — not the seven
+ * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is FIFTEEN — not the seven
  * `SearchablePopover` frames alone. The seam is the positioning pass, so the component the panel
  * happens to be is not the question a frame answers; whether the frame's own `expectSelector`
  * requires a panel to be measured, placed and portaled is:
@@ -1276,12 +1344,25 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
  *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
  *                        row menu and whose selector names an item inside the portaled panel
+ *   `Select`, canvas     `interactables-config-source-open` and
+ *                        `interactables-manager-region-open` (issue 1520 review round 2) — the
+ *                        two GM canvas windows' open option panels, in a third and fourth
+ *                        application root the seam clamps against
  *
- * The last two are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That map answers a DIFFERENT
- * question — which frames a change to `IconPicker.svelte` or `ActionMenu.svelte` publishes —
- * whereas this array is what a change to `anchoredPopover.js` publishes, and a broad-signal entry
- * for a component says nothing about a file that component imports. Reading the override as
- * cover for those two frames is a category error, and it left the seam publishing seven of ten.
+ * The `IconPicker` and `ActionMenu` frames are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That
+ * map answers a DIFFERENT question — which frames a change to `IconPicker.svelte` or
+ * `ActionMenu.svelte` publishes — whereas this array is what a change to `anchoredPopover.js`
+ * publishes, and a broad-signal entry for a component says nothing about a file that component
+ * imports. Reading the override as cover for those two frames is a category error, and it left the
+ * seam publishing seven of ten.
+ *
+ * THE TWO CANVAS FRAMES WERE THE SAME ERROR THROUGH A DIFFERENT DOOR, and the round that found it
+ * found it by measuring one of them: `interactables-config-source-open` was already published, and
+ * its panel opened 110px narrower than the trigger it dropped from — a defect whose repair was in
+ * this seam, in a frame this seam did not route to. The cover being read that time was the
+ * window's own two source patterns, which answer "what does a change to this window publish" and
+ * not "what does a change to the pass that places its panel publish". A frame that rests on an
+ * open panel and does not name the seam is a frame the seam can break without publishing.
  *
  * `manager-recipes-bulk-edit-picker` takes `[...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES]`
  * rather than gaining the seam through the shared array: four other bulk-edit frames use
@@ -1674,8 +1755,14 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'world-prerequisites',
     label: 'Manager — World Character prerequisites',
-    smokeLabels: ['world-prerequisites'],
-    reaches: 'exact',
+    // NO COUNTERPART, and the empty array is a correction rather than an omission (issue 1520).
+    // This case claimed `world-prerequisites` as its smoke label from the day it was written, and
+    // the live walk has never emitted a frame by that name — `world-prerequisites` does not occur
+    // in `scripts/foundry-test-run.mjs` at all. Nothing could see it: the shape check over
+    // `smokeLabels` never asked whether the harness emits what a case claims, which is the gap the
+    // cross-check below this registry now closes.
+    smokeLabels: [],
+    reaches: 'beyond',
     // World > Rules & Resources > Character prerequisites (issue 1311). The library is WORLD
     // scope since issue 1308, so this route needs no selected system and is ungated. Both steps
     // are needed: the parent lands on Currency, and the sub-item is what moves to this page.
@@ -1692,8 +1779,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'world-modifiers',
     label: 'Manager — World Modifiers',
-    smokeLabels: ['world-modifiers'],
-    reaches: 'exact',
+    // NO COUNTERPART, for the reason its sibling above records. The smoke DOES reach the
+    // Modifiers route — `manager-system-edit-lists` is captured there — but it takes no frame
+    // under this name, and `world-modifiers` occurs in the harness only inside the
+    // `[data-world-modifiers]` selector that walk uses. So there is no counterpart frame this one
+    // could be compared with, which is what `beyond` says.
+    smokeLabels: [],
+    reaches: 'beyond',
     // World > Rules & Resources > Modifiers (issue 1311). `scroll` is load-bearing for the reason
     // the currency cases give: the list runs below the page's own fold and `frame.screenshot()`
     // does not scroll nested overflow containers, so without it the entries are simply absent
@@ -12735,6 +12827,314 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'extension'],
     sourceMatches: PLAYER_EXTENSION_SOURCES,
   }),
+
+  // ── THE THREE GM CANVAS WINDOWS (issue 1520) ──────────────────────────────────────────────────
+  //
+  // Registered before the design-system adoption that re-skins them, and the ordering is not a
+  // preference. Measured before these cases existed: a diff touching all three of these roots
+  // selected exactly one case, `fabricate-app-shell`, through the `selected.size === 0` fallback
+  // at the end of `mapChangedFilesToCases`; the evidence matcher then computed its expectation
+  // from the SAME selector, found that id in it, and reported `check-screenshots` SATISFIED. The
+  // gate could not fail, and the frame it passed on was the player crafting window.
+  //
+  // Every frame below is a WHOLE WINDOW at its declared size — 420x620, 480x680, 560x680 — and
+  // `assertWindowGeometry` fails the capture when the rendered box is not that size. That is what
+  // lets the phase which splits the shared size floor off `.fabricate-app` measure these windows
+  // rather than inspect them.
+  browserCase({
+    id: 'interactables-browser-tools',
+    label: 'Interactable browser — Tools tab, populated',
+    // `beyond`: the live smoke never opens the Interactable browser, so there is no counterpart
+    // frame for this to fall short of and no label it could claim.
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [],
+    // The populated list, not merely the window: an empty `fab-ib-list` renders the "No tools in
+    // this system." branch, which is a different screen wearing the same chrome.
+    expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
+    // THE NARROWEST WINDOW IN THE REGISTRY GATES ITS OWN SPILL (issue 1520 review). At 420px the
+    // filter bar holds two controls side by side and every row holds a thumbnail, a label and two
+    // icon buttons, so a control that stops shrinking puts a horizontal scrollbar in a window a
+    // GM cannot widen far. The bar is the specific risk the root is included for: it is pulled to
+    // the window edge with a negative inline margin exactly equal to this column's padding, so an
+    // over-wide control inside it spills past the padding box rather than into it.
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
+  browserCase({
+    // THE WINDOW'S SECOND TAB, WHICH NOTHING PHOTOGRAPHED (issue 1520 review). The two cases
+    // beside this one both rest on the Tools tab, and the panels are an `{#if}`/`{:else}` pair
+    // rather than a shown/hidden pair — so `fab-ib-panel-tasks` was not merely off screen, it was
+    // UNRENDERED in every frame of this window. That matters beyond completeness: this phase
+    // re-skins that panel (row actions to the shared icon button, opacity mutes to inked ones,
+    // row radii onto the ladder), and its leaf-icon fallback is the ONE place in the window that
+    // renders at all, because every tool row is unconditionally a thumbnail.
+    //
+    // It is also the shape the requirement this change AUTHORED forbids: a window is registered
+    // in the View Lab before a change re-skins it, and a re-skinned panel with zero frames is
+    // that rule failing on the change that wrote it.
+    id: 'interactables-browser-tasks',
+    label: 'Interactable browser — Gathering tasks tab, populated',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // ONE STEP, and it is the tab button's own id rather than a positional `:nth-child`. The
+    // tablist is hand-rolled here — this phase deliberately did not convert it, because a roving
+    // tabindex driving two `aria-controls` panels is a keyboard contract rather than a radio
+    // group — so the id is the stable handle, and it is pinned by the window's residue census.
+    steps: [{ selector: '#fab-ib-tab-tasks' }],
+    // SCOPED INSIDE THE PANEL, not to the list class the Tools frame also matches: the whole
+    // claim of this case is that the OTHER branch rendered, and `.fab-ib-list .fab-ib-row` alone
+    // is satisfied by the tab this case navigated away from.
+    expectSelector: '#fab-ib-panel-tasks .fab-ib-list .fab-ib-row',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
+  browserCase({
+    id: 'interactables-browser-filtered',
+    label: 'Interactable browser — search filtered to one Tool',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      // The system is CHOSEN rather than inherited. `pickDefaultSystemId` picks the first system
+      // carrying sources, so leaving it implicit would tie this frame to the fixture's ordering,
+      // and a re-ordering would silently move the frame to another system's library.
+      //
+      // TWO STEPS, because the picker is `components/Select.svelte` now (issue 1520) and there
+      // is no `<select>` left to issue `selectOption` against — the trigger is clicked by the
+      // stable hook it carries on `Select`'s `triggerData`, and the row by its own
+      // `data-popover-option` identity handle inside the portalled panel.
+      ...chooseSelectOption(
+        '[data-interactable-browser-system]',
+        'lab-smithing',
+        '.fabricate-interactable-browser-app'
+      ),
+      // "Forge" matches exactly one smithing Tool — `sm-tool-tongs`, "Forge Tongs" — so the
+      // filtered list is ONE row rather than a shorter version of the same list. The field is
+      // `ManagerSearchField` now; the hook rides its `inputAttrs`, because the rest spread
+      // belongs to the `<label>` and cannot reach the input.
+      { selector: '[data-interactable-browser-search]', fill: 'Forge' },
+    ],
+    expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
+  configCase({
+    id: 'interactables-config-configured',
+    label: 'Interactable config — configured gathering-task interactable',
+    // `window`, not `exact`. The three labels below are three distinct smoke conditions — the
+    // resource node LINKED, the node UNLINKED, and the identity section expanded on a configured
+    // interactable — and one resting frame is none of them exactly. It is the same window in the
+    // same configured state, which is what `window` means.
+    reaches: 'window',
+    smokeLabels: [
+      'interactable-config-linked',
+      'interactable-config-unlinked',
+      'interactable-config-source-configured',
+    ],
+    query: { interactable: 'configured' },
+    steps: [],
+    // Both halves matter. The `:not(...)` proves this is NOT the unconfigured panel — which
+    // renders the same window with the same chrome — and the pressed node-link toggle proves the
+    // gathering-task Resource node section reached its LINKED state, the condition the smoke's
+    // own `interactable-config-linked` frame is taken at.
+    expectSelector:
+      '.fabricate-interactable-config:not(:has([data-interactable-needs-config])) ' +
+      '[data-interactable-node-section] [data-interactable-node-link][aria-pressed="true"]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
+  configCase({
+    id: 'interactables-config-needs-configuration',
+    label: 'Interactable config — needs configuration',
+    reaches: 'window',
+    smokeLabels: ['interactable-config-needs-configuration'],
+    // The behaviour Foundry's own Region → Behaviors → "+ Add Behavior" path produces: an empty
+    // system, born valid and inert. See `tests/view-lab/world/labInteractables.js`.
+    query: { interactable: 'unconfigured' },
+    steps: [],
+    // The banner AND the identity body it force-opens. The banner alone would pass on a panel
+    // whose picker failed to render, which is the half a GM actually has to use.
+    expectSelector:
+      '.fabricate-interactable-config:has([data-interactable-needs-config]) ' +
+      '[data-interactable-identity-body] [data-interactable-identity-type]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
+  configCase({
+    id: 'interactables-config-source-open',
+    label: 'Interactable config — source picker open, portalled onto the window frame',
+    // `beyond`: the smoke never opens one of these panels, so there is no counterpart frame for
+    // this to fall short of and no label it could claim.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: 'configured' },
+    steps: [
+      // Expand the collapsed identity section, then open the crafting-system picker inside it.
+      { selector: '[data-interactable-identity-toggle]' },
+      { selector: '[data-interactable-identity-system]' },
+    ],
+    // THE ONE FRAME THAT PROVES THE PORTAL RESOLVES (issue 1520), and the `>` is the whole
+    // assertion. `resolveOverlayHost` walks `closest` for `.fabricate-manager` / `.fabricate-app`
+    // and `portal` does a bare `appendChild`, so a panel that found its window is a DIRECT CHILD
+    // of the frame element and a panel that did not is a direct child of `<body>`. The two are
+    // indistinguishable in a resting frame — the panel is not open — and nearly
+    // indistinguishable in an open one, because the fallback still draws the panel where its
+    // trigger is; what it loses is the window's stacking and its clip, plus a `console.error` per
+    // scroll tick. That is the exact defect adopting `.fabricate-app` at the frame exists to
+    // prevent, arriving through the conversion meant to modernise the control, and no other case
+    // in this registry opens a portalled surface in one of these three windows.
+    expectSelector:
+      '.fabricate-interactable-config-app > .fabricate-select-popover [data-popover-option]',
+    kinds: ['canvas', 'interactables'],
+    // THE POSITIONING SEAM BELONGS IN HERE, and its absence was a routing gap rather than a
+    // judgement (issue 1520 review round 2). This case rests on an OPEN, measured, clamped and
+    // portalled panel, which is exactly the membership rule `ANCHORED_POPOVER_SOURCES` documents
+    // — so a change to that pass could regress this frame while publishing thirteen others that
+    // could not show it. The width finding this round answers came from measuring THIS frame and
+    // was fixed in that seam, so the gap was load-bearing rather than tidy.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  interactablesManagerCase({
+    id: 'interactables-manager-list',
+    label: 'Manage Interactables — populated scene list',
+    // `window`: the smoke's list is its own two Azure Grove interactables, and this one carries a
+    // third with a resolving Tile marker and a locked state, plus a fourth whose marker does NOT
+    // resolve and which is disabled, so every badge the row can draw is photographed. Same
+    // window, same populated condition, different rows.
+    reaches: 'window',
+    smokeLabels: ['interactables-manager-list'],
+    steps: [],
+    // A row WITH its actions, so a list that renders names but loses its per-row controls fails
+    // here rather than publishing as a healthy list.
+    //
+    // AND THE `missing` MARKER IS IN THE FRAME, asserted through `:has()` on the list rather than
+    // on a row, because the claim is about the list holding such a row at all (issue 1520 review).
+    // `markerTone` routes `missing` to `danger` — the largest of its three tone changes, and the
+    // only one that paints an alarm colour — and until the fixture gained an unresolvable marker
+    // no frame in this registry could show it. A fixture uuid that started resolving, or a row
+    // dropped from the seeder, would leave that tone unphotographed again with every assertion
+    // above still green; this fails the capture WHOLE instead, and publishes nothing. The Foundry
+    // smoke makes the same assertion over its own world, which is why the two lists differ in
+    // rows and agree on what a list has to be able to show.
+    expectSelector:
+      '.fabricate-interactables-manager-body ' +
+      '.fab-im-list:has([data-interactable-manager-chip-marker="missing"]) .fab-im-row ' +
+      '.fab-im-row-actions [data-interactable-manager-delete]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/interactables\//,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+    ],
+  }),
+  interactablesManagerCase({
+    id: 'interactables-manager-promote',
+    label: 'Manage Interactables — promote panel, ready to promote',
+    reaches: 'window',
+    smokeLabels: ['interactables-manager-promote'],
+    steps: [
+      { selector: '[data-interactable-manager-promote-toggle]' },
+      // The one selection the panel cannot make for itself: the system and the source both
+      // auto-pick through their own effects, and the region does not. Without it the panel
+      // photographs with its confirm button disabled, which is the panel before it is usable
+      // rather than the panel.
+      //
+      // TWO STEPS for the reason the browser's system picker takes two (issue 1520): the region
+      // picker is `components/Select.svelte`, so there is no `<select>` to issue `selectOption`
+      // against. The old form addressed it POSITIONALLY — `label.fab-im-field:first-of-type
+      // select` — which would have silently moved to another picker had the panel's field order
+      // changed; the hook names the control instead.
+      ...chooseSelectOption(
+        '[data-interactable-manager-region]',
+        'deep-gate',
+        '.fabricate-interactables-manager'
+      ),
+    ],
+    // `:not([disabled])` is the whole point of the step above: it asserts `canPromote`, which is
+    // region AND system AND source, so an auto-pick that silently stopped working fails here.
+    expectSelector:
+      '[data-interactable-manager-promote] ' +
+      '[data-interactable-manager-promote-confirm]:not([disabled])',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/interactables\//,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+    ],
+  }),
+  interactablesManagerCase({
+    // THE WIDEST TRIGGER IN THE THREE WINDOWS, WITH ITS PANEL OPEN (issue 1520 review round 2).
+    //
+    // The Manage panel's promote card states `width: 100%` on its select triggers, and at this
+    // window's 560px that is a 508px control — the worst case of the three, and no frame in the
+    // registry reached it. `interactables-manager-promote` opens this same picker and CLICKS
+    // THROUGH it, so its frame rests on a closed control; the review round that measured a 340px
+    // panel under a 450px trigger had to measure it on the config window because this one could
+    // not be photographed at all.
+    //
+    // The steps are the promote case's own, minus its second: the toggle and the region trigger
+    // are both already proven to resolve there, so this case adds a state rather than a new
+    // locator. `expectSelector` names `deep-gate` for the same reason — it is the row that case
+    // clicks — and the `>` is the portal assertion the config window's open-panel frame carries,
+    // which is what makes a `<body>`-hosted fallback fail the capture rather than photograph as
+    // a healthy panel.
+    id: 'interactables-manager-region-open',
+    label: 'Manage Interactables — promote region picker open under a full-width trigger',
+    // `beyond`: the smoke opens the promote card but never rests on one of its panels, so there
+    // is no counterpart frame for this to fall short of and no label it could claim.
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '[data-interactable-manager-promote-toggle]' },
+      { selector: '[data-interactable-manager-region]' },
+    ],
+    expectSelector:
+      '.fabricate-interactables-manager > .fabricate-select-popover ' +
+      '[data-popover-option="deep-gate"]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/interactables\//,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  interactablesManagerCase({
+    id: 'interactables-manager-empty',
+    label: 'Manage Interactables — scene with no interactables',
+    reaches: 'window',
+    smokeLabels: ['interactables-manager-empty'],
+    // A world whose scene carries no `fabricate.interactable` behaviour at all. It is a world
+    // FLAG rather than a seeded state because the panel scans whatever the active scene carries:
+    // "nothing on this scene" is a property of the world, not of which behaviour a case opens.
+    query: { noInteractables: '1' },
+    steps: [],
+    expectSelector: '.fabricate-interactables-manager-body .fab-im-list-section .fab-im-empty',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/interactables\//,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+    ],
+  }),
 ]);
 
 /**
@@ -12905,10 +13305,43 @@ export function fallbackCase() {
  * @returns {string} Its surface key.
  */
 export function labSurfaceKey(viewCase) {
-  const surface = viewCase.app === MANAGER ? viewCase.expectView : viewCase.query?.tab;
+  const surface = canvasSurfaceOf(viewCase);
   const theme = viewCase.query?.colorScheme ?? DEFAULT_COLOR_SCHEME;
   return `${viewCase.app}|${surface || viewCase.id}|${theme}`;
 }
+
+/**
+ * The route-or-tab half of the surface key, per window family.
+ *
+ * Split out of {@link labSurfaceKey} when the three canvas windows arrived (issue 1520), because
+ * the two-way ternary it replaced answered `query.tab` for them — which none of them declares —
+ * and every canvas case therefore fell to the id fallback and became ITS OWN surface. That is the
+ * fail-safe direction and it is not wrong, but it is not true either: coverage would have held a
+ * frame of the browser's filtered state and of the manager's promote panel as though each were a
+ * screen you can navigate to.
+ *
+ * Each canvas window IS one screen. There is no route to name, and the browser's two
+ * `role="tab"` panels are exactly the sub-tabs this key already folds into their screen (see the
+ * header above: the Recipe editor's Results tab and the Tags studio's second tab fold the same
+ * way). So the window is the surface, and the app id — already the first term of the key — is
+ * what says which.
+ *
+ * @param {object} viewCase A registry case.
+ * @returns {string|undefined} Its route or tab, or the single-screen sentinel.
+ */
+function canvasSurfaceOf(viewCase) {
+  if (viewCase.app === MANAGER) return viewCase.expectView;
+  if (rendersInCanvasWindow(viewCase)) return SINGLE_SCREEN_SURFACE;
+  return viewCase.query?.tab;
+}
+
+/**
+ * The surface term for a window that has exactly one screen.
+ *
+ * A constant rather than the app id repeated, because the app id is already the key's first term;
+ * repeating it would read as though the two terms could disagree.
+ */
+const SINGLE_SCREEN_SURFACE = 'window';
 
 /**
  * Which of two cases is the better photograph OF ITS SURFACE, rather than of a state that surface
@@ -13178,6 +13611,14 @@ function rendersInPlayerWindow(viewCase) {
 }
 
 /**
+ * @param {object} viewCase A case.
+ * @returns {boolean} True when it photographs one of the three GM canvas windows (issue 1520).
+ */
+function rendersInCanvasWindow(viewCase) {
+  return CANVAS_APPS.includes(viewCase.app);
+}
+
+/**
  * The render files that read an actor's owned recipe-item copies or learned recipes.
  *
  * Real paths, and probes rather than a list of case ids: a case is asked whether ITS OWN
@@ -13318,10 +13759,16 @@ export function parseLabActorTableRegions(sourceLines) {
 const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSourceLines()));
 
 /**
- * The four regions of `tests/view-lab/mount.js` that only the PLAYER window can render, each with
- * the predicate deciding which frames read what it produces (issue 1198).
+ * The regions of `tests/view-lab/mount.js` whose readership is NARROWER than the whole corpus,
+ * each with the predicate deciding which frames read what that region produces.
  *
- * All four are `app === PLAYER`, and each is a derivation rather than a convenience:
+ * Four are player-only (issue 1198) and two are canvas-only (issue 1520). The table was named
+ * `PLAYER_MOUNT_REGIONS` while every key answered `rendersInPlayerWindow`; it is
+ * `MOUNT_REGIONS` now, because a canvas key inside a table called PLAYER would be a name
+ * asserting something false about its own contents — the exact mirror-rot this file polices
+ * everywhere else.
+ *
+ * Each entry is a derivation rather than a convenience:
  *
  *   - `player-extension-params` — the three companion query params. Nothing but `mountPlayerApp`
  *     reads them, and only a player frame carries a nav rail to put a provider tab in.
@@ -13331,20 +13778,26 @@ const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSou
  *     bag declares and the Manager's `_buildServices()` does not declare at all, so `watched` is
  *     empty on every manager frame and the block cannot move one.
  *   - `mount-player-app` — the player window's whole mount path.
+ *   - `canvas-mount-params` — the `interactable` and `noInteractables` query params. Neither is
+ *     read anywhere but `mountCanvasApp` and the world build it drives, and neither the player
+ *     window nor the Manager mounts a canvas window at all.
+ *   - `mount-canvas-app` — the three canvas windows' whole mount path, table included.
  *
- * They are MARKED regions rather than whole functions on purpose. Two of the four edits this
- * attribution exists for land inside functions the manager window also runs — `readParams` and
- * `settle` — so keying on those functions would claim a player-only readership the file does not
- * have, and a later edit to a manager param would then select the player frames and silently
- * publish no evidence for the manager frames it moved. Marking the blocks keeps every declared
- * region's readership true, and a hunk landing outside every marker widens to surface coverage,
- * which is the fail-safe default.
+ * They are MARKED regions rather than whole functions on purpose. Three of the six edits this
+ * attribution exists for land inside functions the other windows also run — `readParams` twice
+ * and `settle` — so keying on those functions would claim a readership the file does not have,
+ * and a later edit to a manager param would then select the player frames and silently publish no
+ * evidence for the manager frames it moved. Marking the blocks keeps every declared region's
+ * readership true, and a hunk landing outside every marker widens to surface coverage, which is
+ * the fail-safe default.
  */
-const PLAYER_MOUNT_REGIONS = Object.freeze({
+const MOUNT_REGIONS = Object.freeze({
   'player-extension-params': rendersInPlayerWindow,
   'lab-player-provider': rendersInPlayerWindow,
   'player-settle-stores': rendersInPlayerWindow,
   'mount-player-app': rendersInPlayerWindow,
+  'canvas-mount-params': rendersInCanvasWindow,
+  'mount-canvas-app': rendersInCanvasWindow,
 });
 
 /** The line opening a marked region: `// view-lab-region:<key>`, at any indent. */
@@ -13357,8 +13810,8 @@ const MOUNT_REGION_CLOSE = `${MOUNT_REGION_OPEN_PREFIX}end`;
  * The 1-based, inclusive span of each marked region in `tests/view-lab/mount.js`.
  *
  * Marker-anchored rather than column-anchored, unlike {@link parseCaseLineRegions} and
- * {@link parseLabActorTableRegions}, because two of the four regions are BLOCKS INSIDE a function
- * the other window runs too — see {@link PLAYER_MOUNT_REGIONS} for why that has to be so. A marker
+ * {@link parseLabActorTableRegions}, because three of the six regions are BLOCKS INSIDE a function
+ * the other windows run too — see {@link MOUNT_REGIONS} for why that has to be so. A marker
  * is a comment, so `isInertSourceLine` skips it: moving or re-wording one can never itself be the
  * change a hunk is attributed on.
  *
@@ -13371,7 +13824,7 @@ const MOUNT_REGION_CLOSE = `${MOUNT_REGION_OPEN_PREFIX}end`;
  * @param {string[]} sourceLines That file, by line.
  * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
  */
-export function parsePlayerMountRegions(sourceLines) {
+export function parseMountRegions(sourceLines) {
   const regions = [];
   let open = null;
   for (const [offset, line] of sourceLines.entries()) {
@@ -13386,18 +13839,18 @@ export function parsePlayerMountRegions(sourceLines) {
     // A nested opener, or a key nothing in the table knows how to answer for.
     if (open) return null;
     const key = text.slice(MOUNT_REGION_OPEN_PREFIX.length);
-    if (!Object.hasOwn(PLAYER_MOUNT_REGIONS, key)) return null;
+    if (!Object.hasOwn(MOUNT_REGIONS, key)) return null;
     open = { key, start: offset + 1 };
   }
 
   if (open) return null;
   const keys = regions.map((region) => region.key);
   if (keys.length !== new Set(keys).size) return null;
-  if (Object.keys(PLAYER_MOUNT_REGIONS).some((key) => !keys.includes(key))) return null;
+  if (Object.keys(MOUNT_REGIONS).some((key) => !keys.includes(key))) return null;
   return regions;
 }
 
-const mountLineRegions = memoized(() => parsePlayerMountRegions(mountSourceLines()));
+const mountLineRegions = memoized(() => parseMountRegions(mountSourceLines()));
 
 /**
  * @param {string} text A source line.
@@ -13681,12 +14134,22 @@ function widenedByCoverage(ids, unattributable) {
  * only cases carrying `expectLayout`, so that case-owned field derives its complete readership.
  *
  * `mount.js` qualifies per REGION for the same reason `labActors.js` does — it is several things
- * at once — but its regions are MARKED rather than found by column, because two of the four are
- * blocks inside functions BOTH windows run. See {@link PLAYER_MOUNT_REGIONS}. Everything else in
+ * at once — but its regions are MARKED rather than found by column, because three of the six are
+ * blocks inside functions the other windows run. See {@link MOUNT_REGIONS}. Everything else in
  * the file — the determinism styles, the chrome-font gate, the lab-induced-clipping measurement,
- * `boot`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and the shared half
- * of `settle` — sits outside every region and keeps the coverage default, which is right: a
- * frame of either window renders through all of it.
+ * `boot`, `mountAppFor`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and
+ * the shared half of `settle` — sits outside every region and keeps the coverage default, which
+ * is right: a frame of any window renders through all of it.
+ *
+ * `labInteractables.js` qualifies WHOLE-FILE, and the narrowing is structural rather than
+ * argued (issue 1520). Everything it produces lands in two places on the lab scene: the region's
+ * `behaviors` collection and the scene's `tiles`. Nothing outside the three canvas windows reads
+ * either — the Manager's only scene read is `readSceneRegions(game.scenes.current)`, which
+ * projects a region's `uuid`, `name` and `color` and never touches its behaviours, and the player
+ * window reads no scene at all. That is WHY the fixture attaches its behaviours to the ONE region
+ * `labWorld.js` already declares instead of adding more: a second region would appear in the
+ * Manager's Travel → Map Region Links frames and make this predicate false, silently. The
+ * fixture's own header records that constraint so the two cannot drift apart.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
   Object.freeze({
@@ -13707,7 +14170,11 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     path: LAB_MOUNT_PATH,
     sourceLines: mountSourceLines,
     regions: mountLineRegions,
-    selectsRegion: (region) => PLAYER_MOUNT_REGIONS[region],
+    selectsRegion: (region) => MOUNT_REGIONS[region],
+  }),
+  Object.freeze({
+    path: LAB_INTERACTABLES_PATH,
+    selects: rendersInCanvasWindow,
   }),
 ]);
 

@@ -970,14 +970,39 @@
      in the light UA scheme, so the player Journal sort dropdowns looked pale
      where the GM selects render dark. */
   color-scheme: dark;
+}
 
-  /* Minimum window size for the resizable Fabricate window (issue 330). The
-     drag-resize handle cannot shrink the window below this floor, so the
-     gathering view's three 280px-floored columns can never be clipped. Derived
-     from the ~84px nav rail + 3 x 280px columns + 2 gutters + content padding +
-     window chrome. ApplicationV2 V13 has no `position.minWidth`/`minHeight`, so
-     this CSS floor is what visually stops the drag handle; SvelteFabricateApp's
-     `_updatePosition` clamp backstops it for both setPosition and drag-resize. */
+.fabricate.fabricate-app-window {
+  /* THE PLAYER WINDOW'S DRAG-RESIZE FLOOR, AND IT IS ON ITS OWN CLASS RATHER THAN ON
+     `.fabricate-app` DELIBERATELY (issue 1520). `.fabricate-app` is a shared AREA class —
+     typography, colour and `color-scheme` — and issue 1520 adopted it on the three canvas
+     windows, which declare themselves at 420, 480 and 560 wide. A floor on the shared class
+     matches the compound the instant the second class lands, on the ApplicationV2 FRAME, which
+     is the element Foundry writes the inline `width` onto; a floor beats an inline width
+     unconditionally, so all three would have painted at the player window's floor with every
+     `position` parity assertion still green, because `position` does not change. An area class
+     carries skin; a size floor belongs to the window that declares the size.
+
+     The floor itself is issue 330's: the drag-resize handle cannot shrink the player window
+     below it, so the gathering view's three 280px-floored columns can never be clipped. Derived
+     from the ~84px nav rail + 3 x 280px columns + 2 gutters + content padding + window chrome.
+     ApplicationV2 V13 has no `position.minWidth`/`minHeight`, so this CSS floor is what visually
+     stops the drag handle; SvelteFabricateApp's `_updatePosition` clamp backstops it for both
+     setPosition and drag-resize, and its MIN_WINDOW_WIDTH/MIN_WINDOW_HEIGHT statics are the same
+     two numbers.
+
+     `tests/view-lab-app-options-parity.test.js` guards this as a PAIR: the floor declarations
+     must be here, AND the shared `.fabricate.fabricate-app` rule must declare neither of them.
+     The positive half alone catches a MOVE and misses an ADD, and an add is the likelier way
+     back — someone reads the shared rule, finds no floor, and "restores" it.
+
+     THE THIRD LEG IS WHAT ACTUALLY CLOSES IT, and it is worth naming because the pair above is
+     selector-shaped and a floor can be re-added on a selector neither half reads.
+     `assertWindowGeometry` in `tests/view-lab/foundryFrame.js` reproduces Foundry's own clamp
+     off the COMPUTED min box and throws when the applied size differs from the size the case
+     declared, so ANY re-added floor that reaches these four windows — by any selector, in any
+     block — fails the capture loudly in CI rather than publishing an inflated frame. The three
+     canvas windows at 420, 480 and 560 wide are what make that measurable. */
   min-width: 1024px;
   min-height: 640px;
 }
@@ -1004,17 +1029,18 @@
    pair that stood here and the byte-identical `.fabricate-manager` pair that stood ~590 lines
    below.
 
-   THE WIDENING REACHES FOUR PLACES NEITHER DONOR DID, and they are worth naming because a
+   THE WIDENING REACHES THREE PLACES NEITHER DONOR DID, and they are worth naming because a
    reader checking this rule against the old pair will otherwise read the collapse as an
    equivalence. (1) `.fabricate-manager` is a <div> INSIDE the manager window rather than an
    application root, so `.fabricate` reaches through it AND around it, onto the ApplicationV2
    frame's own header controls - the same accent ring those controls already carry in the
-   player app and the three interactables windows. (2) The standalone component-editor window
-   (`SvelteComponentEditorApp`) carried no pair at all and now takes both halves. (3) Nor did
-   the interaction-prompt toast, whose dimmed close control is why the `:focus-visible` opacity
-   rule far below exists. (4) `a` is newly named on BOTH halves in the player app, which listed
-   `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits no
-   <a>, so what this reaches is enriched content links and Foundry frame chrome.
+   player app and the three interactables windows. (2) The interaction-prompt toast carried no
+   pair at all and now takes both halves; its dimmed close control is why the `:focus-visible`
+   opacity rule far below exists. (3) `a` is newly named on BOTH halves in the player app, which
+   listed `button, input, select, textarea, [tabindex]` only; Fabricate's own player markup emits
+   no <a>, so what this reaches is enriched content links and Foundry frame chrome. A FOURTH
+   place stood here until issue 1520 deleted the orphaned standalone component-editor window,
+   which had carried no pair either; the widening now reaches three.
 
    WRITTEN FLAT, and that is prescribed rather than stylistic. `.fabricate a:focus` is (0,2,1),
    the rank both donor blocks held, so per-component focus rings still win. The `:is()` form
@@ -20939,109 +20965,81 @@
    ==========================================
    The rich GM config panel for a `fabricate.interactable` Region Behaviour. The
    panel body + its component-scoped styles live in InteractableConfigRoot.svelte;
-   this block carries only the area-level focus-ring override (Foundry core paints
-   an orange ring that must be stripped on :focus and repainted on :focus-visible
-   per app surface) plus the Tile-HUD discoverability button. All selectors are
-   namespaced under the app root / HUD button class so nothing bleeds.
+   this block now carries only the Tile-HUD discoverability button, namespaced
+   under the HUD button class so nothing bleeds.
 
-   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
-   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
-   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
-   which owns these copies and is named by the gate's own message. */
-.fabricate-interactable-config-app button:focus,
-.fabricate-interactable-config-app input:focus,
-.fabricate-interactable-config-app select:focus,
-.fabricate-interactable-config-app textarea:focus,
-.fabricate-interactable-config-app [tabindex]:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-interactable-config-app button:focus-visible,
-.fabricate-interactable-config-app input:focus-visible,
-.fabricate-interactable-config-app select:focus-visible,
-.fabricate-interactable-config-app textarea:focus-visible,
-.fabricate-interactable-config-app [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
+   An area-level focus-ring pair stood here until issue 1520 deleted it. It was a byte-for-byte
+   copy of the module-rooted pair at the top of this sheet (issue 1501): this window's root emits
+   `fabricate`, so the module pair already reaches every element the copy named, at the same
+   (0,2,1) rank and with a wider element list, and which of the two painted was decided by source
+   order rather than by anything a reader of either block could see. */
 .fabricate-interactable-config-hud {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Interactable Browser — paired area-level focus-ring override. The browser app
-   body lives in InteractableBrowserRoot.svelte; this block strips Foundry core's
-   orange :focus ring and repaints the accent ring on :focus-visible per app
-   surface (mirroring the config app block above), kept at single area-class
-   specificity so the component-scoped focus rings still win.
-
-   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
-   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
-   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
-   which owns these copies and is named by the gate's own message. */
-.fabricate-interactable-browser-app button:focus,
-.fabricate-interactable-browser-app input:focus,
-.fabricate-interactable-browser-app select:focus,
-.fabricate-interactable-browser-app textarea:focus,
-.fabricate-interactable-browser-app [tabindex]:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-interactable-browser-app button:focus-visible,
-.fabricate-interactable-browser-app input:focus-visible,
-.fabricate-interactable-browser-app select:focus-visible,
-.fabricate-interactable-browser-app textarea:focus-visible,
-.fabricate-interactable-browser-app [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
+/* The Interactable Browser's whole global footprint was one area-level focus-ring pair, and
+   issue 1520 deleted it: the browser app body lives in InteractableBrowserRoot.svelte and the
+   pair was a copy of the module-rooted pair at the top of this sheet (issue 1501), which reaches
+   this window through the `fabricate` class its root already emits. Nothing global is left, so
+   no rule replaces it here. */
 
 /* ==========================================
    Manage Interactables panel (issue 335)
    ==========================================
    The GM-only scene panel that lists/manages every interactable on the scene and
-   promotes regions. The panel body + its element styles live here, namespaced
-   under the `.fabricate-interactables-manager` app-root class. This block carries
-   the area-level Foundry focus-ring override (strip the orange ring on :focus,
-   repaint the accent ring on :focus-visible — single area-class specificity so the
-   per-element rings still win), the custom-content button layout override (the
-   panel renders icon+label and icon-only buttons), and the panel layout. All
-   colours use `var(--fab-*)` theme tokens.
+   promotes regions. TWO RULES ARE LEFT HERE, and issue 1520 moved everything else.
 
-   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): this
-   window's root emits `fabricate` too, so `.fabricate` already reaches it at the same (0,2,1)
-   rank and with a wider element list. Left in place because deleting it belongs to issue 1520,
-   which owns these copies and is named by the gate's own message. */
-.fabricate-interactables-manager button:focus,
-.fabricate-interactables-manager input:focus,
-.fabricate-interactables-manager select:focus,
-.fabricate-interactables-manager textarea:focus,
-.fabricate-interactables-manager [tabindex]:focus {
-  outline: none;
-  box-shadow: none;
-}
+   The panel's whole PRIVATE element family — 28 rules over 29 selectors, for a header, a
+   toolbar, a promote card, three fieldsets, a list, its rows and their chips and actions — stood
+   here because the root carried no scoped `<style>` block and had nowhere else to put it.
+   (Its class prefix is deliberately not written anywhere in this file any more: the change's own
+   acceptance greps this sheet for that prefix and expects nothing back, and a mention in prose
+   is a hit a reviewer then has to adjudicate.) Every CONTROL in it is
+   a shared primitive's now, and the LAYOUT that survives moved into
+   `apps/interactables/InteractablesManagerRoot.svelte`'s own scoped block, which is what makes
+   the window host-independent rather than painted by an application class.
 
-.fabricate-interactables-manager button:focus-visible,
-.fabricate-interactables-manager input:focus-visible,
-.fabricate-interactables-manager select:focus-visible,
-.fabricate-interactables-manager textarea:focus-visible,
-.fabricate-interactables-manager [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
+   An area-level focus-ring pair stood at the head of this block until issue 1520 deleted it.
+   It was a copy of the module-rooted pair at the top of this sheet (issue 1501): this window's
+   root emits `fabricate`, so the module pair already reaches every element the copy named, at
+   the same (0,2,1) rank and with a wider element list. */
 
-/* Custom-content buttons (icon + label, and icon-only action buttons) must not be
-   centred/clipped by Foundry's global button rules — left-align content and let
-   the height grow to the content. */
+/* THE FOUNDRY HOST RESET, and what it reaches after the conversion.
+
+   `foundry2.css` declares `button { display: flex; justify-content: center }` and a FIXED
+   `height: var(--button-size)` in `@layer elements.forms`, so a window rendering its own
+   custom-content buttons has to left-align them and turn the fixed height back into a floor.
+
+   MEASURED at issue 1520 over the population this rule ACTUALLY reaches, which grew in the same
+   change: every `<button>` this window renders AND every element portalled into it. The frame is
+   the overlay host now, so a popover panel opened from any control in this window is appended to
+   the frame and is a descendant of this selector — the widest reading, and the one an earlier
+   revision of this comment missed by measuring the window's own markup alone. The travel
+   picker's option row is the case that decides it: `.fabricate-picker-popover
+   .manager-travel-option` is (0,2,0) against this rule's (0,1,1) and restates all three
+   declarations, so it wins wherever it is portalled.
+
+   Every `<button>` this window now renders is a shared primitive's, and each one out-specifies
+   this rule on all three declarations —
+   `.fabricate-icon-button.manager-icon-button` and `.fabricate-button.manager-button` at (0,2,0)
+   against this rule's (0,1,1), and the select trigger through
+   `.fabricate-select .fabricate-select-trigger-form`'s `min-height` at (0,2,0), with the other
+   two declarations identical to the ones it would inherit here. So it moves nothing today. It is
+   retained rather than deleted because it is the HOST reset for this window: a bare `<button>`
+   added to this panel by a later edit would otherwise be centred and clipped by core, which is
+   the defect this rule was written for and which no primitive can answer on its behalf. */
 .fabricate-interactables-manager button {
   justify-content: flex-start;
   height: auto;
   min-height: 1.75rem;
 }
+
+/* THE WINDOW'S SCROLL CONTAINMENT, which is the frame's contract rather than the panel's
+   content layout — the root fills `.window-content` and scrolls inside it. It stays in this
+   sheet, where the window's other frame-level rules are, and is the one `.fabricate-interactables-manager`
+   descendant rule issue 1520 did not move. Deleting it removes the panel's scrolling. */
 
 .fabricate-interactables-manager .fabricate-interactables-manager-body {
   display: flex;
@@ -21050,195 +21048,6 @@
   padding: var(--fab-space-3);
   height: 100%;
   overflow-y: auto;
-}
-
-.fabricate-interactables-manager .fab-im-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-title {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.fabricate-interactables-manager .fab-im-subtitle {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.fabricate-interactables-manager .fab-im-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-promote-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  width: auto;
-  flex: 0 0 auto;
-  padding: var(--fab-space-2) var(--fab-space-3);
-}
-
-.fabricate-interactables-manager .fab-im-promote-toggle.is-active {
-  border-color: var(--fab-accent);
-}
-
-.fabricate-interactables-manager .fab-im-promote {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-interactables-manager .fab-im-promote-hint {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.fabricate-interactables-manager .fab-im-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-field-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-3);
-  align-items: center;
-  margin: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 4px;
-}
-
-.fabricate-interactables-manager .fab-im-radio {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-  font-size: 0.9rem;
-}
-
-.fabricate-interactables-manager .fab-im-radio input {
-  width: auto;
-}
-
-.fabricate-interactables-manager .fab-im-promote-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-promote-confirm,
-.fabricate-interactables-manager .fab-im-promote-cancel {
-  width: auto;
-  flex: 0 0 auto;
-  justify-content: center;
-  padding: var(--fab-space-2) var(--fab-space-3);
-}
-
-.fabricate-interactables-manager .fab-im-list-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-empty {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 4px;
-}
-
-.fabricate-interactables-manager .fab-im-row-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-row-name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-interactables-manager .fab-im-row-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-chip {
-  font-size: 0.7rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--fab-overlay-light-06);
-  border: 1px solid var(--fab-overlay-light-16);
-  white-space: nowrap;
-}
-
-.fabricate-interactables-manager .fab-im-chip-marker.is-missing {
-  color: var(--fab-danger);
-  border-color: var(--fab-danger);
-}
-
-.fabricate-interactables-manager .fab-im-chip-marker.is-region-only {
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-row-actions {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-action {
-  width: 2rem;
-  flex: 0 0 auto;
-  justify-content: center;
-  padding: 0;
-}
-
-.fabricate-interactables-manager .fab-im-action-delete:hover {
-  color: var(--fab-danger);
 }
 
 /* ==========================================
@@ -22598,11 +22407,19 @@
   border-radius: 11px;
 }
 
-/* THE BAND IS RESTATED HERE BECAUSE THE PROP ALONE IS NOT ENOUGH. `anchoredPopover` writes the
-   panel's width as an inline style computed inside `[minWidth, maxWidth]`, and the shared
-   box's own `min-width: 240px` then FLOORS that result — so a 96px band would still open a
-   240px panel over a list of two-digit numbers. These figures mirror `SIZES` in
-   `Select.svelte`, and a mounted case reads both out of the two files and pins them equal. */
+/* THE BAND IS RESTATED HERE AS THE UNMEASURED FALLBACK, AND ONLY AS THAT. It used to be load
+   bearing: `anchoredPopover` wrote the panel's width as a bare inline `width` computed inside
+   `[minWidth, maxWidth]`, and the shared box's own bounds then clipped that result — a 96px
+   band opened a 240px panel over a list of two-digit numbers, and a caller raising its ceiling
+   past 340 got 340 anyway, because a `max-width` constrains a used width whatever its origin.
+   Since issue 1520's review the action writes the resolved width as a width AND as both of its
+   bounds, so a MEASURED panel takes the caller's figure and no rule here can clip it.
+
+   What is left for these three rules is the panel `clear()` leaves behind when the layout
+   declines to place it, which is a real state and wants a sane box rather than `max-content`.
+   The figures still mirror `SIZES` in `Select.svelte` and a mounted case still pins the two
+   files equal, so the fallback cannot drift away from the band it stands in for; the RENDERED
+   consequence is measured in `tests/components/select-popover-width.test.js`. */
 .fabricate-picker-popover.fabricate-select-popover-form {
   min-width: 240px;
   max-width: 340px;
@@ -23023,11 +22840,21 @@
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
-/* LOAD-BEARING. `.fabricate-roll-prompt-dialog input:focus` (below) zeroes `box-shadow`,
-   which is also what paints the checked centre dot — and it has EQUAL specificity to the
-   `:checked` rule above while appearing later, so without this restore a radio loses its
-   dot the instant it is clicked. Same fix as `.manager-resolution-option` in the manager.
-   The dialog's `input:focus-visible` rule already supplies the accent focus ring. */
+/* A `:focus` suppression zeroes `box-shadow`, which is also what paints the checked centre dot,
+   so a radio can lose its dot the instant it is clicked. This restore is the same fix as
+   `.manager-resolution-option` in the manager, and the accent focus ring is supplied by the
+   module-rooted `:focus-visible` half at the top of this sheet.
+
+   WHAT ISSUE 1520 CHANGED HERE, STATED BECAUSE THE OLD NOTE NAMED A RULE THAT NO LONGER EXISTS.
+   The suppressor it cited was `.fabricate-roll-prompt-dialog input:focus`, a per-area copy of
+   the module reset, deleted with the rest of that copy. The module reset that remains is
+   `.fabricate input:focus` at (0,2,1), which does NOT tie the `:checked` rule above at (0,3,1) —
+   and neither did the deleted copy, also (0,2,1), so the old note's "EQUAL specificity" claim
+   was already untrue of this dialog. It is true of the manager pair this was copied from, whose
+   suppressor is `.fabricate-manager .manager-resolution-option input[type='radio']:focus` at
+   (0,3,1). The rule is KEPT rather than re-derived away: nothing in issue 1520 makes it newly
+   redundant, its cost is one declaration, and deleting a restore on arithmetic alone is how the
+   defect it guards against comes back. */
 .fabricate-roll-prompt__modifier-option input[type='radio']:checked:focus {
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
@@ -23221,26 +23048,24 @@
   background: var(--fab-danger-surface-strong);
 }
 
-/* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
+/* ONE RULE SURVIVES HERE AND IT IS NOT A COPY. Issue 1520 deleted this block's Foundry-core
+   `:focus` reset and its `button, input` `:focus-visible` ring: the dialog root emits
+   `fabricate`, so the module-rooted focus pair at the top of this sheet (issue 1501) reaches
+   this DialogV2 body at the same (0,2,1) rank and with a wider element list, and both halves
+   were byte-for-byte what the module already writes.
 
-   REDUNDANT under the module-rooted focus pair at the top of this sheet (issue 1501): the
-   dialog root emits `fabricate` too, so `.fabricate` now reaches this DialogV2 body at the
-   same (0,2,1) rank and with a wider element list. This block still follows it in source and
-   so still wins for the three targets it names. Left in place because deleting it belongs to
-   issue 1520, which owns these copies and is named by the gate's own message. */
-.fabricate-roll-prompt-dialog button:focus,
-.fabricate-roll-prompt-dialog input:focus,
-.fabricate-roll-prompt-dialog select:focus {
-  outline: none;
-  box-shadow: none;
-}
+   The `select` ring below is a DIFFERENT TREATMENT rather than a copy, so it stays. The module
+   ring paints an OUTSET `outline`; on a `<select>` sitting flush to this dialog's
+   overflow-clipped edge an outset ring is clipped and reads as a one-sided flash, so this one
+   paints INSET. The dialog's classes are `fabricate`, `fabricate-dialog` and
+   `fabricate-roll-prompt-dialog` with no `fabricate-app`, so the inset `select` ring the player
+   area writes cannot cover the loss either.
 
-.fabricate-roll-prompt-dialog button:focus-visible,
-.fabricate-roll-prompt-dialog input:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
+   The rule the ratchet applies is: a per-area copy of a suppression or a ring the module root
+   already writes is deleted by the change that proves the module rule reaches it, but the
+   licence extends to COPIES and not to VARIANTS. The ratchet's population is keyed on ELEMENTS
+   rather than on declarations, so it cannot tell the two apart and membership in `RING_ROOTS` is
+   not a licence to delete. */
 .fabricate-roll-prompt-dialog select:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--fab-accent);

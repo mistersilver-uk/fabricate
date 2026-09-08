@@ -103,10 +103,7 @@
     "styles/fabricate.css | .fabricate-roll-prompt__modifier-option input[type='radio']:checked:focus | inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent) | 1"
   ],
   "nativeSelectElements": [
-    "src/ui/svelte/apps/InteractableBrowserRoot.svelte | 1",
-    "src/ui/svelte/apps/InteractableConfigRoot.svelte | 8",
     "src/ui/svelte/apps/crafting/RecipeBrowser.svelte | 2",
-    "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte | 3",
     "src/ui/svelte/apps/inventory/InventoryFilters.svelte | 1",
     "src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | 1",
     "src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte | 1",
@@ -149,9 +146,6 @@
   "offLadderRadii": [
     "src/ui/svelte/apps/ComponentEditorRoot.svelte | border-radius | 8px | 2",
     "src/ui/svelte/apps/FabricateAppRoot.svelte | border-radius | 10px | 2",
-    "src/ui/svelte/apps/InteractableBrowserRoot.svelte | border-radius | 3px | 1",
-    "src/ui/svelte/apps/InteractableBrowserRoot.svelte | border-radius | 4px | 3",
-    "src/ui/svelte/apps/InteractableConfigRoot.svelte | border-radius | 3px | 1",
     "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte | border-radius | 14px | 2",
     "src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte | border-radius | 8px | 2",
@@ -281,7 +275,7 @@
     "styles/fabricate.css | border-radius | 12px | 5",
     "styles/fabricate.css | border-radius | 13px | 1",
     "styles/fabricate.css | border-radius | 3px | 2",
-    "styles/fabricate.css | border-radius | 4px | 24",
+    "styles/fabricate.css | border-radius | 4px | 22",
     "styles/fabricate.css | border-radius | 5px | 14",
     "styles/fabricate.css | border-radius | 8px | 71"
   ],
@@ -312,7 +306,6 @@
   ],
   "roleFocusTargets": [
     "src/ui/svelte/apps/FabricateAppRoot.svelte | 1",
-    "src/ui/svelte/apps/InteractableBrowserRoot.svelte | 2",
     "src/ui/svelte/apps/alchemy/Workbench.svelte | 1",
     "src/ui/svelte/apps/crafting/RecipeListRow.svelte | 1",
     "src/ui/svelte/apps/gathering/GatheringEventRow.svelte | 1",
@@ -331,8 +324,6 @@
   ],
   "formlessButtons": [
     "src/ui/svelte/apps/ComponentEditorRoot.svelte | 2",
-    "src/ui/svelte/apps/InteractableBrowserRoot.svelte | 4",
-    "src/ui/svelte/apps/InteractableConfigRoot.svelte | 19",
     "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte | 1",
     "src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte | 1",
     "src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | 2",
@@ -352,7 +343,6 @@
     "src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte | 1",
     "src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte | 1",
     "src/ui/svelte/apps/gathering/LinkedScene.svelte | 1",
-    "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte | 6",
     "src/ui/svelte/apps/inventory/InventoryFilters.svelte | 1",
     "src/ui/svelte/apps/inventory/InventoryItemCard.svelte | 1",
     "src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte | 5",

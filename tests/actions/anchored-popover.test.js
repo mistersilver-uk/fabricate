@@ -142,7 +142,8 @@ describe('anchoredPopover', () => {
     );
     assert.equal(
       panel.getAttribute('style'),
-      'left: 100px; right: auto; width: 240px; max-height: 380px; top: 136px; bottom: auto;'
+      'left: 100px; right: auto; width: 240px; min-width: 240px; max-width: 240px; ' +
+        'max-height: 380px; top: 136px; bottom: auto;'
     );
     handle.destroy();
   });
@@ -170,7 +171,8 @@ describe('anchoredPopover', () => {
 
     assert.equal(
       panel.getAttribute('style'),
-      'left: 100px; right: auto; width: 240px; max-height: 380px; top: auto; bottom: 106px;',
+      'left: 100px; right: auto; width: 240px; min-width: 240px; max-width: 240px; ' +
+        'max-height: 380px; top: auto; bottom: 106px;',
       'a flipped panel is pinned by its BOTTOM edge, with `top` released'
     );
     handle.destroy();
@@ -230,7 +232,8 @@ describe('anchoredPopover', () => {
 
     assert.equal(
       panel.getAttribute('style'),
-      'left: 244px; right: auto; width: 240px; max-height: 380px; top: 136px; bottom: auto;',
+      'left: 244px; right: auto; width: 240px; min-width: 240px; max-width: 240px; ' +
+        'max-height: 380px; top: 136px; bottom: auto;',
       'the 240px panel is pushed left so its right edge sits on the boundary (484 - 240); ' +
         'left-aligned to the trigger and unclamped it would be 400'
     );
@@ -384,6 +387,54 @@ describe('anchoredPopover', () => {
     width = 300;
     window.dispatchEvent(new Event('resize'));
     assert.match(panel.getAttribute('style'), /width: 300px;/);
+    handle.destroy();
+  });
+
+  it('writes the measured width as BOTH of its bounds, so no class rule can clip it', () => {
+    // THE FINDING (issue 1520 review round 2). A caller raises its `maxWidth` past the panel
+    // class's own `max-width` and nothing moves, because `max-width` constrains a USED width
+    // whatever its origin — so an inline `width` cannot beat a stylesheet ceiling. Measured on
+    // the published `interactables-config-source-open` frame: a 450px trigger over a 340px panel,
+    // with `maxWidth={480}` threaded correctly through all three files.
+    //
+    // The caller's band and a 450px trigger are the config window's own numbers. Both bounds are
+    // asserted, and the ceiling is the half this finding is about: `min-width` alone would leave
+    // the 340px clip exactly where it was.
+    const { trigger, panel } = scene({ trigger: box(20, 100, 450, 30) });
+
+    const handle = anchoredPopover(
+      panel,
+      options({
+        trigger,
+        layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 240, maxWidth: 480 }),
+      })
+    );
+
+    assert.match(
+      panel.getAttribute('style'),
+      /width: 450px; min-width: 450px; max-width: 450px;/,
+      'a 450px trigger under a 480px band opens a 450px panel, bounded at itself'
+    );
+    handle.destroy();
+  });
+
+  it('bounds a panel at its FLOOR too, for a trigger narrower than the band', () => {
+    // The same defect in the other direction, and it is not hypothetical: the "or…" menu shipped
+    // asking for 150 and rendering at 240 because the shared box floors at 240, and the fix at the
+    // time was to restate 150 in the sheet for that one call site. The floor is now the layout's
+    // own answer, so the next caller does not rediscover it.
+    const { trigger, panel } = scene({ trigger: box(100, 100, 40, 30) });
+
+    const handle = anchoredPopover(
+      panel,
+      options({ trigger, layoutOptions: () => ({ minWidth: 150, maxWidth: 150 }) })
+    );
+
+    assert.match(
+      panel.getAttribute('style'),
+      /width: 150px; min-width: 150px; max-width: 150px;/,
+      'a 40px trigger takes the band floor, and the panel is bounded there rather than at 240'
+    );
     handle.destroy();
   });
 

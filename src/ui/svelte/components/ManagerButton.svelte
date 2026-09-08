@@ -78,11 +78,16 @@
   Consequence, UNTIL ISSUE 1502: this button WAS only styled inside `.fabricate-manager`,
   because every rule in the family was rooted at that application class. It is now rooted at
   `fabricate-button`, which this component emits itself as the leading literal of `classes`
-  below, so the family paints wherever the primitive renders. That makes it a CAPABILITY
-  rather than an app-agnostic control in practice: 63 of its 64 importers still sit under
-  `apps/manager/**`, and the 64th is `SearchablePopover`, which renders this component only for
-  a caller passing `triggerButton` — no caller outside the manager does — so nothing outside the
-  manager exercises it yet.
+  below, so the family paints wherever the primitive renders — and measured over the whole
+  sheet at issue 1520, not one rule of it is written under a `.fabricate-manager` descendant
+  chain, so the capability has no residue to qualify it.
+
+  THE CLOSING CLAUSE "nothing outside the manager exercises it yet" IS NOW FALSE and is
+  retired (issue 1520). Two of Fabricate's canvas windows render this button in a
+  `.fabricate-app` frame: the interactable config panel draws sixteen of them and the Manage
+  Interactables panel three, and neither goes through `SearchablePopover`'s `triggerButton`
+  seam. So the re-root is exercised in production by a whole application area, and the frames
+  those two windows publish are what shows it painting there.
   `manager-layout.test.js` pins the equivalence in
   a real browser — it renders a tool studio button and a Modifiers card button of the
   same role and compares the COMPUTED `font-size`, `font-weight`, `padding`, `height`

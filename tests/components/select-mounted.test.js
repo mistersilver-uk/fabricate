@@ -991,13 +991,21 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
-    it('declares one panel width band, in the props AND in the CSS that floors them', () => {
-      // A MIRROR WITH A REAL REASON AND THEREFORE A REAL GUARD. `anchoredPopover` writes the
-      // panel's width as an inline style computed inside `[minWidth, maxWidth]`, so the band has
-      // to be props; the shared box's own `min-width: 240px` then floors that result, so it has to
-      // be CSS as well. Two copies of three pairs is what this clause pins together — and since
-      // issue 1504 lifted the family into `styles/fabricate.css`, the two copies now sit in two
-      // FILES, which is the drift this clause exists to catch.
+    it('declares one panel width band, in the props AND in the CSS fallback that mirrors them', () => {
+      // A MIRROR WITH A REAL REASON AND THEREFORE A REAL GUARD. `anchoredPopover` resolves the
+      // panel's width inside `[minWidth, maxWidth]` and writes it as a width and as both of its
+      // bounds, so the band has to be props; the sheet's per-rung rules are the box a panel takes
+      // when the layout DECLINES to place it and `clear()` wipes that style, so the same three
+      // pairs have to be CSS as well. Two copies of three pairs is what this clause pins together
+      // — and since issue 1504 lifted the family into `styles/fabricate.css`, the two copies now
+      // sit in two FILES, which is the drift this clause exists to catch.
+      //
+      // WHAT IT DOES NOT AND CANNOT SAY is what either copy RENDERS as. This suite is happy-dom,
+      // which computes no cascade, so the sheet's figure being equal to the prop's is the whole of
+      // this clause's reach — and for one review round that equality was read as evidence the
+      // sheet was fine while it was clipping every full-width caller to 340px.
+      // `tests/components/select-popover-width.test.js` measures the rendered box in Chromium and
+      // is the assertion that half of the claim belongs to.
       const table = selectSource.match(/const SIZES = Object\.freeze\(\{[\s\S]*?\n {2}\}\);/)?.[0];
       assert.ok(Boolean(table), 'Select.svelte declares its rungs in one frozen table');
 

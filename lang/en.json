@@ -280,6 +280,7 @@
         "Title": "Interactable browser",
         "Hint": "Drag an entry onto the canvas, or use Place on current scene.",
         "SystemLabel": "Crafting system",
+        "FiltersLabel": "Interactable browser filters",
         "SearchLabel": "Search",
         "SearchPlaceholder": "Search entries…",
         "ToolsHeading": "Tools",
@@ -7131,7 +7132,6 @@
         "NoTags": "No tags",
         "NoEssences": "No essences",
         "NoSourceUuid": "No source UUID",
-        "EditItem": "Edit Item",
         "DeleteItem": "Delete Item",
         "DropInvalidItem": "Drop an Item document from sidebar or compendium.",
         "ItemUpdated": "Updated existing item: {name}.",
@@ -7181,10 +7181,7 @@
           "DecrementEssence": "Decrease {name}",
           "QuantityLabel": "{name} quantity",
           "Save": "Save Component",
-          "Cancel": "Cancel",
-          "NotGm": "Only GMs can manage components.",
-          "ComponentNotFound": "Component not found.",
-          "SaveFailed": "Failed to save component."
+          "Cancel": "Cancel"
         }
       },
       "Environments": {

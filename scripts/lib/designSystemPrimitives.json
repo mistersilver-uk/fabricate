@@ -181,8 +181,8 @@
       "library": "<Segmented>",
       "status": "shipped",
       "evidence": "broad",
-      "scope": "manager-only",
-      "why": "`library.html:613` — two to four named options, exactly one chosen, rendered as a radio group. 11 callers. Scoped `manager-only`: every measured importer is a manager editor. That is a LOCATION decision and not a claim about the control, which is a general one — `library.html` specifies `<Segmented>` for the whole product, so a player caller is what would move this row rather than a re-root."
+      "scope": "shared",
+      "why": "`library.html:613` — two to four named options, exactly one chosen, rendered as a radio group. 11 callers. Scoped `shared` DESPITE its `apps/manager/` path. It read `manager-only` because every measured importer was a manager editor, and it recorded that a caller elsewhere is what would move the row rather than a re-root. **The flip is decided by the FIRST caller outside `apps/manager/`, regardless of audience.** Here that caller is `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` — the GM-only Manage Interactables scene panel, a canvas application outside that directory, NOT a player surface. The gate `tests/design-system-coverage.test.js` enforces scope by import PATH, not by audience, so a manager-audience caller outside the directory falsifies `manager-only` exactly as a player one would. Of the two remedies that gate states, the importer is NOT the defect: the control was always a general one, `library.html` specifies `<Segmented>` for the whole product, and nothing about the component changed — only the location decision did. The path is the debt; the scope is the fact. A FURTHER non-manager caller is additional evidence for the same decision rather than a new reason for it, so a later change that renders this control from its own non-manager root adds its file to the list above and does not re-justify the scope."
     },
     {
       "path": "src/ui/svelte/apps/manager/SubjectModifierPicker.svelte",

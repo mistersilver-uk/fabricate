@@ -34,7 +34,7 @@ import {
   mapChangedFilesToCases,
   normalizePath,
   parseLabActorTableRegions,
-  parsePlayerMountRegions,
+  parseMountRegions,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
   WORLD_TOOL_SEARCH_MISS_TERM,
@@ -49,6 +49,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
@@ -207,6 +208,37 @@ function renderSources() {
         file === 'lang/en.json' ||
         (file.startsWith('src/ui/') && file.endsWith('.js'))
     )
+  );
+}
+
+/**
+ * The same corpus, reduced to the half of each file that can put a hook ON AN ELEMENT.
+ *
+ * WHY A WHOLE-FILE SCAN IS THE WRONG CORPUS FOR A SELECTOR (issue 1520 review round 2). A
+ * component's own class names are written TWICE — once on the element and once as the selector of
+ * the scoped rule that paints it — so "the file contains `fab-ib-row`" stays true after the
+ * `class="…"` attribute is deleted, and a `data-*` hook survives in any paragraph that names it.
+ * Measured on the interactable browser: with `floor: 0` the selector scan is the sole owner of
+ * `[data-interactable-browser-system]` and `[data-interactable-browser-search]`, deleting both
+ * from the markup reds it — and re-running with ONE added `//` comment naming the two hooks goes
+ * green over a tree that emits neither, at which point the `fill` step of
+ * `interactables-browser-filtered` throws twenty minutes into a capture run.
+ *
+ * `emittingHalfOf` is the reduction `tests/helpers/interactablesSmokeLocators.js` already applies
+ * to the smoke-locator scan for the same reason, shared rather than copied: two implementations of
+ * "the part that can carry an attribute" is two things to weaken.
+ *
+ * `lang/en.json` is passed through untouched — it carries no comments and no `<style>` block, and
+ * the label branch reads it for TEXT rather than for hooks.
+ *
+ * @returns {Map<string, string>} `path -> emitting half`, keyed as {@link renderSources}.
+ */
+function emittingSources() {
+  return new Map(
+    [...renderSources()].map(([file, text]) => [
+      file,
+      file === 'lang/en.json' ? text : emittingHalfOf(text),
+    ])
   );
 }
 
@@ -426,6 +458,23 @@ function stripNegations(selector) {
  * SHAPE has finished with it.
  */
 function collectSelectorHookFailures(viewCase, selector, sources, haystack, missing) {
+  // A LITERAL ID IS ANSWERED BY THE ID ITSELF (issue 1520 review). The branch below exists
+  // because an editor tab strip INTERPOLATES its ids, so neither half of `#tool-tab-validation`
+  // appears in any source and the guard has to go looking for the file that builds the stem. A
+  // hand-rolled tablist writes its ids out - `id="fab-ib-tab-tasks"` in the interactable
+  // browser - and for those the heuristic is not merely unnecessary, it is WRONG: the family
+  // `fab-ib` builds no `${...}` ids and declares no `idStem`, so the branch reported a selector
+  // that resolves perfectly as naming UI that does not exist.
+  //
+  // The literal form is STRICTER than the branch it short-circuits, not looser: it demands the
+  // whole id on an `id` attribute somewhere in the corpus, where the branch demands only that
+  // some file interpolates the family and mentions the tab id in quotes. So an id renamed on the
+  // element still fails - through this branch when nothing writes it, and through the one below
+  // when nothing builds it either.
+  const literalId = /^#([\w-]+)$/.exec(selector);
+  if (literalId && [...sources].some(([, text]) => text.includes(`id="${literalId[1]}"`))) {
+    return;
+  }
   const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(selector);
   if (editorTab) {
     const [, family, tabId] = editorTab;
@@ -589,7 +638,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   // the case would capture whichever screen happened to be showing.
   // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
   // `crafting/craftingNav.js`, not in any component file.
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
@@ -738,7 +787,7 @@ test('every expectSelector names UI that still exists', () => {
   // is the normal shape for a case whose whole job is to assert a state — was guarded by
   // nothing. `data-world-modifier-roll-note` was exactly that: mutated to nonsense, every
   // guard passed and only a 20-minute capture run would have found it.
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   let checked = 0;
@@ -862,7 +911,7 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
 });
 
 test('layout expectation selectors name UI that still exists', () => {
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
@@ -996,11 +1045,12 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
   // what the new player attribute mirrors. Renaming the REAL attribute then left the guard green,
   // because the prose still matched. A check whose haystack includes its own documentation cannot
   // fail on a rename that only the documentation survives.
-  const haystack = [...renderSources().values()]
-    .join('\n')
-    .replaceAll(/<!--[\S\s]*?-->/g, '')
-    .replaceAll(/\/\*[\S\s]*?\*\//g, '')
-    .replaceAll(/^\s*\/\/.*$/gm, '');
+  //
+  // It used to strip comments HERE, in a third hand-rolled copy that left `<style>` blocks in — so
+  // `.manager-nav-button` would still have resolved out of the rule that paints it after the class
+  // came off the element. {@link emittingSources} is the shared reduction, and it removes the
+  // scoped block as well (issue 1520 review round 2).
+  const haystack = [...emittingSources().values()].join('\n');
   const absent = DRIVER_HOOKS.filter(
     (hook) => !new RegExp(String.raw`(?<![\w-])${hook}(?![\w-])`).test(haystack)
   );
@@ -2150,10 +2200,20 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The thirteen frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, and the
+// The fifteen frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
-// PLAYER window, which is a second application root for the seam to clamp against).
+// PLAYER window, which is a second application root for the seam to clamp against — and the
+// fourteenth and fifteenth at issue 1520's second review round, which is the two GM canvas
+// windows' open option panels).
+//
+// THOSE LAST TWO ARRIVED THE WAY THE THREE BEFORE THEM DID: a frame resting on an open panel that
+// did not name the seam. `interactables-config-source-open` was PUBLISHED, and it is the frame the
+// round measured a 340px option panel under a 450px trigger on — a defect whose repair was in this
+// seam, in a frame the seam did not route to. That is the same category error the paragraph below
+// records for `IconPicker` and `ActionMenu`, arriving by a different door: not "an override covers
+// it" this time, but "the window's own two source patterns cover it", which answers a different
+// question again.
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2168,6 +2228,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
 // of them in a case's `sourceMatches` and dropped the other would publish a full-looking set for
 // half the seam.
 const ANCHORED_POPOVER_FRAMES = [
+  'interactables-config-source-open',
+  'interactables-manager-region-open',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
@@ -2380,6 +2442,164 @@ test('every case records the smoke labels it corresponds to', () => {
     }
     assert.ok(viewCase.smokeLabels.length > 0, `case "${viewCase.id}" declares no smokeLabels`);
   }
+});
+
+/**
+ * The smoke script, read once, so the label cross-check below answers against the live harness.
+ */
+const smokeHarnessSource = readFileSync(resolve(ROOT, 'scripts/foundry-test-run.mjs'), 'utf8');
+
+/**
+ * A capture label's SHAPE: lowercase kebab with at least one hyphen.
+ *
+ * The filter exists because `label:` is not exclusively a capture key in the smoke — it is also a
+ * fixture field on essences, currency units and tools ("Gold", "Alchemy", "Smoke Anvil"). Without
+ * it the emitted set would absorb every one of those, and a case could then claim a smoke frame
+ * named after a currency unit and pass.
+ */
+const SMOKE_LABEL_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
+
+/**
+ * The text between a balanced pair of delimiters, starting at the opener.
+ *
+ * Balancing rather than a regex because the smoke's capture calls run across several lines and
+ * carry nested calls and object literals in their arguments; a non-greedy match stops at the first
+ * `)` and reads one argument of four.
+ *
+ * @param {string} source The file text.
+ * @param {number} openIndex Index of the opening delimiter.
+ * @param {string} open The opening delimiter.
+ * @param {string} close The closing delimiter.
+ * @returns {string} The enclosed text, or '' when it never closes.
+ */
+function balancedSlice(source, openIndex, open, close) {
+  let depth = 0;
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === open) depth += 1;
+    else if (source[index] === close) {
+      depth -= 1;
+      if (depth === 0) return source.slice(openIndex + 1, index);
+    }
+  }
+  return '';
+}
+
+/**
+ * The helpers that FORWARD their own `label` binding into `screenshot(page, label)`.
+ *
+ * Derived from the harness rather than listed, because the list has changed five times: the tool
+ * studio, the recipe results tab, the stable-manager capture and the player gathering walk each
+ * grew their own wrapper, and a hand-written list would have gone stale as each arrived — quietly,
+ * since a missing wrapper makes this check REJECT a label the smoke really does emit, and the
+ * cheapest way out of a false failure is to delete the assertion.
+ *
+ * @returns {string[]} Function names.
+ */
+function labelForwardingHelpers() {
+  const names = [];
+  for (const match of smokeHarnessSource.matchAll(/(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g)) {
+    const parenIndex = smokeHarnessSource.indexOf('(', match.index);
+    const params = balancedSlice(smokeHarnessSource, parenIndex, '(', ')');
+    if (!/\blabel\b/.test(params)) continue;
+    const braceIndex = smokeHarnessSource.indexOf('{', parenIndex + params.length + 1);
+    if (braceIndex === -1) continue;
+    const body = balancedSlice(smokeHarnessSource, braceIndex, '{', '}');
+    if (/screenshot\(\s*page\s*,\s*label\b/.test(body)) names.push(match[1]);
+  }
+  return names;
+}
+
+/**
+ * Every label the smoke harness can actually write a PNG under.
+ *
+ * FOUR forms, because the harness reaches `screenshot()` four ways and modelling only the direct
+ * one would reject 40 labels the smoke genuinely emits:
+ *
+ *   1. `screenshot(page, 'label')` — the direct call.
+ *   2. `label: 'label'` inside a capture helper's options object.
+ *   3. `['tab-id', 'label']` — the environment editor's tab loop destructures a tuple and passes
+ *      the second element.
+ *   4. any string literal in the argument list of a {@link labelForwardingHelpers} call.
+ *
+ * Form 4 is the loose one: it admits a helper's OTHER string arguments too. That is deliberate and
+ * bounded — those arguments are selectors and fixture names, which the shape filter rejects on
+ * sight (`.manager-card`, `Smoke Anvil`) — and the alternative is modelling argument positions per
+ * helper, which is the shape that rots.
+ *
+ * @returns {Set<string>} Emitted labels.
+ */
+function smokeEmittedLabels() {
+  const emitted = new Set();
+  const admit = (value) => {
+    if (SMOKE_LABEL_SHAPE.test(value)) emitted.add(value);
+  };
+  for (const match of smokeHarnessSource.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
+    emitted.add(match[1]);
+  }
+  for (const match of smokeHarnessSource.matchAll(/\blabel:\s*'([^']+)'/g)) admit(match[1]);
+  for (const match of smokeHarnessSource.matchAll(/\[\s*'[^']+'\s*,\s*'([^']+)'\s*\]/g)) {
+    admit(match[1]);
+  }
+  for (const name of labelForwardingHelpers()) {
+    for (const call of smokeHarnessSource.matchAll(new RegExp(String.raw`\b${name}\s*\(`, 'g'))) {
+      const parenIndex = smokeHarnessSource.indexOf('(', call.index + name.length);
+      for (const literal of balancedSlice(smokeHarnessSource, parenIndex, '(', ')').matchAll(
+        /'([^']+)'/g
+      )) {
+        admit(literal[1]);
+      }
+    }
+  }
+  return emitted;
+}
+
+test('every declared smoke label is one the harness can actually emit', () => {
+  // THE GAP THIS CLOSES, AND WHY IT MATTERS (issue 1520). `smokeLabels` was checked for SHAPE and
+  // non-emptiness and for nothing else, so a case could name a frame the smoke has never taken and
+  // pass — and one revision of this change's own plan did exactly that, pairing the three canvas
+  // config cases with `interactable-config`, which is a STEP ID in the harness
+  // (`results.steps.push({ step: 'interactable-config' })`) and not a capture label at all. It
+  // would have shipped green: the string exists in the file, the array is non-empty, the shape is
+  // right, and nothing anywhere asked the harness.
+  //
+  // The failure it prevents is not cosmetic. `smokeLabels` is the answer to "which smoke frame
+  // does this replace?", which is what a reviewer uses to put a lab frame beside its live
+  // counterpart; a label naming no frame sends them looking for a photograph that does not exist.
+  const emitted = smokeEmittedLabels();
+
+  // NON-VACUITY FIRST, because every clause below quantifies over this set: an extraction that
+  // silently matched nothing would report zero unknown labels and read as a clean bill of health.
+  assert.ok(
+    emitted.size >= 150,
+    `only ${emitted.size} capture labels were extracted from the smoke harness; the extraction is ` +
+      'probably broken, which would make every assertion below vacuous'
+  );
+  // And a NEGATIVE control, named rather than generic: the exact string the wrong revision used.
+  // It occurs in the harness — as a step id — so a check that merely looked for the literal would
+  // admit it. This clause is what proves the extraction distinguishes the two.
+  assert.ok(
+    !emitted.has('interactable-config'),
+    '"interactable-config" is a step id, not a capture label. If it is being extracted as one, ' +
+      'this check can no longer tell a label from a step and would have passed the error it exists ' +
+      'to catch'
+  );
+
+  const unknown = publishableCases()
+    .flatMap((viewCase) =>
+      (viewCase.smokeLabels ?? [])
+        .filter((label) => !emitted.has(label))
+        .map((label) => `${viewCase.id}: ${label}`)
+    )
+    .sort();
+
+  assert.deepEqual(
+    unknown,
+    [],
+    'these cases claim a smoke counterpart the harness never captures, so "which smoke frame does ' +
+      'this replace?" has no answer. Either the label is wrong, or the case reaches BEYOND the ' +
+      'smoke and must say so with `reaches: \'beyond\'` and an empty array:\n  ' +
+      unknown.join('\n  ')
+  );
 });
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -2930,7 +3150,7 @@ test('the registry counts quoted in prose match the registry', () => {
       /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
       [reaches('exact'), reaches('window'), reaches('beyond'), total],
     ],
-    ['AGENTS.md', /the normal case, at (\d+) cases across both windows/, [total]],
+    ['AGENTS.md', /the normal case, at (\d+) cases across five windows/, [total]],
     ['AGENTS.md', /one frame of every route and tab the lab renders, (\d+) cases/, [coverage]],
     [
       '.agents/skills/fabricate-orchestrator/SKILL.md',
@@ -3280,7 +3500,7 @@ function tableNameByLine() {
  * @returns {Map<number, string>} Line number -> region key, for lines inside a marked region.
  */
 function mountRegionNameByLine() {
-  const regions = parsePlayerMountRegions(labMountSource);
+  const regions = parseMountRegions(labMountSource);
   assert.ok(regions, `${LAB_MOUNT_PATH} no longer parses into its marked regions`);
   const byLine = new Map();
   for (const { key, start, end } of regions) {
@@ -3655,6 +3875,21 @@ test('a deletion-only hunk inside a case literal selects that case, not the fall
 const playerCaseIds = () =>
   publishableCases()
     .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+
+/**
+ * The three canvas windows' cases, derived rather than listed.
+ *
+ * Keyed on "neither the player window nor the Manager", so a fourth canvas window registered
+ * later is inside this set the day its `APP_CHROME` entry lands — which is what stops the canvas
+ * attribution claims below going quietly half-true.
+ */
+const canvasCaseIds = () =>
+  publishableCases()
+    .filter(
+      (viewCase) =>
+        viewCase.app !== 'fabricate-app' && viewCase.app !== 'fabricate-crafting-system-manager'
+    )
     .map((viewCase) => viewCase.id);
 
 const knowledgeSurfaceCaseIds = () =>
@@ -4177,6 +4412,22 @@ const MOUNT_REGION_ANCHORS = [
   ['player-settle-stores', '      if (pending.length === 0) break;'],
 ];
 
+/**
+ * The same, for the two regions only the three CANVAS windows can render (issue 1520).
+ *
+ * A SEPARATE list rather than two more rows above, because the assertion each list drives is a
+ * different claim: the player list is held to "selects every player frame and no manager frame",
+ * and a canvas row in it would fail that loop rather than be checked by it. The two are
+ * concatenated for the marker-count and parser checks, which quantify over every declared key.
+ */
+const CANVAS_MOUNT_REGION_ANCHORS = [
+  ['canvas-mount-params', "    interactable: params.get('interactable') ?? null,"],
+  ['mount-canvas-app', "    exportName: 'InteractableBrowserApp',"],
+];
+
+/** Every marked region in the mount page, whatever its readership. */
+const ALL_MOUNT_REGION_ANCHORS = [...MOUNT_REGION_ANCHORS, ...CANVAS_MOUNT_REGION_ANCHORS];
+
 test('a mount.js patch confined to a player region selects every player frame and only those', () => {
   const players = playerCaseIds();
   for (const [region, text] of MOUNT_REGION_ANCHORS) {
@@ -4246,17 +4497,43 @@ test('a mount.js change outside its player regions selects surface coverage', ()
   assert.deepEqual(selectedIds([LAB_MOUNT_PATH], { patches: {} }), coverageIds());
 });
 
-test('the four mount.js regions the selector keys on are still marked in the file', () => {
+test('a mount.js patch confined to a canvas region selects every canvas frame and only those', () => {
+  // The canvas half of the claim above, and it is the one that is newly load-bearing: the mount
+  // page now draws FIVE windows, so a region marked here but attributed to the wrong predicate
+  // would publish player or manager frames as evidence of a canvas change.
+  const canvas = canvasCaseIds();
+  assert.ok(canvas.length > 0, 'the registry must hold canvas cases for this to measure anything');
+  for (const [region, text] of CANVAS_MOUNT_REGION_ANCHORS) {
+    const patches = labMountPatches([labMountLineOf(text)]);
+    assert.deepEqual(
+      selectedIds([LAB_MOUNT_PATH], patches),
+      canvas,
+      `a change inside the "${region}" region must select every canvas frame and no other`
+    );
+    // Derived and shift-proof for the same reason the player loop's is: a merge commit moves the
+    // hunk header's numbers and moves nothing the hunk is anchored by.
+    assert.deepEqual(
+      selectedIds(
+        [LAB_MOUNT_PATH],
+        patchesFor(LAB_MOUNT_PATH, shiftHunkHeaders(patches.patches[LAB_MOUNT_PATH], 200))
+      ),
+      canvas,
+      `a shifted "${region}" patch must select the same frames`
+    );
+  }
+});
+
+test('the six mount.js regions the selector keys on are still marked in the file', () => {
   // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
   // selected — which is correct and invisible: the only symptom would be a capture job quietly
   // back at twenty minutes. So it has to fail LOUDLY here too.
-  const missing = MOUNT_REGION_ANCHORS.map(([region]) => region).filter(
+  const missing = ALL_MOUNT_REGION_ANCHORS.map(([region]) => region).filter(
     (region) => !labMountSource.some((line) => line.trim() === `// view-lab-region:${region}`)
   );
   assert.deepEqual(
     missing,
     [],
-    'these regions are no longer marked in the mount page, so `parsePlayerMountRegions` refuses ' +
+    'these regions are no longer marked in the mount page, so `parseMountRegions` refuses ' +
       `the file and every mount.js change captures the whole corpus again:\n  ${missing.join('\n  ')}`
   );
 
@@ -4265,7 +4542,7 @@ test('the four mount.js regions the selector keys on are still marked in the fil
       line.trim().startsWith('// view-lab-region:') && line.trim() !== '// view-lab-region:end'
   ).length;
   const closes = labMountSource.filter((line) => line.trim() === '// view-lab-region:end').length;
-  assert.equal(opens, MOUNT_REGION_ANCHORS.length, 'every marked region is a declared region');
+  assert.equal(opens, ALL_MOUNT_REGION_ANCHORS.length, 'every marked region is a declared region');
   assert.equal(closes, opens, 'every marked region is closed');
 });
 
@@ -4277,7 +4554,7 @@ test('the player-only readership of the settle-stores region is still a fact abo
   // the Manager's `_buildServices()` does not declare, so `watched` is empty on every manager
   // frame and an edit here cannot move one.
   //
-  // Every other refusal in `parsePlayerMountRegions` fails SAFE: it widens to the whole corpus.
+  // Every other refusal in `parseMountRegions` fails SAFE: it widens to the whole corpus.
   // This one fails UNSAFE. The day the Manager gains a `journal` or an `inventory` seam, an edit
   // inside these markers narrows to player frames only and publishes NO evidence for the manager
   // frames it moved — the silent wrong narrowing the whole table exists to make unreachable, and
@@ -4287,7 +4564,7 @@ test('the player-only readership of the settle-stores region is still a fact abo
   // Both halves are DERIVED rather than restated: the names come out of the region itself, and
   // the keys out of the manager's own services literal, so neither can drift from what it
   // describes without failing.
-  const region = parsePlayerMountRegions(labMountSource)?.find(
+  const region = parseMountRegions(labMountSource)?.find(
     (candidate) => candidate.key === 'player-settle-stores'
   );
   assert.ok(region, 'the settle-stores region must still parse for this claim to be about it');
@@ -4328,12 +4605,12 @@ test('the player-only readership of the settle-stores region is still a fact abo
     'the Manager now declares one of the stores the settle-stores region waits on, so that ' +
       'region is no longer player-only: an edit inside its markers would narrow the capture to ' +
       'player frames and publish nothing for the manager frames it moved. Either move the block ' +
-      'outside the markers or drop it from PLAYER_MOUNT_REGIONS — do not just update this test.'
+      'outside the markers or drop it from MOUNT_REGIONS — do not just update this test.'
   );
 });
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-// `parsePlayerMountRegions`, driven directly.
+// `parseMountRegions`, driven directly.
 //
 // The tests above reach it only through `mapChangedFilesToCases`, over the file this repo ships —
 // which is well-formed, so every one of its refusals is unreachable from there. It is a pure
@@ -4348,12 +4625,12 @@ const mountRegionBlock = (key, { close = true } = {}) => [
 ];
 
 /** Every declared key, in the order the file marks them. */
-const DECLARED_MOUNT_REGIONS = MOUNT_REGION_ANCHORS.map(([region]) => region);
+const DECLARED_MOUNT_REGIONS = ALL_MOUNT_REGION_ANCHORS.map(([region]) => region);
 
 const wellFormedMountSource = () => DECLARED_MOUNT_REGIONS.flatMap((key) => mountRegionBlock(key));
 
-test('parsePlayerMountRegions maps each marked region to its own span', () => {
-  const regions = parsePlayerMountRegions(wellFormedMountSource());
+test('parseMountRegions maps each marked region to its own span', () => {
+  const regions = parseMountRegions(wellFormedMountSource());
   assert.ok(regions, 'a well-formed file must parse');
   assert.deepEqual(
     regions,
@@ -4368,7 +4645,7 @@ test('parsePlayerMountRegions maps each marked region to its own span', () => {
   );
 });
 
-test('parsePlayerMountRegions refuses every shape whose spans would be a guess', () => {
+test('parseMountRegions refuses every shape whose spans would be a guess', () => {
   const wellFormed = wellFormedMountSource();
   for (const [why, source] of [
     [
@@ -4396,14 +4673,14 @@ test('parsePlayerMountRegions refuses every shape whose spans would be a guess',
     ],
   ]) {
     assert.equal(
-      parsePlayerMountRegions(source),
+      parseMountRegions(source),
       null,
       `${why} must refuse the file, so the selection widens to the corpus rather than narrowing wrongly`
     );
   }
 
   // The control, so the six refusals above are about the shapes and not about the fixture.
-  assert.ok(parsePlayerMountRegions(wellFormed), 'the control fixture must parse');
+  assert.ok(parseMountRegions(wellFormed), 'the control fixture must parse');
 });
 
 test('the player companion cases photograph the seam through the production registry', () => {

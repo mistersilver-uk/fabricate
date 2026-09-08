@@ -323,8 +323,14 @@ test('the application-root vocabulary is derived from the applications themselve
 
   assert.ok(
     roots.size >= 10,
-    `only ${roots.size} application-root classes were derived. Seven applications contribute ` +
-      'thirteen; a collapse to a handful means the reader is finding one layer and not the other.'
+    `only ${roots.size} application-root classes were derived. Six application files contribute ` +
+      'TWELVE, and the two moves behind that figure are both issue 1520\'s: the deletion of the ' +
+      'orphaned component-editor window took its window and Svelte-root classes with it, ' +
+      'leaving eleven, and the split of the player window\'s drag-resize floor off the shared ' +
+      '`fabricate-app` area class added `fabricate-app-window` to `SvelteFabricateApp`\'s ' +
+      '`classes` array, making twelve. A class the frame emits is a root for this derivation ' +
+      'whatever it carries, so a floor-only class counts like any other; a collapse to a ' +
+      'handful means the reader is finding one layer and not the other.'
   );
 });
 

@@ -4,7 +4,6 @@ import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting } from '../config/settings.js';
 import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
-import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import {
@@ -955,11 +954,6 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           } catch (err) {
             ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Items.SourceNotFound'));
           }
-        },
-        onEditComponent: async (itemId) => {
-          const systemId = get(this._adminStore.selectedSystemId) || '';
-          if (!systemId || !itemId) return;
-          SvelteComponentEditorApp.show(itemId, systemId, this);
         },
         confirmDiscardEssenceDraft: () =>
           confirmDialog({

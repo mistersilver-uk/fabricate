@@ -139,9 +139,20 @@ describe('GatheringView 3-column layout and states', () => {
         && appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
       'the clamp should floor both width and height at the configured minimum'
     );
-    // The drag-resize floor lives on the app root in the global stylesheet.
-    assert.ok(cssSource.includes('min-width: 1024px;'), 'the app root CSS should floor the window width');
-    assert.ok(cssSource.includes('min-height: 640px;'), 'the app root CSS should floor the window height');
+    // The drag-resize floor lives on `.fabricate.fabricate-app-window` in the global stylesheet —
+    // the PLAYER-ONLY class, not the shared `.fabricate-app` area class the three canvas
+    // interactables windows adopted in issue 1520.
+    //
+    // THESE TWO CLAUSES ARE SELECTOR-BLIND AND ARE NOT THE AUTHORITATIVE FLOOR GUARD. They are
+    // bare substring reads over the whole sheet, so they pass wherever the declarations sit —
+    // including on the shared class, which is the one place they must not be, because a floor
+    // there inflates three 420-560px windows to the player window's size. The authority is the
+    // PAIR in `tests/view-lab-app-options-parity.test.js`: the declarations are on the
+    // `-window` rule AND the shared rule declares neither. What survives here is the weaker but
+    // still useful claim these clauses were written for — that the sheet floors the player
+    // window at the same two numbers the app's own constants above name.
+    assert.ok(cssSource.includes('min-width: 1024px;'), 'the sheet should floor the player window width');
+    assert.ok(cssSource.includes('min-height: 640px;'), 'the sheet should floor the player window height');
   });
 
   it('localizes the loading, error, and empty states', () => {

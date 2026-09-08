@@ -63,6 +63,53 @@ import { portal } from './portal.js';
 const BOUNDS_INSET = 16;
 
 /**
+ * The three declarations that make a MEASURED width the whole answer (issue 1520 review round 2).
+ *
+ * ── THE DEFECT ──────────────────────────────────────────────────────────────────────────────
+ * `computeIconPickerPopoverLayout` already resolves the caller's band into ONE number:
+ * `clamp(max(triggerWidth, minWidth), minWidth, maxWidth)`, with `maxWidth` itself floored at the
+ * space between the clipping bounds. By the time a width reaches here every constraint the caller
+ * stated has been applied to it. Writing it as a bare `width` then leaves that answer at the mercy
+ * of whatever `min-width`/`max-width` the panel's own class rules happen to carry — and a `max-width`
+ * constrains a used `width` REGARDLESS of where the width came from, so a stylesheet ceiling beats
+ * an inline width. It is not a cascade contest an inline declaration can win, because it is not a
+ * cascade contest at all.
+ *
+ * Measured, three times, before this was written:
+ *
+ *   - `.fabricate-picker-popover.fabricate-select-popover-form` caps the panel at 340px, so the
+ *     three interactables windows' full-width triggers (450, 394 and 508px) each dropped a 340px
+ *     option list, with the `maxWidth` prop each window passes — 480, 420 and 560 — reaching the
+ *     element as an inline `width` the sheet then clipped. That is the finding this answers.
+ *   - `.fabricate-picker-popover.manager-recipe-or-popover` records the FLOOR half of the same
+ *     defect: a caller asking for 150 rendered at 240 "with the inline declaration sitting there
+ *     looking honoured", and the fix at the time was to restate the band in CSS per call site.
+ *   - `Select.svelte`'s three rung rules restate their bands for that same reason.
+ *
+ * Restating a band in CSS answers one call site and leaves the next one to rediscover it, which is
+ * exactly what happened. Writing all three declarations answers every caller once: the number this
+ * action computed is the number the box takes.
+ *
+ * ── WHAT THIS DOES *NOT* CHANGE ─────────────────────────────────────────────────────────────
+ * Nothing whose CSS band already agreed with its props, which is every other shipped caller — the
+ * three `Select` rungs (240/340, 96/240, 160/320) mirror the sheet exactly, `IconPicker` (260/340)
+ * and `EssenceSourceSelector` (280/340) sit strictly inside the shared 240/340 box, the two colour
+ * pickers ask for 220 against a rule that states `width: 220px` and no bounds at all, and
+ * `manager-recipe-or-popover` asks for 150 against a rule restating 150. The class rules stay where
+ * they are: they are still the box when `layout` declines to place the panel and `clear()` wipes
+ * this style, and for `applyWidth: false` callers they are the only width there has ever been.
+ *
+ * `ActionMenu` is untouched for a stronger reason — `computeActionMenuLayout` returns no `width` at
+ * all (it takes the panel's already-measured box as an INPUT), so this branch never runs for it.
+ *
+ * @param {number} width The layout's own resolved width, in CSS pixels.
+ * @returns {string[]} The declarations, in `panelStyle` order.
+ */
+function panelWidthDeclarations(width) {
+  return [`width: ${width}px;`, `min-width: ${width}px;`, `max-width: ${width}px;`];
+}
+
+/**
  * Adapt a `computeIconPickerPopoverLayout`-shaped function to this action's `layout` contract.
  *
  * The picker layout takes a HOST-RELATIVE trigger box and a `{ width, height }` viewport, while
@@ -125,8 +172,9 @@ export function hostRelativePopoverLayout(compute) {
  *   layout's `listMaxHeight` (issue 1280's whole-row flooring).
  * @param {number} [params.maxHeightCap] A post-hoc cap on the layout's own `maxHeight`. `0`
  *   (the default) means uncapped.
- * @param {boolean} [params.applyWidth] Whether the layout's `width` is written. False for a panel
- *   that sizes to its content (`width: max-content`), where writing a width would fix the box.
+ * @param {boolean} [params.applyWidth] Whether the layout's `width` is written — as a WIDTH AND
+ *   AS BOTH ITS BOUNDS; see {@link panelWidthDeclarations}. False for a panel that sizes to its
+ *   content (`width: max-content`), where writing a width would fix the box.
  * @param {boolean} [params.ignoreScrollWithin] Drop viewport events that started inside the panel
  *   itself. The panel is anchored to the trigger and scrolling INSIDE it moves neither, so the
  *   answer a re-measure would recompute is the one already applied.
@@ -204,7 +252,7 @@ export function anchoredPopover(node, params = {}) {
     else if (Number.isFinite(layout.right)) parts.push('left: auto;', `right: ${layout.right}px;`);
 
     if (options.applyWidth !== false && Number.isFinite(layout.width)) {
-      parts.push(`width: ${layout.width}px;`);
+      parts.push(...panelWidthDeclarations(layout.width));
     }
 
     if (Number.isFinite(layout.maxHeight)) {

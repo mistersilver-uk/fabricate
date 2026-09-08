@@ -100,11 +100,19 @@
 
   ── NO SCOPED STYLE, AND WHY ──────────────────────────────────────────────────────
   Like `ManagerButton`, `IconButton` and `InspectorCard`, this leaf has no scoped
-  `<style>`: the pill is painted by `styles/fabricate.css` under `.fabricate-manager`,
-  and a scoped block here would be a second source of truth for the same control.
-  It is a MANAGER primitive; dropped into `.fabricate-app` it renders as an unstyled
-  `<label>`. That consequence is not reached today — the player apps' four search
-  inputs are hand-rolled and write none of these classes.
+  `<style>`: the pill is painted by `styles/fabricate.css`, and a scoped block here would
+  be a second source of truth for the same control.
+
+  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
+  contradicted the family-root section above it (corrected in issue 1520). Those rules are
+  written `.fabricate-search.manager-search…`, which is what the section says and what the
+  sheet contains, so the pill paints wherever it is rendered. The two that genuinely cannot
+  travel are the `@container fabricate-manager` pair named a few paragraphs up, and they are
+  the whole of the residue.
+
+  The clause's second half is retired rather than re-dated: the Interactable browser renders
+  this field inside a `.fabricate-app` frame, and its frames show a painted pill with its
+  leading glyph.
 
   It is an IMPORT-FREE LEAF: props only, no `foundryBridge`, no util imports. Callers
   pass ALREADY-LOCALIZED `placeholder` and `ariaLabel`.

@@ -11540,9 +11540,12 @@ async function main() {
           if (rowCount < 3) {
             throw new Error(`Manage list shows only ${rowCount} row(s); expected at least 3 marker-status variants.`);
           }
-          // The danger "missing" badge must be present so the .is-missing branch is exercised.
-          if (await page.locator('.fabricate-interactables-manager .fab-im-chip-marker.is-missing').count() === 0) {
-            throw new Error('Manage list is missing the .is-missing danger badge variant.');
+          // The danger "missing" badge must be present so the danger-toned branch is exercised.
+          // The badge is a shared `<Chip>` now (issue 1520), so the state is read off the row's
+          // own `data-…-chip-marker` VALUE rather than off an `is-missing` class the chip does
+          // not emit — an attribute that cannot drift from the status it reports.
+          if (await page.locator('.fabricate-interactables-manager [data-interactable-manager-chip-marker="missing"]').count() === 0) {
+            throw new Error('Manage list is missing the danger marker badge variant.');
           }
           await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
           await screenshot(page, 'interactables-manager-list');
@@ -11551,58 +11554,80 @@ async function main() {
           // POPULATED Source dropdown (proving the Tool enumeration fix) and the
           // Promote/Cancel action buttons in frame. Select Tool, then assert the
           // Source <select> has at least one real (non-placeholder) option.
-          const promoteToggle = page.locator('.fabricate-interactables-manager .fab-im-promote-toggle').first();
+          const promoteToggle = page.locator('.fabricate-interactables-manager [data-interactable-manager-promote-toggle]').first();
           await promoteToggle.waitFor({ state: 'visible', timeout: 10_000 });
           await promoteToggle.click();
-          const promotePanel = page.locator('.fabricate-interactables-manager .fab-im-promote').first();
+          const promotePanel = page.locator('.fabricate-interactables-manager [data-interactable-manager-promote]').first();
           await promotePanel.waitFor({ state: 'visible', timeout: 10_000 });
-          // Select the crafting system that actually owns the seeded Tool. The panel
-          // defaults to the FIRST system, and a world can hold multiple systems
-          // (even same-named ones), so pin the system explicitly to make the Tool
-          // enumeration deterministic regardless of system ordering. The system
-          // <select> is the one whose options include the seeded systemId.
-          await page.evaluate((systemId) => {
-            const selects = Array.from(document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select'));
-            const sysSelect = selects.find((sel) => Array.from(sel.options).some((o) => o.value === systemId));
-            if (sysSelect && sysSelect.value !== systemId) {
-              sysSelect.value = systemId;
-              sysSelect.dispatchEvent(new Event('change', { bubbles: true }));
-              sysSelect.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          }, craftingSetup.systemId);
-          // Choose the Tool source type so the Source dropdown lists the system's tools.
-          await page.locator('.fabricate-interactables-manager input[name="fab-im-source-type"][value="tool"]').first()
-            .check({ force: true });
+
+          // ── THREE REAL INTERACTIONS, NOT THREE `.value` WRITES (issue 1520) ─────────────
+          //
+          // The three blocks this replaces were `page.evaluate` bodies that did
+          // `querySelectorAll('… .fab-im-promote select')` and then set `.value` on whatever
+          // they found. The promote panel's three pickers are `components/Select.svelte` now —
+          // a `<button>` trigger over a portalled listbox — so there is no `<select>` in this
+          // window at all, and every one of those blocks would have selected ZERO nodes and
+          // returned quietly. A substituted string would have left a GREEN walk that operated
+          // nothing: the first would have skipped the system pin, the second would have counted
+          // zero options and thrown a misleading "No-sources regression" error, and the third
+          // would have printed an empty diagnostic for it.
+          //
+          // Each is therefore driven the way a GM drives it — open the panel, click the row —
+          // and each FAILS LOUDLY when its target is absent, because a Playwright click on a
+          // locator matching nothing times out rather than resolving.
+          //
+          // The panel is portalled OUT of the trigger's subtree onto the window's frame, so its
+          // rows are addressed through `.fabricate-select-popover`, the primitive's own panel
+          // class, rather than through a selector inherited from the promote card.
+
+          // Pin the crafting system that actually owns the seeded Tool. The panel defaults to
+          // the FIRST source-bearing system and a world can hold several (even same-named ones),
+          // so choosing it explicitly is what makes the Tool enumeration below deterministic.
+          await page.locator('.fabricate-interactables-manager [data-interactable-manager-system]').first().click();
+          await page.locator(`.fabricate-select-popover [data-popover-option="${craftingSetup.systemId}"]`)
+            .first().click({ timeout: 10_000 });
+
+          // Choose the Tool source type so the Source picker lists the system's tools. The
+          // three fieldsets are `SegmentedControl` tracks now, whose radio is visually hidden
+          // behind its `<label>` segment — so the SEGMENT is clicked, which is the element a
+          // pointer actually hits, instead of force-checking an input no user can reach.
+          await page.locator('.fabricate-interactables-manager [data-interactable-manager-source-type-option="tool"]')
+            .first().click();
           await page.waitForTimeout(150); // let the $derived source list recompute
-          // Assert the Source <select> now carries the seeded Tool (the "No sources"
-          // placeholder is the failure mode the FIX 1 enumeration repair prevents).
-          const sourceOptionCount = await page.evaluate(() => {
-            const selects = Array.from(document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select'));
-            for (const sel of selects) {
-              const opts = Array.from(sel.options).map((o) => o.textContent.trim());
-              if (opts.some((t) => /Herbalist Sickle/i.test(t))) {
-                return opts.filter((t) => t && !/^No sources/i.test(t)).length;
-              }
-            }
-            return 0;
-          });
-          if (sourceOptionCount < 1) {
+
+          // Assert the Source picker now carries the seeded Tool (the "No sources in this
+          // system." row is the failure mode the FIX 1 enumeration repair prevents), then CHOOSE
+          // it — which also arms `canPromote` for the confirm button's enabled state below.
+          await page.locator('.fabricate-interactables-manager [data-interactable-manager-source]').first().click();
+          const sourceRows = page.locator('.fabricate-select-popover [data-popover-option]');
+          await sourceRows.first().waitFor({ state: 'visible', timeout: 10_000 });
+          const sourceOptionLabels = (await sourceRows.allInnerTexts())
+            .map((t) => t.replace(/\s+/g, ' ').trim())
+            .filter((t) => t && !/^No sources/i.test(t));
+          const seededToolRow = page.locator('.fabricate-select-popover [data-popover-option]')
+            .filter({ hasText: /Herbalist Sickle/i });
+          if (sourceOptionLabels.length < 1 || (await seededToolRow.count()) === 0) {
             const diag = await page.evaluate(() => {
-              const out = { selects: [], liveSystems: [] };
+              const out = { panelRows: [], triggers: [], liveSystems: [] };
               try {
                 out.liveSystems = game.fabricate.getCraftingSystemManager().getSystems()
                   .map((s) => ({ id: s.id, name: s.name, toolCount: (s.tools || []).length }));
               } catch (e) { out.liveSystemsErr = e.message; }
-              document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select').forEach((sel, i) => {
-                out.selects.push({ i, value: sel.value, opts: Array.from(sel.options).map((o) => `${o.value}=${o.textContent.trim()}`) });
+              document.querySelectorAll('.fabricate-select-popover [data-popover-option]').forEach((row, i) => {
+                out.panelRows.push({ i, value: row.getAttribute('data-popover-option'), text: row.textContent.replace(/\s+/g, ' ').trim() });
+              });
+              document.querySelectorAll('.fabricate-interactables-manager .fabricate-select-trigger').forEach((btn, i) => {
+                out.triggers.push({ i, text: btn.textContent.replace(/\s+/g, ' ').trim() });
               });
               return out;
             });
             process.stderr.write('PROMOTE DIAG: ' + JSON.stringify(diag) + '\n');
-            throw new Error('Promote Source dropdown is empty for Tool — the No-sources regression is not fixed.');
+            throw new Error('Promote Source picker does not list the seeded Tool — the No-sources regression is not fixed.');
           }
+          await seededToolRow.first().click();
+
           // Ensure the Promote/Cancel actions are in frame (not clipped below the fold).
-          await page.locator('.fabricate-interactables-manager .fab-im-promote-confirm').first()
+          await page.locator('.fabricate-interactables-manager [data-interactable-manager-promote-confirm]').first()
             .scrollIntoViewIfNeeded();
           await page.locator('.fabricate-interactables-manager .fab-im-promote-actions').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
@@ -12549,9 +12574,12 @@ async function main() {
         }
         // Drive the window below the gathering grid's stacking breakpoint. This
         // simulates the small-screen case from #330 where Foundry constrains the
-        // window to a viewport narrower than the CSS min-width floor: the inline
-        // `min-width: 0` overrides the floor (.fabricate-app min-width: 1024px)
-        // for this capture so the app can shrink past the 900px grid breakpoint,
+        // window to a viewport narrower than the CSS floor. That floor is on
+        // `.fabricate.fabricate-app-window`, which only the player window emits
+        // (issue 1520 split it off the shared `.fabricate-app` area class so the
+        // three canvas windows could adopt that class without being inflated to
+        // 1024px). The inline `min-width: 0` set below beats the floor whichever
+        // class carries it, so this capture can shrink past the 900px breakpoint,
         // at which point the grid's @container query collapses it to one column.
         const stackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
