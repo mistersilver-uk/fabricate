@@ -263,11 +263,21 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 27;
  * key is a separate element on a separate screen, and it is issue 1510's to convert. The pair the
  * paragraph above calls duplicated is now asked two different ways, deliberately and briefly,
  * which is the cost the convergence argument accepted rather than a defect this table hides.
+ *
+ * 96 -> 88 with issue 1520's fourth phase, and the row leaves entirely:
+ * `apps/InteractableConfigRoot.svelte | 8` is DELETED because all eight elements now render
+ * `components/Select.svelte`. The file count falls 36 -> 35 with it. Paid down by conversion,
+ * exactly as issue 1504's eight were - and it is the first payment made from OUTSIDE the manager
+ * and the player app, which is what the interactables windows joining the design system means.
+ *
+ * The two remaining interactables rows - `InteractableBrowserRoot.svelte | 1` and
+ * `interactables/InteractablesManagerRoot.svelte | 3` - STAY, and stay owed: they are the same
+ * change's fifth phase, in files this phase does not open.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 96;
+export const KNOWN_NATIVE_SELECT_TOTAL = 88;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.
@@ -349,9 +359,17 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * border-radius | 10px` falls 13 → 12, because the deleted `[data-failure-salvage-note]`
  * override carried one of those thirteen. The key count falls 138 → 137 with the first.
  *
+ * 308 -> 307 with issue 1520's fourth phase, and it is a SNAP rather than a deletion:
+ * `apps/InteractableConfigRoot.svelte | border-radius | 3px | 1` is the reference-id pill in the
+ * panel's facts row, and 3px is off the ladder at every band. It takes the 6px rung the ladder
+ * publishes for a chip at or below 24px, so the corner moves by three pixels and the row leaves.
+ * The key count falls with it. The panel's other two corners were the type chip's 999px and the
+ * unconfigured section's 6px, both compliant and neither on this table; the chip's went to
+ * `Chip` and the section's went with the box the `<Notice>` replaced.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 308;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 307;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -531,9 +549,19 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * row. The two hand-rolled `manager-status-toggle` buttons in `CraftingSystemManagerRoot.svelte`
  * are `<span>`s and a `<button>` inside the root's own rows, and their file's row is unmoved.
  *
+ * 272 -> 253 with issue 1520's fourth phase, and it is the largest single payment this table has
+ * taken: `apps/InteractableConfigRoot.svelte | 19` leaves whole. Nineteen is also the file's RAW
+ * button count, so nothing is left behind - sixteen became `<ManagerButton>`, three became
+ * `<StatusToggle>`, and both primitives write `data-keyboard-focus="true"` themselves.
+ *
+ * It is the same INVISIBILITY this table records above, read the other way. The scanner counts
+ * SOURCE elements, so a file that renders nineteen shared buttons scores zero while a file that
+ * writes one raw `<button>` scores one. That is why this row could only ever be paid by
+ * conversion, and why the payment is nineteen at once rather than nineteen attributes.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 272;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 253;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

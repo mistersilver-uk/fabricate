@@ -30,6 +30,12 @@
   import { localize } from '../util/foundryBridge.js';
   import { describeVisualStatus, describeActivationGate } from '../../interactableConfigView.js';
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
+  import Chip from '../components/Chip.svelte';
+  import Field from '../components/Field.svelte';
+  import ManagerButton from '../components/ManagerButton.svelte';
+  import Notice from '../components/Notice.svelte';
+  import Select from '../components/Select.svelte';
+  import StatusToggle from '../components/StatusToggle.svelte';
   import Stepper from '../components/Stepper.svelte';
   import { stepperLabels } from '../components/stepperLabels.js';
 
@@ -106,6 +112,58 @@
   });
 
   const canApplyIdentity = $derived(Boolean(selSystemId) && Boolean(selReferenceId));
+
+  // THE SHARED SELECT'S OPTION VOCABULARY (issue 1520). `Select` takes an `options` array
+  // rather than `<option>` children, so each list is built here from exactly the source the
+  // native `<select>` iterated. The leading empty-value row is KEPT rather than expressed as
+  // the component's `placeholder`, because it is a real selectable row today: a GM clears a
+  // chosen system, source or environment by picking it, and a placeholder is only ever shown.
+  const typeOptions = $derived([
+    { value: 'tool', label: text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station') },
+    {
+      value: 'gatheringTask',
+      label: text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task'),
+    },
+  ]);
+
+  const systemSelectOptions = $derived([
+    {
+      value: '',
+      label: text(
+        'FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem',
+        'Select a crafting system…'
+      ),
+    },
+    ...systemOptions.map((option) => ({
+      value: option.id,
+      label: systemDisplayLabel(option, systemLabels),
+    })),
+  ]);
+
+  const sourceSelectOptions = $derived([
+    {
+      value: '',
+      label:
+        selType === 'tool'
+          ? text('FABRICATE.Canvas.Interactable.Config.Identity.SelectTool', 'Select a tool…')
+          : text(
+              'FABRICATE.Canvas.Interactable.Config.Identity.SelectTask',
+              'Select a gathering task…'
+            ),
+    },
+    ...sourceOptions.map((option) => ({ value: option.id, label: option.name })),
+  ]);
+
+  const environmentSelectOptions = $derived([
+    {
+      value: '',
+      label: text(
+        'FABRICATE.Canvas.Interactable.Config.Identity.SelectEnvironment',
+        'No environment'
+      ),
+    },
+    ...environmentOptions.map((option) => ({ value: option.id, label: option.name })),
+  ]);
 
   function onSelectType(next) {
     selType = next;
@@ -188,6 +246,26 @@
     refresh();
   }
 
+  const missingPolicyOptions = $derived([
+    {
+      value: 'ignore',
+      label: text('FABRICATE.Canvas.Interactable.Config.MissingIgnore', 'Ignore'),
+    },
+    { value: 'warn', label: text('FABRICATE.Canvas.Interactable.Config.MissingWarn', 'Warn') },
+    {
+      value: 'recreate',
+      label: text('FABRICATE.Canvas.Interactable.Config.MissingRecreate', 'Recreate'),
+    },
+  ]);
+
+  const audienceOptions = $derived([
+    {
+      value: 'players',
+      label: text('FABRICATE.Canvas.Interactable.Config.AudiencePlayers', 'Players'),
+    },
+    { value: 'all', label: text('FABRICATE.Canvas.Interactable.Config.AudienceAll', 'Everyone') },
+  ]);
+
   // --- Interactable-scoped resource node (issue 302) --------------------------
   const isGatheringTask = $derived(view?.interactableType === 'gatheringTask');
   const taskNodeLink = $derived(view?.taskNodeLink ?? 'linked');
@@ -195,6 +273,29 @@
   const scopedNode = $derived(view?.node ?? null);
   const respawnPolicy = $derived(scopedNode?.respawn?.policy ?? 'manual');
   const nodeIsNonRegenerating = $derived(respawnPolicy === 'nonRegenerating');
+
+  const depleteOptions = $derived([
+    {
+      value: 'onStart',
+      label: text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start'),
+    },
+    {
+      value: 'onSuccess',
+      label: text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success'),
+    },
+  ]);
+
+  const respawnOptions = $derived([
+    { value: 'manual', label: text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual') },
+    {
+      value: 'overTime',
+      label: text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time'),
+    },
+    {
+      value: 'nonRegenerating',
+      label: text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'Does not regenerate'),
+    },
+  ]);
 
   async function setTaskNodeLink(link) {
     await services?.setTaskNodeLink?.(link);
@@ -242,169 +343,115 @@
         {view.name ||
           text('FABRICATE.Canvas.Interactable.Config.Untitled', 'Untitled interactable')}
       </h2>
-      <span class="fab-ic-type-chip">
-        {view.interactableType === 'tool'
+      <Chip tone="secondary"
+        >{view.interactableType === 'tool'
           ? text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')
-          : text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}
-      </span>
+          : text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}</Chip
+      >
     </header>
 
     <!-- Identity / source (issue 342). Prominent "Needs configuration" state while
          unconfigured; collapsed re-target affordance once configured. -->
-    <section
-      class="fab-ic-section fab-ic-identity"
-      class:is-unconfigured={unconfigured}
-      data-interactable-identity-section
-    >
+    <section class="fab-ic-section fab-ic-identity" data-interactable-identity-section>
       {#if unconfigured}
-        <div class="fab-ic-identity-banner" data-interactable-needs-config>
-          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-          <div>
-            <strong
-              >{text(
-                'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle',
-                'Needs configuration'
-              )}</strong
-            >
-            <p class="fab-ic-fact-muted fab-ic-identity-hint">
-              {text(
-                'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint',
-                'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.'
-              )}
-            </p>
-          </div>
-        </div>
+        <!-- THE HOOK RIDES A DECLARED PROP, NOT A SPREAD. `Notice` takes no `class`, no
+             `style` and no rest spread, so `dataAttr` is the only route for
+             `data-interactable-needs-config` - which the Foundry smoke and the View Lab both
+             locate, and which this root's source contract asserts is present. It renders as
+             `data-interactable-needs-config=""` rather than bare; every reader of it is a
+             presence selector.
+
+             THE SECTION'S OWN ACCENT BOX LEFT WITH THE BANNER rather than being retargeted.
+             `is-unconfigured` sat on the SECTION, not on the bar, so keeping it would have
+             drawn a tinted, bordered box around a tinted, bordered notice - one state painted
+             twice, in two different colour families. The `warning` tone is where that
+             statement lives now. -->
+        <Notice
+          tone="warning"
+          title={text(
+            'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle',
+            'Needs configuration'
+          )}
+          detail={text(
+            'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint',
+            'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.'
+          )}
+          dataAttr="data-interactable-needs-config"
+        />
       {:else}
         <div class="fab-ic-identity-head">
           <h3 class="fab-ic-section-title">
             {text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}
           </h3>
-          <button
-            type="button"
-            class="fab-ic-btn fab-ic-identity-toggle"
+          <ManagerButton
             aria-expanded={identityOpen}
             onclick={() => (identityOpen = !identityOpen)}
-            data-interactable-identity-toggle
+            data-interactable-identity-toggle=""
           >
             {identityOpen
               ? text('FABRICATE.Canvas.Interactable.Config.Identity.Hide', 'Hide')
               : text('FABRICATE.Canvas.Interactable.Config.Identity.Retarget', 'Change source')}
-          </button>
+          </ManagerButton>
         </div>
       {/if}
 
       {#if showIdentityBody}
         <div class="fab-ic-identity-body" data-interactable-identity-body>
-          <label class="fab-ic-field">
-            <span class="fab-ic-field-label"
-              >{text('FABRICATE.Canvas.Interactable.Config.Identity.TypeLabel', 'Type')}</span
-            >
-            <select
-              value={selType}
-              onchange={(e) => onSelectType(e.currentTarget.value)}
-              data-interactable-identity-type
-            >
-              <option value="tool"
-                >{text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')}</option
-              >
-              <option value="gatheringTask"
-                >{text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}</option
-              >
-            </select>
-          </label>
+          <Select
+            label={text('FABRICATE.Canvas.Interactable.Config.Identity.TypeLabel', 'Type')}
+            value={selType}
+            options={typeOptions}
+            onChange={(next) => onSelectType(next)}
+            triggerData={{ 'data-interactable-identity-type': '' }}
+          />
 
-          <label class="fab-ic-field">
-            <span class="fab-ic-field-label"
-              >{text(
-                'FABRICATE.Canvas.Interactable.Config.Identity.SystemLabel',
-                'Crafting system'
-              )}</span
-            >
-            <select
-              value={selSystemId}
-              onchange={(e) => onSelectSystem(e.currentTarget.value)}
-              data-interactable-identity-system
-            >
-              <option value=""
-                >{text(
-                  'FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem',
-                  'Select a crafting system…'
-                )}</option
-              >
-              {#each systemOptions as option (option.id)}
-                <option value={option.id}>{systemDisplayLabel(option, systemLabels)}</option>
-              {/each}
-            </select>
-          </label>
+          <Select
+            label={text(
+              'FABRICATE.Canvas.Interactable.Config.Identity.SystemLabel',
+              'Crafting system'
+            )}
+            value={selSystemId}
+            options={systemSelectOptions}
+            onChange={(next) => onSelectSystem(next)}
+            triggerData={{ 'data-interactable-identity-system': '' }}
+          />
 
-          <label class="fab-ic-field">
-            <span class="fab-ic-field-label">
-              {selType === 'tool'
-                ? text('FABRICATE.Canvas.Interactable.Config.Identity.ToolLabel', 'Tool')
-                : text('FABRICATE.Canvas.Interactable.Config.Identity.TaskLabel', 'Gathering task')}
-            </span>
-            <select
-              value={selReferenceId}
-              onchange={(e) => (selReferenceId = e.currentTarget.value)}
-              disabled={!selSystemId}
-              data-interactable-identity-source
-            >
-              <option value=""
-                >{selType === 'tool'
-                  ? text(
-                      'FABRICATE.Canvas.Interactable.Config.Identity.SelectTool',
-                      'Select a tool…'
-                    )
-                  : text(
-                      'FABRICATE.Canvas.Interactable.Config.Identity.SelectTask',
-                      'Select a gathering task…'
-                    )}</option
-              >
-              {#each sourceOptions as option (option.id)}
-                <option value={option.id}>{option.name}</option>
-              {/each}
-            </select>
-          </label>
+          <Select
+            label={selType === 'tool'
+              ? text('FABRICATE.Canvas.Interactable.Config.Identity.ToolLabel', 'Tool')
+              : text('FABRICATE.Canvas.Interactable.Config.Identity.TaskLabel', 'Gathering task')}
+            value={selReferenceId}
+            options={sourceSelectOptions}
+            disabled={!selSystemId}
+            onChange={(next) => (selReferenceId = next)}
+            triggerData={{ 'data-interactable-identity-source': '' }}
+          />
 
           {#if selType === 'gatheringTask'}
-            <label class="fab-ic-field">
-              <span class="fab-ic-field-label"
-                >{text(
-                  'FABRICATE.Canvas.Interactable.Config.Identity.EnvironmentLabel',
-                  'Environment (optional)'
-                )}</span
-              >
-              <select
-                value={selEnvironmentId}
-                onchange={(e) => (selEnvironmentId = e.currentTarget.value)}
-                data-interactable-identity-environment
-              >
-                <option value=""
-                  >{text(
-                    'FABRICATE.Canvas.Interactable.Config.Identity.SelectEnvironment',
-                    'No environment'
-                  )}</option
-                >
-                {#each environmentOptions as option (option.id)}
-                  <option value={option.id}>{option.name}</option>
-                {/each}
-              </select>
-            </label>
+            <Select
+              label={text(
+                'FABRICATE.Canvas.Interactable.Config.Identity.EnvironmentLabel',
+                'Environment (optional)'
+              )}
+              value={selEnvironmentId}
+              options={environmentSelectOptions}
+              onChange={(next) => (selEnvironmentId = next)}
+              triggerData={{ 'data-interactable-identity-environment': '' }}
+            />
           {/if}
 
           <div class="fab-ic-actions fab-ic-actions-inline">
-            <button
-              type="button"
-              class="fab-ic-btn fab-ic-btn-primary"
+            <ManagerButton
+              role="primary"
               disabled={!canApplyIdentity}
               onclick={applyIdentity}
-              data-interactable-identity-apply
+              data-interactable-identity-apply=""
             >
               <i class="fas fa-check" aria-hidden="true"></i>
               <span
                 >{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span
               >
-            </button>
+            </ManagerButton>
           </div>
         </div>
       {/if}
@@ -412,10 +459,8 @@
 
     <!-- Editable identity -->
     <section class="fab-ic-section">
-      <label class="fab-ic-field">
-        <span class="fab-ic-field-label"
-          >{text('FABRICATE.Canvas.Interactable.Config.NameLabel', 'Name')}</span
-        >
+      <Field as="label">
+        <span>{text('FABRICATE.Canvas.Interactable.Config.NameLabel', 'Name')}</span>
         <input
           type="text"
           bind:value={nameDraft}
@@ -423,11 +468,9 @@
           onblur={commitName}
           aria-label={text('FABRICATE.Canvas.Interactable.Config.NameLabel', 'Name')}
         />
-      </label>
-      <label class="fab-ic-field">
-        <span class="fab-ic-field-label"
-          >{text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}</span
-        >
+      </Field>
+      <Field as="label">
+        <span>{text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}</span>
         <input
           type="text"
           bind:value={promptDraft}
@@ -439,7 +482,7 @@
           )}
           aria-label={text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}
         />
-      </label>
+      </Field>
     </section>
 
     <!-- Read-only facts: an inline row — Linked task | Environment | Status. The
@@ -497,32 +540,34 @@
         <h3 class="fab-ic-section-title">
           {text('FABRICATE.Canvas.Interactable.Config.Node.Heading', 'Resource node')}
         </h3>
-        <div class="fab-ic-field">
-          <span class="fab-ic-field-label"
+        <Field as="div">
+          <span
             >{text('FABRICATE.Canvas.Interactable.Config.Node.LinkLabel', 'Task node link')}</span
           >
-          <button
-            type="button"
-            class="fab-ic-btn fab-ic-btn-toggle"
-            class:is-active={!isUnlinked}
-            aria-pressed={!isUnlinked}
+          <!-- THE SWITCH REPLACES THE LINK GLYPH RATHER THAN CARRYING IT. The button this
+               converts drew `fa-link` / `fa-link-slash` because a pressed text button cannot
+               show its own position; a track and a knob can, and `StatusToggle` has no icon
+               slot for a second statement of the same thing.
+
+               `on` is LINKED, so `aria-pressed` keeps the polarity the Foundry smoke asserts
+               (`true` on open, `false` after the toggle) and the View Lab's configured case
+               selects on. The reading beside the switch is the state, which is the shipped
+               `label` idiom. -->
+          <StatusToggle
+            on={!isUnlinked}
+            label={isUnlinked
+              ? text(
+                  'FABRICATE.Canvas.Interactable.Config.Node.LinkUnlinked',
+                  'Independent (this interactable only)'
+                )
+              : text(
+                  'FABRICATE.Canvas.Interactable.Config.Node.LinkLinked',
+                  'Linked to gathering task'
+                )}
             onclick={() => setTaskNodeLink(isUnlinked ? 'linked' : 'unlinked')}
-            data-interactable-node-link
-          >
-            <i class="fas {isUnlinked ? 'fa-link-slash' : 'fa-link'}" aria-hidden="true"></i>
-            <span
-              >{isUnlinked
-                ? text(
-                    'FABRICATE.Canvas.Interactable.Config.Node.LinkUnlinked',
-                    'Independent (this interactable only)'
-                  )
-                : text(
-                    'FABRICATE.Canvas.Interactable.Config.Node.LinkLinked',
-                    'Linked to gathering task'
-                  )}</span
-            >
-          </button>
-        </div>
+            data-interactable-node-link=""
+          />
+        </Field>
 
         {#if !isUnlinked}
           <p class="fab-ic-fact-muted fab-ic-node-hint">
@@ -568,14 +613,12 @@
                The commit moment also moves from `change` to `input`, matching every other
                migrated field; the persisted value is identical.
 
-               `fill` needs a slot to fill, and `.fab-ic-field` is a `flex-direction:
-               column` box with no declared width, so the slot is supplied by
+               `fill` needs a slot to fill, and the `<Field>` that hosts it is a
+               `flex-direction: column` box with no declared width, so the slot is supplied by
                `.fab-ic-node-count-field`'s `max-width` below. See the note there for why
                dropping `fill` would not have been the fix. -->
-          <div class="fab-ic-field fab-ic-node-count-field">
-            <span class="fab-ic-field-label"
-              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span
-            >
+          <Field as="div" class="fab-ic-node-count-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
             <Stepper
               value={scopedNode.max}
               min={0}
@@ -588,52 +631,23 @@
               inputProps={{ 'data-interactable-node-count': '' }}
               onChange={(next) => setNodeCount(next)}
             />
-          </div>
+          </Field>
 
-          <label class="fab-ic-field">
-            <span class="fab-ic-field-label"
-              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span
-            >
-            <select
-              value={scopedNode.depletionTiming}
-              onchange={(e) => setNodeDeplete(e.currentTarget.value)}
-              data-interactable-node-deplete
-            >
-              <option value="onStart"
-                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option
-              >
-              <option value="onSuccess"
-                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option
-              >
-            </select>
-          </label>
+          <Select
+            label={text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}
+            value={scopedNode.depletionTiming}
+            options={depleteOptions}
+            onChange={(next) => setNodeDeplete(next)}
+            triggerData={{ 'data-interactable-node-deplete': '' }}
+          />
 
-          <label class="fab-ic-field">
-            <span class="fab-ic-field-label"
-              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span
-            >
-            <select
-              value={respawnPolicy}
-              onchange={(e) => setNodeRespawnPolicy(e.currentTarget.value)}
-              data-interactable-node-respawn
-            >
-              <option value="manual"
-                >{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option
-              >
-              <option value="overTime"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RespawnOverTime',
-                  'Over world time'
-                )}</option
-              >
-              <option value="nonRegenerating"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RespawnNone',
-                  'Does not regenerate'
-                )}</option
-              >
-            </select>
-          </label>
+          <Select
+            label={text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}
+            value={respawnPolicy}
+            options={respawnOptions}
+            onChange={(next) => setNodeRespawnPolicy(next)}
+            triggerData={{ 'data-interactable-node-respawn': '' }}
+          />
 
           {#if nodeIsNonRegenerating}
             <!-- A nonRegenerating pool is a permanent reserve: no Restock action,
@@ -647,15 +661,10 @@
             </p>
           {:else}
             <div class="fab-ic-actions fab-ic-actions-inline">
-              <button
-                type="button"
-                class="fab-ic-btn"
-                onclick={restockFull}
-                data-interactable-node-restock
-              >
+              <ManagerButton onclick={restockFull} data-interactable-node-restock="">
                 <i class="fas fa-arrows-rotate" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Restock', 'Restock')}</span>
-              </button>
+              </ManagerButton>
             </div>
           {/if}
         {/if}
@@ -682,55 +691,31 @@
 
       {#if visualStatus.severity === 'missing'}
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.createReplacementTile?.())}
-          >
+          <ManagerButton onclick={() => run(() => services?.createReplacementTile?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RecreateTile', 'Recreate tile')}
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.createDrawingMarker?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
               'Create drawing marker'
             )}
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.relinkSelected?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.removeVisualMarker?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.ClearVisualLink', 'Clear visual link')}
-          </button>
+          </ManagerButton>
         </div>
       {:else if visualStatus.severity === 'none'}
         <!-- Region-only (no marker): offer an upgrade to a linked Tile or Drawing. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.createMarker?.())}
-          >
+          <ManagerButton onclick={() => run(() => services?.createMarker?.())}>
             <i class="fas fa-map-pin" aria-hidden="true"></i>
             <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span
             >
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.createDrawingMarker?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
             <i class="fas fa-draw-polygon" aria-hidden="true"></i>
             <span
               >{text(
@@ -738,65 +723,42 @@
                 'Create drawing marker'
               )}</span
             >
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.relinkSelected?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </button>
+          </ManagerButton>
         </div>
       {:else if visualStatus.severity === 'ok'}
         <!-- Resolved (healthy) marker: still offer relink-to-a-different-doc and
              remove-from-panel, mirroring the missing-state affordances. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.relinkSelected?.())}
-          >
+          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </button>
-          <button
-            type="button"
-            class="fab-ic-btn"
-            onclick={() => run(() => services?.removeVisualMarker?.())}
-          >
+          </ManagerButton>
+          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker',
               'Remove visual marker'
             )}
-          </button>
+          </ManagerButton>
         </div>
       {/if}
 
-      <label class="fab-ic-field">
-        <span class="fab-ic-field-label"
-          >{text(
-            'FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel',
-            'If the marker is missing'
-          )}</span
-        >
-        <select
-          value={view.linkedVisual.missingPolicy}
-          onchange={(e) => setMissingPolicy(e.currentTarget.value)}
-          aria-label={text(
-            'FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel',
-            'If the marker is missing'
-          )}
-        >
-          <option value="ignore"
-            >{text('FABRICATE.Canvas.Interactable.Config.MissingIgnore', 'Ignore')}</option
-          >
-          <option value="warn"
-            >{text('FABRICATE.Canvas.Interactable.Config.MissingWarn', 'Warn')}</option
-          >
-          <option value="recreate"
-            >{text('FABRICATE.Canvas.Interactable.Config.MissingRecreate', 'Recreate')}</option
-          >
-        </select>
-      </label>
+      <!-- NO `ariaLabel` BESIDE THE `label`. The native select carried both a caption span
+           and an `aria-label` repeating it; the labelled `<Select>` mints an id for its own
+           caption and points the trigger at it with `aria-labelledby`, which WINS over an
+           `aria-label` — so a second copy would be dead text free to drift from the caption
+           beside it. -->
+      <Select
+        label={text(
+          'FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel',
+          'If the marker is missing'
+        )}
+        value={view.linkedVisual.missingPolicy}
+        options={missingPolicyOptions}
+        onChange={(next) => setMissingPolicy(next)}
+        triggerData={{ 'data-interactable-missing-policy': '' }}
+      />
     </section>
 
     <!-- Presentation toggles -->
@@ -811,84 +773,86 @@
           >{text('FABRICATE.Canvas.Interactable.Config.HiddenLabel', 'Hidden from players')}</span
         >
       </label>
-      <label class="fab-ic-field">
-        <span class="fab-ic-field-label"
-          >{text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}</span
-        >
-        <select
-          value={view.activation.audience}
-          onchange={(e) => setAudience(e.currentTarget.value)}
-          aria-label={text(
-            'FABRICATE.Canvas.Interactable.Config.AudienceLabel',
-            'Who can activate'
-          )}
-        >
-          <option value="players"
-            >{text('FABRICATE.Canvas.Interactable.Config.AudiencePlayers', 'Players')}</option
-          >
-          <option value="all"
-            >{text('FABRICATE.Canvas.Interactable.Config.AudienceAll', 'Everyone')}</option
-          >
-        </select>
-      </label>
+      <Select
+        label={text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}
+        value={view.activation.audience}
+        options={audienceOptions}
+        onChange={(next) => setAudience(next)}
+        triggerData={{ 'data-interactable-audience': '' }}
+      />
     </section>
 
     <!-- Primary action row -->
     <section class="fab-ic-section fab-ic-actions">
-      <button
-        type="button"
-        class="fab-ic-btn fab-ic-btn-primary"
-        onclick={() => run(() => services?.testAsPlayer?.())}
-      >
+      <ManagerButton role="primary" onclick={() => run(() => services?.testAsPlayer?.())}>
         <i class="fas fa-play" aria-hidden="true"></i>
         <span>{text('FABRICATE.Canvas.Interactable.Config.TestAsPlayer', 'Test as player')}</span>
-      </button>
-      <button type="button" class="fab-ic-btn" onclick={() => services?.jumpToRegion?.()}>
+      </ManagerButton>
+      <ManagerButton onclick={() => services?.jumpToRegion?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToRegion', 'Jump to region')}
-      </button>
-      <button type="button" class="fab-ic-btn" onclick={() => services?.jumpToVisual?.()}>
+      </ManagerButton>
+      <ManagerButton onclick={() => services?.jumpToVisual?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToVisual', 'Jump to marker')}
-      </button>
+      </ManagerButton>
     </section>
 
-    <!-- State toggle row. The Disable / Lock buttons carry an `is-active`
-         (and aria-pressed) treatment when the interactable is currently
-         disabled / locked so the GM sees the live state at a glance. -->
+    <!-- State toggle row. Disabled and Locked are STATES of the interactable, so each is a
+         switch whose position IS the state: `on` reads disabled / locked, which is the polarity
+         the pressed `is-active` button before it carried and the polarity `aria-pressed` still
+         announces.
+
+         THE READING IS THE SHIPPED ACTION VERB, UNCHANGED, AND IT IS NOT WHAT A SWITCH WANTS.
+         `StatusToggle`'s `label` is documented as the READING beside the switch - a state, not
+         a verb - and these two flip between "Disable"/"Enable" and "Lock"/"Unlock" because a
+         button had to say what pressing it would do. So the switch reads ON-and-"Enable" when
+         the interactable is disabled, which states the opposite of its own knob.
+
+         THAT PAIRING IS PRE-EXISTING RATHER THAN INTRODUCED HERE: the button this converts
+         already announced "Enable, toggle button, PRESSED" in exactly that state. Fixing it
+         needs state readings ("Disabled", "Locked") that `lang/en.json` does not carry, and
+         the alternative - a static axis name - orphans
+         `FABRICATE.Canvas.Interactable.Config.Enable` and `.Unlock`, which
+         `tests/lang-keys-no-orphans.test.js` refuses. The copy is therefore carried across
+         byte-for-byte and the defect is recorded for the change that owns the strings. -->
     <section class="fab-ic-section fab-ic-actions">
-      <button
-        type="button"
-        class="fab-ic-btn fab-ic-btn-toggle"
-        class:is-active={view.state.enabled === false}
-        aria-pressed={view.state.enabled === false}
-        onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
-      >
-        {view.state.enabled
+      <StatusToggle
+        on={view.state.enabled === false}
+        label={view.state.enabled
           ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
           : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
-      </button>
-      <button
-        type="button"
-        class="fab-ic-btn fab-ic-btn-toggle"
-        class:is-active={view.state.locked === true}
-        aria-pressed={view.state.locked === true}
-        onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
-      >
-        {view.state.locked
+        onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
+      />
+      <StatusToggle
+        on={view.state.locked === true}
+        label={view.state.locked
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
-      </button>
-      <button
-        type="button"
-        class="fab-ic-btn fab-ic-btn-danger"
-        onclick={() => run(() => services?.deleteInteractable?.())}
-      >
+        onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
+      />
+      <ManagerButton role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
-      </button>
+      </ManagerButton>
     </section>
   {/if}
 </div>
 
 <style>
+  /* WHAT SURVIVES IN THIS BLOCK, AND WHY (issue 1520).
+
+     Every CONTROL family this panel used to draw itself - the button, the field, the toggle,
+     the type chip and the identity banner - is a shared primitive's now, so its rules left
+     with the markup that carried them. What is left is this window's own LAYOUT: the scroll
+     container, the section rhythm, the facts grid and the two status readings. That split is
+     the design system's own rule - a primitive owns its appearance, a caller owns where the
+     primitive sits - so the residue here is not a leftover to sweep later, it is the part a
+     primitive cannot own.
+
+     Four rules below reach a CHILD COMPONENT's element and are therefore `:global(...)`.
+     Svelte stamps its `svelte-<hash>` onto the elements THIS component writes and forwards a
+     `class` prop verbatim, so a scoped rule naming a primitive's class is emitted with the
+     hash attached and matches nothing - silently, with `css.code` byte-identical and no
+     compiler warning. Each is anchored on a class this file DOES write, so the hash lands on
+     the ancestor compound where it belongs. */
   .fabricate-interactable-config {
     display: flex;
     flex-direction: column;
@@ -896,6 +860,47 @@
     padding: 0.85rem;
     height: 100%;
     overflow-y: auto;
+  }
+
+  /* THE SELECT TRIGGER STATES ITS OWN WIDTH, and `Select.svelte` records why it has to be
+     stated at all: the shared select declares no `width` and no `min-width`, because "the
+     trigger's box is the one thing this API does not address". A `<button>` hugs its content,
+     so eight controls that were full-width `<select>`s in a column would have opened as eight
+     differently-sized chips down the left edge. `.fabricate-select-field` is the class the
+     labelled form's own `<Field>` emits, so this reaches the primitive's element without
+     minting a class for it. */
+  .fabricate-interactable-config :global(.fabricate-select-field .fabricate-select-trigger) {
+    width: 100%;
+  }
+
+  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.manager-field` sets `font-weight:
+     700` on the BOX because the caption it wraps is a label, and Foundry's control reset gives
+     an `<input>` `font: inherit` - so a GM's typed name would render at heading weight. The
+     shipped repair for the same defect is scoped to one manager route
+     (`[data-manager-view='world-tool-entry']` in `styles/fabricate.css`); this is that rule
+     for this window, with its `:not(.fab-stepper-input)` exclusion intact because the stepper
+     supplies its own chrome. */
+  .fabricate-interactable-config :global(.manager-field input:not(.fab-stepper-input)) {
+    font-weight: 400;
+  }
+
+  /* THE SWITCH'S READING IS A SENTENCE HERE. `.manager-status-toggle` caps itself at 78px, so
+     with a 34px track the label has ~36px and every reading in this panel would ellipsise -
+     "Linked to gathering task" to "Li...". The shipped precedent for a switch whose reading is
+     the control's whole content is the Checks activation card, which releases the same cap in
+     `styles/fabricate.css` for the same stated reason. Scoped to this root rather than added
+     to the sheet, because the sheet is not this phase's to edit. */
+  .fabricate-interactable-config :global(.manager-status-toggle) {
+    max-width: none;
+  }
+
+  /* The action rows are `flex-wrap: wrap`, and the shared button declares `min-width: 0`, so
+     without this a converted button squashes below its own label instead of wrapping to the
+     next line. It is POSITION rather than appearance, which is the half a caller keeps. */
+  .fab-ic-actions :global(.fabricate-button),
+  .fab-ic-identity-head :global(.fabricate-button) {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .fab-ic-header {
@@ -910,17 +915,6 @@
     font-size: 1.15rem;
   }
 
-  .fab-ic-type-chip {
-    flex: 0 0 auto;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    opacity: 0.85;
-  }
-
   .fab-ic-section {
     display: flex;
     flex-direction: column;
@@ -932,31 +926,24 @@
     font-size: 0.95rem;
   }
 
-  .fab-ic-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  /* The one `.fab-ic-field` holding a numeric stepper rather than a `<select>` or a
-     toggle. A `<select>` wants the card's full width; a three-digit node count does not,
-     and without a cap the filled stepper resolved `width: 100%` against the whole config
-     card and stood its − and + at opposite ends of it.
+  /* The one field holding a numeric stepper rather than a select or a toggle. A select wants
+     the card's full width; a three-digit node count does not, and without a cap the filled
+     stepper resolved `width: 100%` against the whole config card and stood its - and + at
+     opposite ends of it.
 
      A cap, not a dropped `fill`: this is a `flex-direction: column` parent, so an unfilled
-     `.fab-stepper` (a flex item with `width: auto`) is stretched to exactly the same box
-     by `align-items: stretch` — measured at 600/600px — while losing the 36px height that
-     matches the selects above it and leaving its 48px input marooned mid-border. 160px is
-     the width the `fill` variant was measured against and leaves a 106px typeable field. */
-  .fab-ic-node-count-field {
-    max-width: 160px;
-  }
+     `.fab-stepper` (a flex item with `width: auto`) is stretched to exactly the same box by
+     `align-items: stretch` - measured at 600/600px - while losing the 36px height that
+     matches the controls above it and leaving its 48px input marooned mid-border. 160px is
+     the width the `fill` variant was measured against and leaves a 106px typeable field.
 
-  .fab-ic-field-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.7;
+     `:global(...)`, and the `.manager-field` half of the compound is load-bearing rather than
+     decorative: this class now travels to a `<Field>`, so the scoped form
+     `.fab-ic-node-count-field.svelte-<hash>` would match nothing, and a bare
+     `:global(.fab-ic-node-count-field)` would reach the element at (0,1,0) where the scoped
+     form was (0,2,0) - smuggling a cascade change in as a repair. */
+  :global(.manager-field.fab-ic-node-count-field) {
+    max-width: 160px;
   }
 
   /* Inline facts row: Linked task | Environment | Status. Two columns by
@@ -990,11 +977,15 @@
     min-width: 0;
   }
 
+  /* THE MUTED READINGS ARE INKED, NOT FADED. Four rules here dimmed their text with `opacity`,
+     which fades the WHOLE element - its border and its background with it - and produces a
+     different colour on every surface it is drawn over. `--fab-text-muted` is the published
+     recessive ink and is what the shared primitives this panel now renders already use. */
   .fab-ic-fact dt {
+    color: var(--fab-text-muted);
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    opacity: 0.6;
   }
 
   .fab-ic-facts {
@@ -1014,16 +1005,18 @@
     overflow-wrap: anywhere;
   }
 
+  /* 6px, not 3: 3 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this pill is under
+     the 24px band the 6px rung is published for. */
   .fab-ic-fact-id {
     font-size: 0.7rem;
     padding: 0.05rem 0.3rem;
     border: 1px solid var(--fab-border);
-    border-radius: 3px;
-    opacity: 0.8;
+    border-radius: 6px;
+    color: var(--fab-text-muted);
   }
 
   .fab-ic-fact-muted {
-    opacity: 0.7;
+    color: var(--fab-text-muted);
   }
 
   .fab-ic-visual-status {
@@ -1056,41 +1049,10 @@
     display: flex;
   }
 
-  .fab-ic-btn {
-    flex: 0 0 auto;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .fab-ic-btn:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .fab-ic-btn-primary {
-    font-weight: 600;
-  }
-
-  /* Active-state treatment for the Disable / Lock toggles: when the interactable
-     is currently disabled / locked the button reads as "on" (themed accent fill,
-     not a literal colour) so the GM sees the live state at a glance. */
-  .fab-ic-btn-toggle.is-active {
-    background: var(--fab-accent-soft);
-    border-color: var(--fab-accent);
-    color: var(--fab-accent-strong);
-    font-weight: 600;
-  }
-
-  .fab-ic-btn-danger {
-    color: var(--fab-danger);
-  }
-
   .fab-ic-empty {
     margin: 0;
+    color: var(--fab-text-muted);
     font-size: 0.9rem;
-    opacity: 0.75;
   }
 
   .fab-ic-node-hint {
@@ -1116,34 +1078,13 @@
     font-weight: 600;
   }
 
-  /* Identity / source section (issue 342). The unconfigured state is given a
-     prominent themed-accent treatment so the GM cannot miss the "Needs
-     configuration" call to action; once configured the section collapses. */
+  /* Identity / source section. The unconfigured state's prominence is the `<Notice>`'s now -
+     its `warning` tone paints the edge, the fill, the glyph and the title - so the accent box
+     this section drew around the notice AND the picker beneath it is gone rather than
+     retargeted: two tinted boxes for one state, in two colour families, is what keeping it
+     would have rendered. */
   .fab-ic-identity {
     gap: 0.55rem;
-  }
-
-  .fab-ic-identity.is-unconfigured {
-    padding: 0.6rem;
-    border: 1px solid var(--fab-accent);
-    border-radius: 6px;
-    background: var(--fab-accent-soft);
-  }
-
-  .fab-ic-identity-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    color: var(--fab-accent-strong);
-  }
-
-  .fab-ic-identity-banner strong {
-    font-size: 0.95rem;
-  }
-
-  .fab-ic-identity-hint {
-    margin: 0.15rem 0 0;
-    font-size: 0.82rem;
   }
 
   .fab-ic-identity-head {
@@ -1157,9 +1098,5 @@
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-  }
-
-  .fab-ic-identity-toggle {
-    flex: 0 0 auto;
   }
 </style>

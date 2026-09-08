@@ -180,7 +180,15 @@ So an adoption whose primitive still lives in `apps/manager/` is deferred on SCO
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
-Issue 1518 and issue 1520 are the changes that turn all six from claims into facts.
+Issue 1518 and issue 1520 are the changes that turn all six from claims into facts, and issue 1520 has now turned two of them.
+`src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
+The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
+It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
+A family reached only through another primitive is reached, so the `Pagination` chain above describes ONE caller's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
+The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose only `<Select>` is still the pager's unlabelled inline one; what the interactables config window changes is the corpus that statement is true of, not the statement.
+Four remain claims, and each is recorded with the change that owns it rather than left to a reader to infer.
+`ManagerSearchField`, `ManagerToolbar` and `InspectorCard` are issue 1520's own fifth phase, in `src/ui/svelte/apps/InteractableBrowserRoot.svelte`.
+`ChanceSlider` has no site in any of the three interactables windows, so it is not this change's to discharge and stays issue 1518's.
 Five more satisfy it as of issue 1509: `EditorTabs` emits `fabricate-tabs`, `EditorValidationSurface` emits `fabricate-validation`, `RadioCardGroup` emits `fabricate-option-cards`, `ToggleCard` emits `fabricate-toggle-card` and `ItemDropZone` emits `fabricate-link-field`.
 None of the five portals anything either, so each needs exactly one root, and each declares one `mirrored` fixture pair.
 All five are pure CAPABILITIES today, and that is measured rather than assumed: every importer of every one of them lies under `src/ui/svelte/apps/manager/`, so no surface outside the manager renders one yet.
