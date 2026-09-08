@@ -29,7 +29,7 @@
  * rather than these 117, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,062 `(at-context, selector)` keys, of which 2,945 appear exactly
+ * Unfiltered, the sheet holds 3,056 `(at-context, selector)` keys, of which 2,939 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,585 rules at that head, 117 repeated keys and 239 appearances
+ * printed from. The sheet holds 2,580 rules at that head, 117 repeated keys and 239 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
@@ -67,6 +67,23 @@
  * header used to supply. Net: the sheet holds two rules MORE, the keyed population rises by two
  * with three more singletons, and the repeated table loses two whole rows. Re-derived by running
  * the gate rather than predicted.
+ *
+ * ISSUE 1515 PHASE 5 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, and it is
+ * the first entry here whose rule and selector counts move by DIFFERENT amounts. The Tools list's
+ * hand-rolled enable switch adopts `StatusToggle`, so its five-rule skin under
+ * `.manager-tools-enabled-toggle` is deleted — the box, the track, the knob and the two `is-on`
+ * repaints — and the sixth selector goes from a SHARED LIST: the switch's `:focus-visible` leg
+ * stood beside `.manager-tools-select-target:focus-visible`, and only the switch's half leaves,
+ * because the primitive's family already writes that exact ring. So SIX selectors go while FIVE
+ * rules do: the rule count falls to 2,580, the key and singleton counts each fall by six to 3,056
+ * and 2,939, and the repeated table is untouched with `pinnedTotal` staying 239 across 117 rows.
+ *
+ * THAT LAST FIGURE IS RE-DERIVED RATHER THAN PREDICTED, and the phase's own plan expected it to
+ * move. It does not: every one of the six is a singleton in both keyings, because a per-screen
+ * skin over a shared control is by construction shared with nothing — which is also exactly why
+ * the four `> span` members had to be deleted rather than re-rooted. They select the primitive's
+ * own track and knob at (0,2,1) and (0,2,2) against the family's (0,2,0), so leaving them would
+ * have re-skinned a shared switch from one caller's block with every gate green.
  *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
  * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the

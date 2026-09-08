@@ -689,6 +689,13 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * spread this source-level scanner cannot see. Nothing is being banked that the scanner did not
  * measure — that trigger is deliberately still counted, exactly as the primitive's own is.
  *
+ * 241 -> 240 with issue 1515's fifth phase, and the row SHRINKS rather than leaving:
+ * `apps/manager/ToolsBrowserView.svelte` 5 -> 4. The Tools list's per-row enable switch is a
+ * `<StatusToggle>` now, and the primitive writes `data-keyboard-focus="true"` on its `button`
+ * host, so the debt is paid by conversion rather than by an attribute. The file's other four
+ * raw buttons — the sort-direction switch, the row's select target, and the row's `Edit rules`
+ * and `Add to system` routes — are unconverted and stay.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
 export const KNOWN_FORMLESS_BUTTON_TOTAL = 241;

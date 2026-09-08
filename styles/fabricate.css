@@ -23504,11 +23504,12 @@
    So the caller's own container is named by a class the caller writes ON THAT SAME ELEMENT.
    The match set is identical, and that is measured rather than argued:
    `data-manager-tools-search` occurs on exactly two elements repo-wide —
-   `ToolsBrowserView.svelte:492` and `tool-rules-list-parity.test.js:187` — and BOTH carry
+   `ToolsBrowserView.svelte:515` and `tool-rules-list-parity.test.js:202` — and BOTH carry
    `manager-tools-library-card`; the class's only other two carriers
-   (`ToolsBrowserView.svelte:575`, `tool-rules-list-parity.test.js:200`, both
+   (`ToolsBrowserView.svelte:602`, `tool-rules-list-parity.test.js:217`, both
    `data-manager-tools-browser`) contain no `.manager-search`, because that file's single
-   `<ManagerSearchField>` is at `:493` inside this search card. Rank is unchanged for each —
+   `<ManagerSearchField>` is at `:519`, inside this search card and inside the
+   `ManagerToolbar` this card now wraps around it (issue 1515). Rank is unchanged for each —
    this rule (0,3,0), the input and the icon (0,3,1) — the position is unchanged, and the
    declarations are byte-identical. `tool-rules-list-parity.test.js` measures the input's 11.5px
    /500 type, 30px height and 8px radius on its own fixture, so the rewrite is CI-armed.
@@ -23631,8 +23632,13 @@
   text-align: left;
 }
 
-.fabricate-manager .manager-tools-select-target:focus-visible,
-.fabricate-manager .manager-tools-enabled-toggle:focus-visible {
+/* ONE LEG, NOT TWO (issue 1515). The row's enable switch is a `StatusToggle` now, and the
+   primitive's family already writes this exact pair — `.fabricate-toggle.manager-status-toggle:
+   focus-visible`, the same 2px accent outline at the same 2px offset — so a second copy under
+   this screen's own class would out-specify the family's ring with a byte-identical one and
+   make the switch's focus state a thing two files decide. The select target keeps the rule
+   because nothing else states its ring. */
+.fabricate-manager .manager-tools-select-target:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
@@ -23697,53 +23703,24 @@
    `.manager-tools-library-actions` had a second block here stating only `padding-right`. It
    is merged into the one above, which is where the cluster's own geometry now lives. */
 
-.fabricate-manager .manager-tools-enabled-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-}
+/* ── THE ROW'S ENABLE SWITCH IS THE SHARED ONE, AND ITS FIVE-RULE SKIN IS GONE (issue 1515) ──
+   The Tools list drew this switch by hand — a 36px box, a 34x20 track and a 14px knob that
+   travelled 14px, in the accent on and the raised neutral off. Every one of those figures is
+   what `.fabricate-toggle.manager-status-toggle` already states for the whole manager, so the
+   control adopts the primitive and the copy is deleted rather than re-rooted.
 
-/* ONE ACCENT FOR BOTH POSITIONS (issue 1373), matching `.manager-status-toggle` above. This
-   row switch is hand-rolled rather than a `StatusToggle`, so it carried its own copy of the
-   defect the shared control had: off drew a bright neutral track and on drew a GREEN one, on a
-   screen where the selected row, the inherit switches and the segmented control all speak in
-   the accent. */
-.fabricate-manager .manager-tools-enabled-toggle > span:first-child {
-  position: relative;
-  display: block;
-  width: 34px;
-  height: 20px;
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  background: var(--fab-surface-raised);
-}
+   FOUR OF THE FIVE HAD TO GO, AND THAT IS A CASCADE FACT RATHER THAN TIDINESS. They select
+   `> span:first-child` and `> span:first-child > span`, which are exactly the track and knob
+   the primitive renders, at (0,2,1)/(0,2,2) against the family's (0,2,0) — so they would have
+   gone on winning against the primitive's own paint on this one screen, silently re-skinning
+   a shared control from a caller's block. `openspec/specs/design-system/spec.md`'s
+   element-and-rank exception is no help: it covers a deletion proved redundant, and a rule that
+   OUT-RANKS the primitive it sits over is the re-skin the exception names as out of scope.
 
-.fabricate-manager .manager-tools-enabled-toggle > span:first-child > span {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--fab-text-subtle);
-  transition: transform 120ms ease, background-color 150ms ease;
-}
-
-.fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent);
-}
-
-.fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child > span {
-  transform: translateX(14px);
-  background: var(--fab-on-accent);
-}
+   The one visible consequence is stated rather than left to be found: the button was pinned to
+   36px around a 34px track and the family sizes it to its content, so the switch is two pixels
+   narrower and the row's action cluster shifts by two. Colours, track, knob, travel and the
+   focus ring are the same declarations either way. */
 
 .fabricate-manager .manager-tool-browser-inspector {
   gap: 14px;

@@ -367,7 +367,7 @@
     "src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte | 2",
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
     "src/ui/svelte/apps/manager/ToolEditView.svelte | 3",
-    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 5",
+    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 4",
     "src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CheckTriggers.svelte | 2",
     "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte | 1",

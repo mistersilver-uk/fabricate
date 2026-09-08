@@ -19933,6 +19933,58 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       ['in', 'all', 'over']
     );
+    // THE BROWSE ARCHETYPE'S FILTER BAR (issue 1515). The search and the membership filter are
+    // the screen's two filters and render in one `ManagerToolbar` INSIDE the search card, which
+    // is why the band above still reports as `search`: the card is unchanged and the bar nests
+    // in it. Identity rather than presence, because two `.manager-toolbar` elements on one
+    // screen - a bar per control - is the failure this reads for, and `querySelector` would
+    // find the first either way.
+    const toolsBar = target.querySelector('[data-manager-tools-search] .manager-toolbar');
+    assert.ok(Boolean(toolsBar), 'the Tools search band renders the shared filter bar');
+    assert.equal(
+      target.querySelectorAll('[data-manager-tools-search] .manager-toolbar').length,
+      1,
+      'one bar, not one per control'
+    );
+    assert.ok(
+      toolsBar.getAttribute('aria-label')?.length > 0,
+      'a `<section>` with no accessible name is not a landmark at all'
+    );
+    assert.ok(
+      Boolean(toolsBar.querySelector('input[type="search"]')),
+      'the search field is a control OF the bar'
+    );
+    assert.ok(
+      Boolean(toolsBar.querySelector('[data-tool-membership-filter]')),
+      'and so is the membership filter'
+    );
+    // THE SEGMENTS ARE A SETTING AND STAY OUT OF IT. They author `breakageSource` on the system
+    // record rather than narrowing this list, so the bar must not have swept them in.
+    assert.ok(
+      !toolsBar.querySelector('[data-tool-authority-segment]'),
+      'the breakage-source segments are a setting, not a filter'
+    );
+
+    // THE ROW SWITCH IS THE SHARED PRIMITIVE (issue 1515, D2), and its own class SURVIVES the
+    // conversion rather than being replaced by it - `StatusToggle` composes `class` onto its
+    // own, which is what keeps the Foundry smoke's selector and the View Lab's steps pointing
+    // at the same control.
+    const enabledSwitch = target.querySelector('.manager-tools-enabled-toggle');
+    assert.ok(Boolean(enabledSwitch), 'the row still writes its enable switch');
+    assert.equal(enabledSwitch.tagName, 'BUTTON');
+    for (const token of ['fabricate-toggle', 'manager-status-toggle', 'is-on']) {
+      assert.ok(
+        enabledSwitch.classList.contains(token),
+        `the enable switch is the shared control and carries \`${token}\``
+      );
+    }
+    assert.equal(enabledSwitch.getAttribute('aria-pressed'), 'true');
+    const switchTrack = enabledSwitch.querySelector('.manager-status-toggle-track');
+    assert.ok(Boolean(switchTrack), 'the primitive renders the track');
+    assert.ok(
+      Boolean(switchTrack.querySelector('.manager-status-toggle-knob')),
+      'and the knob INSIDE it - a track with no knob is a switch that cannot show its state'
+    );
     // The drop behaviour itself moved WITH the control, to
     // `tests/components/world-tool-catalogue-mounted.test.js`, which drives the zone on the
     // screen that now owns it - including the compendium `{pack, id}` payload that carries no
