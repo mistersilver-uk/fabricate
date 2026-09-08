@@ -125,21 +125,6 @@
 </script>
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.SystemsShort', 'Systems')}>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Browse', 'Browse')}</p>
-      <h2 class="manager-title">
-        {text('FABRICATE.Admin.Manager.SystemLibrary', 'System library')}
-      </h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.SystemLibraryHint',
-          'Select a row to view counts and enabled features.'
-        )}
-      </p>
-    </div>
-  </section>
-
   <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
     <ManagerSearchField
       value={searchTerm}

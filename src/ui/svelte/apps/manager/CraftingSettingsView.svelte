@@ -208,24 +208,6 @@
   >
     <div class="crafting-settings-layout">
       <div class="crafting-settings-content">
-        <section class="manager-section-header">
-          <div class="manager-heading">
-            <p class="manager-kicker">{selectedSystem.name}</p>
-            <h2 class="manager-title">
-              {text(
-                'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
-                'Crafting settings'
-              )}
-            </h2>
-            <p class="manager-subtitle">
-              {text(
-                'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
-                'Control how players get access to the recipes in this system.'
-              )}
-            </p>
-          </div>
-        </section>
-
         <div class="crafting-settings-body">
           <section class="crafting-settings-section" data-crafting-resolution-section>
             <div class="crafting-settings-section-head">

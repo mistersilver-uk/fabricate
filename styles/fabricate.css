@@ -1881,6 +1881,17 @@
   reference's other eyebrow family, `proto:519` — and the Tools authority and create cards'
   0.64rem.
 */
+
+/*
+  THE PAGE HEADER'S EYEBROW WRAPPER (issue 1515). The eyebrow itself is `Kicker.svelte`, which
+  declares `margin: 0` and takes no `class` — a caller needing layout keeps its own element and
+  nests the primitive inside it. This is that element, and the only thing it owns is the gap
+  `.manager-kicker` below states in its own shorthand, on the scale rather than as a raw figure.
+*/
+.fabricate-manager .manager-page-kicker {
+  margin-bottom: var(--fab-space-2xs);
+}
+
 .fabricate-manager .manager-kicker {
   margin: 0 0 var(--fab-space-2xs);
   color: var(--fab-text-subtle);
@@ -2371,8 +2382,12 @@
   background: var(--fab-bg-2);
 }
 
+/* The settings tab's scrolling form, and nothing above it. The leading `auto` track was the
+   view's own duplicate page header (issue 1515); with that deleted the form is the only child,
+   and leaving two tracks put the form in the `auto` row and left the growing one empty — the
+   same failure the components pager and the tags workspace hit when their headers went. */
 .fabricate-manager .manager-system-edit-main {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* Drop zone, toolbar, the LIST (which takes the slack), then the pager. The fourth
@@ -2401,6 +2416,17 @@
    the scrolling table (same failure family as the components pager above). */
 .fabricate-manager[data-manager-view="books-scrolls"] .manager-main {
   grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/* Filter toolbar, then the LIST which takes the slack, then the pager (issue 1515). Named
+   explicitly rather than left to the shared `auto auto 1fr`, which was right while these two
+   routes drew their own duplicate page header ABOVE the toolbar and is wrong now that the page
+   header is the shell's alone: three children against three tracks hands the growing track to
+   the PAGER and pins the list to an `auto` row. Same failure family as the recipe library below
+   and the components pager above. */
+.fabricate-manager[data-manager-view="systems"] .manager-main,
+.fabricate-manager[data-manager-view="access"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 /*
@@ -5548,21 +5574,19 @@
   border: 0;
 }
 
-.fabricate-manager .manager-section-header,
+/*
+  ONE RULE, MERGED (issue 1515). The first four declarations were written in a LIST shared with
+  `.manager-section-header`, which is how the toolbar and the page header a view drew under it kept
+  the same padding and rule line. That second header is gone from all six views that drew one, so
+  the list holds one selector — and two rules stating the same single selector is the duplicate
+  `stylelint`'s `no-duplicate-selectors` rejects, where two differing LISTS were allowed by design.
+  Merged at the earlier position with the declarations in their original order, so the cascade is
+  unchanged.
+*/
 .fabricate-filter-bar.manager-toolbar {
   min-width: 0;
   padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-filter-bar.manager-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -17002,7 +17026,12 @@
 
   .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-main {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+
+    /* ONE track, not two. The leading `auto` was the browse view's own duplicate page header
+       (issue 1515); with that deleted the Parties pane is the only child, and two tracks would
+       leave it in the `auto` row this rule exists to keep it OUT of — sized to max-content, which
+       is what carries the persistent footer off the bottom of the panel. */
+    grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
   }
 
@@ -17255,8 +17284,7 @@
 }
 
 @container fabricate-manager (max-width: 680px) {
-  .fabricate-manager .manager-header,
-  .fabricate-manager .manager-section-header {
+  .fabricate-manager .manager-header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -19748,6 +19776,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-4);
+}
+
+/* The counts rail's own inset. It used to inherit one from the `manager-section-header` it sat
+   inside (issue 1515); as a direct child of the flex surface it would otherwise sit hard against
+   the panel edge while every group below it is indented by its card padding. The horizontal
+   figure is that card padding, so the chips line up with the rows they count. */
+.fabricate-manager .manager-system-overview-counts {
+  padding: var(--fab-space-3) var(--fab-space-4) 0;
 }
 
 .fabricate-manager .manager-system-overview-group {

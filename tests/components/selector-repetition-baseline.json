@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 243,
+  "pinnedTotal": 239,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -27,10 +27,6 @@
     },
     {
       "key": "(top level) | .fabricate-field.manager-field textarea",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-filter-bar.manager-toolbar",
       "count": 2
     },
     {
@@ -271,10 +267,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-salvage-dc-card",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-section-header",
       "count": 2
     },
     {

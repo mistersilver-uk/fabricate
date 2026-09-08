@@ -3770,9 +3770,29 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-table-head [role="columnheader"]').length, 4);
     assert.equal(target.querySelectorAll('.manager-count-cluster').length, 0);
     assert.ok(target.querySelector('.manager-breadcrumbs'));
-    assert.equal(target.querySelector('.manager-header .manager-heading > .manager-kicker'), null);
+    // ONE PAGE HEADER, EYEBROW INCLUDED (issue 1515). The library used to draw its own
+    // `manager-section-header` — `Browse` / `System library` / a second hint — directly under the
+    // shell's. The eyebrow survives as the shell's `<Kicker>`; the second title does not, and the
+    // lede is the library's own actionable sentence rather than the generic one that described
+    // what a crafting system IS.
+    assert.ok(
+      !target.querySelector('.manager-header .manager-heading > .manager-kicker'),
+      'the shell eyebrow is the shared Kicker primitive, not the manager class it replaces'
+    );
+    assert.equal(
+      target.querySelector('.manager-header [data-page-kicker]').textContent.trim(),
+      'Browse'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Select a row to view counts and enabled features.'
+    );
     assert.equal(target.textContent.includes('Systems View'), false);
-    assert.equal(target.querySelector('.manager-section-header .manager-action-group'), null);
+    assert.equal(target.textContent.includes('System library'), false);
+    assert.ok(
+      !target.querySelector('.manager-main .manager-section-header'),
+      'the library renders no second page header, so it carries no header action group either'
+    );
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
@@ -7567,7 +7587,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Downtime',
       ]
     );
-    assert.ok(target.textContent.includes('System library'));
+    // The system library's own page copy is the shell's, since issue 1515 deleted the second
+    // header this used to read `System library` from.
+    assert.ok(target.textContent.includes('Select a row to view counts and enabled features.'));
   });
 
   it('routes to the recipes browser with selected recipe inspector and actions', async () => {
@@ -14747,8 +14769,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelector('.manager-toolbar'), null);
     assert.equal(target.querySelector('.manager-environments-table'), null);
-    assert.ok(
-      target.textContent.includes('Set system-level drop resolution and event rules for gathering.')
+    // The Gathering tab's page hint is the SHELL's since issue 1515 deleted the browse view's own
+    // section header, so it reads the rail record's fallback — which is the one that agrees with
+    // `lang/en.json`. The view's own tab table still carries a longer copy for the empty-tab
+    // panel; the two tables have disagreed on this string since before this change.
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Set system-level rules for gathering.'
     );
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     // Region is no longer a vocabulary dimension: only the biome vocabulary panel remains.
@@ -18683,23 +18710,31 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
     assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    // ONE PAGE HEADER (issue 1515). This route used to render the kicker, the title AND a
+    // description sentence a second time inside `.manager-main`, under a page header already
+    // saying two of the three. The eyebrow moves to the shell as a `<Kicker>`, the title was
+    // always the shell's, and the description sentence RETIRES: the maintainer ruled the lede
+    // keeps the computed census, which is the one line on the screen the rows do not already say.
+    // `docs/world/parties.md` carries the retired sentence.
+    assert.ok(
+      !target.querySelector('.manager-main .manager-section-header'),
+      'World Parties renders no second page header'
+    );
+    assert.equal(
+      target.querySelector('.manager-header [data-page-kicker]').textContent.trim(),
+      'WORLD / every system'
+    );
     assert.equal(
       target.querySelector('.manager-header .manager-title').textContent.trim(),
       'World Parties'
     );
-    const worldHeading = target.querySelector('.manager-main .manager-section-header');
     assert.equal(
-      worldHeading.querySelector('.manager-kicker').textContent.trim(),
-      'WORLD / every system'
+      target.textContent.includes('shared across every crafting system'),
+      false,
+      'the retired description sentence is gone rather than moved'
     );
-    assert.equal(worldHeading.querySelector('.manager-title').textContent.trim(), 'World Parties');
-    assert.match(
-      worldHeading.querySelector('.manager-subtitle').textContent,
-      /shared across every crafting system/
-    );
-    // The PAGE header carries the computed census. It is a different element from the
-    // section heading above, and the regex there matches both strings, so this one is
-    // pinned exactly or the count could drift unnoticed.
+    // The page header carries the computed census, pinned exactly or the count could drift
+    // unnoticed.
     assert.equal(
       target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
       '2 parties · 1 enabled · 1 of 2 characters assigned'
@@ -23234,10 +23269,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-system-overview-blocker]'),
       'the validation list keeps its blocker note'
     );
-    // The summary badges + Review copy stay on the validation tab.
+    // THE COUNTS STAY ON THE VALIDATION SURFACE, AND STAY IN ORDER (issue 1515). The route's page
+    // header moved to the manager shell and the section this row sat inside was deleted with it;
+    // the row itself is not header chrome — `openspec/specs/design-system/spec.md` requires the
+    // validation surface to carry the counts — so it is lifted to a direct child of the surface.
+    // Pinned by POSITION as well as presence, because "lifted out of the deleted section" is a
+    // claim a presence check alone cannot tell apart from "left inside something else".
+    const overviewCounts = target.querySelector('[data-system-overview-counts]');
+    assert.ok(overviewCounts, 'the critical/warning/notes summary badges render');
     assert.ok(
-      target.querySelector('[data-system-overview-counts]'),
-      'the critical/warning/notes summary badges render'
+      overviewCounts.parentElement?.hasAttribute('data-system-overview'),
+      'the counts row is a direct child of the validation surface, not of a page header'
+    );
+    // THE ORDER IS THE CONTRACT, not the wording. `spec.md` states the counts as a closed ordered
+    // vocabulary and this surface answers the SUBSET it can: the report it renders carries no
+    // denominator — `evaluateSystemValidation` counts issues, never checks run — so no passing
+    // figure is derivable from it and none is invented here. What is pinned is that the severities
+    // run in increasing severity-of-attention order, so a re-spelling of the words cannot silently
+    // reorder them.
+    assert.deepEqual(
+      [...overviewCounts.querySelectorAll('[data-overview-count]')].map((chip) =>
+        chip.getAttribute('data-overview-count')
+      ),
+      ['critical', 'warning', 'info'],
+      'the counts render in one fixed order'
     );
 
     const recipeLink = target.querySelector(

@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 213 repeated selectors
- * rather than these 119, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 211 repeated selectors
+ * rather than these 117, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,060 `(at-context, selector)` keys, of which 2,941 appear exactly
+ * Unfiltered, the sheet holds 3,062 `(at-context, selector)` keys, of which 2,945 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,32 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,584 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,585 rules at that head, 117 repeated keys and 239 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
+ * left the repeated table alone. `.fabricate-manager .manager-section-header` was written twice at
+ * the top level — once as a list member beside `.fabricate-filter-bar.manager-toolbar` for the
+ * shared padding and rule line, and once alone for its own flex row — and a third time inside the
+ * 680px `@container`, which is a different at-context and was always a singleton. All three go,
+ * because the class has no emitter left: the six manager views that drew a SECOND page header
+ * under the shell's own now draw none, and a rule that went on painting one would be a standing
+ * invitation to write it again.
+ *
+ * THE SECOND ROW IS THE CONSEQUENCE OF THE FIRST, and it is the reason this file asks for the
+ * reason rather than the number. Removing one member from a two-member list left
+ * `.fabricate-filter-bar.manager-toolbar` stated ALONE in two rules — which is the duplicate
+ * `stylelint`'s `no-duplicate-selectors` rejects, where two DIFFERING lists were allowed by design
+ * and are what almost every row in this table is. So the two rules are MERGED, at the earlier
+ * position and in declaration order, and the toolbar's own row vanishes with the header's. One
+ * THREE RULES ARRIVE with the deleted headers' consequences, and every one is a singleton in both
+ * keyings: the page eyebrow's wrapper margin, the `systems`/`access` route row template — three
+ * children against the shared three-track default would have handed the growing track to the
+ * PAGER, which is the failure issues 643 and 676 recorded when they deleted the same header from
+ * two other routes — and the validation surface's counts-rail inset, which the deleted section
+ * header used to supply. Net: the sheet holds two rules MORE, the keyed population rises by two
+ * with three more singletons, and the repeated table loses two whole rows. Re-derived by running
+ * the gate rather than predicted.
  *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
  * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the
@@ -266,6 +290,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 243 across 119 rows.
+ * measured commit it is 239 across 117 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

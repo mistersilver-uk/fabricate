@@ -191,35 +191,27 @@
   data-system-overview
   aria-label={text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.SystemOverview.Kicker', 'System overview')}
-      </p>
-      <h2 class="manager-title">
-        {text('FABRICATE.Admin.Manager.SystemOverview.Heading', 'Validation overview')}
-      </h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.SystemOverview.Subtitle',
-          'Review every validation issue across this crafting system and jump straight to the editor that owns each one.'
-        )}
-      </p>
-    </div>
-    <div class="manager-chip-row" data-system-overview-counts>
-      <Chip tone="danger" data-overview-count="critical"
-        >{counts.critical}
-        {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip
-      >
-      <Chip tone="warning" data-overview-count="warning"
-        >{counts.warning}
-        {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
-      >
-      <Chip tone="neutral" data-overview-count="info"
-        >{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip
-      >
-    </div>
-  </section>
+  <!--
+    THE COUNTS ROW STAYS ON THE VALIDATION SURFACE (issue 1515). The route's page header moved
+    to the manager shell, which now names the SYSTEM in its `<h1>`; the kicker, heading and
+    description this section used to carry are retired with it. The counts are not header
+    chrome — `openspec/specs/design-system/spec.md` requires the validation surface itself to
+    carry them — so the row is lifted out of the deleted `<section>` and kept as a direct child
+    of `.manager-main`, with `data-system-overview-counts` and every per-count hook unchanged.
+  -->
+  <div class="manager-chip-row manager-system-overview-counts" data-system-overview-counts>
+    <Chip tone="danger" data-overview-count="critical"
+      >{counts.critical}
+      {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip
+    >
+    <Chip tone="warning" data-overview-count="warning"
+      >{counts.warning}
+      {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
+    >
+    <Chip tone="neutral" data-overview-count="info"
+      >{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip
+    >
+  </div>
 
   {#if report?.blocksSystem === true}
     <div

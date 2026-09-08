@@ -287,24 +287,6 @@
             class="manager-main manager-system-edit-main"
             aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}
           >
-            <section class="manager-section-header">
-              <div class="manager-heading">
-                <p class="manager-kicker">{selectedSystem.name}</p>
-                <h2 class="manager-title">
-                  {text(
-                    'FABRICATE.Admin.Manager.SystemEdit.EditBaseSettings',
-                    'Edit base settings'
-                  )}
-                </h2>
-                <p class="manager-subtitle">
-                  {text(
-                    'FABRICATE.Admin.Manager.SystemEdit.EditBaseSettingsHint',
-                    'Changes use the existing admin store persistence and confirmation flows.'
-                  )}
-                </p>
-              </div>
-            </section>
-
             <form class="manager-system-edit-form" onsubmit={handleSubmit}>
               {#if systemBlocked}
                 <div

@@ -1725,7 +1725,6 @@
         "NoSelection": "No Selection",
         "SelectSystemHint": "Select a system to inspect its configuration.",
         "Browse": "Browse",
-        "SystemLibrary": "System library",
         "SystemLibraryHint": "Select a row to view counts and enabled features.",
         "SystemFilters": "System filters",
         "LoadingSystemsKicker": "Startup",
@@ -1813,7 +1812,6 @@
           "Title": "System settings",
           "Subtitle": "Edit base settings for the selected crafting system.",
           "Breadcrumb": "System settings",
-          "PageTitle": "System Overview",
           "PageSubtitle": "Edit base settings and review validation issues for the selected crafting system.",
           "PageBreadcrumb": "System Overview",
           "Nav": "System Overview",
@@ -1824,8 +1822,6 @@
             "Validation": "Validation"
           },
           "BackToSystems": "Back to systems",
-          "EditBaseSettings": "Edit base settings",
-          "EditBaseSettingsHint": "Changes use the existing admin store persistence and confirmation flows.",
           "Identity": "Identity",
           "SaveDetails": "Save details",
           "Dirty": "Unsaved",
@@ -1892,10 +1888,7 @@
           "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\""
         },
         "SystemOverview": {
-          "Kicker": "System overview",
           "Title": "System overview",
-          "Heading": "Validation overview",
-          "Subtitle": "Review every validation issue across this crafting system and jump straight to the editor that owns each one.",
           "Breadcrumb": "System overview",
           "Actions": "System overview actions",
           "CountBadgeAria": "Open validation issues",
@@ -1989,8 +1982,7 @@
             "Settings": "Settings",
             "Recipes": "Recipes",
             "BooksScrolls": "Books & Scrolls",
-            "SettingsPlaceholderTitle": "Crafting settings",
-            "SettingsHint": "System-level crafting rules: resolution mode and recipe visibility."
+            "SettingsPlaceholderTitle": "Crafting settings"
           },
           "Settings": {
             "ResolutionHeading": "Recipe resolution",
@@ -3660,8 +3652,8 @@
         },
         "Environment": {
           "Kicker": "Environments View",
-          "Title": "Environments",
-          "Subtitle": "Manage gathering environments for the selected crafting system.",
+          "Library": "Gathering environments",
+          "LibraryHint": "Browse scene-linked gathering environments and open the existing editor for task authoring.",
           "EditKicker": "Environment Edit",
           "EditTitle": "Edit environment",
           "EditSubtitle": "Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.",
@@ -3669,8 +3661,6 @@
           "Actions": "Environment actions",
           "Create": "Create environment",
           "BackToBrowse": "Back to environments",
-          "Library": "Gathering environments",
-          "LibraryHint": "Browse scene-linked gathering environments and open the existing editor for task authoring.",
           "Risk": "Risk",
           "RiskFilterLabel": "Filter environments by risk",
           "RiskAll": "All risks",
@@ -4736,7 +4726,6 @@
           "TravelDestinations": "Travel destinations",
           "PartiesTitle": "World Parties",
           "PartiesKicker": "WORLD / every system",
-          "PartiesHint": "Create and manage parties shared across every crafting system.",
           "PartiesActions": "World party actions",
           "PartiesInspector": "Selected world party",
           "RulesNav": "Rules & Resources",
@@ -6163,7 +6152,6 @@
           "SearchCharacters": "Search characters…",
           "SearchPlayers": "Search players…",
           "Seat": "Seat {n}",
-          "Subtitle": "Grant individual recipes to specific characters or players.",
           "Summary": "{chars} characters · {players} players",
           "Table": "Recipe access table",
           "Title": "Recipe access",

@@ -35,7 +35,6 @@
     environmentDraftDirty = false,
     environmentValidationCount = 0,
     selectedEnvironmentId = '',
-    selectedSystemName = '',
     selectedSystemId = '',
     gatheringConfig = null,
     sceneOptions = [],
@@ -43,7 +42,6 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     activeTravelTab = 'parties',
-    worldParties = false,
     services = null,
     selectedTaskId = '',
     selectedEventId = '',
@@ -250,9 +248,6 @@
     selectedGatheringSystemConfig.vocabularies?.biomes || {
       values: gatheringConfig?.vocabularies?.biomes || [],
     }
-  );
-  const activeGatheringTabConfig = $derived(
-    gatheringTabs.find((tab) => tab.id === activeGatheringTab) || gatheringTabs[0]
   );
   const biomeOptions = $derived(
     uniqueSorted(
@@ -625,48 +620,12 @@
   function conditionValues(setting) {
     return Array.isArray(setting?.values) ? setting.values : [];
   }
-
-  function gatheringHeaderTitle() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    }
-    const titleKey = activeGatheringTabConfig?.titleKey;
-    if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
-    return text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments');
-  }
-
-  function gatheringHeaderHint() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text(
-        'FABRICATE.Admin.Manager.World.PartiesHint',
-        'Create and manage parties shared across every crafting system.'
-      );
-    }
-    const hintKey = activeGatheringTabConfig?.hintKey;
-    if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
-    return text(
-      'FABRICATE.Admin.Manager.Environment.LibraryHint',
-      'Browse scene-linked gathering environments and open the existing editor for task authoring.'
-    );
-  }
 </script>
 
 <main
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {worldParties
-          ? text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system')
-          : selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-      </p>
-      <h2 class="manager-title">{gatheringHeaderTitle()}</h2>
-      <p class="manager-subtitle">{gatheringHeaderHint()}</p>
-    </div>
-  </section>
-
   {#if activeGatheringTab === 'environments'}
     <div
       class="manager-gathering-panel manager-gathering-panel-environments"

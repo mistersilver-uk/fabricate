@@ -4734,8 +4734,11 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
+  // ONE track since issue 1515 deleted this tab's duplicate page header: the scrolling form is
+  // the only child of `.manager-system-edit-main`, and a leading `auto` track would take it while
+  // the growing one sat empty.
   assert.ok(
-    mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'),
+    mainBlock.includes('grid-template-rows: minmax(0, 1fr);'),
     'system edit main should reserve scrollable form space'
   );
   assert.ok(
@@ -7815,7 +7818,6 @@ test('World Parties keeps its card scroller and sibling pager independently reac
         <div class="manager-body">
           <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
           <main class="manager-main">
-            <section class="manager-section-header"><div class="manager-heading"><h2>World Parties</h2></div></section>
             <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
           </main>
         </div>

@@ -1642,19 +1642,43 @@ describe('CraftingSystemManager source contract', () => {
       'no consumer references the removed Summary key'
     );
 
-    // The System Overview page is the renamed system-edit route; the page title,
-    // breadcrumb, and nav label all read "System Overview".
+    // The System Overview page is the renamed system-edit route, and since issue 1515 its
+    // breadcrumb tail and nav label read "System Overview" while its `<h1>` reads the SELECTED
+    // SYSTEM'S NAME. That split is deliberate rather than a drift: every other editor route in
+    // the Manager titles itself after the record it edits, and this one repeated the route name
+    // a third time under a trail that already said it twice. The trail names where you are; the
+    // title names what you are looking at.
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Nav,
       'System Overview',
       'the nav item is renamed System Overview'
     );
-    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.PageTitle, 'System Overview');
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb,
+      'System Overview',
+      'and the breadcrumb tail keeps the route name'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.SystemEdit.PageTitle,
+      undefined,
+      'the page-title key is retired: the heading is the record, not a localized route name'
+    );
+    assert.ok(
+      !rootSource.includes('SystemEdit.PageTitle'),
+      'no consumer references the retired page-title key'
+    );
     assert.ok(
       rootSource.includes(
-        "text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview')"
+        "selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"
       ),
-      'the page title reads System Overview'
+      'the page title is the selected system name, falling back to the route name when there is ' +
+        'no selection rather than rendering an empty heading'
+    );
+    assert.ok(
+      rootSource.includes(
+        "text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')"
+      ),
+      'the breadcrumb tail still names the route'
     );
     assert.ok(
       rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"),
@@ -1775,13 +1799,35 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('keeps first-slice action and navigation hierarchy focused', () => {
+    // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
+    // "only the page title and subtitle", and no view kicker, which was true of the SHELL and
+    // false of the product: six routes drew their own eyebrow a few pixels lower, inside a second
+    // page header of their own. Deleting those headers moved the eyebrow up rather than removing
+    // it, so the shell resolves one per route — and the clause the old assertions were really
+    // protecting, that an eyebrow must not restate the title, is now stated positively below.
     assert.ok(
-      !rootSource.includes('function viewKicker'),
-      'top-bar view kickers should not duplicate the page title'
+      rootSource.includes('function viewKicker'),
+      'the shell resolves the page eyebrow per route, beside viewTitle and viewSubtitle'
     );
     assert.ok(
-      !rootSource.includes('{viewKicker()}'),
-      'top-bar header should render only the page title and subtitle'
+      rootSource.includes('{viewKicker()}'),
+      'and renders it in the page header rather than leaving the resolver unread'
+    );
+    // NO EYEBROW ON `system-edit`, deliberately: its heading is the system's name and its trail
+    // already names both the system and the route, so a third statement of the same fact would be
+    // exactly the duplication the deleted assertions were aimed at.
+    const kickerBody = rootSource.slice(
+      rootSource.indexOf('function viewKicker'),
+      rootSource.indexOf('function viewTitle')
+    );
+    assert.ok(kickerBody.length > 0, 'the viewKicker body read is broken');
+    assert.ok(
+      !kickerBody.includes("'system-edit'"),
+      'system-edit renders no eyebrow; its title is the record and its trail names the route'
+    );
+    assert.ok(
+      !kickerBody.includes('viewTitle('),
+      'and no route resolves its eyebrow from its own title'
     );
     assert.ok(
       rootSource.includes('visiblePlaceholderViews'),
